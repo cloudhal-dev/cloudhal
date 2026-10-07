@@ -62,6 +62,7 @@ export async function studio(
       resolveActor: auth.resolveActor,
       resolvePrincipal: auth.resolvePrincipal,
       authHandler: auth.handler,
+      agentKeys: auth.agentKeys,
     };
   }
   const app = createApi(deps);

@@ -84,6 +84,21 @@ export function renderEntryPreview(site: Site, entry: ContentEntry): PreviewDocu
   };
 }
 
+/**
+ * Neutral reading styles so previews are legible without the site's theme (the theme only exists
+ * in the Astro build). Inline because preview responses are CSP-sandboxed (`style-src 'unsafe-inline'`).
+ */
+const PREVIEW_CSS =
+  ":root{color-scheme:light dark;--fg:#1f2328;--muted:#59636e;--line:#d1d9e0;--bg:#fff}" +
+  "@media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--muted:#9198a1;--line:#3d444d;--bg:#0d1117}}" +
+  "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,'Segoe UI',sans-serif}" +
+  "header{padding:14px 24px;border-bottom:1px solid var(--line)}header a{color:var(--fg);font-weight:600;text-decoration:none}" +
+  "main{max-width:720px;margin:0 auto;padding:32px 24px 64px}h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em}h1{font-size:2rem;margin-top:.4em}" +
+  "p,ul,ol{margin:0 0 1em}a{color:#0969da}img{max-width:100%;height:auto;border-radius:6px}" +
+  "pre,code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}pre{overflow:auto;padding:12px;border:1px solid var(--line);border-radius:6px}" +
+  "blockquote{margin:0 0 1em;padding-left:1em;border-left:3px solid var(--line);color:var(--muted)}" +
+  "section+section{margin-top:2.5rem}small,time,.muted{color:var(--muted)}";
+
 function document(
   site: Site,
   title: string,
@@ -92,5 +107,5 @@ function document(
 ): string {
   return `<!doctype html><html lang="${esc(site.defaultLocale)}"><head><meta charset="utf-8"><title>${esc(title)}</title>${
     description ? `<meta name="description" content="${esc(description)}">` : ""
-  }<meta name="generator" content="Cloudhal preview"></head><body><header><a href="/">${esc(site.name)}</a></header><main>${body}</main></body></html>`;
+  }<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}</style></head><body><header><a href="/">${esc(site.name)}</a></header><main>${body}</main></body></html>`;
 }
