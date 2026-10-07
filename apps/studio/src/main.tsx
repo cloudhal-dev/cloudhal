@@ -4,6 +4,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppLink } from "./components/AppLink.tsx";
+import { CodeProvider } from "./components/CodeProvider.tsx";
 import { I18nProvider } from "./i18n/index.tsx";
 import { createStudioRouter } from "./router.tsx";
 import "./styles.css";
@@ -19,9 +20,11 @@ createRoot(document.getElementById("root") as HTMLElement).render(
       <QueryClientProvider client={queryClient}>
         <LinkProvider component={AppLink}>
           <TooltipProvider>
-            <Toasty>
-              <RouterProvider router={router} />
-            </Toasty>
+            <CodeProvider>
+              <Toasty>
+                <RouterProvider router={router} />
+              </Toasty>
+            </CodeProvider>
           </TooltipProvider>
         </LinkProvider>
       </QueryClientProvider>

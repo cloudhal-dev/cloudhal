@@ -1,10 +1,10 @@
 import { Sidebar, SidebarSwitcher } from "@cloudhal/ui";
-import { Gear, SquaresFour } from "@phosphor-icons/react";
+import { Gear, Robot, SquaresFour } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { AppFrame } from "../components/AppFrame.tsx";
 import { useT } from "../i18n/index.tsx";
-import { api } from "../lib/api.ts";
+import { api, isNotEnabled } from "../lib/api.ts";
 
 /** Account surface: everything above a single site (DESIGN.md §1). */
 export function AccountShell() {
@@ -12,6 +12,11 @@ export function AccountShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites.list });
+  const keys = useQuery({
+    queryKey: ["agent-keys"],
+    queryFn: api.agentKeys.list,
+    retry: (count, error) => !isNotEnabled(error) && count < 1,
+  });
   return (
     <AppFrame
       title={t("app.name")}
@@ -46,6 +51,20 @@ export function AccountShell() {
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
+            <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
+            <Sidebar.Menu>
+              <Sidebar.MenuButton
+                icon={Robot}
+                href="/agents"
+                active={pathname === "/agents"}
+                tooltip={t("nav.agents")}
+              >
+                {t("nav.agents")}
+                {keys.data && <Sidebar.MenuBadge>{keys.data.length}</Sidebar.MenuBadge>}
+              </Sidebar.MenuButton>
+            </Sidebar.Menu>
+          </Sidebar.Group>
+          <Sidebar.Group>
             <Sidebar.GroupLabel>{t("nav.account")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
               <Sidebar.MenuButton icon={Gear} tooltip={t("nav.soon")} disabled>
@@ -56,7 +75,10 @@ export function AccountShell() {
           </Sidebar.Group>
         </>
       }
-      commands={[{ id: "sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) }]}
+      commands={[
+        { id: "sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
+        { id: "agents", label: t("commands.goAgents"), run: () => navigate({ to: "/agents" }) },
+      ]}
     >
       <Outlet />
     </AppFrame>

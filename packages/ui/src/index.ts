@@ -6,6 +6,17 @@
 export * from "@cloudflare/kumo";
 export { ApprovalDialog, type ApprovalDialogProps } from "./blocks/ApprovalDialog.tsx";
 export {
+  ActorBadge,
+  type ActorBadgeProps,
+  type AuditActorKind,
+  type AuditDecision,
+  type AuditOutcome,
+  DecisionBadge,
+  type DecisionBadgeProps,
+  OutcomeBadge,
+  type OutcomeBadgeProps,
+} from "./blocks/AuditBadges.tsx";
+export {
   DeleteResource,
   type DeleteResourceProps,
 } from "./blocks/kumo/delete-resource/delete-resource.tsx";
@@ -14,6 +25,13 @@ export {
   ResourceListPage,
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
+export {
+  PREVIEW_DEVICE_WIDTH,
+  type PreviewDevice,
+  PreviewPanel,
+  type PreviewPanelLabels,
+  type PreviewPanelProps,
+} from "./blocks/PreviewPanel.tsx";
 export {
   SidebarSwitcher,
   type SidebarSwitcherProps,

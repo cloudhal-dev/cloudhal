@@ -8,6 +8,8 @@ import {
 } from "@tanstack/react-router";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
+import { ActivityPage } from "./routes/ActivityPage.tsx";
+import { AgentsPage } from "./routes/AgentsPage.tsx";
 import { ArticleEditorPage } from "./routes/ArticleEditorPage.tsx";
 import { ArticlesPage } from "./routes/ArticlesPage.tsx";
 import { LoginPage } from "./routes/LoginPage.tsx";
@@ -56,6 +58,11 @@ const sitesRoute = createRoute({
   path: "/sites",
   component: SitesPage,
 });
+const agentsRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/agents",
+  component: AgentsPage,
+});
 
 // Site surface
 const siteRoute = createRoute({
@@ -87,7 +94,15 @@ const articlesRoute = createRoute({
 const snapshotsRoute = createRoute({
   getParentRoute: () => siteTabsRoute,
   path: "/snapshots",
+  /** `?diff=<snapshotId>` opens that snapshot's changes (linked from Activity). */
+  validateSearch: (search: Record<string, unknown>): { diff?: string } =>
+    typeof search.diff === "string" && search.diff ? { diff: search.diff } : {},
   component: SnapshotsPage,
+});
+const activityRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/activity",
+  component: ActivityPage,
 });
 const pageEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -103,9 +118,15 @@ const articleEditorRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  accountRoute.addChildren([sitesRoute]),
+  accountRoute.addChildren([sitesRoute, agentsRoute]),
   siteRoute.addChildren([
-    siteTabsRoute.addChildren([siteIndexRoute, pagesRoute, articlesRoute, snapshotsRoute]),
+    siteTabsRoute.addChildren([
+      siteIndexRoute,
+      pagesRoute,
+      articlesRoute,
+      snapshotsRoute,
+      activityRoute,
+    ]),
     pageEditorRoute,
     articleEditorRoute,
   ]),

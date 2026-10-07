@@ -2,9 +2,10 @@ import type { Snapshot } from "@cloudhal/core-contracts";
 import { ApprovalDialog, LayerCard, Pagination, SnapshotTimeline, Toolbar } from "@cloudhal/ui";
 import { Camera, RocketLaunch } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { SnapshotDiffDialog } from "../components/SnapshotDiffDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePaging } from "../components/usePaging.ts";
@@ -33,6 +34,23 @@ export function SnapshotsPage() {
   );
   const [label, setLabel] = useState("");
   const [pending, setPending] = useState<Pending | undefined>();
+  // The open diff lives in the URL (`?diff=<id>`) so Activity can link straight to it.
+  const navigate = useNavigate();
+  const { diff: diffId } = useSearch({ strict: false }) as { diff?: string };
+  const setDiff = (id: string | undefined) =>
+    navigate({
+      to: "/sites/$siteId/snapshots",
+      params: { siteId },
+      search: id ? { diff: id } : {},
+      replace: !id,
+    });
+  const listed = snapshots.data?.find((s) => s.id === diffId);
+  const fetched = useQuery({
+    queryKey: ["snapshot", siteId, diffId],
+    queryFn: () => api.snapshots.get(siteId, diffId as string),
+    enabled: !!diffId && snapshots.isSuccess && !listed,
+  });
+  const diffSnapshot = diffId ? (listed ?? fetched.data) : undefined;
 
   const act = useMutation({
     mutationFn: async (p: Pending) => {
@@ -61,7 +79,7 @@ export function SnapshotsPage() {
 
   return (
     <div className="grid gap-4">
-      <ErrorBanner error={snapshots.error ?? act.error} />
+      <ErrorBanner error={snapshots.error ?? act.error ?? fetched.error} />
       <Toolbar size="sm" className="w-full max-w-2xl" aria-label={t("snapshots.title")}>
         <Toolbar.Input
           aria-label={t("snapshots.label")}
@@ -95,6 +113,7 @@ export function SnapshotsPage() {
             publishedSnapshotId={site.data?.publishedSnapshotId}
             onPublish={(s) => setPending({ kind: "publish", snapshot: s })}
             onRollback={(s) => setPending({ kind: "rollback", snapshot: s })}
+            onCompare={(s) => setDiff(s.id)}
             emptyIcon={<Camera size={48} className="text-kumo-inactive" />}
             formatDate={(iso) => new Date(iso).toLocaleString(locale)}
             labels={{
@@ -103,6 +122,7 @@ export function SnapshotsPage() {
               live: t("common.live"),
               publish: t("common.publish"),
               rollBack: t("common.rollBack"),
+              compare: t("snapshots.compare"),
               columns: {
                 snapshot: t("snapshots.columns.snapshot"),
                 actor: t("snapshots.columns.actor"),
@@ -129,6 +149,12 @@ export function SnapshotsPage() {
           setPage={paging.setPage}
         />
       )}
+      <SnapshotDiffDialog
+        siteId={siteId}
+        snapshot={diffSnapshot}
+        publishedSnapshotId={site.data?.publishedSnapshotId}
+        onOpenChange={(o) => !o && setDiff(undefined)}
+      />
       <ApprovalDialog
         open={pending !== undefined}
         onOpenChange={(o) => !o && setPending(undefined)}

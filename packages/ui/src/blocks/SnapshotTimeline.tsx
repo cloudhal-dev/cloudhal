@@ -1,5 +1,6 @@
 import { Badge, Button, Empty, InlineCopyText, Table, Text } from "@cloudflare/kumo";
 import type { Snapshot } from "@cloudhal/core-contracts";
+import { GitDiff } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 export interface SnapshotTimelineLabels {
@@ -8,6 +9,8 @@ export interface SnapshotTimelineLabels {
   live: string;
   publish: string;
   rollBack: string;
+  /** Label of the "compare" action (shown when `onCompare` is set). */
+  compare?: string;
   columns: { snapshot: string; actor: string; changes: string; when: string };
   reasons: Record<Snapshot["reason"], string>;
 }
@@ -17,6 +20,8 @@ export interface SnapshotTimelineProps {
   publishedSnapshotId?: string | undefined;
   onPublish?: ((snapshot: Snapshot) => void) | undefined;
   onRollback?: ((snapshot: Snapshot) => void) | undefined;
+  /** Opens a diff of this snapshot against its predecessor or the live one. */
+  onCompare?: ((snapshot: Snapshot) => void) | undefined;
   labels: SnapshotTimelineLabels;
   emptyIcon?: ReactNode;
   formatDate?: ((iso: string) => string) | undefined;
@@ -28,6 +33,7 @@ export function SnapshotTimeline({
   publishedSnapshotId,
   onPublish,
   onRollback,
+  onCompare,
   labels,
   emptyIcon,
   formatDate,
@@ -79,17 +85,29 @@ export function SnapshotTimeline({
                 </Text>
               </Table.Cell>
               <Table.Cell>{fmt(s.createdAt)}</Table.Cell>
-              <Table.Cell className="text-right">
-                {!isLive && onPublish && !isOlderThanLive && (
-                  <Button variant="secondary" size="sm" onClick={() => onPublish(s)}>
-                    {labels.publish}
-                  </Button>
-                )}
-                {!isLive && onRollback && isOlderThanLive && (
-                  <Button variant="secondary-destructive" size="sm" onClick={() => onRollback(s)}>
-                    {labels.rollBack}
-                  </Button>
-                )}
+              <Table.Cell>
+                <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                  {onCompare && (s.parentId || (publishedSnapshotId && !isLive)) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<GitDiff />}
+                      onClick={() => onCompare(s)}
+                    >
+                      {labels.compare ?? "Compare"}
+                    </Button>
+                  )}
+                  {!isLive && onPublish && !isOlderThanLive && (
+                    <Button variant="secondary" size="sm" onClick={() => onPublish(s)}>
+                      {labels.publish}
+                    </Button>
+                  )}
+                  {!isLive && onRollback && isOlderThanLive && (
+                    <Button variant="secondary-destructive" size="sm" onClick={() => onRollback(s)}>
+                      {labels.rollBack}
+                    </Button>
+                  )}
+                </div>
               </Table.Cell>
             </Table.Row>
           );
