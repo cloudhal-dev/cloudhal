@@ -1,0 +1,11 @@
+---
+import type { RichTextSection } from "@cloudhal/core-contracts";
+import { renderBody } from "../markdown.ts";
+
+interface Props {
+  section: RichTextSection;
+}
+const { section } = Astro.props;
+const html = renderBody({ format: section.format, value: section.body });
+---
+<section class="ch-richtext" data-section-id={section.id} data-kind="richText" set:html={html} />

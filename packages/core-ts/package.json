@@ -10,7 +10,8 @@
   },
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./local": "./src/local.ts"
   },
   "files": [
     "src",
@@ -32,5 +33,13 @@
     "miniflare": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
   }
 }

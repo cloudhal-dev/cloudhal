@@ -1,0 +1,12 @@
+---
+import type { ImageSection } from "@cloudhal/core-contracts";
+
+interface Props {
+  section: ImageSection;
+}
+const { section } = Astro.props;
+---
+<figure class="ch-image" data-section-id={section.id} data-kind="image">
+  <img src={section.image.src} alt={section.image.alt} width={section.image.width} height={section.image.height} />
+  {section.caption && <figcaption>{section.caption}</figcaption>}
+</figure>

@@ -1,0 +1,31 @@
+---
+import type { ContentEntry, ContentListSection } from "@cloudhal/core-contracts";
+
+interface Props {
+  section: ContentListSection;
+  entries: ContentEntry[];
+  hrefFor?: (entry: ContentEntry) => string;
+}
+const { section, entries, hrefFor = (e) => `/${e.collection}/${e.slug}` } = Astro.props;
+const sorted = [...entries]
+  .sort((a, b) =>
+    section.sort === "title"
+      ? a.title.localeCompare(b.title)
+      : section.sort === "oldest"
+        ? (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt)
+        : (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt),
+  )
+  .slice(0, section.limit);
+---
+<section class="ch-contentlist" data-section-id={section.id} data-kind="contentList" data-collection={section.collection}>
+  {sorted.length === 0 ? <p class="ch-contentlist__empty">Nothing published yet.</p> : (
+    <ul>
+      {sorted.map((e) => (
+        <li>
+          <a href={hrefFor(e)}>{e.title}</a>
+          {e.summary && <p>{e.summary}</p>}
+        </li>
+      ))}
+    </ul>
+  )}
+</section>

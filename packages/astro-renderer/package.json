@@ -1,0 +1,45 @@
+{
+  "name": "@cloudhal/astro-renderer",
+  "version": "0.0.1",
+  "description": "Render a Cloudhal Site Graph with Astro: data sources (live/snapshot), section components and the cloudhal() integration",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/astro-renderer"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./source": "./src/source.ts",
+    "./integration": "./src/integration.ts",
+    "./components": "./src/components/index.ts",
+    "./components/*": "./src/components/*",
+    "./runtime": "./src/runtime.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "marked": "catalog:"
+  },
+  "peerDependencies": {
+    "astro": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "astro": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

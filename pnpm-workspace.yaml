@@ -3,6 +3,7 @@ packages:
   - packages/*
   - capabilities/*/*
   - starters/*
+  - examples/*
 
 catalogMode: strict
 
@@ -21,6 +22,10 @@ catalog:
   "@types/better-sqlite3": ^9.6.0
   miniflare: 3.20250718.3
   "@cloudflare/workers-types": ^5.20261007.1
+  astro: ^7.3.6
+  "@tailwindcss/vite": ^4.3.3
+  tailwindcss: ^4.3.3
+  marked: ^18.1.0
 
 # Native build scripts must be explicitly approved (pnpm 12 `allowBuilds`).
 allowBuilds:

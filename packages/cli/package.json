@@ -1,0 +1,43 @@
+{
+  "name": "@cloudhal/cli",
+  "version": "0.0.1",
+  "description": "cloudhal — create, run and build Cloudhal sites locally",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "bin": {
+    "cloudhal": "./bin/cloudhal.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "bin",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "better-sqlite3": "catalog:"
+  },
+  "peerDependencies": {
+    "astro": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "astro": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

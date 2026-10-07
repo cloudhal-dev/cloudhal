@@ -1,0 +1,26 @@
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+import { migrate, migrations } from "@cloudhal/storage";
+import { FsBlobStore } from "@cloudhal/storage/fs";
+import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
+import { SiteGraphStore } from "./store.ts";
+
+export interface LocalStore {
+  readonly store: SiteGraphStore;
+  readonly dataDir: string;
+  close(): Promise<void>;
+}
+
+/**
+ * Opens (or creates) the local, offline store under `dataDir`:
+ * `<dataDir>/data.db` (SQLite via better-sqlite3) and `<dataDir>/blobs/` (filesystem blob store).
+ * This is what `cloudhal dev` and self-hosted installs use.
+ */
+export async function openLocalStore(dataDir: string): Promise<LocalStore> {
+  const dir = path.resolve(dataDir);
+  await mkdir(path.join(dir, "blobs"), { recursive: true });
+  const sql = await BetterSqlite3Driver.open(path.join(dir, "data.db"));
+  await migrate(sql, migrations);
+  const store = new SiteGraphStore({ sql, blobs: new FsBlobStore(path.join(dir, "blobs")) });
+  return { store, dataDir: dir, close: () => sql.close() };
+}

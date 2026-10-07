@@ -1,0 +1,20 @@
+{
+  "name": "@cloudhal/starter-blog",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudhal blog starter (Astro). Copied by `cloudhal init`.",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@cloudhal/astro-renderer": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "astro": "catalog:",
+    "better-sqlite3": "catalog:",
+    "tailwindcss": "catalog:"
+  }
+}

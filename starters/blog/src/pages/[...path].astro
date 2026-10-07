@@ -1,0 +1,33 @@
+---
+import config from "virtual:cloudhal/config";
+import { Sections } from "@cloudhal/astro-renderer/components";
+import { getSource } from "@cloudhal/astro-renderer/runtime";
+import Base from "../layouts/Base.astro";
+import { components } from "../theme.ts";
+
+export async function getStaticPaths() {
+  const source = await getSource(config);
+  const site = await source.site();
+  const pages = (await source.pages()).filter((p) => p.locale === site.defaultLocale);
+  return pages.map((page) => ({
+    params: { path: page.path === "/" ? undefined : page.path.slice(1) },
+    props: { pageId: page.id },
+  }));
+}
+
+const source = await getSource(config);
+const site = await source.site();
+const path = Astro.params.path ? `/${Astro.params.path}` : "/";
+const page = await source.pageByPath(path);
+if (!page) return new Response(null, { status: 404 });
+
+const collections = [
+  ...new Set(page.sections.filter((s) => s.kind === "contentList").map((s) => s.collection)),
+];
+const entries = Object.fromEntries(
+  await Promise.all(collections.map(async (c) => [c, await source.entries(c)])),
+);
+---
+<Base site={site} title={page.seo?.title ?? page.title} description={page.seo?.description}>
+  <Sections sections={page.sections} entries={entries} components={components} />
+</Base>

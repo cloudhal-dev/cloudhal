@@ -22,7 +22,10 @@ pnpm changeset                    # add a release note for a published package
 - `packages/core-contracts/src/generated/`, `crates/cloudhal-schema/src/generated/` — generated; never edit.
 - `packages/core-contracts/fixtures/{valid,invalid}/<schema>/` — golden fixtures used by both languages.
 - `packages/storage` — `SqlDriver`/`BlobStore` + adapters (`sqlite`, `d1`, `fs`, `r2`) + migrations (`migrations/*.ts`, plain SQL). Conformance suites in `src/testing.ts`.
-- `packages/core-ts` — `SiteGraphStore` (CAS on `rev`, snapshots, diff, publish, rollback). Behavioural suite in `src/testing.ts` runs on sqlite and Miniflare D1.
+- `packages/core-ts` — `SiteGraphStore` (CAS on `rev`, snapshots, diff, publish, rollback). Behavioural suite in `src/testing.ts` runs on sqlite and Miniflare D1. `./local` opens the offline store; `seedStarterSite` seeds a demo.
+- `packages/astro-renderer` — `GraphSource` (live/snapshot), `cloudhal()` integration (virtual config + dev route-cache watcher), `.astro` section components. Routes live in starters, not here.
+- `packages/cli` — `cloudhal init|dev|snapshot|build`; TS bin run by Node 24 type stripping. E2E test spawns the bin (Astro disables dev middleware under `VITEST`).
+- `starters/blog` — the theme boundary: `src/pages/[...path].astro`, `src/layouts`, `src/theme.ts`.
 - `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals.
 - `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`.
 
@@ -38,7 +41,7 @@ pnpm changeset                    # add a release note for a published package
 9. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
 
 ## Versions (pinned via pnpm catalog / Cargo workspace)
-Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 3.2025 (legacy line; v5 alpha lacks programmatic D1).
+Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 3.2025 (legacy line; v5 alpha lacks programmatic D1) · Astro 7.3 · Tailwind 4.3 · marked 18.
 
 ## When unsure
 Read `docs/adr/README.md` and the relevant ADR; each ADR links its primary sources. If the change alters a contract or a public interface, write an RFC first (`.agents/skills/write-rfc`).

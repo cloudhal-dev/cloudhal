@@ -1,0 +1,33 @@
+---
+/**
+ * Renders a page's sections by `kind`. Themes override any component through `components`;
+ * `entries` supplies collection data for contentList sections (keyed by collection name).
+ */
+import type { ContentEntry, Section } from "@cloudhal/core-contracts";
+import ContentList from "./ContentList.astro";
+import Hero from "./Hero.astro";
+import Image from "./Image.astro";
+import RichText from "./RichText.astro";
+
+export type SectionComponents = Partial<Record<Section["kind"], unknown>>;
+
+interface Props {
+  sections: Section[];
+  entries?: Record<string, ContentEntry[]>;
+  components?: SectionComponents;
+}
+const { sections, entries = {}, components = {} } = Astro.props;
+const defaults = { hero: Hero, richText: RichText, image: Image, contentList: ContentList };
+type AnyComponent = (props: never) => unknown;
+const resolved = { ...defaults, ...components } as Record<
+  Section["kind"],
+  AnyComponent | undefined
+>;
+---
+{sections.map((section) => {
+  const Component = resolved[section.kind];
+  if (!Component) return <div data-unknown-section={section.kind} />;
+  return section.kind === "contentList"
+    ? <Component section={section} entries={entries[section.collection] ?? []} />
+    : <Component section={section} />;
+})}

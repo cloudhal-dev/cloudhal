@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/* Section defaults; a theme overrides these or swaps components. */
+.ch-hero {
+  @apply py-12;
+}
+.ch-hero h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-hero__sub {
+  @apply mt-3 text-lg text-zinc-600;
+}
+.ch-hero__cta {
+  @apply mt-6 inline-block rounded bg-zinc-900 px-4 py-2 text-white;
+}
+.ch-richtext {
+  @apply space-y-4 py-6 leading-relaxed;
+}
+.ch-richtext h1 {
+  @apply text-3xl font-bold;
+}
+.ch-richtext h2 {
+  @apply text-2xl font-semibold;
+}
+.ch-image {
+  @apply py-6;
+}
+.ch-image figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-contentlist {
+  @apply py-6;
+}
+.ch-contentlist ul {
+  @apply space-y-4;
+}
+.ch-contentlist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-contentlist p {
+  @apply text-sm text-zinc-600;
+}
