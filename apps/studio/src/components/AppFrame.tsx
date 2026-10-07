@@ -66,7 +66,15 @@ export function AppFrame({
   };
 
   return (
-    <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
+    // Kumo's aside element is `h-full`, so the provider needs a definite height; the content column
+    // scrolls on its own and the sidebar stays viewport-tall with its footer pinned (DESIGN.md §3).
+    <Sidebar.Provider
+      defaultOpen
+      collapsible="icon"
+      peekable
+      mobileBreakpoint={768}
+      className="h-svh"
+    >
       <Sidebar>
         <Sidebar.Header>{switcher}</Sidebar.Header>
         {loading ? <Sidebar.Loading /> : <Sidebar.Content>{nav}</Sidebar.Content>}
@@ -99,7 +107,7 @@ export function AppFrame({
         </Sidebar.Footer>
         <Sidebar.Rail />
       </Sidebar>
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col bg-kumo-overlay">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-overlay">
         <header className="sticky top-0 z-10 flex h-12 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
           <span className="min-w-0 truncate">
             <Text variant="secondary" size="sm" as="span">

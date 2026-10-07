@@ -12,7 +12,7 @@ Studio mirrors this one-to-one:
 
 | Part | Kumo implementation |
 |---|---|
-| App shell | `Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}` → `<Sidebar>` + `<main className="flex-1 bg-kumo-overlay">`. Sidebar 16.25 rem expanded, 57 px icon rail. |
+| App shell | `Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768} className="h-svh"` → `<Sidebar>` + a content column `flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-kumo-overlay`. The provider must have a definite height because Kumo's `<aside>` is `h-full`; the column scrolls, the sidebar stays viewport-tall. Sidebar 16.25 rem expanded, 57 px icon rail. |
 | Surfaces | *Account surface* (all sites) and *site surface* (one site); the switcher at the top of the sidebar is a `DropdownMenu` listing sites and "All sites". |
 | Top bar | `header.sticky.top-0.z-10.h-12.border-b.border-kumo-hairline.bg-kumo-canvas` with `Sidebar.Trigger` (mobile), a ghost `Button` that opens `CommandPalette` (⌘K and `/`), language `Select`, user `DropdownMenu`. |
 | Content container | `mx-auto max-w-[1400px] p-6 md:p-8 lg:px-10 lg:py-9` (copied from `ResourceListPage`). |
