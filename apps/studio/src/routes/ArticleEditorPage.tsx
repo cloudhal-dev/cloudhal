@@ -5,7 +5,6 @@ import {
   ClipboardText,
   DeleteResource,
   Grid,
-  InlineCopyText,
   Input,
   InputArea,
   LayerCard,
