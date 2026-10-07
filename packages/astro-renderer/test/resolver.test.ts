@@ -16,11 +16,20 @@ describe("SiteResolver", () => {
     new Request(`https://site.example${path}`, cookie ? { headers: { cookie } } : {});
 
   beforeEach(async () => {
-    store = new SiteGraphStore({ sql: await BetterSqlite3Driver.open(":memory:"), blobs: new MemoryBlobStore() });
+    store = new SiteGraphStore({
+      sql: await BetterSqlite3Driver.open(":memory:"),
+      blobs: new MemoryBlobStore(),
+    });
     await store.init();
     siteId = (await seedStarterSite(store, { name: "Resolver", slug: "resolver" })).id;
     clock = Date.UTC(2026, 9, 8, 12);
-    resolver = new SiteResolver({ store, siteId, previewSecret: SECRET, pointerTtlMs: 1000, now: () => clock });
+    resolver = new SiteResolver({
+      store,
+      siteId,
+      previewSecret: SECRET,
+      pointerTtlMs: 1000,
+      now: () => clock,
+    });
   });
 
   const publish = async (label: string) => {
@@ -63,12 +72,19 @@ describe("SiteResolver", () => {
     const about = (await store.listPages(siteId)).find((p) => p.path === "/about");
     await store.updatePage({ ...(about as NonNullable<typeof about>), title: "Draft title" });
 
-    const live = await mintPreviewToken(SECRET, { site: siteId, target: "live", ttlSeconds: 600, now: clock });
+    const live = await mintPreviewToken(SECRET, {
+      site: siteId,
+      target: "live",
+      ttlSeconds: 600,
+      now: clock,
+    });
     const first = await resolver.resolve(req(`/about?cloudhal-preview=${live}`));
     expect(first.kind).toBe("preview");
     if (first.kind !== "preview") throw new Error("unreachable");
     expect((await first.source.pageByPath("/about"))?.title).toBe("Draft title");
-    expect(first.setCookie).toMatch(new RegExp(`^${PREVIEW_COOKIE}=.+; Path=/; HttpOnly; SameSite=Lax; Max-Age=600; Secure$`));
+    expect(first.setCookie).toMatch(
+      new RegExp(`^${PREVIEW_COOKIE}=.+; Path=/; HttpOnly; SameSite=Lax; Max-Age=600; Secure$`),
+    );
 
     const cookie = `${PREVIEW_COOKIE}=${encodeURIComponent(live)}`;
     const next = await resolver.resolve(req("/", cookie));
@@ -79,19 +95,32 @@ describe("SiteResolver", () => {
     expect(exit).toMatchObject({ kind: "published", snapshotId: v1 });
     expect((exit as { setCookie?: string }).setCookie).toContain("Max-Age=0");
 
-    const snapToken = await mintPreviewToken(SECRET, { site: siteId, target: { snapshot: v1 }, now: clock });
+    const snapToken = await mintPreviewToken(SECRET, {
+      site: siteId,
+      target: { snapshot: v1 },
+      now: clock,
+    });
     const snap = await resolver.resolve(req(`/?cloudhal-preview=${snapToken}`));
     expect(snap).toMatchObject({ kind: "preview", target: { snapshot: v1 } });
   });
 
   it("ignores bad, expired or foreign tokens and clears a bad cookie", async () => {
     await publish("v1");
-    const other = await mintPreviewToken(SECRET, { site: "site_other00001", target: "live", now: clock });
+    const other = await mintPreviewToken(SECRET, {
+      site: "site_other00001",
+      target: "live",
+      now: clock,
+    });
     const foreign = await resolver.resolve(req(`/?cloudhal-preview=${other}`));
     expect(foreign.kind).toBe("published");
     expect((foreign as { previewError?: string }).previewError).toMatch(/site/);
 
-    const short = await mintPreviewToken(SECRET, { site: siteId, target: "live", ttlSeconds: 60, now: clock });
+    const short = await mintPreviewToken(SECRET, {
+      site: siteId,
+      target: "live",
+      ttlSeconds: 60,
+      now: clock,
+    });
     clock += 61_000;
     const expired = await resolver.resolve(req("/", `${PREVIEW_COOKIE}=${short}`));
     expect(expired.kind).toBe("published");

@@ -141,7 +141,9 @@ describe("preview links", () => {
     expect(res.status).toBe(201);
     const link = (await res.json()) as { url: string; token: string; expiresAt: string };
     expect(link.url).toMatch(/^https:\/\/news\.example\.com\/about\?cloudhal-preview=/);
-    expect((await verifyPreviewToken(secret, link.token, seeded.id)).target).toEqual({ snapshot: snap.id });
+    expect((await verifyPreviewToken(secret, link.token, seeded.id)).target).toEqual({
+      snapshot: snap.id,
+    });
     expect(Date.parse(link.expiresAt) - Date.now()).toBeLessThanOrEqual(300_000);
 
     expect((await post({ target: { snapshot: "snap_missing000001" } })).status).toBe(404);

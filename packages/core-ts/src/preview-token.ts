@@ -39,11 +39,15 @@ function fromB64url(text: string): Uint8Array<ArrayBuffer> {
 }
 
 async function key(secret: string) {
-  if (enc.encode(secret).length < 32) throw new RangeError("preview secret must be at least 32 bytes");
-  return crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-    "verify",
-  ]);
+  if (enc.encode(secret).length < 32)
+    throw new RangeError("preview secret must be at least 32 bytes");
+  return crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
 }
 
 /** Mints a preview token valid for `ttlSeconds` (default one hour, max one week). */
@@ -76,12 +80,7 @@ export async function verifyPreviewToken(
   } catch {
     throw new PreviewTokenError("malformed");
   }
-  const ok = await crypto.subtle.verify(
-    "HMAC",
-    await key(secret),
-    mac,
-    payload,
-  );
+  const ok = await crypto.subtle.verify("HMAC", await key(secret), mac, payload);
   if (!ok) throw new PreviewTokenError("signature");
   let claims: PreviewClaims;
   try {
@@ -101,7 +100,9 @@ export async function verifyPreviewToken(
 }
 
 /** The site's primary public origin (`https://<primary domain>`), if it has one. */
-export function primaryOrigin(site: { domains?: { hostname: string; primary: boolean }[] }): string | undefined {
+export function primaryOrigin(site: {
+  domains?: { hostname: string; primary: boolean }[];
+}): string | undefined {
   const domain = site.domains?.find((d) => d.primary) ?? site.domains?.[0];
   return domain ? `https://${domain.hostname}` : undefined;
 }

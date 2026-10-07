@@ -28,14 +28,19 @@ export const previewLinks: Hono<Env> = new Hono<Env>().post("/", async (c) => {
     target = { snapshot: snapshotId };
   }
   const path = typeof body.path === "string" && body.path.startsWith("/") ? body.path : "/";
-  if (body.ttlSeconds !== undefined && (typeof body.ttlSeconds !== "number" || body.ttlSeconds <= 0))
+  if (
+    body.ttlSeconds !== undefined &&
+    (typeof body.ttlSeconds !== "number" || body.ttlSeconds <= 0)
+  )
     throw badRequest("ttlSeconds must be a positive number");
   const token = await mintPreviewToken(secret, {
     site: site.id,
     target,
     ...(typeof body.ttlSeconds === "number" ? { ttlSeconds: body.ttlSeconds } : {}),
   });
-  const exp = JSON.parse(atob((token.split(".")[0] as string).replace(/-/g, "+").replace(/_/g, "/"))).exp as number;
+  const exp = JSON.parse(
+    atob((token.split(".")[0] as string).replace(/-/g, "+").replace(/_/g, "/")),
+  ).exp as number;
   return c.json(
     {
       token,

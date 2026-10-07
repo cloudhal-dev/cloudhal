@@ -30,15 +30,28 @@ describe("preview tokens", () => {
 
   it("rejects tampering, other sites, expiry, wrong secrets and junk", async () => {
     const now = Date.UTC(2026, 9, 8);
-    const token = await mintPreviewToken(SECRET, { site: "site_abc123", target: "live", ttlSeconds: 120, now });
+    const token = await mintPreviewToken(SECRET, {
+      site: "site_abc123",
+      target: "live",
+      ttlSeconds: 120,
+      now,
+    });
     const [p, m] = token.split(".") as [string, string];
     const forged = `${btoa(JSON.stringify({ site: "site_abc123", target: "live", exp: 9e9 })).replace(/=+$/, "")}.${m}`;
     expect(await reason(verifyPreviewToken(SECRET, forged, "site_abc123", now))).toBe("signature");
     expect(await reason(verifyPreviewToken(SECRET, token, "site_other1", now))).toBe("site");
-    expect(await reason(verifyPreviewToken(SECRET, token, "site_abc123", now + 121_000))).toBe("expired");
-    expect(await reason(verifyPreviewToken(`${SECRET}x`, token, "site_abc123", now))).toBe("signature");
+    expect(await reason(verifyPreviewToken(SECRET, token, "site_abc123", now + 121_000))).toBe(
+      "expired",
+    );
+    expect(await reason(verifyPreviewToken(`${SECRET}x`, token, "site_abc123", now))).toBe(
+      "signature",
+    );
     expect(await reason(verifyPreviewToken(SECRET, "nope", "site_abc123", now))).toBe("malformed");
-    expect(await reason(verifyPreviewToken(SECRET, `${p}.${m}.x`, "site_abc123", now))).toBe("malformed");
-    await expect(mintPreviewToken("short", { site: "s", target: "live" })).rejects.toThrow(RangeError);
+    expect(await reason(verifyPreviewToken(SECRET, `${p}.${m}.x`, "site_abc123", now))).toBe(
+      "malformed",
+    );
+    await expect(mintPreviewToken("short", { site: "s", target: "live" })).rejects.toThrow(
+      RangeError,
+    );
   });
 });

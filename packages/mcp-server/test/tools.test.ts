@@ -171,14 +171,22 @@ describe("preview_page on a deployed site", () => {
     await migrate(sql, migrations);
     const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
     const seeded = await seedStarterSite(store, { name: "Deployed", slug: "deployed" });
-    await store.updateSite({ ...seeded, domains: [{ hostname: "news.example.com", primary: true }] });
+    await store.updateSite({
+      ...seeded,
+      domains: [{ hostname: "news.example.com", primary: true }],
+    });
     const secret = "mcp-preview-secret-at-least-32-bytes-long";
     const page = (await store.listPages(seeded.id)).find((p) => p.path === "/about");
     const def = tools.find((t) => t.name === "preview_page") as (typeof tools)[number];
     const out = await runTool(
       def,
       { siteId: seeded.id, pageId: page?.id },
-      { store, principal: { actor: agent, scopes: defaultScopes(agent) }, previewSecret: secret, previewBaseUrl: "http://localhost:4321" },
+      {
+        store,
+        principal: { actor: agent, scopes: defaultScopes(agent) },
+        previewSecret: secret,
+        previewBaseUrl: "http://localhost:4321",
+      },
       { policy: new PolicyEngine(toolPolicies(tools)) },
     );
     const url = new URL((out.result as { url: string }).url);

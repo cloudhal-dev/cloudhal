@@ -26,7 +26,13 @@ import {
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
-import { ConflictError, mintPreviewToken, NotFoundError, previewUrl, primaryOrigin } from "@cloudhal/core-ts";
+import {
+  ConflictError,
+  mintPreviewToken,
+  NotFoundError,
+  previewUrl,
+  primaryOrigin,
+} from "@cloudhal/core-ts";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -679,7 +685,10 @@ function rawTools(): ToolDefinition[] {
         }
         // Prefer a signed link to the deployed site (drafts visible); fall back to `cloudhal dev`.
         if (ctx.previewSecret && primaryOrigin(site)) {
-          const token = await mintPreviewToken(ctx.previewSecret, { site: site.id, target: "live" });
+          const token = await mintPreviewToken(ctx.previewSecret, {
+            site: site.id,
+            target: "live",
+          });
           return { ...doc, url: previewUrl(site, doc.path, token) ?? null };
         }
         return {
