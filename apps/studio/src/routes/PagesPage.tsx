@@ -1,0 +1,169 @@
+import type { Page } from "@cloudhal/core-contracts";
+import {
+  Button,
+  DeleteResource,
+  Empty,
+  LayerCard,
+  Link,
+  Pagination,
+  Table,
+  Text,
+} from "@cloudhal/ui";
+import { FileText, Plus } from "@phosphor-icons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { useState } from "react";
+import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ListToolbar } from "../components/ListToolbar.tsx";
+import { RowMenu } from "../components/RowMenu.tsx";
+import { Status } from "../components/Status.tsx";
+import { TableSkeleton } from "../components/TableSkeleton.tsx";
+import { usePaging } from "../components/usePaging.ts";
+import { useI18n, useT } from "../i18n/index.tsx";
+import { api } from "../lib/api.ts";
+
+export function PagesPage() {
+  const t = useT();
+  const { locale } = useI18n();
+  const { siteId } = useParams({ from: "/sites/$siteId" });
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
+  const [toDelete, setToDelete] = useState<Page | undefined>();
+  const order = new Map((site.data?.pageIds ?? []).map((id, i) => [id, i]));
+  const sorted = [...(pages.data ?? [])].sort(
+    (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
+  );
+  const paging = usePaging(
+    sorted,
+    (p, q) => p.title.toLowerCase().includes(q) || p.path.includes(q),
+  );
+  const create = useMutation({
+    mutationFn: () =>
+      api.pages.create(siteId, {
+        path: `/page-${Date.now().toString(36)}`,
+        title: t("overview.newPage"),
+        locale: site.data?.defaultLocale ?? "en",
+        status: "draft",
+        sections: [],
+      }),
+    onSuccess: async ({ page }) => {
+      await qc.invalidateQueries({ queryKey: ["pages", siteId] });
+      await qc.invalidateQueries({ queryKey: ["site", siteId] });
+      await navigate({ to: "/sites/$siteId/pages/$pageId", params: { siteId, pageId: page.id } });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: async (page: Page) => {
+      await api.pages.remove(page);
+    },
+    onSuccess: async () => {
+      setToDelete(undefined);
+      await qc.invalidateQueries({ queryKey: ["pages", siteId] });
+      await qc.invalidateQueries({ queryKey: ["site", siteId] });
+    },
+  });
+  const newButton = (
+    <Button
+      variant="primary"
+      icon={<Plus />}
+      onClick={() => create.mutate()}
+      loading={create.isPending}
+    >
+      {t("overview.newPage")}
+    </Button>
+  );
+  return (
+    <div className="grid gap-4">
+      <ErrorBanner error={pages.error ?? create.error ?? remove.error} />
+      <ListToolbar
+        search={paging.search}
+        onSearch={paging.setSearch}
+        placeholder={t("overview.search")}
+        actions={newButton}
+      />
+      {pages.data?.length === 0 ? (
+        <Empty
+          icon={<FileText size={48} className="text-kumo-inactive" />}
+          title={t("overview.empty")}
+          description={t("overview.emptyDescription")}
+          contents={newButton}
+        />
+      ) : (
+        <LayerCard className="p-0">
+          <Table>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>{t("overview.columns.title")}</Table.Head>
+                <Table.Head>{t("overview.columns.path")}</Table.Head>
+                <Table.Head>{t("overview.columns.status")}</Table.Head>
+                <Table.Head>{t("overview.columns.updated")}</Table.Head>
+                <Table.Head />
+              </Table.Row>
+            </Table.Header>
+            {pages.isPending ? (
+              <TableSkeleton columns={5} />
+            ) : (
+              <Table.Body>
+                {paging.pageItems.map((p) => (
+                  <Table.Row key={p.id}>
+                    <Table.Cell>
+                      <Link href={`/sites/${siteId}/pages/${p.id}`} variant="plain">
+                        <Text bold as="span">
+                          {p.title}
+                        </Text>
+                      </Link>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text variant="mono-secondary" as="span">
+                        {p.path}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Status status={p.status} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text variant="secondary" size="sm" as="span">
+                        {new Date(p.updatedAt).toLocaleString(locale)}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell className="text-right">
+                      <RowMenu
+                        onOpen={() =>
+                          navigate({
+                            to: "/sites/$siteId/pages/$pageId",
+                            params: { siteId, pageId: p.id },
+                          })
+                        }
+                        onDelete={() => setToDelete(p)}
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            )}
+          </Table>
+        </LayerCard>
+      )}
+      {paging.total > paging.perPage && (
+        <Pagination
+          page={paging.page}
+          perPage={paging.perPage}
+          totalCount={paging.total}
+          setPage={paging.setPage}
+        />
+      )}
+      <DeleteResource
+        open={toDelete !== undefined}
+        onOpenChange={(o) => !o && setToDelete(undefined)}
+        resourceType={t("editor.page")}
+        resourceName={toDelete?.path ?? ""}
+        isDeleting={remove.isPending}
+        onDelete={async () => {
+          if (toDelete) await remove.mutateAsync(toDelete);
+        }}
+      />
+    </div>
+  );
+}

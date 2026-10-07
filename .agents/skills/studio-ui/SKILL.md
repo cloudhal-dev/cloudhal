@@ -9,6 +9,8 @@ metadata:
 
 # Studio UI
 
+**Read first:** `docs/design/DESIGN.md` (binding) and the official `kumo-design` skill in `.agents/skills/kumo-design`. The design-rules test in `apps/studio/test/design-rules.test.ts` must stay green.
+
 Stack (ADR-0003): Vite 8 + React 19 SPA, TanStack Router + Query, Tailwind 4, **Kumo** (`@cloudflare/kumo` 2.x on `@base-ui/react`, Phosphor icons) consumed only through `@cloudhal/ui`. Cloudhal is a premium, community-facing product: use Kumo's components and blocks, not hand-rolled markup.
 
 ## Before writing UI

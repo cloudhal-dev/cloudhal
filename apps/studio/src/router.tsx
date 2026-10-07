@@ -7,13 +7,16 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { authClient } from "./lib/auth.ts";
+import { AccountShell } from "./routes/AccountShell.tsx";
 import { ArticleEditorPage } from "./routes/ArticleEditorPage.tsx";
 import { ArticlesPage } from "./routes/ArticlesPage.tsx";
 import { LoginPage } from "./routes/LoginPage.tsx";
 import { PageEditorPage } from "./routes/PageEditorPage.tsx";
+import { PagesPage } from "./routes/PagesPage.tsx";
 import { SiteOverviewPage } from "./routes/SiteOverviewPage.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
 import { SitesPage } from "./routes/SitesPage.tsx";
+import { SiteTabsLayout } from "./routes/SiteTabsLayout.tsx";
 import { SnapshotsPage } from "./routes/SnapshotsPage.tsx";
 
 export interface RouterContext {
@@ -26,16 +29,12 @@ async function requireSession() {
   return data;
 }
 
-const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: () => <Outlet />,
-});
-
+const rootRoute = createRootRouteWithContext<RouterContext>()({ component: () => <Outlet /> });
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginPage,
 });
-
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -45,56 +44,70 @@ const indexRoute = createRoute({
   },
 });
 
-const sitesRoute = createRoute({
+// Account surface
+const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/sites",
+  id: "account",
   beforeLoad: requireSession,
+  component: AccountShell,
+});
+const sitesRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/sites",
   component: SitesPage,
 });
 
+// Site surface
 const siteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sites/$siteId",
   beforeLoad: requireSession,
   component: SiteShell,
 });
-
-const siteIndexRoute = createRoute({
+const siteTabsRoute = createRoute({
   getParentRoute: () => siteRoute,
+  id: "site-tabs",
+  component: SiteTabsLayout,
+});
+const siteIndexRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
   path: "/",
   component: SiteOverviewPage,
+});
+const pagesRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/pages",
+  component: PagesPage,
+});
+const articlesRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/articles",
+  component: ArticlesPage,
+});
+const snapshotsRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/snapshots",
+  component: SnapshotsPage,
 });
 const pageEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/pages/$pageId",
   component: PageEditorPage,
 });
-const articlesRoute = createRoute({
-  getParentRoute: () => siteRoute,
-  path: "/articles",
-  component: ArticlesPage,
-});
 const articleEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/articles/$entryId",
   component: ArticleEditorPage,
 });
-const snapshotsRoute = createRoute({
-  getParentRoute: () => siteRoute,
-  path: "/snapshots",
-  component: SnapshotsPage,
-});
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  sitesRoute,
+  accountRoute.addChildren([sitesRoute]),
   siteRoute.addChildren([
-    siteIndexRoute,
+    siteTabsRoute.addChildren([siteIndexRoute, pagesRoute, articlesRoute, snapshotsRoute]),
     pageEditorRoute,
-    articlesRoute,
     articleEditorRoute,
-    snapshotsRoute,
   ]),
 ]);
 

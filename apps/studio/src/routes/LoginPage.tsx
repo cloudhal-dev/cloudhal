@@ -1,4 +1,5 @@
-import { Button, Input, LayerCard, Tabs, Text } from "@cloudhal/ui";
+import { Button, Input, Surface, Tabs, Text } from "@cloudhal/ui";
+import { SquaresFour } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -33,18 +34,23 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-kumo-canvas px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div className="grid gap-1">
-            <Text variant="heading" size="lg" as="h1">
-              {t("app.name")}
-            </Text>
-            <Text variant="secondary">{t("app.tagline")}</Text>
+    <main className="flex min-h-screen items-center justify-center bg-kumo-overlay px-4">
+      <div className="grid w-full max-w-sm gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <SquaresFour size={24} className="text-kumo-brand" />
+            <div className="grid gap-0.5">
+              <Text variant="heading" size="lg" as="h1">
+                {t("app.name")}
+              </Text>
+              <Text variant="secondary" size="sm">
+                {t("app.tagline")}
+              </Text>
+            </div>
           </div>
           <LanguageSwitch size="xs" />
         </div>
-        <LayerCard className="px-5 py-4">
+        <Surface className="rounded-xl bg-kumo-base px-6 py-5 ring ring-kumo-line">
           <form onSubmit={submit} className="grid gap-4" data-testid="login-form">
             <Tabs
               tabs={[
@@ -63,6 +69,7 @@ export function LoginPage() {
                 value={name}
                 onValueChange={setName}
                 required
+                autoComplete="name"
               />
             )}
             <Input
@@ -89,7 +96,7 @@ export function LoginPage() {
               {mode === "signup" ? t("auth.createAccount") : t("auth.signIn")}
             </Button>
           </form>
-        </LayerCard>
+        </Surface>
       </div>
     </main>
   );

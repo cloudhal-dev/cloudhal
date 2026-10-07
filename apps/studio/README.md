@@ -1,6 +1,6 @@
 # Cloudhal Studio
 
-The admin UI: Vite 8 + React 19 SPA, TanStack Router/Query, Tailwind 4, Kumo via `@cloudhal/ui`.
+The admin UI: Vite 8 + React 19 SPA, TanStack Router/Query, Tailwind 4, Kumo via `@cloudhal/ui`. Layout and components follow [docs/design/DESIGN.md](../../docs/design/DESIGN.md) (binding; enforced by `test/design-rules.test.ts`) and Cloudflare's `kumo-design` skill.
 
 Screens: login/sign-up, sites, site overview (pages), page editor (sections), articles + article editor (draft → review → published with an approval dialog), snapshots (timeline, publish, roll back), ⌘K command palette. UI language: English and Turkish (`src/i18n`), auto-detected and switchable.
 

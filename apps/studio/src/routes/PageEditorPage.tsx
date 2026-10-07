@@ -2,6 +2,7 @@ import type { Page, PublishStatus, Section } from "@cloudhal/core-contracts";
 import {
   ApprovalDialog,
   Button,
+  ClipboardText,
   DeleteResource,
   DropdownMenu,
   Empty,
@@ -12,13 +13,15 @@ import {
   LayerCard,
   PageHeader,
   Select,
+  SkeletonLine,
   Text,
 } from "@cloudhal/ui";
 import { ArrowDown, ArrowUp, FloppyDisk, Plus, Rows, Trash, X } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Crumbs } from "../components/Crumbs.tsx";
+import { Content } from "../components/AppFrame.tsx";
+import { EditorCrumbs } from "../components/EditorCrumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
@@ -160,7 +163,16 @@ export function PageEditorPage() {
       await navigate({ to: "/sites/$siteId", params: { siteId } });
     },
   });
-  if (!draft) return <ErrorBanner error={query.error} />;
+  if (!draft) {
+    return (
+      <Content>
+        <ErrorBanner error={query.error} />
+        <LayerCard className="px-5 py-4">
+          <SkeletonLine />
+        </LayerCard>
+      </Content>
+    );
+  }
   const updateSection = (i: number, s: Section) =>
     setDraft({ ...draft, sections: draft.sections.map((x, j) => (j === i ? s : x)) });
   const move = (i: number, dir: -1 | 1) => {
@@ -193,15 +205,15 @@ export function PageEditorPage() {
     </DropdownMenu>
   );
   return (
-    <div className="grid gap-6">
+    <Content>
       <PageHeader
         breadcrumbs={
-          <Crumbs
-            items={[
-              { label: t("sites.title"), href: "/sites" },
-              { label: site.data?.name ?? "…", href: `/sites/${siteId}` },
-              { label: draft.title },
-            ]}
+          <EditorCrumbs
+            siteId={siteId}
+            siteName={site.data?.name}
+            section={{ label: t("nav.pages"), href: `/sites/${siteId}/pages` }}
+            current={draft.title}
+            id={draft.id}
           />
         }
         title={draft.title}
@@ -292,7 +304,7 @@ export function PageEditorPage() {
             ))
           )}
         </div>
-        <div className="grid content-start gap-4">
+        <div className="grid min-w-0 content-start gap-4">
           <LayerCard className="px-5 py-4">
             <div className="grid gap-4">
               <div className="flex items-center justify-between">
@@ -312,20 +324,13 @@ export function PageEditorPage() {
                 onValueChange={(v) => setDraft({ ...draft, path: v })}
                 description={t("editor.pathHint")}
               />
-              <dl className="grid gap-1.5 text-kumo-subtle text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <dt>ID</dt>
-                  <dd>
-                    <InlineCopyText>{draft.id}</InlineCopyText>
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <dt>{t("common.rev", { rev: draft.rev })}</dt>
-                  <dd>
-                    {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
-                  </dd>
-                </div>
-              </dl>
+              <div className="grid gap-2">
+                <ClipboardText size="sm" text={draft.id} />
+                <Text variant="secondary" size="xs">
+                  {t("common.rev", { rev: draft.rev })} ·{" "}
+                  {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
+                </Text>
+              </div>
             </div>
           </LayerCard>
           <Button
@@ -359,6 +364,6 @@ export function PageEditorPage() {
           await remove.mutateAsync(draft);
         }}
       />
-    </div>
+    </Content>
   );
 }

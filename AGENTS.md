@@ -29,8 +29,8 @@ pnpm changeset                    # add a release note for a published package
 - `packages/api` — Hono app (`createApi`), Better Auth (`src/auth.ts`), error mapping; shared suite `src/testing.ts` on sqlite + D1.
 - `packages/ui` — `export * from "@cloudflare/kumo"` + blocks; `styles.css` is the only Tailwind entry for admin UIs.
 - `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`).
-- `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals.
-- `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`.
+- `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals · `docs/design/DESIGN.md` the binding admin design system (Kumo).
+- `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`, and Cloudflare's official **`kumo-design`** (installed from `cloudflare/kumo`, tracked in `skills-lock.json`; update with `npx skills update`). Any admin-UI change loads `kumo-design` + `studio-ui` and follows `docs/design/DESIGN.md`.
 
 ## Hard rules
 1. **Never edit generated files.** Change the schema, run `pnpm gen`, commit both.

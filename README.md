@@ -40,6 +40,7 @@ apps/studio               Studio admin UI (Vite + React SPA, en/tr)
 starters/blog             the first starter: routes, layout, theme map
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
+docs/design               DESIGN.md — the binding admin design system (Kumo)
 docs/rfcs                 design proposals (RFC-0001: Site Graph)
 .agents/skills            skills for coding agents working on this repo
 ```
