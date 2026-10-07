@@ -3,7 +3,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
 import { seedStarterSite } from "../src/seed.ts";
 import { SiteGraphStore } from "../src/store.ts";
-import { copySite, SyncConflictError } from "../src/sync.ts";
+import { copySite, exportSite, importSite, SyncConflictError } from "../src/sync.ts";
 
 const actor = { kind: "human" as const, id: "user_sync000001" };
 
@@ -81,5 +81,38 @@ describe("copySite", () => {
     await src.blobs.delete(`nodes/${snap.nodes[0]?.hash}.json`);
     await expect(copySite(src, dst, site.id)).rejects.toThrow(/missing/);
     expect(await dst.store.getSite(site.id)).toBeUndefined();
+  });
+
+  it("round-trips as JSON and rejects tampered or foreign bundles", async () => {
+    const src = await pair();
+    const site = await seedStarterSite(src.store, { name: "Bundle", slug: "bundle" });
+    await src.store.createSnapshot(site.id, { actor, reason: "manual" });
+    const bundle = JSON.parse(JSON.stringify(await exportSite(src, site.id)));
+    expect(bundle.format).toBe("cloudhal.site-bundle@1");
+    expect(Object.keys(bundle.blobs).length).toBeGreaterThan(0);
+
+    const ok = await pair();
+    await importSite(ok, bundle);
+    expect((await ok.store.listPages(site.id)).length).toBe(2);
+
+    const [hash] = Object.keys(bundle.blobs) as [string];
+    const tampered = {
+      ...bundle,
+      blobs: { ...bundle.blobs, [hash]: JSON.stringify({ evil: true }) },
+    };
+    await expect(importSite(await pair(), tampered)).rejects.toThrow(/does not match/);
+
+    const foreign = {
+      ...bundle,
+      nodes: [
+        ...bundle.nodes,
+        { ...bundle.nodes[0], id: "page_other000001", site_id: "site_other000001" },
+      ],
+    };
+    await expect(importSite(await pair(), foreign)).rejects.toThrow(/another site/);
+
+    const missing = { ...bundle, blobs: {} };
+    await expect(importSite(await pair(), missing)).rejects.toThrow(/missing blob/);
+    await expect(importSite(await pair(), { ...bundle, format: "nope" })).rejects.toThrow(/format/);
   });
 });

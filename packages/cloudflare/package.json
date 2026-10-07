@@ -1,0 +1,39 @@
+{
+  "name": "@cloudhal/cloudflare",
+  "version": "0.0.1",
+  "description": "Cloudhal on Cloudflare: the admin Worker (API, auth, MCP, Studio) over D1 + R2",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/cloudflare"
+  },
+  "type": "module",
+  "exports": {
+    "./admin": "./src/admin-worker.ts",
+    "./workerd-prelude": "./src/workerd-prelude.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/api": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

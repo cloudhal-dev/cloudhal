@@ -43,6 +43,12 @@ export interface SiteGraphStoreOptions {
   /** Clock, injectable for tests. */
   readonly now?: () => Date;
   readonly idGen?: (prefix: string) => string;
+  /**
+   * Called after the published pointer moved (publish and rollback). Deployments use it to purge
+   * edge caches. Failures are reported to `onHookError` and never undo the publish.
+   */
+  readonly onPublished?: (site: Site) => Promise<void>;
+  readonly onHookError?: (error: unknown) => void;
 }
 
 /** Fields the store fills in on create. */
@@ -93,7 +99,12 @@ export class SiteGraphStore {
     this.#blobs = options.blobs;
     this.#now = options.now ?? (() => new Date());
     this.#newId = options.idGen ?? newId;
+    this.#onPublished = options.onPublished;
+    this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
   }
+
+  readonly #onPublished: SiteGraphStoreOptions["onPublished"];
+  readonly #onHookError: (error: unknown) => void;
 
   /** Applies pending storage migrations. Safe to call on every start. */
   async init(): Promise<void> {
@@ -495,7 +506,15 @@ export class SiteGraphStore {
   async publish(site: Site, snapshotId: string): Promise<Site> {
     const snap = await this.getSnapshot(snapshotId);
     if (!snap || snap.siteId !== site.id) throw new NotFoundError("snapshot", snapshotId);
-    return this.updateSite({ ...site, publishedSnapshotId: snapshotId });
+    const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
+    if (this.#onPublished) {
+      try {
+        await this.#onPublished(updated);
+      } catch (e) {
+        this.#onHookError(e);
+      }
+    }
+    return updated;
   }
 
   /**

@@ -284,6 +284,9 @@ catalogs:
     wrangler:
       specifier: 4.148.0
       version: 4.148.0
+    zod:
+      specifier: 4.6.5
+      version: 4.6.5
 
 importers:
 
@@ -570,6 +573,9 @@ importers:
       '@cloudhal/api':
         specifier: workspace:*
         version: link:../api
+      '@cloudhal/cloudflare':
+        specifier: workspace:*
+        version: link:../cloudflare
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -601,6 +607,40 @@ importers:
       astro:
         specifier: 'catalog:'
         version: 7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@24.19.1)(happy-dom@20.14.5)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1)
+
+  packages/cloudflare:
+    dependencies:
+      '@cloudhal/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
+      '@cloudhal/api':
+        specifier: workspace:*
+        version: link:../api
+      '@cloudhal/core-ts':
+        specifier: workspace:*
+        version: link:../core-ts
+      '@cloudhal/storage':
+        specifier: workspace:*
+        version: link:../storage
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 5.20261007.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -805,6 +845,9 @@ importers:
         specifier: 'catalog:'
         version: 4.3.3
     devDependencies:
+      '@cloudhal/cloudflare':
+        specifier: workspace:*
+        version: link:../../packages/cloudflare
       wrangler:
         specifier: 'catalog:'
         version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1)

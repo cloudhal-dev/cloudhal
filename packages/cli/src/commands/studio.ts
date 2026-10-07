@@ -52,7 +52,7 @@ export async function studio(
     },
   };
   if (!options.noAuth) {
-    const { createAuthFor } = await import("@cloudhal/api/auth");
+    const { createAuthFor } = await import("@cloudhal/api/auth/node");
     const auth = await createAuthFor({
       dataDir: local.dataDir,
       baseURL: `http://localhost:${options.port ?? 8787}`,

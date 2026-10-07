@@ -12,7 +12,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./auth/node": "./src/auth-node.ts"
   },
   "files": [
     "src",

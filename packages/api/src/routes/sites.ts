@@ -14,5 +14,13 @@ export const sites: Hono<Env> = new Hono<Env>()
   .put("/:siteId", async (c) => {
     const body = (await c.req.json()) as Site;
     if (body.id !== param(c, "siteId")) throw badRequest("body.id must match the URL");
-    return c.json(await c.get("store").updateSite(body));
+    const store = c.get("store");
+    const current = await store.getSite(body.id);
+    if (!current) throw notFound("site not found");
+    // The published pointer only moves through publish/rollback (approval, ancestry, cache purge).
+    if ((body.publishedSnapshotId ?? null) !== (current.publishedSnapshotId ?? null))
+      throw badRequest(
+        "publishedSnapshotId changes go through /snapshots/:id/publish or /rollback",
+      );
+    return c.json(await store.updateSite(body));
   });

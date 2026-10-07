@@ -1,9 +1,10 @@
 import { defaultScopes } from "@cloudhal/agent-runtime";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
-import { type Context, Hono } from "hono";
-import type { ApiDeps, Env, PrincipalResolver } from "./context.ts";
+import { Hono } from "hono";
+import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
 import { activity } from "./routes/activity.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { entries } from "./routes/entries.ts";
 import { pages } from "./routes/pages.ts";
@@ -24,7 +25,15 @@ export function createApi(deps: ApiDeps) {
     c.set("store", deps.store);
     c.set("audit", deps.audit ?? deps.mcp?.audit);
     c.set("previewSecret", deps.preview?.secret);
-    c.set("actor", deps.resolveActor ? await deps.resolveActor(c) : undefined);
+    if (deps.resolvePrincipal) {
+      const principal = await deps.resolvePrincipal(c);
+      c.set("principal", principal);
+      c.set("actor", principal?.actor);
+    } else {
+      const actor = deps.resolveActor ? await deps.resolveActor(c) : undefined;
+      c.set("actor", actor);
+      c.set("principal", actor ? { actor, scopes: defaultScopes(actor) } : undefined);
+    }
     await next();
   });
 
@@ -33,6 +42,12 @@ export function createApi(deps: ApiDeps) {
     const handler = deps.authHandler;
     app.on(["GET", "POST"], "/api/auth/*", (c) => handler(c.req.raw));
   }
+  if (deps.admin) {
+    if (deps.admin.deployToken.length < 32)
+      throw new Error("admin.deployToken must be at least 32 characters");
+    app.route("/api/admin", adminRoutes(deps.admin.deployToken, deps.admin.storage));
+  }
+
   app.get("/api/me", (c) => {
     const actor = c.get("actor");
     if (!actor) throw unauthorized();
@@ -55,14 +70,15 @@ export function createApi(deps: ApiDeps) {
       ...deps.mcp,
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
     });
-    const resolvePrincipal: PrincipalResolver =
-      deps.resolvePrincipal ??
-      (async (c) => {
-        const actor = (c as Context<Env>).get("actor");
-        return actor ? { actor, scopes: defaultScopes(actor) } : undefined;
-      });
     app.all("/mcp", async (c) => {
-      const principal = await resolvePrincipal(c);
+      // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
+      const origin = c.req.header("origin");
+      if (origin && origin !== new URL(c.req.url).origin)
+        return c.json(
+          { error: "forbidden", message: "cross-origin MCP requests are not allowed" },
+          403,
+        );
+      const principal = c.get("principal");
       if (!principal) throw unauthorized();
       return mcp.fetch(c.req.raw, principal);
     });

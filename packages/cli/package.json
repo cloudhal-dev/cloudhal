@@ -33,7 +33,8 @@
     "@cloudhal/api": "workspace:*",
     "@hono/node-server": "catalog:",
     "@cloudhal/agent-runtime": "workspace:*",
-    "@cloudhal/mcp-server": "workspace:*"
+    "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/cloudflare": "workspace:*"
   },
   "peerDependencies": {
     "astro": "^7.3.0"

@@ -19,6 +19,7 @@
     "@astrojs/cloudflare": "catalog:"
   },
   "devDependencies": {
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "@cloudhal/cloudflare": "workspace:*"
   }
 }

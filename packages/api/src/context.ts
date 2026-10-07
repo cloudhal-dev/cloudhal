@@ -1,6 +1,6 @@
 import type { AuditLog, LoadedSkill, Principal } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { Context } from "hono";
 import type { AgentKeyService } from "./auth.ts";
 
@@ -33,6 +33,11 @@ export interface ApiDeps {
   readonly audit?: AuditLog;
   /** Enables `/api/sites/:id/preview-links` (signed links to drafts/snapshots on the deployed site). */
   readonly preview?: { readonly secret: string };
+  /**
+   * Mounts `/api/admin/*` (site bundle export/import for `cloudhal push`/`pull`) behind this
+   * deployment token. Needs the raw storage the store was built on.
+   */
+  readonly admin?: { readonly deployToken: string; readonly storage: StoragePair };
   /** Mounts `/api/agent-keys` (create/list/delete API keys for agents). */
   readonly agentKeys?: AgentKeyService;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */
@@ -44,6 +49,8 @@ export interface ApiDeps {
 export type Env = {
   Variables: {
     actor: Actor | undefined;
+    /** Resolved once per request (API-key verification counts against the key's rate limit). */
+    principal: Principal | undefined;
     store: SiteGraphStore;
     audit: AuditLog | undefined;
     previewSecret: string | undefined;

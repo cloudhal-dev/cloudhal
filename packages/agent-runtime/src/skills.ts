@@ -68,40 +68,41 @@ function list(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-/** Loads one skill directory: validates the manifest against the `SkillManifest` contract and the `cloudhal.*` metadata keys. */
-export async function loadSkill(dir: string): Promise<LoadedSkill> {
-  const file = path.join(dir, "SKILL.md");
-  const markdown = await readFile(file, "utf8");
-  const { frontmatter, body } = parseFrontmatter(markdown);
+/** A skill as plain data (SKILL.md text + reference files), e.g. bundled into a Worker. */
+export interface SkillSource {
+  /** Directory name; must equal the manifest `name`. */
+  name: string;
+  markdown: string;
+  references: Record<string, string>;
+}
+
+/**
+ * Builds a `LoadedSkill` from data — no filesystem. Validates the manifest against the
+ * `SkillManifest` contract and the `cloudhal.*` metadata keys.
+ */
+export function skillFromSource(source: SkillSource, dir = `skill:${source.name}`): LoadedSkill {
+  const { frontmatter, body } = parseFrontmatter(source.markdown);
   assertValid("skill-manifest", frontmatter);
   const manifest = frontmatter;
-  if (manifest.name !== path.basename(dir))
-    throw new SkillError(
-      `skill name "${manifest.name}" must match directory "${path.basename(dir)}"`,
-    );
+  if (manifest.name !== source.name)
+    throw new SkillError(`skill name "${manifest.name}" must match directory "${source.name}"`);
   const meta = manifest.metadata ?? {};
   const schemaVersion = Number(meta["cloudhal.schemaVersion"] ?? "1");
   if (schemaVersion !== 1)
     throw new SkillError(`${manifest.name}: unsupported cloudhal.schemaVersion ${schemaVersion}`);
+  const refs = Object.keys(source.references)
+    .filter((f) => f.endsWith(".md"))
+    .sort();
   return {
     manifest,
     dir,
     body: async () => body,
-    source: async () => markdown,
+    source: async () => source.markdown,
     reference: async (name) => {
-      if (name !== path.basename(name) || !name.endsWith(".md"))
-        throw new SkillError(`invalid reference name "${name}"`);
-      return readFile(path.join(dir, "references", name), "utf8");
+      if (!refs.includes(name)) throw new SkillError(`invalid reference name "${name}"`);
+      return source.references[name] as string;
     },
-    references: async () => {
-      const refDir = path.join(dir, "references");
-      try {
-        if (!(await stat(refDir)).isDirectory()) return [];
-        return (await readdir(refDir)).filter((f) => f.endsWith(".md")).sort();
-      } catch {
-        return [];
-      }
-    },
+    references: async () => refs,
     cloudhal: {
       schemaVersion,
       requiresCapabilities: list(meta["cloudhal.requiresCapabilities"]),
@@ -109,6 +110,35 @@ export async function loadSkill(dir: string): Promise<LoadedSkill> {
       approval: list(meta["cloudhal.approval"]),
     },
   };
+}
+
+/** Reads one skill directory into a `SkillSource` (Node). */
+export async function readSkillSource(dir: string): Promise<SkillSource> {
+  const markdown = await readFile(path.join(dir, "SKILL.md"), "utf8");
+  const references: Record<string, string> = {};
+  const refDir = path.join(dir, "references");
+  try {
+    if ((await stat(refDir)).isDirectory())
+      for (const f of (await readdir(refDir)).filter((x) => x.endsWith(".md")).sort())
+        references[f] = await readFile(path.join(refDir, f), "utf8");
+  } catch {
+    // no references
+  }
+  return { name: path.basename(dir), markdown, references };
+}
+
+/** Reads every skill under `root` (one directory per skill), sorted by name. */
+export async function readSkillSources(root: string): Promise<SkillSource[]> {
+  const entries = await readdir(root, { withFileTypes: true });
+  const sources = await Promise.all(
+    entries.filter((e) => e.isDirectory()).map((e) => readSkillSource(path.join(root, e.name))),
+  );
+  return sources.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Loads one skill directory: validates the manifest against the `SkillManifest` contract and the `cloudhal.*` metadata keys. */
+export async function loadSkill(dir: string): Promise<LoadedSkill> {
+  return skillFromSource(await readSkillSource(dir), dir);
 }
 
 /** Loads every skill under `root` (one directory per skill). Sorted by name for deterministic listings. */
