@@ -171,6 +171,33 @@ export function describeBlobStoreConformance(label: string, factory: BlobStoreFa
   });
 }
 
+/**
+ * Drops every user table so a shared database can be reused between tests. Foreign keys are
+ * enforced (D1 cannot turn them off), so tables are dropped in rounds until none are left:
+ * a table that still has dependants fails this round and succeeds once they are gone.
+ */
+export async function dropAllTables(driver: SqlDriver): Promise<void> {
+  for (let round = 0; round < 20; round++) {
+    const tables = await driver.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'",
+    );
+    if (tables.length === 0) return;
+    let dropped = 0;
+    for (const t of tables) {
+      try {
+        await driver.exec(`DROP TABLE IF EXISTS "${t.name}"`);
+        dropped++;
+      } catch {
+        // referenced by another table; retry next round
+      }
+    }
+    if (dropped === 0)
+      throw new StorageError(
+        `dropAllTables: could not drop ${tables.map((t) => t.name).join(", ")}`,
+      );
+  }
+}
+
 /** Spins up a Miniflare-backed D1 database (workerd in-process, no Cloudflare account). */
 export async function createMiniflareD1(): Promise<{ db: D1Database; dispose(): Promise<void> }> {
   const { Miniflare } = await import("miniflare");

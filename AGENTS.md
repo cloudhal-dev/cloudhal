@@ -26,6 +26,9 @@ pnpm changeset                    # add a release note for a published package
 - `packages/astro-renderer` — `GraphSource` (live/snapshot), `cloudhal()` integration (virtual config + dev route-cache watcher), `.astro` section components. Routes live in starters, not here.
 - `packages/cli` — `cloudhal init|dev|snapshot|build`; TS bin run by Node 24 type stripping. E2E test spawns the bin (Astro disables dev middleware under `VITEST`).
 - `starters/blog` — the theme boundary: `src/pages/[...path].astro`, `src/layouts`, `src/theme.ts`.
+- `packages/api` — Hono app (`createApi`), Better Auth (`src/auth.ts`), error mapping; shared suite `src/testing.ts` on sqlite + D1.
+- `packages/ui` — `export * from "@cloudflare/kumo"` + blocks; `styles.css` is the only Tailwind entry for admin UIs.
+- `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`).
 - `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals.
 - `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`.
 
@@ -38,10 +41,11 @@ pnpm changeset                    # add a release note for a published package
 6. **Admin UIs** import UI primitives from `@cloudhal/ui` only; direct `@base-ui/react` imports are lint errors.
 7. **Skills** (`SKILL.md`) use only the six spec fields; Cloudhal data goes in `metadata` as `cloudhal.*` string keys.
 8. **Secrets** never in code, fixtures or docs. Test values live in `.env.example`.
-9. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
+9. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts`; no hard-coded English in `apps/studio`.
+10. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
 
 ## Versions (pinned via pnpm catalog / Cargo workspace)
-Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 3.2025 (legacy line; v5 alpha lacks programmatic D1) · Astro 7.3 · Tailwind 4.3 · marked 18.
+Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 3.2025 (legacy line; v5 alpha lacks programmatic D1) · Astro 7.3 · Tailwind 4.3 · marked 18 · Hono 4.13 · Better Auth 1.7.7 · Kumo 2.14 · React 19.3 · TanStack Router 1.170 / Query 5.104 · Vite 8.3.
 
 ## When unsure
 Read `docs/adr/README.md` and the relevant ADR; each ADR links its primary sources. If the change alters a contract or a public interface, write an RFC first (`.agents/skills/write-rfc`).

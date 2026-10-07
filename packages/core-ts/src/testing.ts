@@ -2,6 +2,7 @@
 import type { Actor, Page, Site } from "@cloudhal/core-contracts";
 import { ContractValidationError } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
+import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ConflictError, UniqueConstraintError } from "./errors.ts";
 import { nodeHash } from "./hash.ts";
@@ -24,8 +25,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
 
     beforeEach(async () => {
       ({ sql, blobs } = await factory.create());
-      for (const t of ["nodes", "snapshots", "projects", "_migrations"])
-        await sql.exec(`DROP TABLE IF EXISTS ${t}`);
+      await dropAllTables(sql);
       tick = 0;
       store = new SiteGraphStore({
         sql,

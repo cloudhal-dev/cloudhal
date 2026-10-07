@@ -1,7 +1,7 @@
 {
   "name": "@cloudhal/cli",
   "version": "0.0.1",
-  "description": "cloudhal — create, run and build Cloudhal sites locally",
+  "description": "cloudhal \u2014 create, run and build Cloudhal sites locally",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -29,7 +29,9 @@
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
-    "better-sqlite3": "catalog:"
+    "better-sqlite3": "catalog:",
+    "@cloudhal/api": "workspace:*",
+    "@hono/node-server": "catalog:"
   },
   "peerDependencies": {
     "astro": "^7.3.0"

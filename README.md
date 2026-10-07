@@ -20,7 +20,8 @@ pnpm install
 pnpm check                      # biome + typecheck + vitest (incl. an init→dev→build e2e)
 cargo test --workspace          # Rust contract tests
 node packages/cli/bin/cloudhal.ts init examples/my-site --name "My Site"
-cd examples/my-site && pnpm install && node ../../packages/cli/bin/cloudhal.ts dev
+cd examples/my-site && pnpm install && node ../../packages/cli/bin/cloudhal.ts dev      # site preview
+node ../../packages/cli/bin/cloudhal.ts studio                                           # Studio + API on :8787
 ```
 
 No Cloudflare account is needed for anything in this repo. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -32,7 +33,10 @@ packages/core-contracts   JSON Schema source of truth, generated TypeScript + pr
 packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs, R2 adapters; migrations
 packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 packages/astro-renderer   Astro 7 integration, live/snapshot data sources, section components
-packages/cli              cloudhal init / dev / snapshot / build (fully offline)
+packages/cli              cloudhal init / dev / snapshot / build / studio (fully offline)
+packages/api              Hono HTTP API + Better Auth (Node and Workers)
+packages/ui               Kumo re-export + Cloudhal blocks
+apps/studio               Studio admin UI (Vite + React SPA, en/tr)
 starters/blog             the first starter: routes, layout, theme map
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
@@ -40,7 +44,7 @@ docs/rfcs                 design proposals (RFC-0001: Site Graph)
 .agents/skills            skills for coding agents working on this repo
 ```
 
-Planned: `packages/{agent-runtime,mcp-server,sdk-js,ui}`, `apps/{studio,site,demo-newsroom}`, `capabilities/`, `skills/official`, `starters/blog`.
+Planned: `packages/{agent-runtime,mcp-server,sdk-js}`, `apps/{studio,site,demo-newsroom}`, `capabilities/`, `skills/official`, `starters/blog`.
 
 ## Open-core boundary
 

@@ -68,6 +68,15 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/ui/src/blocks/kumo/**"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
     }
   ]
 }

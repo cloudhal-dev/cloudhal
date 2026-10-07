@@ -1,0 +1,5 @@
+/* Cloudhal admin styles: Kumo tokens + Tailwind 4. Kumo's layer must be imported before Tailwind. */
+@import "@cloudflare/kumo/styles/tailwind";
+@import "tailwindcss";
+@source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
+@source "./";

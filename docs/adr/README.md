@@ -26,3 +26,4 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0007](0007-license-and-community.md) | Apache-2.0 open core, DCO, Contributor Covenant 3.0 |
 | [0008](0008-runtime-validation-and-d1-testing.md) | Precompiled schema validators; D1 tested through Miniflare |
 | [0009](0009-renderer-sources-and-local-dev.md) | Renderer: live in dev, snapshot in builds; starters own routes |
+| [0010](0010-auth-better-auth.md) | Better Auth for identity, tenants and MCP authorization |

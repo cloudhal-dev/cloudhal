@@ -214,11 +214,13 @@ export class SiteGraphStore {
     return this.#getNode<Site>("site", id);
   }
 
-  async listSites(projectId: string): Promise<Site[]> {
+  /** All sites, optionally filtered by project. */
+  async listSites(projectId?: string): Promise<Site[]> {
     const rows = await this.#sql.all<Row>(
       "SELECT body FROM nodes WHERE kind = 'site' ORDER BY created_at, id",
     );
-    return rows.map((r) => JSON.parse(r.body) as Site).filter((s) => s.projectId === projectId);
+    const sites = rows.map((r) => JSON.parse(r.body) as Site);
+    return projectId ? sites.filter((s) => s.projectId === projectId) : sites;
   }
 
   async updateSite(site: Site): Promise<Site> {

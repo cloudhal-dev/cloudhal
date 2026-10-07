@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": ["node", "@testing-library/jest-dom"],
+    "exactOptionalPropertyTypes": false,
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["src", "test"]
+}

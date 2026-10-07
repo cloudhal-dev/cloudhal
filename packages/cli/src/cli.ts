@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { build, dev } from "./commands/astro.ts";
 import { init } from "./commands/init.ts";
 import { snapshot } from "./commands/snapshot.ts";
+import { studio } from "./commands/studio.ts";
 
 const HELP = `cloudhal — agent-native sites
 
@@ -10,6 +11,7 @@ Usage:
   cloudhal dev [--port <n>] [--host]                      live preview (drafts visible)
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
+  cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
   cloudhal --help
 `;
 
@@ -26,6 +28,7 @@ export async function main(argv: string[]): Promise<number> {
       label: { type: "string" },
       publish: { type: "boolean" },
       snapshot: { type: "string" },
+      "no-auth": { type: "boolean" },
     },
   });
   const [command, ...rest] = positionals;
@@ -77,6 +80,19 @@ export async function main(argv: string[]): Promise<number> {
         ...(values.snapshot ? { snapshotId: values.snapshot } : {}),
       });
       console.log(`built ${r.outDir} from ${r.snapshotId}`);
+      return 0;
+    }
+    case "studio": {
+      const s = await studio({
+        projectDir,
+        ...(values.port ? { port: Number(values.port) } : {}),
+        ...(values["no-auth"] ? { noAuth: true } : {}),
+      });
+      console.log(`cloudhal studio → ${s.url}`);
+      await new Promise<void>((resolve) => {
+        for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => resolve());
+      });
+      await s.stop();
       return 0;
     }
     default:

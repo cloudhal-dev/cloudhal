@@ -1,0 +1,112 @@
+import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { MemoryBlobStore } from "@cloudhal/storage";
+import { D1Driver } from "@cloudhal/storage/d1";
+import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
+import { createMiniflareD1 } from "@cloudhal/storage/testing";
+import Database from "better-sqlite3";
+import { afterAll, describe, expect, it } from "vitest";
+import { createApi } from "../src/app.ts";
+import { createAuth } from "../src/auth.ts";
+
+interface Backend {
+  label: string;
+  setup(): Promise<{ store: SiteGraphStore; database: unknown; dispose?(): Promise<void> }>;
+}
+
+const backends: Backend[] = [
+  {
+    label: "better-sqlite3",
+    async setup() {
+      const db = new Database(":memory:");
+      const store = new SiteGraphStore({
+        sql: new BetterSqlite3Driver(db),
+        blobs: new MemoryBlobStore(),
+      });
+      await store.init();
+      return { store, database: db };
+    },
+  },
+  {
+    label: "Cloudflare D1 (Miniflare)",
+    async setup() {
+      const h = await createMiniflareD1();
+      const store = new SiteGraphStore({ sql: new D1Driver(h.db), blobs: new MemoryBlobStore() });
+      await store.init();
+      return { store, database: h.db, dispose: () => h.dispose() };
+    },
+  },
+];
+
+for (const backend of backends) {
+  describe(`auth on ${backend.label}`, async () => {
+    const { store, database, dispose } = await backend.setup();
+    const siteId = (await seedStarterSite(store, { name: "Auth Site", slug: "auth-site" })).id;
+    const auth = createAuth({
+      database,
+      baseURL: "http://localhost",
+      secret: "test-secret-test-secret-test-secret",
+    });
+    const app = createApi({ store, resolveActor: auth.resolveActor, authHandler: auth.handler });
+
+    afterAll(async () => {
+      await dispose?.();
+    });
+
+    it("sign-up sets a session cookie that resolves to a human actor", async () => {
+      const res = await app.request("/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Halil",
+          email: "halil@example.com",
+          password: "correct horse battery",
+        }),
+      });
+      expect(res.status, await res.clone().text()).toBe(200);
+      const cookie = res.headers.get("set-cookie") ?? "";
+      expect(cookie).toContain("better-auth.session_token=");
+      const sessionCookie = cookie.split(";")[0] as string;
+
+      const me = await app.request("/api/me", { headers: { cookie: sessionCookie } });
+      expect(me.status).toBe(200);
+      const { actor } = (await me.json()) as { actor: { kind: string; id: string; name?: string } };
+      expect(actor.kind).toBe("human");
+      expect(actor.id).toMatch(/^user_[A-Za-z0-9]{6,32}$/);
+      expect(actor.name).toBe("Halil");
+
+      // an authenticated mutation records the actor
+      const snap = await app.request(`/api/sites/${siteId}/snapshots`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({ label: "from session" }),
+      });
+      expect(snap.status).toBe(201);
+      expect(
+        ((await snap.json()) as { snapshot: { actor: { id: string } } }).snapshot.actor.id,
+      ).toBe(actor.id);
+    });
+
+    it("sign-in works, wrong password and anonymous requests are rejected", async () => {
+      const bad = await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "halil@example.com", password: "wrong" }),
+      });
+      expect(bad.status).toBe(401);
+      const ok = await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "halil@example.com", password: "correct horse battery" }),
+      });
+      expect(ok.status).toBe(200);
+      expect((await app.request("/api/sites")).status).toBe(401);
+      expect(
+        (
+          await app.request("/api/sites", {
+            headers: { cookie: "better-auth.session_token=forged" },
+          })
+        ).status,
+      ).toBe(401);
+    });
+  });
+}

@@ -17,29 +17,41 @@ describe("splitStatements", () => {
 describe("migrate", () => {
   it("applies the Cloudhal schema on better-sqlite3, idempotently", async () => {
     const driver = await BetterSqlite3Driver.open(":memory:");
-    expect((await migrate(driver, migrations)).applied).toEqual(["0001_init"]);
+    expect((await migrate(driver, migrations)).applied).toEqual(["0001_init", "0002_auth"]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
-    expect(await appliedMigrations(driver)).toEqual(["0001_init"]);
+    expect(await appliedMigrations(driver)).toEqual(["0001_init", "0002_auth"]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
-    expect(tables.map((t) => t.name)).toEqual(["_migrations", "nodes", "projects", "snapshots"]);
+    expect(tables.map((t) => t.name)).toEqual([
+      "_migrations",
+      "account",
+      "invitation",
+      "member",
+      "nodes",
+      "organization",
+      "projects",
+      "session",
+      "snapshots",
+      "user",
+      "verification",
+    ]);
     await driver.close();
   });
 
   it("applies the Cloudhal schema on D1 (Miniflare)", async () => {
     const h = await createMiniflareD1();
     const driver = new D1Driver(h.db);
-    expect((await migrate(driver, migrations)).applied).toEqual(["0001_init"]);
-    expect(await appliedMigrations(driver)).toEqual(["0001_init"]);
+    expect((await migrate(driver, migrations)).applied).toEqual(["0001_init", "0002_auth"]);
+    expect(await appliedMigrations(driver)).toEqual(["0001_init", "0002_auth"]);
     await h.dispose();
   });
 
   it("a failing migration leaves earlier ones applied and itself unapplied", async () => {
     const driver = await BetterSqlite3Driver.open(":memory:");
-    const bad = { name: "0002_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
-    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0002_bad/);
-    expect(await appliedMigrations(driver)).toEqual(["0001_init"]);
+    const bad = { name: "0003_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
+    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0003_bad/);
+    expect(await appliedMigrations(driver)).toEqual(["0001_init", "0002_auth"]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();
     await driver.close();
