@@ -15,7 +15,8 @@ export async function getStaticPaths() {
   }));
 }
 
-const source = await getSource(config);
+const source = await getSource(config, Astro);
+if (!source) return new Response("This site has not been published yet.", { status: 503 });
 const site = await source.site();
 const path = Astro.params.path ? `/${Astro.params.path}` : "/";
 const page = await source.pageByPath(path);

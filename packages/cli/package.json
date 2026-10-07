@@ -43,6 +43,8 @@
     "astro": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "@modelcontextprotocol/client": "catalog:"
+    "@modelcontextprotocol/client": "catalog:",
+    "wrangler": "catalog:",
+    "@cloudflare/workers-types": "catalog:"
   }
 }

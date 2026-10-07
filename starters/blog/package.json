@@ -15,6 +15,10 @@
     "@tailwindcss/vite": "catalog:",
     "astro": "catalog:",
     "better-sqlite3": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "@astrojs/cloudflare": "catalog:"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
   }
 }

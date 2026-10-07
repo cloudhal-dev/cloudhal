@@ -11,7 +11,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schemas/*": "./schemas/*"
+    "./schemas/*": "./schemas/*",
+    "./bundle": "./scripts/bundle.ts"
   },
   "files": [
     "schemas",

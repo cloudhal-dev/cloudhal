@@ -1,6 +1,6 @@
 ---
 import config from "virtual:cloudhal/config";
-import { renderBody } from "@cloudhal/astro-renderer";
+import { renderBody } from "@cloudhal/astro-renderer/markdown";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import Base from "../../layouts/Base.astro";
 
@@ -9,7 +9,8 @@ export async function getStaticPaths() {
   return (await source.entries("posts")).map((e) => ({ params: { slug: e.slug } }));
 }
 
-const source = await getSource(config);
+const source = await getSource(config, Astro);
+if (!source) return new Response("This site has not been published yet.", { status: 503 });
 const site = await source.site();
 const entry = await source.entryBySlug("posts", Astro.params.slug as string);
 if (!entry) return new Response(null, { status: 404 });

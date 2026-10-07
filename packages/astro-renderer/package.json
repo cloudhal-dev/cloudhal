@@ -15,9 +15,14 @@
     "./integration": "./src/integration.ts",
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
-    "./runtime": "./src/runtime.ts",
+    "./runtime": {
+      "workerd": "./src/runtime-workerd.ts",
+      "default": "./src/runtime.ts"
+    },
     "./preview": "./src/preview.ts",
-    "./resolver": "./src/resolver.ts"
+    "./resolver": "./src/resolver.ts",
+    "./markdown": "./src/markdown.ts",
+    "./cloudflare-entry": "./src/cloudflare-entry.ts"
   },
   "files": [
     "src",
@@ -35,13 +40,22 @@
     "marked": "catalog:"
   },
   "peerDependencies": {
-    "astro": "^7.3.0"
+    "astro": "^7.3.0",
+    "@astrojs/cloudflare": "^14.3.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "astro": "catalog:",
     "better-sqlite3": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@astrojs/cloudflare": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@astrojs/cloudflare": {
+      "optional": true
+    }
   }
 }

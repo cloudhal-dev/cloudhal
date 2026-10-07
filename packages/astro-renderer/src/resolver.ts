@@ -40,6 +40,11 @@ export interface SiteResolverOptions {
   previewSecret?: string | undefined;
   /** How long the published pointer is trusted before re-reading it. Default 2000 ms. */
   pointerTtlMs?: number | undefined;
+  /**
+   * Persist a preview token from the URL in an HttpOnly cookie (default true). Disable it behind
+   * an edge cache that does not vary on cookies; carry the token in links instead.
+   */
+  previewCookie?: boolean | undefined;
   /** Snapshot sources kept per isolate (they are immutable). Default 8. */
   snapshotCacheSize?: number | undefined;
   now?: () => number;
@@ -60,6 +65,7 @@ export class SiteResolver {
     siteId: string;
     pointerTtlMs: number;
     snapshotCacheSize: number;
+    previewCookie: boolean;
     now: () => number;
     previewSecret?: string;
   };
@@ -72,6 +78,7 @@ export class SiteResolver {
       siteId: options.siteId,
       pointerTtlMs: options.pointerTtlMs ?? 2000,
       snapshotCacheSize: options.snapshotCacheSize ?? 8,
+      previewCookie: options.previewCookie ?? true,
       now: options.now ?? Date.now,
       ...(options.previewSecret ? { previewSecret: options.previewSecret } : {}),
     };
@@ -122,7 +129,11 @@ export class SiteResolver {
     if (fromUrl === "exit") {
       clearCookie = cookie("", 0);
     } else {
-      const token = fromUrl ?? readCookie(request.headers.get("cookie"), PREVIEW_COOKIE);
+      const token =
+        fromUrl ??
+        (this.#o.previewCookie
+          ? readCookie(request.headers.get("cookie"), PREVIEW_COOKIE)
+          : undefined);
       if (token && this.#o.previewSecret) {
         try {
           const claims = await verifyPreviewToken(
@@ -142,7 +153,7 @@ export class SiteResolver {
             kind: "preview",
             source,
             target: claims.target,
-            ...(fromUrl ? { setCookie: cookie(token, maxAge) } : {}),
+            ...(fromUrl && this.#o.previewCookie ? { setCookie: cookie(token, maxAge) } : {}),
           };
         } catch (e) {
           previewError = e instanceof Error ? e.message : String(e);

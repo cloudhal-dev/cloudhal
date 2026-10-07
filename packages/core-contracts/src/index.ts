@@ -6,7 +6,6 @@
  * schemas via `loadBundledSchemas()` when you need runtime validation.
  */
 
-export { bundleAll } from "../scripts/bundle.ts";
 export { ROOT_SCHEMAS, type RootSchemaName } from "../scripts/schema-list.ts";
 export * from "./generated/index.ts";
 export * from "./generated/schemas.ts";

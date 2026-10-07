@@ -10,6 +10,12 @@ export interface CloudhalRendererConfig {
    * (build/production). `CLOUDHAL_SOURCE` in the environment overrides this.
    */
   readonly source?: "live" | `snapshot:${string}`;
+  /**
+   * `node` (default): `cloudhal dev` / static `cloudhal build` from the local store.
+   * `cloudflare`: the deployed Site Worker — every page renders on demand from D1/R2 so publish and
+   * rollback are pointer flips (needs the `@astrojs/cloudflare` adapter; see ADR-0012).
+   */
+  readonly target?: "node" | "cloudflare";
 }
 
 const VIRTUAL_ID = "virtual:cloudhal/config";
@@ -26,6 +32,7 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
           ...config,
           dataDir: config.dataDir.startsWith("/") ? config.dataDir : `${root}${config.dataDir}`,
         };
+        const cloudflare = config.target === "cloudflare";
         updateConfig({
           vite: {
             plugins: [
@@ -36,10 +43,15 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
                   id === RESOLVED_ID ? `export default ${JSON.stringify(resolved)};` : undefined,
               },
             ],
-            // Native module + workspace packages must stay external in SSR.
-            ssr: { external: ["better-sqlite3"] },
+            // Native module must stay external in Node SSR; workerd never loads it.
+            ...(cloudflare ? {} : { ssr: { external: ["better-sqlite3"] } }),
           },
         });
+      },
+      /** On Cloudflare every project page is rendered per request (pointer-flip publishing). */
+      "astro:route:setup": ({ route }) => {
+        if (config.target === "cloudflare" && route.component.startsWith("src/pages/"))
+          route.prerender = false;
       },
       /**
        * Astro ≥6.3 caches `getStaticPaths()` results across dev requests, so pages added to the

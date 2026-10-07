@@ -8,7 +8,11 @@ let cached: Promise<GraphSource> | undefined;
  * The page-side entry point: returns the configured `GraphSource`, created once per process.
  * `CLOUDHAL_SOURCE=live | snapshot:<id>` overrides the integration config (used by `cloudhal build`).
  */
-export function getSource(config: CloudhalRendererConfig): Promise<GraphSource> {
+export function getSource(
+  config: CloudhalRendererConfig,
+  /** Ignored on Node (one source per process); the `workerd` build resolves per request. */
+  _astro?: { request: Request; response: { headers: Headers } },
+): Promise<GraphSource> {
   cached ??= (async () => {
     const selector = process.env.CLOUDHAL_SOURCE ?? config.source ?? "live";
     const { store } = await openLocalStore(config.dataDir);
@@ -24,3 +28,6 @@ export function getSource(config: CloudhalRendererConfig): Promise<GraphSource> 
 export function resetSource(): void {
   cached = undefined;
 }
+
+/** Shared with the `workerd` runtime so code importing either build sees the same names. */
+export const CACHE_TAG_PREFIX = "cloudhal-site-";

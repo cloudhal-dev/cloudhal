@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
+import { type BlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { FsBlobStore } from "@cloudhal/storage/fs";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { SiteGraphStore } from "./store.ts";
@@ -9,6 +9,7 @@ export interface LocalStore {
   readonly store: SiteGraphStore;
   /** The underlying driver, for services that keep their own tables (audit log, auth). */
   readonly sql: SqlDriver;
+  readonly blobs: BlobStore;
   readonly dataDir: string;
   close(): Promise<void>;
 }
@@ -23,6 +24,7 @@ export async function openLocalStore(dataDir: string): Promise<LocalStore> {
   await mkdir(path.join(dir, "blobs"), { recursive: true });
   const sql = await BetterSqlite3Driver.open(path.join(dir, "data.db"));
   await migrate(sql, migrations);
-  const store = new SiteGraphStore({ sql, blobs: new FsBlobStore(path.join(dir, "blobs")) });
-  return { store, sql, dataDir: dir, close: () => sql.close() };
+  const blobs = new FsBlobStore(path.join(dir, "blobs"));
+  const store = new SiteGraphStore({ sql, blobs });
+  return { store, sql, blobs, dataDir: dir, close: () => sql.close() };
 }
