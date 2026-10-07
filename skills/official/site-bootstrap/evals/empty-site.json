@@ -1,0 +1,9 @@
+{
+  "task": "Bootstrap a site called 'Harbour Notes' about coastal weather for sailors; tone calm and practical.",
+  "expect": {
+    "pagesCreated": ["/", "/about"],
+    "sectionsOnHome": ["hero", "contentList"],
+    "published": false,
+    "snapshotLabelStartsWith": "Bootstrap:"
+  }
+}

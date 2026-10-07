@@ -1,6 +1,9 @@
-import { Hono } from "hono";
-import type { ApiDeps, Env } from "./context.ts";
+import { defaultScopes } from "@cloudhal/agent-runtime";
+import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
+import { type Context, Hono } from "hono";
+import type { ApiDeps, Env, PrincipalResolver } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
+import { agentKeys } from "./routes/agent-keys.ts";
 import { entries } from "./routes/entries.ts";
 import { pages } from "./routes/pages.ts";
 import { sites } from "./routes/sites.ts";
@@ -41,6 +44,33 @@ export function createApi(deps: ApiDeps) {
     if (requireAuth && !c.get("actor")) throw unauthorized();
     await next();
   });
+
+  if (deps.mcp) {
+    const mcp = createCloudhalMcpHandler({ store: deps.store, ...deps.mcp });
+    const resolvePrincipal: PrincipalResolver =
+      deps.resolvePrincipal ??
+      (async (c) => {
+        const actor = (c as Context<Env>).get("actor");
+        return actor ? { actor, scopes: defaultScopes(actor) } : undefined;
+      });
+    app.all("/mcp", async (c) => {
+      const principal = await resolvePrincipal(c);
+      if (!principal) throw unauthorized();
+      return mcp.fetch(c.req.raw, principal);
+    });
+  }
+
+  if (deps.agentKeys) {
+    app.use("/api/agent-keys", async (c, next) => {
+      if (!c.get("actor")) throw unauthorized();
+      await next();
+    });
+    app.use("/api/agent-keys/*", async (c, next) => {
+      if (!c.get("actor")) throw unauthorized();
+      await next();
+    });
+    app.route("/api/agent-keys", agentKeys(deps.agentKeys));
+  }
 
   app.route("/api/sites", sites);
   app.route("/api/sites/:siteId/pages", pages);

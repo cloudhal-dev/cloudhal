@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build, init, readProjectConfig, snapshot } from "../src/index.ts";
 
@@ -71,6 +73,41 @@ describe("cloudhal init → dev → snapshot → build", () => {
     await expect(init({ dir: projectDir })).rejects.toThrow(/not empty/);
     // Borrow the starter's installed dependencies so Astro can resolve packages in the temp dir.
     await symlink(STARTER_NODE_MODULES, path.join(projectDir, "node_modules"), "dir");
+  });
+
+  it("mcp serves the project's tools and skills over stdio", async () => {
+    const { VITEST: _v, NODE_ENV: _n, ...env } = process.env as Record<string, string>;
+    const client = new Client({ name: "e2e", version: "1.0.0" }, { capabilities: {} });
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [BIN, "mcp", "--scopes", "site:read,content:read"],
+      cwd: projectDir,
+      env,
+      stderr: "pipe",
+    });
+    try {
+      await client.connect(transport);
+      const { tools } = await client.listTools();
+      expect(tools.map((t) => t.name)).toContain("preview_page");
+      const { resources } = await client.listResources();
+      expect(resources.map((r) => r.uri)).toContain("skill://safe-edit/SKILL.md");
+      const cfg = await readProjectConfig(projectDir);
+      const sites = await client.callTool({ name: "list_sites", arguments: {} });
+      expect((sites.structuredContent as { sites: { id: string }[] }).sites[0]?.id).toBe(
+        cfg.siteId,
+      );
+      // --scopes limited this client to reading
+      const denied = await client.callTool({
+        name: "create_page",
+        arguments: { siteId: cfg.siteId, path: "/nope", title: "Nope" },
+      });
+      expect(denied.isError).toBe(true);
+      expect((denied.content[0] as { text: string }).text).toMatch(
+        /denied: missing scope content:write/,
+      );
+    } finally {
+      await client.close();
+    }
   });
 
   it("dev serves live pages and reflects edits without restart", async () => {

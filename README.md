@@ -33,11 +33,14 @@ packages/core-contracts   JSON Schema source of truth, generated TypeScript + pr
 packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs, R2 adapters; migrations
 packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 packages/astro-renderer   Astro 7 integration, live/snapshot data sources, section components
-packages/cli              cloudhal init / dev / snapshot / build / studio (fully offline)
-packages/api              Hono HTTP API + Better Auth (Node and Workers)
+packages/cli              cloudhal init / dev / snapshot / build / studio / mcp (fully offline)
+packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
+packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
+packages/mcp-server       MCP server: 18 semantic tools, approval gate, skills as resources; stdio + HTTP
 packages/ui               Kumo re-export + Cloudhal blocks
 apps/studio               Studio admin UI (Vite + React SPA, en/tr)
 starters/blog             the first starter: routes, layout, theme map
+skills/official           site-bootstrap, safe-edit, publish-article, rollback (Agent Skills spec)
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
 docs/design               DESIGN.md — the binding admin design system (Kumo)
@@ -45,7 +48,7 @@ docs/rfcs                 design proposals (RFC-0001: Site Graph)
 .agents/skills            skills for coding agents working on this repo
 ```
 
-Planned: `packages/{agent-runtime,mcp-server,sdk-js}`, `apps/{studio,site,demo-newsroom}`, `capabilities/`, `skills/official`, `starters/blog`.
+Planned: `packages/sdk-js`, `apps/{site,demo-newsroom}`, `capabilities/`.
 
 ## Open-core boundary
 

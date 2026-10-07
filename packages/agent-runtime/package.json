@@ -1,0 +1,34 @@
+{
+  "name": "@cloudhal/agent-runtime",
+  "version": "0.0.1",
+  "description": "Cloudhal agent runtime: policy engine (actors, scopes, approvals), skill loader, audit log",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/agent-runtime"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

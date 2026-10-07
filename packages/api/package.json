@@ -28,7 +28,10 @@
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "hono": "catalog:",
-    "better-auth": "catalog:"
+    "better-auth": "catalog:",
+    "@better-auth/api-key": "catalog:",
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*"
   },
   "peerDependencies": {
     "@hono/node-server": "^2.0.0",
@@ -50,6 +53,7 @@
     "better-sqlite3": "catalog:",
     "miniflare": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@modelcontextprotocol/client": "catalog:"
   }
 }

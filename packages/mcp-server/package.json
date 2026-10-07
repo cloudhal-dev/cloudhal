@@ -1,0 +1,42 @@
+{
+  "name": "@cloudhal/mcp-server",
+  "version": "0.0.1",
+  "description": "Cloudhal MCP server: semantic site tools (pages, articles, snapshots, preview, publish) governed by the policy engine",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/mcp-server"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools.ts",
+    "./stdio": "./src/stdio.ts",
+    "./http": "./src/http.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/astro-renderer": "workspace:*",
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "@modelcontextprotocol/server": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@modelcontextprotocol/client": "catalog:"
+  }
+}

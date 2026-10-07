@@ -1,0 +1,171 @@
+/** `/mcp` over HTTP: session cookie → human (approval-gated), API key → agent (scope-limited). */
+import { AuditLog } from "@cloudhal/agent-runtime";
+import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { MemoryBlobStore } from "@cloudhal/storage";
+import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
+import { createApi } from "../src/app.ts";
+import { createAuth } from "../src/auth.ts";
+
+async function setup() {
+  const db = new Database(":memory:");
+  const sql = new BetterSqlite3Driver(db);
+  const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+  await store.init();
+  const siteId = (await seedStarterSite(store, { name: "MCP Site", slug: "mcp-site" })).id;
+  const auth = createAuth({
+    database: db,
+    baseURL: "http://localhost",
+    secret: "test-secret-test-secret-test-secret",
+  });
+  const audit = new AuditLog(sql);
+  const app = createApi({
+    store,
+    resolveActor: auth.resolveActor,
+    resolvePrincipal: auth.resolvePrincipal,
+    authHandler: auth.handler,
+    mcp: { stateKey: "http-test-key-at-least-thirty-two-bytes-long", audit },
+    agentKeys: auth.agentKeys,
+  });
+
+  const signUp = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Halil",
+      email: "halil@example.com",
+      password: "correct horse battery",
+    }),
+  });
+  expect(signUp.status, await signUp.clone().text()).toBe(200);
+  const cookie = (signUp.headers.get("set-cookie") ?? "").split(";")[0] as string;
+
+  const connect = async (headers: Record<string, string>, elicit?: () => "accept" | "decline") => {
+    const client = new Client(
+      { name: "http-test", version: "1.0.0" },
+      {
+        capabilities: elicit ? { elicitation: { form: {} } } : {},
+        // Speak 2026-07-28 (per-request envelope) so the stateless server sees our capabilities.
+        versionNegotiation: { mode: "auto" },
+      },
+    );
+    if (elicit)
+      client.setRequestHandler("elicitation/create", async () => {
+        const action = elicit();
+        return action === "accept" ? { action, content: { confirm: true } } : { action };
+      });
+    const transport = new StreamableHTTPClientTransport(new URL("http://localhost/mcp"), {
+      requestInit: { headers },
+      fetch: async (input, init) => app.fetch(new Request(input, init as RequestInit)),
+    });
+    await client.connect(transport);
+    return client;
+  };
+  return { app, store, siteId, cookie, audit, connect };
+}
+
+describe("MCP over HTTP", () => {
+  it("rejects anonymous callers", async () => {
+    const { app } = await setup();
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("a signed-in human can create and publish (with approval)", async () => {
+    const { siteId, cookie, connect, store } = await setup();
+    const client = await connect({ cookie }, () => "accept");
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name)).toContain("publish");
+
+    const before = (await store.getSite(siteId))?.pageIds.length ?? 0;
+    const created = await client.callTool({
+      name: "create_page",
+      arguments: { siteId, path: "/contact", title: "Contact" },
+    });
+    expect(created.isError, JSON.stringify(created.content)).toBeFalsy();
+    const published = await client.callTool({
+      name: "publish",
+      arguments: { siteId, label: "via http" },
+    });
+    expect(published.isError, JSON.stringify(published.content)).toBeFalsy();
+    const site = await store.getSite(siteId);
+    expect(site?.publishedSnapshotId).toBeDefined();
+    expect(site?.pageIds.length).toBe(before + 1);
+  });
+
+  it("an API key acts as a scope-limited agent and shows up as one in audit", async () => {
+    const { app, siteId, cookie, connect, audit } = await setup();
+    expect((await app.request("/api/agent-keys", { method: "POST" })).status).toBe(401);
+    const create = await app.request("/api/agent-keys", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "newsroom-bot",
+        scopes: ["site:read", "content:read", "content:write", "preview:create"],
+      }),
+    });
+    expect(create.status, await create.clone().text()).toBe(201);
+    const { key, id, scopes } = (await create.json()) as {
+      key: string;
+      id: string;
+      scopes: string[];
+    };
+    expect(scopes).toEqual(["site:read", "content:read", "content:write", "preview:create"]);
+    const badScope = await app.request("/api/agent-keys", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ name: "x", scopes: ["root"] }),
+    });
+    expect(badScope.status).toBe(400);
+    const listed = (await (
+      await app.request("/api/agent-keys", { headers: { cookie } })
+    ).json()) as {
+      id: string;
+      key?: string;
+    }[];
+    expect(listed.map((k) => k.id)).toEqual([id]);
+    expect(listed[0]).not.toHaveProperty("key");
+
+    const me = await app.request("/api/me", { headers: { "x-api-key": key } });
+    const { actor } = (await me.json()) as { actor: { kind: string; id: string; name: string } };
+    expect(actor).toMatchObject({ kind: "agent", name: "newsroom-bot" });
+    expect(actor.id).toMatch(/^agent_[A-Za-z0-9]{6,32}$/);
+    expect((await app.request("/api/me", { headers: { "x-api-key": "not-a-key" } })).status).toBe(
+      401,
+    );
+
+    const client = await connect({ "x-api-key": key });
+    const entry = await client.callTool({
+      name: "create_entry",
+      arguments: { siteId, slug: "bot-post", title: "Bot post", body: "text" },
+    });
+    expect(entry.isError, JSON.stringify(entry.content)).toBeFalsy();
+    const publish = await client.callTool({ name: "publish", arguments: { siteId } });
+    expect(publish.isError).toBe(true);
+    expect((publish.content[0] as { text: string }).text).toMatch(
+      /denied: missing scope site:publish/,
+    );
+
+    const rows = await audit.list({ siteId });
+    expect(rows.map((r) => `${r.actor.kind}:${r.tool}:${r.decision}`)).toEqual([
+      "agent:publish:deny",
+      "agent:create_entry:allow",
+    ]);
+    expect(rows[0]?.actor.id).toBe(actor.id);
+
+    expect(
+      (await app.request(`/api/agent-keys/${id}`, { method: "DELETE", headers: { cookie } }))
+        .status,
+    ).toBe(204);
+    expect((await app.request("/api/me", { headers: { "x-api-key": key } })).status).toBe(401);
+  });
+});

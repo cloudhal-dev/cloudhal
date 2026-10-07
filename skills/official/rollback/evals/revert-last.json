@@ -1,0 +1,4 @@
+{
+  "task": "Revert the site to the snapshot before the last publish.",
+  "expect": { "rollbackRequestedApproval": true, "targetIsAncestor": true }
+}

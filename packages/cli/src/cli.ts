@@ -1,6 +1,8 @@
 import { parseArgs } from "node:util";
+import type { Scope } from "@cloudhal/agent-runtime";
 import { build, dev } from "./commands/astro.ts";
 import { init } from "./commands/init.ts";
+import { mcp } from "./commands/mcp.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 
@@ -12,6 +14,8 @@ Usage:
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
+  cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
+                                                          MCP server over stdio for this project
   cloudhal --help
 `;
 
@@ -29,6 +33,9 @@ export async function main(argv: string[]): Promise<number> {
       publish: { type: "boolean" },
       snapshot: { type: "string" },
       "no-auth": { type: "boolean" },
+      scopes: { type: "string" },
+      skills: { type: "string" },
+      "preview-url": { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -93,6 +100,22 @@ export async function main(argv: string[]): Promise<number> {
         for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => resolve());
       });
       await s.stop();
+      return 0;
+    }
+    case "mcp": {
+      const server = await mcp({
+        projectDir,
+        ...(values.scopes
+          ? { scopes: values.scopes.split(",").map((s) => s.trim()) as Scope[] }
+          : {}),
+        ...(values.skills ? { skillsDir: values.skills } : {}),
+        ...(values["preview-url"] ? { previewUrl: values["preview-url"] } : {}),
+      });
+      await new Promise<void>((resolve) => {
+        for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => resolve());
+        process.stdin.once("close", () => resolve());
+      });
+      await server.stop();
       return 0;
     }
     default:

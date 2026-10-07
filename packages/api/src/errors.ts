@@ -2,6 +2,7 @@ import { ContractValidationError } from "@cloudhal/core-contracts";
 import { ConflictError, NotFoundError, UniqueConstraintError } from "@cloudhal/core-ts";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { AuthError } from "./auth.ts";
 
 export interface ApiErrorBody {
   error: string;
@@ -12,6 +13,8 @@ export interface ApiErrorBody {
 /** Maps domain errors to HTTP responses. Everything else is a 500 with a generic message. */
 export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof HTTPException) return err.getResponse();
+  if (err instanceof AuthError)
+    return c.json<ApiErrorBody>({ error: "auth", message: err.message }, 400);
   if (err instanceof ContractValidationError) {
     return c.json<ApiErrorBody>(
       { error: "validation", message: err.message, details: err.errors },

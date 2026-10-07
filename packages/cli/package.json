@@ -31,7 +31,9 @@
     "@cloudhal/storage": "workspace:*",
     "better-sqlite3": "catalog:",
     "@cloudhal/api": "workspace:*",
-    "@hono/node-server": "catalog:"
+    "@hono/node-server": "catalog:",
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*"
   },
   "peerDependencies": {
     "astro": "^7.3.0"
@@ -40,6 +42,7 @@
     "@types/node": "catalog:",
     "astro": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@modelcontextprotocol/client": "catalog:"
   }
 }

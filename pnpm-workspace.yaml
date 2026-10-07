@@ -30,6 +30,9 @@ catalog:
   "@hono/node-server": ^2.1.3
   better-auth: 1.7.7
   "@better-auth/kysely-adapter": 1.7.7
+  "@better-auth/api-key": 1.7.7
+  "@modelcontextprotocol/server": 2.3.1
+  "@modelcontextprotocol/client": 2.3.1
   "@better-auth/cli": ^1.4.21
   "@cloudflare/kumo": ^2.14.0
   "@base-ui/react": ^1.8.0
