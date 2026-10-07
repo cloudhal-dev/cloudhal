@@ -21,3 +21,6 @@ The self-host promise is real only if the same code runs on Cloudflare (D1/R2/KV
 - Positive: adapters are tiny; D1's constraints become everyone's constraints early, so nothing "works locally but not on Cloudflare".
 - Negative: no long transactions means careful batch design for multi-node mutations (a snapshot write is one batch).
 - Risks: D1 100-param limit on bulk upserts (chunk ≤100 binds); stale reads with D1 replication (use first-primary sessions for CAS reads).
+
+## Addendum (2026-10-07, Sprint 2)
+Drizzle is deferred: with three tables, hand-written SQL migrations (`packages/storage/migrations/*.ts`, applied as one atomic batch each) are smaller and bundle for Workers without a build step. Revisit Drizzle when the schema grows or typed query building becomes a maintenance problem. Everything else in this ADR stands and is implemented.

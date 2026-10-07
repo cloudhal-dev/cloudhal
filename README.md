@@ -27,14 +27,16 @@ No Cloudflare account is needed for anything in this repo. See [CONTRIBUTING.md]
 ## Repository layout
 
 ```
-packages/core-contracts   JSON Schema source of truth + generated TypeScript
+packages/core-contracts   JSON Schema source of truth, generated TypeScript + precompiled validators
+packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs, R2 adapters; migrations
+packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
 docs/rfcs                 design proposals (RFC-0001: Site Graph)
 .agents/skills            skills for coding agents working on this repo
 ```
 
-Planned: `packages/{core-ts,storage,astro-renderer,agent-runtime,mcp-server,cli,sdk-js,ui}`, `apps/{studio,site,demo-newsroom}`, `capabilities/`, `skills/official`, `starters/blog`.
+Planned: `packages/{astro-renderer,agent-runtime,mcp-server,cli,sdk-js,ui}`, `apps/{studio,site,demo-newsroom}`, `capabilities/`, `skills/official`, `starters/blog`.
 
 ## Open-core boundary
 
