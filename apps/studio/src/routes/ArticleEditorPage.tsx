@@ -5,7 +5,6 @@ import {
   ClipboardText,
   DeleteResource,
   Field,
-  Grid,
   Input,
   InputArea,
   InputGroup,
@@ -21,13 +20,21 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Content } from "../components/AppFrame.tsx";
 import { EditorCrumbs } from "../components/EditorCrumbs.tsx";
+import {
+  EditorLayout,
+  PreviewToggle,
+  SPLIT_QUERY,
+  useMediaQuery,
+  usePreviewVisible,
+} from "../components/EditorLayout.tsx";
+import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { setOptional } from "../lib/util.ts";
+import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
 export function ArticleEditorPage() {
@@ -44,9 +51,12 @@ export function ArticleEditorPage() {
   const [draft, setDraft] = useState<ContentEntry | undefined>();
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [previewVisible, setPreviewVisible] = usePreviewVisible();
+  const wide = useMediaQuery(SPLIT_QUERY);
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
+  const dirty = isDirty(draft, query.data);
 
   const save = useMutation({
     mutationFn: (entry: ContentEntry) => api.entries.update(entry),
@@ -109,93 +119,108 @@ export function ArticleEditorPage() {
             >
               {t("common.save")}
             </Button>
+            {wide && <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />}
           </>
         }
       />
       <ErrorBanner error={save.error ?? remove.error} />
-      <Grid variant="2-1" gap="base">
-        <LayerCard>
-          <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
-            <Text variant="heading" as="h2">
-              {t("editor.content")}
-            </Text>
-            <Status status={draft.status} />
-          </LayerCard.Secondary>
-          <LayerCard.Primary className="grid gap-4 px-5 py-4">
-            <Input
-              label={t("editor.title")}
-              value={draft.title}
-              onValueChange={(v) =>
-                setDraft({
-                  ...draft,
-                  title: v,
-                  slug: draft.slug.startsWith("untitled") ? slugify(v) : draft.slug,
-                })
-              }
-            />
-            <Input
-              label={t("editor.summary")}
-              value={draft.summary ?? ""}
-              onValueChange={(v) => setDraft(setOptional(draft, "summary", v))}
-              required={false}
-            />
-            <InputArea
-              label={t("editor.body")}
-              value={draft.body.value}
-              onValueChange={(v) => set("body", { ...draft.body, value: v })}
-              autoResize
-              minRows={14}
-              maxRows={40}
-              className="font-mono"
-            />
-          </LayerCard.Primary>
-        </LayerCard>
-        <div className="grid min-w-0 content-start gap-4">
+      <EditorLayout
+        previewVisible={previewVisible}
+        preview={(height) => (
+          <EditorPreview
+            src={api.preview.entry(siteId, entryId)}
+            rev={draft.rev}
+            name={draft.title || t("articles.untitled")}
+            dirty={dirty}
+            height={height}
+          />
+        )}
+        main={
           <LayerCard>
-            <LayerCard.Secondary className="px-5 py-3">
+            <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
               <Text variant="heading" as="h2">
-                {t("editor.metadata")}
+                {t("editor.content")}
               </Text>
+              <Status status={draft.status} />
             </LayerCard.Secondary>
             <LayerCard.Primary className="grid gap-4 px-5 py-4">
-              <Field label={t("editor.slug")} description={t("editor.slugHint")}>
-                <InputGroup>
-                  <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
-                  <InputGroup.Input
-                    aria-label={t("editor.slug")}
-                    value={draft.slug}
-                    onChange={(e) => set("slug", slugify((e.target as HTMLInputElement).value))}
-                  />
-                </InputGroup>
-              </Field>
-              <TagInput
-                label={t("editor.tags")}
-                value={draft.tags}
-                onValueChange={(tags: string[]) =>
-                  set("tags", [
-                    ...new Set(tags.map((x) => slugify(x)).filter((x) => x && x !== "untitled")),
-                  ])
+              <Input
+                label={t("editor.title")}
+                value={draft.title}
+                onValueChange={(v) =>
+                  setDraft({
+                    ...draft,
+                    title: v,
+                    slug: draft.slug.startsWith("untitled") ? slugify(v) : draft.slug,
+                  })
                 }
-                description={t("editor.tagsHint")}
               />
-              <div className="grid gap-2">
-                <ClipboardText size="sm" text={draft.id} />
-                <Text variant="secondary" size="xs">
-                  {t("common.rev", { rev: draft.rev })} ·{" "}
-                  {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
-                </Text>
-              </div>
+              <Input
+                label={t("editor.summary")}
+                value={draft.summary ?? ""}
+                onValueChange={(v) => setDraft(setOptional(draft, "summary", v))}
+                required={false}
+              />
+              <InputArea
+                label={t("editor.body")}
+                value={draft.body.value}
+                onValueChange={(v) => set("body", { ...draft.body, value: v })}
+                autoResize
+                minRows={14}
+                maxRows={40}
+                className="font-mono"
+              />
             </LayerCard.Primary>
           </LayerCard>
-          <Button
-            variant="secondary-destructive"
-            icon={<Trash />}
-            onClick={() => setDeleteOpen(true)}
-          >
-            {t("editor.deleteArticle")}
-          </Button>
-        </div>
-      </Grid>
+        }
+        aside={
+          <>
+            <LayerCard>
+              <LayerCard.Secondary className="px-5 py-3">
+                <Text variant="heading" as="h2">
+                  {t("editor.metadata")}
+                </Text>
+              </LayerCard.Secondary>
+              <LayerCard.Primary className="grid gap-4 px-5 py-4">
+                <Field label={t("editor.slug")} description={t("editor.slugHint")}>
+                  <InputGroup>
+                    <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
+                    <InputGroup.Input
+                      aria-label={t("editor.slug")}
+                      value={draft.slug}
+                      onChange={(e) => set("slug", slugify((e.target as HTMLInputElement).value))}
+                    />
+                  </InputGroup>
+                </Field>
+                <TagInput
+                  label={t("editor.tags")}
+                  value={draft.tags}
+                  onValueChange={(tags: string[]) =>
+                    set("tags", [
+                      ...new Set(tags.map((x) => slugify(x)).filter((x) => x && x !== "untitled")),
+                    ])
+                  }
+                  description={t("editor.tagsHint")}
+                />
+                <div className="grid gap-2">
+                  <ClipboardText size="sm" text={draft.id} />
+                  <Text variant="secondary" size="xs">
+                    {t("common.rev", { rev: draft.rev })} ·{" "}
+                    {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
+                  </Text>
+                </div>
+              </LayerCard.Primary>
+            </LayerCard>
+            <Button
+              variant="secondary-destructive"
+              icon={<Trash />}
+              onClick={() => setDeleteOpen(true)}
+            >
+              {t("editor.deleteArticle")}
+            </Button>
+          </>
+        }
+      />
       <ApprovalDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}

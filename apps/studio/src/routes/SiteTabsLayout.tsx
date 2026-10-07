@@ -16,7 +16,7 @@ import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
-const TABS = ["overview", "pages", "articles", "snapshots"] as const;
+const TABS = ["overview", "pages", "articles", "snapshots", "activity"] as const;
 
 /** Site-level header with tabs (DESIGN.md §2b); the tab routes render in the outlet. */
 export function SiteTabsLayout() {
@@ -67,7 +67,7 @@ export function SiteTabsLayout() {
             : undefined
         }
         tabs={TABS.map((tab) => ({ value: tab, label: t(`site.tabs.${tab}`) }))}
-        defaultTab={current}
+        tab={current}
         onValueChange={(v) => navigate({ to: v === "overview" ? base : `${base}/${v}` })}
       >
         <ButtonGroup aria-label={t("site.publish")}>

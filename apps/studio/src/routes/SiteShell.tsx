@@ -3,6 +3,7 @@ import {
   Article,
   CalendarDots,
   Camera,
+  ClockCounterClockwise,
   FileText,
   Globe,
   House,
@@ -94,6 +95,12 @@ export function SiteShell() {
       label: t("commands.goSnapshots"),
       run: () => navigate({ to: "/sites/$siteId/snapshots", params: { siteId } }),
     },
+    {
+      id: "activity",
+      label: t("commands.goActivity"),
+      run: () => navigate({ to: "/sites/$siteId/activity", params: { siteId } }),
+    },
+    { id: "agents", label: t("commands.goAgents"), run: () => navigate({ to: "/agents" }) },
     { id: "new-article", label: t("commands.newArticle"), run: () => createArticle.mutate() },
     { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate(false) },
     { id: "publish", label: t("commands.publishSite"), run: () => snapshot.mutate(true) },
@@ -167,26 +174,38 @@ export function SiteShell() {
                 {t("nav.snapshots")}
                 <Sidebar.MenuBadge>{snapshots.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={ClockCounterClockwise}
+                href={`${base}/activity`}
+                active={is(`${base}/activity`)}
+                tooltip={t("nav.activity")}
+              >
+                {t("nav.activity")}
+              </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
             <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
               <Sidebar.MenuItem>
-                <Sidebar.Collapsible>
+                <Sidebar.Collapsible defaultOpen>
                   <Sidebar.CollapsibleTrigger
                     render={
                       <Sidebar.MenuButton icon={Robot} tooltip={t("nav.agents")}>
                         {t("nav.agents")}
-                        <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
                         <Sidebar.MenuChevron />
                       </Sidebar.MenuButton>
                     }
                   />
                   <Sidebar.CollapsibleContent>
                     <Sidebar.MenuSub>
-                      <Sidebar.MenuSubButton>{t("nav.agentRuns")}</Sidebar.MenuSubButton>
-                      <Sidebar.MenuSubButton>{t("nav.agentSkills")}</Sidebar.MenuSubButton>
+                      <Sidebar.MenuSubButton href="/agents">
+                        {t("nav.agentKeys")}
+                      </Sidebar.MenuSubButton>
+                      <Sidebar.MenuSubButton disabled>
+                        {t("nav.agentSkills")}
+                        <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
+                      </Sidebar.MenuSubButton>
                     </Sidebar.MenuSub>
                   </Sidebar.CollapsibleContent>
                 </Sidebar.Collapsible>

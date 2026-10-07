@@ -48,6 +48,8 @@ const FORBIDDEN_ELEMENTS = [
   "ol",
   "li",
   "p",
+  // Previews go through @cloudhal/ui's PreviewPanel (sandboxed, scaled, reloadable).
+  "iframe",
 ];
 const FORBIDDEN_CLASSES: Array<[RegExp, string]> = [
   [/\bfont-bold\b/, "use font-semibold or <Text bold>"],
@@ -110,8 +112,50 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "DeleteResource",
     "SkeletonLine",
   ],
-  "routes/SnapshotsPage.tsx": ["Toolbar", "SnapshotTimeline", "Pagination", "ApprovalDialog"],
+  "routes/SnapshotsPage.tsx": [
+    "Toolbar",
+    "SnapshotTimeline",
+    "Pagination",
+    "ApprovalDialog",
+    "SnapshotDiffDialog",
+  ],
   "routes/LoginPage.tsx": ["Surface", "Tabs", "Input", "Button"],
+  "routes/AgentsPage.tsx": [
+    "ResourceListPage",
+    "ListToolbar",
+    "Table",
+    "Empty",
+    "Pagination",
+    "DeleteResource",
+    "ClipboardText",
+    "CodeHighlighted",
+    "CreateAgentKeyDialog",
+  ],
+  "routes/ActivityPage.tsx": [
+    "Toolbar",
+    "Select",
+    "Table",
+    "Empty",
+    "TableSkeleton",
+    "RefreshButton",
+    "ErrorBanner",
+    "ActivityDetailDialog",
+  ],
+  "components/CreateAgentKeyDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Checkbox",
+    "ClipboardText",
+    "Banner",
+    "CodeHighlighted",
+  ],
+  "components/ActivityDetailDialog.tsx": ["LayerDialog", "Banner", "CodeHighlighted"],
+  "components/SnapshotDiffDialog.tsx": ["LayerDialog", "Tabs", "Badge", "Table", "Empty"],
+  "components/EditorLayout.tsx": ["Grid", "Tabs", "Tooltip"],
+  "components/EditorPreview.tsx": ["PreviewPanel"],
+  "routes/PageEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
+  "routes/ArticleEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
+  "routes/SiteOverviewPage.tsx#activity": ["RecentActivity"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -147,6 +191,16 @@ const REQUIRED_SOMEWHERE = [
   "InlineCopyText",
   "Grid",
   "Link",
+  "LayerDialog",
+  "Checkbox",
+  "Tooltip",
+  "RefreshButton",
+  "LinkButton",
+  "CodeHighlighted",
+  "PreviewPanel",
+  "DecisionBadge",
+  "ActorBadge",
+  "OutcomeBadge",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -168,7 +222,9 @@ describe("design rules (DESIGN.md)", () => {
 
   it.each(Object.entries(REQUIRED_IMPORTS))(
     "%s is composed from the required Kumo blocks",
-    (file, required) => {
+    (key, required) => {
+      // `file#topic` lets one file carry several independent requirements.
+      const file = key.split("#")[0] as string;
       const text = (files.find((f) => f.file === file) as { text: string }).text;
       const missing = required.filter((name) => !new RegExp(`\\b${name}\\b`).test(text));
       expect(missing, `${file} must use ${missing.join(", ")}`).toEqual([]);
@@ -179,6 +235,27 @@ describe("design rules (DESIGN.md)", () => {
     const all = files.map((f) => f.text).join("\n");
     const missing = REQUIRED_SOMEWHERE.filter((name) => !new RegExp(`\\b${name}\\b`).test(all));
     expect(missing).toEqual([]);
+  });
+
+  it("every iframe is fully sandboxed (previews include drafts)", () => {
+    const UI_BLOCKS = path.resolve(here, "../../../packages/ui/src/blocks");
+    const sources = [
+      ...files,
+      ...walk(UI_BLOCKS).map((f) => ({ file: f, text: readFileSync(f, "utf8") })),
+    ];
+    const unsandboxed = sources.flatMap((f) =>
+      [...f.text.matchAll(/<iframe\b[^>]*>/g)]
+        .filter((m) => !/\bsandbox=""/.test(m[0]))
+        .map(() => path.basename(f.file)),
+    );
+    expect(unsandboxed, 'use sandbox="" (no scripts, no same-origin)').toEqual([]);
+  });
+
+  it("LayerDialog.Content gets its parts directly (Kumo throws on fragments/conditionals)", () => {
+    const offenders = uiFiles
+      .filter((f) => /<LayerDialog\.Content[^>]*>\s*(?:\{|<>)/.test(f.text))
+      .map((f) => f.file);
+    expect(offenders).toEqual([]);
   });
 
   it("every user-facing string goes through useT()", () => {

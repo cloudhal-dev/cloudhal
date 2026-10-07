@@ -23,13 +23,21 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Content } from "../components/AppFrame.tsx";
 import { EditorCrumbs } from "../components/EditorCrumbs.tsx";
+import {
+  EditorLayout,
+  PreviewToggle,
+  SPLIT_QUERY,
+  useMediaQuery,
+  usePreviewVisible,
+} from "../components/EditorLayout.tsx";
+import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { setOptional } from "../lib/util.ts";
+import { isDirty, setOptional } from "../lib/util.ts";
 
 const KINDS: Section["kind"][] = ["hero", "richText", "image", "contentList"];
 
@@ -144,9 +152,12 @@ export function PageEditorPage() {
   const [draft, setDraft] = useState<Page | undefined>();
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [previewVisible, setPreviewVisible] = usePreviewVisible();
+  const wide = useMediaQuery(SPLIT_QUERY);
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
+  const dirty = isDirty(draft, query.data);
   const save = useMutation({
     mutationFn: (page: Page) => api.pages.update(page),
     onSuccess: async (saved) => {
@@ -234,123 +245,138 @@ export function PageEditorPage() {
             >
               {t("common.save")}
             </Button>
+            {wide && <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />}
           </>
         }
       />
       <ErrorBanner error={save.error ?? remove.error} />
-      <Grid variant="2-1" gap="base">
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <Text variant="heading" as="h2">
-              {t("editor.sections")}
-            </Text>
-            {addMenu}
-          </div>
-          {draft.sections.length === 0 ? (
-            <Empty
-              size="sm"
-              icon={<Rows size={32} className="text-kumo-inactive" />}
-              title={t("editor.noSections")}
-              description={t("editor.noSectionsDescription")}
-              contents={addMenu}
-            />
-          ) : (
-            draft.sections.map((s, i) => (
-              <LayerCard key={s.id} data-section-kind={s.kind}>
-                <LayerCard.Secondary className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Text bold as="span">
-                      {s.kind}
-                    </Text>
-                    <InlineCopyText>{s.id}</InlineCopyText>
-                  </div>
-                  <div className="flex gap-1">
-                    <Tooltip
-                      content={t("editor.moveUp")}
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          shape="square"
-                          icon={<ArrowUp />}
-                          aria-label={t("editor.moveUp")}
-                          onClick={() => move(i, -1)}
-                          disabled={i === 0}
-                        />
-                      }
-                    />
-                    <Tooltip
-                      content={t("editor.moveDown")}
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          shape="square"
-                          icon={<ArrowDown />}
-                          aria-label={t("editor.moveDown")}
-                          onClick={() => move(i, 1)}
-                          disabled={i === draft.sections.length - 1}
-                        />
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      shape="square"
-                      aria-label={t("editor.remove")}
-                      onClick={() =>
-                        setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== i) })
-                      }
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                </LayerCard.Secondary>
-                <LayerCard.Primary>
-                  <SectionForm section={s} onChange={(next) => updateSection(i, next)} />
-                </LayerCard.Primary>
-              </LayerCard>
-            ))
-          )}
-        </div>
-        <div className="grid min-w-0 content-start gap-4">
-          <LayerCard>
-            <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
+      <EditorLayout
+        previewVisible={previewVisible}
+        preview={(height) => (
+          <EditorPreview
+            src={api.preview.page(siteId, pageId)}
+            rev={draft.rev}
+            name={draft.path}
+            dirty={dirty}
+            height={height}
+          />
+        )}
+        main={
+          <>
+            <div className="flex items-center justify-between">
               <Text variant="heading" as="h2">
-                {t("editor.metadata")}
+                {t("editor.sections")}
               </Text>
-              <Status status={draft.status} />
-            </LayerCard.Secondary>
-            <LayerCard.Primary className="grid gap-4 px-5 py-4">
-              <Input
-                label={t("editor.title")}
-                value={draft.title}
-                onValueChange={(v) => setDraft({ ...draft, title: v })}
+              {addMenu}
+            </div>
+            {draft.sections.length === 0 ? (
+              <Empty
+                size="sm"
+                icon={<Rows size={32} className="text-kumo-inactive" />}
+                title={t("editor.noSections")}
+                description={t("editor.noSectionsDescription")}
+                contents={addMenu}
               />
-              <Input
-                label={t("editor.path")}
-                value={draft.path}
-                onValueChange={(v) => setDraft({ ...draft, path: v })}
-                description={t("editor.pathHint")}
-              />
-              <div className="grid gap-2">
-                <ClipboardText size="sm" text={draft.id} />
-                <Text variant="secondary" size="xs">
-                  {t("common.rev", { rev: draft.rev })} ·{" "}
-                  {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
+            ) : (
+              draft.sections.map((s, i) => (
+                <LayerCard key={s.id} data-section-kind={s.kind}>
+                  <LayerCard.Secondary className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Text bold as="span">
+                        {s.kind}
+                      </Text>
+                      <InlineCopyText>{s.id}</InlineCopyText>
+                    </div>
+                    <div className="flex gap-1">
+                      <Tooltip
+                        content={t("editor.moveUp")}
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            shape="square"
+                            icon={<ArrowUp />}
+                            aria-label={t("editor.moveUp")}
+                            onClick={() => move(i, -1)}
+                            disabled={i === 0}
+                          />
+                        }
+                      />
+                      <Tooltip
+                        content={t("editor.moveDown")}
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            shape="square"
+                            icon={<ArrowDown />}
+                            aria-label={t("editor.moveDown")}
+                            onClick={() => move(i, 1)}
+                            disabled={i === draft.sections.length - 1}
+                          />
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        shape="square"
+                        aria-label={t("editor.remove")}
+                        onClick={() =>
+                          setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== i) })
+                        }
+                      >
+                        <X />
+                      </Button>
+                    </div>
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <SectionForm section={s} onChange={(next) => updateSection(i, next)} />
+                  </LayerCard.Primary>
+                </LayerCard>
+              ))
+            )}
+          </>
+        }
+        aside={
+          <>
+            <LayerCard>
+              <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
+                <Text variant="heading" as="h2">
+                  {t("editor.metadata")}
                 </Text>
-              </div>
-            </LayerCard.Primary>
-          </LayerCard>
-          <Button
-            variant="secondary-destructive"
-            icon={<Trash />}
-            onClick={() => setDeleteOpen(true)}
-          >
-            {t("editor.deletePage")}
-          </Button>
-        </div>
-      </Grid>
+                <Status status={draft.status} />
+              </LayerCard.Secondary>
+              <LayerCard.Primary className="grid gap-4 px-5 py-4">
+                <Input
+                  label={t("editor.title")}
+                  value={draft.title}
+                  onValueChange={(v) => setDraft({ ...draft, title: v })}
+                />
+                <Input
+                  label={t("editor.path")}
+                  value={draft.path}
+                  onValueChange={(v) => setDraft({ ...draft, path: v })}
+                  description={t("editor.pathHint")}
+                />
+                <div className="grid gap-2">
+                  <ClipboardText size="sm" text={draft.id} />
+                  <Text variant="secondary" size="xs">
+                    {t("common.rev", { rev: draft.rev })} ·{" "}
+                    {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
+                  </Text>
+                </div>
+              </LayerCard.Primary>
+            </LayerCard>
+            <Button
+              variant="secondary-destructive"
+              icon={<Trash />}
+              onClick={() => setDeleteOpen(true)}
+            >
+              {t("editor.deletePage")}
+            </Button>
+          </>
+        }
+      />
       <ApprovalDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}

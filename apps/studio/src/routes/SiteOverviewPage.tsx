@@ -16,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT } from "../i18n/index.tsx";
@@ -242,6 +243,15 @@ export function SiteOverviewPage() {
               {site.data?.publishedSnapshotId && (
                 <ClipboardText size="sm" text={site.data.publishedSnapshotId} />
               )}
+            </LayerCard.Primary>
+          </Card>
+          <Card
+            title={t("activity.recent")}
+            href={`/sites/${siteId}/activity`}
+            viewAll={t("overview.viewAll")}
+          >
+            <LayerCard.Primary className="p-0">
+              <RecentActivity siteId={siteId} />
             </LayerCard.Primary>
           </Card>
           <Card title={t("overview.quickActions")}>
