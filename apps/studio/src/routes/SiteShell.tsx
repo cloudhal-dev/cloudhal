@@ -1,8 +1,8 @@
-import { DropdownMenu, Sidebar, Text } from "@cloudhal/ui";
+import { DropdownMenu, Sidebar, SidebarSwitcher } from "@cloudhal/ui";
 import {
   Article,
+  CalendarDots,
   Camera,
-  CaretUpDown,
   FileText,
   Globe,
   House,
@@ -26,6 +26,15 @@ export function SiteShell() {
   const toast = useToast();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites.list });
+  const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
+  const entries = useQuery({
+    queryKey: ["entries", siteId, "posts"],
+    queryFn: () => api.entries.list(siteId, "posts"),
+  });
+  const snapshots = useQuery({
+    queryKey: ["snapshots", siteId],
+    queryFn: () => api.snapshots.list(siteId),
+  });
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -94,37 +103,19 @@ export function SiteShell() {
   return (
     <AppFrame
       title={site.data?.name ?? "…"}
+      loading={site.isPending}
       switcher={
-        <DropdownMenu>
-          <DropdownMenu.Trigger
-            render={<Sidebar.MenuButton icon={Globe} tooltip={t("nav.switchSite")} />}
-          >
-            <span className="grid min-w-0 text-left">
-              <Text variant="secondary" size="xs" as="span">
-                {t("nav.sites")}
-              </Text>
-              <Text bold truncate as="span" data-testid="site-name">
-                {site.data?.name ?? "…"}
-              </Text>
-            </span>
-            <CaretUpDown className="ml-auto size-4 shrink-0 text-kumo-subtle" />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="start" className="w-(--anchor-width)">
-            {sites.data?.map((s) => (
-              <DropdownMenu.Item
-                key={s.id}
-                icon={Globe}
-                selected={s.id === siteId}
-                onClick={() => navigate({ to: "/sites/$siteId", params: { siteId: s.id } })}
-              >
-                {s.name}
-              </DropdownMenu.Item>
-            ))}
+        <SidebarSwitcher
+          ariaLabel={t("nav.switchSite")}
+          current={{ id: siteId, name: site.data?.name ?? "…", icon: Globe }}
+          items={(sites.data ?? []).map((s) => ({ id: s.id, name: s.name, icon: Globe }))}
+          onSelect={(item) => navigate({ to: "/sites/$siteId", params: { siteId: item.id } })}
+          extra={
             <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
               {t("nav.allSites")}
             </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu>
+          }
+        />
       }
       nav={
         <>
@@ -151,6 +142,7 @@ export function SiteShell() {
                 tooltip={t("nav.pages")}
               >
                 {t("nav.pages")}
+                <Sidebar.MenuBadge>{pages.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
               <Sidebar.MenuButton
                 icon={Article}
@@ -159,6 +151,7 @@ export function SiteShell() {
                 tooltip={t("nav.articles")}
               >
                 {t("nav.articles")}
+                <Sidebar.MenuBadge>{entries.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
@@ -172,14 +165,34 @@ export function SiteShell() {
                 tooltip={t("nav.snapshots")}
               >
                 {t("nav.snapshots")}
+                <Sidebar.MenuBadge>{snapshots.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
             <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
-              <Sidebar.MenuButton icon={Robot} tooltip={t("nav.soon")}>
-                {t("nav.agents")}
+              <Sidebar.MenuItem>
+                <Sidebar.Collapsible>
+                  <Sidebar.CollapsibleTrigger
+                    render={
+                      <Sidebar.MenuButton icon={Robot} tooltip={t("nav.agents")}>
+                        {t("nav.agents")}
+                        <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
+                        <Sidebar.MenuChevron />
+                      </Sidebar.MenuButton>
+                    }
+                  />
+                  <Sidebar.CollapsibleContent>
+                    <Sidebar.MenuSub>
+                      <Sidebar.MenuSubButton>{t("nav.agentRuns")}</Sidebar.MenuSubButton>
+                      <Sidebar.MenuSubButton>{t("nav.agentSkills")}</Sidebar.MenuSubButton>
+                    </Sidebar.MenuSub>
+                  </Sidebar.CollapsibleContent>
+                </Sidebar.Collapsible>
+              </Sidebar.MenuItem>
+              <Sidebar.MenuButton icon={CalendarDots} tooltip={t("nav.schedules")} disabled>
+                {t("nav.schedules")}
                 <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
             </Sidebar.Menu>

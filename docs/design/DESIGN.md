@@ -19,7 +19,7 @@ Studio mirrors this one-to-one:
 | Breadcrumbs | `Breadcrumbs` → `Breadcrumbs.Link href icon`, `Breadcrumbs.Separator`, `Breadcrumbs.Current loading`, `Breadcrumbs.Clipboard text` for ids. Always the first row of a detail page (inside `PageHeader`). |
 | Page header | Block `PageHeader` (ours, from `kumo add PageHeader` + an `actions` slot): `breadcrumbs`, `title`, `description`, `tabs`, `defaultTab`, `onValueChange`, actions right-aligned. |
 | Lists | `ResourceListPage` (`title`, `description`, `icon`, `usage`, `additionalContent`) + `Toolbar` (search/filter) + `LayerCard className="p-0"` + `Table` + `Pagination` + `Empty`. |
-| Sections | `LayerCard` with `LayerCard.Secondary` (header) and `LayerCard.Primary` (body). Never nested. |
+| Sections | `LayerCard` with `LayerCard.Secondary` (muted header row: title, badge, "View all") and `LayerCard.Primary` (body; `p-0` when it holds a `Table`). Never nested; never a bare `LayerCard` with hand-made headers. |
 | Neutral panels | `Surface` (usage/code panels, login card). |
 | Feedback | `Banner` (page/section), `Field`/`Input error` (inline), `Toasty` + `useKumoToastManager` (transient). |
 | Confirmation | `ApprovalDialog` (ours, on `Dialog`) for publish/rollback; `DeleteResource` (block) for typed-name deletes; `LayerDialog.Alert` for other destructive alerts. Always rendered, controlled by `open`. |
@@ -72,6 +72,13 @@ Centered `Surface` (`max-w-sm`, `ring ring-kumo-line rounded-xl px-6 py-5`), bra
   <main className="flex-1 bg-kumo-overlay">…</main>
 </Sidebar.Provider>
 ```
+Composition rules verified against Kumo's own `SidebarDemo.tsx`:
+- The header switcher is **not** a `MenuButton` (that auto-wraps in `<li>` and renders a bullet outside a `Menu`); it is a plain row trigger for `DropdownMenu` with `w-(--anchor-width)` content and a check on the current item — `@cloudhal/ui` ships it as `SidebarSwitcher`.
+- `Sidebar.Loading` replaces `Sidebar.Content` until navigation data resolves; never render an empty menu.
+- Counts and states go in `Sidebar.MenuBadge` (`4`, `Soon`, `Beta`); unavailable items are `disabled`, never hidden.
+- Sub-navigation uses `Sidebar.MenuItem` → `Sidebar.Collapsible` → `CollapsibleTrigger render={<Sidebar.MenuButton>… <Sidebar.MenuChevron /></Sidebar.MenuButton>}` → `CollapsibleContent` → `MenuSub`/`MenuSubButton`.
+- The user menu is a `DropdownMenu` on a `MenuButton` inside `Sidebar.Footer`, next to `Sidebar.Trigger`; `Sidebar.Rail` closes the sidebar.
+
 Rules from `sidebar.tsx`: `MenuButton` auto-wraps in `<li>`; `MenuItem` only around `Collapsible`; `tooltip` shows only when collapsed and not peekable; `GroupLabel` becomes a divider when collapsed; sub-menus via `Sidebar.Collapsible` + `MenuSub`/`MenuSubButton`; account↔site via `Sidebar.SlidingViews`; below `mobileBreakpoint` the sidebar is a sheet. Group names follow capabilities (Overview, Content, History, Automation, Settings), never product names.
 
 ## 4. Typography, spacing, colour
@@ -84,7 +91,7 @@ Rules from `sidebar.tsx`: `MenuButton` auto-wraps in `<li>`; `MenuItem` only aro
 ## 5. States
 | State | Implementation |
 |---|---|
-| Loading | `SkeletonLine` rows in tables and cards; `Breadcrumbs.Current loading`; `Select loading`; `Button loading`; `Sidebar.Loading`. Never a spinner-only page. |
+| Loading | Prefer each component's own loading affordance: `Sidebar.Loading`, `Breadcrumbs.Current loading`, `Select loading`, `Button loading`, `InputGroup.Addon` with `Loader` for async validation; `SkeletonLine` rows only where no component owns the state (table bodies, text cards). Never a spinner-only page. |
 | Empty | `Empty` with icon (48), title, description, `commandLine` for CLI parity, `contents` for the CTA. |
 | Error | `Banner variant="error"` with `Banner.Action` retry; field errors via `Input error`; conflicts (409) explain "someone else changed this" and offer reload. |
 | Success | `useKumoToastManager().add({ title, description, type: "success" })`; long jobs via `promise()`. |
@@ -117,7 +124,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | Field | wraps controls that lack a `label` prop |
 | Grid | detail/settings layouts |
 | InlineCopyText | ids in dense cells |
-| Input / InputArea / InputGroup | forms, slugs with prefix |
+| Input / InputArea / InputGroup | forms; `InputGroup.Addon` for slug/URL prefixes and async validation state |
 | Label | standalone labels only |
 | LayerCard | section cards (never nested) |
 | LayerDialog | create/edit forms, destructive alerts |

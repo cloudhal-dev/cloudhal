@@ -4,9 +4,11 @@ import {
   Button,
   ClipboardText,
   DeleteResource,
+  Field,
   Grid,
   Input,
   InputArea,
+  InputGroup,
   LayerCard,
   PageHeader,
   SkeletonLine,
@@ -112,8 +114,14 @@ export function ArticleEditorPage() {
       />
       <ErrorBanner error={save.error ?? remove.error} />
       <Grid variant="2-1" gap="base">
-        <LayerCard className="px-5 py-4">
-          <div className="grid gap-4">
+        <LayerCard>
+          <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
+            <Text variant="heading" as="h2">
+              {t("editor.content")}
+            </Text>
+            <Status status={draft.status} />
+          </LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-4 px-5 py-4">
             <Input
               label={t("editor.title")}
               value={draft.title}
@@ -140,23 +148,26 @@ export function ArticleEditorPage() {
               maxRows={40}
               className="font-mono"
             />
-          </div>
+          </LayerCard.Primary>
         </LayerCard>
         <div className="grid min-w-0 content-start gap-4">
-          <LayerCard className="px-5 py-4">
-            <div className="grid gap-4">
-              <div className="flex items-center justify-between">
-                <Text variant="heading" as="h2">
-                  {t("editor.metadata")}
-                </Text>
-                <Status status={draft.status} />
-              </div>
-              <Input
-                label={t("editor.slug")}
-                value={draft.slug}
-                onValueChange={(v) => set("slug", slugify(v))}
-                description={`/${draft.collection}/${draft.slug}`}
-              />
+          <LayerCard>
+            <LayerCard.Secondary className="px-5 py-3">
+              <Text variant="heading" as="h2">
+                {t("editor.metadata")}
+              </Text>
+            </LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-4 px-5 py-4">
+              <Field label={t("editor.slug")} description={t("editor.slugHint")}>
+                <InputGroup>
+                  <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
+                  <InputGroup.Input
+                    aria-label={t("editor.slug")}
+                    value={draft.slug}
+                    onChange={(e) => set("slug", slugify((e.target as HTMLInputElement).value))}
+                  />
+                </InputGroup>
+              </Field>
               <TagInput
                 label={t("editor.tags")}
                 value={draft.tags}
@@ -174,7 +185,7 @@ export function ArticleEditorPage() {
                   {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
                 </Text>
               </div>
-            </div>
+            </LayerCard.Primary>
           </LayerCard>
           <Button
             variant="secondary-destructive"

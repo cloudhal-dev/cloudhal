@@ -57,6 +57,9 @@ export const en = {
     commands: "Commands",
     search: "Search or run a command…",
     shortcutHint: "⌘K",
+    agentRuns: "Runs",
+    agentSkills: "Skills",
+    schedules: "Schedules",
     toggleSidebar: "Toggle sidebar",
   },
   commands: {
@@ -146,6 +149,8 @@ export const en = {
     deletePage: "Delete page",
     article: "Article",
     page: "Page",
+    content: "Content",
+    slugHint: "Lower-case, hyphenated; becomes the URL.",
     metadata: "Details",
   },
   status: { draft: "Draft", review: "In review", published: "Published", archived: "Archived" },

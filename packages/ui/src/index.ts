@@ -15,6 +15,11 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  SidebarSwitcher,
+  type SidebarSwitcherProps,
+  type SwitcherItem,
+} from "./blocks/SidebarSwitcher.tsx";
+export {
   SnapshotTimeline,
   type SnapshotTimelineLabels,
   type SnapshotTimelineProps,

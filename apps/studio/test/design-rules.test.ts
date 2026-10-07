@@ -63,8 +63,15 @@ const FORBIDDEN_CLASSES: Array<[RegExp, string]> = [
 
 /** Every screen must be composed from these; the matrix in DESIGN.md maps the rest. */
 const REQUIRED_IMPORTS: Record<string, string[]> = {
-  "components/AppFrame.tsx": ["Sidebar", "CommandPalette", "DropdownMenu"],
-  "routes/SiteShell.tsx": ["Sidebar", "DropdownMenu"],
+  "components/AppFrame.tsx": [
+    "Sidebar",
+    "CommandPalette",
+    "DropdownMenu",
+    "Sidebar.Loading",
+    "Sidebar.Trigger",
+    "Sidebar.Rail",
+  ],
+  "routes/SiteShell.tsx": ["SidebarSwitcher", "Sidebar.MenuBadge", "Sidebar.Collapsible"],
   "routes/SiteTabsLayout.tsx": ["PageHeader", "Breadcrumbs", "ButtonGroup", "ApprovalDialog"],
   "routes/SitesPage.tsx": ["ResourceListPage", "Table", "Empty", "Surface", "Code", "Pagination"],
   "routes/SiteOverviewPage.tsx": ["Grid", "LayerCard", "Table", "Empty", "ClipboardText"],

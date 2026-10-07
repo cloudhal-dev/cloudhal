@@ -15,6 +15,7 @@ import {
   Select,
   SkeletonLine,
   Text,
+  Tooltip,
 } from "@cloudhal/ui";
 import { ArrowDown, ArrowUp, FloppyDisk, Plus, Rows, Trash, X } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -264,26 +265,34 @@ export function PageEditorPage() {
                     <InlineCopyText>{s.id}</InlineCopyText>
                   </div>
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      shape="square"
-                      aria-label={t("editor.moveUp")}
-                      onClick={() => move(i, -1)}
-                      disabled={i === 0}
-                    >
-                      <ArrowUp />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      shape="square"
-                      aria-label={t("editor.moveDown")}
-                      onClick={() => move(i, 1)}
-                      disabled={i === draft.sections.length - 1}
-                    >
-                      <ArrowDown />
-                    </Button>
+                    <Tooltip
+                      content={t("editor.moveUp")}
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          shape="square"
+                          icon={<ArrowUp />}
+                          aria-label={t("editor.moveUp")}
+                          onClick={() => move(i, -1)}
+                          disabled={i === 0}
+                        />
+                      }
+                    />
+                    <Tooltip
+                      content={t("editor.moveDown")}
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          shape="square"
+                          icon={<ArrowDown />}
+                          aria-label={t("editor.moveDown")}
+                          onClick={() => move(i, 1)}
+                          disabled={i === draft.sections.length - 1}
+                        />
+                      }
+                    />
                     <Button
                       variant="ghost"
                       size="xs"
@@ -305,14 +314,14 @@ export function PageEditorPage() {
           )}
         </div>
         <div className="grid min-w-0 content-start gap-4">
-          <LayerCard className="px-5 py-4">
-            <div className="grid gap-4">
-              <div className="flex items-center justify-between">
-                <Text variant="heading" as="h2">
-                  {t("editor.metadata")}
-                </Text>
-                <Status status={draft.status} />
-              </div>
+          <LayerCard>
+            <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
+              <Text variant="heading" as="h2">
+                {t("editor.metadata")}
+              </Text>
+              <Status status={draft.status} />
+            </LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-4 px-5 py-4">
               <Input
                 label={t("editor.title")}
                 value={draft.title}
@@ -331,7 +340,7 @@ export function PageEditorPage() {
                   {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
                 </Text>
               </div>
-            </div>
+            </LayerCard.Primary>
           </LayerCard>
           <Button
             variant="secondary-destructive"

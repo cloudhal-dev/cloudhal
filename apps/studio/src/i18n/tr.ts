@@ -57,6 +57,9 @@ export const tr: Messages = {
     commands: "Komutlar",
     search: "Ara veya komut çalıştır…",
     shortcutHint: "⌘K",
+    agentRuns: "Çalıştırmalar",
+    agentSkills: "Skill'ler",
+    schedules: "Zamanlamalar",
     toggleSidebar: "Kenar çubuğunu aç/kapat",
   },
   commands: {
@@ -145,6 +148,8 @@ export const tr: Messages = {
     deletePage: "Sayfayı sil",
     article: "Makale",
     page: "Sayfa",
+    content: "İçerik",
+    slugHint: "Küçük harf, tireli; URL olur.",
     metadata: "Ayrıntılar",
   },
   status: { draft: "Taslak", review: "İncelemede", published: "Yayında", archived: "Arşiv" },

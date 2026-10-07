@@ -1,11 +1,5 @@
 import { Button, CommandPalette, DropdownMenu, Sidebar, Text } from "@cloudhal/ui";
-import {
-  CaretUpDown,
-  MagnifyingGlass,
-  SignOut,
-  SquaresFour,
-  UserCircle,
-} from "@phosphor-icons/react";
+import { MagnifyingGlass, SignOut, SquaresFour, UserCircle } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
@@ -21,20 +15,23 @@ export interface PaletteCommand {
 }
 
 /**
- * The dashboard shell (DESIGN.md §1, §3): Kumo Sidebar with a surface switcher in the header,
- * capability-named groups, user menu + trigger in the footer, a slim sticky top bar with search
- * (⌘K, `/`) and the content container. Sidebar contents come from the caller (account vs site).
+ * The dashboard shell (DESIGN.md §1, §3), composed the way Kumo's own Sidebar demos do it:
+ * switcher in `Sidebar.Header`, nav in `Sidebar.Content` (or `Sidebar.Loading` until data is
+ * ready), user menu + `Sidebar.Trigger` in `Sidebar.Footer`, `Sidebar.Rail` for drag/peek, and
+ * a slim sticky top bar with search (⌘K, `/`).
  */
 export function AppFrame({
   title,
   switcher,
   nav,
+  loading = false,
   commands,
   children,
 }: {
   title: string;
   switcher: ReactNode;
   nav: ReactNode;
+  loading?: boolean;
   commands: PaletteCommand[];
   children: ReactNode;
 }) {
@@ -72,35 +69,39 @@ export function AppFrame({
     <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
       <Sidebar>
         <Sidebar.Header>{switcher}</Sidebar.Header>
-        <Sidebar.Content>{nav}</Sidebar.Content>
+        {loading ? <Sidebar.Loading /> : <Sidebar.Content>{nav}</Sidebar.Content>}
         <Sidebar.Footer>
           <Sidebar.Menu>
-            <DropdownMenu>
-              <DropdownMenu.Trigger
-                render={
-                  <Sidebar.MenuButton
-                    icon={UserCircle}
-                    tooltip={me.data?.actor.name ?? t("nav.account")}
-                  />
-                }
-              >
-                <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
-                <CaretUpDown className="ml-auto size-4 text-kumo-subtle" />
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
-                <DropdownMenu.Item icon={SignOut} onClick={signOut}>
-                  {t("common.signOut")}
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu>
+            <Sidebar.MenuItem>
+              <DropdownMenu>
+                <DropdownMenu.Trigger
+                  render={
+                    <Sidebar.MenuButton
+                      icon={UserCircle}
+                      tooltip={me.data?.actor.name ?? t("nav.account")}
+                    />
+                  }
+                >
+                  <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
+                  <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
+                    {t("nav.allSites")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item icon={SignOut} onClick={signOut}>
+                    {t("common.signOut")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu>
+            </Sidebar.MenuItem>
           </Sidebar.Menu>
+          <Sidebar.Trigger />
         </Sidebar.Footer>
         <Sidebar.Rail />
       </Sidebar>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col bg-kumo-overlay">
-        <header className="sticky top-0 z-10 flex h-12 items-center gap-2 border-kumo-hairline border-b bg-kumo-canvas px-3">
-          <Sidebar.Trigger aria-label={t("nav.toggleSidebar")} />
-          <span className="hidden min-w-0 truncate sm:inline">
+        <header className="sticky top-0 z-10 flex h-12 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
+          <span className="min-w-0 truncate">
             <Text variant="secondary" size="sm" as="span">
               {title}
             </Text>
@@ -119,23 +120,6 @@ export function AppFrame({
               </kbd>
             </Button>
             <LanguageSwitch size="xs" />
-            <DropdownMenu>
-              <DropdownMenu.Trigger
-                render={
-                  <Button variant="ghost" size="sm" shape="square" aria-label={t("nav.account")} />
-                }
-              >
-                <UserCircle size={20} />
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="end">
-                <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
-                  {t("nav.allSites")}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item icon={SignOut} onClick={signOut}>
-                  {t("common.signOut")}
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu>
           </div>
         </header>
         <main className="min-w-0 flex-1">{children}</main>
