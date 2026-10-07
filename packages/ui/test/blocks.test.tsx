@@ -1,7 +1,15 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { SnapshotTimeline, type SnapshotTimelineLabels, StatusBadge } from "../src/index.ts";
+import {
+  ActorBadge,
+  DecisionBadge,
+  OutcomeBadge,
+  PreviewPanel,
+  SnapshotTimeline,
+  type SnapshotTimelineLabels,
+  StatusBadge,
+} from "../src/index.ts";
 
 const labels: SnapshotTimelineLabels = {
   empty: "No snapshots yet",
@@ -67,5 +75,90 @@ describe("SnapshotTimeline", () => {
   it("shows an empty state", () => {
     render(<SnapshotTimeline snapshots={[]} labels={labels} />);
     expect(screen.getByText("No snapshots yet")).toBeInTheDocument();
+  });
+
+  it("offers Compare only when there is something to compare with", () => {
+    const onCompare = vi.fn();
+    const first = snap("snap_first000001", "2026-10-08T08:00:00Z");
+    const second = { ...snap("snap_second00001", "2026-10-08T09:00:00Z"), parentId: first.id };
+    render(
+      <SnapshotTimeline
+        snapshots={[second, first]}
+        onCompare={onCompare}
+        labels={{ ...labels, compare: "Compare" }}
+      />,
+    );
+    const buttons = screen.getAllByText("Compare");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0] as HTMLElement);
+    expect(onCompare).toHaveBeenCalledWith(second);
+  });
+});
+
+describe("audit badges", () => {
+  it("carry machine-readable values and localised labels", () => {
+    render(
+      <>
+        <DecisionBadge decision="deny" label="Reddedildi" />
+        <OutcomeBadge outcome="pending" />
+        <ActorBadge kind="agent" />
+      </>,
+    );
+    expect(screen.getByText("Reddedildi").closest("[data-decision]")).toHaveAttribute(
+      "data-decision",
+      "deny",
+    );
+    expect(screen.getByText("Pending").closest("[data-outcome]")).toHaveAttribute(
+      "data-outcome",
+      "pending",
+    );
+    expect(screen.getByText("Agent").closest("[data-actor-kind]")).toHaveAttribute(
+      "data-actor-kind",
+      "agent",
+    );
+  });
+});
+
+describe("PreviewPanel", () => {
+  const previewLabels = {
+    title: "Preview",
+    frameTitle: "Preview of /about",
+    device: "Device",
+    desktop: "Desktop",
+    tablet: "Tablet",
+    mobile: "Mobile",
+    reload: "Reload preview",
+    openInNewTab: "Open in new tab",
+    loading: "Loading preview",
+  };
+
+  it("renders a fully sandboxed frame that reloads per version", () => {
+    const { rerender } = render(
+      <PreviewPanel src="/api/sites/s/pages/p/preview" version={3} labels={previewLabels} />,
+    );
+    const frame = screen.getByTitle("Preview of /about");
+    expect(frame.tagName).toBe("IFRAME");
+    expect(frame).toHaveAttribute("sandbox", "");
+    expect(frame.getAttribute("src")).toBe("/api/sites/s/pages/p/preview?v=3.0");
+    expect(screen.getByRole("status", { name: "Loading preview" })).toBeInTheDocument();
+    fireEvent.load(frame);
+    expect(screen.queryByRole("status", { name: "Loading preview" })).toBeNull();
+
+    rerender(
+      <PreviewPanel src="/api/sites/s/pages/p/preview" version={4} labels={previewLabels} />,
+    );
+    expect(screen.getByTitle("Preview of /about").getAttribute("src")).toContain("v=4.0");
+    expect(screen.getByRole("link", { name: "Open in new tab" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+  });
+
+  it("renders tablet/mobile at their real width", () => {
+    const { container } = render(
+      <PreviewPanel src="/preview" labels={previewLabels} defaultDevice="mobile" />,
+    );
+    expect(container.querySelector("[data-device]")).toHaveAttribute("data-device", "mobile");
+    expect((container.querySelector("iframe") as HTMLIFrameElement).style.width).toBe("390px");
   });
 });
