@@ -1,0 +1,4 @@
+{
+  "name": "rollback",
+  "description": "Restores a site to an earlier snapshot after confirming the target with the user."
+}

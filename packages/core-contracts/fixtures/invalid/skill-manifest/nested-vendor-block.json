@@ -1,0 +1,8 @@
+{
+  "reason": "nested vendor block 'cloudhal' is not a spec field; use metadata.cloudhal.* strings",
+  "data": {
+    "name": "publish-article",
+    "description": "x",
+    "cloudhal": { "schemaVersion": 1, "scopes": ["content:write"] }
+  }
+}

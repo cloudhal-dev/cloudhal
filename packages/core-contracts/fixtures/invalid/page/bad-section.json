@@ -1,0 +1,16 @@
+{
+  "reason": "embedded section fails the Section oneOf",
+  "data": {
+    "schemaVersion": 1,
+    "id": "page_01HZX8K3Q9GH",
+    "siteId": "site_01HZX8K3Q9EF",
+    "path": "/",
+    "title": "Home",
+    "locale": "en",
+    "status": "draft",
+    "sections": [{ "id": "sec_01HZX8K3Q9QR", "kind": "richText", "format": "docx", "body": "" }],
+    "rev": 0,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T20:00:00Z"
+  }
+}

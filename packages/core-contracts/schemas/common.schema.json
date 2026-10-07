@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/common.schema.json",
+  "title": "Common",
+  "description": "Shared definitions referenced by every Cloudhal contract. Not a root type: the bundler inlines these $defs into each root schema before code generation.",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Slug": {
+      "type": "string",
+      "description": "Lower-case URL segment.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [1]
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": { "type": "string" }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": ["human", "agent", "system"]
+    },
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/ActorKind" },
+        "id": { "$ref": "#/$defs/Id" },
+        "name": { "type": "string", "maxLength": 200 }
+      }
+    },
+    "ImageRef": {
+      "type": "object",
+      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "additionalProperties": false,
+      "required": ["src", "alt"],
+      "properties": {
+        "src": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "alt": { "type": "string", "maxLength": 500 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "href"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "href": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "external": { "type": "boolean" }
+      }
+    },
+    "PublishStatus": {
+      "type": "string",
+      "description": "Editorial lifecycle of a page or content entry.",
+      "enum": ["draft", "review", "published", "archived"]
+    }
+  }
+}

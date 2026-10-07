@@ -1,0 +1,155 @@
+/* eslint-disable */
+/* biome-ignore-all lint: generated */
+/**
+ * GENERATED FILE — DO NOT EDIT.
+ * Source: packages/core-contracts/schemas/*.schema.json  (run `pnpm gen`)
+ */
+
+/**
+ * Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "SchemaVersion".
+ */
+export type SchemaVersion = 1;
+/**
+ * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Id".
+ */
+export type Id = string;
+/**
+ * BCP 47 language tag, e.g. en, tr, en-US.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Locale".
+ */
+export type Locale = string;
+/**
+ * Editorial lifecycle of a page or content entry.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "PublishStatus".
+ */
+export type PublishStatus = "draft" | "review" | "published" | "archived";
+/**
+ * A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Section".
+ */
+export type Section = HeroSection | RichTextSection | ImageSection | ContentListSection;
+/**
+ * Lower-case URL segment.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Slug".
+ */
+export type Slug = string;
+/**
+ * Monotonic per-node revision used for optimistic locking (compare-and-swap on write).
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Revision".
+ */
+export type Revision = number;
+/**
+ * RFC 3339 / ISO 8601 instant in UTC.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Timestamp".
+ */
+export type Timestamp = string;
+
+/**
+ * A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.
+ */
+export interface Page {
+  schemaVersion: SchemaVersion;
+  id: Id;
+  siteId: Id;
+  /**
+   * Absolute URL path, starting with '/', no trailing slash except root.
+   */
+  path: string;
+  title: string;
+  locale: Locale;
+  status: PublishStatus;
+  sections: Section[];
+  seo?: Seo;
+  rev: Revision;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  metadata?: Metadata;
+}
+export interface HeroSection {
+  id: Id;
+  kind: "hero";
+  heading: string;
+  subheading?: string;
+  image?: ImageRef;
+  cta?: Link;
+}
+/**
+ * Reference to a media asset. src may be a relative asset path or an absolute URL.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "ImageRef".
+ */
+export interface ImageRef {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+}
+/**
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Link".
+ */
+export interface Link {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+export interface RichTextSection {
+  id: Id;
+  kind: "richText";
+  format: "markdown" | "html";
+  body: string;
+}
+export interface ImageSection {
+  id: Id;
+  kind: "image";
+  image: ImageRef;
+  caption?: string;
+}
+/**
+ * Renders the newest entries of a content collection (e.g. blog posts).
+ */
+export interface ContentListSection {
+  id: Id;
+  kind: "contentList";
+  collection: Slug;
+  limit: number;
+  sort: "newest" | "oldest" | "title";
+}
+/**
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Seo".
+ */
+export interface Seo {
+  title?: string;
+  description?: string;
+  noindex?: boolean;
+  canonical?: string;
+}
+/**
+ * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Metadata".
+ */
+export interface Metadata {
+  [k: string]: string | undefined;
+}

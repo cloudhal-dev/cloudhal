@@ -1,0 +1,16 @@
+{
+  "reason": "path must not end with a slash",
+  "data": {
+    "schemaVersion": 1,
+    "id": "page_01HZX8K3Q9GH",
+    "siteId": "site_01HZX8K3Q9EF",
+    "path": "/about/",
+    "title": "About",
+    "locale": "en",
+    "status": "draft",
+    "sections": [],
+    "rev": 0,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T20:00:00Z"
+  }
+}

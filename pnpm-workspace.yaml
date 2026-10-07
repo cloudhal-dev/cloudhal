@@ -1,0 +1,23 @@
+packages:
+  - apps/*
+  - packages/*
+  - capabilities/*/*
+  - starters/*
+
+catalogMode: strict
+
+catalog:
+  "@biomejs/biome": 2.5.15
+  "@changesets/cli": 3.0.3
+  "@types/node": ^24.0.0
+  ajv: 8.20.0
+  ajv-formats: 3.0.1
+  json-schema-to-typescript: 16.0.0
+  tsx: ^4.23.15
+  turbo: 2.11.7
+  typescript: 7.0.2
+  vitest: 5.0.3
+
+# Native build scripts must be explicitly approved (pnpm 12 `allowBuilds`).
+allowBuilds:
+  esbuild: true

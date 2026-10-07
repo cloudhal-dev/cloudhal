@@ -1,0 +1,8 @@
+{
+  "id": "sec_01HZX8K3Q9OP",
+  "kind": "hero",
+  "heading": "The morning briefing, written by an agent",
+  "subheading": "Every change previewed, approved and reversible.",
+  "image": { "src": "/assets/hero.jpg", "alt": "Newsroom desk", "width": 1600, "height": 900 },
+  "cta": { "label": "Read today's issue", "href": "/issues/latest" }
+}

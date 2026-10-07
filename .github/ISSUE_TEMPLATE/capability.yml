@@ -1,0 +1,12 @@
+name: Capability proposal
+description: Propose a new capability (tools + policy + optional UI panel) for capabilities/
+labels: ["capability", "help wanted"]
+body:
+  - type: input
+    attributes: { label: Capability name, placeholder: e.g. newsletter }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Tools it exposes to agents, description: Name each tool, its scopes and whether it needs human approval. }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: External services / credentials, description: What tenant-scoped secrets does it need? }

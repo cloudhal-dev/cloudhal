@@ -1,0 +1,20 @@
+{
+  "reason": "actor kind 'bot' is not allowed",
+  "data": {
+    "schemaVersion": 1,
+    "id": "entry_01HZX8K3Q9WX",
+    "siteId": "site_01HZX8K3Q9EF",
+    "collection": "posts",
+    "slug": "a",
+    "locale": "en",
+    "status": "draft",
+    "title": "A",
+    "body": { "format": "markdown", "value": "" },
+    "fields": {},
+    "tags": [],
+    "author": { "kind": "bot", "id": "agent_01HZX8K3Q9YZ" },
+    "rev": 0,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T20:00:00Z"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "proj_01HZX8K3Q9AB",
+  "name": "Demo Newsroom",
+  "slug": "demo-newsroom",
+  "ownerId": "user_01HZX8K3Q9CD",
+  "siteIds": ["site_01HZX8K3Q9EF"],
+  "rev": 3,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T20:30:00Z",
+  "metadata": { "cloudhal.source": "fixture" }
+}

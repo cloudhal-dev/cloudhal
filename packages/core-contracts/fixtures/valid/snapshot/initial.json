@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "snap_01HZX8K3Q9AA",
+  "siteId": "site_01HZX8K3Q9EF",
+  "siteRev": 0,
+  "reason": "import",
+  "actor": { "kind": "system", "id": "sys_bootstrap01" },
+  "nodes": [],
+  "summary": { "added": 0, "changed": 0, "removed": 0 },
+  "createdAt": "2026-10-07T20:00:00Z"
+}

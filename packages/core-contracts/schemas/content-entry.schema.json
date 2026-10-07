@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/content-entry.schema.json",
+  "title": "ContentEntry",
+  "description": "A structured content item in a named collection (e.g. collection 'posts'). Core fields are typed; collection-specific fields live in `fields` and are validated by the collection's own schema in a later phase.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "collection",
+    "slug",
+    "locale",
+    "status",
+    "title",
+    "body",
+    "fields",
+    "tags",
+    "author",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "collection": { "$ref": "common.schema.json#/$defs/Slug" },
+    "slug": { "$ref": "common.schema.json#/$defs/Slug" },
+    "locale": { "$ref": "common.schema.json#/$defs/Locale" },
+    "status": { "$ref": "common.schema.json#/$defs/PublishStatus" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "summary": { "type": "string", "maxLength": 2000 },
+    "body": { "$ref": "#/$defs/Body" },
+    "fields": {
+      "type": "object",
+      "description": "Collection-specific values; any JSON.",
+      "additionalProperties": true
+    },
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Slug" },
+      "uniqueItems": true,
+      "maxItems": 50
+    },
+    "author": { "$ref": "common.schema.json#/$defs/Actor" },
+    "coverImage": { "$ref": "common.schema.json#/$defs/ImageRef" },
+    "publishedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "Body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "value"],
+      "properties": {
+        "format": { "type": "string", "enum": ["markdown", "html"] },
+        "value": { "type": "string", "maxLength": 1000000 }
+      }
+    }
+  }
+}

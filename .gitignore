@@ -1,0 +1,16 @@
+node_modules/
+dist/
+target/
+.turbo/
+.wrangler/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage/
+packages/core-contracts/schemas/.bundled/
+
+# Internal working notes (roadmap, research, team state) — never committed
+.internal/
+.10x/

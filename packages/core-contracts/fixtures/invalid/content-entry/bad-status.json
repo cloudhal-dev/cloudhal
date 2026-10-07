@@ -1,0 +1,20 @@
+{
+  "reason": "status 'live' is not in PublishStatus",
+  "data": {
+    "schemaVersion": 1,
+    "id": "entry_01HZX8K3Q9WX",
+    "siteId": "site_01HZX8K3Q9EF",
+    "collection": "posts",
+    "slug": "a",
+    "locale": "en",
+    "status": "live",
+    "title": "A",
+    "body": { "format": "markdown", "value": "" },
+    "fields": {},
+    "tags": [],
+    "author": { "kind": "human", "id": "user_01HZX8K3Q9CD" },
+    "rev": 0,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T20:00:00Z"
+  }
+}

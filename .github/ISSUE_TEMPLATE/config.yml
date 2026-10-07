@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / idea
+    url: https://github.com/cloudhal-dev/cloudhal/discussions
+    about: Use GitHub Discussions for Q&A and ideas.
+  - name: Security vulnerability
+    url: https://github.com/cloudhal-dev/cloudhal/security/advisories/new
+    about: Report privately. Do not open a public issue.

@@ -1,0 +1,21 @@
+[package]
+name = "cloudhal-schema"
+description = "Cloudhal domain contracts as Rust types, generated from packages/core-contracts JSON Schemas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["cloudhal", "cms", "json-schema"]
+categories = ["data-structures"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+regress = { workspace = true }
+
+[dev-dependencies]
+jsonschema = { workspace = true }

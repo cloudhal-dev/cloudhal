@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/page.schema.json",
+  "title": "Page",
+  "description": "A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "path",
+    "title",
+    "locale",
+    "status",
+    "sections",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "path": {
+      "type": "string",
+      "description": "Absolute URL path, starting with '/', no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "locale": { "$ref": "common.schema.json#/$defs/Locale" },
+    "status": { "$ref": "common.schema.json#/$defs/PublishStatus" },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "section.schema.json" }
+    },
+    "seo": { "$ref": "#/$defs/Seo" },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "Seo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 500 },
+        "noindex": { "type": "boolean" },
+        "canonical": { "type": "string", "maxLength": 2048 }
+      }
+    }
+  }
+}

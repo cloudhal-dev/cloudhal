@@ -1,0 +1,44 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "**",
+      "!**/src/generated",
+      "!**/.bundled",
+      "!**/dist",
+      "!**/target",
+      "!**/.turbo",
+      "!**/node_modules"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "@base-ui/react": "Import UI primitives through @cloudhal/ui, never Base UI directly.",
+              "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui."
+            }
+          }
+        }
+      }
+    }
+  },
+  "javascript": {
+    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
+  },
+  "json": {
+    "parser": { "allowComments": true, "allowTrailingCommas": false }
+  }
+}

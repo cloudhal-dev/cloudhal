@@ -1,0 +1,14 @@
+name: Feature request
+description: Propose a change. Large changes should become an RFC (docs/rfcs).
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    attributes: { label: Problem, description: What can't you do today? Who is affected? }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Proposal }
+  - type: checkboxes
+    attributes:
+      label: Scope
+      options:
+        - label: This touches the Site Graph contracts (packages/core-contracts) → needs an RFC

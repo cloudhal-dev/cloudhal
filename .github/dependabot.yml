@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      dev-tooling: { patterns: ["@biomejs/*", "turbo", "vitest", "typescript", "@changesets/*", "tsx"] }
+    ignore:
+      # Generators are pinned exactly; bump them deliberately with a regen + ADR note.
+      - dependency-name: json-schema-to-typescript
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

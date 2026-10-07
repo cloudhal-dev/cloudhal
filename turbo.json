@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "gen": {
+      "outputs": ["src/generated/**", "../../crates/cloudhal-schema/src/generated/**"],
+      "inputs": ["schemas/**", "scripts/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "gen"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["gen"],
+      "outputs": []
+    },
+    "check": {
+      "dependsOn": ["typecheck", "test"],
+      "outputs": []
+    }
+  }
+}

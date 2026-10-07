@@ -1,0 +1,14 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    attributes: { label: What happened, description: Steps, expected vs actual. Include `cloudhal --version` / commit SHA. }
+    validations: { required: true }
+  - type: dropdown
+    attributes:
+      label: Area
+      options: ["area:graph", "area:studio", "area:agent", "area:deploy", "area:cli", "other"]
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Environment, description: OS, Node version, pnpm version, self-host or Cloud. }

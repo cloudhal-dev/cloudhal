@@ -1,0 +1,12 @@
+name: Skill proposal
+description: Propose a new official agent skill (skills/official)
+labels: ["skill", "help wanted"]
+body:
+  - type: input
+    attributes: { label: Skill name, placeholder: kebab-case, e.g. seo-audit }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: What job does it teach the agent, description: Steps, references it needs, approval points. }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Required capabilities and scopes, placeholder: "content:write, preview:create" }

@@ -1,0 +1,13 @@
+{
+  "name": "publish-article",
+  "description": "Checks a draft article, produces a preview and submits it for approval. Use when the user asks to publish or schedule an article.",
+  "license": "Apache-2.0",
+  "compatibility": "Requires the Cloudhal MCP server with content and preview capabilities.",
+  "metadata": {
+    "cloudhal.schemaVersion": "1",
+    "cloudhal.requiresCapabilities": "content,media",
+    "cloudhal.scopes": "content:write,preview:create",
+    "cloudhal.approval": "publish"
+  },
+  "allowed-tools": "cloudhal_snapshot cloudhal_diff cloudhal_preview"
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/skill-manifest.schema.json",
+  "title": "SkillManifest",
+  "description": "YAML frontmatter of a SKILL.md, exactly the six fields of the Agent Skills specification (agentskills.io). Cloudhal-specific data goes under `metadata` as flat string keys prefixed `cloudhal.` (schemaVersion, requiresCapabilities, scopes, approval); nested vendor blocks are rejected by hosted skill uploaders.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Lower-case kebab-case; must equal the skill directory name.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "license": { "type": "string", "maxLength": 200 },
+    "compatibility": { "type": "string", "maxLength": 500 },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" },
+    "allowed-tools": {
+      "type": "string",
+      "description": "Space-separated tool names the skill may call (experimental in the spec).",
+      "maxLength": 2000
+    }
+  }
+}

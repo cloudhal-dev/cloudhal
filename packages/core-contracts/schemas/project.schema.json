@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/project.schema.json",
+  "title": "Project",
+  "description": "Top-level ownership boundary. A project belongs to one owner (human or organisation) and groups one or more sites. In Cloud it maps to a tenant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "slug",
+    "ownerId",
+    "siteIds",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "slug": { "$ref": "common.schema.json#/$defs/Slug" },
+    "ownerId": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteIds": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Id" },
+      "uniqueItems": true
+    },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  }
+}

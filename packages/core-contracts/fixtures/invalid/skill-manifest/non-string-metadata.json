@@ -1,0 +1,4 @@
+{
+  "reason": "metadata values must be strings",
+  "data": { "name": "rollback", "description": "x", "metadata": { "cloudhal.schemaVersion": 1 } }
+}

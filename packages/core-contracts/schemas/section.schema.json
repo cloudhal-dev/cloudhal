@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/section.schema.json",
+  "title": "Section",
+  "description": "A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "HeroSection",
+      "additionalProperties": false,
+      "required": ["id", "kind", "heading"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/Id" },
+        "kind": { "type": "string", "enum": ["hero"] },
+        "heading": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "subheading": { "type": "string", "maxLength": 1000 },
+        "image": { "$ref": "common.schema.json#/$defs/ImageRef" },
+        "cta": { "$ref": "common.schema.json#/$defs/Link" }
+      }
+    },
+    {
+      "type": "object",
+      "title": "RichTextSection",
+      "additionalProperties": false,
+      "required": ["id", "kind", "format", "body"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/Id" },
+        "kind": { "type": "string", "enum": ["richText"] },
+        "format": { "type": "string", "enum": ["markdown", "html"] },
+        "body": { "type": "string", "maxLength": 200000 }
+      }
+    },
+    {
+      "type": "object",
+      "title": "ImageSection",
+      "additionalProperties": false,
+      "required": ["id", "kind", "image"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/Id" },
+        "kind": { "type": "string", "enum": ["image"] },
+        "image": { "$ref": "common.schema.json#/$defs/ImageRef" },
+        "caption": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    {
+      "type": "object",
+      "title": "ContentListSection",
+      "description": "Renders the newest entries of a content collection (e.g. blog posts).",
+      "additionalProperties": false,
+      "required": ["id", "kind", "collection", "limit", "sort"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/Id" },
+        "kind": { "type": "string", "enum": ["contentList"] },
+        "collection": { "$ref": "common.schema.json#/$defs/Slug" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "sort": { "type": "string", "enum": ["newest", "oldest", "title"] }
+      }
+    }
+  ]
+}

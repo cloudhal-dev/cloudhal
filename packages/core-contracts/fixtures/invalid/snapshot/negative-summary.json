@@ -1,0 +1,14 @@
+{
+  "reason": "summary counts cannot be negative",
+  "data": {
+    "schemaVersion": 1,
+    "id": "snap_01HZX8K3Q9KL",
+    "siteId": "site_01HZX8K3Q9EF",
+    "siteRev": 1,
+    "reason": "manual",
+    "actor": { "kind": "human", "id": "user_01HZX8K3Q9CD" },
+    "nodes": [],
+    "summary": { "added": -1, "changed": 0, "removed": 0 },
+    "createdAt": "2026-10-07T21:00:00Z"
+  }
+}

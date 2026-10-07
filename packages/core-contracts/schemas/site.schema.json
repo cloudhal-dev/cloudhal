@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/site.schema.json",
+  "title": "Site",
+  "description": "Root node of a Site Graph: one deployable website with its locales, domains, theme and page index. Pages and content entries are separate nodes referenced by id so they can be versioned and locked independently.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "projectId",
+    "name",
+    "slug",
+    "defaultLocale",
+    "locales",
+    "domains",
+    "pageIds",
+    "theme",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "projectId": { "$ref": "common.schema.json#/$defs/Id" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "slug": { "$ref": "common.schema.json#/$defs/Slug" },
+    "defaultLocale": { "$ref": "common.schema.json#/$defs/Locale" },
+    "locales": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Locale" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "domains": {
+      "type": "array",
+      "description": "Hostnames serving this site. Exactly one should be primary; the *.cloudhal.app subdomain is always present in Cloud.",
+      "items": { "$ref": "#/$defs/Domain" }
+    },
+    "pageIds": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/Id" },
+      "uniqueItems": true
+    },
+    "homePageId": { "$ref": "common.schema.json#/$defs/Id" },
+    "theme": { "$ref": "#/$defs/ThemeRef" },
+    "publishedSnapshotId": {
+      "$ref": "common.schema.json#/$defs/Id",
+      "description": "Snapshot currently serving production. Rollback = pointing this at an older snapshot."
+    },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "Domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostname", "primary"],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+          "maxLength": 253
+        },
+        "primary": { "type": "boolean" }
+      }
+    },
+    "ThemeRef": {
+      "type": "object",
+      "description": "Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "common.schema.json#/$defs/Slug" },
+        "version": { "type": "string", "maxLength": 64 },
+        "config": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

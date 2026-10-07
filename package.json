@@ -1,0 +1,31 @@
+{
+  "name": "cloudhal-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Cloudhal — the open-source, agent-native site platform (monorepo root)",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "type": "module",
+  "scripts": {
+    "check": "turbo run check",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "gen": "turbo run gen",
+    "drift": "pnpm gen && git diff --exit-code -- packages/core-contracts/src/generated crates/cloudhal-schema/src/generated",
+    "cargo:test": "cargo test --workspace --locked",
+    "cargo:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+    "changeset": "changeset",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@changesets/cli": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

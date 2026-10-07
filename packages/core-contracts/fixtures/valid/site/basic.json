@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9EF",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Demo Newsroom",
+  "slug": "demo-newsroom",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [
+    { "hostname": "demo-newsroom.cloudhal.app", "primary": false },
+    { "hostname": "news.example.com", "primary": true }
+  ],
+  "pageIds": ["page_01HZX8K3Q9GH", "page_01HZX8K3Q9IJ"],
+  "homePageId": "page_01HZX8K3Q9GH",
+  "theme": { "name": "blog", "version": "0.1.0", "config": { "accent": "#0f62fe" } },
+  "publishedSnapshotId": "snap_01HZX8K3Q9KL",
+  "rev": 12,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z"
+}

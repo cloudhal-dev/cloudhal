@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "snap_01HZX8K3Q9KL",
+  "siteId": "site_01HZX8K3Q9EF",
+  "parentId": "snap_01HZX8K3Q9AA",
+  "siteRev": 12,
+  "reason": "agentMutation",
+  "label": "Publish morning briefing",
+  "actor": { "kind": "agent", "id": "agent_01HZX8K3Q9YZ" },
+  "nodes": [
+    {
+      "id": "site_01HZX8K3Q9EF",
+      "kind": "site",
+      "rev": 12,
+      "hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "id": "page_01HZX8K3Q9GH",
+      "kind": "page",
+      "rev": 7,
+      "hash": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+    },
+    {
+      "id": "entry_01HZX8K3Q9WX",
+      "kind": "contentEntry",
+      "rev": 2,
+      "hash": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9"
+    }
+  ],
+  "summary": { "added": 1, "changed": 1, "removed": 0 },
+  "createdAt": "2026-10-07T21:00:00Z"
+}
