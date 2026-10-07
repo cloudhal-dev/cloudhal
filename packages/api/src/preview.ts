@@ -1,0 +1,15 @@
+import type { Context } from "hono";
+
+/**
+ * Serves a rendered preview document. Previews include drafts, so they are private (no caching)
+ * and sandboxed: no scripts, no framing by other origins, nothing leaves the page.
+ */
+export function previewResponse(c: Context, html: string): Response {
+  return c.body(html, 200, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "private, no-store",
+    "content-security-policy":
+      "default-src 'none'; img-src * data:; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+    "x-content-type-options": "nosniff",
+  });
+}

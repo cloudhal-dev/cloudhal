@@ -27,6 +27,8 @@ export interface ApiDeps {
   readonly resolvePrincipal?: PrincipalResolver;
   /** Mounts the MCP server at `/mcp` (ADR-0011). */
   readonly mcp?: McpMountOptions;
+  /** Enables `/api/sites/:id/activity` (the agent/human audit trail). */
+  readonly audit?: AuditLog;
   /** Mounts `/api/agent-keys` (create/list/delete API keys for agents). */
   readonly agentKeys?: AgentKeyService;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */
@@ -35,4 +37,6 @@ export interface ApiDeps {
   readonly requireAuth?: boolean;
 }
 
-export type Env = { Variables: { actor: Actor | undefined; store: SiteGraphStore } };
+export type Env = {
+  Variables: { actor: Actor | undefined; store: SiteGraphStore; audit: AuditLog | undefined };
+};

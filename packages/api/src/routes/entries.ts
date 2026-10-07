@@ -1,8 +1,10 @@
+import { renderEntryPreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { param } from "../params.ts";
+import { previewResponse } from "../preview.ts";
 
 export const entries: Hono<Env> = new Hono<Env>()
   .get("/", async (c) => {
@@ -23,6 +25,14 @@ export const entries: Hono<Env> = new Hono<Env>()
       author: input.author ?? actor ?? { kind: "system", id: "sys_api00000001" },
     });
     return c.json(entry, 201);
+  })
+  .get("/:entryId/preview", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    const entry = await store.getContentEntry(param(c, "entryId"));
+    if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
+    return previewResponse(c, renderEntryPreview(site, entry).html);
   })
   .get("/:entryId", async (c) => {
     const entry = await c.get("store").getContentEntry(param(c, "entryId"));

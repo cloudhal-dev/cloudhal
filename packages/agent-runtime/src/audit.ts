@@ -28,11 +28,12 @@ export class AuditLog {
 
   async record(entry: AuditEntry): Promise<number> {
     const r = await this.#sql.run(
-      "INSERT INTO audit (at, actor_kind, actor_id, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         entry.at,
         entry.actor.kind,
         entry.actor.id,
+        entry.actor.name ?? null,
         entry.siteId ?? null,
         entry.tool,
         entry.decision,
@@ -48,10 +49,20 @@ export class AuditLog {
   }
 
   async list(
-    filter: { siteId?: string; actorId?: string; limit?: number } = {},
+    filter: {
+      siteId?: string | undefined;
+      actorId?: string | undefined;
+      /** Only rows older than this id (cursor pagination, newest first). */
+      before?: number | undefined;
+      limit?: number | undefined;
+    } = {},
   ): Promise<AuditRow[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
+    if (filter.before !== undefined) {
+      where.push("id < ?");
+      params.push(filter.before);
+    }
     if (filter.siteId) {
       where.push("site_id = ?");
       params.push(filter.siteId);
@@ -68,7 +79,11 @@ export class AuditLog {
     return rows.map((r) => ({
       id: r.id as number,
       at: r.at as string,
-      actor: { kind: r.actor_kind as Actor["kind"], id: r.actor_id as string },
+      actor: {
+        kind: r.actor_kind as Actor["kind"],
+        id: r.actor_id as string,
+        ...(r.actor_name ? { name: r.actor_name as string } : {}),
+      },
       siteId: (r.site_id as string | null) ?? undefined,
       tool: r.tool as string,
       decision: r.decision as AuditEntry["decision"],

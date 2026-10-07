@@ -435,6 +435,9 @@ importers:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@cloudhal/astro-renderer':
+        specifier: workspace:*
+        version: link:../astro-renderer
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts

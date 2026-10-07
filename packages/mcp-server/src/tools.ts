@@ -16,7 +16,7 @@ import type {
   ToolAnnotations,
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
-import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer";
+import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, Page, Section, Site, Snapshot } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
