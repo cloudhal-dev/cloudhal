@@ -108,8 +108,12 @@ export function AppFrame({
         <Sidebar.Rail />
       </Sidebar>
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-overlay">
-        <header className="sticky top-0 z-10 flex h-12 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
-          <span className="min-w-0 truncate">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
+          {/* The sidebar is a sheet below the mobile breakpoint; this is its only way in there. */}
+          <span className="-ml-1 md:hidden">
+            <Sidebar.Trigger />
+          </span>
+          <span className="hidden min-w-0 truncate sm:inline">
             <Text variant="secondary" size="sm" as="span">
               {title}
             </Text>
@@ -120,9 +124,9 @@ export function AppFrame({
               size="sm"
               icon={<MagnifyingGlass />}
               onClick={() => setOpen(true)}
-              className="w-64 justify-start text-kumo-subtle"
+              className="w-48 justify-start text-kumo-subtle sm:w-64"
             >
-              <span className="flex-1 text-left">{t("nav.search")}</span>
+              <span className="min-w-0 flex-1 truncate text-left">{t("nav.search")}</span>
               <kbd className="rounded bg-kumo-recessed px-1 font-mono text-kumo-subtle text-xs">
                 {t("nav.shortcutHint")}
               </kbd>
