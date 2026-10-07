@@ -2,16 +2,20 @@
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "tasks": {
-    "gen": {
-      "outputs": ["src/generated/**", "../../crates/cloudhal-schema/src/generated/**"],
-      "inputs": ["schemas/**", "scripts/**"]
+    "gen:ts": {
+      "inputs": ["schemas/**", "scripts/**"],
+      "outputs": ["src/generated/**", "schemas/.bundled/**"]
+    },
+    "gen:rs": {
+      "inputs": ["schemas/**", "scripts/**"],
+      "outputs": ["../../crates/cloudhal-schema/src/generated/**", "schemas/.bundled/**"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck", "gen"],
+      "dependsOn": ["^typecheck", "gen:ts"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["gen"],
+      "dependsOn": ["gen:ts"],
       "outputs": []
     },
     "check": {

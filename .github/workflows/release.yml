@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,12 +15,15 @@ concurrency: release-${{ github.ref }}
 jobs:
   changesets:
     name: Version or publish (Changesets)
+    # Publishing is gated until the npm org `cloudhal` exists and trusted publishing is
+    # configured: set the repository variable RELEASE_ENABLED=true to turn it on.
+    if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 24

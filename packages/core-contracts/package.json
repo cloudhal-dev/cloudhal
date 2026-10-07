@@ -22,7 +22,7 @@
     "bundle": "tsx scripts/bundle.ts",
     "gen:ts": "tsx scripts/gen-ts.ts",
     "gen:rs": "tsx scripts/gen-rs.ts",
-    "gen": "pnpm bundle && pnpm gen:ts && pnpm gen:rs",
+    "gen": "pnpm gen:ts && pnpm gen:rs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm test"
