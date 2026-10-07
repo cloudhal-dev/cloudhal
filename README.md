@@ -37,6 +37,7 @@ packages/cli              cloudhal init / dev / snapshot / build / studio / mcp 
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
 packages/mcp-server       MCP server: 18 semantic tools, approval gate, skills as resources; stdio + HTTP
+packages/cloudflare       admin Worker (Studio + API + auth + MCP on D1/R2); site Worker entry lives in astro-renderer
 packages/ui               Kumo re-export + Cloudhal blocks
 apps/studio               Studio admin UI (Vite + React SPA, en/tr)
 starters/blog             the first starter: routes, layout, theme map
@@ -48,7 +49,9 @@ docs/rfcs                 design proposals (RFC-0001: Site Graph)
 .agents/skills            skills for coding agents working on this repo
 ```
 
-Planned: `packages/sdk-js`, `apps/{site,demo-newsroom}`, `capabilities/`.
+apps/demo-newsroom        Cloudhal's own newsroom, published by an agent through Cloudhal (dogfooding)
+
+Planned: `packages/sdk-js`, `capabilities/`.
 
 ## Open-core boundary
 

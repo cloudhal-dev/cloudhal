@@ -1,10 +1,12 @@
 import { parseArgs } from "node:util";
 import type { Scope } from "@cloudhal/agent-runtime";
 import { build, dev } from "./commands/astro.ts";
+import { deploy } from "./commands/deploy.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
+import { pullSite, pushSite } from "./commands/sync.ts";
 
 const HELP = `cloudhal — agent-native sites
 
@@ -16,6 +18,9 @@ Usage:
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
   cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
+  cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare (uses wrangler login)
+  cloudhal push [--replace] [--admin-url <url>]           local site → deployment
+  cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
   cloudhal --help
 `;
 
@@ -36,6 +41,9 @@ export async function main(argv: string[]): Promise<number> {
       scopes: { type: "string" },
       skills: { type: "string" },
       "preview-url": { type: "string" },
+      "dry-run": { type: "boolean" },
+      replace: { type: "boolean" },
+      "admin-url": { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -100,6 +108,37 @@ export async function main(argv: string[]): Promise<number> {
         for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => resolve());
       });
       await s.stop();
+      return 0;
+    }
+    case "deploy": {
+      const r = await deploy({
+        projectDir,
+        ...(values.name ? { name: values.name } : {}),
+        ...(values["dry-run"] ? { dryRun: true } : {}),
+        log: (l) => console.log(l),
+      });
+      if (r.dryRun) {
+        console.log(
+          `\nDry run OK. Workers: ${r.names.site}, ${r.names.admin}. Nothing was deployed.`,
+        );
+      } else {
+        console.log(
+          `\nSite:   ${r.siteUrl ?? "(see wrangler output)"}\nStudio: ${r.adminUrl ?? "(see wrangler output)"}`,
+        );
+        console.log(r.pushed ? "Local site pushed. Open Studio and create the owner account." : "");
+      }
+      return 0;
+    }
+    case "push":
+    case "pull": {
+      const opts = {
+        projectDir,
+        ...(values.replace ? { replace: true } : {}),
+        ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+        log: (l: string) => console.log(l),
+      };
+      if (command === "push") await pushSite(opts);
+      else await pullSite(opts);
       return 0;
     }
     case "mcp": {

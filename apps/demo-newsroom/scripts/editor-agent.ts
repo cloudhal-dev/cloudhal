@@ -2,9 +2,9 @@
  * The newsroom's "editor agent": a small, deterministic MCP client that publishes the articles in
  * `content/posts/*.md` through Cloudhal's own MCP tools — the same path any AI agent takes.
  *
- *   node scripts/editor-agent.ts                 # local: spawns `cloudhal mcp` in this project
- *   node scripts/editor-agent.ts --url https://admin.example.com/mcp   # remote, needs CLOUDHAL_API_KEY
- *   node scripts/editor-agent.ts --no-publish    # write + preview only
+ *   node scripts/editor-agent.ts --project ../my-newsroom        # local: `cloudhal mcp` in that project
+ *   node scripts/editor-agent.ts --url https://<admin>/mcp       # deployed; needs CLOUDHAL_API_KEY
+ *   node scripts/editor-agent.ts ... --no-publish                # write + preview only
  *
  * Publishing stops for a person: the server asks for approval and this script relays the question
  * to your terminal. Without a terminal (CI) the answer is "decline".
@@ -18,8 +18,8 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT = path.resolve(here, "..");
-const CLI = path.resolve(PROJECT, "../../packages/cli/bin/cloudhal.ts");
+const APP = path.resolve(here, "..");
+const CLI = path.resolve(APP, "../../packages/cli/bin/cloudhal.ts");
 
 interface Post {
   slug: string;
@@ -220,7 +220,12 @@ export async function runEditorAgent(options: {
 
 async function main() {
   const { values } = parseArgs({
-    options: { url: { type: "string" }, "no-publish": { type: "boolean" } },
+    options: {
+      url: { type: "string" },
+      project: { type: "string" },
+      content: { type: "string" },
+      "no-publish": { type: "boolean" },
+    },
   });
   const client = new Client(
     { name: "cloudhal-newsroom-editor", version: "0.0.1" },
@@ -243,11 +248,13 @@ async function main() {
       }),
     );
   } else {
+    if (!values.project)
+      throw new Error("pass --project <dir> (a `cloudhal init` project) or --url <admin>/mcp");
     await client.connect(
       new StdioClientTransport({
         command: process.execPath,
         args: [CLI, "mcp"],
-        cwd: PROJECT,
+        cwd: path.resolve(values.project),
         stderr: "inherit",
       }),
     );
@@ -255,8 +262,8 @@ async function main() {
   try {
     await runEditorAgent({
       client,
-      postsDir: path.join(PROJECT, "content/posts"),
-      siteFile: path.join(PROJECT, "content/site.md"),
+      postsDir: path.join(values.content ?? path.join(APP, "content"), "posts"),
+      siteFile: path.join(values.content ?? path.join(APP, "content"), "site.md"),
       publish: !values["no-publish"],
     });
   } finally {

@@ -1,0 +1,98 @@
+/**
+ * `cloudhal push` / `cloudhal pull`: move the site between the local project and its Cloudflare
+ * deployment through the admin Worker (`/api/admin/sites/:id/bundle`, deployment token).
+ */
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { exportSite, importSite, type SiteBundle } from "@cloudhal/core-ts";
+import { openLocalStore } from "@cloudhal/core-ts/local";
+import { readProjectConfig } from "../config.ts";
+
+export interface SyncOptions {
+  readonly projectDir: string;
+  /** Overwrite diverged content on the receiving side. */
+  readonly replace?: boolean;
+  /** Admin Worker URL; default from `<dataDir>/deploy/state.json`. */
+  readonly adminUrl?: string;
+  readonly log?: (line: string) => void;
+  /** Injected in tests. */
+  readonly fetch?: typeof fetch;
+}
+
+async function target(options: SyncOptions) {
+  const cfg = await readProjectConfig(options.projectDir);
+  const dir = path.join(options.projectDir, cfg.dataDir, "deploy");
+  let adminUrl = options.adminUrl;
+  if (!adminUrl) {
+    try {
+      adminUrl = (
+        JSON.parse(await readFile(path.join(dir, "state.json"), "utf8")) as { adminUrl?: string }
+      ).adminUrl;
+    } catch {
+      // not deployed
+    }
+  }
+  if (!adminUrl)
+    throw new Error("no deployment found: run `cloudhal deploy` first (or pass --admin-url)");
+  const secrets = JSON.parse(await readFile(path.join(dir, "secrets.json"), "utf8")) as {
+    CLOUDHAL_DEPLOY_TOKEN?: string;
+  };
+  if (!secrets.CLOUDHAL_DEPLOY_TOKEN)
+    throw new Error("deployment token missing in .cloudhal/deploy/secrets.json");
+  const url = new URL(`/api/admin/sites/${cfg.siteId}/bundle`, adminUrl);
+  return { cfg, url, token: secrets.CLOUDHAL_DEPLOY_TOKEN, fetch: options.fetch ?? fetch };
+}
+
+export async function pushSite(
+  options: SyncOptions & { ifAbsent?: boolean },
+): Promise<{ pushed: boolean; message: string }> {
+  const log = options.log ?? (() => {});
+  const { cfg, url, token, fetch: f } = await target(options);
+  const auth = { authorization: `Bearer ${token}` };
+  if (options.ifAbsent) {
+    const probe = await f(url, { headers: auth });
+    if (probe.status === 200) {
+      log(
+        "the deployment already has this site; leaving it as the source of truth (use `cloudhal pull`)",
+      );
+      return { pushed: false, message: "already deployed" };
+    }
+  }
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  const bundle = await exportSite(local, cfg.siteId);
+  await local.close();
+  url.searchParams.set("mode", options.replace ? "replace" : "bootstrap");
+  const res = await f(url, {
+    method: "PUT",
+    headers: { ...auth, "content-type": "application/json" },
+    body: JSON.stringify(bundle),
+  });
+  const body = await res.text();
+  if (res.status === 409)
+    throw new Error(
+      `the deployment has diverged from your local copy: ${body}\nRun \`cloudhal pull\` first, or \`cloudhal push --replace\` to overwrite.`,
+    );
+  if (!res.ok) throw new Error(`push failed (${res.status}): ${body}`);
+  log(`pushed: ${body}`);
+  return { pushed: true, message: body };
+}
+
+export async function pullSite(options: SyncOptions): Promise<{ message: string }> {
+  const log = options.log ?? (() => {});
+  const { cfg, url, token, fetch: f } = await target(options);
+  const res = await f(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`pull failed (${res.status}): ${await res.text()}`);
+  const bundle = (await res.json()) as SiteBundle;
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  try {
+    const result = await importSite(local, bundle, {
+      mode: options.replace ? "replace" : "bootstrap",
+      log,
+    });
+    const message = JSON.stringify(result);
+    log(`pulled: ${message}`);
+    return { message };
+  } finally {
+    await local.close();
+  }
+}

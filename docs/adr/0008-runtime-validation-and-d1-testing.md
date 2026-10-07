@@ -1,5 +1,5 @@
 # ADR-0008: Precompiled schema validators; D1 tested through Miniflare
-- Status: Accepted
+- Status: Accepted (Miniflare version rationale corrected by ADR-0012)
 - Date: 2026-10-07
 - Related: ADR-0001, ADR-0002
 - Sources: https://ajv.js.org/standalone.html · https://developers.cloudflare.com/workers/runtime-apis/web-standards/#javascript-standards (no `eval`/`new Function`) · https://github.com/cloudflare/workers-sdk/tree/main/packages/miniflare (programmatic `getD1Database`)

@@ -24,7 +24,9 @@ pnpm changeset                    # add a release note for a published package
 - `packages/storage` — `SqlDriver`/`BlobStore` + adapters (`sqlite`, `d1`, `fs`, `r2`) + migrations (`migrations/*.ts`, plain SQL). Conformance suites in `src/testing.ts`.
 - `packages/core-ts` — `SiteGraphStore` (CAS on `rev`, snapshots, diff, publish, rollback). Behavioural suite in `src/testing.ts` runs on sqlite and Miniflare D1. `./local` opens the offline store; `seedStarterSite` seeds a demo.
 - `packages/astro-renderer` — `GraphSource` (live/snapshot), `cloudhal()` integration (virtual config + dev route-cache watcher), `.astro` section components. Routes live in starters, not here.
-- `packages/cli` — `cloudhal init|dev|snapshot|build`; TS bin run by Node 24 type stripping. E2E test spawns the bin (Astro disables dev middleware under `VITEST`).
+- `packages/cli` — `cloudhal init|dev|snapshot|build|studio|mcp|deploy|push|pull`; TS bin run by Node 24 type stripping. E2E test spawns the bin (Astro disables dev middleware under `VITEST`). Cloudflare tests run both Workers on workerd via wrangler's `createTestHarness`; test files run serially (shared starter caches).
+- `packages/cloudflare` — the admin Worker (`createAdminWorker`). Generated entries must import `@cloudhal/cloudflare/workerd-prelude` first (ADR-0012).
+- `packages/agent-runtime` / `packages/mcp-server` — policy, skills, audit; MCP tools and transports (ADR-0011).
 - `starters/blog` — the theme boundary: `src/pages/[...path].astro`, `src/layouts`, `src/theme.ts`.
 - `packages/api` — Hono app (`createApi`), Better Auth (`src/auth.ts`), error mapping; shared suite `src/testing.ts` on sqlite + D1.
 - `packages/ui` — `export * from "@cloudflare/kumo"` + blocks; `styles.css` is the only Tailwind entry for admin UIs.
@@ -37,15 +39,16 @@ pnpm changeset                    # add a release note for a published package
 2. **Schema subset** (so TS and Rust generators agree): discriminated unions = `oneOf` with inline variants and `kind: {"type":"string","enum":["x"]}`; no `default`; no `$dynamicRef`/`unevaluated*`/`dependentSchemas`; cross-file `$ref` only to `common.schema.json#/$defs/*` or another root schema's top level; `additionalProperties: false` on every object except declared maps.
 3. **Every root type** has `schemaVersion` (enum `[1]`); mutable nodes have `rev`. New fields are optional unless an RFC says otherwise.
 4. **No interactive DB transactions** anywhere (D1 has none); only atomic `batch()`. Composite writes guard later statements on the earlier CAS (match on the new content `hash`, not `rev + 1`).
-5. **Runtime validation** uses the precompiled validators (`assertValid`/`isValid`), never `new Ajv()` (Workers forbid eval).
-6. **Admin UIs** import UI primitives from `@cloudhal/ui` only; direct `@base-ui/react` imports are lint errors.
-7. **Skills** (`SKILL.md`) use only the six spec fields; Cloudhal data goes in `metadata` as `cloudhal.*` string keys.
-8. **Secrets** never in code, fixtures or docs. Test values live in `.env.example`.
-9. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts`; no hard-coded English in `apps/studio`.
-10. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
+5. **Worker-safe imports:** code reachable from a Worker never imports Node-only modules at top level (`better-sqlite3`, `node:fs` helpers, `@cloudhal/core-contracts/bundle`, `@cloudhal/api/auth/node`). Use the package subpaths.
+6. **Runtime validation** uses the precompiled validators (`assertValid`/`isValid`), never `new Ajv()` (Workers forbid eval).
+7. **Admin UIs** import UI primitives from `@cloudhal/ui` only; direct `@base-ui/react` imports are lint errors.
+8. **Skills** (`SKILL.md`) use only the six spec fields; Cloudhal data goes in `metadata` as `cloudhal.*` string keys.
+9. **Secrets** never in code, fixtures or docs. Test values live in `.env.example`.
+10. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts`; no hard-coded English in `apps/studio`.
+11. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
 
 ## Versions (pinned via pnpm catalog / Cargo workspace)
-Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 3.2025 (legacy line; v5 alpha lacks programmatic D1) · Astro 7.3 · Tailwind 4.3 · marked 18 · Hono 4.13 · Better Auth 1.7.7 · Kumo 2.14 · React 19.3 · TanStack Router 1.170 / Query 5.104 · Vite 8.3.
+Node 24 · pnpm 12 · TypeScript 7.0 · Biome 2.5 · Vitest 5 · Turborepo 2.11 · Rust 2024 edition · json-schema-to-typescript 16.0.0 · cargo-typify 0.8.0 · ajv 8.20 · jsonschema 0.58 · better-sqlite3 13 · miniflare 4.20260730 (last stable 4.x; see ADR-0012) · wrangler 4.148 · @astrojs/cloudflare 14.3 · Astro 7.3 · Tailwind 4.3 · marked 18 · Hono 4.13 · Better Auth 1.7.7 · Kumo 2.14 · React 19.3 · TanStack Router 1.170 / Query 5.104 · Vite 8.3.
 
 ## When unsure
 Read `docs/adr/README.md` and the relevant ADR; each ADR links its primary sources. If the change alters a contract or a public interface, write an RFC first (`.agents/skills/write-rfc`).

@@ -8,7 +8,18 @@ cloudhal build [--snapshot <id>]                        static HTML from the pub
 cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp) for this project
 cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                         MCP server over stdio for this project
+cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare
+cloudhal push [--replace] [--admin-url <url>]           local site → deployment
+cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
 ```
+
+### Deploying to Cloudflare (ADR-0012)
+
+`cloudhal deploy` uses **your** wrangler login (`npx wrangler login`, or `CLOUDFLARE_API_TOKEN`); Cloudhal never reads those credentials. It creates the D1 database and R2 bucket if needed, generates the deployment secrets once into `.cloudhal/deploy/secrets.json` (0600 — keep it out of git), builds and deploys the **site Worker** (Astro on demand, edge-cached) and the **admin Worker** (Studio, API, auth, MCP), and on the first deploy pushes your local site.
+
+After that the deployment is the source of truth — agents edit it there. `cloudhal push` refuses to overwrite content that changed remotely; `cloudhal pull` brings it home. `--dry-run` bundles both Workers with the real wrangler without an account.
+
+Publishing and rollback never rebuild anything: the site Worker follows the published snapshot pointer and the admin Worker purges its cache. Preview links (`?cloudhal-preview=…`) show drafts on the real site.
 
 `cloudhal mcp` is what you register in Claude Code / Cursor / any MCP client:
 

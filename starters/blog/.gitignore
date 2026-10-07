@@ -3,3 +3,4 @@ dist/
 .cloudhal/
 node_modules/
 cloudhal.json
+.wrangler/
