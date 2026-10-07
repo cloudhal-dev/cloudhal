@@ -16,7 +16,8 @@
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
     "./runtime": "./src/runtime.ts",
-    "./preview": "./src/preview.ts"
+    "./preview": "./src/preview.ts",
+    "./resolver": "./src/resolver.ts"
   },
   "files": [
     "src",

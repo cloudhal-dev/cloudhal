@@ -163,3 +163,27 @@ describe("Cloudhal tools (SDK-independent)", () => {
     expect(list.decision.kind).toBe("allow");
   });
 });
+
+describe("preview_page on a deployed site", () => {
+  it("returns a signed link to the primary domain when a preview secret is configured", async () => {
+    const { verifyPreviewToken } = await import("@cloudhal/core-ts");
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const seeded = await seedStarterSite(store, { name: "Deployed", slug: "deployed" });
+    await store.updateSite({ ...seeded, domains: [{ hostname: "news.example.com", primary: true }] });
+    const secret = "mcp-preview-secret-at-least-32-bytes-long";
+    const page = (await store.listPages(seeded.id)).find((p) => p.path === "/about");
+    const def = tools.find((t) => t.name === "preview_page") as (typeof tools)[number];
+    const out = await runTool(
+      def,
+      { siteId: seeded.id, pageId: page?.id },
+      { store, principal: { actor: agent, scopes: defaultScopes(agent) }, previewSecret: secret, previewBaseUrl: "http://localhost:4321" },
+      { policy: new PolicyEngine(toolPolicies(tools)) },
+    );
+    const url = new URL((out.result as { url: string }).url);
+    expect(url.origin + url.pathname).toBe("https://news.example.com/about");
+    const token = url.searchParams.get("cloudhal-preview") as string;
+    expect((await verifyPreviewToken(secret, token, seeded.id)).target).toBe("live");
+  });
+});

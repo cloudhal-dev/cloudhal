@@ -26,7 +26,7 @@ import {
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
-import { ConflictError, NotFoundError } from "@cloudhal/core-ts";
+import { ConflictError, mintPreviewToken, NotFoundError, previewUrl, primaryOrigin } from "@cloudhal/core-ts";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -49,6 +49,8 @@ export interface ToolContext {
   principal: Principal;
   /** Base URL of a running `cloudhal dev` server, when known (preview links). */
   previewBaseUrl?: string | undefined;
+  /** Shared preview secret: signed links to the deployed site (preferred over `previewBaseUrl`). */
+  previewSecret?: string | undefined;
 }
 
 export class ToolError extends Error {
@@ -674,6 +676,11 @@ function rawTools(): ToolDefinition[] {
           doc = renderPagePreview(site, page, entries);
         } else {
           throw new ToolError("invalid", "pass pageId or entryId");
+        }
+        // Prefer a signed link to the deployed site (drafts visible); fall back to `cloudhal dev`.
+        if (ctx.previewSecret && primaryOrigin(site)) {
+          const token = await mintPreviewToken(ctx.previewSecret, { site: site.id, target: "live" });
+          return { ...doc, url: previewUrl(site, doc.path, token) ?? null };
         }
         return {
           ...doc,

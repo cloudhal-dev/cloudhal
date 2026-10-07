@@ -4,5 +4,6 @@
 export * from "./errors.ts";
 export * from "./hash.ts";
 export * from "./ids.ts";
+export * from "./preview-token.ts";
 export * from "./seed.ts";
 export * from "./store.ts";

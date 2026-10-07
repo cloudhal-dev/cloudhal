@@ -13,6 +13,7 @@ export interface HttpOptions {
   audit?: AuditLog | undefined;
   skills?: LoadedSkill[] | undefined;
   previewBaseUrl?: string | undefined;
+  previewSecret?: string | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
   confirmTokenFallback?: boolean | undefined;
@@ -38,6 +39,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         audit: options.audit,
         skills: options.skills,
         previewBaseUrl: options.previewBaseUrl,
+        previewSecret: options.previewSecret,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,
       });

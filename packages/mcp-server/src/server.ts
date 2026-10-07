@@ -46,6 +46,8 @@ export interface CloudhalMcpOptions {
   skills?: LoadedSkill[] | undefined;
   /** Base URL of a running `cloudhal dev`, used for `preview_page.url`. */
   previewBaseUrl?: string | undefined;
+  /** Preview secret shared with the deployed site: `preview_page.url` becomes a signed link. */
+  previewSecret?: string | undefined;
   /**
    * HMAC key (≥ 32 bytes) for the approval state. Every instance that may receive a retried round
    * must share it: a random per-process key is fine for stdio, a configured secret for HTTP.
@@ -228,7 +230,12 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           confirmed = true;
         }
 
-        const toolCtx = { store: options.store, principal, previewBaseUrl: options.previewBaseUrl };
+        const toolCtx = {
+          store: options.store,
+          principal,
+          previewBaseUrl: options.previewBaseUrl,
+          previewSecret: options.previewSecret,
+        };
         let outcome: Awaited<ReturnType<typeof runTool>>;
         try {
           outcome = await runTool(def, args, toolCtx, { policy, audit: options.audit, confirmed });

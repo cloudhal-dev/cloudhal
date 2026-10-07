@@ -17,6 +17,8 @@ export interface McpMountOptions {
   readonly previewBaseUrl?: string | undefined;
   readonly confirmTokenFallback?: boolean | undefined;
   readonly legacy?: "stateless" | "reject" | undefined;
+  /** Same secret as `ApiDeps.preview`: lets `preview_page` return signed links to the deployed site. */
+  readonly previewSecret?: string | undefined;
 }
 
 export interface ApiDeps {
@@ -29,6 +31,8 @@ export interface ApiDeps {
   readonly mcp?: McpMountOptions;
   /** Enables `/api/sites/:id/activity` (the agent/human audit trail). */
   readonly audit?: AuditLog;
+  /** Enables `/api/sites/:id/preview-links` (signed links to drafts/snapshots on the deployed site). */
+  readonly preview?: { readonly secret: string };
   /** Mounts `/api/agent-keys` (create/list/delete API keys for agents). */
   readonly agentKeys?: AgentKeyService;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */
@@ -38,5 +42,10 @@ export interface ApiDeps {
 }
 
 export type Env = {
-  Variables: { actor: Actor | undefined; store: SiteGraphStore; audit: AuditLog | undefined };
+  Variables: {
+    actor: Actor | undefined;
+    store: SiteGraphStore;
+    audit: AuditLog | undefined;
+    previewSecret: string | undefined;
+  };
 };

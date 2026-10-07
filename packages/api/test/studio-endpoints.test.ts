@@ -106,3 +106,48 @@ describe("preview", () => {
     );
   });
 });
+
+describe("preview links", () => {
+  it("mints signed links for drafts and snapshots on the site's primary domain", async () => {
+    const { verifyPreviewToken } = await import("@cloudhal/core-ts");
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    await store.init();
+    const seeded = await seedStarterSite(store, { name: "Links", slug: "links" });
+    const secret = "api-preview-secret-at-least-32-bytes-long";
+    const app = createApi({
+      store,
+      resolveActor: async (c) => (c.req.header("x-test-user") ? human : undefined),
+      preview: { secret },
+    });
+    const post = (body: unknown) =>
+      app.request(`/api/sites/${seeded.id}/preview-links`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-test-user": "1" },
+        body: JSON.stringify(body),
+      });
+
+    const noDomain = (await (await post({})).json()) as { url: string | null; token: string };
+    expect(noDomain.url).toBeNull();
+    expect((await verifyPreviewToken(secret, noDomain.token, seeded.id)).target).toBe("live");
+
+    const site = await store.getSite(seeded.id);
+    await store.updateSite({
+      ...(site as NonNullable<typeof site>),
+      domains: [{ hostname: "news.example.com", primary: true }],
+    });
+    const snap = await store.createSnapshot(seeded.id, { actor: human, reason: "manual" });
+    const res = await post({ target: { snapshot: snap.id }, path: "/about", ttlSeconds: 300 });
+    expect(res.status).toBe(201);
+    const link = (await res.json()) as { url: string; token: string; expiresAt: string };
+    expect(link.url).toMatch(/^https:\/\/news\.example\.com\/about\?cloudhal-preview=/);
+    expect((await verifyPreviewToken(secret, link.token, seeded.id)).target).toEqual({ snapshot: snap.id });
+    expect(Date.parse(link.expiresAt) - Date.now()).toBeLessThanOrEqual(300_000);
+
+    expect((await post({ target: { snapshot: "snap_missing000001" } })).status).toBe(404);
+    expect((await post({ target: 42 })).status).toBe(400);
+    expect(
+      (await app.request(`/api/sites/${seeded.id}/preview-links`, { method: "POST" })).status,
+    ).toBe(401);
+  });
+});
