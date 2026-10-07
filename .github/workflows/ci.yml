@@ -62,7 +62,7 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-typify@${{ env.TYPIFY_VERSION }}
       - uses: pnpm/action-setup@v6
