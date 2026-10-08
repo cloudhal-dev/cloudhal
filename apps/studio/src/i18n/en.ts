@@ -36,6 +36,9 @@ export const en = {
     password: "Password",
     passwordHint: "At least 8 characters",
     failed: "Sign-in failed",
+    setupTitle: "Set up this Studio",
+    setupDescription:
+      "You opened the setup link from `cloudhal deploy`. The account you create now becomes the owner; afterwards sign-up closes.",
   },
   sites: {
     title: "Sites",
@@ -483,6 +486,7 @@ export const en = {
         activity: "Activity log",
         previewLinks: "Preview links",
         deployTransfer: "Deploy and transfer",
+        approvals: "Approvals in Studio",
       },
       featureHints: {
         agentKeys: "Agents and CI jobs sign in with keys you create.",
@@ -490,6 +494,7 @@ export const en = {
         activity: "Every tool call is recorded per site.",
         previewLinks: "Signed links that show drafts on the deployed site.",
         deployTransfer: "cloudhal push and pull can reach this server.",
+        approvals: "Agents' publish, rollback and delete requests wait here for a person.",
       },
     },
   },

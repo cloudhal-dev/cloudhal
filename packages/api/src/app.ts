@@ -162,6 +162,7 @@ export function createApi(deps: ApiDeps) {
           activity: Boolean(deps.audit ?? deps.mcp?.audit),
           previewLinks: Boolean(deps.preview),
           deployTransfer: Boolean(deps.admin),
+          approvals: Boolean(deps.mcp?.approvals),
         },
       }),
       deps.mcp?.skills ?? [],

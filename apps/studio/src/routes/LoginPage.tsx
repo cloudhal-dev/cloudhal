@@ -1,16 +1,43 @@
-import { Button, Input, Surface, Tabs, Text } from "@cloudhal/ui";
-import { SquaresFour } from "@phosphor-icons/react";
+import { Banner, Button, Input, Surface, Tabs, Text } from "@cloudhal/ui";
+import { Key, SquaresFour } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { LanguageSwitch } from "../components/LanguageSwitch.tsx";
 import { useT } from "../i18n/index.tsx";
 import { authClient } from "../lib/auth.ts";
 
+const SETUP_KEY = "cloudhal.setupToken";
+
+/**
+ * A fresh deployment's owner arrives with `/login?setup=<token>` (printed by `cloudhal deploy`).
+ * The token is moved out of the URL at once (screenshots, history, referrers) and kept for this
+ * tab only; the server requires it for the first account.
+ */
+export function takeSetupToken(): string | undefined {
+  try {
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get("setup");
+    if (fromUrl) {
+      sessionStorage.setItem(SETUP_KEY, fromUrl);
+      url.searchParams.delete("setup");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      return fromUrl;
+    }
+    return sessionStorage.getItem(SETUP_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function LoginPage() {
   const t = useT();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [setupToken] = useState(takeSetupToken);
+  const [mode, setMode] = useState<"signin" | "signup">(setupToken ? "signup" : "signin");
+  useEffect(() => {
+    if (setupToken) setMode("signup");
+  }, [setupToken]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,12 +50,20 @@ export function LoginPage() {
     setError(undefined);
     const result =
       mode === "signup"
-        ? await authClient.signUp.email({ name, email, password })
+        ? await authClient.signUp.email(
+            { name, email, password },
+            setupToken ? { headers: { "x-cloudhal-setup-token": setupToken } } : undefined,
+          )
         : await authClient.signIn.email({ email, password });
     setBusy(false);
     if (result.error) {
       setError(result.error.message ?? t("auth.failed"));
       return;
+    }
+    try {
+      sessionStorage.removeItem(SETUP_KEY);
+    } catch {
+      // storage unavailable
     }
     await navigate({ to: "/sites" });
   }
@@ -52,6 +87,14 @@ export function LoginPage() {
         </div>
         <Surface className="rounded-xl bg-kumo-base px-6 py-5 ring ring-kumo-line">
           <form onSubmit={submit} className="grid gap-4" data-testid="login-form">
+            {setupToken && mode === "signup" && (
+              <Banner
+                variant="default"
+                icon={<Key weight="fill" />}
+                title={t("auth.setupTitle")}
+                description={t("auth.setupDescription")}
+              />
+            )}
             <Tabs
               tabs={[
                 { value: "signin", label: t("auth.signIn") },

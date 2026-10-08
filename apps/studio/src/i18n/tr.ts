@@ -37,6 +37,9 @@ export const tr: Messages = {
     password: "Şifre",
     passwordHint: "En az 8 karakter",
     failed: "Giriş başarısız",
+    setupTitle: "Bu Studio'yu kur",
+    setupDescription:
+      "`cloudhal deploy` çıktısındaki kurulum bağlantısıyla geldin. Şimdi oluşturacağın hesap sahip olur; ardından yeni kayıtlar kapanır.",
   },
   sites: {
     title: "Siteler",
@@ -484,6 +487,7 @@ export const tr: Messages = {
         activity: "Etkinlik kaydı",
         previewLinks: "Önizleme bağlantıları",
         deployTransfer: "Dağıtım ve aktarım",
+        approvals: "Studio'da onaylar",
       },
       featureHints: {
         agentKeys: "Agent'lar ve CI işleri oluşturduğun anahtarlarla giriş yapar.",
@@ -491,6 +495,8 @@ export const tr: Messages = {
         activity: "Her araç çağrısı site bazında kaydedilir.",
         previewLinks: "Dağıtılmış sitede taslakları gösteren imzalı bağlantılar.",
         deployTransfer: "cloudhal push ve pull bu sunucuya ulaşabilir.",
+        approvals:
+          "Ajanların yayınlama, geri alma ve silme istekleri burada bir kişinin kararını bekler.",
       },
     },
   },

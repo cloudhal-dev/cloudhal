@@ -117,6 +117,8 @@ export interface InstanceInfo {
     activity: boolean;
     previewLinks: boolean;
     deployTransfer: boolean;
+    /** Agents' gated calls wait for a person in Studio (ADR-0014). Older servers omit it. */
+    approvals?: boolean;
   };
 }
 export type SignUpPolicy = InstanceInfo["signUp"];

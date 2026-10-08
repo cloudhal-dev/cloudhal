@@ -187,6 +187,7 @@ describe("instance and skills", () => {
         activity: false,
         previewLinks: false,
         deployTransfer: false,
+        approvals: false,
       },
     });
     const skills = (await (

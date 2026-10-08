@@ -14,6 +14,7 @@ export interface InstanceInfo {
     activity: boolean;
     previewLinks: boolean;
     deployTransfer: boolean;
+    approvals: boolean;
   };
 }
 
