@@ -19,6 +19,9 @@ const adapter =
 
 export default defineConfig({
   output: "static",
+  // Sites keep no server-side session state; without this the Cloudflare adapter would add (and
+  // wrangler would provision) a SESSION KV namespace the site never uses.
+  session: false,
   ...(adapter ? { adapter } : {}),
   integrations: [
     cloudhal({ siteId: project.siteId, dataDir: project.dataDir ?? ".cloudhal", target }),

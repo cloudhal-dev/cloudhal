@@ -1,0 +1,2 @@
+# Source maps stay out of the deployed assets (wrangler reads this from the assets directory).
+*.map

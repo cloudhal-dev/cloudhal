@@ -134,7 +134,7 @@ async function ensureResources(
   log: (l: string) => void,
 ) {
   const info = async () => {
-    const r = await run(["d1", "info", names.database, "--json"], { cwd });
+    const r = await run(["d1", "info", names.database, "--json"], { cwd, quiet: true });
     if (r.code !== 0) return undefined;
     try {
       return (JSON.parse(r.stdout) as { uuid?: string }).uuid;

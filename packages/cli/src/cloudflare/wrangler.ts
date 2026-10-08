@@ -17,7 +17,10 @@ export interface WranglerResult {
   records: Record<string, unknown>[];
 }
 
-export type WranglerRunner = (args: string[], options: { cwd: string }) => Promise<WranglerResult>;
+export type WranglerRunner = (
+  args: string[],
+  options: { cwd: string; quiet?: boolean },
+) => Promise<WranglerResult>;
 
 export function resolveWranglerBin(projectDir: string): string {
   const require = createRequire(path.join(projectDir, "package.json"));
@@ -29,7 +32,7 @@ export function wranglerRunner(
   log: (line: string) => void = () => {},
 ): WranglerRunner {
   const bin = resolveWranglerBin(projectDir);
-  return async (args, { cwd }) => {
+  return async (args, { cwd, quiet }) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cloudhal-wrangler-"));
     const outputFile = path.join(dir, "output.ndjson");
     const { VITEST: _v, NODE_ENV: _n, ...env } = process.env;
@@ -45,7 +48,7 @@ export function wranglerRunner(
           let stderr = "";
           child.stdout.on("data", (c: Buffer) => {
             stdout += c.toString();
-            for (const l of c.toString().split("\n")) if (l.trim()) log(`  ${l}`);
+            if (!quiet) for (const l of c.toString().split("\n")) if (l.trim()) log(`  ${l}`);
           });
           child.stderr.on("data", (c: Buffer) => {
             stderr += c.toString();
