@@ -7,6 +7,7 @@ import {
   FileText,
   GearSix,
   Globe,
+  HandPalm,
   House,
   Robot,
   SquaresFour,
@@ -15,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
 import { useToast } from "../components/Toast.ts";
+import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
@@ -37,6 +39,9 @@ export function SiteShell() {
     queryKey: ["snapshots", siteId],
     queryFn: () => api.snapshots.list(siteId),
   });
+  // Polls while the site surface is open; drives the sidebar badge (and the overview banner).
+  const approvals = usePendingApprovals(siteId);
+  const pendingApprovals = approvals.data?.length ?? 0;
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -100,6 +105,11 @@ export function SiteShell() {
       id: "activity",
       label: t("commands.goActivity"),
       run: () => navigate({ to: "/sites/$siteId/activity", params: { siteId } }),
+    },
+    {
+      id: "approvals",
+      label: t("commands.goApprovals"),
+      run: () => navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
     },
     {
       id: "settings",
@@ -193,6 +203,15 @@ export function SiteShell() {
                 tooltip={t("nav.activity")}
               >
                 {t("nav.activity")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={HandPalm}
+                href={`${base}/approvals`}
+                active={is(`${base}/approvals`)}
+                tooltip={t("nav.approvals")}
+              >
+                {t("nav.approvals")}
+                {pendingApprovals > 0 && <Sidebar.MenuBadge>{pendingApprovals}</Sidebar.MenuBadge>}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

@@ -137,6 +137,26 @@ export interface SkillSummary {
   resource: string;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "denied" | "consumed" | "expired";
+
+/** An agent's gated call waiting for (or decided by) a person (ADR-0014, `/api/sites/:id/approvals`). */
+export interface Approval {
+  id: string;
+  siteId?: string;
+  tool: string;
+  input?: unknown;
+  actor: Actor;
+  /** Server-built question; may quote agent-controlled titles, so it is shown as plain text only. */
+  prompt: string;
+  status: ApprovalStatus;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt?: string;
+  /** Actor id of the person who decided. */
+  decidedBy?: string;
+  consumedAt?: string;
+}
+
 /** What a preview link renders: the current drafts or one snapshot. */
 export type PreviewTarget = "live" | { snapshot: string };
 
@@ -172,6 +192,19 @@ export const api = {
   instance: () => request<InstanceInfo>("/api/instance"),
   skills: {
     list: () => request<SkillSummary[]>("/api/skills"),
+  },
+  approvals: {
+    /** Newest first; all statuses unless `status` is given. 404 when approvals are disabled. */
+    list: (siteId: string, status?: ApprovalStatus) =>
+      request<{ items: Approval[] }>(
+        `/api/sites/${encodeURIComponent(siteId)}/approvals${query({ status })}`,
+      ).then((r) => r.items),
+    /** 409 when the request is no longer pending (decided, consumed or expired meanwhile). */
+    decide: (siteId: string, id: string, decision: "approve" | "deny") =>
+      request<Approval>(
+        `/api/sites/${encodeURIComponent(siteId)}/approvals/${encodeURIComponent(id)}/${decision}`,
+        { method: "POST" },
+      ),
   },
   previewLinks: {
     /** 404 when the server has no preview secret (see `isNotEnabled`). */

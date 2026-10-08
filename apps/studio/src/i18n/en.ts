@@ -75,6 +75,7 @@ export const en = {
     toggleSidebar: "Toggle sidebar",
     activity: "Activity",
     agentKeys: "Keys and MCP",
+    approvals: "Approvals",
     settings: "Settings",
     siteSettings: "Settings",
   },
@@ -93,6 +94,7 @@ export const en = {
     goSkills: "Go to skills",
     goAccount: "Go to account settings",
     goSiteSettings: "Go to site settings",
+    goApprovals: "Go to approvals",
   },
   overview: {
     liveSnapshot: "Live snapshot {id}",
@@ -642,6 +644,77 @@ export const en = {
       title: "Add your own",
       description:
         "Studio loads skills from the skills/ folder of your project. Without one, it serves the official set.",
+    },
+  },
+  approvals: {
+    title: "Approvals",
+    views: { activity: "Activity", approvals: "Approvals" },
+    description:
+      "Agents' publish, rollback and delete requests wait here until a person decides. Approving lets the agent make that exact call once.",
+    pending: "Waiting for you",
+    history: "History",
+    noPending: "Nothing is waiting for you",
+    noPendingDescription:
+      "When an agent asks to publish, roll back or delete, its request appears here and the agent waits for your decision.",
+    noHistory: "No decisions yet",
+    noHistoryDescription: "Approved, denied, used and expired requests are listed here.",
+    requested: "Requested",
+    expires: "Expires",
+    expiresSoon: "Expires soon",
+    arguments: "Arguments",
+    noArguments: "This call has no arguments.",
+    prompt: "Request",
+    approve: "Approve",
+    deny: "Deny",
+    approved: "Request approved",
+    approvedDescription: "{agent} can now make this call once.",
+    denied: "Request denied",
+    deniedDescription: "{agent} will be told the request was denied.",
+    failed: "Couldn't record your decision",
+    noLongerPending: "This request is no longer pending",
+    noLongerPendingDescription:
+      "It was decided, used or expired in the meantime. The list has been refreshed.",
+    statuses: {
+      pending: "Pending",
+      approved: "Approved",
+      denied: "Denied",
+      consumed: "Used",
+      expired: "Expired",
+    },
+    columns: {
+      request: "Request",
+      status: "Status",
+      agent: "Agent",
+      requested: "Requested",
+      decided: "Decided",
+    },
+    decidedBy: "by {actor}",
+    decidedByYou: "by you",
+    notEnabledTitle: "This server doesn't keep approvals",
+    notEnabledDescription:
+      "Agents' publish and rollback requests are confirmed in their MCP client here. Approvals in Studio need cloudhal studio or the admin Worker.",
+    confirm: {
+      title: "Approve “{tool}”?",
+      requestedBy: "Requested by {agent}",
+      singleUseTitle: "Single use, for the site as it is now",
+      singleUse:
+        "{agent} may make this exact call once. If anything on the site changes before the agent calls again, the approval is void and it has to ask again.",
+      changes: "Approximate changes",
+      changesHint:
+        "The live version compared with the newest snapshot. Edits saved after that snapshot are published too, but aren't counted here.",
+      viewChanges: "View changes",
+      first: "Nothing is live yet: this publish makes the site public for the first time.",
+      upToDate:
+        "The newest snapshot is already live, so only edits saved since then would be published.",
+      rollbackTarget: "Live site goes back to",
+      deleteTarget: "Deletes",
+      submit: "Approve",
+    },
+    banner: {
+      title: "{count} agent requests are waiting for your approval",
+      titleOne: "An agent request is waiting for your approval",
+      description: "Agents can't publish, roll back or delete until a person decides.",
+      action: "Review requests",
     },
   },
   tools: {

@@ -75,6 +75,7 @@ export const tr: Messages = {
     toggleSidebar: "Kenar çubuğunu aç/kapat",
     activity: "Etkinlik",
     agentKeys: "Anahtarlar ve MCP",
+    approvals: "Onaylar",
     settings: "Ayarlar",
     siteSettings: "Ayarlar",
   },
@@ -93,6 +94,7 @@ export const tr: Messages = {
     goSkills: "Skill'lere git",
     goAccount: "Hesap ayarlarına git",
     goSiteSettings: "Site ayarlarına git",
+    goApprovals: "Onaylara git",
   },
   overview: {
     liveSnapshot: "Canlı snapshot {id}",
@@ -645,6 +647,78 @@ export const tr: Messages = {
       title: "Kendi skill'ini ekle",
       description:
         "Studio skill'leri projendeki skills/ klasöründen yükler. Klasör yoksa resmi seti sunar.",
+    },
+  },
+  approvals: {
+    title: "Onaylar",
+    views: { activity: "Etkinlik", approvals: "Onaylar" },
+    description:
+      "Agent'ların yayınlama, geri alma ve silme istekleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir.",
+    pending: "Seni bekleyenler",
+    history: "Geçmiş",
+    noPending: "Seni bekleyen bir şey yok",
+    noPendingDescription:
+      "Bir agent yayınlamak, geri almak ya da silmek istediğinde isteği burada görünür ve agent senin kararını bekler.",
+    noHistory: "Henüz karar yok",
+    noHistoryDescription:
+      "Onaylanan, reddedilen, kullanılan ve süresi dolan istekler burada listelenir.",
+    requested: "İstendi",
+    expires: "Sona erer",
+    expiresSoon: "Yakında sona eriyor",
+    arguments: "Argümanlar",
+    noArguments: "Bu çağrının argümanı yok.",
+    prompt: "İstek",
+    approve: "Onayla",
+    deny: "Reddet",
+    approved: "İstek onaylandı",
+    approvedDescription: "{agent} artık bu çağrıyı bir kez yapabilir.",
+    denied: "İstek reddedildi",
+    deniedDescription: "{agent} isteğin reddedildiğini öğrenecek.",
+    failed: "Kararın kaydedilemedi",
+    noLongerPending: "Bu istek artık beklemede değil",
+    noLongerPendingDescription:
+      "Bu arada karara bağlandı, kullanıldı ya da süresi doldu. Liste yenilendi.",
+    statuses: {
+      pending: "Beklemede",
+      approved: "Onaylandı",
+      denied: "Reddedildi",
+      consumed: "Kullanıldı",
+      expired: "Süresi doldu",
+    },
+    columns: {
+      request: "İstek",
+      status: "Durum",
+      agent: "Agent",
+      requested: "İstendi",
+      decided: "Karar",
+    },
+    decidedBy: "{actor} tarafından",
+    decidedByYou: "senin tarafından",
+    notEnabledTitle: "Bu sunucu onay kaydı tutmuyor",
+    notEnabledDescription:
+      "Burada agent'ların yayınlama ve geri alma istekleri kendi MCP istemcilerinde onaylanır. Studio'da onay için cloudhal studio ya da admin Worker gerekir.",
+    confirm: {
+      title: "“{tool}” onaylansın mı?",
+      requestedBy: "{agent} istedi",
+      singleUseTitle: "Tek kullanımlık, sitenin şu anki hâli için",
+      singleUse:
+        "{agent} tam bu çağrıyı yalnızca bir kez yapabilir. Agent yeniden çağırmadan önce sitede herhangi bir şey değişirse onay geçersiz olur ve agent yeniden sormak zorunda kalır.",
+      changes: "Yaklaşık değişiklikler",
+      changesHint:
+        "Canlı sürüm en yeni snapshot ile karşılaştırıldı. O snapshot'tan sonra kaydedilen düzenlemeler de yayınlanır ama burada sayılmaz.",
+      viewChanges: "Değişiklikleri gör",
+      first: "Henüz canlıda bir şey yok: bu yayın siteyi ilk kez herkese açar.",
+      upToDate:
+        "En yeni snapshot zaten canlıda; yalnızca ondan sonra kaydedilen düzenlemeler yayınlanır.",
+      rollbackTarget: "Canlı site şu sürüme döner",
+      deleteTarget: "Silinecek",
+      submit: "Onayla",
+    },
+    banner: {
+      title: "{count} agent isteği onayını bekliyor",
+      titleOne: "Bir agent isteği onayını bekliyor",
+      description: "Bir kişi karar verene kadar agent'lar yayınlayamaz, geri alamaz ya da silemez.",
+      action: "İstekleri incele",
     },
   },
   tools: {

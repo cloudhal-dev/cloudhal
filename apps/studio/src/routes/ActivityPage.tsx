@@ -23,6 +23,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog.tsx";
+import { ActivityViews } from "../components/ActivityViews.tsx";
 import { ActorCell, Decision, Outcome, ToolCell, useToolLabel } from "../components/Audit.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
@@ -67,12 +68,17 @@ export function ActivityPage() {
 
   if (notEnabled) {
     return (
-      <Banner
-        variant="secondary"
-        icon={<Info weight="fill" />}
-        title={t("activity.notEnabledTitle")}
-        description={t("activity.notEnabledDescription")}
-      />
+      <div className="grid gap-6">
+        <div>
+          <ActivityViews siteId={siteId} value="activity" />
+        </div>
+        <Banner
+          variant="secondary"
+          icon={<Info weight="fill" />}
+          title={t("activity.notEnabledTitle")}
+          description={t("activity.notEnabledDescription")}
+        />
+      </div>
     );
   }
 
@@ -80,6 +86,9 @@ export function ActivityPage() {
 
   return (
     <div className="grid gap-4">
+      <div>
+        <ActivityViews siteId={siteId} value="activity" />
+      </div>
       <ErrorBanner
         error={activity.error}
         onRetry={() => activity.refetch()}

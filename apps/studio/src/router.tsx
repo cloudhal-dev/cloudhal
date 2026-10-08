@@ -20,6 +20,10 @@ import { SiteTabsLayout } from "./routes/SiteTabsLayout.tsx";
 const AccountPage = lazyRouteComponent(() => import("./routes/AccountPage.tsx"), "AccountPage");
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
 const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
+const ApprovalsPage = lazyRouteComponent(
+  () => import("./routes/ApprovalsPage.tsx"),
+  "ApprovalsPage",
+);
 const ArticleEditorPage = lazyRouteComponent(
   () => import("./routes/ArticleEditorPage.tsx"),
   "ArticleEditorPage",
@@ -139,6 +143,12 @@ const activityRoute = createRoute({
   path: "/activity",
   component: ActivityPage,
 });
+/** Activity › Approvals: agents' gated calls waiting for a person (ADR-0014). */
+const approvalsRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/approvals",
+  component: ApprovalsPage,
+});
 const siteSettingsRoute = createRoute({
   getParentRoute: () => siteTabsRoute,
   path: "/settings",
@@ -166,6 +176,7 @@ const routeTree = rootRoute.addChildren([
       articlesRoute,
       snapshotsRoute,
       activityRoute,
+      approvalsRoute,
       siteSettingsRoute,
     ]),
     pageEditorRoute,

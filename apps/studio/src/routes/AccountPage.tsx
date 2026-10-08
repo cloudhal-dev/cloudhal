@@ -179,6 +179,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
             />
           )}
           <Input
+            className="w-full"
             label={t("account.profile.name")}
             description={t("account.profile.nameHint")}
             value={name}
@@ -196,12 +197,12 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
             }}
           />
           <Input
+            className="w-full text-kumo-subtle"
             label={t("account.profile.email")}
             description={t("account.profile.emailHint")}
             value={me.user.email}
             type="email"
             readOnly
-            className="text-kumo-subtle"
           />
           <dl className="-my-3 border-kumo-hairline border-t">
             <SettingRow

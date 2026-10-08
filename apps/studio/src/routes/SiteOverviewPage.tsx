@@ -16,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -95,6 +96,7 @@ export function SiteOverviewPage() {
 
   return (
     <>
+      <PendingApprovalsBanner siteId={siteId} />
       <ErrorBanner error={pages.error ?? entries.error ?? createPage.error} />
       <Grid variant="2-1" gap="base">
         <div className="grid content-start gap-6">

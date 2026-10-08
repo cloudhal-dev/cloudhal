@@ -217,6 +217,7 @@ function GeneralSection({
             reloading={reloading}
           />
           <Input
+            className="w-full"
             label={t("siteSettings.general.name")}
             description={t("siteSettings.general.nameHint")}
             value={name}
@@ -483,7 +484,7 @@ function DomainsSection({
                 </InputGroup>
               </div>
               {/* Aligns with the input, below its label. */}
-              <div className="pt-6">
+              <div className="sm:pt-6">
                 <Button
                   variant="secondary"
                   icon={<Plus />}

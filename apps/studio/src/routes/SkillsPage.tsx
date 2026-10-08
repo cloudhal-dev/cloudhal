@@ -2,6 +2,7 @@ import {
   Banner,
   Button,
   Code,
+  Collapsible,
   Empty,
   InlineCopyText,
   LayerCard,
@@ -61,18 +62,18 @@ function HowSkillsWork() {
             </div>
           ))}
         </div>
-        <div className="grid min-w-0 gap-2">
-          <Text size="sm" bold as="span">
-            {t("skills.how.example")}
-          </Text>
-          <div className="min-w-0 overflow-x-auto">
-            <CodeHighlighted
-              code={skillCallSnippet({ name: "safe-edit", approval: [] })}
-              lang="json"
-              showCopyButton
-            />
-          </div>
-        </div>
+        <Collapsible.Root>
+          <Collapsible.DefaultTrigger>{t("skills.how.example")}</Collapsible.DefaultTrigger>
+          <Collapsible.DefaultPanel>
+            <div className="min-w-0 overflow-x-auto">
+              <CodeHighlighted
+                code={skillCallSnippet({ name: "safe-edit", approval: [] })}
+                lang="json"
+                showCopyButton
+              />
+            </div>
+          </Collapsible.DefaultPanel>
+        </Collapsible.Root>
       </LayerCard.Primary>
     </LayerCard>
   );
@@ -154,16 +155,15 @@ export function SkillsPage() {
                   <Table.Head>{t("skills.columns.scopes")}</Table.Head>
                   <Table.Head>{t("skills.columns.approval")}</Table.Head>
                   <Table.Head>{t("skills.columns.references")}</Table.Head>
-                  <Table.Head>{t("skills.columns.resource")}</Table.Head>
                   <Table.Head sticky="right" />
                 </Table.Row>
               </Table.Header>
               {skills.isPending ? (
-                <TableSkeleton columns={6} rows={4} />
+                <TableSkeleton columns={5} rows={4} />
               ) : paging.pageItems.length === 0 ? (
                 <Table.Body>
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={5}>
                       <Empty
                         size="sm"
                         icon={<BookOpenText size={32} className="text-kumo-inactive" />}
@@ -182,18 +182,23 @@ export function SkillsPage() {
                       onClick={() => setSelected(s)}
                       className="cursor-pointer hover:bg-kumo-tint"
                     >
-                      <Table.Cell className="min-w-64 max-w-md">
-                        <div className="grid gap-0.5">
+                      <Table.Cell>
+                        <div className="grid w-56 gap-1 2xl:w-80">
                           <Text bold as="span">
                             {s.name}
                           </Text>
                           <Text variant="secondary" size="sm" as="span">
-                            {s.description}
+                            <span className="line-clamp-2">{s.description}</span>
                           </Text>
+                          {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops the row click */}
+                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: the copy button handles keys itself */}
+                          <span className="w-fit" onClick={(e) => e.stopPropagation()}>
+                            <InlineCopyText>{s.resource}</InlineCopyText>
+                          </span>
                         </div>
                       </Table.Cell>
                       <Table.Cell>
-                        <div className="flex min-w-48 flex-wrap gap-1">
+                        <div className="flex min-w-40 flex-wrap gap-1">
                           {orderSkillScopes(s.scopes).map((scope) => (
                             <SkillScope key={scope} scope={scope} />
                           ))}
@@ -201,7 +206,7 @@ export function SkillsPage() {
                       </Table.Cell>
                       <Table.Cell>
                         {s.approval.length > 0 ? (
-                          <div className="flex min-w-36 flex-wrap gap-1">
+                          <div className="flex min-w-32 flex-wrap gap-1">
                             {s.approval.map((tool) => (
                               <ApprovalTool key={tool} tool={tool} />
                             ))}
@@ -222,13 +227,6 @@ export function SkillsPage() {
                             {t("skills.none")}
                           </Text>
                         )}
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops the row click */}
-                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: the copy button handles keys itself */}
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <InlineCopyText>{s.resource}</InlineCopyText>
-                        </span>
                       </Table.Cell>
                       <Table.Cell sticky="right" className="text-right">
                         <Button

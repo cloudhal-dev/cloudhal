@@ -29,8 +29,11 @@ export function SiteTabsLayout() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const [publishOpen, setPublishOpen] = useState(false);
   const base = `/sites/${siteId}`;
-  const current =
-    TABS.find((tab) => tab !== "overview" && pathname.startsWith(`${base}/${tab}`)) ?? "overview";
+  // Approvals live under the Activity tab (segmented "Activity | Approvals" inside it).
+  const current = pathname.startsWith(`${base}/approvals`)
+    ? "activity"
+    : (TABS.find((tab) => tab !== "overview" && pathname.startsWith(`${base}/${tab}`)) ??
+      "overview");
 
   const snapshot = useMutation({
     mutationFn: (publish: boolean) =>
