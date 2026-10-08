@@ -10,12 +10,15 @@ import {
   HandPalm,
   House,
   Robot,
+  Signpost,
   SquaresFour,
+  Tag,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
+import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
@@ -43,6 +46,9 @@ export function SiteShell() {
   // Polls while the site surface is open; drives the sidebar badge (and the overview banner).
   const approvals = usePendingApprovals(siteId);
   const pendingApprovals = approvals.data?.length ?? 0;
+  // Proposed terms wait for a person (RFC-0002 §8): their count rides on the sidebar item.
+  const taxonomy = useTaxonomyData(siteId);
+  const proposedTerms = taxonomy.items.filter((i) => i.term.status === "proposed").length;
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -96,6 +102,16 @@ export function SiteShell() {
       id: "articles",
       label: t("commands.goArticles"),
       run: () => navigate({ to: "/sites/$siteId/articles", params: { siteId } }),
+    },
+    {
+      id: "taxonomy",
+      label: t("commands.goTaxonomy"),
+      run: () => navigate({ to: "/sites/$siteId/taxonomy", params: { siteId } }),
+    },
+    {
+      id: "redirects",
+      label: t("commands.goRedirects"),
+      run: () => navigate({ to: "/sites/$siteId/redirects", params: { siteId } }),
     },
     {
       id: "snapshots",
@@ -183,6 +199,15 @@ export function SiteShell() {
                 {t("nav.articles")}
                 <Sidebar.MenuBadge>{entries.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={Tag}
+                href={`${base}/taxonomy`}
+                active={is(`${base}/taxonomy`)}
+                tooltip={t("nav.taxonomy")}
+              >
+                {t("nav.taxonomy")}
+                {proposedTerms > 0 && <Sidebar.MenuBadge>{proposedTerms}</Sidebar.MenuBadge>}
+              </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
@@ -257,6 +282,14 @@ export function SiteShell() {
                 tooltip={t("nav.siteSettings")}
               >
                 {t("nav.siteSettings")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={Signpost}
+                href={`${base}/redirects`}
+                active={is(`${base}/redirects`)}
+                tooltip={t("nav.redirects")}
+              >
+                {t("nav.redirects")}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

@@ -12,11 +12,20 @@ import {
   Tabs,
   Text,
 } from "@cloudhal/ui";
-import { Equals, GitDiff, MinusCircle, PencilSimple, PlusCircle } from "@phosphor-icons/react";
+import {
+  Equals,
+  GitDiff,
+  Minus,
+  MinusCircle,
+  PencilSimple,
+  Plus,
+  PlusCircle,
+  Star,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n/index.tsx";
-import { api } from "../lib/api.ts";
+import { type AssignmentDelta, api } from "../lib/api.ts";
 import {
   CHANGES,
   type Change,
@@ -25,7 +34,52 @@ import {
   diffBases,
   diffRows,
 } from "../lib/diff.ts";
+import { archivePath } from "../lib/taxonomy.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
+import { type TaxonomyData, taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx";
+
+/**
+ * How an article's terms moved between the two snapshots (RFC-0002 §6.4): "+ Tag AI",
+ * "− Tag LLMs", "Primary category → News", as quiet badges under the article's row.
+ */
+function AssignmentDeltas({ deltas, data }: { deltas: AssignmentDelta[]; data: TaxonomyData }) {
+  const t = useT();
+  const name = (id: string | null) => {
+    if (!id) return t("diff.assignments.none");
+    const term = data.byId.get(id)?.term;
+    return term ? data.name(term) : id;
+  };
+  const taxLabel = (key: string) => {
+    const tax = data.taxonomies.data?.find((x) => x.key === key);
+    return (tax ? data.label(tax, "singular") : key).toLocaleLowerCase();
+  };
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-1" data-testid="assignment-deltas">
+      {deltas.flatMap((d) => [
+        ...d.added.map((id) => (
+          <Badge key={`+${d.taxonomy}${id}`} variant="outline" icon={<Plus />}>
+            {t("diff.assignments.added", { taxonomy: taxLabel(d.taxonomy), name: name(id) })}
+          </Badge>
+        )),
+        ...d.removed.map((id) => (
+          <Badge key={`-${d.taxonomy}${id}`} variant="outline" icon={<Minus />}>
+            {t("diff.assignments.removed", { taxonomy: taxLabel(d.taxonomy), name: name(id) })}
+          </Badge>
+        )),
+        ...(d.primary
+          ? [
+              <Badge key={`*${d.taxonomy}`} variant="outline" icon={<Star />}>
+                {t("diff.assignments.primary", {
+                  taxonomy: taxLabel(d.taxonomy),
+                  name: name(d.primary.to),
+                })}
+              </Badge>,
+            ]
+          : []),
+      ])}
+    </span>
+  );
+}
 
 const CHANGE_STYLE: Record<
   Change,
@@ -53,6 +107,12 @@ function useNodeNames(siteId: string, enabled: boolean) {
     queryFn: () => api.entries.list(siteId),
     enabled,
   });
+  const taxonomy = useTaxonomyData(siteId, enabled);
+  const redirects = useQuery({
+    queryKey: taxonomyKeys.redirects(siteId),
+    queryFn: () => api.redirects.list(siteId),
+    enabled,
+  });
   return (row: DiffRow): { title?: string; href?: string; detail?: string } => {
     if (row.kind === "site") {
       return site.data?.id === row.id
@@ -65,8 +125,31 @@ function useNodeNames(siteId: string, enabled: boolean) {
         ? { title: page.title, detail: page.path, href: `/sites/${siteId}/pages/${page.id}` }
         : {};
     }
-    // Taxonomies, terms and redirects are named by their kind badge until Studio lists them.
-    if (row.kind !== "contentEntry") return {};
+    if (row.kind === "taxonomy") {
+      const tax = taxonomy.taxonomies.data?.find((x) => x.id === row.id);
+      return tax
+        ? {
+            title: taxonomy.label(tax),
+            detail: tax.archive.basePath,
+            href: `/sites/${siteId}/taxonomy?taxonomy=${tax.key}`,
+          }
+        : {};
+    }
+    if (row.kind === "term") {
+      const term = taxonomy.byId.get(row.id)?.term;
+      const tax = term && taxonomy.taxonomies.data?.find((x) => x.id === term.taxonomyId);
+      return term
+        ? {
+            title: taxonomy.name(term),
+            ...(tax ? { detail: archivePath(tax, term.slug) } : {}),
+            href: `/sites/${siteId}/taxonomy/${term.id}`,
+          }
+        : {};
+    }
+    if (row.kind === "redirect") {
+      const r = redirects.data?.find((x) => x.id === row.id);
+      return r ? { title: `${r.from} → ${r.to}`, href: `/sites/${siteId}/redirects` } : {};
+    }
     const entry = entries.data?.find((e) => e.id === row.id);
     return entry
       ? {
@@ -110,11 +193,17 @@ export function SnapshotDiffDialog({
   const baseId = bases[effective];
   const diff = useQuery({
     queryKey: ["snapshot-diff", siteId, baseId, snapshot?.id],
-    queryFn: () => api.snapshots.diff(siteId, baseId as string, (snapshot as Snapshot).id),
+    queryFn: () =>
+      api.snapshots.diff(siteId, baseId as string, (snapshot as Snapshot).id, {
+        assignments: true,
+      }),
     enabled: open && !!baseId && !!snapshot,
     staleTime: Number.POSITIVE_INFINITY, // snapshots are immutable
   });
   const name = useNodeNames(siteId, open);
+  const taxonomy = useTaxonomyData(siteId, open);
+  const deltasOf = (entryId: string) =>
+    (diff.data?.assignments ?? []).filter((d) => d.entryId === entryId);
   const groups = diff.data ? diffRows(diff.data) : undefined;
   const total = groups ? CHANGES.reduce((n, c) => n + groups[c].length, 0) : 0;
   const title = snapshot?.label ?? snapshot?.id ?? "";
@@ -248,6 +337,9 @@ export function SnapshotDiffDialog({
                                     )}
                                     <InlineCopyText>{row.id}</InlineCopyText>
                                   </div>
+                                  {row.kind === "contentEntry" && deltasOf(row.id).length > 0 && (
+                                    <AssignmentDeltas deltas={deltasOf(row.id)} data={taxonomy} />
+                                  )}
                                 </div>
                               </Table.Cell>
                               <Table.Cell>

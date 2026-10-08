@@ -101,6 +101,16 @@ export const en = {
       title: "Account",
       description: "Your profile, how you sign in, and who else can get into this Studio.",
     },
+    taxonomy: {
+      title: "Categories & tags",
+      description:
+        "How articles are filed and found. A rename, merge or retirement is one change and one snapshot, and leaves redirects behind.",
+    },
+    redirects: {
+      title: "Redirects",
+      description:
+        "Old addresses and where they send visitors. Slug changes, merges and retirements add them on their own; you can add your own too.",
+    },
   },
   nav: {
     overview: "Overview",
@@ -129,6 +139,8 @@ export const en = {
     approvals: "Approvals",
     settings: "Settings",
     siteSettings: "Settings",
+    taxonomy: "Categories & tags",
+    redirects: "Redirects",
   },
   commands: {
     placeholder: "Type a command…",
@@ -146,6 +158,8 @@ export const en = {
     goAccount: "Go to account settings",
     goSiteSettings: "Go to site settings",
     goApprovals: "Go to approvals",
+    goTaxonomy: "Go to categories and tags",
+    goRedirects: "Go to redirects",
   },
   overview: {
     liveSnapshotLabel: "Live snapshot",
@@ -183,6 +197,56 @@ export const en = {
     },
     search: "Search articles",
     open: "Open",
+    none: "—",
+    noCategory: "No category",
+    primary: "Primary category",
+    facets: {
+      label: "Filter articles",
+      category: "Filter by category",
+      tag: "Filter by tag",
+      allCategories: "All {label}",
+      allTags: "All {label}",
+      clear: "Clear filters",
+      empty: "No articles match these filters",
+      emptyDescription: "Try another category or tag, or clear the filters.",
+    },
+  },
+  articleTerms: {
+    title: "Categories and tags",
+    description:
+      "Categories file the article; tags describe it. The primary category appears in breadcrumbs and in the article's metadata.",
+    legacyDescription:
+      "This site still keeps tags as plain text. Move them to categories and tags to give them names, archives and redirects.",
+    legacyTitle: "Older tags on this article",
+    legacyPending: "{tags} become tags when you save.",
+    required: "Choose a {singular} to send this article to review or publish it.",
+    requiredToast: "Choose a {singular} first",
+    slugRedirect:
+      "Lower-case, hyphenated. This article is published: a new slug leaves a redirect from the old address.",
+  },
+  pickers: {
+    under: "in {path}",
+    clear: "Clear",
+    showOptions: "Show options",
+    noMatch: "Nothing matches",
+    remove: "Remove {name}",
+    atMost: "At most {max}. Remove one to add another.",
+    categoryHint: "Up to {max}. Type to search names and synonyms.",
+    categoryRequiredHint: "Needed to send it to review or publish it. Up to {max}.",
+    categoryPlaceholder: "Choose categories…",
+    noCategory: "No category matches. Add categories in Categories & tags.",
+    primary: "Primary category",
+    primaryHint: "Shown in breadcrumbs and used as the article's section.",
+    primaryNone: "Choose one…",
+    tagHint: "Up to {max}. Existing tags come first, and synonyms find them too.",
+    tagPlaceholder: "Add a tag…",
+    tagFull: "Tag limit reached",
+    viaSynonym: "synonym “{value}”",
+    similar: "similar",
+    create: "Create “{name}”",
+    createNoSlug: "This name has no letters or digits for an address. Try another name.",
+    nearDuplicate: "Looks like {names}. Use the existing tag if it means the same.",
+    proposedChip: "Proposed by an agent. It gets a public page once someone approves it.",
   },
   editor: {
     status: "Status",
@@ -360,6 +424,13 @@ export const en = {
     noindexBadge: "noindex",
     noindexBadgeHint: "Hidden from search engines. Change it in the page's search settings.",
     noCover: "No cover image",
+    archive: {
+      seoTitleHint: "Leave empty to use the term's name.",
+      noindexHint: "Adds a noindex tag to the archive. It stays reachable through its link.",
+      noindexWarningTitle: "This archive is hidden from search engines",
+      noindexWarning:
+        "Search engines are asked not to list it, and it leaves the sitemap. Leave this off for topics people should find through search.",
+    },
   },
   status: { draft: "Draft", review: "In review", published: "Published", archived: "Archived" },
   site: {
@@ -1278,6 +1349,507 @@ export const en = {
     revs: "rev {from} → {to}",
     rev: "rev {rev}",
     columns: { item: "Item", revision: "Revision" },
+    assignments: {
+      added: "+ {taxonomy} {name}",
+      removed: "− {taxonomy} {name}",
+      primary: "Primary {taxonomy} → {name}",
+      none: "none",
+    },
+  },
+  taxonomy: {
+    newTerm: "New {singular}",
+    search: "Search {plural}",
+    columns: {
+      name: "Name",
+      usage: "Articles",
+      lastUsed: "Last used",
+      index: "Search engines",
+      visibility: "Visibility",
+    },
+    filters: {
+      all: "All",
+      public: "Public",
+      internal: "Internal",
+      proposed: "Proposed",
+      retired: "Retired",
+    },
+    state: {
+      proposed: "Proposed",
+      proposedHint:
+        "An agent proposed it. It can be assigned, but it has no public page until someone approves it.",
+      internal: "Internal",
+      internalHint:
+        "No archive, feed or sitemap entry, and articles don't show it. Themes and filters can still use it.",
+      retired: "Retired",
+      mergedInto: "Merged into {name}",
+    },
+    visibility: { public: "Public", internal: "Internal", none: "—" },
+    defaults: {
+      category: { singular: "Category", plural: "Categories" },
+      tag: { singular: "Tag", plural: "Tags" },
+    },
+    usage: {
+      value: "{published} / {total}",
+      hint: "{published} published of {total} articles. Opens them in Articles.",
+      none: "None",
+      never: "Never",
+    },
+    index: {
+      indexed: "Indexed",
+      indexedHint:
+        "{count} published articles: the archive is listed in search results and in the sitemap.",
+      thin: "Not indexed: {count} of {min}",
+      thinHint:
+        "Archives with fewer than {min} published articles are served with noindex, follow and left out of the sitemap.",
+      empty: "Empty",
+      emptyHint: "No published articles: the archive answers 404 until one is filed here.",
+      noindex: "noindex",
+      noindexHint: "Hidden from search engines in its search settings.",
+      none: {
+        internal: "No archive",
+        proposed: "Not public yet",
+        retired: "Retired",
+        archiveOff: "Archives off",
+      },
+      noneHint: {
+        internal: "Internal terms have no public archive.",
+        proposed: "Proposed terms have no public archive until someone approves them.",
+        retired: "Retired terms have no archive; old links redirect or answer 410 Gone.",
+        archiveOff: "This taxonomy publishes no archive pages.",
+      },
+    },
+    menu: {
+      label: "Term actions",
+      edit: "Edit",
+      view: "View",
+      rename: "Rename slug",
+      merge: "Merge into…",
+      mergeExisting: "Merge into an existing term…",
+      move: "Move…",
+      makeInternal: "Make internal",
+      makePublic: "Make public",
+      retire: "Retire",
+    },
+    review: {
+      waiting: "Proposals waiting for review: {count}",
+      waitingDescription:
+        "Agents proposed these {plural}. Approve one to give it a public page, merge it into an existing one, or reject it.",
+      open: "Review",
+      approve: "Approve",
+      approved: "{name} approved",
+      failed: "Couldn't approve",
+      reject: "Reject",
+      merge: "Merge…",
+      rejectNamed: "Reject {name}",
+      proposedBy: "Proposed by",
+    },
+    empty: {
+      all: "No {plural} yet",
+      public: "No public {plural}",
+      internal: "No internal {plural}",
+      proposed: "Nothing waiting for review",
+      retired: "No retired {plural}",
+      search: "Nothing matches your search",
+      allDescription: "Create the first one, or let agents propose tags as they write.",
+      filteredDescription: "Try another filter or search.",
+      noTaxonomies: "No categories or tags yet",
+      noTaxonomiesDescription:
+        "This site still keeps tags as plain text on each article. Move them to categories and tags; you see what changes before anything is written.",
+    },
+    create: {
+      title: "New {singular}",
+      description:
+        "Give it a name. Synonyms, an introduction, an image and search settings can follow in its editor.",
+      descriptionTree:
+        "Give it a name and, if it belongs under another category, a parent. The rest can follow in its editor.",
+      name: "Name ({locale})",
+      slugHint: "The address of its archive. It follows the name until you change it.",
+      parentHint: "Leave it at the top level, or file it under another category.",
+      internal: "Internal",
+      internalHint: "Internal terms get no public page; themes and filters can still use them.",
+      similarTitle: "This looks like an existing term",
+      similar: "Similar: {names}. Use that one if it means the same.",
+      submit: "Create {singular}",
+      created: "{name} created",
+    },
+    health: {
+      title: "Vocabulary health",
+      description:
+        "The same report agents read before they tag. Keep one page per topic so readers and search engines find it.",
+      issues: "{count} to review",
+      clean: "Nothing to tidy up",
+      cleanDescription: "No near-duplicates, single-use or empty terms right now.",
+      nearDuplicates: "Near-duplicates ({count})",
+      nearDuplicatesHint:
+        "Probably the same topic. Merging keeps the busier one and redirects the other.",
+      mergeInto: "{source} → {target}",
+      merge: "Merge",
+      morePairs: "{count} more pairs",
+      reasons: {
+        similar: "Spelled almost the same",
+        plural: "Singular and plural",
+        synonym: "One's synonym is the other's name",
+      },
+      proposed: "Waiting for review ({count})",
+      review: "Review",
+      uncategorised: "Articles without a category ({count})",
+      uncategorisedHint: "File them so they appear in an archive and in breadcrumbs.",
+      singleUse: "Used once ({count})",
+      empty: "Empty categories ({count})",
+      emptyHint: "their archives answer 404 until an article is filed",
+      oversized: "Very large categories ({count})",
+      oversizedHint: "over half of all articles; sub-categories would help",
+      andMore: " and {count} more",
+    },
+    rules: {
+      title: "How {plural} work",
+      description: "The rules of this taxonomy. Agents see the same ones.",
+      structure: "Structure",
+      tree: "Tree",
+      flat: "Flat list",
+      treeHint: "A term can sit under a parent, up to 5 levels deep.",
+      flatHint: "Terms have no parent.",
+      newTerms: "New terms",
+      newTermsValue: { none: "People only", propose: "Agents propose", free: "Agents add" },
+      newTermsHint: {
+        none: "Only people create them; agents choose from the existing ones.",
+        propose: "Agents propose new ones, which get a public page once someone approves.",
+        free: "Agents may add active terms directly.",
+      },
+      perArticle: "Per article",
+      required: "Required · up to {max}",
+      optional: "Optional · up to {max}",
+      requiredHint: "An article needs one, with a primary, to be reviewed or published.",
+      optionalHint: "Articles may have none.",
+      archive: "Archives",
+      archiveHint: "Indexed from {min} published articles; thinner archives are noindex.",
+      archiveOff: "No archive pages are published.",
+    },
+  },
+  governance: {
+    oneSnapshot: "One change, one snapshot. It goes live with the next publish.",
+    conflict:
+      "This term changed somewhere else in the meantime. Close the dialog and try again on the latest version.",
+    rename: {
+      title: "Rename the slug of {name}",
+      description:
+        "The archive moves to the new address. The old one keeps working through a permanent redirect, and the old slug stays reserved.",
+      slug: "New slug",
+      slugHint: "Lower-case letters, digits and single hyphens.",
+      reclaim: "Reclaim it: free this slug from the earlier term and drop its redirect",
+      history: "Earlier slugs: {slugs}",
+      confirm: "Rename",
+      errors: {
+        required: "Enter a slug.",
+        invalid: "Use lower-case letters, digits and single hyphens.",
+        tooLong: "At most 128 characters.",
+        taken: "Another term uses this slug.",
+        reserved:
+          "A term used this slug before and its old address redirects. Reclaim it below to use it here.",
+      },
+    },
+    merge: {
+      title: "Merge {name} into…",
+      description:
+        "Its articles move to the term you choose, which also takes over its names and slugs, so old links and synonyms keep working.",
+      target: "Merge into",
+      targetHint: "An active term of the same taxonomy.",
+      targetPlaceholder: "Search terms…",
+      confirm: "Merge",
+    },
+    reviewMerge: {
+      title: "Merge the proposal {name} into…",
+      description:
+        "The proposal is retired and its articles move to the existing term, which keeps its name as a synonym.",
+      confirm: "Merge",
+    },
+    retire: {
+      title: "Retire {name}",
+      description:
+        "It is removed from every article and can't be assigned again. Its archive can redirect to another term.",
+      redirectTo: "Redirect to…",
+      redirectToHint:
+        "Without a redirect, its archive answers 410 Gone, so search engines drop it for good.",
+      redirectToParentHint:
+        "Without a choice, the archive redirects to its parent category when that one is public.",
+      noRedirect: "No redirect",
+      redirectPlaceholder: "Search terms…",
+      confirm: "Retire",
+    },
+    move: {
+      title: "Move {name}",
+      description:
+        "Choose its new parent. Articles and addresses stay as they are; menus, breadcrumbs and the parent's archive change.",
+      parent: "Parent",
+      parentHint: "Up to {max} levels deep. A category can't move under itself or below it.",
+      parentPlaceholder: "Search categories…",
+      topLevel: "Top level",
+      confirm: "Move",
+    },
+    visibility: {
+      title: { internal: "Make {name} internal", public: "Make {name} public" },
+      description: {
+        internal:
+          "Its archive, feed and sitemap entry go away and articles stop showing it. Themes and filters can still use it.",
+        public: "It gets a public archive, a feed and a sitemap entry, and articles show it.",
+      },
+      confirm: { internal: "Make internal", public: "Make public" },
+    },
+    reject: {
+      title: "Reject the proposal {name}",
+      description:
+        "The proposal is retired and removed from the articles that carry it. The agent sees it was rejected.",
+      confirm: "Reject",
+    },
+    preview: {
+      waiting: "Make a choice to see what changes.",
+      loading: "Working out what changes",
+      articles: "Articles",
+      noArticles: "No article carries it.",
+      articlesMove:
+        "These articles change in the same operation. One change can touch up to {limit} articles.",
+      articlesLose:
+        "These articles lose it in the same operation. One change can touch up to {limit} articles.",
+      articlesKeep: "These articles keep it; their links follow the new address.",
+      more: "and {count} more",
+      redirects: "Redirects",
+      noRedirects: "No redirect is created.",
+      permanent: "301 permanent",
+      prefix: "Pages and feeds below the old address follow too.",
+      repointed: "{count} existing redirects to the old address now point to the new one.",
+    },
+    tooLarge: {
+      title: "Too large for one change",
+      description:
+        "This would change {count} articles; one change can touch at most {limit}. Split it into smaller steps, or ask for the staged job.",
+    },
+    blocked: {
+      title: "{count} published or in-review articles would lose their only category",
+      description:
+        "They need a category. Merge this term into another one instead, or file those articles elsewhere first.",
+    },
+    gone: {
+      title: "Its archive will answer 410 Gone",
+      description:
+        "{path} gets no redirect, so search engines drop it for good. Choose a term above to send visitors there instead.",
+    },
+    hidden: {
+      title: "Its archive stops being public",
+      description: "{path} answers 404 after the next publish.",
+    },
+    appears: {
+      title: "Its archive becomes public",
+      description: "{path} goes live with the next publish.",
+    },
+    done: {
+      rename: "{name} renamed",
+      merge: "{name} merged",
+      reviewMerge: "{name} merged",
+      retire: "{name} retired",
+      reject: "{name} rejected",
+      move: "{name} moved",
+      visibility: "Visibility of {name} changed",
+      detail:
+        "Articles changed: {entries}. Redirects: {redirects}. One snapshot; live with the next publish.",
+    },
+  },
+  termEditor: {
+    language: "Language",
+    default: "default",
+    names: {
+      title: "Names and synonyms",
+      description: "What readers see, and what people and agents may type to find it.",
+      name: "Name ({locale})",
+      nameHintDefault: "Required in the site's default language.",
+      nameHint: "Leave it empty to show the {locale} name.",
+      altNames: "Synonyms",
+      altNamesHint:
+        "Other names that find this term when someone types them or an agent assigns by name. Never shown as separate terms.",
+    },
+    intro: {
+      title: "Archive introduction",
+      description: "Markdown shown at the top of {path}, on its first page only.",
+      hint: "Markdown. HTML is shown as text.",
+    },
+    image: {
+      title: "Image",
+      description:
+        "Shown on the archive and used as its picture when the link is shared. Link to an image that is already online.",
+    },
+    seo: {
+      title: "Search engines and sharing",
+      description: "How the archive appears in search results, in {locale}.",
+    },
+    indexing: {
+      title: "Indexing",
+      indexed: "{path} is listed by search engines, with {count} published articles.",
+      thin: "{path} has {count} of the {min} published articles it needs; until then it is served with noindex, follow.",
+      empty: "{path} has no published articles and answers 404 until one is filed.",
+      noindex: "{path} is hidden from search engines in its search settings.",
+    },
+    placement: {
+      title: "Placement",
+      position: "Position",
+      positionHint: "Lower numbers come first among siblings. Empty: sorted by name.",
+    },
+    history: {
+      title: "Slug history",
+      description: "Earlier addresses of this archive. They stay reserved and redirect here.",
+      empty: "No earlier slugs",
+      emptyDescription: "Its address has always been {path}.",
+      reserved: "reserved",
+    },
+    details: { taxonomy: "Taxonomy", visibility: "Visibility", usage: "Articles" },
+    retire: {
+      title: "Retire this {singular}",
+      description: "Removes it from every article; its archive redirects or answers 410 Gone.",
+    },
+    retired: {
+      title: "This term is retired",
+      merged: "This term was merged into {name}",
+      description:
+        "It has no archive and can't be assigned. Its old addresses redirect when a redirect was set.",
+    },
+    errors: {
+      nameRequired: "Enter a name in the site's default language.",
+      nameTooLong: "At most 200 characters.",
+      altTooLong: "“{value}” is longer than 200 characters.",
+      altDuplicate: "“{value}” is listed twice or repeats the name.",
+      altCollision: "“{value}” already names {other}. A synonym can't point to two terms.",
+      introTooLong: "At most 20,000 characters.",
+      position: "Use a whole number from 0 to {max}.",
+    },
+  },
+  migration: {
+    banner: {
+      title: "Move your tags to categories and tags",
+      description:
+        "Tags on this site are still plain text. Turn them into tags with names, archives and redirects, and start filing articles under categories. You see the result first, and you can undo it.",
+      action: "Preview the move",
+    },
+    dialog: {
+      title: "Move tags to categories and tags",
+      description: "This is a dry run: nothing is written until you run it.",
+      summary: "What the move does",
+      tags: "Tags found",
+      entries: "Articles rewritten",
+      terms: "Tags",
+      termsValue: "{created} new, {reused} reused",
+      taxonomies: "Taxonomies created",
+      none: "None",
+      skipped: "{count} articles are skipped",
+      how: "Studio takes a snapshot before and after. Categories start optional on this site, so nothing is blocked, and nothing goes live until you publish.",
+      upToDate: "Nothing to move",
+      upToDateDescription: "Every article already uses tags and categories.",
+      run: "Run the move",
+    },
+    done: {
+      title: "Tags moved",
+      description: "Your articles now use tags. Publish when you're ready.",
+      toast: "Tags moved",
+      toastDetail: "{tags} tags on {entries} articles, with snapshots before and after.",
+      undoHint:
+        "Changed your mind? Undo restores the old tags on articles nobody has edited since.",
+      undo: "Undo the move",
+      close: "Done",
+    },
+    revert: {
+      toast: "Move undone",
+      toastDetail: "Old tags restored on {count} articles.",
+    },
+  },
+  redirects: {
+    new: "New redirect",
+    search: "Search addresses",
+    menu: "Actions for {from}",
+    edit: "Edit",
+    filters: { reason: "Source", all: "All sources" },
+    reasons: {
+      "slug-change": "Slug change",
+      merge: "Merge",
+      retire: "Retired",
+      manual: "Manual",
+    },
+    columns: {
+      from: "Old address",
+      to: "Sends to",
+      type: "Type",
+      source: "Source",
+      updated: "Updated",
+    },
+    status: {
+      "301": "Permanent (301)",
+      "301Hint":
+        "Search engines move the old address's standing to the new one. Use it when the move is for good.",
+      "302": "Temporary (302)",
+      "302Hint": "For a short while, like a campaign; search engines keep the old address.",
+      short301: "301",
+      short302: "302",
+    },
+    match: {
+      exact: "This address only",
+      exactHint: "Only this exact path.",
+      prefix: "This address and everything below it",
+      prefixHint: "The rest of the path is kept: /old/a goes to /new/a.",
+      prefixShort: "and below",
+    },
+    external: {
+      badge: "External",
+      title: "Send visitors to another site?",
+      description: "Check the destination before you create the redirect.",
+      leave: "Visitors will leave for {host}",
+      warning:
+        "Everyone who opens the old address goes to a site you don't control. Agents can never create this; only people can.",
+      target: "Destination",
+      host: "Host",
+      confirm: "Redirect to {host}",
+    },
+    externalHint: "Sends visitors to {host}, outside this site.",
+    dialog: {
+      createTitle: "New redirect",
+      editTitle: "Edit redirect",
+      description: "Send visitors from an address the site no longer serves to a new one.",
+      from: "Old address",
+      fromHint:
+        "A path on this site, like /old-page. It can't be an address the site still serves.",
+      fromLocked: "The old address can't change. Delete this redirect and create another instead.",
+      to: "Sends to",
+      toHint: "A path on this site (/new-page) or an https:// address.",
+      toExternal: "Outside this site: {host}. You confirm it in the next step.",
+      toPlaceholder: "/new-page or https://…",
+      match: "Applies to",
+      status: "Kind",
+      automatic: "Automatic redirects are always permanent (301).",
+      note: "Note",
+      noteHint: "Optional. Why it exists, for whoever looks next.",
+      create: "Create redirect",
+    },
+    errors: {
+      fromRequired: "Enter the old address.",
+      fromInvalid: "Use a path that starts with /, without spaces, ? or #.",
+      fromTooLong: "At most 1,024 characters.",
+      fromTaken: "A redirect from this address already exists. Edit that one instead.",
+      fromServed:
+        "The site serves this address. A redirect can't hide a page, a published article or an archive.",
+      toRequired: "Enter where it sends visitors.",
+      toInvalid: "Use a path that starts with / or an https:// address.",
+      toInsecure: "Use https://.",
+      toTooLong: "At most 2,048 characters.",
+      toSelf: "It can't send visitors to the same address.",
+      toLoop: "That would loop: the target redirects back here.",
+    },
+    saved: "Redirect saved",
+    created: "Redirect from {from} created",
+    deleted: "Redirect from {from} deleted",
+    deleteTitle: "Delete the redirect from {from}?",
+    deleteDescription: "After the next publish, the old address answers 404.",
+    deleteAutomatic:
+      "Studio created it when an address changed. After the next publish the old address answers 404, and links to it break.",
+    deleteConfirm: "Delete redirect",
+    empty: "No redirects yet",
+    emptyFiltered: "No redirects from this source",
+    emptyDescription:
+      "Slug changes, merges and retirements add redirects here on their own. Add your own for addresses that moved.",
   },
 } as const;
 

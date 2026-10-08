@@ -71,12 +71,19 @@ export function EditorLayout({
 }: {
   main: ReactNode;
   aside: ReactNode;
-  /** The `EditorPreview`; it fills the column's height. */
-  preview: ReactNode;
-  previewVisible: boolean;
+  /** The `EditorPreview`; it fills the column's height. Absent: a node without a page of its own to preview (a term). */
+  preview?: ReactNode;
+  previewVisible?: boolean;
 }) {
   const t = useT();
   const [view, setView] = useState<"edit" | "preview">("edit");
+  if (preview === undefined)
+    return (
+      <Columns variant="2-1">
+        <div className="grid min-w-0 content-start gap-6">{main}</div>
+        <div className="grid min-w-0 content-start gap-6">{aside}</div>
+      </Columns>
+    );
   return (
     <div className="grid min-w-0 gap-6">
       <Tabs

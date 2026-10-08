@@ -30,7 +30,7 @@ export function ListToolbar({
           className="flex-1"
         />
       </Toolbar>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full min-w-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }
