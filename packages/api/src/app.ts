@@ -10,11 +10,15 @@ import { agentKeys } from "./routes/agent-keys.ts";
 import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
 import { agentModesInfo, instanceRoutes } from "./routes/instance.ts";
+import { migrations } from "./routes/migrations.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
 import { previewLinks } from "./routes/preview-links.ts";
+import { redirects } from "./routes/redirects.ts";
 import { sites } from "./routes/sites.ts";
 import { snapshots } from "./routes/snapshots.ts";
+import { taxonomies } from "./routes/taxonomies.ts";
+import { terms } from "./routes/terms.ts";
 
 /**
  * Builds the Cloudhal API as a Hono app (a `fetch` handler). The same app runs on Node
@@ -183,6 +187,11 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);
   app.route("/api/sites/:siteId/approvals", approvals);
+  // RFC-0002 §6.1: taxonomy, terms, redirects and the tags migration (people; agents use MCP).
+  app.route("/api/sites/:siteId/taxonomies", taxonomies);
+  app.route("/api/sites/:siteId/terms", terms);
+  app.route("/api/sites/:siteId/redirects", redirects);
+  app.route("/api/sites/:siteId/migrations", migrations);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

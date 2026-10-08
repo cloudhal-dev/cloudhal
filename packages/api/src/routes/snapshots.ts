@@ -1,4 +1,5 @@
-import type { Snapshot } from "@cloudhal/core-contracts";
+import type { ContentEntry, NodeRef, Snapshot } from "@cloudhal/core-contracts";
+import type { SiteGraphStore, SnapshotDiff } from "@cloudhal/core-ts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
@@ -12,6 +13,54 @@ const REASONS = new Set<Snapshot["reason"]>([
   "scheduled",
   "import",
 ]);
+
+/** How one entry's term assignments changed between two snapshots (RFC-0002 §6.4, §8). */
+export interface AssignmentDelta {
+  entryId: string;
+  taxonomy: string;
+  added: string[];
+  removed: string[];
+  /** Set when the primary term changed; `null` = none. */
+  primary?: { from: string | null; to: string | null };
+}
+
+/** Entries whose bodies are compared; larger diffs list the first ones only. */
+const ASSIGNMENT_DELTA_LIMIT = 200;
+
+/** Term assignment changes of the added and changed entries in a diff (read from the blobs). */
+async function assignmentDeltas(
+  store: SiteGraphStore,
+  diff: SnapshotDiff,
+): Promise<AssignmentDelta[]> {
+  const pairs: [NodeRef | undefined, NodeRef][] = [
+    ...diff.changed.map((c) => [c.before, c.after] as [NodeRef, NodeRef]),
+    ...diff.added.map((a) => [undefined, a] as [undefined, NodeRef]),
+  ].filter(([, after]) => after.kind === "contentEntry");
+  const out: AssignmentDelta[] = [];
+  for (const [before, after] of pairs.slice(0, ASSIGNMENT_DELTA_LIMIT)) {
+    const a = before ? await store.readSnapshotNode<ContentEntry>(before) : undefined;
+    const b = await store.readSnapshotNode<ContentEntry>(after);
+    const keys = new Set([...Object.keys(a?.terms ?? {}), ...Object.keys(b.terms ?? {})]);
+    for (const key of [...keys].sort()) {
+      const was = a?.terms?.[key];
+      const now = b.terms?.[key];
+      const added = (now?.ids ?? []).filter((id) => !was?.ids.includes(id));
+      const removed = (was?.ids ?? []).filter((id) => !now?.ids.includes(id));
+      const primaryChanged = (was?.primary ?? null) !== (now?.primary ?? null);
+      if (!added.length && !removed.length && !primaryChanged) continue;
+      out.push({
+        entryId: after.id,
+        taxonomy: key,
+        added,
+        removed,
+        ...(primaryChanged
+          ? { primary: { from: was?.primary ?? null, to: now?.primary ?? null } }
+          : {}),
+      });
+    }
+  }
+  return out;
+}
 
 function snapshotLimit(raw: string | undefined): number {
   if (raw === undefined) return 50;
@@ -58,7 +107,9 @@ export const snapshots: Hono<Env> = new Hono<Env>()
       const snap = await store.getSnapshot(id);
       if (!snap || snap.siteId !== siteId) throw notFound("snapshot not found");
     }
-    return c.json(await store.diffSnapshots(param(c, "snapshotId"), param(c, "otherId")));
+    const diff = await store.diffSnapshots(param(c, "snapshotId"), param(c, "otherId"));
+    if (c.req.query("assignments") !== "1") return c.json(diff);
+    return c.json({ ...diff, assignments: await assignmentDeltas(store, diff) });
   })
   .post("/:snapshotId/publish", async (c) => {
     const store = c.get("store");
