@@ -1,5 +1,5 @@
 # RFC-0002: Taxonomy (categories, tags) and redirects
-- Status: Draft
+- Status: Accepted (2026-10-08, Halil — including the recommended answers below)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-08
 - Related: RFC-0001 (open question "redirects … as first-class nodes"), ADR-0001, ADR-0002, ADR-0004, ADR-0009, ADR-0011, ADR-0012, ADR-0014, ADR-0015
 - Contracts on this branch: `taxonomy.schema.json`, `term.schema.json`, `redirect.schema.json`, and the diffs in §2 (all generated and tested; §2.8 is the one diff that waits for code)

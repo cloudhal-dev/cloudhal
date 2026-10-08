@@ -2,6 +2,8 @@
 
 **The open-source, agent-native site platform.** Agents build, edit and operate websites through a governed interface: every change is a snapshot, every snapshot has a diff and a preview, every publish is approved and reversible.
 
+Blogs and newsrooms first; documentation sites and research or data documentation next. They share the same governed layer, because the more an audience relies on what an agent wrote, the more each change needs an owner, an approval and a way back.
+
 > Status: **alpha, private until launch.** The loop works end to end on the blog starter — Intent → Agent → Safe Change → Preview → Approve → Publish → Rollback — offline and on Cloudflare. Cloudhal's own newsroom is written by an agent and published through it. Packages are not on npm yet; until they are, run the CLI from this repo (see *Contributors* below).
 
 ## What it is

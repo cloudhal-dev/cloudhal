@@ -33,3 +33,4 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0014](0014-out-of-band-approvals.md) | Approvals in Studio: single use, bound to the call and the content state; no agent self-approval |
 | [0015](0015-agent-modes.md) | Agent modes: plan, manual, edits, auto (low-risk publishes), bypass (local only) |
 | [0016](0016-time-boxed-elevation.md) | Time-boxed elevation: a more autonomous mode until a set time, computed per call, audited |
+| [0017](0017-taxonomy-and-redirects.md) | Taxonomy and redirects are graph nodes; terms referenced by id; governed rename/merge with automatic 301s (RFC-0002) |
