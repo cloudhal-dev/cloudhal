@@ -177,4 +177,3 @@ describe("time-boxed elevation (ADR-0016)", () => {
     expect(activeElevation("edits", undefined, new Date())).toBeUndefined();
   });
 });
-
