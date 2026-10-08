@@ -3,6 +3,21 @@
  */
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";
+export {
+  type AssetFields,
+  type AssetPage,
+  type AssetQuery,
+  type AssetRefRow,
+  type AssetUsage,
+  type BlobLedgerRow,
+  canonicalAsset,
+  checkAssetRules,
+  type GcResult,
+  type IngestAssetInput,
+  type IngestAssetResult,
+  mediaBlobKey,
+  type StreamIngestInput,
+} from "./assets.ts";
 export * from "./domains.ts";
 export * from "./errors.ts";
 export * from "./filter.ts";

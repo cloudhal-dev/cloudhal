@@ -230,7 +230,7 @@ export const MEDIA_ROUTE =
 
 /** Invariant 12: paths no page, entry, archive or redirect may take. */
 export function isReservedMediaPath(path: string): boolean {
-  return /^\/media\/[0-9a-f]{16}(?:\/|$)/.test(path);
+  return /^\/media\/[0-9a-f]{16}\//.test(path);
 }
 
 const SPECIAL: Record<string, string> = {

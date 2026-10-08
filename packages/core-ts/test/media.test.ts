@@ -535,7 +535,8 @@ describe("references and URLs", () => {
     expect(MEDIA_ROUTE.test("/media/0123456789abcdeg/x.jpg")).toBe(false);
     expect(MEDIA_ROUTE.test("/media/about")).toBe(false);
     expect(isReservedMediaPath("/media/0123456789abcdef/x")).toBe(true);
-    expect(isReservedMediaPath("/media/0123456789abcdef")).toBe(true);
+    expect(isReservedMediaPath("/media/0123456789abcdef")).toBe(false);
+    expect(isReservedMediaPath("/media/0123456789abcdef/")).toBe(true);
     expect(isReservedMediaPath("/media")).toBe(false);
     expect(isReservedMediaPath("/media/press-kit")).toBe(false);
     expect(slugifyFilename("Boğaz at Dawn (1).JPG")).toBe("bogaz-at-dawn-1");

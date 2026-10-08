@@ -122,6 +122,26 @@ export function assetRefsOf(kind: string, node: unknown): AssetRefUse[] {
 }
 
 /**
+ * API and MCP inputs may send `{ assetId, alt? }` without `src` (§2.2): give such refs a
+ * placeholder `src` (and `alt: ""`) so the document validates; the store then writes the real URL.
+ * Defensive: an input of the wrong shape is left for schema validation to reject.
+ */
+export function fillMissingSrc(kind: string, node: unknown): void {
+  if (kind !== "page" && kind !== "contentEntry" && kind !== "term") return;
+  try {
+    for (const slot of imageSlots(kind, node as Page | ContentEntry | Term)) {
+      const ref = slot.ref as Partial<ImageRef> | null;
+      if (!ref || typeof ref !== "object" || typeof ref.assetId !== "string") continue;
+      if (typeof ref.src !== "string" || ref.src === "")
+        slot.set({ ...ref, src: `asset:${ref.assetId}`, alt: ref.alt ?? "" } as ImageRef);
+      else if (ref.alt === undefined) slot.set({ ...ref, alt: "" } as ImageRef);
+    }
+  } catch {
+    // not a valid node; validation reports it
+  }
+}
+
+/**
  * Invariant 8: an ImageRef with `assetId` carries the asset's URL in `src` and its intrinsic size
  * in `width`/`height` (as of the write), for readers that do not resolve assets. Mutates `node`
  * (pass a copy). Unknown ids are left alone; the store refuses them separately.

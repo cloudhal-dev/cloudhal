@@ -24,7 +24,25 @@ export interface ApiErrorBody {
  * for a request that can never succeed as written, 422 for a well-formed request the data
  * invariants refuse right now.
  */
-export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 422> = {
+export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422 | 503> = {
+  // RFC-0004 (assets and media)
+  unsupported_type: 415,
+  type_mismatch: 415,
+  too_many_pixels: 422,
+  svg_unsafe: 422,
+  metadata_unsupported: 422,
+  quota_exceeded: 409,
+  purged: 410,
+  in_use: 409,
+  unknown_asset: 422,
+  retired_asset: 422,
+  fetch_blocked: 422,
+  fetch_failed: 422,
+  retry: 503,
+  reserved_path: 409,
+  missing_media: 409,
+  invalid_asset: 400,
+  // RFC-0002
   too_large: 409,
   slug_taken: 409,
   path_conflict: 409,
