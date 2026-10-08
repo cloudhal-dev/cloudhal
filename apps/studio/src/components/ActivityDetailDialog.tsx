@@ -44,7 +44,7 @@ export function ActivityDetailDialog({
   const label = useToolLabel();
   const input = row ? formatInput(row.input) : undefined;
   const autoApproved = row ? isAutoApproved(row) : false;
-  const autoCount = autoApprovalCount(row?.reason);
+  const autoCount = row ? autoApprovalCount(row) : undefined;
   return (
     <LayerDialog.Root open={current !== undefined} onOpenChange={onOpenChange}>
       <LayerDialog.Content size="lg" closeLabel={t("common.close")}>

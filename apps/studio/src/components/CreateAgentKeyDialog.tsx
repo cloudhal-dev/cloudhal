@@ -16,17 +16,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import {
-  DEFAULT_MODE,
   type GrantableScope,
   mcpSnippet,
   SCOPE_GROUPS,
   type ScopeGroup,
   type SnippetKind,
   sameScopes,
-  scopesForMode,
 } from "../lib/agents.ts";
 import { api, type CreatedAgentKey, type KeyMode } from "../lib/api.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
+import { useAgentModeRules } from "./useAgentModeRules.ts";
 
 type Step = "mode" | "details";
 
@@ -47,18 +46,21 @@ export function CreateAgentKeyDialog({
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const rules = useAgentModeRules();
   const [step, setStep] = useState<Step>("mode");
-  const [mode, setMode] = useState<KeyMode>(DEFAULT_MODE);
+  const [mode, setMode] = useState<KeyMode>(rules.defaultMode);
+  // Whether the person picked a mode yet; until then the server's default (once known) applies.
+  const [modeTouched, setModeTouched] = useState(false);
   const [autoConfirmed, setAutoConfirmed] = useState(false);
   const [modeSubmitted, setModeSubmitted] = useState(false);
   const [name, setName] = useState("");
-  const [scopes, setScopes] = useState<GrantableScope[]>(scopesForMode(DEFAULT_MODE));
+  const [scopes, setScopes] = useState<GrantableScope[]>(rules.scopesFor(rules.defaultMode));
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [created, setCreated] = useState<CreatedAgentKey | undefined>();
   const [snippet, setSnippet] = useState<SnippetKind>("json");
 
-  const modeScopes = scopesForMode(mode);
+  const modeScopes = rules.scopesFor(mode);
   const customised = !sameScopes(scopes, modeScopes);
   const missing = modeScopes.filter((s) => !scopes.includes(s));
 
@@ -76,11 +78,12 @@ export function CreateAgentKeyDialog({
   useEffect(() => {
     if (open) {
       setStep("mode");
-      setMode(DEFAULT_MODE);
+      setMode(rules.defaultMode);
+      setModeTouched(false);
       setAutoConfirmed(false);
       setModeSubmitted(false);
       setName("");
-      setScopes(scopesForMode(DEFAULT_MODE));
+      setScopes(rules.scopesFor(rules.defaultMode));
       setAdvancedOpen(false);
       setSubmitted(false);
       setSnippet("json");
@@ -90,9 +93,18 @@ export function CreateAgentKeyDialog({
     }
   }, [open]);
 
+  // `/api/instance` may answer after the dialog opened: adopt its default if nothing was picked.
+  useEffect(() => {
+    if (!modeTouched && step === "mode") {
+      setMode(rules.defaultMode);
+      setScopes(rules.scopesFor(rules.defaultMode));
+    }
+  }, [rules]);
+
   const chooseMode = (next: KeyMode) => {
+    setModeTouched(true);
     setMode(next);
-    setScopes(scopesForMode(next));
+    setScopes(rules.scopesFor(next));
     setAutoConfirmed(false);
     setModeSubmitted(false);
   };

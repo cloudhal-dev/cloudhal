@@ -35,7 +35,7 @@ export function DecisionCell({
       }
     >
       <Decision decision={row.decision} />
-      {isAutoApproved(row) && <AutoApprovedBadge reason={row.reason} />}
+      {isAutoApproved(row) && <AutoApprovedBadge row={row} />}
     </div>
   );
 }

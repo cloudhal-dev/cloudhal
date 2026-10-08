@@ -26,7 +26,7 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
-import { isManualModeRequest } from "../lib/agents.ts";
+import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
 import { type Approval, api, isNotEnabled } from "../lib/api.ts";
 import {
   expiresSoon,
@@ -60,8 +60,7 @@ function usePromptText() {
   const label = useToolLabel();
   return useCallback(
     (request: Approval, short = false) => {
-      if (!isManualModeRequest(request.prompt) || needsConfirmation(request.tool))
-        return request.prompt;
+      if (!isManualModeRequest(request) || needsConfirmation(request.tool)) return request.prompt;
       const tool = label(request.tool);
       return short
         ? t("approvals.manualPromptShort", { tool })
@@ -85,7 +84,8 @@ function PendingRequest({
   const promptText = usePromptText();
   const args = formatArguments(request.input);
   const soon = expiresSoon(request.expiresAt);
-  const manual = isManualModeRequest(request.prompt) && !needsConfirmation(request.tool);
+  const manual = isManualModeRequest(request) && !needsConfirmation(request.tool);
+  const heldBack = autoCheckHeldBack(request);
   const prompt = promptText(request);
   return (
     <div className="grid gap-3 px-5 py-4" data-approval-id={request.id} data-tool={request.tool}>
@@ -134,8 +134,28 @@ function PendingRequest({
           </Text>
         </div>
       ) : (
-        // Server-built text that can quote agent-written titles: rendered as plain text.
-        <Text>{prompt}</Text>
+        <div className="grid gap-1.5">
+          <div className="flex items-start gap-2">
+            {request.mode && (
+              <span className="flex h-lh items-center">
+                <ModeBadge mode={request.mode} subtle />
+              </span>
+            )}
+            {/* Server-built text that can quote agent-written titles: rendered as plain text. */}
+            <Text>{prompt}</Text>
+          </div>
+          {heldBack && (
+            // Auto mode did not publish this on its own: say why, in the person's language.
+            <Text variant="secondary" size="sm" data-auto-held-back={heldBack.code}>
+              {t("approvals.autoHeldBack", {
+                reason: t(`approvals.autoCheck.${heldBack.code}`, {
+                  changes: heldBack.changes,
+                  limit: heldBack.limit,
+                }),
+              })}
+            </Text>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <span className="flex items-center gap-1.5">

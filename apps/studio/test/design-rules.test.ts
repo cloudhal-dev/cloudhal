@@ -361,7 +361,8 @@ describe("design rules (DESIGN.md)", () => {
     const modes = files.find((f) => f.file === "components/AgentModes.tsx") as { text: string };
     const picker = modes.text.slice(modes.text.indexOf("export function ModePicker"));
     expect(picker).toMatch(/<Radio\.Group[\s\S]*appearance="card"/);
-    expect(picker).toMatch(/KEY_MODES\.map/);
+    // modes come from `modeRules`, which only ever yields key modes (test/lib.test.ts)
+    expect(picker).toMatch(/useAgentModeRules\(\)[\s\S]*modes\.map/);
     // Nothing in Studio may offer or send bypass for a key.
     const offenders = files
       .filter((f) => /value=["{]+["']?bypass|mode:\s*["']bypass/.test(f.text))

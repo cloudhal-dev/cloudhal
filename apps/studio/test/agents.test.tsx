@@ -44,7 +44,8 @@ describe("audit cells", () => {
   });
 });
 
-function createServer() {
+/** Mocks `POST /api/agent-keys`; `/api/instance` answers like an older server unless `agentModes` is given. */
+function createServer(agentModes?: unknown) {
   const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body));
     return new Response(
@@ -62,7 +63,19 @@ function createServer() {
       { status: 201, headers: { "content-type": "application/json" } },
     );
   });
-  vi.stubGlobal("fetch", fetch);
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) =>
+    url === "/api/instance"
+      ? agentModes
+        ? new Response(JSON.stringify({ signUp: "first-user", features: {}, agentModes }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
+        : new Response(JSON.stringify({ error: "not_found", message: url }), {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          })
+      : fetch(url, init),
+  );
   return fetch;
 }
 
@@ -200,6 +213,34 @@ describe("CreateAgentKeyDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create key" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(sentBody(fetch)).toEqual({ name: "Newsroom", mode: "auto" });
+  });
+
+  it("follows the server's mode rules from /api/instance", async () => {
+    const fetch = createServer({
+      modes: ["plan", "manual", "edits", "auto"],
+      default: "manual",
+      scopes: { manual: ["site:read", "content:read", "content:write"] },
+      autoPublishLimit: 5,
+    });
+    render(wrap(<CreateAgentKeyDialog open onOpenChange={() => {}} endpoint="http://x/mcp" />));
+    await screen.findByTestId("create-step-mode");
+    // the server's default is preselected once /api/instance answers
+    await waitFor(() => expect(checkedMode()).toBe("manual"));
+    // the server's limit reaches the auto consent copy
+    fireEvent.click(modeRadio("auto"));
+    expect(await screen.findByTestId("auto-confirm")).toHaveTextContent(/\b5\b/);
+    fireEvent.click(modeRadio("manual"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByTestId("create-step-details");
+    fireEvent.click(screen.getByRole("button", { name: /Advanced: scopes/ }));
+    const scopes = await screen.findByTestId("advanced-scopes");
+    const checked = Array.from(scopes.querySelectorAll('[role="checkbox"][aria-checked="true"]'));
+    expect(checked).toHaveLength(3);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Desk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create key" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // the server's own default scopes for the mode → left to the server
+    expect(sentBody(fetch)).toEqual({ name: "Desk", mode: "manual" });
   });
 });
 

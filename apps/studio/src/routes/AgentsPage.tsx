@@ -37,6 +37,7 @@ import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ScopeBadge } from "../components/ScopeBadge.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useAgentModeRules } from "../components/useAgentModeRules.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import {
@@ -45,7 +46,6 @@ import {
   mcpSnippet,
   type SnippetKind,
   sameScopes,
-  scopesForMode,
   sortScopes,
 } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
@@ -65,8 +65,9 @@ const modeOf = (k: AgentKeySummary) => (isKeyMode(k.mode) ? k.mode : DEFAULT_MOD
  */
 function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
   const t = useT();
+  const rules = useAgentModeRules();
   const scopes = sortScopes(agentKey.scopes);
-  if (sameScopes(scopes, scopesForMode(modeOf(agentKey)))) {
+  if (sameScopes(scopes, rules.scopesFor(modeOf(agentKey)))) {
     return (
       <span data-scopes="mode-default" className="inline-flex">
         <Tooltip

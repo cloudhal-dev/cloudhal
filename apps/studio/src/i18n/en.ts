@@ -762,6 +762,14 @@ export const en = {
     manualPromptShort: "Manual mode: {tool}",
     manualHint:
       "Manual mode asks before every change. Approving lets the agent make this one edit with exactly these arguments; it is snapshotted like any other.",
+    autoHeldBack:
+      "Auto mode publishes small article updates on its own. This one waits for you because {reason}.",
+    autoCheck: {
+      "removes-content": "it removes content",
+      nothing: "there is nothing new to publish",
+      structure: "it changes pages or site settings",
+      "too-many": "it carries {changes} changes and auto mode stops at {limit}",
+    },
     noHistory: "No decisions yet",
     noHistoryDescription: "Approved, denied, used and expired requests are listed here.",
     requested: "Requested",

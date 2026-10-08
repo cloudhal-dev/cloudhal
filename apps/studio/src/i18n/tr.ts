@@ -766,6 +766,14 @@ export const tr: Messages = {
     manualPromptShort: "Manuel mod: {tool}",
     manualHint:
       "Manuel mod her değişiklikten önce sorar. Onaylarsan agent bu tek düzenlemeyi tam bu argümanlarla yapabilir; değişiklik her zamanki gibi snapshot'lanır.",
+    autoHeldBack:
+      "Otomatik mod küçük makale güncellemelerini kendisi yayınlar. Bu yayın senin onayını bekliyor, çünkü {reason}.",
+    autoCheck: {
+      "removes-content": "içerik siliyor",
+      nothing: "yayınlanacak yeni bir şey yok",
+      structure: "sayfaları ya da site ayarlarını değiştiriyor",
+      "too-many": "{changes} değişiklik içeriyor ve otomatik modun sınırı {limit}",
+    },
     noHistory: "Henüz karar yok",
     noHistoryDescription:
       "Onaylanan, reddedilen, kullanılan ve süresi dolan istekler burada listelenir.",

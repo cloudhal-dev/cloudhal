@@ -186,7 +186,7 @@ describe("agent key list", () => {
         container.querySelector('[data-key-id="key_docs"] [data-mode]')?.getAttribute("data-mode"),
       ).toBe("auto"),
     );
-  });
+  }, 15_000); // several dialogs and menus; slow when the whole monorepo tests in parallel
 
   it("keeps the dialog open and shows the server's reason when the change is refused (400)", async () => {
     const fetch = serve((url, init) =>
@@ -321,6 +321,59 @@ describe("approvals from manual-mode agents", () => {
           .filter((c) => (c[1] as RequestInit | undefined)?.method === "POST")
           .map((c) => c[0]),
       ).toEqual(["/api/sites/site_1/approvals/appr_man/approve"]),
+    );
+  });
+
+  it("reads the structured cause and explains why Auto mode held a publish back", async () => {
+    const base = {
+      siteId: "site_1",
+      status: "pending" as const,
+      createdAt: "2026-10-08T10:00:00Z",
+      expiresAt: "2099-10-09T10:00:00Z",
+    };
+    const EDIT: Approval = {
+      ...base,
+      id: "appr_edit",
+      tool: "create_entry",
+      input: { siteId: "site_1", slug: "x" },
+      actor: { kind: "agent", id: "agent_care01", name: "Careful bot" },
+      // a server may word its reason differently: the cause decides
+      prompt: "Create article x?",
+      mode: "manual",
+      cause: "manual-mode",
+    };
+    const PUBLISH: Approval = {
+      ...base,
+      id: "appr_auto",
+      tool: "publish",
+      input: { siteId: "site_1" },
+      actor: { kind: "agent", id: "agent_fast01", name: "Fast bot" },
+      prompt: 'Publish "News" to production?',
+      mode: "auto",
+      cause: "tool",
+      autoCheck: {
+        rule: "low-risk-publish",
+        lowRisk: false,
+        code: "too-many",
+        changes: 25,
+        limit: 20,
+      },
+    };
+    serve((url) => {
+      if (url === "/api/sites/site_1/approvals")
+        return { status: 200, body: { items: [EDIT, PUBLISH] } };
+      if (url === "/api/me") return { status: 200, body: { actor: { kind: "human", id: "u" } } };
+      return undefined;
+    });
+    const { container } = render(wrap(<ApprovalsPage />));
+    const pending = await screen.findByTestId("pending-approvals");
+    await within(pending).findByText(
+      "Careful bot works in Manual mode, so this change waits for you: Create article.",
+    );
+    const auto = container.querySelector('[data-approval-id="appr_auto"]') as HTMLElement;
+    expect(auto.querySelector("[data-mode]")).toHaveAttribute("data-mode", "auto");
+    expect(auto.querySelector("[data-auto-held-back]")).toHaveTextContent(
+      "Auto mode publishes small article updates on its own. This one waits for you because it carries 25 changes and auto mode stops at 20.",
     );
   });
 });

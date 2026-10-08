@@ -11,6 +11,7 @@ import {
   ALL_GRANTABLE,
   ALWAYS_GATED_TOOLS,
   autoApprovalCount,
+  autoCheckHeldBack,
   DEFAULT_MODE,
   isAutoApproved,
   isKeyMode,
@@ -19,6 +20,7 @@ import {
   MODE_RISK,
   MODE_RULES,
   mcpSnippet,
+  modeRules,
   modeVariant,
   sameScopes,
   scopesForMode,
@@ -113,17 +115,32 @@ describe("agent modes (ADR-0015)", () => {
   });
 
   it("recognises auto-approved publishes and manual-mode requests", () => {
-    const auto = {
+    const check = {
+      rule: "low-risk-publish" as const,
+      lowRisk: true,
+      code: "low-risk" as const,
+      changes: 3,
+      limit: 20,
+    };
+    // structured rows (current servers)
+    const auto = { decision: "allow" as const, reason: "anything", autoCheck: check };
+    expect(isAutoApproved(auto)).toBe(true);
+    expect(autoApprovalCount(auto)).toBe(3);
+    expect(isAutoApproved({ ...auto, decision: "deny" })).toBe(false);
+    expect(
+      isAutoApproved({
+        decision: "allow",
+        autoCheck: { ...check, lowRisk: false, code: "structure" },
+      }),
+    ).toBe(false);
+    // older rows: only the English reason
+    const legacy = {
       decision: "allow" as const,
       reason: "auto mode: published without approval (2 article change(s) only)",
     };
-    expect(isAutoApproved(auto)).toBe(true);
-    expect(autoApprovalCount(auto.reason)).toBe(2);
-    expect(autoApprovalCount("auto mode: published without approval")).toBeUndefined();
-    expect(
-      isAutoApproved({ decision: "allow", reason: "auto mode: published without approval" }),
-    ).toBe(true);
-    expect(isAutoApproved({ ...auto, decision: "deny" })).toBe(false);
+    expect(isAutoApproved(legacy)).toBe(true);
+    expect(autoApprovalCount(legacy)).toBe(2);
+    expect(autoApprovalCount({ reason: "auto mode: published without approval" })).toBeUndefined();
     expect(
       isAutoApproved({
         decision: "approval-required",
@@ -131,8 +148,45 @@ describe("agent modes (ADR-0015)", () => {
       }),
     ).toBe(false);
     expect(isAutoApproved({ decision: "allow" })).toBe(false);
-    expect(isManualModeRequest("manual mode: update_entry needs a person's approval")).toBe(true);
-    expect(isManualModeRequest('Publish "Sprint 7"?')).toBe(false);
+
+    expect(isManualModeRequest({ prompt: "Create article?", cause: "manual-mode" })).toBe(true);
+    expect(isManualModeRequest({ prompt: "manual mode: x", cause: "tool" })).toBe(false);
+    expect(
+      isManualModeRequest({ prompt: "manual mode: update_entry needs a person's approval" }),
+    ).toBe(true);
+    expect(isManualModeRequest({ prompt: 'Publish "Sprint 7"?' })).toBe(false);
+
+    expect(autoCheckHeldBack({ autoCheck: check })).toBeUndefined();
+    expect(
+      autoCheckHeldBack({ autoCheck: { ...check, lowRisk: false, code: "too-many", changes: 25 } }),
+    ).toMatchObject({ code: "too-many", changes: 25 });
+    expect(autoCheckHeldBack({})).toBeUndefined();
+  });
+
+  it("uses the server's mode rules when it reports them", () => {
+    const local = modeRules();
+    expect(local.modes).toEqual(KEY_MODES);
+    expect(local.defaultMode).toBe("edits");
+    expect(local.autoPublishLimit).toBe(20);
+    expect(local.scopesFor("plan")).toEqual(scopesForMode("plan"));
+    const server = modeRules({
+      modes: ["plan", "edits", "bypass"],
+      default: "plan",
+      scopes: { plan: ["site:read", "*"], edits: ["site:read", "content:write"] },
+      autoPublishLimit: 5,
+    });
+    expect(server.modes).toEqual(["plan", "edits"]); // bypass is never offered for a key
+    expect(server.defaultMode).toBe("plan");
+    expect(server.scopesFor("plan")).toEqual(["site:read"]); // only grantable scopes
+    expect(server.scopesFor("edits")).toEqual(["site:read", "content:write"]);
+    expect(server.scopesFor("auto")).toEqual(scopesForMode("auto")); // not reported → local copy
+    expect(server.autoPublishLimit).toBe(5);
+    expect(
+      modeRules({ modes: [], default: "bypass", scopes: {}, autoPublishLimit: 20 }),
+    ).toMatchObject({
+      modes: KEY_MODES,
+      defaultMode: "edits",
+    });
   });
 
   it("searches activity by mode", () => {

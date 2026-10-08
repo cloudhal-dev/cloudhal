@@ -59,6 +59,25 @@ export interface AuditRow {
   durationMs?: number;
   /** Agent mode the call ran under (ADR-0015); absent for people and for older rows. */
   mode?: AgentMode;
+  /** Why the call waited for a person (`approval-required` rows; absent on older rows). */
+  cause?: ApprovalCause;
+  /** The `auto`-mode check behind a publish; `lowRisk` on an `allow` row = went live without a person. */
+  autoCheck?: AutoCheck;
+}
+
+/** Why a call waits for a person (packages/agent-runtime/src/policy.ts). */
+export type ApprovalCause = "tool" | "destructive" | "skill" | "manual-mode";
+
+/** Why `auto` mode did or did not let a publish through (packages/agent-runtime/src/modes.ts). */
+export type AutoCheckCode = "low-risk" | "removes-content" | "nothing" | "structure" | "too-many";
+export interface AutoCheck {
+  rule: "low-risk-publish";
+  lowRisk: boolean;
+  code: AutoCheckCode;
+  /** Pending changes the publish carried. */
+  changes: number;
+  /** Largest publish `auto` mode lets through, at the time of the check. */
+  limit: number;
 }
 export type AuditDecision = AuditRow["decision"];
 export type AuditOutcome = NonNullable<AuditRow["outcome"]>;
@@ -132,6 +151,17 @@ export interface InstanceInfo {
     /** Agents' gated calls wait for a person in Studio (ADR-0014). Older servers omit it. */
     approvals?: boolean;
   };
+  /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
+  agentModes?: AgentModesInfo;
+}
+
+export interface AgentModesInfo {
+  /** Modes an API key can hold, in order of increasing autonomy. */
+  modes: AgentMode[];
+  default: AgentMode;
+  /** Scopes a key gets in each mode when the owner does not choose them. */
+  scopes: Partial<Record<AgentMode, AgentScope[]>>;
+  autoPublishLimit: number;
 }
 export type SignUpPolicy = InstanceInfo["signUp"];
 export type InstanceFeature = keyof InstanceInfo["features"];
@@ -162,6 +192,12 @@ export interface Approval {
   actor: Actor;
   /** Server-built question; may quote agent-controlled titles, so it is shown as plain text only. */
   prompt: string;
+  /** The mode the agent worked in when it asked (absent on older requests). */
+  mode?: AgentMode;
+  /** Why a person must decide (absent on older requests). */
+  cause?: ApprovalCause;
+  /** An `auto`-mode publish: the low-risk check that sent it to a person. */
+  autoCheck?: AutoCheck;
   status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;

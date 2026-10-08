@@ -1,4 +1,12 @@
-import type { AgentMode, AgentScope, AuditRow, KeyMode } from "./api.ts";
+import type {
+  AgentMode,
+  AgentModesInfo,
+  AgentScope,
+  Approval,
+  AuditRow,
+  AutoCheck,
+  KeyMode,
+} from "./api.ts";
 
 export type GrantableScope = Exclude<AgentScope, "*">;
 export type ScopeGroup = "read" | "write" | "release";
@@ -22,8 +30,8 @@ export function isKeyMode(value: unknown): value is KeyMode {
 }
 
 /**
- * The scopes a key needs to be useful in a mode; mirrors `scopesForMode` in
- * `packages/agent-runtime/src/modes.ts`, which the server applies when `scopes` is omitted.
+ * The scopes a key needs to be useful in a mode. The server's own rules come from `/api/instance`
+ * (`modeRules`); this copy of `scopesForMode` is the fallback for servers that do not report them.
  */
 export function scopesForMode(mode: AgentMode): GrantableScope[] {
   const read: GrantableScope[] = ["site:read", "content:read", "preview:create"];
@@ -76,27 +84,63 @@ export const MODE_RULES: Record<
   bypass: { edits: "free", publish: "free", rollback: "free" },
 };
 
-/** Audit reason the MCP server writes when `auto` mode published without a person. */
+/** Audit reason older servers wrote when `auto` mode published without a person. */
 const AUTO_APPROVED = /^auto mode: published without approval(?: \((.+)\))?$/;
 
 /** An `auto`-mode publish that went live without a person. */
-export function isAutoApproved(row: Pick<AuditRow, "reason" | "decision">): boolean {
-  return row.decision === "allow" && AUTO_APPROVED.test(row.reason ?? "");
+export function isAutoApproved(row: Pick<AuditRow, "reason" | "decision" | "autoCheck">): boolean {
+  if (row.decision !== "allow") return false;
+  // Rows written before the structured check (ADR-0015 addendum) only have the English reason.
+  return row.autoCheck ? row.autoCheck.lowRisk : AUTO_APPROVED.test(row.reason ?? "");
 }
 
-/**
- * How many article changes an auto-approved publish carried ("(3 article change(s) only)" in the
- * server's English reason), so Studio can say it in the person's language.
- */
-export function autoApprovalCount(reason: string | undefined): number | undefined {
-  const detail = AUTO_APPROVED.exec(reason ?? "")?.[1];
+/** How many changes an auto-approved publish carried, so Studio can say it in the person's language. */
+export function autoApprovalCount(row: Pick<AuditRow, "reason" | "autoCheck">): number | undefined {
+  if (row.autoCheck) return row.autoCheck.changes;
+  const detail = AUTO_APPROVED.exec(row.reason ?? "")?.[1];
   const count = /^(\d+) article/.exec(detail ?? "")?.[1];
   return count === undefined ? undefined : Number(count);
 }
 
-/** Prompts the policy writes for writes that wait only because the agent works in manual mode. */
-export function isManualModeRequest(prompt: string): boolean {
-  return prompt.startsWith("manual mode:");
+/** A write that waits only because the agent works in manual mode. */
+export function isManualModeRequest(request: Pick<Approval, "prompt" | "cause">): boolean {
+  // Older requests carry no `cause`; their policy reason starts with "manual mode:".
+  return request.cause
+    ? request.cause === "manual-mode"
+    : request.prompt.startsWith("manual mode:");
+}
+
+export type HeldBackCheck = AutoCheck & { code: Exclude<AutoCheck["code"], "low-risk"> };
+
+/** An `auto`-mode publish that the low-risk check sent to a person instead of publishing. */
+export function autoCheckHeldBack(request: {
+  autoCheck?: AutoCheck | undefined;
+}): HeldBackCheck | undefined {
+  const check = request.autoCheck;
+  return check && !check.lowRisk && check.code !== "low-risk"
+    ? { ...check, code: check.code }
+    : undefined;
+}
+
+/** The mode rules Studio applies: the server's (`/api/instance`) when reported, else Studio's copy. */
+export interface ModeRules {
+  /** Key modes to offer, in order (only ones Studio has words for). */
+  modes: readonly KeyMode[];
+  defaultMode: KeyMode;
+  scopesFor: (mode: AgentMode) => GrantableScope[];
+  autoPublishLimit: number;
+}
+
+export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
+  const offered = info?.modes.filter(isKeyMode) ?? [];
+  const grantable = (scopes: readonly AgentScope[] | undefined) =>
+    scopes?.filter((s): s is GrantableScope => (ALL_GRANTABLE as AgentScope[]).includes(s));
+  return {
+    modes: offered.length > 0 ? KEY_MODES.filter((m) => offered.includes(m)) : KEY_MODES,
+    defaultMode: isKeyMode(info?.default) ? info.default : DEFAULT_MODE,
+    scopesFor: (mode) => grantable(info?.scopes[mode]) ?? scopesForMode(mode),
+    autoPublishLimit: info?.autoPublishLimit ?? AUTO_PUBLISH_LIMIT,
+  };
 }
 
 export function scopeGroup(scope: AgentScope): ScopeGroup | "all" {

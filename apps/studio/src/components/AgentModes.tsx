@@ -15,16 +15,15 @@ import {
 import { useT } from "../i18n/index.tsx";
 import {
   ALWAYS_GATED_TOOLS,
-  AUTO_PUBLISH_LIMIT,
   autoApprovalCount,
-  KEY_MODES,
   MODE_RISK,
   MODE_RULES,
   type ModeRisk,
   type ModeRule,
   modeVariant,
 } from "../lib/agents.ts";
-import type { AgentMode, KeyMode } from "../lib/api.ts";
+import type { AgentMode, AuditRow, KeyMode } from "../lib/api.ts";
+import { useAgentModeRules } from "./useAgentModeRules.ts";
 
 /** The only way to get `bypass` (ADR-0015): the local stdio server, never an API key. */
 export const BYPASS_COMMAND = "cloudhal mcp --mode bypass";
@@ -107,10 +106,11 @@ export function ModePicker({
   legend: string;
 }) {
   const t = useT();
+  const { modes } = useAgentModeRules();
   return (
     <Radio.Group appearance="card" value={value} onValueChange={(v) => onValueChange(v as KeyMode)}>
       <Radio.Legend className="sr-only">{legend}</Radio.Legend>
-      {KEY_MODES.map((mode) => (
+      {modes.map((mode) => (
         <Radio.Item
           key={mode}
           value={mode}
@@ -178,6 +178,7 @@ export function AutoModeConfirm({
   showError: boolean;
 }) {
   const t = useT();
+  const { autoPublishLimit } = useAgentModeRules();
   const error = showError && !checked;
   return (
     <div className="grid gap-3" data-testid="auto-confirm">
@@ -185,7 +186,7 @@ export function AutoModeConfirm({
         variant="alert"
         icon={<Lightning weight="fill" />}
         title={t("agents.modes.autoTitle")}
-        description={t("agents.modes.autoDescription", { limit: AUTO_PUBLISH_LIMIT })}
+        description={t("agents.modes.autoDescription", { limit: autoPublishLimit })}
       />
       <div className="grid gap-1.5">
         <Checkbox
@@ -204,10 +205,10 @@ export function AutoModeConfirm({
   );
 }
 
-/** An `auto`-mode publish that went live without a person (audit reason from the MCP server). */
-export function AutoApprovedBadge({ reason }: { reason?: string | undefined }) {
+/** An `auto`-mode publish that went live without a person (the audit row's `autoCheck`). */
+export function AutoApprovedBadge({ row }: { row: Pick<AuditRow, "reason" | "autoCheck"> }) {
   const t = useT();
-  const count = autoApprovalCount(reason);
+  const count = autoApprovalCount(row);
   return (
     <span data-auto-approved="true" className="inline-flex">
       <Tooltip
@@ -235,12 +236,13 @@ const RULE_VARIANT: Record<ModeRule, "neutral" | "warning" | "success"> = {
 
 function RuleBadge({ rule }: { rule: ModeRule }) {
   const t = useT();
+  const { autoPublishLimit } = useAgentModeRules();
   return (
     <span data-rule={rule} className="inline-flex">
       <Tooltip
         content={
           <span className="block max-w-64">
-            {t(`agents.howModes.rulesHint.${rule}`, { limit: AUTO_PUBLISH_LIMIT })}
+            {t(`agents.howModes.rulesHint.${rule}`, { limit: autoPublishLimit })}
           </span>
         }
       >
@@ -258,6 +260,7 @@ function RuleBadge({ rule }: { rule: ModeRule }) {
  */
 export function HowModesWorkCard() {
   const t = useT();
+  const { modes } = useAgentModeRules();
   return (
     <LayerCard data-testid="how-modes">
       <LayerCard.Secondary className="flex items-center gap-2 px-5 py-3">
@@ -283,7 +286,7 @@ export function HowModesWorkCard() {
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {KEY_MODES.map((mode) => (
+              {modes.map((mode) => (
                 <Table.Row key={mode} data-mode-row={mode}>
                   <Table.Cell className="whitespace-nowrap">
                     <Text as="span" bold>
