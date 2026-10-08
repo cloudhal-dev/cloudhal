@@ -10,7 +10,7 @@
   },
   "type": "module",
   "scripts": {
-    "check": "turbo run check",
+    "check": "biome check . && turbo run typecheck && turbo run test",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
