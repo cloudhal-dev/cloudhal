@@ -3,6 +3,7 @@ import {
   Button,
   DeleteResource,
   Empty,
+  ImagePreview,
   LayerCard,
   Link,
   PageLayout,
@@ -24,6 +25,8 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { usePaging } from "../components/usePaging.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { previewImageUrl } from "../lib/seo.ts";
+import { primaryHostname } from "../lib/site-settings.ts";
 
 const AUTHOR_ICON: Record<ContentEntry["author"]["kind"], Icon> = {
   human: User,
@@ -38,6 +41,7 @@ export function ArticlesPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const host = primaryHostname(site.data?.domains ?? []);
   const entries = useQuery({
     queryKey: ["entries", siteId, "posts"],
     queryFn: () => api.entries.list(siteId, "posts"),
@@ -129,15 +133,27 @@ export function ArticlesPage() {
                   return (
                     <Table.Row key={e.id} data-entry-id={e.id}>
                       <Table.Cell>
-                        <div className="grid min-w-48 gap-1">
-                          <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
-                            <Text bold as="span">
-                              {e.title}
+                        <div className="flex min-w-56 items-center gap-3">
+                          <ImagePreview
+                            size="thumb"
+                            src={e.coverImage ? previewImageUrl(e.coverImage.src, host) : undefined}
+                            alt=""
+                            labels={{
+                              empty: t("seo.noCover"),
+                              loading: t("seo.cover.loading"),
+                              error: t("seo.cover.broken"),
+                            }}
+                          />
+                          <div className="grid min-w-0 gap-1">
+                            <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
+                              <Text bold as="span">
+                                {e.title}
+                              </Text>
+                            </Link>
+                            <Text variant="mono-secondary" as="span" truncate>
+                              /{e.collection}/{e.slug}
                             </Text>
-                          </Link>
-                          <Text variant="mono-secondary" as="span" truncate>
-                            /{e.collection}/{e.slug}
-                          </Text>
+                          </div>
                         </div>
                       </Table.Cell>
                       <Table.Cell>
