@@ -1266,7 +1266,10 @@ export const SnapshotSchema = {
           "enum": [
             "site",
             "page",
-            "contentEntry"
+            "contentEntry",
+            "taxonomy",
+            "term",
+            "redirect"
           ]
         },
         "rev": {
@@ -1620,6 +1623,12 @@ export const TermSchema = {
     "parentId": {
       "$ref": "#/$defs/Id",
       "description": "Parent term in the same taxonomy; only in hierarchical taxonomies. No cycles."
+    },
+    "position": {
+      "type": "integer",
+      "description": "Order among sibling terms (same taxonomy and parent), lowest first, for menus and sidebars. Terms without a position follow, by name.",
+      "minimum": 0,
+      "maximum": 100000
     },
     "image": {
       "$ref": "#/$defs/ImageRef"

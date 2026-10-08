@@ -703,6 +703,9 @@ pub struct Term {
         skip_serializing_if = "::std::option::Option::is_none"
     )]
     pub parent_id: ::std::option::Option<Id>,
+    #[doc = "Order among sibling terms (same taxonomy and parent), lowest first, for menus and sidebars. Terms without a position follow, by name."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub position: ::std::option::Option<i64>,
     #[serde(
         rename = "proposedBy",
         skip_serializing_if = "::std::option::Option::is_none"

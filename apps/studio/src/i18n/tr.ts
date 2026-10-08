@@ -1287,7 +1287,14 @@ export const tr: Messages = {
     nothingToCompare: "Karşılaştırılacak bir şey yok",
     nothingToCompareDescription:
       "Bu, sitenin ilk snapshot'ı ve canlıda başka bir sürüm yok; karşılaştırılacak bir şey henüz bulunmuyor.",
-    kinds: { site: "Site ayarları", page: "Sayfa", contentEntry: "Makale" },
+    kinds: {
+      site: "Site ayarları",
+      page: "Sayfa",
+      contentEntry: "Makale",
+      taxonomy: "Sınıflandırma",
+      term: "Terim",
+      redirect: "Yönlendirme",
+    },
     gone: "Artık mevcut değil",
     revs: "rev {from} → {to}",
     rev: "rev {rev}",

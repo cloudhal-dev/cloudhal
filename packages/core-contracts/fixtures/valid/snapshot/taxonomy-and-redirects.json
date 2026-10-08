@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "snap_01HZX8K3Q9TX",
+  "siteId": "site_01HZX8K3Q9EF",
+  "parentId": "snap_01HZX8K3Q9KL",
+  "siteRev": 12,
+  "reason": "manual",
+  "label": "tags-to-terms",
+  "actor": {
+    "kind": "human",
+    "id": "user_01HZX8K3Q9CD",
+    "name": "Halil"
+  },
+  "nodes": [
+    {
+      "id": "redir_01HZX8K3Q9RD",
+      "kind": "redirect",
+      "rev": 0,
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "site_01HZX8K3Q9EF",
+      "kind": "site",
+      "rev": 12,
+      "hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "id": "tax_01HZX8K3Q9CA",
+      "kind": "taxonomy",
+      "rev": 0,
+      "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "id": "term_01HZX8K3Q9NW",
+      "kind": "term",
+      "rev": 3,
+      "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "summary": {
+    "added": 3,
+    "changed": 0,
+    "removed": 0
+  },
+  "createdAt": "2026-10-08T21:00:00Z"
+}

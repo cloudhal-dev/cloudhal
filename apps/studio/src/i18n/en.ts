@@ -1266,7 +1266,14 @@ export const en = {
     nothingToCompare: "Nothing to compare with",
     nothingToCompareDescription:
       "This is the site's first snapshot and no other version is live, so there is nothing to compare it with yet.",
-    kinds: { site: "Site settings", page: "Page", contentEntry: "Article" },
+    kinds: {
+      site: "Site settings",
+      page: "Page",
+      contentEntry: "Article",
+      taxonomy: "Taxonomy",
+      term: "Term",
+      redirect: "Redirect",
+    },
     gone: "No longer exists",
     revs: "rev {from} → {to}",
     rev: "rev {rev}",

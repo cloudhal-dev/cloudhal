@@ -46,7 +46,10 @@
       "required": ["id", "kind", "rev", "hash"],
       "properties": {
         "id": { "$ref": "common.schema.json#/$defs/Id" },
-        "kind": { "type": "string", "enum": ["site", "page", "contentEntry"] },
+        "kind": {
+          "type": "string",
+          "enum": ["site", "page", "contentEntry", "taxonomy", "term", "redirect"]
+        },
         "rev": { "$ref": "common.schema.json#/$defs/Revision" },
         "hash": {
           "type": "string",
