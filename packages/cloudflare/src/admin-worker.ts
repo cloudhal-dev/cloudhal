@@ -53,8 +53,9 @@ function required(env: AdminEnv, key: keyof AdminEnv): string {
 export function createAdminWorker(options: AdminWorkerOptions = {}) {
   const skills: LoadedSkill[] = (options.skills ?? []).map((s) => skillFromSource(s));
   const log = options.log ?? ((line: string) => console.log(line));
-  let migrated: Promise<void> | undefined;
-  const auths = new Map<string, CloudhalAuth>();
+  // Only plain values survive between requests. Workers do not let one request await I/O started
+  // by another (it hangs), so no promise, auth instance or binding wrapper is cached here.
+  let migrated = false;
 
   return {
     async fetch(request: Request, env: AdminEnv, ctx: ExecutionContext): Promise<Response> {
@@ -66,14 +67,15 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
 
       const sql = new D1Driver(env.DB);
       const blobs = new R2BlobStore(env.BLOBS);
-      migrated ??= migrate(sql, migrations).then(
-        () => undefined,
-        (e) => {
-          migrated = undefined; // another isolate may have raced us; retry next request
-          throw e;
-        },
-      );
-      await migrated;
+      if (!migrated) {
+        try {
+          await migrate(sql, migrations);
+        } catch {
+          // A concurrent request or isolate applied them first; a second pass sees them as done.
+          await migrate(sql, migrations);
+        }
+        migrated = true;
+      }
 
       const store = new SiteGraphStore({
         sql,
@@ -89,20 +91,18 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });
 
-      let auth = auths.get(url.origin);
-      if (!auth) {
-        auth = createAuth({
-          database: env.DB,
-          baseURL: url.origin,
-          secret: required(env, "BETTER_AUTH_SECRET"),
-          signUp:
-            env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
-              ? env.CLOUDHAL_SIGNUP
-              : "first-user",
-          workers: { waitUntil: (p) => ctx.waitUntil(p) },
-        });
-        auths.set(url.origin, auth);
-      }
+      // Per request: Better Auth keeps request-scoped state (background tasks, plugin promises),
+      // and its construction does no I/O.
+      const auth: CloudhalAuth = createAuth({
+        database: env.DB,
+        baseURL: url.origin,
+        secret: required(env, "BETTER_AUTH_SECRET"),
+        signUp:
+          env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
+            ? env.CLOUDHAL_SIGNUP
+            : "first-user",
+        workers: { waitUntil: (p) => ctx.waitUntil(p) },
+      });
       const audit = new AuditLog(sql);
       const app = createApi({
         store,

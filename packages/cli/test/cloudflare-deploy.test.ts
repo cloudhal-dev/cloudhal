@@ -144,6 +144,28 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     expect(keyRes.status, await keyRes.clone().text()).toBe(201);
     const { key } = (await keyRes.json()) as { key: string };
 
+    // Regression: listing keys used to leave the cached auth instance tied to that request, and
+    // every later request in the isolate hung (Studio showed an endless loading screen).
+    const within = <T>(p: Promise<T>, ms = 5000) =>
+      Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`no response within ${ms}ms`)), ms),
+        ),
+      ]);
+    for (let i = 0; i < 2; i++) {
+      expect((await within(adminFetch("/api/agent-keys", { headers: { cookie } }))).status).toBe(
+        200,
+      );
+      expect(
+        (await within(adminFetch(`/api/sites/${siteId}`, { headers: { cookie } }))).status,
+      ).toBe(200);
+      expect(
+        (await within(adminFetch(`/api/sites/${siteId}/snapshots`, { headers: { cookie } })))
+          .status,
+      ).toBe(200);
+    }
+
     // the agent connects over MCP
     const prompts: string[] = [];
     const client = new Client(
