@@ -3,11 +3,11 @@ import { CodeHighlighted } from "@cloudhal/ui/code";
 import { GitDiff, HandPalm, Lightning, Prohibit } from "@phosphor-icons/react";
 import { type ReactNode, useRef } from "react";
 import { useI18n } from "../i18n/index.tsx";
-import { absoluteTime, formatInput, relativeTime } from "../lib/activity.ts";
+import { absoluteTime, formatInput, relativeTime, requestedByAgent } from "../lib/activity.ts";
 import { autoApprovalCount, isAutoApproved } from "../lib/agents.ts";
 import type { AuditRow } from "../lib/api.ts";
 import { ModeBadge } from "./AgentModes.tsx";
-import { ActorCell, DecisionCell, Outcome, useToolLabel } from "./Audit.tsx";
+import { ActorCell, DecisionCell, ElevationGrant, Outcome, useToolLabel } from "./Audit.tsx";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -45,6 +45,7 @@ export function ActivityDetailDialog({
   const input = row ? formatInput(row.input) : undefined;
   const autoApproved = row ? isAutoApproved(row) : false;
   const autoCount = row ? autoApprovalCount(row) : undefined;
+  const requestId = row ? requestedByAgent(row) : undefined;
   return (
     <LayerDialog.Root open={current !== undefined} onOpenChange={onOpenChange}>
       <LayerDialog.Content size="lg" closeLabel={t("common.close")}>
@@ -122,6 +123,28 @@ export function ActivityDetailDialog({
                           from: t(`agents.modes.names.${row.elevation.from}`),
                         })}
                       </Text>
+                    </div>
+                  </Row>
+                )}
+                {row.tool === "agent-key.elevate" && row.elevation && row.mode && (
+                  <Row label={t("activity.detail.elevationGranted")}>
+                    <div className="grid gap-1.5" data-testid="activity-elevation-grant">
+                      <ElevationGrant row={row} />
+                      <Text as="span">
+                        {t("activity.detail.elevationGrantedUntil", {
+                          mode: t(`agents.modes.names.${row.mode}`),
+                          time: absoluteTime(row.elevation.until, locale),
+                          from: t(`agents.modes.names.${row.elevation.from}`),
+                        })}
+                      </Text>
+                      {requestId && (
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <Text variant="secondary" size="sm" as="span">
+                            {t("activity.detail.requestedByAgent")}
+                          </Text>
+                          <InlineCopyText>{requestId}</InlineCopyText>
+                        </div>
+                      )}
                     </div>
                   </Row>
                 )}

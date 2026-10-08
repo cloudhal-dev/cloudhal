@@ -403,6 +403,7 @@ export const en = {
       left: "{time} left",
       ownMode: "Own mode: {mode}",
       tooltip: "Elevated from {from} until {time} by {who}",
+      requestedReason: "Requested by the agent: “{reason}”",
       byYou: "you",
       temporary: "Temporarily elevated",
       marker: "Temporarily elevated from {from} until {time}",
@@ -523,6 +524,9 @@ export const en = {
       elevation: "Elevation",
       elevationHint:
         "The key's own mode is {from}. Its owner granted more autonomy for a while; when the elevation ends, the key works in {from} mode again.",
+      elevationGranted: "Elevation granted",
+      elevationGrantedUntil: "{mode} mode until {time}, then back to {from}.",
+      requestedByAgent: "Answers the agent's request",
     },
     autoApproved: "Auto-approved",
     autoApprovedHint:
@@ -533,6 +537,9 @@ export const en = {
       "The agent works in Auto mode and this publish only added or edited articles. You can roll it back from Snapshots.",
     autoApprovedDescriptionCount:
       "The agent works in Auto mode and this publish only added or edited articles ({count} in total). You can roll it back from Snapshots.",
+    requestedByAgent: "Requested by the agent",
+    requestedByAgentHint:
+      "The agent asked for this elevation and a person granted it in Approvals.",
     recent: "Recent activity",
     recentEmpty: "No agent activity yet",
     recentEmptyDescription: "Connect an agent and its tool calls appear here.",
@@ -650,6 +657,7 @@ export const en = {
         previewLinks: "Preview links",
         deployTransfer: "Deploy and transfer",
         approvals: "Approvals in Studio",
+        elevationRequests: "Elevation requests",
       },
       featureHints: {
         agentKeys: "Agents and CI jobs sign in with keys you create.",
@@ -658,6 +666,8 @@ export const en = {
         previewLinks: "Signed links that show drafts on the deployed site.",
         deployTransfer: "cloudhal push and pull can reach this server.",
         approvals: "Agents' publish, rollback and delete requests wait here for a person.",
+        elevationRequests:
+          "Agents can ask for a more autonomous mode for a while; a person grants it in Approvals.",
       },
     },
   },
@@ -818,12 +828,45 @@ export const en = {
     title: "Approvals",
     views: { activity: "Activity", approvals: "Approvals" },
     description:
-      "Agents' publish, rollback and delete requests, and every change from agents in Manual mode, wait here until a person decides. Approving lets the agent make that exact call once.",
+      "Agents' publish, rollback and delete requests, their requests for more autonomy, and every change from agents in Manual mode wait here until a person decides. Approving lets the agent make that exact call once, or grants the elevation it asked for.",
     pending: "Waiting for you",
     history: "History",
     noPending: "Nothing is waiting for you",
     noPendingDescription:
-      "When an agent asks to publish, roll back or delete, or an agent in Manual mode wants to change anything, its request appears here and the agent waits for your decision.",
+      "When an agent asks to publish, roll back or delete, asks for a more autonomous mode for a while, or works in Manual mode and wants to change anything, its request appears here and the agent waits for your decision.",
+    elevation: {
+      badge: "Elevation request",
+      sentence: "{agent} asks to work in {mode} mode for {duration}.",
+      history: "Elevation to {mode} · {duration}",
+      reasonLabel: "The agent's reason",
+      noReason: "The agent gave no reason.",
+      untilIfNow: "If you approve now: until {time}",
+      hint: "Approving grants it on the agent's key for the time you choose, then the key returns to its own mode by itself. Nothing on the site changes.",
+      granted: "Granted",
+      cannotTake:
+        "{agent}'s key now works in {own} mode on its own, so there is nothing to grant. Deny the request to let the agent know.",
+      title: "Grant {mode} mode to {agent}?",
+      description: "{agent} asked for this. You can shorten the time, not extend it.",
+      mode: "Mode",
+      modeFixed:
+        "As requested. To grant another mode, deny this request and elevate the key from Agents.",
+      presetHours: "{count} hr",
+      presetMinutes: "{count} min",
+      requested: "Requested: {duration}. Shorter is fine, longer isn't possible.",
+      summary: "{agent} works in {mode} mode until {time}, then back to {from}.",
+      summaryNoOwn: "{agent} works in {mode} mode until {time}, then back to its own mode.",
+      nextCall: "Applies on the agent's next call. You can end it early from Agents.",
+      submit: "Grant elevation",
+      failed: "Couldn't grant the elevation",
+      stillPending:
+        "The request stays in the list while it is pending. You can deny it, or grant it once the key can take it.",
+      done: "Elevation granted",
+      doneDescription: "{agent} works in {mode} mode until {time}, then back to {from}.",
+      doneDescriptionNoOwn: "{agent} works in {mode} mode until {time}.",
+      asksFor: "Asks for {mode}",
+      asksForTooltip:
+        "{agent} asks to work in {mode} mode for {duration}. Open Approvals to decide.",
+    },
     manualPrompt: "{agent} works in Manual mode, so this change waits for you: {tool}.",
     manualPromptShort: "Manual mode: {tool}",
     manualHint:
@@ -917,6 +960,11 @@ export const en = {
     preview_page: "Preview page",
     publish: "Publish site",
     rollback: "Roll back site",
+    request_elevation: "Request elevation",
+    get_mode: "Get mode",
+    agentKeyMode: "Change agent key mode",
+    agentKeyElevate: "Elevate agent key",
+    agentKeyElevationEnd: "End elevation",
   },
   preview: {
     title: "Preview",

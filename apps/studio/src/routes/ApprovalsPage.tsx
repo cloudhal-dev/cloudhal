@@ -15,24 +15,35 @@ import { CodeHighlighted } from "@cloudhal/ui/code";
 import { CheckCircle, ClockCountdown, HandPalm, Info, X } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityViews } from "../components/ActivityViews.tsx";
 import { ModeBadge } from "../components/AgentModes.tsx";
+import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
 import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import {
+  cannotTake,
+  ElevationRequestCell,
+  ElevationRequestDetails,
+  UntilIfApprovedNow,
+  useElevationRequestText,
+} from "../components/ElevationRequest.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
-import { type Approval, api, isNotEnabled } from "../lib/api.ts";
+import { type Approval, api, isNotEnabled, type KeyMode } from "../lib/api.ts";
 import {
+  elevationRequestOf,
   expiresSoon,
   formatArguments,
   isNoLongerPending,
   needsConfirmation,
+  requestOwnMode,
   STATUS_VARIANT,
   splitApprovals,
 } from "../lib/approvals.ts";
@@ -58,15 +69,23 @@ function SectionHeading({ title, count }: { title: string; count?: number | unde
 function usePromptText() {
   const t = useT();
   const label = useToolLabel();
+  const elevationText = useElevationRequestText();
   return useCallback(
     (request: Approval, short = false) => {
+      // Elevation requests (ADR-0016): the server's line is English; say it in the person's language.
+      const elevation = elevationRequestOf(request);
+      if (elevation) {
+        const text = elevationText(request, elevation);
+        if (short) return text.short;
+        return elevation.reason ? `${text.sentence} “${elevation.reason}”` : text.sentence;
+      }
       if (!isManualModeRequest(request) || needsConfirmation(request.tool)) return request.prompt;
       const tool = label(request.tool);
       return short
         ? t("approvals.manualPromptShort", { tool })
         : t("approvals.manualPrompt", { agent: request.actor.name ?? request.actor.id, tool });
     },
-    [t, label],
+    [t, label, elevationText],
   );
 }
 
@@ -75,15 +94,21 @@ function PendingRequest({
   request,
   busy,
   onDecide,
+  ownMode,
+  now,
 }: {
   request: Approval;
   busy: Decision | undefined;
   onDecide: (decision: Decision) => void;
+  /** Elevation requests: the key's own mode, for "Edits → Auto". */
+  ownMode: KeyMode | undefined;
+  now: number;
 }) {
   const t = useT();
   const promptText = usePromptText();
   const args = formatArguments(request.input);
   const soon = expiresSoon(request.expiresAt);
+  const elevation = elevationRequestOf(request);
   const manual = isManualModeRequest(request) && !needsConfirmation(request.tool);
   const heldBack = autoCheckHeldBack(request);
   const prompt = promptText(request);
@@ -91,7 +116,7 @@ function PendingRequest({
     <div className="grid gap-3 px-5 py-4" data-approval-id={request.id} data-tool={request.tool}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-start gap-x-6 gap-y-2">
-          <ToolCell tool={request.tool} />
+          {elevation ? <ElevationRequestCell /> : <ToolCell tool={request.tool} />}
           <div className="grid gap-1">
             <Text variant="secondary" size="xs" as="span">
               {t("approvals.columns.agent")}
@@ -120,7 +145,10 @@ function PendingRequest({
           </Button>
         </div>
       </div>
-      {manual ? (
+      {elevation ? (
+        // An agent asks for more autonomy: never the server's English line, the reason as text.
+        <ElevationRequestDetails request={request} elevation={elevation} ownMode={ownMode} />
+      ) : manual ? (
         // Manual mode: the server's reason is a terse policy line; say what it means instead.
         <div className="grid gap-1.5" data-manual-mode="true">
           <div className="flex items-start gap-2">
@@ -175,6 +203,9 @@ function PendingRequest({
             </Badge>
           )}
         </span>
+        {elevation && !cannotTake(ownMode, elevation) && (
+          <UntilIfApprovedNow minutes={elevation.minutes} now={now} />
+        )}
       </div>
       <Collapsible.Root>
         <Collapsible.DefaultTrigger>{t("approvals.arguments")}</Collapsible.DefaultTrigger>
@@ -192,12 +223,20 @@ function PendingRequest({
   );
 }
 
-function StatusBadgeFor({ status }: { status: Approval["status"] }) {
+function StatusBadgeFor({
+  status,
+  elevation = false,
+}: {
+  status: Approval["status"];
+  /** An elevation request: "used" means the server granted it, so it reads "Granted". */
+  elevation?: boolean;
+}) {
   const t = useT();
+  const granted = elevation && status === "consumed";
   return (
     <span data-status={status}>
-      <Badge variant={STATUS_VARIANT[status]} appearance="dot">
-        {t(`approvals.statuses.${status}`)}
+      <Badge variant={granted ? "success" : STATUS_VARIANT[status]} appearance="dot">
+        {granted ? t("approvals.elevation.granted") : t(`approvals.statuses.${status}`)}
       </Badge>
     </span>
   );
@@ -248,7 +287,16 @@ function HistoryTable({
               <Table.Row key={r.id} data-approval-id={r.id}>
                 <Table.Cell>
                   <div className="grid w-72 gap-1">
-                    <ToolCell tool={r.tool} />
+                    {elevationRequestOf(r) ? (
+                      <span className="flex items-center gap-1.5" data-elevation-history>
+                        <ClockCountdown size={16} className="shrink-0 text-kumo-subtle" />
+                        <Text bold as="span">
+                          {t("approvals.elevation.badge")}
+                        </Text>
+                      </span>
+                    ) : (
+                      <ToolCell tool={r.tool} />
+                    )}
                     <Tooltip content={promptText(r)} className="block min-w-0 text-left">
                       <Text variant="secondary" size="sm" truncate>
                         {promptText(r, true)}
@@ -257,7 +305,10 @@ function HistoryTable({
                   </div>
                 </Table.Cell>
                 <Table.Cell className="whitespace-nowrap">
-                  <StatusBadgeFor status={r.status} />
+                  <StatusBadgeFor
+                    status={r.status}
+                    elevation={elevationRequestOf(r) !== undefined}
+                  />
                 </Table.Cell>
                 <Table.Cell className="min-w-44 max-w-64">
                   <ActorCell actor={r.actor} />
@@ -310,6 +361,20 @@ export function ApprovalsPage() {
   });
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
   const [confirming, setConfirming] = useState<Approval | undefined>();
+  const [granting, setGranting] = useState<Approval | undefined>();
+  const now = useNow();
+  // Elevation requests show the key's own mode; the owner's key list knows it best.
+  const hasElevationRequests = (all.data ?? []).some(
+    (a) => a.status === "pending" && elevationRequestOf(a) !== undefined,
+  );
+  const keys = useQuery({
+    queryKey: ["agent-keys"],
+    queryFn: api.agentKeys.list,
+    enabled: hasElevationRequests,
+    retry: false,
+  });
+  const ownModeOf = (request: Approval | undefined): KeyMode | undefined =>
+    request ? requestOwnMode(request, keys.data) : undefined;
   const decide = useMutation({
     mutationFn: ({ request, decision }: { request: Approval; decision: Decision }) =>
       api.approvals.decide(siteId, request.id, decision),
@@ -333,9 +398,18 @@ export function ApprovalsPage() {
   });
   const onDecide = (request: Approval, decision: Decision) => {
     decide.reset();
-    if (decision === "approve" && needsConfirmation(request.tool)) setConfirming(request);
+    // Granting an elevation always goes through its dialog (mode, time, Auto consent).
+    if (decision === "approve" && elevationRequestOf(request)) setGranting(request);
+    else if (decision === "approve" && needsConfirmation(request.tool)) setConfirming(request);
     else decide.mutate({ request, decision });
   };
+  // A request decided elsewhere (or expired) while its grant dialog is open: close and say so.
+  useEffect(() => {
+    if (!granting || !all.data) return;
+    if (all.data.some((a) => a.id === granting.id && a.status === "pending")) return;
+    setGranting(undefined);
+    toast.error(t("approvals.noLongerPending"), t("approvals.noLongerPendingDescription"));
+  }, [all.data]);
   const busyFor = (request: Approval): Decision | undefined =>
     decide.isPending && decide.variables?.request.id === request.id
       ? decide.variables.decision
@@ -392,6 +466,8 @@ export function ApprovalsPage() {
                       request={r}
                       busy={busyFor(r)}
                       onDecide={(d) => onDecide(r, d)}
+                      ownMode={ownModeOf(r)}
+                      now={now}
                     />
                   ))}
                 </div>
@@ -420,6 +496,12 @@ export function ApprovalsPage() {
             : undefined
         }
         onConfirm={(request) => decide.mutate({ request, decision: "approve" })}
+      />
+      <ApproveElevationDialog
+        siteId={siteId}
+        request={granting}
+        ownMode={ownModeOf(granting)}
+        onOpenChange={(open) => !open && setGranting(undefined)}
       />
     </div>
   );
