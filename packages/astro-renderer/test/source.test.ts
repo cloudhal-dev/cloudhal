@@ -55,4 +55,56 @@ describe("GraphSource", () => {
     expect((await frozen.entries("posts")).length).toBe(1);
     await expect(SnapshotSource.open(store, "snap_nope000001")).rejects.toThrow(/not found/);
   });
+
+  it("both sources expose taxonomies, shown terms, filtered entries and redirects (RFC-0002 §7)", async () => {
+    const live = new LiveSource(store, siteId);
+    const tag = (await store.getTaxonomyByKey(siteId, "tag")) as NonNullable<
+      Awaited<ReturnType<typeof store.getTaxonomyByKey>>
+    >;
+    await store.createRedirect({
+      siteId,
+      from: "/old-about",
+      to: "/about",
+      status: 301,
+      match: "exact",
+      reason: "manual",
+    });
+    const snap = await store.createSnapshot(siteId, {
+      actor: { kind: "system", id: "sys_test0001" },
+      reason: "manual",
+    });
+    // A later proposed tag is visible to authors in live mode only, never in a snapshot.
+    await store.createTerm({
+      siteId,
+      taxonomyId: tag.id,
+      slug: "proposed-one",
+      status: "proposed",
+      visibility: "public",
+      labels: { en: { name: "Proposed one" } },
+    });
+    // Renderers ignore node kinds they do not know (forward compatibility).
+    const frozen = new SnapshotSource(store, {
+      ...snap,
+      nodes: [
+        ...snap.nodes,
+        { id: "author_01HZX8K3Q9", kind: "author" as never, rev: 0, hash: "0".repeat(64) },
+      ],
+    });
+    for (const source of [live, frozen]) {
+      expect((await source.taxonomies()).map((t) => t.key).sort()).toEqual(["category", "tag"]);
+      expect((await source.terms("category")).map((t) => t.slug)).toEqual(["news"]);
+      expect((await source.termBySlug("tag", "cloudhal"))?.labels.en?.name).toBe("Cloudhal");
+      expect(await source.termBySlug("tag", "nope")).toBeUndefined();
+      expect(
+        (await source.entriesByTerm("category", "news", { descendants: true })).map((e) => e.slug),
+      ).toEqual(["hello-world"]);
+      expect((await source.entriesByFilter("category:news+tag:cloudhal")).length).toBe(1);
+      expect(await source.entriesByFilter("tag:unknown-term")).toEqual([]);
+      expect((await source.redirectFor("/old-about/"))?.location).toBe("/about");
+      expect(await source.redirectFor("/about")).toBeUndefined();
+    }
+    expect((await live.terms("tag")).map((t) => t.slug)).toEqual(["cloudhal", "proposed-one"]);
+    expect((await frozen.terms("tag")).map((t) => t.slug)).toEqual(["cloudhal"]);
+    expect(await frozen.terms("series")).toEqual([]);
+  });
 });

@@ -29,8 +29,10 @@ beforeEach(async () => {
   });
 });
 
+/** Entries are filed under the seeded "News" category (required for published entries, RFC-0002). */
 async function entry(overrides: Partial<ContentEntry>): Promise<ContentEntry> {
-  return store.createContentEntry({
+  const news = (await store.getTermBySlug(site.id, "category", "news"))?.id as string;
+  const created = await store.createContentEntry({
     siteId: site.id,
     collection: "posts",
     slug: "launch",
@@ -41,9 +43,14 @@ async function entry(overrides: Partial<ContentEntry>): Promise<ContentEntry> {
     body: { format: "markdown", value: "# We launched <today>\n\nBody with **bold**." },
     fields: {},
     tags: ["launch", "news"],
+    terms: { category: { ids: [news], primary: news } },
     author: human,
     ...overrides,
   } as never);
+  // What the renderer sees: the deprecated tags became terms and the source shows their slugs.
+  return (
+    (await new LiveSource(store, site.id).entryBySlug(created.collection, created.slug)) ?? created
+  );
 }
 
 describe("seo", () => {
