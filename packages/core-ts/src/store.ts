@@ -852,6 +852,11 @@ export class SiteGraphStore {
     return this.#assets.assetUsage(siteId, ids);
   }
 
+  /** Assets an actor added since an instant (per-key daily limits, RFC-0004 §5.6). */
+  assetUploadStats(actorId: string, since: string): Promise<{ count: number; bytes: number }> {
+    return this.#assets.uploadStats(actorId, since);
+  }
+
   verifyExternalAsset(asset: Asset, result: { sha256: string; bytes: number }): Promise<Asset> {
     return this.#assets.verifyExternalAsset(asset, result);
   }

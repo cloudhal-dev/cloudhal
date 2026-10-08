@@ -14,6 +14,7 @@ import {
   type Scope,
 } from "@cloudhal/agent-runtime";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { serveCloudhalStdio } from "@cloudhal/mcp-server/stdio";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
@@ -62,6 +63,8 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
     audit: new AuditLog(local.sql),
     skills,
     previewBaseUrl: options.previewUrl,
+    // fetch_asset_url resolves, checks and pins every address on Node (RFC-0004 §5.7).
+    media: { fetchTransport: nodeTransport() },
     onerror: (e) => process.stderr.write(`cloudhal mcp: ${e.message}\n`),
   });
   return {

@@ -361,6 +361,15 @@ export class AssetEngine {
     return out;
   }
 
+  /** Assets an actor added since `since` (all sites), for per-key daily limits (§5.6). */
+  async uploadStats(actorId: string, since: string): Promise<{ count: number; bytes: number }> {
+    const r = await this.#sql.get<{ n: number; b: number }>(
+      "SELECT count(*) AS n, coalesce(sum(json_extract(body, '$.bytes')), 0) AS b FROM nodes WHERE kind = 'asset' AND json_extract(body, '$.uploadedBy.id') = ? AND created_at >= ?",
+      [actorId, since],
+    );
+    return { count: r?.n ?? 0, bytes: r?.b ?? 0 };
+  }
+
   // ───────────────────────────── ledger ─────────────────────────────
 
   async blobState(siteId: string, sha256: string): Promise<BlobLedgerRow | undefined> {

@@ -8,6 +8,7 @@ import type {
 } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
+import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { MailSender } from "./mail.ts";
@@ -29,6 +30,8 @@ export interface McpMountOptions {
   readonly legacy?: "stateless" | "reject" | undefined;
   /** Same secret as `ApiDeps.preview`: lets `preview_page` return signed links to the deployed site. */
   readonly previewSecret?: string | undefined;
+  /** Media settings for the asset tools (fetch transport, host lists; RFC-0004). */
+  readonly media?: MediaToolOptions | undefined;
 }
 
 export interface ApiDeps {

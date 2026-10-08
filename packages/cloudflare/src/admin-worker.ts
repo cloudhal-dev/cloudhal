@@ -147,6 +147,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           approvals,
           // Remote clients must speak the stateless 2026-07-28 protocol or be served statelessly.
           legacy: "stateless",
+          // fetch_asset_url never reaches this Worker's own host (Studio, API, purge); each site's
+          // domains are refused too. Workers cannot pin DNS: see `workersTransport` (RFC-0004 §5.7).
+          media: { blockedHosts: [url.hostname] },
         },
         ...(env.CLOUDHAL_PREVIEW_SECRET
           ? { preview: { secret: env.CLOUDHAL_PREVIEW_SECRET } }
