@@ -99,6 +99,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["PUT", `${S}/taxonomies/:taxonomyId`, "site:write"],
   ["GET", `${S}/terms`, "content:read"],
   ["POST", `${S}/terms`, "content:draft:own"],
+  // the term editor's archive preview: saved (GET) or the unsaved draft (POST); writes nothing
+  ["GET", `${T}/preview`, "content:read"],
+  ["POST", `${T}/preview`, "content:read"],
   ["GET", T, "content:read"],
   ["PUT", T, "content:write"],
   ["POST", `${T}/rename`, "site:write"],

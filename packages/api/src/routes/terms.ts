@@ -1,11 +1,13 @@
 import { holds, termCreation } from "@cloudhal/agent-runtime";
-import type { Taxonomy, Term } from "@cloudhal/core-contracts";
+import { type ArchivePreviewReason, renderArchivePreview } from "@cloudhal/astro-renderer/preview";
+import type { ImageRef, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { foldName, type GovernanceResult, type TermUsage } from "@cloudhal/core-ts";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, missingScope, notFound } from "../errors.ts";
 import { type PreviewOp, previewGovernance, requireSite, snapshotAfter } from "../governance.ts";
 import { param } from "../params.ts";
+import { previewResponse } from "../preview.ts";
 
 type TermInput = Omit<Term, "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion" | "siteId">;
 
@@ -93,6 +95,98 @@ async function govern(
   return c.json({ result, snapshot });
 }
 
+/** What `POST /terms/:termId/preview` answers: the document and the archive's public state. */
+export interface TermPreview {
+  html: string;
+  archive: {
+    /** What the public route answers (`archiveState`): 200, 404 or 410. */
+    status: 200 | 404 | 410;
+    indexable: boolean;
+    reason: ArchivePreviewReason;
+    /** Published entries the archive lists. */
+    total: number;
+    minEntriesToIndex: number;
+    path: string;
+  };
+}
+
+const LOCALE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+const record = (v: unknown) =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
+
+function imageRef(v: unknown): ImageRef | undefined {
+  const r = record(v);
+  const src = text(r?.src, 2048);
+  if (!r || !src) return undefined;
+  const size = (n: unknown) =>
+    Number.isInteger(n) && (n as number) > 0 ? (n as number) : undefined;
+  const width = size(r.width);
+  const height = size(r.height);
+  return {
+    src,
+    alt: text(r.alt, 300) ?? "",
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {}),
+  };
+}
+
+/**
+ * The stored term with the editor's unsaved presentation (labels: names, synonyms, intro, SEO;
+ * the image) — never its slug, status, visibility or parent, which only governance changes.
+ * Unknown or mistyped fields are dropped: a draft that would not save still previews.
+ */
+function presentationDraft(stored: Term, b: OpBody): Term {
+  const raw = b.labels === undefined ? undefined : record(b.labels);
+  if (b.labels !== undefined && !raw) throw badRequest("labels must be an object per locale");
+  const labels: Term["labels"] = raw ? {} : stored.labels;
+  for (const [locale, value] of Object.entries(raw ?? {})) {
+    const l = record(value);
+    if (!LOCALE.test(locale) || !l) continue;
+    const seo = record(l.seo);
+    const ogImage = imageRef(seo?.ogImage);
+    const fields = {
+      title: text(seo?.title, 300),
+      description: text(seo?.description, 500),
+      canonical: text(seo?.canonical, 2048),
+    };
+    const description = text(l.description, 20_000);
+    labels[locale] = {
+      name: text(l.name, 200)?.trim() || stored.labels[locale]?.name || stored.slug,
+      ...(description ? { description } : {}),
+      ...(seo
+        ? {
+            seo: {
+              ...Object.fromEntries(Object.entries(fields).filter(([, x]) => x)),
+              ...(seo.noindex === true ? { noindex: true } : {}),
+              ...(ogImage ? { ogImage } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+  const { image: _image, ...rest } = stored;
+  const image = b.image === undefined ? stored.image : imageRef(b.image);
+  return { ...rest, labels, ...(image ? { image } : {}) };
+}
+
+/** A term's archive page as the site would render it, from the current graph. */
+async function archivePreview(c: Context<Env>, term: Term) {
+  const store = c.get("store");
+  const site = await requireSite(c);
+  const [taxonomies, vocabulary, entries] = await Promise.all([
+    store.listTaxonomies(site.id),
+    store.listTerms(site.id),
+    store.listContentEntries(site.id, {}),
+  ]);
+  return renderArchivePreview(site, {
+    taxonomies,
+    terms: vocabulary.map((t) => (t.id === term.id ? term : t)),
+    termId: term.id,
+    entries,
+  });
+}
+
 /** `/api/sites/:siteId/terms` (RFC-0002 §6.1, people only). */
 export const terms: Hono<Env> = new Hono<Env>()
   .get("/", async (c) => {
@@ -140,6 +234,27 @@ export const terms: Hono<Env> = new Hono<Env>()
     );
     const snapshot = await snapshotAfter(c, site.id, "create_term");
     return c.json({ term, snapshot }, 201);
+  })
+  .get("/:termId/preview", async (c) => {
+    const { term } = await loadTerm(c);
+    return previewResponse(c, (await archivePreview(c, term)).html);
+  })
+  .post("/:termId/preview", async (c) => {
+    // The term editor's live preview: the archive with the unsaved text (names, intro, SEO,
+    // image) and what the public route answers with it (RFC-0002 §7). Nothing is written.
+    const { term } = await loadTerm(c);
+    const doc = await archivePreview(c, presentationDraft(term, await body(c)));
+    return c.json({
+      html: doc.html,
+      archive: {
+        status: doc.state.status,
+        indexable: doc.state.status === 200 && doc.state.indexable,
+        reason: doc.reason,
+        total: doc.total,
+        minEntriesToIndex: doc.minEntriesToIndex,
+        path: doc.path,
+      },
+    } satisfies TermPreview);
   })
   .get("/:termId", async (c) => {
     const { term, tax } = await loadTerm(c);
