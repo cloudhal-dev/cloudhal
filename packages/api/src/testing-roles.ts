@@ -675,6 +675,8 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "content:read",
         "preview:create",
         "content:draft:own",
+        // RFC-0004: Contributors and above upload media (ADR-0018); keys outside plan get it.
+        "asset:upload",
       ]);
       const key = await newKey(t.author, { name: "author-bot", mode: "edits" });
       expect(key.scopes).toEqual([
@@ -682,6 +684,7 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "content:read",
         "preview:create",
         "content:write:own",
+        "asset:upload",
         "site:publish:own",
       ]);
 

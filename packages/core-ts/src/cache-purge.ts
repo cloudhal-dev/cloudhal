@@ -215,7 +215,8 @@ export async function planCachePurge(
           continue;
         }
         const [a, b] = await Promise.all([read<Asset>(c.before as NodeRef), read<Asset>(c.after)]);
-        if (a.slug !== b.slug || a.status !== b.status) why.push(`asset ${id}: slug or status changed`);
+        if (a.slug !== b.slug || a.status !== b.status)
+          why.push(`asset ${id}: slug or status changed`);
         else why.push(`asset ${id} changed`);
         shown.add(id);
       }

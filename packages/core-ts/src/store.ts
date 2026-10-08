@@ -20,7 +20,6 @@ import {
   type SqlDriver,
   type SqlStatement,
 } from "@cloudhal/storage";
-import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   AssetEngine,
   type AssetPage,
@@ -32,6 +31,7 @@ import {
   type IngestAssetResult,
   type StreamIngestInput,
 } from "./assets.ts";
+import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
   InvariantError,
@@ -41,10 +41,10 @@ import {
 } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
-import type { TargetRef } from "./menu.ts";
-import { MenuEngine } from "./menu-store.ts";
 import { fillMissingSrc } from "./media/refs.ts";
 import { isReservedMediaPath, MEDIA_LIMITS } from "./media/types.ts";
+import type { TargetRef } from "./menu.ts";
+import { MenuEngine } from "./menu-store.ts";
 import type { Resolution } from "./names.ts";
 import {
   and,
@@ -1125,7 +1125,6 @@ export class SiteGraphStore {
   async publish(site: Site, snapshotId: string): Promise<Site> {
     const snap = await this.getSnapshot(snapshotId);
     if (!snap || snap.siteId !== site.id) throw new NotFoundError("snapshot", snapshotId);
-    const previous = site.publishedSnapshotId;
     const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
     await this.#runOnPublished(updated, {
       ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),

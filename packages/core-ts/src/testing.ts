@@ -7,8 +7,8 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ConflictError, UniqueConstraintError } from "./errors.ts";
 import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
-import { menuSuite } from "./testing-menu.ts";
 import { assetsSuite } from "./testing-assets.ts";
+import { menuSuite } from "./testing-menu.ts";
 import { racingDriver, type SuiteContext, taxonomySuite } from "./testing-taxonomy.ts";
 
 export interface StoreFactory {
