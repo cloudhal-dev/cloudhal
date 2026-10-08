@@ -2057,6 +2057,12 @@ export const en = {
       under: "Under “{label}”",
       add: "Add item",
       apply: "Apply",
+      targetGone: {
+        page: "The page this item linked to was deleted. Choose another target, or remove the item.",
+        contentEntry:
+          "The article this item linked to was deleted. Choose another target, or remove the item.",
+        term: "The term this item linked to is gone or retired. Choose another target, or remove the item.",
+      },
       hiddenUntil: {
         draft: "This is a draft. The item stays hidden on your site until it's published.",
         review: "This is in review. The item stays hidden on your site until it's published.",

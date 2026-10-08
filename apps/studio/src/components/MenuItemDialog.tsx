@@ -283,6 +283,15 @@ export function MenuItemDialog({
                 </span>
               </InsetPanel>
             )}
+            {item && nodeTarget && !value && (
+              <Banner
+                variant="alert"
+                size="sm"
+                icon={<WarningCircle weight="fill" />}
+                title={t(`menus.item.targetGone.${kind}`)}
+                data-testid="menu-item-target-gone"
+              />
+            )}
             {status && (
               <Banner
                 variant="secondary"

@@ -2096,6 +2096,12 @@ export const tr: Messages = {
       under: "“{label}” altında",
       add: "Öğe ekle",
       apply: "Uygula",
+      targetGone: {
+        page: "Bu öğenin bağlandığı sayfa silindi. Başka bir hedef seç ya da öğeyi kaldır.",
+        contentEntry:
+          "Bu öğenin bağlandığı makale silindi. Başka bir hedef seç ya da öğeyi kaldır.",
+        term: "Bu öğenin bağlandığı terim silinmiş ya da kaldırılmış. Başka bir hedef seç ya da öğeyi kaldır.",
+      },
       hiddenUntil: {
         draft: "Bu bir taslak. Öğe, yayınlanana kadar sitende gizli kalır.",
         review: "Bu incelemede. Öğe, yayınlanana kadar sitende gizli kalır.",

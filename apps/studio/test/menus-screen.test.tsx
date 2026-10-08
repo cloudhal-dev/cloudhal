@@ -281,6 +281,14 @@ describe("Navigation: the menu editor", () => {
     expect(badge.closest("[data-hidden-reason]")).toHaveAttribute("data-hidden-reason", "missing");
     expect(screen.getByTestId("hidden-banner")).toHaveTextContent("1 item is hidden on your site");
     expect(screen.getByTestId("save-menu")).toBeDisabled();
+    // Fix → choose another target: the dialog says the old one is gone.
+    fireEvent.click(within(row("item_gone000001")).getByTestId("fix-item"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Choose another target…" }));
+    expect(await screen.findByTestId("menu-item-target-gone")).toHaveTextContent(
+      "The page this item linked to was deleted.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    // Fix → remove.
     fireEvent.click(within(row("item_gone000001")).getByTestId("fix-item"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
     await waitFor(() => expect(rowIds()).toEqual(["item_about00001", "item_status0001"]));
