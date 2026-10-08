@@ -4,6 +4,8 @@
  *
  * - `GET  /?status=pending|approved|denied|consumed|expired`
  * - `POST /:approvalId/approve` · `POST /:approvalId/deny`
+ *   409 `conflict`: no longer pending · 409 `elevation_conflict`: still pending, but the agent's key
+ *   cannot take the elevation (gone, not yours, or its own mode reached it)
  *
  * An agent's `request_elevation` (ADR-0016) is carried out here when a person approves it: the
  * elevation is granted on the agent's key with the approver's own rights (`{minutes?}` may shorten
@@ -39,6 +41,14 @@ function elevationInput(a: Approval): ElevationInput | undefined {
 }
 
 /**
+ * The request is still pending, but the key cannot take it: distinct from `conflict` (already
+ * decided), so a client knows the request stays in the list.
+ */
+function elevationConflict(c: Context<Env>, message: string): Response {
+  return c.json({ error: "elevation_conflict", message }, 409);
+}
+
+/**
  * Before deciding an elevation request: the approver's own key still exists and can still take it
  * (its own mode may have changed meanwhile). Returns the minutes to grant.
  */
@@ -59,13 +69,9 @@ async function checkElevation(
   const minutes = body.minutes ?? input.minutes;
   if (minutes > input.minutes) throw badRequest("an approver can shorten a request, not extend it");
   const key = (await keys.list({ headers: c.req.raw.headers })).find((k) => k.id === input.keyId);
-  if (!key)
-    return c.json(
-      { error: "conflict", message: "the agent's key no longer exists, or it is not yours" },
-      409,
-    );
+  if (!key) return elevationConflict(c, "the agent's key no longer exists, or it is not yours");
   const problem = elevationProblem(key.mode, input.mode, minutes);
-  if (problem) return c.json({ error: "conflict", message: problem }, 409);
+  if (problem) return elevationConflict(c, problem);
   return { input, minutes };
 }
 
@@ -132,8 +138,14 @@ export const approvals: Hono<Env> = new Hono<Env>()
         minutes: elevation.minutes,
         reason: `requested by the agent: ${elevation.input.reason ?? ""}`.trim(),
       });
-      decided = (await store?.complete(id)) ?? decided;
       const until = granted.elevation?.until ?? "";
+      decided =
+        (await store?.complete(id, {
+          from: granted.mode,
+          mode: elevation.input.mode,
+          minutes: elevation.minutes,
+          until,
+        })) ?? decided;
       await c.get("audit")?.record({
         at: new Date().toISOString(),
         actor,
@@ -142,6 +154,8 @@ export const approvals: Hono<Env> = new Hono<Env>()
         decision: "allow",
         outcome: "ok",
         reason: `${granted.name ?? granted.id}: ${granted.mode} → ${granted.effectiveMode} until ${until} (${elevation.minutes} min), requested by the agent (${id})`,
+        // Structured for readers: which request this granted, and for how long.
+        input: { requestId: id, keyId: elevation.input.keyId, minutes: elevation.minutes },
         mode: granted.effectiveMode,
         elevation: { from: granted.mode, until },
       });

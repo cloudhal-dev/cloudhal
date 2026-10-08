@@ -3,8 +3,13 @@ import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
-import { ApiRequestError, type Approval, api, type KeyMode } from "../lib/api.ts";
-import { elevationRequestOf, grantPresets } from "../lib/approvals.ts";
+import { type Approval, api, type KeyMode } from "../lib/api.ts";
+import {
+  elevationRequestOf,
+  grantPresets,
+  isElevationConflict,
+  isNoLongerPending,
+} from "../lib/approvals.ts";
 import {
   type CustomUnit,
   formatDuration,
@@ -25,7 +30,7 @@ type Preset = `${number}` | "custom";
  * the agent asked for and cannot be changed here; the time can be shortened, never extended. Auto
  * needs the same explicit consent as everywhere else. The server grants the elevation on the
  * agent's key with the approver's rights; `{minutes}` is sent only when shortened. A 400 stays in
- * the dialog; a 409 shows the server's reason and refreshes the list, where the request stays
+ * the dialog; a 409 `elevation_conflict` shows the server's reason and refreshes the list, where the request stays
  * while it is still pending. Always mounted; `request` undefined closes it.
  */
 export function ApproveElevationDialog({
@@ -66,9 +71,12 @@ export function ApproveElevationDialog({
   const grant = useMutation({
     mutationFn: ({ id, minutes }: { id: string; minutes: number | undefined }) =>
       api.approvals.grantElevation(siteId, id, minutes),
-    onSuccess: async (_r, { minutes }) => {
+    onSuccess: async (approval, { minutes }) => {
       onOpenChange(false);
-      const until = new Date(Date.now() + (minutes ?? requested) * 60_000).toISOString();
+      // The server records what it granted; older servers do not, so estimate from now.
+      const until =
+        approval.grant?.until ??
+        new Date(Date.now() + (minutes ?? requested) * 60_000).toISOString();
       const params = { agent, mode: modeName, time: formatUntil(until, locale) };
       toast.success(
         t("approvals.elevation.done"),
@@ -86,8 +94,15 @@ export function ApproveElevationDialog({
       ]);
     },
     onError: async (error) => {
-      // 409: decided meanwhile, or the key can no longer take it (then it is still pending).
-      if (error instanceof ApiRequestError && error.status === 409)
+      // Decided, used or expired meanwhile: nothing left to grant here.
+      if (isNoLongerPending(error)) {
+        onOpenChange(false);
+        toast.error(t("approvals.noLongerPending"), t("approvals.noLongerPendingDescription"));
+        await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+        return;
+      }
+      // Still pending, but the key cannot take it now: say why and keep the dialog open.
+      if (isElevationConflict(error))
         await Promise.all([
           qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
           qc.invalidateQueries({ queryKey: ["agent-keys"] }),
@@ -122,7 +137,7 @@ export function ApproveElevationDialog({
       ? t(`agents.elevate.customErrors.${custom.error}`, boundWords)
       : undefined;
   const needsConsent = mode === "auto";
-  const conflict = grant.error instanceof ApiRequestError && grant.error.status === 409;
+  const conflict = isElevationConflict(grant.error);
 
   const submit = () => {
     setSubmitted(true);

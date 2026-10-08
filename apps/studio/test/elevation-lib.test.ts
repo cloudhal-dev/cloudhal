@@ -3,9 +3,12 @@ import { translate } from "../src/i18n/index.tsx";
 import { isKeyEvent, isKnownTool, requestedByAgent } from "../src/lib/activity.ts";
 import { KEY_MODES, modeRules } from "../src/lib/agents.ts";
 import type { Approval } from "../src/lib/api.ts";
+import { ApiRequestError } from "../src/lib/api.ts";
 import {
   elevationRequestOf,
   grantPresets,
+  isElevationConflict,
+  isNoLongerPending,
   pendingElevationsByKey,
   requestOwnMode,
 } from "../src/lib/approvals.ts";
@@ -222,8 +225,45 @@ describe("elevation requests (ADR-0016 addendum)", () => {
         reason: "Desk: edits → auto (60 min): launch",
       }),
     ).toBeUndefined();
+    // current servers say it as data, whatever the wording
+    expect(
+      requestedByAgent({
+        tool: "agent-key.elevate",
+        reason: "anything",
+        input: { requestId: "appr_cd34", keyId: "key_1", minutes: 30 },
+      }),
+    ).toBe("appr_cd34");
     expect(
       requestedByAgent({ tool: "publish", reason: "requested by the agent (appr_x)" }),
     ).toBeUndefined();
+  });
+});
+
+describe("structured elevation answers", () => {
+  it("prefers the own mode recorded with the request over the English prompt", () => {
+    const request = {
+      tool: "request_elevation",
+      prompt: 'desk asks to work in AUTO mode for 60 min (its own mode is PLAN): "x"',
+      mode: "manual" as const,
+      input: { mode: "auto", minutes: 60, reason: "x", keyId: "key_1", ownMode: "edits" },
+    };
+    expect(elevationRequestOf(request)?.ownMode).toBe("edits");
+    expect(requestOwnMode(request)).toBe("edits");
+    expect(requestOwnMode(request, [{ id: "key_1", mode: "manual" }])).toBe("manual");
+    // older servers: only the prompt names it
+    const { ownMode: _o, ...older } = request.input;
+    expect(requestOwnMode({ ...request, input: older })).toBe("plan");
+  });
+
+  it("tells a still-pending elevation conflict from a decided request", () => {
+    const elevation = new ApiRequestError(409, { error: "elevation_conflict", message: "m" });
+    const decided = new ApiRequestError(409, { error: "conflict", message: "m" });
+    expect(isElevationConflict(elevation)).toBe(true);
+    expect(isNoLongerPending(elevation)).toBe(false);
+    expect(isElevationConflict(decided)).toBe(false);
+    expect(isNoLongerPending(decided)).toBe(true);
+    expect(
+      isNoLongerPending(new ApiRequestError(400, { error: "bad_request", message: "m" })),
+    ).toBe(false);
   });
 });

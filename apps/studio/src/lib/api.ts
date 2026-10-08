@@ -77,6 +77,14 @@ export interface AuditElevation {
   until: string;
 }
 
+/** The elevation a person granted for an agent's request (ADR-0016). */
+export interface ElevationGrant {
+  from: AgentMode;
+  mode: AgentMode;
+  minutes: number;
+  until: string;
+}
+
 /** Why a call waits for a person (packages/agent-runtime/src/policy.ts). */
 export type ApprovalCause = "tool" | "destructive" | "skill" | "manual-mode";
 
@@ -238,6 +246,8 @@ export interface Approval {
   cause?: ApprovalCause;
   /** An `auto`-mode publish: the low-risk check that sent it to a person. */
   autoCheck?: AutoCheck;
+  /** A granted `request_elevation`: what the person granted (possibly shorter than asked). */
+  grant?: ElevationGrant;
   status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;
@@ -299,7 +309,8 @@ export const api = {
      * Approves an agent's `request_elevation` (ADR-0016 addendum): the server grants the elevation
      * on the agent's key with the approver's rights and answers with the request `consumed`.
      * `minutes` may shorten the request (400 when it would extend it) and is sent only when given.
-     * 409 when the request is no longer pending, or the key is gone, not yours or can no longer
+     * 409 `conflict` when the request is no longer pending; 409 `elevation_conflict` (still pending)
+     * when the key is gone, not yours or can no longer
      * take it (the request then stays pending).
      */
     grantElevation: (siteId: string, id: string, minutes?: number) =>

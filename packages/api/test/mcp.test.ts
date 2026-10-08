@@ -336,7 +336,10 @@ describe("time-boxed elevation (ADR-0016)", () => {
     expect(ended.elevation).toBeUndefined();
     expect(
       (await audit.list({ limit: 50 })).find((r) => r.tool === "agent-key.elevation-end"),
-    ).toMatchObject({ reason: "desk: auto → manual (ended early)" });
+    ).toMatchObject({
+      reason: "desk: auto → manual (ended early)",
+      elevation: { from: "manual", until: expect.any(String) },
+    });
     // ending when nothing is in force is harmless and not audited again
     expect((await json("DELETE", `/api/agent-keys/${created.id}/elevation`)).status).toBe(200);
     expect(
@@ -426,7 +429,12 @@ describe("agents asking for an elevation (ADR-0016)", () => {
       minutes: 30,
     });
     expect(approved.status, await approved.clone().text()).toBe(200);
-    expect(((await approved.json()) as { status: string }).status).toBe("consumed");
+    // the approval records what was granted (shorter than asked)
+    expect(await approved.json()).toMatchObject({
+      status: "consumed",
+      input: { mode: "auto", minutes: 60, ownMode: "edits" },
+      grant: { from: "edits", mode: "auto", minutes: 30, until: "2026-10-08T10:30:00.000Z" },
+    });
 
     const during = await call("get_mode");
     expect(during.instructions).toContain("AUTO mode");
@@ -436,7 +444,13 @@ describe("agents asking for an elevation (ADR-0016)", () => {
       ownMode: "edits",
       elevation: { from: "edits", until: "2026-10-08T10:30:00.000Z" },
       requestableModes: [],
-      latestRequest: { id: request.id, status: "consumed", mode: "auto", minutes: 60 },
+      latestRequest: {
+        id: request.id,
+        status: "consumed",
+        mode: "auto",
+        minutes: 60,
+        granted: { minutes: 30, until: "2026-10-08T10:30:00.000Z" },
+      },
     });
     // the grant shows up in the site's activity, with who asked
     const activity = (await (await json("GET", `/api/sites/${siteId}/activity`)).json()) as {
@@ -444,6 +458,7 @@ describe("agents asking for an elevation (ADR-0016)", () => {
     };
     expect(activity.items.find((r) => r.tool === "agent-key.elevate")).toMatchObject({
       reason: `desk: edits → auto until 2026-10-08T10:30:00.000Z (30 min), requested by the agent (${request.id})`,
+      input: { requestId: request.id, keyId: key.id, minutes: 30 },
       elevation: { from: "edits", until: "2026-10-08T10:30:00.000Z" },
     });
     // already elevated: asking again for the same mode is refused
@@ -488,9 +503,17 @@ describe("agents asking for an elevation (ADR-0016)", () => {
     await json("PATCH", `/api/agent-keys/${key.id}`, { mode: "auto" });
     const res = await json("POST", `/api/sites/${siteId}/approvals/${id}/approve`);
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { message: string }).message).toMatch(/more autonomous/);
+    // distinct from "already decided": the request is still pending
+    expect(await res.json()).toMatchObject({
+      error: "elevation_conflict",
+      message: expect.stringMatching(/more autonomous/),
+    });
     // still pending: the person can deny it
     expect((await json("POST", `/api/sites/${siteId}/approvals/${id}/deny`)).status).toBe(200);
+    // deciding again is the plain "no longer pending" conflict
+    expect(
+      await (await json("POST", `/api/sites/${siteId}/approvals/${id}/approve`)).json(),
+    ).toMatchObject({ error: "conflict" });
 
     const human = await connect({ cookie, origin: "http://localhost" });
     const mine = await human.callTool({ name: "get_mode", arguments: {} });

@@ -23,9 +23,25 @@ export function needsConfirmation(tool: string): boolean {
   return (CONFIRM_TOOLS as readonly string[]).includes(tool);
 }
 
-/** The server answers 409 when a request was decided, used or expired in the meantime. */
+/** The server answers 409 `conflict` when a request was decided, used or expired in the meantime. */
 export function isNoLongerPending(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.status === 409;
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 409 &&
+    error.body.error !== "elevation_conflict"
+  );
+}
+
+/**
+ * 409 `elevation_conflict`: the request is still pending, but the agent's key cannot take the
+ * elevation now (gone, not yours, or its own mode reached it).
+ */
+export function isElevationConflict(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 409 &&
+    error.body.error === "elevation_conflict"
+  );
 }
 
 export const STATUS_VARIANT: Record<ApprovalStatus, "success" | "warning" | "error" | "neutral"> = {
@@ -104,6 +120,8 @@ export interface ElevationRequest {
   /** The agent's own words (agent-controlled: plain text only); may be empty on odd requests. */
   reason: string;
   keyId: string | undefined;
+  /** The key's own mode when it asked (servers since the ADR-0016 follow-up record it). */
+  ownMode: KeyMode | undefined;
 }
 
 /** The request's `input` read as an elevation request; undefined for every other approval. */
@@ -120,6 +138,7 @@ export function elevationRequestOf(
     minutes: Math.round(input.minutes),
     reason: typeof input.reason === "string" ? input.reason.trim() : "",
     keyId: typeof input.keyId === "string" ? input.keyId : undefined,
+    ownMode: isKeyMode(input.ownMode) ? input.ownMode : undefined,
   };
 }
 
@@ -131,16 +150,20 @@ export function isElevationRequest(request: Pick<Approval, "tool" | "input">): b
 const OWN_MODE_IN_PROMPT = /\(its own mode is ([A-Za-z]+)\)/;
 
 /**
- * The key's own mode when it asked, best source first: the owner's key list (current truth), the
- * server's prompt, then the mode the agent worked in (which may itself have been an elevation).
+ * The key's own mode, best source first: the owner's key list (current truth), the mode recorded
+ * with the request, the server's prompt (older servers), then the mode the agent worked in (which
+ * may itself have been an elevation).
  */
 export function requestOwnMode(
   request: Pick<Approval, "prompt" | "mode" | "input" | "tool">,
   keys?: readonly Pick<AgentKeySummary, "id" | "mode">[] | undefined,
 ): KeyMode | undefined {
-  const keyId = elevationRequestOf(request)?.keyId;
+  const elevation = elevationRequestOf(request);
+  const keyId = elevation?.keyId;
   const key = keyId ? keys?.find((k) => k.id === keyId) : undefined;
   if (key && isKeyMode(key.mode)) return key.mode;
+  if (elevation?.ownMode) return elevation.ownMode;
+  // Requests from older servers only name it in the English prompt.
   const fromPrompt = OWN_MODE_IN_PROMPT.exec(request.prompt)?.[1]?.toLowerCase();
   if (isKeyMode(fromPrompt)) return fromPrompt;
   return isKeyMode(request.mode) ? request.mode : undefined;

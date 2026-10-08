@@ -56,4 +56,10 @@ An agent that needs more autonomy for a task asks for it instead of failing or n
   - The request is then marked `consumed`, since the agent has nothing to redeem.
   - The grant is audited as `agent-key.elevate` on the site, naming the request.
 - **The agent learns the outcome** from `get_mode` or from its next call's instructions. Nothing it receives can grant the elevation.
+- **Answers are data, not wording.** Readers never parse the English text:
+  - The request's `input` carries the key's own mode (`ownMode`).
+  - A granted request records what was granted, `grant: {from, mode, minutes, until}` (migration 0010), which may be shorter than asked. `get_mode` reports it as `latestRequest.granted`.
+  - The grant's audit row carries `input: {requestId, keyId, minutes}`.
+  - A 409 says which case applies: `conflict` when the request is no longer pending, and `elevation_conflict` when it is still pending but the key cannot take it.
+  - Ending an elevation early is audited with its `elevation`.
 

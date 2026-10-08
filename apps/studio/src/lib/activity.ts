@@ -50,8 +50,13 @@ export function isKeyEvent(tool: string): tool is KeyEvent {
 const REQUESTED_BY_AGENT = /requested by the agent \((appr_[A-Za-z0-9_-]+)\)\s*$/;
 
 /** The approval id when an `agent-key.elevate` row granted an agent's own request. */
-export function requestedByAgent(row: Pick<AuditRow, "tool" | "reason">): string | undefined {
+export function requestedByAgent(
+  row: Pick<AuditRow, "tool" | "reason" | "input">,
+): string | undefined {
   if (row.tool !== "agent-key.elevate") return undefined;
+  const requestId = (row.input as { requestId?: unknown } | undefined)?.requestId;
+  if (typeof requestId === "string") return requestId;
+  // Rows from older servers only say it in the English reason.
   return REQUESTED_BY_AGENT.exec(row.reason ?? "")?.[1];
 }
 

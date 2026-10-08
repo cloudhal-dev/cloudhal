@@ -24,12 +24,23 @@ export interface Approval {
   cause?: ApprovalCause | undefined;
   /** For an `auto`-mode publish: the low-risk check that sent it to a person. */
   autoCheck?: AutoCheck | undefined;
+  /** For a granted `request_elevation`: what was granted (the approver may have shortened it). */
+  grant?: ElevationGrant | undefined;
   status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;
   decidedAt?: string | undefined;
   decidedBy?: string | undefined;
   consumedAt?: string | undefined;
+}
+
+/** The elevation a person granted for an agent's request (ADR-0016). */
+export interface ElevationGrant {
+  /** The key's own mode it was granted on top of. */
+  from: AgentMode;
+  mode: AgentMode;
+  minutes: number;
+  until: string;
 }
 
 export interface ApprovalRequest {
@@ -73,6 +84,12 @@ function parseJson(raw: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function grantOf(raw: unknown): { grant?: ElevationGrant } {
+  const result =
+    typeof raw === "string" ? (parseJson(raw) as { grant?: ElevationGrant }) : undefined;
+  return result?.grant ? { grant: result.grant } : {};
 }
 
 export class ApprovalStore {
@@ -172,11 +189,11 @@ export class ApprovalStore {
    * Marks an approved request as used when the server itself carries it out on approval (an
    * elevation request, ADR-0016) rather than the agent redeeming it.
    */
-  async complete(id: string): Promise<Approval | undefined> {
+  async complete(id: string, grant?: ElevationGrant): Promise<Approval | undefined> {
     const now = this.#now().toISOString();
     const r = await this.#sql.run(
-      "UPDATE approvals SET status = 'consumed', consumed_at = ? WHERE id = ? AND status = 'approved'",
-      [now, id],
+      "UPDATE approvals SET status = 'consumed', consumed_at = ?, result = ? WHERE id = ? AND status = 'approved'",
+      [now, grant ? JSON.stringify({ grant }) : null, id],
     );
     if (r.changes !== 1) return undefined;
     return this.get(id);
@@ -237,6 +254,7 @@ export class ApprovalStore {
       ...(r.mode ? { mode: r.mode as AgentMode } : {}),
       ...(r.cause ? { cause: r.cause as ApprovalCause } : {}),
       ...(r.auto_check ? { autoCheck: parseJson(r.auto_check as string) as AutoCheck } : {}),
+      ...grantOf(r.result),
       status: status === "pending" && (r.expires_at as string) <= now ? "expired" : status,
       createdAt: r.created_at as string,
       expiresAt: r.expires_at as string,

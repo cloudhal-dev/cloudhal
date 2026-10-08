@@ -838,6 +838,7 @@ export const en = {
       badge: "Elevation request",
       sentence: "{agent} asks to work in {mode} mode for {duration}.",
       history: "Elevation to {mode} · {duration}",
+      historyShortened: "Elevation to {mode} · {duration} (asked {asked})",
       reasonLabel: "The agent's reason",
       noReason: "The agent gave no reason.",
       untilIfNow: "If you approve now: until {time}",

@@ -843,6 +843,7 @@ export const tr: Messages = {
       badge: "Yükseltme isteği",
       sentence: "{agent}, {duration} boyunca {mode} modunda çalışmak istiyor.",
       history: "{mode} moduna yükseltme · {duration}",
+      historyShortened: "{mode} moduna yükseltme · {duration} (istenen: {asked})",
       reasonLabel: "Agent'ın gerekçesi",
       noReason: "Agent bir gerekçe belirtmedi.",
       untilIfNow: "Şimdi onaylarsan bitiş: {time}",

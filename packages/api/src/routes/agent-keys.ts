@@ -116,6 +116,7 @@ export function agentKeys(service: AgentKeyService): Hono<Env> {
           outcome: "ok",
           reason: `${updated.name ?? updated.id}: ${before.elevation.mode} → ${updated.mode} (ended early)`,
           mode: updated.mode,
+          elevation: { from: updated.mode, until: before.elevation.until },
         });
       return c.json(updated);
     })

@@ -178,6 +178,10 @@ describe("elevation requests in Approvals", () => {
         history("appr_granted", "consumed"),
         history("appr_denied", "denied", 240),
         history("appr_expired", "expired", 15),
+        {
+          ...history("appr_short", "consumed"),
+          grant: { from: "edits", mode: "auto", minutes: 15, until: "2026-10-08T10:20:00Z" },
+        },
       ],
     });
     const { container } = render(wrap(<ApprovalsPage />));
@@ -191,6 +195,11 @@ describe("elevation requests in Approvals", () => {
     const expired = await findRow(container, "appr_expired");
     expect(within(expired).getByText("Elevation to Auto · 15 min")).toBeInTheDocument();
     expect(within(expired).getByText("Expired")).toBeInTheDocument();
+    // granted shorter than asked: the time granted, and what was asked
+    const short = await findRow(container, "appr_short");
+    expect(
+      within(short).getByText("Elevation to Auto · 15 min (asked 1 hour)"),
+    ).toBeInTheDocument();
   });
 
   it("says when the key's own mode has caught up and nothing is left to grant", async () => {
@@ -334,7 +343,7 @@ describe("grant dialog", () => {
       approve: {
         status: 409,
         body: {
-          error: "conflict",
+          error: "elevation_conflict",
           message: "the agent's key no longer exists, or it is not yours",
         },
       },
@@ -355,7 +364,7 @@ describe("grant dialog", () => {
     expect(screen.getByTestId("approve-elevation")).toBeInTheDocument();
   });
 
-  it("closes when a 409 refresh shows the request was decided meanwhile", async () => {
+  it("closes when the server says the request was decided meanwhile", async () => {
     const server = approvalsServer({
       approve: {
         status: 409,

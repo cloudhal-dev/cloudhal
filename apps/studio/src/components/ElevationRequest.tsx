@@ -47,7 +47,7 @@ export function useElevationRequestText() {
   const { t, locale } = useI18n();
   const shortDuration = useShortDuration();
   return useCallback(
-    (request: Pick<Approval, "actor">, elevation: ElevationRequest) => {
+    (request: Pick<Approval, "actor" | "grant">, elevation: ElevationRequest) => {
       const agent = request.actor.name ?? request.actor.id;
       const mode = t(`agents.modes.names.${elevation.mode}`);
       return {
@@ -59,11 +59,18 @@ export function useElevationRequestText() {
           mode,
           duration: formatDuration(elevation.minutes, locale, "long"),
         }),
-        /** "Elevation to Auto · 1 hr" (History). */
-        short: t("approvals.elevation.history", {
-          mode,
-          duration: shortDuration(elevation.minutes),
-        }),
+        /** "Elevation to Auto · 1 hr" (History); what was granted, and what was asked if shorter. */
+        short:
+          request.grant && request.grant.minutes < elevation.minutes
+            ? t("approvals.elevation.historyShortened", {
+                mode,
+                duration: shortDuration(request.grant.minutes),
+                asked: shortDuration(elevation.minutes),
+              })
+            : t("approvals.elevation.history", {
+                mode,
+                duration: shortDuration(request.grant?.minutes ?? elevation.minutes),
+              }),
       };
     },
     [t, locale, shortDuration],

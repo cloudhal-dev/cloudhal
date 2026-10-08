@@ -35,6 +35,12 @@ const REQUEST: JsonSchema = {
     mode: { type: "string" },
     minutes: { type: "number" },
     reason: { type: "string" },
+    granted: {
+      type: "object",
+      additionalProperties: false,
+      properties: { minutes: { type: "number" }, until: { type: "string" } },
+      required: ["minutes", "until"],
+    },
     createdAt: { type: "string" },
     expiresAt: { type: "string" },
   },
@@ -50,6 +56,7 @@ function requestView(a: Approval) {
     ...(typeof input.mode === "string" ? { mode: input.mode } : {}),
     ...(typeof input.minutes === "number" ? { minutes: input.minutes } : {}),
     ...(typeof input.reason === "string" ? { reason: input.reason } : {}),
+    ...(a.grant ? { granted: { minutes: a.grant.minutes, until: a.grant.until } } : {}),
     createdAt: a.createdAt,
     expiresAt: a.expiresAt,
   };
@@ -200,7 +207,7 @@ export function elevationTools(): ToolDefinition[] {
             message: `You already have a pending request (${open.id}); a person decides it in Studio. Check with get_mode.`,
           };
 
-        const input = { mode, minutes, reason, keyId: ctx.principal.keyId as string };
+        const input = { mode, minutes, reason, keyId: ctx.principal.keyId as string, ownMode: own };
         const name = ctx.principal.actor.name ?? ctx.principal.actor.id;
         const request = await approvals.request({
           siteId,
