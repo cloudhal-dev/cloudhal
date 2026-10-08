@@ -33,6 +33,22 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  MenuTree,
+  type MenuTreeBlock,
+  type MenuTreeEvent,
+  type MenuTreeItem,
+  type MenuTreeLabels,
+  type MenuTreeMove,
+  type MenuTreeProps,
+  type MenuTreeRowContext,
+} from "./blocks/MenuTree.tsx";
+export {
+  NavigationPreview,
+  type NavigationPreviewItem,
+  type NavigationPreviewLabels,
+  type NavigationPreviewProps,
+} from "./blocks/NavigationPreview.tsx";
+export {
   NotificationBell,
   type NotificationBellProps,
   NotificationItem,
