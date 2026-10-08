@@ -1,4 +1,5 @@
 /** The newsroom is published the way any agent would do it: MCP tools, snapshots, human approval. */
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AuditLog } from "@cloudhal/agent-runtime";
@@ -59,7 +60,7 @@ describe("newsroom editor agent", () => {
     const files = (await readdir(path.join(ROOT, "content/posts"))).filter((f) =>
       f.endsWith(".md"),
     );
-    expect(files.length).toBeGreaterThanOrEqual(6);
+    expect(files.length).toBeGreaterThanOrEqual(7);
     for (const f of files) {
       const post = parsePost(await readFile(path.join(ROOT, "content/posts", f), "utf8"));
       expect(`${post.slug}.md`).toBe(f);
@@ -70,7 +71,11 @@ describe("newsroom editor agent", () => {
   it("writes the newsroom through MCP and publishes only after approval", async () => {
     const { store, site, audit, client, prompts } = await setup("accept");
     const r = await run(client);
-    expect(r.created).toHaveLength(6);
+    const slugs = (await readdir(path.join(ROOT, "content/posts")))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => f.replace(/\.md$/, ""))
+      .sort();
+    expect(r.created.sort()).toEqual(slugs);
     expect(r.published).toBe(true);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toMatch(/^Publish "Starter" to production/);
@@ -83,14 +88,7 @@ describe("newsroom editor agent", () => {
         .filter((p) => p.status === "published")
         .map((p) => p.slug)
         .sort(),
-    ).toEqual([
-      "agents-through-mcp",
-      "contracts-in-two-languages",
-      "offline-dev-with-astro",
-      "publishing-on-cloudflare",
-      "storage-on-sqlite-and-d1",
-      "studio-on-kumo",
-    ]);
+    ).toEqual(slugs);
     expect(posts.find((p) => p.slug === "hello-world")?.status).toBe("archived");
     const home = (await store.listPages(site.id)).find((p) => p.path === "/");
     expect(home?.title).toBe("Cloudhal Newsroom");
