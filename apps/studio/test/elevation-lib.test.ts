@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "../src/i18n/index.tsx";
+import { isKeyEvent, isKnownTool, requestedByAgent } from "../src/lib/activity.ts";
 import { KEY_MODES, modeRules } from "../src/lib/agents.ts";
+import type { Approval } from "../src/lib/api.ts";
+import {
+  elevationRequestOf,
+  grantPresets,
+  pendingElevationsByKey,
+  requestOwnMode,
+} from "../src/lib/approvals.ts";
 import {
   activeElevation,
   ELEVATION_PRESETS,
@@ -133,5 +141,89 @@ describe("custom durations", () => {
     expect(parseCustomDuration("", "minutes", bounds)).toEqual({ error: "invalid" });
     expect(parseCustomDuration("abc", "minutes", bounds)).toEqual({ error: "invalid" });
     expect(parseCustomDuration("-10", "minutes", bounds)).toEqual({ error: "invalid" });
+  });
+});
+
+describe("elevation requests (ADR-0016 addendum)", () => {
+  const request = (over: Partial<Approval> = {}): Approval => ({
+    id: "appr_1",
+    siteId: "site_1",
+    tool: "request_elevation",
+    input: { mode: "auto", minutes: 60, reason: " Launch ", keyId: "key_1" },
+    actor: { kind: "agent", id: "agent_1", name: "Desk" },
+    prompt: 'Desk asks to work in AUTO mode for 60 min (its own mode is MANUAL): "Launch"',
+    mode: "edits",
+    status: "pending",
+    createdAt: "2026-10-08T10:00:00Z",
+    expiresAt: "2026-10-09T10:00:00Z",
+    ...over,
+  });
+
+  it("reads only well-formed request_elevation inputs", () => {
+    expect(elevationRequestOf(request())).toEqual({
+      mode: "auto",
+      minutes: 60,
+      reason: "Launch",
+      keyId: "key_1",
+    });
+    expect(elevationRequestOf(request({ tool: "publish" }))).toBeUndefined();
+    expect(elevationRequestOf(request({ input: { mode: "bypass", minutes: 60 } }))).toBeUndefined();
+    expect(elevationRequestOf(request({ input: { mode: "auto" } }))).toBeUndefined();
+  });
+
+  it("takes the own mode from the key list, else the prompt, else the request's mode", () => {
+    expect(requestOwnMode(request(), [{ id: "key_1", mode: "plan" }])).toBe("plan");
+    expect(requestOwnMode(request(), [{ id: "key_other", mode: "plan" }])).toBe("manual");
+    expect(requestOwnMode(request({ prompt: "something else" }))).toBe("edits");
+    expect(requestOwnMode(request({ prompt: "x", mode: "bypass" }))).toBeUndefined();
+  });
+
+  it("offers shorter presets and the request itself, never longer", () => {
+    expect(grantPresets(60, { minMinutes: 5 })).toEqual([15, 60]);
+    expect(grantPresets(90, { minMinutes: 5 })).toEqual([15, 60, 90]);
+    expect(grantPresets(1440, { minMinutes: 5 })).toEqual([15, 60, 240, 1440]);
+    expect(grantPresets(10, { minMinutes: 5 })).toEqual([10]);
+    expect(grantPresets(240, { minMinutes: 30 })).toEqual([60, 240]);
+  });
+
+  it("maps pending requests to their keys across sites, newest first", () => {
+    const older = request({ id: "appr_old", createdAt: "2026-10-08T09:00:00Z" });
+    const newer = request({ id: "appr_new", createdAt: "2026-10-08T11:00:00Z" });
+    const done = request({
+      id: "appr_done",
+      status: "denied",
+      input: { mode: "auto", minutes: 5, keyId: "key_2" },
+    });
+    const byKey = pendingElevationsByKey([
+      { siteId: "site_a", items: [older, done] },
+      { siteId: "site_b", items: [newer] },
+      { siteId: "site_c", items: undefined },
+    ]);
+    expect([...byKey.keys()]).toEqual(["key_1"]);
+    expect(byKey.get("key_1")).toMatchObject({ siteId: "site_b", request: { id: "appr_new" } });
+  });
+
+  it("labels the new tools and key events, and finds grants made on an agent's request", () => {
+    expect(isKnownTool("request_elevation")).toBe(true);
+    expect(isKnownTool("get_mode")).toBe(true);
+    expect(isKeyEvent("agent-key.elevate")).toBe(true);
+    expect(isKeyEvent("toString")).toBe(false);
+    expect(en("tools.request_elevation")).toBe("Request elevation");
+    expect(translate("tr", "tools.get_mode")).toBe("Modu oku");
+    expect(
+      requestedByAgent({
+        tool: "agent-key.elevate",
+        reason: "Desk: edits → auto until x (60 min), requested by the agent (appr_ab12)",
+      }),
+    ).toBe("appr_ab12");
+    expect(
+      requestedByAgent({
+        tool: "agent-key.elevate",
+        reason: "Desk: edits → auto (60 min): launch",
+      }),
+    ).toBeUndefined();
+    expect(
+      requestedByAgent({ tool: "publish", reason: "requested by the agent (appr_x)" }),
+    ).toBeUndefined();
   });
 });

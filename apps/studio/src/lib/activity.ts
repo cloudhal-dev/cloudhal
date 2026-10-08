@@ -21,11 +21,38 @@ export const KNOWN_TOOLS = [
   "preview_page",
   "publish",
   "rollback",
+  "request_elevation",
+  "get_mode",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 
 export function isKnownTool(tool: string): tool is KnownTool {
   return (KNOWN_TOOLS as readonly string[]).includes(tool);
+}
+
+/**
+ * Things people do to agent keys that the audit log records next to tool calls (packages/api
+ * `routes/agent-keys.ts`, `routes/approvals.ts`), with their label key under `tools`. Only a grant
+ * that answers an agent's request carries a site, so `agent-key.elevate` is the one Activity shows.
+ */
+export const KEY_EVENTS = {
+  "agent-key.mode": "agentKeyMode",
+  "agent-key.elevate": "agentKeyElevate",
+  "agent-key.elevation-end": "agentKeyElevationEnd",
+} as const;
+export type KeyEvent = keyof typeof KEY_EVENTS;
+
+export function isKeyEvent(tool: string): tool is KeyEvent {
+  return Object.hasOwn(KEY_EVENTS, tool);
+}
+
+/** An elevation grant's audit reason ends with `requested by the agent (appr_…)` (ADR-0016). */
+const REQUESTED_BY_AGENT = /requested by the agent \((appr_[A-Za-z0-9_-]+)\)\s*$/;
+
+/** The approval id when an `agent-key.elevate` row granted an agent's own request. */
+export function requestedByAgent(row: Pick<AuditRow, "tool" | "reason">): string | undefined {
+  if (row.tool !== "agent-key.elevate") return undefined;
+  return REQUESTED_BY_AGENT.exec(row.reason ?? "")?.[1];
 }
 
 /** Badge variants (Kumo) per decision / outcome: green ran, amber waits for a human, red refused or failed. */

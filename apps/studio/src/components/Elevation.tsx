@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ownModeOf } from "../lib/agents.ts";
 import { type AgentKeyElevation, type AgentKeySummary, api } from "../lib/api.ts";
+import type { PendingElevation } from "../lib/approvals.ts";
 import {
   activeElevation,
   formatUntil,
@@ -12,6 +13,7 @@ import {
   remainingLabel,
 } from "../lib/elevation.ts";
 import { ModeBadge } from "./AgentModes.tsx";
+import { AsksForBadge } from "./ElevationRequest.tsx";
 import { useToast } from "./Toast.ts";
 
 /** Keys with an elevation in force at `now`, with that elevation. */
@@ -37,13 +39,31 @@ function useGrantedBy(): (actorId: string) => string {
  * The key list's Mode cell (DESIGN.md §2g). While an elevation runs: the elevated `ModeBadge`, an
  * outline timer badge "42 min left" whose tooltip says from which mode, until when, by whom and
  * why, and the key's own mode underneath. Otherwise just the own mode. `now` ticks from the page.
+ * When the key's agent waits for an elevation it asked for, "Asks for Auto" links to Approvals.
  */
-export function KeyModeCell({ agentKey, now }: { agentKey: AgentKeySummary; now: number }) {
+export function KeyModeCell({
+  agentKey,
+  now,
+  asks,
+}: {
+  agentKey: AgentKeySummary;
+  now: number;
+  /** The agent's pending elevation request, if any (ADR-0016 addendum). */
+  asks?: PendingElevation | undefined;
+}) {
   const { t, locale } = useI18n();
   const grantedBy = useGrantedBy();
   const own = ownModeOf(agentKey);
   const elevation = activeElevation({ mode: own, elevation: agentKey.elevation }, now);
-  if (!elevation) return <ModeBadge mode={own} />;
+  if (!elevation)
+    return asks ? (
+      <div className="grid justify-items-start gap-1.5">
+        <ModeBadge mode={own} />
+        <AsksForBadge pending={asks} />
+      </div>
+    ) : (
+      <ModeBadge mode={own} />
+    );
   const ownName = t(`agents.modes.names.${own}`);
   return (
     <div className="grid justify-items-start gap-1" data-elevated-to={elevation.mode}>
@@ -61,7 +81,15 @@ export function KeyModeCell({ agentKey, now }: { agentKey: AgentKeySummary; now:
                     who: grantedBy(elevation.grantedBy),
                   })}
                 </span>
-                {elevation.reason && <span className="text-kumo-subtle">“{elevation.reason}”</span>}
+                {elevation.reason && (
+                  <span className="text-kumo-subtle">
+                    {agentAsked(elevation.reason)
+                      ? t("agents.elevation.requestedReason", {
+                          reason: agentAsked(elevation.reason) ?? "",
+                        })
+                      : `“${elevation.reason}”`}
+                  </span>
+                )}
               </span>
             }
           >
@@ -74,8 +102,18 @@ export function KeyModeCell({ agentKey, now }: { agentKey: AgentKeySummary; now:
       <Text variant="secondary" size="xs" as="span" data-own-mode={own}>
         {t("agents.elevation.ownMode", { mode: ownName })}
       </Text>
+      {asks && <AsksForBadge pending={asks} />}
     </div>
   );
+}
+
+/**
+ * A grant made from an agent's request stores the reason as `requested by the agent: …`
+ * (packages/api routes/approvals.ts); returns the agent's own words, or undefined otherwise.
+ */
+function agentAsked(reason: string): string | undefined {
+  const m = /^requested by the agent:\s*(.*)$/s.exec(reason);
+  return m ? (m[1] ?? "").trim() || "…" : undefined;
 }
 
 /**

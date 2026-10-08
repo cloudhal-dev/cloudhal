@@ -3,7 +3,15 @@
  * wait for a person in Studio.
  */
 import type { Site, Snapshot } from "@cloudhal/core-contracts";
-import { ApiRequestError, type Approval, type ApprovalStatus } from "./api.ts";
+import { isKeyMode } from "./agents.ts";
+import {
+  type AgentKeySummary,
+  ApiRequestError,
+  type Approval,
+  type ApprovalStatus,
+  type KeyMode,
+} from "./api.ts";
+import { ELEVATION_PRESETS } from "./elevation.ts";
 
 /** How often the site surface checks for new requests (sidebar badge, overview banner). */
 export const APPROVALS_POLL_MS = 15_000;
@@ -84,4 +92,91 @@ export function publishDiffRange(
   if (!site.publishedSnapshotId) return { kind: "first" };
   if (!latest || latest.id === site.publishedSnapshotId) return { kind: "up-to-date" };
   return { kind: "range", from: site.publishedSnapshotId, to: latest.id };
+}
+
+/** The MCP tool an agent calls to ask for a time-boxed elevation (ADR-0016 addendum). */
+export const REQUEST_ELEVATION = "request_elevation";
+
+/** What an agent asked for: a mode, for how long, why, and on which of the owner's keys. */
+export interface ElevationRequest {
+  mode: KeyMode;
+  minutes: number;
+  /** The agent's own words (agent-controlled: plain text only); may be empty on odd requests. */
+  reason: string;
+  keyId: string | undefined;
+}
+
+/** The request's `input` read as an elevation request; undefined for every other approval. */
+export function elevationRequestOf(
+  request: Pick<Approval, "tool" | "input">,
+): ElevationRequest | undefined {
+  if (request.tool !== REQUEST_ELEVATION || !request.input || typeof request.input !== "object")
+    return undefined;
+  const input = request.input as Record<string, unknown>;
+  if (!isKeyMode(input.mode) || typeof input.minutes !== "number" || !(input.minutes > 0))
+    return undefined;
+  return {
+    mode: input.mode,
+    minutes: Math.round(input.minutes),
+    reason: typeof input.reason === "string" ? input.reason.trim() : "",
+    keyId: typeof input.keyId === "string" ? input.keyId : undefined,
+  };
+}
+
+export function isElevationRequest(request: Pick<Approval, "tool" | "input">): boolean {
+  return elevationRequestOf(request) !== undefined;
+}
+
+/** The server's English prompt names the key's own mode: `… (its own mode is EDITS): "…"`. */
+const OWN_MODE_IN_PROMPT = /\(its own mode is ([A-Za-z]+)\)/;
+
+/**
+ * The key's own mode when it asked, best source first: the owner's key list (current truth), the
+ * server's prompt, then the mode the agent worked in (which may itself have been an elevation).
+ */
+export function requestOwnMode(
+  request: Pick<Approval, "prompt" | "mode" | "input" | "tool">,
+  keys?: readonly Pick<AgentKeySummary, "id" | "mode">[] | undefined,
+): KeyMode | undefined {
+  const keyId = elevationRequestOf(request)?.keyId;
+  const key = keyId ? keys?.find((k) => k.id === keyId) : undefined;
+  if (key && isKeyMode(key.mode)) return key.mode;
+  const fromPrompt = OWN_MODE_IN_PROMPT.exec(request.prompt)?.[1]?.toLowerCase();
+  if (isKeyMode(fromPrompt)) return fromPrompt;
+  return isKeyMode(request.mode) ? request.mode : undefined;
+}
+
+/**
+ * One-click durations when granting a request: the standard presets shorter than what the agent
+ * asked for (and allowed by the server), then the request itself. Never longer.
+ */
+export function grantPresets(requested: number, bounds: { minMinutes: number }): number[] {
+  const shorter = ELEVATION_PRESETS.filter((m) => m < requested && m >= bounds.minMinutes);
+  return [...shorter, requested];
+}
+
+export interface PendingElevation {
+  siteId: string;
+  request: Approval;
+  elevation: ElevationRequest;
+}
+
+/**
+ * Pending elevation requests by the key they are for (one per key, the server's rule), so the
+ * key list can say "Asks for Auto". Requests from several sites are merged; the newest wins.
+ */
+export function pendingElevationsByKey(
+  bySite: ReadonlyArray<{ siteId: string; items: readonly Approval[] | undefined }>,
+): Map<string, PendingElevation> {
+  const out = new Map<string, PendingElevation>();
+  for (const { siteId, items } of bySite) {
+    for (const request of items ?? []) {
+      const elevation = request.status === "pending" ? elevationRequestOf(request) : undefined;
+      if (!elevation?.keyId) continue;
+      const seen = out.get(elevation.keyId);
+      if (!seen || seen.request.createdAt < request.createdAt)
+        out.set(elevation.keyId, { siteId, request, elevation });
+    }
+  }
+  return out;
 }

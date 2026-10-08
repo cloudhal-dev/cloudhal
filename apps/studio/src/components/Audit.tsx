@@ -1,8 +1,9 @@
 import type { Actor } from "@cloudhal/core-contracts";
-import { ActorBadge, DecisionBadge, OutcomeBadge, Text } from "@cloudhal/ui";
+import { ActorBadge, Badge, DecisionBadge, OutcomeBadge, Text, Tooltip } from "@cloudhal/ui";
+import { ArrowRight, Robot } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
-import { isKnownTool } from "../lib/activity.ts";
+import { isKeyEvent, isKnownTool, KEY_EVENTS, requestedByAgent } from "../lib/activity.ts";
 import { isAutoApproved } from "../lib/agents.ts";
 import type {
   AgentMode,
@@ -13,10 +14,21 @@ import type {
 } from "../lib/api.ts";
 import { AutoApprovedBadge, ModeBadge } from "./AgentModes.tsx";
 
-/** Human-readable label for an MCP tool name ("update_page" → "Updated page"); unknown tools pass through. */
+/**
+ * Human-readable label for an MCP tool name ("update_page" → "Update page") or a person's action
+ * on an agent key ("agent-key.elevate" → "Elevate agent key"); unknown tools pass through.
+ */
 export function useToolLabel() {
   const t = useT();
-  return useCallback((tool: string) => (isKnownTool(tool) ? t(`tools.${tool}`) : tool), [t]);
+  return useCallback(
+    (tool: string) =>
+      isKnownTool(tool)
+        ? t(`tools.${tool}`)
+        : isKeyEvent(tool)
+          ? t(`tools.${KEY_EVENTS[tool]}`)
+          : tool,
+    [t],
+  );
 }
 
 export function Decision({ decision }: { decision: AuditDecision }) {
@@ -84,17 +96,67 @@ export function ActorCell({
   );
 }
 
-/** Tool label with the raw MCP name underneath, so both people and developers can scan it. */
-export function ToolCell({ tool }: { tool: string }) {
+/**
+ * An `agent-key.elevate` event (ADR-0016): "Edits → Auto" with the timer marker, and "Requested by
+ * the agent" when the person granted an agent's own request from Approvals. Nothing otherwise.
+ */
+export function ElevationGrant({
+  row,
+}: {
+  row: Pick<AuditRow, "tool" | "reason" | "mode" | "elevation">;
+}) {
+  const t = useT();
+  if (row.tool !== "agent-key.elevate" || !row.elevation || !row.mode) return null;
+  const requested = requestedByAgent(row);
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1.5"
+      data-elevation-grant={row.mode}
+      data-requested={requested ? "true" : undefined}
+    >
+      <span className="flex items-center gap-1.5 whitespace-nowrap">
+        <ModeBadge mode={row.elevation.from} subtle />
+        <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+        <ModeBadge mode={row.mode} subtle elevation={row.elevation} />
+      </span>
+      {requested && (
+        <span className="inline-flex">
+          <Tooltip content={t("activity.requestedByAgentHint")}>
+            <Badge variant="outline" icon={<Robot />}>
+              {t("activity.requestedByAgent")}
+            </Badge>
+          </Tooltip>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tool label with the raw MCP name underneath, so both people and developers can scan it. With the
+ * audit `row`, an elevation grant also shows which mode it granted (`ElevationGrant`).
+ */
+export function ToolCell({
+  tool,
+  row,
+}: {
+  tool: string;
+  row?: Pick<AuditRow, "tool" | "reason" | "mode" | "elevation"> | undefined;
+}) {
   const label = useToolLabel();
   return (
-    <div className="grid gap-0.5">
+    <div className="grid justify-items-start gap-0.5">
       <Text bold as="span">
         {label(tool)}
       </Text>
       <Text variant="mono-secondary" as="span">
         {tool}
       </Text>
+      {row?.tool === "agent-key.elevate" && row.elevation && (
+        <span className="pt-1">
+          <ElevationGrant row={row} />
+        </span>
+      )}
     </div>
   );
 }

@@ -49,6 +49,7 @@ import { useToast } from "../components/Toast.ts";
 import { useAgentModeRules } from "../components/useAgentModeRules.ts";
 import { useNow } from "../components/useNow.ts";
 import { usePaging } from "../components/usePaging.ts";
+import { usePendingElevations } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { mcpSnippet, ownModeOf, type SnippetKind, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
@@ -246,6 +247,8 @@ export function AgentsPage() {
   const now = useNow();
   useElevationExpiry(keys.data);
   const endElevation = useEndElevation();
+  // Agents that asked for more autonomy and wait for a person (ADR-0016 addendum).
+  const asks = usePendingElevations();
 
   const revoke = useMutation({
     mutationFn: (key: AgentKeySummary) => api.agentKeys.remove(key.id),
@@ -357,7 +360,7 @@ export function AgentsPage() {
                         </div>
                       </Table.Cell>
                       <Table.Cell className="whitespace-nowrap">
-                        <KeyModeCell agentKey={k} now={now} />
+                        <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
                       </Table.Cell>
                       <Table.Cell>
                         <KeyScopes agentKey={k} />

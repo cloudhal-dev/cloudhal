@@ -211,6 +211,32 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/ActivityDetailDialog.tsx#modes": ["ModeBadge", "DecisionCell"],
   "components/RecentActivity.tsx#modes": ["DecisionCell"],
   "routes/ApprovalsPage.tsx#modes": ["ModeBadge", "isManualModeRequest"],
+  // Agents ask for an elevation (§2m, ADR-0016 addendum): own rendering, grant dialog, badges.
+  "routes/ApprovalsPage.tsx#elevation-requests": [
+    "ApproveElevationDialog",
+    "ElevationRequestCell",
+    "ElevationRequestDetails",
+    "elevationRequestOf",
+    "requestOwnMode",
+  ],
+  "components/ElevationRequest.tsx": ["ModeBadge", "Badge", "Tooltip", "Link", "Text"],
+  "components/ApproveElevationDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "AutoModeConfirm",
+    "ModeBadge",
+    "Surface",
+    "Tabs",
+    "Input",
+    "Select",
+    "Banner",
+    "useToast",
+    "grantPresets",
+  ],
+  "routes/AgentsPage.tsx#elevation-requests": ["usePendingElevations"],
+  "components/Elevation.tsx#elevation-requests": ["AsksForBadge"],
+  "components/Audit.tsx#elevation-requests": ["ElevationGrant", "requestedByAgent"],
+  "components/ActivityDetailDialog.tsx#elevation-requests": ["ElevationGrant"],
   "components/ActivityDetailDialog.tsx": ["LayerDialog", "Banner", "CodeHighlighted"],
   "components/SnapshotDiffDialog.tsx": ["LayerDialog", "Tabs", "Badge", "Table", "Empty"],
   "components/EditorLayout.tsx": ["Grid", "Tabs", "Tooltip"],
@@ -417,6 +443,25 @@ describe("design rules (DESIGN.md)", () => {
       expect(f.text, f.file).toMatch(/<AutoModeConfirm\b/);
       expect(f.text, f.file).toMatch(/needsConsent && !autoConfirmed\) return/);
     }
+  });
+
+  it("every screen that grants an agent's elevation request asks for consent before Auto", () => {
+    // Approving a request_elevation grants it on the server, so it only ever goes through the
+    // grant dialog: fixed mode, never longer than asked, Auto consent (ADR-0016 addendum).
+    const granting = uiFiles.filter((f) => /api\.approvals\.grantElevation\b/.test(f.text));
+    expect(granting.map((f) => f.file)).toEqual(["components/ApproveElevationDialog.tsx"]);
+    for (const f of granting) {
+      expect(f.text, f.file).toMatch(/<AutoModeConfirm\b/);
+      expect(f.text, f.file).toMatch(/needsConsent && !autoConfirmed\) return/);
+      expect(f.text, f.file).toMatch(/minutes > requested\) return/);
+      expect(f.text, f.file).not.toMatch(/<ModePicker\b/);
+    }
+    const page = files.find((f) => f.file === "routes/ApprovalsPage.tsx") as { text: string };
+    // An elevation request is routed to that dialog before any other approve path.
+    expect(page.text).toMatch(
+      /if \(decision === "approve" && elevationRequestOf\(request\)\) setGranting\(request\);\s*else if/,
+    );
+    expect(page.text).toMatch(/<ApproveElevationDialog\b/);
   });
 
   it("every screen that can pick Auto asks for consent first", () => {

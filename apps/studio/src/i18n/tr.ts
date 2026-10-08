@@ -405,6 +405,7 @@ export const tr: Messages = {
       left: "{time} kaldı",
       ownMode: "Kendi modu: {mode}",
       tooltip: "{who} tarafından {from} modundan yükseltildi, bitiş: {time}",
+      requestedReason: "Agent istedi: “{reason}”",
       byYou: "Senin",
       temporary: "Geçici olarak yükseltilmiş",
       marker: "Geçici olarak {from} modundan yükseltildi, bitiş: {time}",
@@ -526,6 +527,9 @@ export const tr: Messages = {
       elevation: "Yükseltme",
       elevationHint:
         "Anahtarın kendi modu {from}. Sahibi bir süreliğine daha fazla bağımsızlık tanıdı; yükseltme bitince anahtar yeniden {from} modunda çalışır.",
+      elevationGranted: "Verilen yükseltme",
+      elevationGrantedUntil: "{mode} modu (bitiş: {time}). Ardından yeniden {from} moduna döner.",
+      requestedByAgent: "Agent'ın isteğine yanıt",
     },
     autoApproved: "Otomatik onaylandı",
     autoApprovedHint:
@@ -536,6 +540,8 @@ export const tr: Messages = {
       "Agent Otomatik modda çalışıyor ve bu yayın yalnızca makale ekledi ya da düzenledi. Snapshot'lar ekranından geri alabilirsin.",
     autoApprovedDescriptionCount:
       "Agent Otomatik modda çalışıyor ve bu yayın yalnızca makale ekledi ya da düzenledi (toplam {count}). Snapshot'lar ekranından geri alabilirsin.",
+    requestedByAgent: "Agent istedi",
+    requestedByAgentHint: "Bu yükseltmeyi agent istedi; bir kişi Onaylar ekranında verdi.",
     recent: "Son etkinlikler",
     recentEmpty: "Henüz agent etkinliği yok",
     recentEmptyDescription: "Bir agent bağla, araç çağrıları burada görünsün.",
@@ -653,6 +659,7 @@ export const tr: Messages = {
         previewLinks: "Önizleme bağlantıları",
         deployTransfer: "Dağıtım ve aktarım",
         approvals: "Studio'da onaylar",
+        elevationRequests: "Yükseltme istekleri",
       },
       featureHints: {
         agentKeys: "Agent'lar ve CI işleri oluşturduğun anahtarlarla giriş yapar.",
@@ -662,6 +669,8 @@ export const tr: Messages = {
         deployTransfer: "cloudhal push ve pull bu sunucuya ulaşabilir.",
         approvals:
           "Ajanların yayınlama, geri alma ve silme istekleri burada bir kişinin kararını bekler.",
+        elevationRequests:
+          "Agent'lar bir süreliğine daha bağımsız bir mod isteyebilir; bir kişi bunu Onaylar ekranında verir.",
       },
     },
   },
@@ -824,12 +833,48 @@ export const tr: Messages = {
     title: "Onaylar",
     views: { activity: "Etkinlik", approvals: "Onaylar" },
     description:
-      "Agent'ların yayınlama, geri alma ve silme istekleri, Manuel moddaki agent'ların ise tüm değişiklikleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir.",
+      "Agent'ların yayınlama, geri alma ve silme istekleri, daha fazla bağımsızlık istekleri ve Manuel moddaki agent'ların tüm değişiklikleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir ya da istediği yükseltmeyi verir.",
     pending: "Seni bekleyenler",
     history: "Geçmiş",
     noPending: "Seni bekleyen bir şey yok",
     noPendingDescription:
-      "Bir agent yayınlamak, geri almak ya da silmek istediğinde ya da Manuel moddaki bir agent bir şeyi değiştirmek istediğinde isteği burada görünür ve agent senin kararını bekler.",
+      "Bir agent yayınlamak, geri almak, silmek ya da bir süreliğine daha bağımsız bir modda çalışmak istediğinde ya da Manuel moddaki bir agent bir şeyi değiştirmek istediğinde isteği burada görünür ve agent senin kararını bekler.",
+    elevation: {
+      badge: "Yükseltme isteği",
+      sentence: "{agent}, {duration} boyunca {mode} modunda çalışmak istiyor.",
+      history: "{mode} moduna yükseltme · {duration}",
+      reasonLabel: "Agent'ın gerekçesi",
+      noReason: "Agent bir gerekçe belirtmedi.",
+      untilIfNow: "Şimdi onaylarsan bitiş: {time}",
+      hint: "Onaylarsan yükseltme agent'ın anahtarına seçtiğin süre için verilir; süre dolunca anahtar kendi moduna kendiliğinden döner. Sitede hiçbir şey değişmez.",
+      granted: "Verildi",
+      cannotTake:
+        "{agent} anahtarının kendi modu artık {own}; verilecek bir şey yok. Agent'a bildirmek için isteği reddet.",
+      title: "{agent} {mode} moduna yükseltilsin mi?",
+      description: "İsteği {agent} gönderdi. Süreyi kısaltabilirsin, uzatamazsın.",
+      mode: "Mod",
+      modeFixed:
+        "İstendiği gibi. Başka bir mod vermek için bu isteği reddet ve anahtarı Agent'lar sayfasından yükselt.",
+      presetHours: "{count} sa",
+      presetMinutes: "{count} dk",
+      requested: "İstenen süre: {duration}. Daha kısası olur, daha uzunu olmaz.",
+      summary:
+        "{agent} {mode} modunda çalışır (bitiş: {time}). Ardından yeniden {from} moduna döner.",
+      summaryNoOwn: "{agent} {mode} modunda çalışır (bitiş: {time}). Ardından kendi moduna döner.",
+      nextCall:
+        "Agent'ın bir sonraki çağrısında geçerli olur. Agent'lar sayfasından erkenden bitirebilirsin.",
+      submit: "Yükseltmeyi ver",
+      failed: "Yükseltme verilemedi",
+      stillPending:
+        "İstek beklemede kaldıkça listede durur. Reddedebilir ya da anahtar uygun olduğunda verebilirsin.",
+      done: "Yükseltme verildi",
+      doneDescription:
+        "{agent} artık {mode} modunda çalışıyor (bitiş: {time}). Ardından yeniden {from} moduna döner.",
+      doneDescriptionNoOwn: "{agent} artık {mode} modunda çalışıyor (bitiş: {time}).",
+      asksFor: "{mode} modu istiyor",
+      asksForTooltip:
+        "{agent}, {duration} boyunca {mode} modunda çalışmak istiyor. Karar vermek için Onaylar'ı aç.",
+    },
     manualPrompt:
       "{agent} Manuel modda çalışıyor, bu yüzden bu değişiklik senin onayını bekliyor: {tool}.",
     manualPromptShort: "Manuel mod: {tool}",
@@ -925,6 +970,11 @@ export const tr: Messages = {
     preview_page: "Sayfayı önizle",
     publish: "Siteyi yayınla",
     rollback: "Siteyi geri al",
+    request_elevation: "Yükseltme iste",
+    get_mode: "Modu oku",
+    agentKeyMode: "Agent anahtarının modunu değiştir",
+    agentKeyElevate: "Agent anahtarını yükselt",
+    agentKeyElevationEnd: "Yükseltmeyi bitir",
   },
   preview: {
     title: "Önizleme",

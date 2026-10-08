@@ -209,7 +209,7 @@ export function ActivityPage() {
                     className="cursor-pointer hover:bg-kumo-tint"
                   >
                     <Table.Cell className="whitespace-nowrap">
-                      <ToolCell tool={r.tool} />
+                      <ToolCell tool={r.tool} row={r} />
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       <DecisionCell row={r} />

@@ -186,6 +186,8 @@ export interface InstanceInfo {
     deployTransfer: boolean;
     /** Agents' gated calls wait for a person in Studio (ADR-0014). Older servers omit it. */
     approvals?: boolean;
+    /** Agents can ask for a time-boxed elevation; a person grants it in Approvals (ADR-0016). */
+    elevationRequests?: boolean;
   };
   /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
   agentModes?: AgentModesInfo;
@@ -292,6 +294,18 @@ export const api = {
       request<Approval>(
         `/api/sites/${encodeURIComponent(siteId)}/approvals/${encodeURIComponent(id)}/${decision}`,
         { method: "POST" },
+      ),
+    /**
+     * Approves an agent's `request_elevation` (ADR-0016 addendum): the server grants the elevation
+     * on the agent's key with the approver's rights and answers with the request `consumed`.
+     * `minutes` may shorten the request (400 when it would extend it) and is sent only when given.
+     * 409 when the request is no longer pending, or the key is gone, not yours or can no longer
+     * take it (the request then stays pending).
+     */
+    grantElevation: (siteId: string, id: string, minutes?: number) =>
+      request<Approval>(
+        `/api/sites/${encodeURIComponent(siteId)}/approvals/${encodeURIComponent(id)}/approve`,
+        { method: "POST", ...(minutes === undefined ? {} : json({ minutes })) },
       ),
   },
   previewLinks: {
