@@ -189,6 +189,7 @@ describe("instance and skills", () => {
         deployTransfer: false,
         approvals: false,
         elevationRequests: false,
+        members: false,
       },
       agentModes: {
         modes: ["plan", "manual", "edits", "auto"],
@@ -222,6 +223,23 @@ describe("instance and skills", () => {
         },
         autoPublishLimit: 20,
         elevation: { minMinutes: 5, maxMinutes: 1440, noticeMinutes: 10 },
+      },
+      roles: expect.objectContaining({
+        names: ["owner", "administrator", "editor", "author", "contributor"],
+        modeCaps: {
+          owner: "auto",
+          administrator: "auto",
+          editor: "auto",
+          author: "auto",
+          contributor: "edits",
+        },
+      }),
+      invites: {
+        defaultHours: 168,
+        minHours: 1,
+        maxHours: 336,
+        adminMaxHours: 72,
+        delivery: ["link"],
       },
     });
     const skills = (await (

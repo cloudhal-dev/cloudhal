@@ -1,8 +1,16 @@
-import type { ApprovalStore, AuditLog, LoadedSkill, Principal } from "@cloudhal/agent-runtime";
+import type {
+  ApprovalStore,
+  AuditLog,
+  LoadedSkill,
+  OwnershipResolver,
+  PolicyEngine,
+  Principal,
+} from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { Context } from "hono";
-import type { AgentKeyService } from "./auth.ts";
+import type { AgentKeyService, StaffService } from "./auth.ts";
+import type { MailSender } from "./mail.ts";
 
 /** Resolves who is calling: a session cookie, an API key, … Returns undefined for anonymous. */
 export type ActorResolver = (c: Context) => Promise<Actor | undefined>;
@@ -57,6 +65,16 @@ export interface ApiDeps {
   readonly requireAuth?: boolean;
   /** Clock for time-based answers such as `/api/notifications` (tests). */
   readonly now?: () => Date;
+  /**
+   * Staff roles and invites (RFC-0005), from `createAuth(...).staff`. When present, a person's
+   * scopes come from their membership role and `/api/members`, `/api/invites` and
+   * `/api/password-reset` are mounted; when absent (auth-less servers, tests) every person is `*`.
+   */
+  readonly staff?: StaffService;
+  /** Optional email delivery for invites (RFC-0005 §7.2). */
+  readonly mail?: MailSender;
+  /** Origin of the Studio that serves `/invite` and `/reset-password` (default: the request's). */
+  readonly studioOrigin?: string;
 }
 
 export type Env = {
@@ -70,5 +88,13 @@ export type Env = {
     approvals: ApprovalStore | undefined;
     /** Grants an agent's elevation request when a person approves it (ADR-0016). */
     agentKeys: AgentKeyService | undefined;
+    /** Membership (RFC-0005); undefined without a membership source. */
+    staff: StaffService | undefined;
+    /** Who owns what (the person behind an agent). */
+    ownership: OwnershipResolver;
+    /** The MCP tools' policies, for "could the approver make this call?" (RFC-0005 §6). */
+    policy: () => PolicyEngine;
+    mail: MailSender | undefined;
+    now: () => Date;
   };
 };

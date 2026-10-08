@@ -108,6 +108,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       // and its construction does no I/O.
       const auth: CloudhalAuth = createAuth({
         database: env.DB,
+        sql,
         baseURL: url.origin,
         secret: required(env, "BETTER_AUTH_SECRET"),
         signUp:
@@ -125,6 +126,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         resolvePrincipal: auth.resolvePrincipal,
         authHandler: auth.handler,
         agentKeys: auth.agentKeys,
+        staff: auth.staff,
         signUp: auth.signUp,
         audit,
         mcp: {

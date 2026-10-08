@@ -3,7 +3,13 @@
  * unchanged on Node (behind the Hono API) and on Cloudflare Workers. The caller authenticates the
  * request and hands over the resolved `Principal`; this module never reads credentials itself.
  */
-import type { ApprovalStore, AuditLog, LoadedSkill, Principal } from "@cloudhal/agent-runtime";
+import type {
+  ApprovalStore,
+  AuditLog,
+  LoadedSkill,
+  OwnershipResolver,
+  Principal,
+} from "@cloudhal/agent-runtime";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import { createCloudhalMcpServer } from "./server.ts";
@@ -21,6 +27,8 @@ export interface HttpOptions {
   confirmTokenFallback?: boolean | undefined;
   /** Out-of-band approvals: agents' gated calls wait for a person in Studio (ADR-0014). */
   approvals?: ApprovalStore | undefined;
+  /** Who owns what: the person behind an agent's key (RFC-0005 §4). */
+  ownership?: OwnershipResolver | undefined;
   /** `"reject"` refuses 2025-era clients (strict, ADR-0004); default serves them statelessly. */
   legacy?: "stateless" | "reject" | undefined;
   onerror?: ((error: Error) => void) | undefined;
@@ -48,6 +56,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,
         approvals: options.approvals,
+        ownership: options.ownership,
       });
     },
     {

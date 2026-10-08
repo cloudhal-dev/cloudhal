@@ -1,4 +1,5 @@
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import type { SqlDriver } from "@cloudhal/storage";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -10,7 +11,12 @@ import { createAuth } from "../src/auth.ts";
 
 interface Backend {
   label: string;
-  setup(): Promise<{ store: SiteGraphStore; database: unknown; dispose?(): Promise<void> }>;
+  setup(): Promise<{
+    store: SiteGraphStore;
+    database: unknown;
+    sql: SqlDriver;
+    dispose?(): Promise<void>;
+  }>;
 }
 
 const backends: Backend[] = [
@@ -18,35 +24,40 @@ const backends: Backend[] = [
     label: "better-sqlite3",
     async setup() {
       const db = new Database(":memory:");
-      const store = new SiteGraphStore({
-        sql: new BetterSqlite3Driver(db),
-        blobs: new MemoryBlobStore(),
-      });
+      const sql = new BetterSqlite3Driver(db);
+      const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
       await store.init();
-      return { store, database: db };
+      return { store, database: db, sql };
     },
   },
   {
     label: "Cloudflare D1 (Miniflare)",
     async setup() {
       const h = await createMiniflareD1();
-      const store = new SiteGraphStore({ sql: new D1Driver(h.db), blobs: new MemoryBlobStore() });
+      const sql = new D1Driver(h.db);
+      const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
       await store.init();
-      return { store, database: h.db, dispose: () => h.dispose() };
+      return { store, database: h.db, sql, dispose: () => h.dispose() };
     },
   },
 ];
 
 for (const backend of backends) {
   describe(`auth on ${backend.label}`, async () => {
-    const { store, database, dispose } = await backend.setup();
+    const { store, database, sql, dispose } = await backend.setup();
     const siteId = (await seedStarterSite(store, { name: "Auth Site", slug: "auth-site" })).id;
     const auth = createAuth({
       database,
+      sql,
       baseURL: "http://localhost",
       secret: "test-secret-test-secret-test-secret",
     });
-    const app = createApi({ store, resolveActor: auth.resolveActor, authHandler: auth.handler });
+    const app = createApi({
+      store,
+      resolvePrincipal: auth.resolvePrincipal,
+      authHandler: auth.handler,
+      staff: auth.staff,
+    });
 
     afterAll(async () => {
       await dispose?.();
@@ -120,19 +131,23 @@ describe("sign-up policy", () => {
     });
   const make = async (signUpMode?: "first-user" | "closed" | "open", setupToken?: string) => {
     const db = new Database(":memory:");
-    const store = new SiteGraphStore({
-      sql: new BetterSqlite3Driver(db),
-      blobs: new MemoryBlobStore(),
-    });
+    const sql = new BetterSqlite3Driver(db);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
     await store.init();
     const auth = createAuth({
       database: db,
+      sql,
       baseURL: "http://localhost",
       secret: "test-secret-test-secret-test-secret",
       ...(signUpMode ? { signUp: signUpMode } : {}),
       ...(setupToken ? { setupToken } : {}),
     });
-    return createApi({ store, resolveActor: auth.resolveActor, authHandler: auth.handler });
+    return createApi({
+      store,
+      resolvePrincipal: auth.resolvePrincipal,
+      authHandler: auth.handler,
+      staff: auth.staff,
+    });
   };
 
   it("by default only the first account (the owner) can sign up", async () => {

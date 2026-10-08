@@ -278,5 +278,45 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     expect(activity.items.find((a) => a.tool === "create_entry")?.actor.name).toBe(
       "newsroom-agent",
     );
+
+    // RFC-0005 on workerd: the owner invites a Contributor; the link's token travels in the
+    // fragment and in a POST body; accepting creates the account (sign-up stays closed).
+    const invite = await adminFetch("/api/invites", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, ...browser },
+      body: JSON.stringify({ email: "writer@example.com", role: "contributor" }),
+    });
+    expect(invite.status, await invite.clone().text()).toBe(201);
+    const { url } = (await invite.json()) as { url: string };
+    expect(url).toMatch(/^https:\/\/admin\.example\/invite#chinv_[A-Za-z0-9_-]{43}$/);
+    const token = url.split("#")[1] as string;
+    const accepted = await adminFetch("/api/invites/accept", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...browser },
+      body: JSON.stringify({
+        token,
+        name: "Wren Writer",
+        password: "correct horse battery staple",
+      }),
+    });
+    expect(accepted.status, await accepted.clone().text()).toBe(200);
+    const writer = (accepted.headers.get("set-cookie") ?? "").split(";")[0] as string;
+    const me = (await (await adminFetch("/api/me", { headers: { cookie: writer } })).json()) as {
+      role: string;
+    };
+    expect(me.role).toBe("contributor");
+    // a Contributor writes drafts but cannot publish or change pages
+    const publish = await adminFetch(`/api/sites/${siteId}/snapshots`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: writer, ...browser },
+      body: JSON.stringify({ publish: true }),
+    });
+    expect(publish.status).toBe(403);
+    const replay = await adminFetch("/api/invites/accept", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...browser },
+      body: JSON.stringify({ token, name: "Again", password: "correct horse battery staple" }),
+    });
+    expect(replay.status).toBe(410);
   });
 });

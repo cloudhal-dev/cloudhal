@@ -1,8 +1,9 @@
+import { holds, termCreation } from "@cloudhal/agent-runtime";
 import type { Taxonomy, Term } from "@cloudhal/core-contracts";
 import { foldName, type GovernanceResult, type TermUsage } from "@cloudhal/core-ts";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
-import { badRequest, notFound } from "../errors.ts";
+import { badRequest, missingScope, notFound } from "../errors.ts";
 import { type PreviewOp, previewGovernance, requireSite, snapshotAfter } from "../governance.ts";
 import { param } from "../params.ts";
 
@@ -115,13 +116,25 @@ export const terms: Hono<Env> = new Hono<Env>()
     const { reclaim, ...input } = (await c.req.json()) as TermInput & { reclaim?: boolean };
     const tax = await c.get("store").getTaxonomy(input.taxonomyId);
     if (!tax || tax.siteId !== site.id) throw notFound("taxonomy not found");
-    // People create active, public terms unless they say otherwise (RFC-0002 §6.4).
+    // People create active, public terms unless they say otherwise (RFC-0002 §6.4). Contributors
+    // and Authors propose terms like agents do; categories and active terms are an Editor's
+    // (RFC-0005 §10.1).
+    const principal = c.get("principal");
+    let status: Term["status"] = input.status ?? "active";
+    if (principal && !holds(principal.scopes, "site:write")) {
+      const rule = termCreation(principal, tax.allowNewTerms);
+      if (!rule.allowed) throw missingScope("site:write", rule.reason);
+      if (reclaim === true) throw missingScope("site:write", "reclaiming a slug needs an Editor");
+      status = rule.status;
+    }
+    const proposer = status === "proposed" && principal ? { proposedBy: principal.actor } : {};
     const term = await c.get("store").createTerm(
       {
         ...input,
-        status: input.status ?? "active",
+        status,
         visibility: input.visibility ?? "public",
         siteId: site.id,
+        ...proposer,
       },
       { reclaim: reclaim === true },
     );

@@ -3,14 +3,23 @@
  * `/api/skills` — the skills agents see over MCP. Both require a signed-in user.
  */
 import {
+  ABILITIES,
   type AgentMode,
   AUTO_PUBLISH_LIMIT,
   DEFAULT_AGENT_MODE,
   ELEVATION_MAX_MINUTES,
   ELEVATION_MIN_MINUTES,
   ELEVATION_NOTICE_MINUTES,
+  INVITE_ADMIN_MAX_HOURS,
+  INVITE_DEFAULT_HOURS,
+  INVITE_MAX_HOURS,
+  INVITE_MIN_HOURS,
   type LoadedSkill,
+  MODE_CAPS,
   REMOTE_AGENT_MODES,
+  ROLES,
+  type Role,
+  roleScopes,
   type Scope,
   scopesForMode,
 } from "@cloudhal/agent-runtime";
@@ -28,9 +37,54 @@ export interface InstanceInfo {
     approvals: boolean;
     /** Agents can ask for a time-boxed elevation; a person grants it in Approvals (ADR-0016). */
     elevationRequests: boolean;
+    /** Staff roles, members and invites (RFC-0005). */
+    members: boolean;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;
+  /** The server's role rules (RFC-0005 §10.1), so Studio applies them instead of copying them. */
+  roles: RolesInfo;
+  /** Invite rules (RFC-0005 §7). */
+  invites: InvitesInfo;
+}
+
+export interface RolesInfo {
+  /** Highest rank first. */
+  names: Role[];
+  scopes: Record<Role, Scope[]>;
+  /** The most autonomous mode a role's keys may hold. */
+  modeCaps: Record<Role, AgentMode>;
+  /** Ability → the scope it needs (`owner`: the Owner only). */
+  abilities: typeof ABILITIES;
+}
+
+export interface InvitesInfo {
+  defaultHours: number;
+  minHours: number;
+  maxHours: number;
+  /** Administrator invites expire sooner. */
+  adminMaxHours: number;
+  /** `["link"]`, or `["link", "email"]` with a mail sender. */
+  delivery: ("link" | "email")[];
+}
+
+export function rolesInfo(): RolesInfo {
+  return {
+    names: [...ROLES],
+    scopes: Object.fromEntries(ROLES.map((r) => [r, roleScopes(r)])) as Record<Role, Scope[]>,
+    modeCaps: { ...MODE_CAPS },
+    abilities: ABILITIES,
+  };
+}
+
+export function invitesInfo(email: boolean): InvitesInfo {
+  return {
+    defaultHours: INVITE_DEFAULT_HOURS,
+    minHours: INVITE_MIN_HOURS,
+    maxHours: INVITE_MAX_HOURS,
+    adminMaxHours: INVITE_ADMIN_MAX_HOURS,
+    delivery: email ? ["link", "email"] : ["link"],
+  };
 }
 
 export interface AgentModesInfo {

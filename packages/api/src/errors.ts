@@ -1,3 +1,4 @@
+import { OwnLimitError } from "@cloudhal/agent-runtime";
 import { ContractValidationError } from "@cloudhal/core-contracts";
 import {
   ConflictError,
@@ -50,7 +51,12 @@ const PLUS_HINT = "In a query string, send '+' as %2B; a bare '+' arrives as a s
 export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof HTTPException) return err.getResponse();
   if (err instanceof AuthError)
-    return c.json<ApiErrorBody>({ error: "auth", message: err.message }, 400);
+    return c.json<ApiErrorBody>({ error: err.code, message: err.message }, err.status);
+  if (err instanceof OwnLimitError)
+    return c.json<ApiErrorBody>(
+      { error: "not_own", message: err.message, details: { code: err.code } },
+      403,
+    );
   if (err instanceof ContractValidationError) {
     return c.json<ApiErrorBody>(
       { error: "validation", message: err.message, details: err.errors },
@@ -117,5 +123,27 @@ export function badRequest(message: string): HTTPException {
 export function unauthorized(): HTTPException {
   return new HTTPException(401, {
     res: Response.json({ error: "unauthorized", message: "sign in required" }, { status: 401 }),
+  });
+}
+
+/** A JSON error with any status (RFC-0005 codes: `missing_scope`, `rank`, `invite_gone`, …). */
+export function apiError(
+  status: 400 | 401 | 403 | 404 | 409 | 410 | 415 | 429,
+  error: string,
+  message: string,
+  details?: unknown,
+): HTTPException {
+  return new HTTPException(status, {
+    res: Response.json(
+      { error, message, ...(details === undefined ? {} : { details }) },
+      { status },
+    ),
+  });
+}
+
+/** 403 for a person whose role lacks `scope`. */
+export function missingScope(scope: string, message?: string): HTTPException {
+  return apiError(403, "missing_scope", message ?? `your role does not include ${scope}`, {
+    scope,
   });
 }

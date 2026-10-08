@@ -2,8 +2,17 @@
  * What every tool module shares: the SDK-independent tool shape, the call context, `ToolError` and
  * the mapping of store errors to it (stable codes, actionable text), and small schema/prompt helpers.
  */
-import type { ApprovalStore, Principal, Scope, ToolAnnotations } from "@cloudhal/agent-runtime";
-import type { Site, Snapshot } from "@cloudhal/core-contracts";
+import {
+  type ApprovalStore,
+  checkEntryLimit,
+  type OwnershipResolver,
+  type OwnLimit,
+  OwnLimitError,
+  type Principal,
+  type Scope,
+  type ToolAnnotations,
+} from "@cloudhal/agent-runtime";
+import type { ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { InvariantCode, SiteGraphStore } from "@cloudhal/core-ts";
 import {
   ConflictError,
@@ -32,6 +41,12 @@ export interface ToolDefinition {
    * that cannot succeed never waits for a person; a throw is audited as a denial.
    */
   precheck?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<void>;
+  /**
+   * The own variants of the tool's scope satisfy it with a limit (RFC-0005 §9): `entry` — the
+   * handler (and `precheck`) check the target with `entryLimitCheck`; `changeset` — `runTool`
+   * checks that a publish is own-only.
+   */
+  own?: "entry" | "changeset";
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
 }
 
@@ -51,6 +66,47 @@ export interface ToolContext {
    * governance operation's id and counts). It lands in the audit row's `input.effect`.
    */
   report?: ((effect: Record<string, unknown>) => void) | undefined;
+  /** Who owns what: the person behind an agent (RFC-0005 §4). */
+  ownership?: OwnershipResolver | undefined;
+  /** Set by `runTool`: the own limit this call runs under (absent = full scope). */
+  limit?: OwnLimit | undefined;
+}
+
+/**
+ * Without a membership source an agent owns what it wrote itself (local stdio with own-limited
+ * scopes); people are themselves; the system owns nothing.
+ */
+export const ACTOR_OWNERSHIP: OwnershipResolver = {
+  async personOf(actor) {
+    return actor.kind === "system" ? undefined : actor.id;
+  },
+};
+
+/** The person a call is measured against for "own" (RFC-0005 §4). */
+export function callerPerson(ctx: ToolContext): string {
+  return ctx.principal.person?.id ?? ctx.principal.actor.id;
+}
+
+/** Checks an entry write against the call's own limit (I9); refusals are `denied`. */
+export async function entryLimitCheck(
+  ctx: ToolContext,
+  op: "create" | "update" | "delete",
+  stored: ContentEntry | undefined,
+  next?: Pick<ContentEntry, "author" | "status"> & { publishedAt?: string | undefined },
+): Promise<void> {
+  try {
+    await checkEntryLimit({
+      limit: ctx.limit,
+      op,
+      person: callerPerson(ctx),
+      owner: ctx.ownership ?? ACTOR_OWNERSHIP,
+      stored,
+      next,
+    });
+  } catch (e) {
+    if (e instanceof OwnLimitError) throw new ToolError("denied", e.message, { code: e.code });
+    throw e;
+  }
 }
 
 /** Stable error codes agents can branch on; the text says what to do next. */

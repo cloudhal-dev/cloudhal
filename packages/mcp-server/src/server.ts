@@ -19,6 +19,7 @@ import {
   type AuditLog,
   effectiveMode,
   type LoadedSkill,
+  type OwnershipResolver,
   PolicyEngine,
   type Principal,
 } from "@cloudhal/agent-runtime";
@@ -62,6 +63,11 @@ export interface CloudhalMcpOptions {
    * Without it (local stdio), the approval question goes to the MCP client (elicitation).
    */
   approvals?: ApprovalStore | undefined;
+  /**
+   * Who owns what (RFC-0005 §4): the person behind an agent. Without it an agent owns what it wrote
+   * itself (local stdio).
+   */
+  ownership?: OwnershipResolver | undefined;
   /**
    * Hand a `confirmToken` to clients that cannot elicit. Default false: the token reaches the
    * agent, so an agent could approve itself (security review H1). Local use only, opt-in.
@@ -130,6 +136,31 @@ const MODE_TEXT: Record<AgentMode, string> = {
     "You are in BYPASS mode on a local project: nothing waits for approval. Be careful — this is the developer's own machine and data.",
 };
 
+const ROLE_NAME: Record<string, string> = {
+  owner: "Owner",
+  administrator: "Administrator",
+  editor: "Editor",
+  author: "Author",
+  contributor: "Contributor",
+};
+
+/** Whose key it is and what that means (RFC-0005 §10.2). */
+function personInstructions(principal: Principal): string {
+  const person = principal.person;
+  if (!person) return "";
+  const role = ROLE_NAME[person.role] ?? person.role;
+  const who = `${person.name ? `${person.name}, ` : ""}${role}`;
+  const limits =
+    person.role === "contributor"
+      ? " Your articles stay drafts or go to review; an Editor publishes them."
+      : person.role === "author"
+        ? " You change only articles by this person (or their agents); a publish that carries anyone else's work, pages, terms or redirects waits for an Editor."
+        : "";
+  return principal.actor.kind === "agent"
+    ? `\nThis key belongs to ${who}: you can do at most what they can.${limits} get_mode lists your effective scopes.`
+    : `\nYou are acting for ${who}.${limits}`;
+}
+
 function modeInstructions(principal: Principal): string {
   const mode = effectiveMode(principal);
   if (!mode) return "You are acting for a signed-in person.";
@@ -171,7 +202,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
     },
     {
       capabilities: { tools: {}, resources: {} },
-      instructions: `${INSTRUCTIONS}\n\n${modeInstructions(options.principal)}`,
+      instructions: `${INSTRUCTIONS}\n\n${modeInstructions(options.principal)}${personInstructions(options.principal)}`,
       requestState: { verify: codec.verify },
     },
   );
@@ -263,6 +294,8 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
 
         // Round 2 of an approval: the client echoed our elicitation answer + signed state.
         let confirmed = false;
+        // A redeemed out-of-band approval: someone who could make the full call decided it.
+        let approved = false;
         const answer = inputResponse(ctx.mcpReq.inputResponses, "approval");
         if (answer.kind !== "missing") {
           if (answer.kind !== "elicit") return errorResult("unexpected input response kind");
@@ -302,6 +335,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           if (!redeemed.ok)
             return errorResult(`approval ${approvalId}: ${REDEEM_MESSAGES[redeemed.reason]}`);
           confirmed = true;
+          approved = true;
         } else if (confirmToken !== undefined) {
           if (!fallback) return errorResult("confirmToken is not accepted on this server");
           if (typeof confirmToken !== "string") return errorResult("confirmToken must be a string");
@@ -325,10 +359,16 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           now: options.now,
           previewBaseUrl: options.previewBaseUrl,
           previewSecret: options.previewSecret,
+          ownership: options.ownership,
         };
         let outcome: Awaited<ReturnType<typeof runTool>>;
         try {
-          outcome = await runTool(def, args, toolCtx, { policy, audit: options.audit, confirmed });
+          outcome = await runTool(def, args, toolCtx, {
+            policy,
+            audit: options.audit,
+            confirmed,
+            approved,
+          });
         } catch (e) {
           if (e instanceof ToolError) return errorResult(`${e.code}: ${e.message}`);
           throw e;
@@ -337,8 +377,15 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           return errorResult(`denied: ${outcome.decision.reason}`);
         if (outcome.decision.kind === "approval-required") {
           const prompt = outcome.approvalPrompt ?? outcome.decision.reason;
+          // A call beyond the caller's role (cause `role`) is decided by someone else, never in
+          // the caller's own client (RFC-0005 §10.2).
+          const role = outcome.decision.cause === "role";
+          if (role && !options.approvals)
+            return errorResult(
+              `denied: ${outcome.decision.reason}. Ask someone whose role allows it (an Editor).`,
+            );
           // Agents with their own credentials never answer for a person: the request waits in Studio.
-          if (options.approvals && principal.actor.kind === "agent") {
+          if (options.approvals && (principal.actor.kind === "agent" || role)) {
             const pending = await options.approvals.request({
               siteId,
               tool: def.name,
@@ -351,6 +398,11 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
               cause: outcome.decision.cause,
               ...(outcome.autoCheck ? { autoCheck: outcome.autoCheck } : {}),
             });
+            // A person's own request is carried out when someone approves it (RFC-0005 §6).
+            if (principal.actor.kind !== "agent")
+              return errorResult(
+                `approval pending: ${outcome.decision.reason}\nRequest ${pending.id} waits in Cloudhal Studio (site → Activity → Approvals) for someone whose role allows it; approving it runs ${def.name} for you. It expires ${pending.expiresAt}.\napprovalId: ${pending.id}`,
+              );
             return errorResult(
               `approval pending: ${prompt}\nA person must approve request ${pending.id} in Cloudhal Studio (site → Activity → Approvals). After it is approved, call ${def.name} again with the same arguments plus approvalId "${pending.id}". It expires ${pending.expiresAt}.\napprovalId: ${pending.id}`,
             );

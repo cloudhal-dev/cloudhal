@@ -1,8 +1,10 @@
-import type { ContentEntry, NodeRef, Snapshot } from "@cloudhal/core-contracts";
+import { type Approval, describeOwnOnly, holds } from "@cloudhal/agent-runtime";
+import type { ContentEntry, NodeRef, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, SnapshotDiff } from "@cloudhal/core-ts";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
-import { badRequest, notFound } from "../errors.ts";
+import { badRequest, missingScope, notFound } from "../errors.ts";
+import { fileRoleRequest, ownOnlySnapshot, personOf, publishesAnything } from "../own.ts";
 import { param } from "../params.ts";
 
 const REASONS = new Set<Snapshot["reason"]>([
@@ -62,6 +64,28 @@ async function assignmentDeltas(
   return out;
 }
 
+/**
+ * Publishes `snapshotId` when the caller may (full `site:publish`, or an own-only change set for
+ * `site:publish:own`, RFC-0005 I10); otherwise files a `role` request an Editor decides.
+ */
+async function publishOrRequest(
+  c: Context<Env>,
+  site: Site,
+  snapshotId: string,
+): Promise<{ site: Site } | { request: Approval; reason: string }> {
+  const store = c.get("store");
+  const principal = c.get("principal");
+  if (!publishesAnything(principal)) {
+    const check = await ownOnlySnapshot(c, site, snapshotId, personOf(c));
+    if (!check.ownOnly) {
+      const reason = describeOwnOnly(check);
+      const request = await fileRoleRequest(c, site, { siteId: site.id, snapshotId }, reason);
+      return { request, reason };
+    }
+  }
+  return { site: await store.publish(site, snapshotId) };
+}
+
 function snapshotLimit(raw: string | undefined): number {
   if (raw === undefined) return 50;
   const n = Number(raw);
@@ -86,13 +110,23 @@ export const snapshots: Hono<Env> = new Hono<Env>()
     const reason = body.reason ?? "manual";
     if (!REASONS.has(reason)) throw badRequest("invalid reason");
     const actor = c.get("actor") ?? { kind: "system" as const, id: "sys_api00000001" };
+    const principal = c.get("principal");
+    if (body.publish && principal && !holds(principal.scopes, "site:publish:own"))
+      throw missingScope(
+        "site:publish:own",
+        "your role cannot publish; an Editor publishes your work",
+      );
     const snap = await store.createSnapshot(siteId, {
       actor,
       reason,
       ...(body.label ? { label: body.label } : {}),
     });
     let site = await store.getSite(siteId);
-    if (body.publish && site) site = await store.publish(site, snap.id);
+    if (body.publish && site) {
+      const outcome = await publishOrRequest(c, site, snap.id);
+      if ("request" in outcome) return c.json({ snapshot: snap, site, ...outcome }, 202);
+      site = outcome.site;
+    }
     return c.json({ snapshot: snap, site }, 201);
   })
   .get("/:snapshotId", async (c) => {
@@ -115,7 +149,12 @@ export const snapshots: Hono<Env> = new Hono<Env>()
     const store = c.get("store");
     const site = await store.getSite(param(c, "siteId"));
     if (!site) throw notFound("site not found");
-    return c.json(await store.publish(site, param(c, "snapshotId")));
+    const snap = await store.getSnapshot(param(c, "snapshotId"));
+    if (!snap || snap.siteId !== site.id) throw notFound("snapshot not found");
+    const outcome = await publishOrRequest(c, site, snap.id);
+    // 202: the publish waits for someone whose role allows it (cause `role`, RFC-0005 §6).
+    if ("request" in outcome) return c.json(outcome, 202);
+    return c.json(outcome.site);
   })
   .post("/:snapshotId/rollback", async (c) => {
     const store = c.get("store");

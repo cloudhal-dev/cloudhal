@@ -101,6 +101,14 @@ export class AuditLog {
     filter: {
       siteId?: string | undefined;
       actorId?: string | undefined;
+      /** Only rows by one of these actors (a person's own rows and their keys' rows). */
+      actorIds?: readonly string[] | undefined;
+      /** Only deployment rows (no site: membership, invites, keys). */
+      deployment?: boolean | undefined;
+      /** Only rows of this tool (or event, e.g. `member.role`). */
+      tool?: string | undefined;
+      /** Only rows at or after this ISO time. */
+      since?: string | undefined;
       /** Only rows older than this id (cursor pagination, newest first). */
       before?: number | undefined;
       limit?: number | undefined;
@@ -119,6 +127,21 @@ export class AuditLog {
     if (filter.actorId) {
       where.push("actor_id = ?");
       params.push(filter.actorId);
+    }
+    if (filter.actorIds) {
+      // An empty list matches nothing; the caller bounds the list (own keys), capped here at 80.
+      const ids = filter.actorIds.slice(0, 80);
+      where.push(ids.length ? `actor_id IN (${ids.map(() => "?").join(", ")})` : "0");
+      params.push(...ids);
+    }
+    if (filter.deployment) where.push("site_id IS NULL");
+    if (filter.tool) {
+      where.push("tool = ?");
+      params.push(filter.tool);
+    }
+    if (filter.since) {
+      where.push("at >= ?");
+      params.push(filter.since);
     }
     params.push(filter.limit ?? 100);
     const rows = await this.#sql.all<Record<string, unknown>>(

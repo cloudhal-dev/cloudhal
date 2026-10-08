@@ -4,7 +4,9 @@
  *
  * - `elevation-ending`: one of their keys' time-boxed elevations ends within
  *   `ELEVATION_NOTICE_MINUTES` (ADR-0016) — extend it or let it end;
- * - `elevation-request`: an agent asks for an elevation and waits in a site's Approvals.
+ * - `elevation-request`: an agent asks for an elevation and waits in a site's Approvals;
+ * - `member-joined`: someone they invited accepted (RFC-0005 §7);
+ * - `role-changed`: someone changed their role (RFC-0005 open question 4).
  *
  * People only. Each item has a stable `id`, so a client can remember what it already showed.
  */
@@ -12,7 +14,9 @@ import {
   type AgentMode,
   ELEVATION_NOTICE_MINUTES,
   endsSoon,
+  isRole,
   minutesLeft,
+  type Role,
 } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
@@ -43,7 +47,29 @@ export type Notification =
       reason: string;
       createdAt: string;
       expiresAt: string;
+    }
+  | {
+      /** Someone the person invited accepted (RFC-0005 §7, last 7 days). */
+      id: string;
+      kind: "member-joined";
+      inviteId: string;
+      userId: string;
+      name: string | null;
+      role: Role;
+      at: string;
+    }
+  | {
+      /** Someone changed the person's role (RFC-0005 open question 4, last 7 days). */
+      id: string;
+      kind: "role-changed";
+      from: Role;
+      to: Role;
+      by: Actor;
+      at: string;
     };
+
+/** How far back `member-joined` and `role-changed` look. */
+export const MEMBER_NOTICE_DAYS = 7;
 
 export interface NotificationsPage {
   items: Notification[];
@@ -106,15 +132,54 @@ export function notificationRoutes(clock: () => Date): Hono<Env> {
       }
     }
 
-    // Soonest-ending first, then the newest requests.
-    items.sort((x, y) =>
-      x.kind === y.kind
-        ? x.kind === "elevation-ending"
-          ? x.until.localeCompare((y as typeof x).until)
-          : (y as typeof x).createdAt.localeCompare(x.createdAt)
-        : x.kind === "elevation-ending"
-          ? -1
-          : 1,
+    const staff = c.get("staff");
+    const person = c.get("principal")?.person;
+    if (staff && person) {
+      const since = new Date(now.getTime() - MEMBER_NOTICE_DAYS * 86_400_000).toISOString();
+      for (const invite of await staff.store.acceptedInvitesBy(person.userId, since)) {
+        const joined = await staff.store.member(invite.acceptedUserId as string);
+        items.push({
+          id: `member-joined:${invite.id}`,
+          kind: "member-joined",
+          inviteId: invite.id,
+          userId: invite.acceptedUserId as string,
+          name: joined?.name ?? null,
+          role: invite.role,
+          at: invite.acceptedAt ?? invite.createdAt,
+        });
+      }
+      const changes = await c
+        .get("audit")
+        ?.list({ deployment: true, tool: "member.role", since, limit: 100 });
+      for (const row of changes ?? []) {
+        const input = (row.input ?? {}) as { userId?: unknown; from?: unknown; to?: unknown };
+        if (input.userId !== person.userId || !isRole(input.from) || !isRole(input.to)) continue;
+        items.push({
+          id: `role-changed:${row.id}`,
+          kind: "role-changed",
+          from: input.from,
+          to: input.to,
+          by: row.actor,
+          at: row.at,
+        });
+      }
+    }
+
+    // Soonest-ending elevations first, then the newest requests and member events.
+    const order: Record<Notification["kind"], number> = {
+      "elevation-ending": 0,
+      "elevation-request": 1,
+      "member-joined": 2,
+      "role-changed": 3,
+    };
+    const time = (n: Notification) =>
+      n.kind === "elevation-ending" ? n.until : n.kind === "elevation-request" ? n.createdAt : n.at;
+    items.sort(
+      (x, y) =>
+        order[x.kind] - order[y.kind] ||
+        (x.kind === "elevation-ending"
+          ? time(x).localeCompare(time(y))
+          : time(y).localeCompare(time(x))),
     );
     return c.json({ items, noticeMinutes: ELEVATION_NOTICE_MINUTES } satisfies NotificationsPage);
   });

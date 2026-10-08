@@ -16,11 +16,14 @@ export async function createAuthFor(options: {
   trustedOrigins?: readonly string[];
 }): Promise<CloudhalAuth> {
   const mod = await import("better-sqlite3");
+  const { BetterSqlite3Driver } = await import("@cloudhal/storage/sqlite");
   const database = new mod.default(path.join(options.dataDir, "data.db"));
   database.pragma("journal_mode = WAL");
   const secret = process.env.BETTER_AUTH_SECRET ?? (await loadOrCreateSecret(options.dataDir));
   return createAuth({
     database,
+    // Membership and invites run guarded statements on the same connection (RFC-0005).
+    sql: new BetterSqlite3Driver(database),
     baseURL: options.baseURL,
     secret,
     trustedOrigins: options.trustedOrigins ?? [],

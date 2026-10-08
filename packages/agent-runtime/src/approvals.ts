@@ -26,6 +26,10 @@ export interface Approval {
   autoCheck?: AutoCheck | undefined;
   /** For a granted `request_elevation`: what was granted (the approver may have shortened it). */
   grant?: ElevationGrant | undefined;
+  /** Why it was decided the way it was, when the server decided (e.g. "member removed"). */
+  reason?: string | undefined;
+  /** The content state the request is bound to (empty for requests not bound to content). */
+  stateHash: string;
   status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;
@@ -86,10 +90,15 @@ function parseJson(raw: string): unknown {
   }
 }
 
-function grantOf(raw: unknown): { grant?: ElevationGrant } {
+function resultOf(raw: unknown): { grant?: ElevationGrant; reason?: string } {
   const result =
-    typeof raw === "string" ? (parseJson(raw) as { grant?: ElevationGrant }) : undefined;
-  return result?.grant ? { grant: result.grant } : {};
+    typeof raw === "string"
+      ? (parseJson(raw) as { grant?: ElevationGrant; reason?: unknown } | undefined)
+      : undefined;
+  return {
+    ...(result?.grant ? { grant: result.grant } : {}),
+    ...(typeof result?.reason === "string" ? { reason: result.reason } : {}),
+  };
 }
 
 export class ApprovalStore {
@@ -175,14 +184,33 @@ export class ApprovalStore {
     id: string,
     decision: "approved" | "denied",
     by: Actor,
+    reason?: string,
   ): Promise<Approval | undefined> {
     const now = this.#now().toISOString();
     const r = await this.#sql.run(
-      "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ? WHERE id = ? AND status = 'pending' AND expires_at > ?",
-      [decision, now, by.id, id, now],
+      "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ?, result = COALESCE(?, result) WHERE id = ? AND status = 'pending' AND expires_at > ?",
+      [decision, now, by.id, reason ? JSON.stringify({ reason }) : null, id, now],
     );
     if (r.changes !== 1) return undefined;
     return this.get(id);
+  }
+
+  /**
+   * Denies every pending request filed by these actors (RFC-0005 §3: a removed member's agents and
+   * their own person-requests), decided by `by` with `reason`. Returns how many were denied.
+   */
+  async denyPending(actorIds: readonly string[], by: Actor, reason: string): Promise<number> {
+    const now = this.#now().toISOString();
+    let denied = 0;
+    for (let i = 0; i < actorIds.length; i += 90) {
+      const chunk = actorIds.slice(i, i + 90);
+      const r = await this.#sql.run(
+        `UPDATE approvals SET status = 'denied', decided_at = ?, decided_by = ?, result = ? WHERE status = 'pending' AND actor_id IN (${chunk.map(() => "?").join(", ")})`,
+        [now, by.id, JSON.stringify({ reason }), ...chunk],
+      );
+      denied += r.changes;
+    }
+    return denied;
   }
 
   /**
@@ -254,7 +282,8 @@ export class ApprovalStore {
       ...(r.mode ? { mode: r.mode as AgentMode } : {}),
       ...(r.cause ? { cause: r.cause as ApprovalCause } : {}),
       ...(r.auto_check ? { autoCheck: parseJson(r.auto_check as string) as AutoCheck } : {}),
-      ...grantOf(r.result),
+      ...resultOf(r.result),
+      stateHash: (r.state_hash as string | null) ?? "",
       status: status === "pending" && (r.expires_at as string) <= now ? "expired" : status,
       createdAt: r.created_at as string,
       expiresAt: r.expires_at as string,

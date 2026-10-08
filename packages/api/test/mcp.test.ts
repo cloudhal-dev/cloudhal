@@ -17,6 +17,7 @@ async function setup(now?: () => Date, withApprovals = false) {
   const siteId = (await seedStarterSite(store, { name: "MCP Site", slug: "mcp-site" })).id;
   const auth = createAuth({
     database: db,
+    sql,
     baseURL: "http://localhost",
     secret: "test-secret-test-secret-test-secret",
     ...(now ? { now } : {}),
@@ -31,6 +32,7 @@ async function setup(now?: () => Date, withApprovals = false) {
     mcp: { stateKey: "http-test-key-at-least-thirty-two-bytes-long", audit, approvals },
     ...(now ? { now } : {}),
     agentKeys: auth.agentKeys,
+    staff: auth.staff,
   });
 
   const signUp = await app.request("/api/auth/sign-up/email", {
@@ -260,9 +262,10 @@ describe("time-boxed elevation (ADR-0016)", () => {
     expect((await elevate({ mode: "bypass", minutes: 60 })).status).toBe(400);
     expect((await elevate({ mode: "auto", minutes: 2 })).status).toBe(400);
     expect((await elevate({ mode: "auto" })).status).toBe(400);
+    // an unknown (or someone else's) key is not found
     expect(
       (await json("POST", "/api/agent-keys/nope/elevation", { mode: "auto", minutes: 60 })).status,
-    ).toBe(400);
+    ).toBe(404);
     // agents cannot elevate themselves (people-only routes)
     expect(
       (
