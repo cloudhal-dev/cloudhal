@@ -81,6 +81,53 @@ describe("api.agentKeys", () => {
     expect((error as ApiRequestError).message).toBe("mode is required (plan, manual, edits, auto)");
   });
 
+  it("elevates for a while and ends it early (ADR-0016)", async () => {
+    const summary = {
+      id: "k/1",
+      mode: "edits",
+      effectiveMode: "auto",
+      elevation: {
+        mode: "auto",
+        until: "2026-10-08T12:30:00Z",
+        grantedBy: "user_1",
+        grantedAt: "x",
+      },
+    };
+    const fetch = mockFetch(summary);
+    const elevated = await api.agentKeys.elevate("k/1", {
+      mode: "auto",
+      minutes: 60,
+      reason: "Launch day",
+    });
+    expect(elevated.effectiveMode).toBe("auto");
+    expect(elevated.elevation?.until).toBe("2026-10-08T12:30:00Z");
+    await api.agentKeys.endElevation("k/1");
+    const [[url, init], [endUrl, endInit]] = fetch.mock.calls as unknown as [
+      [string, RequestInit],
+      [string, RequestInit],
+    ];
+    expect(url).toBe("/api/agent-keys/k%2F1/elevation");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      mode: "auto",
+      minutes: 60,
+      reason: "Launch day",
+    });
+    expect(endUrl).toBe("/api/agent-keys/k%2F1/elevation");
+    expect(endInit.method).toBe("DELETE");
+    expect(endInit.body).toBeUndefined();
+  });
+
+  it("surfaces the server's reason when an elevation is refused (400)", async () => {
+    mockFetch({ error: "auth", message: "minutes must be a whole number between 5 and 1440" }, 400);
+    const error = await api.agentKeys
+      .elevate("k1", { mode: "auto", minutes: 2 })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiRequestError);
+    expect((error as ApiRequestError).status).toBe(400);
+    expect((error as ApiRequestError).message).toMatch(/between 5 and 1440/);
+  });
+
   it("revokes by id (204, no body)", async () => {
     const fetch = mockFetch(null, 204);
     await expect(api.agentKeys.remove("a/b")).resolves.toBeUndefined();

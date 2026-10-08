@@ -1,5 +1,6 @@
 import { Badge, Banner, Checkbox, LayerCard, Radio, Table, Text, Tooltip } from "@cloudhal/ui";
 import {
+  ClockCountdown,
   Eye,
   HandPalm,
   type Icon,
@@ -12,7 +13,7 @@ import {
   UserCheck,
   Warning,
 } from "@phosphor-icons/react";
-import { useT } from "../i18n/index.tsx";
+import { useI18n, useT } from "../i18n/index.tsx";
 import {
   ALWAYS_GATED_TOOLS,
   autoApprovalCount,
@@ -22,7 +23,8 @@ import {
   type ModeRule,
   modeVariant,
 } from "../lib/agents.ts";
-import type { AgentMode, AuditRow, KeyMode } from "../lib/api.ts";
+import type { AgentMode, AuditElevation, AuditRow, KeyMode } from "../lib/api.ts";
+import { formatUntil } from "../lib/elevation.ts";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 
 /** The only way to get `bypass` (ADR-0015): the local stdio server, never an API key. */
@@ -63,14 +65,49 @@ function ModeSummary({ mode }: { mode: AgentMode }) {
 /**
  * Mode pill with an explanation in a tooltip. Semantic tone by autonomy (DESIGN.md §2g); `subtle`
  * is the outline form for dense audit cells, where the decision badge must stay the loudest.
+ * `elevation` marks a mode that was temporary (ADR-0016): a timer inside the pill, and the tooltip
+ * leads with "Temporarily elevated from Edits until 14:30".
  */
-export function ModeBadge({ mode, subtle = false }: { mode: AgentMode; subtle?: boolean }) {
-  const t = useT();
+export function ModeBadge({
+  mode,
+  subtle = false,
+  elevation,
+}: {
+  mode: AgentMode;
+  subtle?: boolean;
+  elevation?: AuditElevation | undefined;
+}) {
+  const { t, locale } = useI18n();
   return (
-    <span data-mode={mode} className="inline-flex">
-      <Tooltip content={<ModeSummary mode={mode} />}>
+    <span data-mode={mode} data-elevated={elevation ? "true" : undefined} className="inline-flex">
+      <Tooltip
+        content={
+          elevation ? (
+            <span className="grid max-w-72 gap-1.5">
+              <Text as="span" size="sm" bold>
+                {t("agents.elevation.marker", {
+                  from: t(`agents.modes.names.${elevation.from}`),
+                  time: formatUntil(elevation.until, locale),
+                })}
+              </Text>
+              <ModeSummary mode={mode} />
+            </span>
+          ) : (
+            <ModeSummary mode={mode} />
+          )
+        }
+      >
         <Badge variant={subtle ? "outline" : modeVariant(mode)} icon={<ModeIcon mode={mode} />}>
           {t(`agents.modes.names.${mode}`)}
+          {elevation && (
+            <ClockCountdown
+              size={12}
+              weight="bold"
+              role="img"
+              aria-label={t("agents.elevation.temporary")}
+              data-testid="elevation-marker"
+            />
+          )}
         </Badge>
       </Tooltip>
     </span>
@@ -98,15 +135,19 @@ export function ModePicker({
   onValueChange,
   current,
   legend,
+  only,
 }: {
   value: KeyMode;
   onValueChange: (mode: KeyMode) => void;
   /** The key's mode today (change dialog): marked "Current". */
   current?: KeyMode | undefined;
   legend: string;
+  /** Offer only these of the server's key modes (elevation: the ones above the key's own). */
+  only?: readonly KeyMode[] | undefined;
 }) {
   const t = useT();
-  const { modes } = useAgentModeRules();
+  const rules = useAgentModeRules();
+  const modes = only ? rules.modes.filter((m) => only.includes(m)) : rules.modes;
   return (
     <Radio.Group appearance="card" value={value} onValueChange={(v) => onValueChange(v as KeyMode)}>
       <Radio.Legend className="sr-only">{legend}</Radio.Legend>
@@ -320,6 +361,15 @@ export function HowModesWorkCard() {
                 </Text>
               </div>
             ))}
+          </div>
+          {/* Prefer a time-boxed elevation over a permanent Auto key (ADR-0016). */}
+          <div className="flex items-start gap-2" data-testid="how-elevation">
+            <span className="flex h-lh items-center text-kumo-subtle">
+              <ClockCountdown size={16} />
+            </span>
+            <Text variant="secondary" size="sm">
+              {t("agents.elevation.howModes")}
+            </Text>
           </div>
           <Text variant="secondary" size="sm">
             {t("agents.howModes.bypass")}{" "}

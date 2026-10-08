@@ -4,7 +4,13 @@ import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
 import { isKnownTool } from "../lib/activity.ts";
 import { isAutoApproved } from "../lib/agents.ts";
-import type { AgentMode, AuditDecision, AuditOutcome, AuditRow } from "../lib/api.ts";
+import type {
+  AgentMode,
+  AuditDecision,
+  AuditElevation,
+  AuditOutcome,
+  AuditRow,
+} from "../lib/api.ts";
 import { AutoApprovedBadge, ModeBadge } from "./AgentModes.tsx";
 
 /** Human-readable label for an MCP tool name ("update_page" → "Updated page"); unknown tools pass through. */
@@ -54,9 +60,18 @@ export function Outcome({ outcome }: { outcome: AuditOutcome | undefined }) {
 
 /**
  * Actor kind badge + display name (falls back to the id); for agents, the mode the call ran under
- * as a subtle badge (ADR-0015).
+ * as a subtle badge (ADR-0015), with a timer marker when that mode was a time-boxed elevation
+ * (ADR-0016).
  */
-export function ActorCell({ actor, mode }: { actor: Actor; mode?: AgentMode | undefined }) {
+export function ActorCell({
+  actor,
+  mode,
+  elevation,
+}: {
+  actor: Actor;
+  mode?: AgentMode | undefined;
+  elevation?: AuditElevation | undefined;
+}) {
   const t = useT();
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -64,7 +79,7 @@ export function ActorCell({ actor, mode }: { actor: Actor; mode?: AgentMode | un
       <Text as="span" truncate>
         {actor.name ?? actor.id}
       </Text>
-      {mode && actor.kind === "agent" && <ModeBadge mode={mode} subtle />}
+      {mode && actor.kind === "agent" && <ModeBadge mode={mode} subtle elevation={elevation} />}
     </div>
   );
 }

@@ -215,7 +215,7 @@ export function ActivityPage() {
                       <DecisionCell row={r} />
                     </Table.Cell>
                     <Table.Cell className="min-w-56 max-w-80">
-                      <ActorCell actor={r.actor} mode={r.mode} />
+                      <ActorCell actor={r.actor} mode={r.mode} elevation={r.elevation} />
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       <RelativeTime iso={r.at} />

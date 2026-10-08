@@ -29,6 +29,11 @@ export function isKeyMode(value: unknown): value is KeyMode {
   return typeof value === "string" && (KEY_MODES as readonly string[]).includes(value);
 }
 
+/** A key's own mode; keys from servers that predate modes read as `edits`, like the server does. */
+export function ownModeOf(key: { mode?: unknown } | undefined): KeyMode {
+  return isKeyMode(key?.mode) ? key.mode : DEFAULT_MODE;
+}
+
 /**
  * The scopes a key needs to be useful in a mode. The server's own rules come from `/api/instance`
  * (`modeRules`); this copy of `scopesForMode` is the fallback for servers that do not report them.
@@ -122,6 +127,10 @@ export function autoCheckHeldBack(request: {
     : undefined;
 }
 
+/** Shortest and longest time-boxed elevation (ADR-0016), for servers that do not report them. */
+export const ELEVATION_MIN_MINUTES = 5;
+export const ELEVATION_MAX_MINUTES = 24 * 60;
+
 /** The mode rules Studio applies: the server's (`/api/instance`) when reported, else Studio's copy. */
 export interface ModeRules {
   /** Key modes to offer, in order (only ones Studio has words for). */
@@ -129,6 +138,8 @@ export interface ModeRules {
   defaultMode: KeyMode;
   scopesFor: (mode: AgentMode) => GrantableScope[];
   autoPublishLimit: number;
+  /** Bounds of a time-boxed elevation, in whole minutes. */
+  elevation: { minMinutes: number; maxMinutes: number };
 }
 
 export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
@@ -140,7 +151,24 @@ export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
     defaultMode: isKeyMode(info?.default) ? info.default : DEFAULT_MODE,
     scopesFor: (mode) => grantable(info?.scopes[mode]) ?? scopesForMode(mode),
     autoPublishLimit: info?.autoPublishLimit ?? AUTO_PUBLISH_LIMIT,
+    elevation: validBounds(info?.elevation) ?? {
+      minMinutes: ELEVATION_MIN_MINUTES,
+      maxMinutes: ELEVATION_MAX_MINUTES,
+    },
   };
+}
+
+function validBounds(
+  bounds: { minMinutes: number; maxMinutes: number } | undefined,
+): { minMinutes: number; maxMinutes: number } | undefined {
+  if (!bounds) return undefined;
+  const { minMinutes, maxMinutes } = bounds;
+  const sane =
+    Number.isInteger(minMinutes) &&
+    Number.isInteger(maxMinutes) &&
+    minMinutes > 0 &&
+    minMinutes <= maxMinutes;
+  return sane ? { minMinutes, maxMinutes } : undefined;
 }
 
 export function scopeGroup(scope: AgentScope): ScopeGroup | "all" {

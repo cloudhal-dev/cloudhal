@@ -63,6 +63,18 @@ export interface AuditRow {
   cause?: ApprovalCause;
   /** The `auto`-mode check behind a publish; `lowRisk` on an `allow` row = went live without a person. */
   autoCheck?: AutoCheck;
+  /**
+   * The call ran under a time-boxed elevation (ADR-0016): `from` is the key's own mode, `until` when
+   * the elevation ended; `mode` is then the elevated one.
+   */
+  elevation?: AuditElevation;
+}
+
+/** How an audit row records a time-boxed elevation (ADR-0016). */
+export interface AuditElevation {
+  from: AgentMode;
+  /** ISO time the elevation ends. */
+  until: string;
 }
 
 /** Why a call waits for a person (packages/agent-runtime/src/policy.ts). */
@@ -113,11 +125,35 @@ export interface AgentKeySummary {
   /** First characters of the key, for recognition. */
   start: string | null;
   scopes: AgentScope[];
-  /** Keys created before modes read as `edits` on the server. */
+  /** The key's own mode. Keys created before modes read as `edits` on the server. */
   mode: KeyMode;
   createdAt: string;
   expiresAt: string | null;
   enabled: boolean;
+  /** A time-boxed elevation in force right now (ADR-0016); absent when none or expired. */
+  elevation?: AgentKeyElevation;
+  /** The mode the agent's next call runs in: the elevation's while it lasts, else `mode`. Older servers omit it. */
+  effectiveMode?: AgentMode;
+}
+
+/** A more autonomous mode an owner granted a key for a while (ADR-0016). */
+export interface AgentKeyElevation {
+  mode: KeyMode;
+  /** ISO time it ends by itself. */
+  until: string;
+  /** Actor id (`user_…`) of the person who granted it. */
+  grantedBy: string;
+  grantedAt: string;
+  /** Why, in the owner's words (at most 200 characters; also in the audit log). */
+  reason?: string;
+}
+
+/** `POST /api/agent-keys/:id/elevation`: a mode more autonomous than the key's own, for a while. */
+export interface ElevationInput {
+  mode: KeyMode;
+  /** Whole minutes within `agentModes.elevation` (5–1440 on current servers). */
+  minutes: number;
+  reason?: string;
 }
 /** The create response: the summary plus the plaintext key, returned exactly once. */
 export type CreatedAgentKey = AgentKeySummary & { key: string };
@@ -162,6 +198,8 @@ export interface AgentModesInfo {
   /** Scopes a key gets in each mode when the owner does not choose them. */
   scopes: Partial<Record<AgentMode, AgentScope[]>>;
   autoPublishLimit: number;
+  /** Bounds of a time-boxed elevation, in minutes (ADR-0016). Older servers omit it. */
+  elevation?: { minMinutes: number; maxMinutes: number };
 }
 export type SignUpPolicy = InstanceInfo["signUp"];
 export type InstanceFeature = keyof InstanceInfo["features"];
@@ -347,6 +385,21 @@ export const api = {
       request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
         method: "PATCH",
         ...json({ mode }),
+      }),
+    /**
+     * A more autonomous mode until the time is up, then the key's own mode again (ADR-0016; audited).
+     * Replaces an elevation in force. 400 when the mode is not above the key's own, is bypass, or
+     * `minutes` is out of bounds.
+     */
+    elevate: (id: string, input: ElevationInput) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}/elevation`, {
+        method: "POST",
+        ...json(input),
+      }),
+    /** Ends an elevation early (audited); harmless when none is in force. */
+    endElevation: (id: string) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}/elevation`, {
+        method: "DELETE",
       }),
     remove: (id: string) =>
       request<void>(`/api/agent-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),
