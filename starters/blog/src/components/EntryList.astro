@@ -1,0 +1,22 @@
+---
+/** A list of articles: title link, summary, publication date. */
+import { entryPath } from "@cloudhal/astro-renderer/routing";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+
+interface Props {
+  entries: ContentEntry[];
+  locale: string;
+}
+const { entries, locale } = Astro.props;
+const date = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+---
+<ul class="ch-entrylist">
+  {entries.map((e) => (
+    <li>
+      <a href={entryPath(e)}>{e.title}</a>
+      {e.summary && <p>{e.summary}</p>}
+      {e.publishedAt && <time datetime={e.publishedAt}>{date(e.publishedAt)}</time>}
+    </li>
+  ))}
+</ul>

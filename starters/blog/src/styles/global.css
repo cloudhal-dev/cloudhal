@@ -52,3 +52,72 @@
 .ch-contentlist p {
   @apply text-sm text-zinc-600;
 }
+
+/* Breadcrumbs, term chips, archives, pagination, related posts (RFC-0002). */
+.ch-breadcrumbs ol {
+  @apply flex flex-wrap gap-1 pt-6 text-sm text-zinc-500;
+}
+.ch-breadcrumbs li + li::before {
+  content: "›";
+  @apply mr-1 text-zinc-400;
+}
+.ch-breadcrumbs a {
+  @apply hover:text-zinc-900;
+}
+.ch-terms {
+  @apply flex flex-wrap gap-2 border-t border-zinc-200 py-4;
+}
+.ch-terms__group {
+  @apply flex flex-wrap gap-2;
+}
+.ch-chip {
+  @apply inline-block rounded-full border border-zinc-300 px-3 py-1 text-sm text-zinc-700;
+}
+a.ch-chip {
+  @apply hover:border-zinc-900 hover:text-zinc-900;
+}
+.ch-terms__group[data-taxonomy="category"] .ch-chip {
+  @apply border-zinc-900 bg-zinc-900 text-white hover:text-white;
+}
+.ch-archive-header {
+  @apply space-y-2 border-b border-zinc-200 pt-4 pb-6;
+}
+.ch-archive-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-archive-kind {
+  @apply text-sm font-medium tracking-wide text-zinc-500 uppercase;
+}
+.ch-archive-meta {
+  @apply flex gap-4 text-sm text-zinc-500;
+}
+.ch-archive-meta a {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-archive-image {
+  @apply mt-4 w-full rounded;
+}
+.ch-entrylist {
+  @apply space-y-6 py-6;
+}
+.ch-entrylist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-entrylist p {
+  @apply text-sm text-zinc-600;
+}
+.ch-entrylist time {
+  @apply text-xs text-zinc-500;
+}
+.ch-pagination {
+  @apply flex items-center justify-between border-t border-zinc-200 py-6 text-sm text-zinc-600;
+}
+.ch-pagination a {
+  @apply font-medium text-zinc-900 underline-offset-4 hover:underline;
+}
+.ch-related {
+  @apply border-t border-zinc-200 pt-6;
+}
+.ch-related h2 {
+  @apply text-xl font-semibold;
+}
