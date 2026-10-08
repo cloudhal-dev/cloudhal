@@ -36,4 +36,24 @@ An owner can **elevate** an API key to a more autonomous mode for a bounded time
 ## Consequences
 - Positive: autonomy can be granted for exactly as long as it is needed, and it is revoked without anyone remembering to. The audit shows who granted what and which calls used it.
 - Negative: the effective mode now depends on the clock. Tests inject `now` (`AuthOptions.now`). Clock skew between isolates is negligible at minute granularity.
-- Follow-ups: request elevation from the agent side (an agent asks, the owner grants in Studio as an approval); notify the owner shortly before an elevation ends.
+- Follow-ups: notify the owner shortly before an elevation ends.
+
+## Addendum (2026-10-08): agents ask for an elevation
+An agent that needs more autonomy for a task asks for it instead of failing or nagging in chat:
+
+- **`request_elevation {siteId, mode, minutes, reason}`** (MCP). It files an approval with tool `request_elevation`, input `{mode, minutes, reason, keyId}` and a prompt quoting the reason, on that site's Approvals.
+  - Only API-key agents on a server with approvals can use it. Local stdio is told to restart with `--mode`, and people are refused.
+  - The same rules as a person's grant apply: more autonomous than the key's own mode, not already in force, never `bypass`, 5 minutes to 24 hours.
+  - One open request per key: asking again returns the pending one.
+  - It changes neither the site nor the key, so it is annotated read-only and also works in `plan` mode (a planner may ask to become `edits`).
+- **`get_mode`** (MCP) returns:
+  - the current and own mode;
+  - the elevation in force;
+  - which modes could still be requested;
+  - the latest request's status (`pending`, `denied`, `expired`, or `consumed` = granted).
+- **Granting is a person's act.** `POST /api/sites/:id/approvals/:id/approve` with an optional `{minutes}` grants the elevation with the approver's own rights. The approver may shorten the request but not extend it.
+  - The key must still exist, belong to the approver, and still be able to take the elevation; otherwise the answer is 409 and the request stays pending.
+  - The request is then marked `consumed`, since the agent has nothing to redeem.
+  - The grant is audited as `agent-key.elevate` on the site, naming the request.
+- **The agent learns the outcome** from `get_mode` or from its next call's instructions. Nothing it receives can grant the elevation.
+

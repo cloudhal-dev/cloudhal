@@ -50,6 +50,8 @@ export interface Principal {
   local?: boolean | undefined;
   /** Set while `mode` comes from a time-boxed elevation (ADR-0016): the key's own mode and the end. */
   elevation?: { from: AgentMode; until: string } | undefined;
+  /** The API key an agent authenticated with (lets it ask for an elevation of that key). */
+  keyId?: string | undefined;
 }
 
 /** The mode that actually applies: `bypass` only counts locally, remote keys fall back to `edits`. */

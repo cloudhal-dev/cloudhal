@@ -402,6 +402,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
         scopes: granted ? (granted as Scope[]) : defaultScopes(actor),
         mode: elevation?.mode ?? base,
         ...(elevation ? { elevation: { from: base, until: elevation.until } } : {}),
+        keyId: verified.key.id,
       };
     }
     const session = await instance.api.getSession({ headers: c.req.raw.headers });

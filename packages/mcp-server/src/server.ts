@@ -111,6 +111,8 @@ const INSTRUCTIONS = `Cloudhal: agent-native sites. Content lives in a site grap
 
 Workflow: list_sites → list_pages / list_entries → get_page / get_entry (note the \`rev\`) → update_* with that rev → preview_page → publish. Publishing, rollback and deletion stop for human approval. Either the person is asked in your MCP client and the call completes, or the call returns "approval pending" with an approvalId: a person approves it in Cloudhal Studio, and you then repeat the same call with that approvalId. Never try to work around approval.
 
+Modes: get_mode tells you how independently you work right now. If a task needs more autonomy for a while (e.g. publishing a series of small updates), call request_elevation with the mode, the minutes and a one-sentence reason; a person decides in Studio, and once granted your next call runs in that mode until the time is up. Ask only for what the task needs.
+
 If you are following a Cloudhal skill (read it from the skill:// resources), send its name in the request \`_meta["cloudhal.skill"]\`; your calls are then limited to the scopes that skill declared.`;
 
 const MODE_TEXT: Record<AgentMode, string> = {
@@ -315,6 +317,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
         const toolCtx = {
           store: options.store,
           principal,
+          approvals: options.approvals,
           previewBaseUrl: options.previewBaseUrl,
           previewSecret: options.previewSecret,
         };

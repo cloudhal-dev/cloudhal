@@ -59,6 +59,7 @@ export function createApi(deps: ApiDeps) {
     c.set("audit", deps.audit ?? deps.mcp?.audit);
     c.set("previewSecret", deps.preview?.secret);
     c.set("approvals", deps.mcp?.approvals);
+    c.set("agentKeys", deps.agentKeys);
     if (deps.resolvePrincipal) {
       const principal = await deps.resolvePrincipal(c);
       c.set("principal", principal);
@@ -163,6 +164,7 @@ export function createApi(deps: ApiDeps) {
           previewLinks: Boolean(deps.preview),
           deployTransfer: Boolean(deps.admin),
           approvals: Boolean(deps.mcp?.approvals),
+          elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
         },
         agentModes: agentModesInfo(),
       }),

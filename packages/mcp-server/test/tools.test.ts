@@ -52,6 +52,8 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "preview_page",
       "publish",
       "rollback",
+      "get_mode",
+      "request_elevation",
     ]);
     for (const t of tools) {
       expect(typeof t.annotations.readOnlyHint).toBe("boolean");
@@ -60,6 +62,11 @@ describe("Cloudhal tools (SDK-independent)", () => {
     }
     expect(byName.publish?.annotations.destructiveHint).toBe(true);
     expect(byName.get_page?.annotations.readOnlyHint).toBe(true);
+    // asking for an elevation changes neither the site nor the key (a person grants it)
+    expect(byName.request_elevation?.annotations).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+    });
   });
 
   it("an agent creates an article, previews it, and every mutation snapshots", async () => {

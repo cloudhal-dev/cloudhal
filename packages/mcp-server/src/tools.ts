@@ -8,6 +8,7 @@
  */
 
 import type {
+  ApprovalStore,
   AuditLog,
   AutoCheck,
   Decision,
@@ -35,8 +36,9 @@ import {
   previewUrl,
   primaryOrigin,
 } from "@cloudhal/core-ts";
+import { elevationTools } from "./elevation-tools.ts";
 
-type JsonSchema = Record<string, unknown>;
+export type JsonSchema = Record<string, unknown>;
 
 export interface ToolDefinition {
   name: string;
@@ -55,6 +57,8 @@ export interface ToolDefinition {
 export interface ToolContext {
   store: SiteGraphStore;
   principal: Principal;
+  /** Out-of-band approvals (HTTP): where `request_elevation` files its request. */
+  approvals?: ApprovalStore | undefined;
   /** Base URL of a running `cloudhal dev` server, when known (preview links). */
   previewBaseUrl?: string | undefined;
   /** Shared preview secret: signed links to the deployed site (preferred over `previewBaseUrl`). */
@@ -185,7 +189,7 @@ export function hoistDefs(schema: JsonSchema): JsonSchema {
 
 /** All tools, in the deterministic order `tools/list` exposes them. */
 export function defineTools(): ToolDefinition[] {
-  return rawTools().map((t) => ({
+  return [...rawTools(), ...elevationTools()].map((t) => ({
     ...t,
     inputSchema: hoistDefs(t.inputSchema),
     outputSchema: hoistDefs(t.outputSchema),

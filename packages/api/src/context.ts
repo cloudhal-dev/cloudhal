@@ -66,5 +66,7 @@ export type Env = {
     audit: AuditLog | undefined;
     previewSecret: string | undefined;
     approvals: ApprovalStore | undefined;
+    /** Grants an agent's elevation request when a person approves it (ADR-0016). */
+    agentKeys: AgentKeyService | undefined;
   };
 };

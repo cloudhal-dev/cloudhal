@@ -25,6 +25,8 @@ export interface InstanceInfo {
     previewLinks: boolean;
     deployTransfer: boolean;
     approvals: boolean;
+    /** Agents can ask for a time-boxed elevation; a person grants it in Approvals (ADR-0016). */
+    elevationRequests: boolean;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;

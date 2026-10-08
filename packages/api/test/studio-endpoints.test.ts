@@ -188,6 +188,7 @@ describe("instance and skills", () => {
         previewLinks: false,
         deployTransfer: false,
         approvals: false,
+        elevationRequests: false,
       },
       agentModes: {
         modes: ["plan", "manual", "edits", "auto"],

@@ -119,13 +119,27 @@ export class ApprovalStore {
   }
 
   async list(
-    filter: { siteId?: string; status?: ApprovalStatus; limit?: number } = {},
+    filter: {
+      siteId?: string;
+      status?: ApprovalStatus;
+      actorId?: string;
+      tool?: string;
+      limit?: number;
+    } = {},
   ): Promise<Approval[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (filter.siteId) {
       where.push("site_id = ?");
       params.push(filter.siteId);
+    }
+    if (filter.actorId) {
+      where.push("actor_id = ?");
+      params.push(filter.actorId);
+    }
+    if (filter.tool) {
+      where.push("tool = ?");
+      params.push(filter.tool);
     }
     if (filter.status) {
       where.push("status = ?");
@@ -149,6 +163,20 @@ export class ApprovalStore {
     const r = await this.#sql.run(
       "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ? WHERE id = ? AND status = 'pending' AND expires_at > ?",
       [decision, now, by.id, id, now],
+    );
+    if (r.changes !== 1) return undefined;
+    return this.get(id);
+  }
+
+  /**
+   * Marks an approved request as used when the server itself carries it out on approval (an
+   * elevation request, ADR-0016) rather than the agent redeeming it.
+   */
+  async complete(id: string): Promise<Approval | undefined> {
+    const now = this.#now().toISOString();
+    const r = await this.#sql.run(
+      "UPDATE approvals SET status = 'consumed', consumed_at = ? WHERE id = ? AND status = 'approved'",
+      [now, id],
     );
     if (r.changes !== 1) return undefined;
     return this.get(id);
