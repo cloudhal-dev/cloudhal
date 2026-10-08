@@ -55,6 +55,32 @@ describe("api.agentKeys", () => {
     expect(JSON.parse(init.body as string)).toEqual({ name: "Bot", scopes: ["site:read"] });
   });
 
+  it("creates by mode alone, leaving the scopes to the server", async () => {
+    const fetch = mockFetch({ id: "k2", name: "Writer", key: "s", mode: "auto", scopes: [] }, 201);
+    await api.agentKeys.create({ name: "Writer", mode: "auto" });
+    const [, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Writer", mode: "auto" });
+  });
+
+  it("changes a key's mode with PATCH and surfaces a 400 refusal", async () => {
+    const fetch = mockFetch({ id: "k/1", name: "Bot", mode: "manual", scopes: [] });
+    const updated = await api.agentKeys.setMode("k/1", "manual");
+    expect(updated.mode).toBe("manual");
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/agent-keys/k%2F1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ mode: "manual" });
+
+    mockFetch(
+      { error: "bad_request", message: "mode is required (plan, manual, edits, auto)" },
+      400,
+    );
+    const error = await api.agentKeys.setMode("k1", "auto").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiRequestError);
+    expect((error as ApiRequestError).status).toBe(400);
+    expect((error as ApiRequestError).message).toBe("mode is required (plan, manual, edits, auto)");
+  });
+
   it("revokes by id (204, no body)", async () => {
     const fetch = mockFetch(null, 204);
     await expect(api.agentKeys.remove("a/b")).resolves.toBeUndefined();

@@ -235,11 +235,12 @@ export const en = {
   agents: {
     title: "Agents",
     description:
-      "Keys let agents, CI jobs and MCP clients work on your sites with only the scopes you grant. Every call is checked by policy and recorded in the site's activity.",
+      "Keys let agents, CI jobs and MCP clients work on your sites. Each key has a mode that decides what the agent does on its own and what waits for you. Every call is checked by policy and recorded in the site's activity.",
     createKey: "Create key",
     search: "Search keys",
     columns: {
       name: "Name",
+      mode: "Mode",
       scopes: "Scopes",
       created: "Created",
       status: "Status",
@@ -251,6 +252,7 @@ export const en = {
     unnamed: "Unnamed key",
     keyPrefix: "{start}…",
     fullAccess: "Full access",
+    scopesModeDefault: "Mode default · {count} scopes",
     empty: "No agent keys yet",
     emptyDescription:
       "Create one key per agent or automation, grant only the scopes it needs, and revoke it when the work is done.",
@@ -274,25 +276,112 @@ export const en = {
       "site:publish": "Publish a snapshot to the live site",
       "site:rollback": "Roll the live site back",
     },
+    modes: {
+      legend: "Mode",
+      names: {
+        plan: "Plan",
+        manual: "Manual",
+        edits: "Edits",
+        auto: "Auto",
+        bypass: "Bypass",
+      },
+      descriptions: {
+        plan: "Reads your sites and renders previews. It can suggest changes but never makes them.",
+        manual: "Asks you before every change it makes, however small.",
+        edits:
+          "Creates and edits content freely. Every change is snapshotted and can be rolled back.",
+        auto: "Works like Edits, and small article publishes go live without you.",
+        bypass: "Nothing waits for a person. Only for cloudhal mcp on your own machine.",
+      },
+      waitsLabel: "Waits for you:",
+      waits: {
+        plan: "nothing, because it can't change anything",
+        manual: "every edit, publish, rollback and deletion",
+        edits: "publish, rollback and deletions",
+        auto: "larger publishes, rollback and deletions",
+        bypass: "nothing",
+      },
+      risk: {
+        safest: "Safest",
+        recommended: "Recommended",
+        caution: "Use with care",
+      },
+      current: "Current",
+      bypassHint:
+        "Bypass, where nothing waits for a person, isn't available for keys. It exists only for the local server on your own machine:",
+      autoTitle: "Small publishes go live without you",
+      autoDescription:
+        "In Auto mode, a publish that only adds or edits articles goes live right away: nothing removed, no pages or site settings changed, at most {limit} changes. Activity marks it as auto-approved and you can roll it back in one click. Larger publishes, rollback and deletions still wait for you.",
+      autoConfirm: "I understand that this agent can publish without my approval",
+      autoConfirmRequired: "Confirm that you understand what Auto mode does",
+    },
+    howModes: {
+      title: "How modes work",
+      description:
+        "A mode decides what an agent does on its own and what waits for you. Scopes stay the hard limit: a mode never grants more.",
+      columns: {
+        mode: "Mode",
+        edits: "Content",
+        publish: "Publish",
+        rollback: "Rollback, delete",
+      },
+      rules: {
+        denied: "Blocked",
+        waits: "Waits",
+        free: "Free",
+        lowRisk: "Small: free",
+      },
+      rulesHint: {
+        denied: "The agent can't do this in this mode.",
+        waits: "The agent asks; you approve in the site's Activity › Approvals.",
+        free: "The agent does this on its own. Every change is snapshotted.",
+        lowRisk:
+          "Only articles added or edited, nothing removed, at most {limit} changes. Anything larger waits for you.",
+      },
+      gated: "Always waits for you with a key",
+      bypass: "Bypass is for your own machine only:",
+    },
+    changeMode: {
+      menu: "Change mode",
+      title: "Change mode",
+      description: "Choose how “{name}” works from now on.",
+      from: "Now",
+      to: "New",
+      nextCallTitle: "Applies on the agent's next call",
+      nextCall:
+        "Calls already running finish in the current mode. The change is recorded in the audit log.",
+      submit: "Change mode",
+      failed: "Couldn't change the mode",
+      changed: "Mode changed",
+      changedDescription: "{name} now works in {mode} mode.",
+    },
     create: {
       title: "Create agent key",
-      description:
-        "The key acts as an agent on every site you can open, limited to the scopes you choose here.",
+      description: "The key acts as an agent on every site you can open, in the mode you choose.",
+      stepMode: "Step 1 of 2 · Choose a mode",
+      stepDetails: "Step 2 of 2 · Name and scopes",
+      continue: "Continue",
+      mode: "Mode",
+      changeMode: "Change",
       name: "Name",
       namePlaceholder: "e.g. Claude Code on my laptop",
       nameHint: "Agents appear under this name in the activity log.",
       nameRequired: "Give the key a name",
+      advanced: "Advanced: scopes",
+      advancedHint:
+        "Prefilled for {mode} mode. Scopes are the hard limit; the mode decides what waits for you.",
+      customised: "Customised",
+      resetScopes: "Use the mode's scopes",
+      missingScopesTitle: "Some of what this mode allows won't work",
+      missingScopes: "Without {scopes}, the agent can't do everything {mode} mode allows.",
       scopes: "Scopes",
       scopesRequired: "Choose at least one scope",
       groups: { read: "Read", write: "Write", release: "Publish and roll back" },
       groupHints: {
         read: "Enough for agents that research, summarise or review.",
         write: "Changes are snapshotted and can be rolled back.",
-        release: "Lets the agent ask to change what visitors see.",
+        release: "Lets the agent change, or ask to change, what visitors see.",
       },
-      releaseWarningTitle: "This key can ask to change the live site",
-      releaseWarning:
-        "Every publish or rollback still waits for a person to approve it, but anyone holding this key can make the request. Keep it out of shared repositories.",
       submit: "Create key",
       failed: "Couldn't create the key",
     },
@@ -308,16 +397,13 @@ export const en = {
     },
     connect: {
       title: "Connect an MCP client",
-      description: "Agents reach Studio over MCP at this address and send their key in a header.",
+      description:
+        "Agents reach Studio over MCP at this address and send their key in a header. When it connects, the agent is told its key's mode, so it knows what waits for you.",
       endpoint: "MCP endpoint",
       header: "Header",
       tabs: { json: "JSON", claude: "Claude Code", stdio: "Local" },
-      stdioHint: "On your own machine, run the stdio server inside the site folder; no key needed.",
-    },
-    approvals: {
-      title: "Always approved by a person",
-      description:
-        "These tools pause and ask a human in the MCP client, whatever scopes the key carries.",
+      stdioHint:
+        "On your own machine, run the stdio server inside the site folder; no key needed. --mode sets how it works, and only here can it be bypass.",
     },
   },
   activity: {
@@ -369,7 +455,18 @@ export const en = {
       input: "Input",
       noInput: "This call had no input.",
       event: "Event #{id}",
+      mode: "Mode",
+      modeHint: "The mode the agent's key had when it made this call.",
     },
+    autoApproved: "Auto-approved",
+    autoApprovedHint:
+      "Went live without a person: the agent works in Auto mode and this publish was low risk.",
+    autoApprovedTitle: "Published without a person",
+    autoApprovedCount: "Article changes published: {count}",
+    autoApprovedDescription:
+      "The agent works in Auto mode and this publish only added or edited articles. You can roll it back from Snapshots.",
+    autoApprovedDescriptionCount:
+      "The agent works in Auto mode and this publish only added or edited articles ({count} in total). You can roll it back from Snapshots.",
     recent: "Recent activity",
     recentEmpty: "No agent activity yet",
     recentEmptyDescription: "Connect an agent and its tool calls appear here.",
@@ -655,12 +752,16 @@ export const en = {
     title: "Approvals",
     views: { activity: "Activity", approvals: "Approvals" },
     description:
-      "Agents' publish, rollback and delete requests wait here until a person decides. Approving lets the agent make that exact call once.",
+      "Agents' publish, rollback and delete requests, and every change from agents in Manual mode, wait here until a person decides. Approving lets the agent make that exact call once.",
     pending: "Waiting for you",
     history: "History",
     noPending: "Nothing is waiting for you",
     noPendingDescription:
-      "When an agent asks to publish, roll back or delete, its request appears here and the agent waits for your decision.",
+      "When an agent asks to publish, roll back or delete, or an agent in Manual mode wants to change anything, its request appears here and the agent waits for your decision.",
+    manualPrompt: "{agent} works in Manual mode, so this change waits for you: {tool}.",
+    manualPromptShort: "Manual mode: {tool}",
+    manualHint:
+      "Manual mode asks before every change. Approving lets the agent make this one edit with exactly these arguments; it is snapshotted like any other.",
     noHistory: "No decisions yet",
     noHistoryDescription: "Approved, denied, used and expired requests are listed here.",
     requested: "Requested",
@@ -718,7 +819,8 @@ export const en = {
     banner: {
       title: "{count} agent requests are waiting for your approval",
       titleOne: "An agent request is waiting for your approval",
-      description: "Agents can't publish, roll back or delete until a person decides.",
+      description:
+        "Agents can't publish, roll back or delete, and agents in Manual mode can't change anything, until a person decides.",
       action: "Review requests",
     },
   },

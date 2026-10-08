@@ -3,7 +3,7 @@ import { ClockCounterClockwise } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import { api, isNotEnabled } from "../lib/api.ts";
-import { Decision, useToolLabel } from "./Audit.tsx";
+import { DecisionCell, useToolLabel } from "./Audit.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
 
 /** Compact "Recent activity" table for the site overview: the five newest audit events. */
@@ -67,7 +67,7 @@ export function RecentActivity({ siteId, limit = 5 }: { siteId: string; limit?: 
               </div>
             </Table.Cell>
             <Table.Cell className="w-0 whitespace-nowrap text-right">
-              <Decision decision={r.decision} />
+              <DecisionCell row={r} align="end" />
             </Table.Cell>
           </Table.Row>
         ))}

@@ -12,21 +12,24 @@ import {
   Table,
   Tabs,
   Text,
+  Tooltip,
 } from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
 import {
   Copy,
   DotsThree,
-  HandPalm,
   Info,
   Key,
   PlugsConnected,
   Plus,
   Robot,
+  SlidersHorizontal,
   Trash,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { HowModesWorkCard, ModeBadge } from "../components/AgentModes.tsx";
+import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
@@ -36,13 +39,60 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
-import { APPROVAL_GATED_TOOLS, mcpSnippet, type SnippetKind, sortScopes } from "../lib/agents.ts";
+import {
+  DEFAULT_MODE,
+  isKeyMode,
+  mcpSnippet,
+  type SnippetKind,
+  sameScopes,
+  scopesForMode,
+  sortScopes,
+} from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
 
 const matches = (k: AgentKeySummary, q: string) =>
   (k.name ?? "").toLowerCase().includes(q) ||
   (k.start ?? "").toLowerCase().includes(q) ||
+  (k.mode ?? "").includes(q) ||
   k.scopes.some((s) => s.includes(q));
+
+/** Keys from servers that predate modes read as `edits`, like the server does. */
+const modeOf = (k: AgentKeySummary) => (isKeyMode(k.mode) ? k.mode : DEFAULT_MODE);
+
+/**
+ * A key's scopes: one quiet "Mode default" badge (scopes in its tooltip) when they are exactly what
+ * the mode prefills, so customised keys stand out with their full list.
+ */
+function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
+  const t = useT();
+  const scopes = sortScopes(agentKey.scopes);
+  if (sameScopes(scopes, scopesForMode(modeOf(agentKey)))) {
+    return (
+      <span data-scopes="mode-default" className="inline-flex">
+        <Tooltip
+          content={
+            <span className="grid gap-0.5">
+              {scopes.map((s) => (
+                <span key={s} className="font-mono text-[0.9em]">
+                  {s}
+                </span>
+              ))}
+            </span>
+          }
+        >
+          <Badge variant="outline">{t("agents.scopesModeDefault", { count: scopes.length })}</Badge>
+        </Tooltip>
+      </span>
+    );
+  }
+  return (
+    <div className="flex min-w-60 flex-wrap gap-1" data-scopes="custom">
+      {scopes.map((s) => (
+        <ScopeBadge key={s} scope={s} />
+      ))}
+    </div>
+  );
+}
 
 /** The "Connect an MCP client" card: endpoint, header and ready-to-paste client config. */
 export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
@@ -99,34 +149,15 @@ export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
   );
 }
 
-function ApprovalsCard() {
-  const t = useT();
-  return (
-    <LayerCard>
-      <LayerCard.Secondary className="flex items-center gap-2 px-5 py-3">
-        <HandPalm size={16} className="text-kumo-subtle" />
-        <Text variant="heading" as="h2">
-          {t("agents.approvals.title")}
-        </Text>
-      </LayerCard.Secondary>
-      <LayerCard.Primary className="grid gap-3 px-5 py-4">
-        <Text variant="secondary">{t("agents.approvals.description")}</Text>
-        <div className="grid gap-2">
-          {APPROVAL_GATED_TOOLS.map((tool) => (
-            <div key={tool} className="flex items-center justify-between gap-3">
-              <Text as="span">{t(`tools.${tool as "publish"}`)}</Text>
-              <Text variant="mono-secondary" as="span">
-                {tool}
-              </Text>
-            </div>
-          ))}
-        </div>
-      </LayerCard.Primary>
-    </LayerCard>
-  );
-}
-
-function KeyMenu({ agentKey, onRevoke }: { agentKey: AgentKeySummary; onRevoke: () => void }) {
+function KeyMenu({
+  agentKey,
+  onChangeMode,
+  onRevoke,
+}: {
+  agentKey: AgentKeySummary;
+  onChangeMode: () => void;
+  onRevoke: () => void;
+}) {
   const t = useT();
   const toast = useToast();
   return (
@@ -143,6 +174,9 @@ function KeyMenu({ agentKey, onRevoke }: { agentKey: AgentKeySummary; onRevoke: 
         }
       />
       <DropdownMenu.Content align="end">
+        <DropdownMenu.Item icon={SlidersHorizontal} onClick={onChangeMode}>
+          {t("agents.changeMode.menu")}
+        </DropdownMenu.Item>
         <DropdownMenu.Item
           icon={Copy}
           onClick={async () => {
@@ -152,6 +186,7 @@ function KeyMenu({ agentKey, onRevoke }: { agentKey: AgentKeySummary; onRevoke: 
         >
           {t("agents.copyId")}
         </DropdownMenu.Item>
+        <DropdownMenu.Separator />
         <DropdownMenu.Item icon={Trash} variant="danger" onClick={onRevoke}>
           {t("agents.revoke")}
         </DropdownMenu.Item>
@@ -173,6 +208,7 @@ export function AgentsPage() {
   const paging = usePaging(keys.data, matches);
   const [createOpen, setCreateOpen] = useState(false);
   const [toRevoke, setToRevoke] = useState<AgentKeySummary | undefined>();
+  const [toChange, setToChange] = useState<AgentKeySummary | undefined>();
   const endpoint = mcpEndpoint(window.location.origin);
   const notEnabled = isNotEnabled(keys.error);
 
@@ -205,7 +241,7 @@ export function AgentsPage() {
       description={t("agents.description")}
       icon={<Robot size={32} className="text-kumo-subtle" />}
       usage={<ConnectMcpCard endpoint={endpoint} />}
-      additionalContent={<ApprovalsCard />}
+      additionalContent={<HowModesWorkCard />}
     >
       <div className="grid gap-4">
         {notEnabled ? (
@@ -242,6 +278,7 @@ export function AgentsPage() {
               <Table.Header>
                 <Table.Row>
                   <Table.Head>{t("agents.columns.name")}</Table.Head>
+                  <Table.Head>{t("agents.columns.mode")}</Table.Head>
                   <Table.Head>{t("agents.columns.scopes")}</Table.Head>
                   <Table.Head>{t("agents.columns.created")}</Table.Head>
                   <Table.Head>{t("agents.columns.status")}</Table.Head>
@@ -249,11 +286,11 @@ export function AgentsPage() {
                 </Table.Row>
               </Table.Header>
               {keys.isPending ? (
-                <TableSkeleton columns={5} rows={3} />
+                <TableSkeleton columns={6} rows={3} />
               ) : paging.pageItems.length === 0 ? (
                 <Table.Body>
                   <Table.Row>
-                    <Table.Cell colSpan={5}>
+                    <Table.Cell colSpan={6}>
                       <Empty
                         size="sm"
                         icon={<Key size={32} className="text-kumo-inactive" />}
@@ -278,12 +315,11 @@ export function AgentsPage() {
                           )}
                         </div>
                       </Table.Cell>
+                      <Table.Cell className="whitespace-nowrap">
+                        <ModeBadge mode={modeOf(k)} />
+                      </Table.Cell>
                       <Table.Cell>
-                        <div className="flex min-w-60 flex-wrap gap-1">
-                          {sortScopes(k.scopes).map((s) => (
-                            <ScopeBadge key={s} scope={s} />
-                          ))}
-                        </div>
+                        <KeyScopes agentKey={k} />
                       </Table.Cell>
                       <Table.Cell className="whitespace-nowrap">
                         <div className="grid gap-0.5">
@@ -313,7 +349,11 @@ export function AgentsPage() {
                         )}
                       </Table.Cell>
                       <Table.Cell sticky="right" className="text-right">
-                        <KeyMenu agentKey={k} onRevoke={() => setToRevoke(k)} />
+                        <KeyMenu
+                          agentKey={k}
+                          onChangeMode={() => setToChange(k)}
+                          onRevoke={() => setToRevoke(k)}
+                        />
                       </Table.Cell>
                     </Table.Row>
                   ))}
@@ -332,6 +372,10 @@ export function AgentsPage() {
         )}
       </div>
       <CreateAgentKeyDialog open={createOpen} onOpenChange={setCreateOpen} endpoint={endpoint} />
+      <ChangeAgentModeDialog
+        agentKey={toChange}
+        onOpenChange={(o) => !o && setToChange(undefined)}
+      />
       <DeleteResource
         open={toRevoke !== undefined}
         onOpenChange={(o) => {

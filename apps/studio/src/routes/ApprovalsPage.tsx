@@ -15,16 +15,18 @@ import { CodeHighlighted } from "@cloudhal/ui/code";
 import { CheckCircle, ClockCountdown, HandPalm, Info, X } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityViews } from "../components/ActivityViews.tsx";
+import { ModeBadge } from "../components/AgentModes.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
-import { ActorCell, ToolCell } from "../components/Audit.tsx";
+import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
+import { isManualModeRequest } from "../lib/agents.ts";
 import { type Approval, api, isNotEnabled } from "../lib/api.ts";
 import {
   expiresSoon,
@@ -49,6 +51,26 @@ function SectionHeading({ title, count }: { title: string; count?: number | unde
   );
 }
 
+/**
+ * The request's question as plain text. Manual-mode writes (ADR-0015) carry a terse policy reason
+ * ("manual mode: update_entry needs a person's approval"); those read as a localised sentence.
+ */
+function usePromptText() {
+  const t = useT();
+  const label = useToolLabel();
+  return useCallback(
+    (request: Approval, short = false) => {
+      if (!isManualModeRequest(request.prompt) || needsConfirmation(request.tool))
+        return request.prompt;
+      const tool = label(request.tool);
+      return short
+        ? t("approvals.manualPromptShort", { tool })
+        : t("approvals.manualPrompt", { agent: request.actor.name ?? request.actor.id, tool });
+    },
+    [t, label],
+  );
+}
+
 /** One pending request: who asks for what, the server's question as plain text, and the decision. */
 function PendingRequest({
   request,
@@ -60,8 +82,11 @@ function PendingRequest({
   onDecide: (decision: Decision) => void;
 }) {
   const t = useT();
+  const promptText = usePromptText();
   const args = formatArguments(request.input);
   const soon = expiresSoon(request.expiresAt);
+  const manual = isManualModeRequest(request.prompt) && !needsConfirmation(request.tool);
+  const prompt = promptText(request);
   return (
     <div className="grid gap-3 px-5 py-4" data-approval-id={request.id} data-tool={request.tool}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -95,8 +120,23 @@ function PendingRequest({
           </Button>
         </div>
       </div>
-      {/* Server-built text that can quote agent-written titles: rendered as plain text. */}
-      <Text>{request.prompt}</Text>
+      {manual ? (
+        // Manual mode: the server's reason is a terse policy line; say what it means instead.
+        <div className="grid gap-1.5" data-manual-mode="true">
+          <div className="flex items-start gap-2">
+            <span className="flex h-lh items-center">
+              <ModeBadge mode="manual" />
+            </span>
+            <Text>{prompt}</Text>
+          </div>
+          <Text variant="secondary" size="sm">
+            {t("approvals.manualHint")}
+          </Text>
+        </div>
+      ) : (
+        // Server-built text that can quote agent-written titles: rendered as plain text.
+        <Text>{prompt}</Text>
+      )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <span className="flex items-center gap-1.5">
           <Text variant="secondary" size="sm" as="span">
@@ -154,6 +194,7 @@ function HistoryTable({
   meId: string | undefined;
 }) {
   const t = useT();
+  const promptText = usePromptText();
   return (
     <LayerCard className="overflow-x-auto p-0">
       <Table>
@@ -188,9 +229,9 @@ function HistoryTable({
                 <Table.Cell>
                   <div className="grid w-72 gap-1">
                     <ToolCell tool={r.tool} />
-                    <Tooltip content={r.prompt} className="block min-w-0 text-left">
+                    <Tooltip content={promptText(r)} className="block min-w-0 text-left">
                       <Text variant="secondary" size="sm" truncate>
-                        {r.prompt}
+                        {promptText(r, true)}
                       </Text>
                     </Tooltip>
                   </div>

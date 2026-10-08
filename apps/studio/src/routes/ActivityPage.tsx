@@ -24,7 +24,7 @@ import { useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog.tsx";
 import { ActivityViews } from "../components/ActivityViews.tsx";
-import { ActorCell, Decision, Outcome, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import { ActorCell, DecisionCell, Outcome, ToolCell, useToolLabel } from "../components/Audit.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -212,10 +212,10 @@ export function ActivityPage() {
                       <ToolCell tool={r.tool} />
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
-                      <Decision decision={r.decision} />
+                      <DecisionCell row={r} />
                     </Table.Cell>
-                    <Table.Cell className="min-w-48 max-w-64">
-                      <ActorCell actor={r.actor} />
+                    <Table.Cell className="min-w-56 max-w-80">
+                      <ActorCell actor={r.actor} mode={r.mode} />
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       <RelativeTime iso={r.at} />

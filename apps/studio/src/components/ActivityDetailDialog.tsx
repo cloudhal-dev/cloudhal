@@ -1,11 +1,13 @@
 import { Banner, InlineCopyText, LayerDialog, LinkButton, Text } from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
-import { GitDiff, HandPalm, Prohibit } from "@phosphor-icons/react";
+import { GitDiff, HandPalm, Lightning, Prohibit } from "@phosphor-icons/react";
 import { type ReactNode, useRef } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { absoluteTime, formatInput, relativeTime } from "../lib/activity.ts";
+import { autoApprovalCount, isAutoApproved } from "../lib/agents.ts";
 import type { AuditRow } from "../lib/api.ts";
-import { ActorCell, Decision, Outcome, useToolLabel } from "./Audit.tsx";
+import { ModeBadge } from "./AgentModes.tsx";
+import { ActorCell, DecisionCell, Outcome, useToolLabel } from "./Audit.tsx";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -41,6 +43,8 @@ export function ActivityDetailDialog({
   const row = current ?? last.current;
   const label = useToolLabel();
   const input = row ? formatInput(row.input) : undefined;
+  const autoApproved = row ? isAutoApproved(row) : false;
+  const autoCount = autoApprovalCount(row?.reason);
   return (
     <LayerDialog.Root open={current !== undefined} onOpenChange={onOpenChange}>
       <LayerDialog.Content size="lg" closeLabel={t("common.close")}>
@@ -53,6 +57,18 @@ export function ActivityDetailDialog({
         <LayerDialog.Body>
           {row && (
             <div className="grid gap-5" data-testid="activity-detail">
+              {autoApproved && (
+                <Banner
+                  variant="alert"
+                  icon={<Lightning weight="fill" />}
+                  title={t("activity.autoApprovedTitle")}
+                  description={
+                    autoCount === undefined
+                      ? t("activity.autoApprovedDescription")
+                      : t("activity.autoApprovedDescriptionCount", { count: autoCount })
+                  }
+                />
+              )}
               {row.reason && row.decision !== "allow" && (
                 <Banner
                   variant={row.decision === "deny" ? "error" : "alert"}
@@ -82,10 +98,20 @@ export function ActivityDetailDialog({
                     {row.tool}
                   </Text>
                 </Row>
+                {row.mode && row.actor.kind === "agent" && (
+                  <Row label={t("activity.detail.mode")}>
+                    <div className="grid gap-1">
+                      <ModeBadge mode={row.mode} />
+                      <Text variant="secondary" size="sm">
+                        {t("activity.detail.modeHint")}
+                      </Text>
+                    </div>
+                  </Row>
+                )}
                 <Row label={t("activity.detail.decision")}>
-                  <Decision decision={row.decision} />
+                  <DecisionCell row={row} />
                 </Row>
-                {row.reason && row.decision === "allow" && (
+                {row.reason && row.decision === "allow" && !autoApproved && (
                   <Row label={t("activity.detail.reason")}>
                     <Text as="span">{row.reason}</Text>
                   </Row>
