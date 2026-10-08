@@ -46,7 +46,7 @@ export type DecisionFilter = "all" | AuditDecision;
 export interface ActivityFilter {
   kind: KindFilter;
   decision: DecisionFilter;
-  /** Matches the tool name, its label, the actor name or the skill (case-insensitive). */
+  /** Matches the tool name, its label, the actor name, the skill or the mode (case-insensitive). */
   search: string;
 }
 
@@ -67,8 +67,8 @@ export function filterActivity(
       (f.kind === "all" || r.actor.kind === f.kind) &&
       (f.decision === "all" || r.decision === f.decision) &&
       (!q ||
-        [r.tool, label(r.tool), r.actor.name ?? "", r.actor.id, r.skill ?? ""].some((s) =>
-          s.toLowerCase().includes(q),
+        [r.tool, label(r.tool), r.actor.name ?? "", r.actor.id, r.skill ?? "", r.mode ?? ""].some(
+          (s) => s.toLowerCase().includes(q),
         )),
   );
 }

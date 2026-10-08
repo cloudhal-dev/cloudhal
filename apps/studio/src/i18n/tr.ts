@@ -234,11 +234,12 @@ export const tr: Messages = {
   agents: {
     title: "Agent'lar",
     description:
-      "Anahtarlar; agent'ların, CI işlerinin ve MCP istemcilerinin sitelerinde yalnızca senin verdiğin yetkilerle çalışmasını sağlar. Her çağrı politika tarafından denetlenir ve sitenin etkinlik kaydına yazılır.",
+      "Anahtarlar; agent'ların, CI işlerinin ve MCP istemcilerinin sitelerinde çalışmasını sağlar. Her anahtarın bir modu vardır: agent'ın neyi kendi başına yapacağını, neyin senin onayını bekleyeceğini belirler. Her çağrı politika tarafından denetlenir ve sitenin etkinlik kaydına yazılır.",
     createKey: "Anahtar oluştur",
     search: "Anahtarlarda ara",
     columns: {
       name: "Ad",
+      mode: "Mod",
       scopes: "Yetkiler",
       created: "Oluşturulma",
       status: "Durum",
@@ -250,6 +251,7 @@ export const tr: Messages = {
     unnamed: "Adsız anahtar",
     keyPrefix: "{start}…",
     fullAccess: "Tam erişim",
+    scopesModeDefault: "Mod varsayılanı · {count} yetki",
     empty: "Henüz agent anahtarı yok",
     emptyDescription:
       "Her agent ya da otomasyon için ayrı bir anahtar oluştur, yalnızca ihtiyaç duyduğu yetkileri ver, iş bitince iptal et.",
@@ -273,25 +275,113 @@ export const tr: Messages = {
       "site:publish": "Bir snapshot'ı canlı siteye yayınlar",
       "site:rollback": "Canlı siteyi geri alır",
     },
+    modes: {
+      legend: "Mod",
+      names: {
+        plan: "Plan",
+        manual: "Manuel",
+        edits: "Düzenleme",
+        auto: "Otomatik",
+        bypass: "Bypass",
+      },
+      descriptions: {
+        plan: "Sitelerini okur ve önizleme oluşturur. Değişiklik önerebilir ama hiçbirini kendisi yapmaz.",
+        manual: "Ne kadar küçük olursa olsun her değişiklikten önce sana sorar.",
+        edits:
+          "İçeriği serbestçe oluşturur ve düzenler. Her değişiklik snapshot'lanır ve geri alınabilir.",
+        auto: "Düzenleme gibi çalışır; küçük makale yayınları ise sana sormadan canlıya çıkar.",
+        bypass: "Hiçbir şey onay beklemez. Yalnızca kendi bilgisayarındaki cloudhal mcp için.",
+      },
+      waitsLabel: "Senin onayını bekler:",
+      waits: {
+        plan: "hiçbir şey, çünkü hiçbir şeyi değiştiremez",
+        manual: "her düzenleme, yayın, geri alma ve silme",
+        edits: "yayın, geri alma ve silme",
+        auto: "büyük yayınlar, geri alma ve silme",
+        bypass: "hiçbir şey",
+      },
+      risk: {
+        safest: "En güvenli",
+        recommended: "Önerilen",
+        caution: "Dikkatli kullan",
+      },
+      current: "Geçerli",
+      bypassHint:
+        "Hiçbir şeyin onay beklemediği Bypass modu anahtarlar için sunulmaz. Yalnızca kendi bilgisayarındaki yerel sunucuda vardır:",
+      autoTitle: "Küçük yayınlar sana sormadan canlıya çıkar",
+      autoDescription:
+        "Otomatik modda yalnızca makale ekleyen ya da düzenleyen bir yayın hemen canlıya çıkar: hiçbir şey silinmez, sayfalar ve site ayarları değişmez, en fazla {limit} değişiklik olur. Etkinlik kaydında otomatik onaylandı olarak görünür ve tek tıkla geri alabilirsin. Daha büyük yayınlar, geri alma ve silme yine senin onayını bekler.",
+      autoConfirm: "Bu agent'ın benim onayım olmadan yayın yapabileceğini anlıyorum",
+      autoConfirmRequired: "Otomatik modun ne yaptığını anladığını onayla",
+    },
+    howModes: {
+      title: "Modlar nasıl çalışır",
+      description:
+        "Mod, agent'ın neyi kendi başına yapacağını ve neyin senin onayını bekleyeceğini belirler. Asıl sınır yine yetkilerdir: mod hiçbir zaman daha fazlasını vermez.",
+      columns: {
+        mode: "Mod",
+        edits: "İçerik",
+        publish: "Yayın",
+        rollback: "Geri alma, silme",
+      },
+      rules: {
+        denied: "Kapalı",
+        waits: "Bekler",
+        free: "Serbest",
+        lowRisk: "Küçükse",
+      },
+      rulesHint: {
+        denied: "Agent bu modda bunu yapamaz.",
+        waits: "Agent sorar; sen sitenin Etkinlik › Onaylar ekranında onaylarsın.",
+        free: "Agent bunu kendi başına yapar. Her değişiklik snapshot'lanır.",
+        lowRisk:
+          "Yalnızca eklenen ya da düzenlenen makaleler, silme yok, en fazla {limit} değişiklik. Daha büyüğü senin onayını bekler.",
+      },
+      gated: "Anahtarla her zaman senin onayını bekler",
+      bypass: "Bypass yalnızca kendi bilgisayarın için:",
+    },
+    changeMode: {
+      menu: "Modu değiştir",
+      title: "Modu değiştir",
+      description: "“{name}” bundan sonra nasıl çalışsın, seç.",
+      from: "Şu an",
+      to: "Yeni",
+      nextCallTitle: "Agent'ın bir sonraki çağrısında geçerli olur",
+      nextCall:
+        "Hâlihazırda süren çağrılar mevcut modda tamamlanır. Değişiklik denetim kaydına yazılır.",
+      submit: "Modu değiştir",
+      failed: "Mod değiştirilemedi",
+      changed: "Mod değiştirildi",
+      changedDescription: "{name} artık {mode} modunda çalışıyor.",
+    },
     create: {
       title: "Agent anahtarı oluştur",
-      description:
-        "Anahtar, açabildiğin her sitede bir agent olarak çalışır; burada seçtiğin yetkilerle sınırlıdır.",
+      description: "Anahtar, açabildiğin her sitede seçtiğin modda bir agent olarak çalışır.",
+      stepMode: "Adım 1 / 2 · Bir mod seç",
+      stepDetails: "Adım 2 / 2 · Ad ve yetkiler",
+      continue: "Devam et",
+      mode: "Mod",
+      changeMode: "Değiştir",
       name: "Ad",
       namePlaceholder: "ör. Dizüstündeki Claude Code",
       nameHint: "Agent etkinlik kaydında bu adla görünür.",
       nameRequired: "Anahtara bir ad ver",
+      advanced: "Gelişmiş: yetkiler",
+      advancedHint:
+        "{mode} modu için önceden dolduruldu. Asıl sınır yetkilerdir; neyin senin onayını bekleyeceğine mod karar verir.",
+      customised: "Özelleştirildi",
+      resetScopes: "Modun yetkilerini kullan",
+      missingScopesTitle: "Bu modun izin verdiği bazı şeyler çalışmayacak",
+      missingScopes: "{scopes} olmadan agent, {mode} modunun izin verdiği her şeyi yapamaz.",
       scopes: "Yetkiler",
       scopesRequired: "En az bir yetki seç",
       groups: { read: "Okuma", write: "Yazma", release: "Yayınlama ve geri alma" },
       groupHints: {
         read: "Araştıran, özetleyen ya da inceleyen agent'lar için yeterli.",
         write: "Her değişiklik snapshot'lanır ve geri alınabilir.",
-        release: "Agent, ziyaretçilerin gördüğü sürümü değiştirmeyi isteyebilir.",
+        release:
+          "Agent, ziyaretçilerin gördüğü sürümü değiştirebilir ya da değiştirmeyi isteyebilir.",
       },
-      releaseWarningTitle: "Bu anahtar canlı siteyi değiştirmeyi isteyebilir",
-      releaseWarning:
-        "Her yayın ya da geri alma yine bir kişinin onayını bekler, ama anahtarı elinde tutan herkes bu isteği yapabilir. Anahtarı paylaşılan depolara koyma.",
       submit: "Anahtar oluştur",
       failed: "Anahtar oluşturulamadı",
     },
@@ -308,17 +398,12 @@ export const tr: Messages = {
     connect: {
       title: "Bir MCP istemcisi bağla",
       description:
-        "Agent'lar Studio'ya bu adresteki MCP üzerinden ulaşır ve anahtarlarını bir başlıkta gönderir.",
+        "Agent'lar Studio'ya bu adresteki MCP üzerinden ulaşır ve anahtarlarını bir başlıkta gönderir. Bağlandığında agent'a anahtarının modu bildirilir; böylece neyin senin onayını bekleyeceğini bilir.",
       endpoint: "MCP adresi",
       header: "Başlık",
       tabs: { json: "JSON", claude: "Claude Code", stdio: "Yerel" },
       stdioHint:
-        "Kendi bilgisayarında stdio sunucusunu site klasörünün içinde çalıştır; anahtar gerekmez.",
-    },
-    approvals: {
-      title: "Her zaman bir kişi onaylar",
-      description:
-        "Bu araçlar, anahtarın yetkileri ne olursa olsun durur ve MCP istemcisinde bir insana sorar.",
+        "Kendi bilgisayarında stdio sunucusunu site klasörünün içinde çalıştır; anahtar gerekmez. --mode nasıl çalışacağını belirler; bypass yalnızca burada mümkündür.",
     },
   },
   activity: {
@@ -370,7 +455,18 @@ export const tr: Messages = {
       input: "Girdi",
       noInput: "Bu çağrının girdisi yoktu.",
       event: "Olay #{id}",
+      mode: "Mod",
+      modeHint: "Agent bu çağrıyı yaptığında anahtarının modu.",
     },
+    autoApproved: "Otomatik onaylandı",
+    autoApprovedHint:
+      "Bir kişi onaylamadan canlıya çıktı: agent Otomatik modda çalışıyor ve bu yayın düşük riskliydi.",
+    autoApprovedTitle: "Bir kişi onaylamadan yayınlandı",
+    autoApprovedCount: "Yayınlanan makale değişikliği: {count}",
+    autoApprovedDescription:
+      "Agent Otomatik modda çalışıyor ve bu yayın yalnızca makale ekledi ya da düzenledi. Snapshot'lar ekranından geri alabilirsin.",
+    autoApprovedDescriptionCount:
+      "Agent Otomatik modda çalışıyor ve bu yayın yalnızca makale ekledi ya da düzenledi (toplam {count}). Snapshot'lar ekranından geri alabilirsin.",
     recent: "Son etkinlikler",
     recentEmpty: "Henüz agent etkinliği yok",
     recentEmptyDescription: "Bir agent bağla, araç çağrıları burada görünsün.",
@@ -659,12 +755,17 @@ export const tr: Messages = {
     title: "Onaylar",
     views: { activity: "Etkinlik", approvals: "Onaylar" },
     description:
-      "Agent'ların yayınlama, geri alma ve silme istekleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir.",
+      "Agent'ların yayınlama, geri alma ve silme istekleri, Manuel moddaki agent'ların ise tüm değişiklikleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir.",
     pending: "Seni bekleyenler",
     history: "Geçmiş",
     noPending: "Seni bekleyen bir şey yok",
     noPendingDescription:
-      "Bir agent yayınlamak, geri almak ya da silmek istediğinde isteği burada görünür ve agent senin kararını bekler.",
+      "Bir agent yayınlamak, geri almak ya da silmek istediğinde ya da Manuel moddaki bir agent bir şeyi değiştirmek istediğinde isteği burada görünür ve agent senin kararını bekler.",
+    manualPrompt:
+      "{agent} Manuel modda çalışıyor, bu yüzden bu değişiklik senin onayını bekliyor: {tool}.",
+    manualPromptShort: "Manuel mod: {tool}",
+    manualHint:
+      "Manuel mod her değişiklikten önce sorar. Onaylarsan agent bu tek düzenlemeyi tam bu argümanlarla yapabilir; değişiklik her zamanki gibi snapshot'lanır.",
     noHistory: "Henüz karar yok",
     noHistoryDescription:
       "Onaylanan, reddedilen, kullanılan ve süresi dolan istekler burada listelenir.",
@@ -723,7 +824,8 @@ export const tr: Messages = {
     banner: {
       title: "{count} agent isteği onayını bekliyor",
       titleOne: "Bir agent isteği onayını bekliyor",
-      description: "Bir kişi karar verene kadar agent'lar yayınlayamaz, geri alamaz ya da silemez.",
+      description:
+        "Bir kişi karar verene kadar agent'lar yayınlayamaz, geri alamaz ya da silemez; Manuel moddaki agent'lar hiçbir şeyi değiştiremez.",
       action: "İstekleri incele",
     },
   },

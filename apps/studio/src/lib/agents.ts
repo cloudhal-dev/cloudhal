@@ -1,4 +1,4 @@
-import type { AgentScope } from "./api.ts";
+import type { AgentMode, AgentScope, AuditRow, KeyMode } from "./api.ts";
 
 export type GrantableScope = Exclude<AgentScope, "*">;
 export type ScopeGroup = "read" | "write" | "release";
@@ -11,8 +11,93 @@ export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
 };
 export const ALL_GRANTABLE: GrantableScope[] = Object.values(SCOPE_GROUPS).flat();
 
-/** A new key starts read-only; everything else is an explicit choice. */
-export const DEFAULT_SCOPES: GrantableScope[] = [...SCOPE_GROUPS.read];
+/** Modes an owner can give an API key, in order of increasing autonomy (ADR-0015). */
+export const KEY_MODES: readonly KeyMode[] = ["plan", "manual", "edits", "auto"];
+
+/** What new keys get unless the owner picks otherwise (and what keys without a mode read as). */
+export const DEFAULT_MODE: KeyMode = "edits";
+
+export function isKeyMode(value: unknown): value is KeyMode {
+  return typeof value === "string" && (KEY_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * The scopes a key needs to be useful in a mode; mirrors `scopesForMode` in
+ * `packages/agent-runtime/src/modes.ts`, which the server applies when `scopes` is omitted.
+ */
+export function scopesForMode(mode: AgentMode): GrantableScope[] {
+  const read: GrantableScope[] = ["site:read", "content:read", "preview:create"];
+  if (mode === "plan") return read;
+  return [...read, "content:write", "site:publish", "site:rollback"];
+}
+
+/** Same set of scopes, in any order. */
+export function sameScopes(a: readonly AgentScope[], b: readonly AgentScope[]): boolean {
+  return a.length === b.length && a.every((s) => b.includes(s));
+}
+
+/** How much a mode lets an agent do without you: the picker's badge and the auto confirmation. */
+export type ModeRisk = "safest" | "recommended" | "caution";
+export const MODE_RISK: Record<AgentMode, ModeRisk> = {
+  plan: "safest",
+  manual: "safest",
+  edits: "recommended",
+  auto: "caution",
+  bypass: "caution",
+};
+
+/** Badge tone per mode: neutral read-only, green "asks first", blue default, amber autonomy. */
+export function modeVariant(mode: AgentMode): "secondary" | "success" | "info" | "warning" {
+  switch (mode) {
+    case "plan":
+      return "secondary";
+    case "manual":
+      return "success";
+    case "edits":
+      return "info";
+    default:
+      return "warning";
+  }
+}
+
+/** Largest publish `auto` mode lets through without a person (`AUTO_PUBLISH_LIMIT`). */
+export const AUTO_PUBLISH_LIMIT = 20;
+
+/** What happens to each kind of change in each mode (the "How modes work" table, ADR-0015). */
+export type ModeRule = "denied" | "waits" | "free" | "lowRisk";
+export const MODE_RULES: Record<
+  AgentMode,
+  { edits: ModeRule; publish: ModeRule; rollback: ModeRule }
+> = {
+  plan: { edits: "denied", publish: "denied", rollback: "denied" },
+  manual: { edits: "waits", publish: "waits", rollback: "waits" },
+  edits: { edits: "free", publish: "waits", rollback: "waits" },
+  auto: { edits: "free", publish: "lowRisk", rollback: "waits" },
+  bypass: { edits: "free", publish: "free", rollback: "free" },
+};
+
+/** Audit reason the MCP server writes when `auto` mode published without a person. */
+const AUTO_APPROVED = /^auto mode: published without approval(?: \((.+)\))?$/;
+
+/** An `auto`-mode publish that went live without a person. */
+export function isAutoApproved(row: Pick<AuditRow, "reason" | "decision">): boolean {
+  return row.decision === "allow" && AUTO_APPROVED.test(row.reason ?? "");
+}
+
+/**
+ * How many article changes an auto-approved publish carried ("(3 article change(s) only)" in the
+ * server's English reason), so Studio can say it in the person's language.
+ */
+export function autoApprovalCount(reason: string | undefined): number | undefined {
+  const detail = AUTO_APPROVED.exec(reason ?? "")?.[1];
+  const count = /^(\d+) article/.exec(detail ?? "")?.[1];
+  return count === undefined ? undefined : Number(count);
+}
+
+/** Prompts the policy writes for writes that wait only because the agent works in manual mode. */
+export function isManualModeRequest(prompt: string): boolean {
+  return prompt.startsWith("manual mode:");
+}
 
 export function scopeGroup(scope: AgentScope): ScopeGroup | "all" {
   if (scope === "*") return "all";
@@ -30,19 +115,17 @@ export function scopeVariant(scope: AgentScope): "secondary" | "info" | "warning
   return group === "read" ? "secondary" : group === "write" ? "info" : "warning";
 }
 
-/** Keys that can ask to change what is live (publish / roll back) get an explicit warning. */
-export function canRelease(scopes: readonly AgentScope[]): boolean {
-  return scopes.some((s) => s === "*" || SCOPE_GROUPS.release.includes(s as GrantableScope));
-}
-
 /** Stable display order regardless of the order the server returns. */
 export function sortScopes(scopes: readonly AgentScope[]): AgentScope[] {
   const order = (s: AgentScope) => (s === "*" ? -1 : ALL_GRANTABLE.indexOf(s));
   return [...scopes].sort((a, b) => order(a) - order(b));
 }
 
-/** Tools that always stop for a human decision, whatever the key's scopes (ADR-0004). */
-export const APPROVAL_GATED_TOOLS = ["publish", "rollback", "delete_page", "delete_entry"];
+/**
+ * Tools that wait for a person in every mode an API key can hold (ADR-0004, ADR-0015). Publish used
+ * to be one of them; `auto` mode now lets small article publishes through.
+ */
+export const ALWAYS_GATED_TOOLS = ["rollback", "delete_page", "delete_entry"] as const;
 
 export type SnippetKind = "json" | "claude" | "stdio";
 
@@ -63,5 +146,5 @@ export function mcpSnippet(kind: SnippetKind, endpoint: string, key?: string): s
   if (kind === "claude") {
     return `claude mcp add --transport http cloudhal ${endpoint} \\\n  --header "x-api-key: ${secret}"`;
   }
-  return "# Run inside the site project; no key needed on your own machine\ncd my-site\nclaude mcp add cloudhal -- npx cloudhal mcp";
+  return "# Run inside the site project; no key needed on your own machine\ncd my-site\nclaude mcp add cloudhal -- npx cloudhal mcp --mode edits";
 }

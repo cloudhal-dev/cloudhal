@@ -1,22 +1,38 @@
-import { Banner, Checkbox, ClipboardText, Input, LayerDialog, Tabs, Text } from "@cloudhal/ui";
+import {
+  Badge,
+  Banner,
+  Button,
+  Checkbox,
+  ClipboardText,
+  Collapsible,
+  Input,
+  LayerDialog,
+  Tabs,
+  Text,
+} from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
-import { ShieldWarning, Warning } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Info, Warning } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import {
-  canRelease,
-  DEFAULT_SCOPES,
+  DEFAULT_MODE,
   type GrantableScope,
   mcpSnippet,
   SCOPE_GROUPS,
   type ScopeGroup,
   type SnippetKind,
+  sameScopes,
+  scopesForMode,
 } from "../lib/agents.ts";
-import { api, type CreatedAgentKey } from "../lib/api.ts";
+import { api, type CreatedAgentKey, type KeyMode } from "../lib/api.ts";
+import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
+
+type Step = "mode" | "details";
 
 /**
- * Create-key flow in one `LayerDialog` (DESIGN.md §2g): name + grouped scopes, then a one-time
+ * Create-key flow in one `LayerDialog` (DESIGN.md §2g): (1) choose a mode with radio cards, (2) name
+ * the key and, under "Advanced", adjust the scopes prefilled from the mode, then (3) a one-time
  * reveal of the plaintext key with copy affordances. The key lives only in this component's state
  * and is dropped as soon as the dialog closes.
  */
@@ -31,14 +47,25 @@ export function CreateAgentKeyDialog({
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const [step, setStep] = useState<Step>("mode");
+  const [mode, setMode] = useState<KeyMode>(DEFAULT_MODE);
+  const [autoConfirmed, setAutoConfirmed] = useState(false);
+  const [modeSubmitted, setModeSubmitted] = useState(false);
   const [name, setName] = useState("");
-  const [scopes, setScopes] = useState<GrantableScope[]>(DEFAULT_SCOPES);
+  const [scopes, setScopes] = useState<GrantableScope[]>(scopesForMode(DEFAULT_MODE));
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [created, setCreated] = useState<CreatedAgentKey | undefined>();
   const [snippet, setSnippet] = useState<SnippetKind>("json");
 
+  const modeScopes = scopesForMode(mode);
+  const customised = !sameScopes(scopes, modeScopes);
+  const missing = modeScopes.filter((s) => !scopes.includes(s));
+
   const create = useMutation({
-    mutationFn: () => api.agentKeys.create({ name: name.trim(), scopes }),
+    // Scopes the mode would get anyway are left to the server (`scopesForMode`).
+    mutationFn: () =>
+      api.agentKeys.create({ name: name.trim(), mode, ...(customised ? { scopes } : {}) }),
     onSuccess: async (key) => {
       setCreated(key);
       await qc.invalidateQueries({ queryKey: ["agent-keys"] });
@@ -48,8 +75,13 @@ export function CreateAgentKeyDialog({
   // Every opening starts from a clean form; closing forgets the plaintext key.
   useEffect(() => {
     if (open) {
+      setStep("mode");
+      setMode(DEFAULT_MODE);
+      setAutoConfirmed(false);
+      setModeSubmitted(false);
       setName("");
-      setScopes(DEFAULT_SCOPES);
+      setScopes(scopesForMode(DEFAULT_MODE));
+      setAdvancedOpen(false);
       setSubmitted(false);
       setSnippet("json");
       create.reset();
@@ -58,16 +90,30 @@ export function CreateAgentKeyDialog({
     }
   }, [open]);
 
+  const chooseMode = (next: KeyMode) => {
+    setMode(next);
+    setScopes(scopesForMode(next));
+    setAutoConfirmed(false);
+    setModeSubmitted(false);
+  };
+  const continueToDetails = () => {
+    setModeSubmitted(true);
+    if (mode === "auto" && !autoConfirmed) return;
+    setStep("details");
+  };
+
   const nameError = submitted && !name.trim() ? t("agents.create.nameRequired") : undefined;
   const scopesError =
     submitted && scopes.length === 0 ? t("agents.create.scopesRequired") : undefined;
   const submit = () => {
     setSubmitted(true);
+    if (scopes.length === 0) setAdvancedOpen(true);
     if (create.isPending || !name.trim() || scopes.length === 0) return;
     create.mutate();
   };
   const toggle = (scope: GrantableScope, on: boolean) =>
     setScopes((prev) => (on ? [...new Set([...prev, scope])] : prev.filter((s) => s !== scope)));
+  const modeName = t(`agents.modes.names.${mode}`);
 
   return (
     <LayerDialog.Root open={open} onOpenChange={onOpenChange} dismissDisabled={create.isPending}>
@@ -124,9 +170,31 @@ export function CreateAgentKeyDialog({
                 </div>
               </div>
             </div>
+          ) : step === "mode" ? (
+            <div className="grid gap-5" data-testid="create-step-mode">
+              <Text variant="secondary" size="sm">
+                {t("agents.create.stepMode")}
+              </Text>
+              <ModePicker
+                value={mode}
+                onValueChange={chooseMode}
+                legend={t("agents.modes.legend")}
+              />
+              {mode === "auto" && (
+                <AutoModeConfirm
+                  checked={autoConfirmed}
+                  onCheckedChange={setAutoConfirmed}
+                  showError={modeSubmitted}
+                />
+              )}
+              <BypassHint />
+            </div>
           ) : (
             // Deliberately no form element: Base UI checkboxes render as buttons and would submit it.
-            <div className="grid gap-6">
+            <div className="grid gap-6" data-testid="create-step-details">
+              <Text variant="secondary" size="sm">
+                {t("agents.create.stepDetails")}
+              </Text>
               {create.error && (
                 <Banner
                   variant="error"
@@ -135,6 +203,22 @@ export function CreateAgentKeyDialog({
                   description={create.error.message}
                 />
               )}
+              <div className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline">
+                <div className="grid min-w-0 gap-1">
+                  <div className="flex items-center gap-2">
+                    <Text size="sm" bold as="span">
+                      {t("agents.create.mode")}
+                    </Text>
+                    <ModeBadge mode={mode} />
+                  </div>
+                  <Text variant="secondary" size="sm">
+                    {t("agents.modes.waitsLabel")} {t(`agents.modes.waits.${mode}`)}
+                  </Text>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => setStep("mode")}>
+                  {t("agents.create.changeMode")}
+                </Button>
+              </div>
               <Input
                 label={t("agents.create.name")}
                 placeholder={t("agents.create.namePlaceholder")}
@@ -151,61 +235,91 @@ export function CreateAgentKeyDialog({
                 autoFocus
                 maxLength={64}
               />
-              <fieldset className="grid min-w-0 gap-4" aria-label={t("agents.create.scopes")}>
-                <div className="grid gap-1.5">
-                  <Text bold as="span">
-                    {t("agents.create.scopes")}
-                  </Text>
-                  {scopesError && (
-                    <Text variant="error" size="sm">
-                      {scopesError}
-                    </Text>
-                  )}
-                </div>
-                {(Object.entries(SCOPE_GROUPS) as Array<[ScopeGroup, GrantableScope[]]>).map(
-                  ([group, groupScopes]) => (
-                    <div
-                      key={group}
-                      className="grid gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-                      data-scope-group={group}
-                    >
-                      <div className="grid gap-0.5">
-                        <Text size="sm" bold as="span">
-                          {t(`agents.create.groups.${group}`)}
-                        </Text>
+              <Collapsible.Root open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <Collapsible.DefaultTrigger>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>{t("agents.create.advanced")}</span>
+                    {customised && <Badge variant="info">{t("agents.create.customised")}</Badge>}
+                  </span>
+                </Collapsible.DefaultTrigger>
+                <Collapsible.DefaultPanel>
+                  <fieldset
+                    className="grid min-w-0 gap-4 pt-1"
+                    aria-label={t("agents.create.scopes")}
+                    data-testid="advanced-scopes"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="grid min-w-0 flex-1 gap-1.5">
                         <Text variant="secondary" size="sm">
-                          {t(`agents.create.groupHints.${group}`)}
+                          {t("agents.create.advancedHint", { mode: modeName })}
                         </Text>
+                        {scopesError && (
+                          <Text variant="error" size="sm">
+                            {scopesError}
+                          </Text>
+                        )}
                       </div>
-                      <div className="grid gap-2.5">
-                        {groupScopes.map((scope) => (
-                          <Checkbox
-                            key={scope}
-                            checked={scopes.includes(scope)}
-                            onCheckedChange={(on) => toggle(scope, on === true)}
-                            label={
-                              <span className="flex flex-wrap items-baseline gap-x-2">
-                                <span>{t(`agents.scopes.${scope}`)}</span>
-                                <span className="font-mono text-[0.9em] text-kumo-subtle">
-                                  {scope}
-                                </span>
-                              </span>
-                            }
-                          />
-                        ))}
-                      </div>
+                      {customised && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<ArrowCounterClockwise />}
+                          onClick={() => setScopes(modeScopes)}
+                        >
+                          {t("agents.create.resetScopes")}
+                        </Button>
+                      )}
                     </div>
-                  ),
-                )}
-                {canRelease(scopes) && (
-                  <Banner
-                    variant="alert"
-                    icon={<ShieldWarning weight="fill" />}
-                    title={t("agents.create.releaseWarningTitle")}
-                    description={t("agents.create.releaseWarning")}
-                  />
-                )}
-              </fieldset>
+                    {(Object.entries(SCOPE_GROUPS) as Array<[ScopeGroup, GrantableScope[]]>).map(
+                      ([group, groupScopes]) => (
+                        <div
+                          key={group}
+                          className="grid gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline"
+                          data-scope-group={group}
+                        >
+                          <div className="grid gap-0.5">
+                            <Text size="sm" bold as="span">
+                              {t(`agents.create.groups.${group}`)}
+                            </Text>
+                            <Text variant="secondary" size="sm">
+                              {t(`agents.create.groupHints.${group}`)}
+                            </Text>
+                          </div>
+                          <div className="grid gap-2.5">
+                            {groupScopes.map((scope) => (
+                              <Checkbox
+                                key={scope}
+                                checked={scopes.includes(scope)}
+                                onCheckedChange={(on) => toggle(scope, on === true)}
+                                label={
+                                  <span className="flex flex-wrap items-baseline gap-x-2">
+                                    <span>{t(`agents.scopes.${scope}`)}</span>
+                                    <span className="font-mono text-[0.9em] text-kumo-subtle">
+                                      {scope}
+                                    </span>
+                                  </span>
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                    {missing.length > 0 && scopes.length > 0 && (
+                      <Banner
+                        variant="secondary"
+                        size="sm"
+                        icon={<Info weight="fill" />}
+                        title={t("agents.create.missingScopesTitle")}
+                        description={t("agents.create.missingScopes", {
+                          scopes: missing.join(", "),
+                          mode: modeName,
+                        })}
+                      />
+                    )}
+                  </fieldset>
+                </Collapsible.DefaultPanel>
+              </Collapsible.Root>
             </div>
           )}
         </LayerDialog.Body>
@@ -213,6 +327,10 @@ export function CreateAgentKeyDialog({
           {created ? (
             <LayerDialog.Actions.Primary onClick={() => onOpenChange(false)}>
               {t("agents.reveal.done")}
+            </LayerDialog.Actions.Primary>
+          ) : step === "mode" ? (
+            <LayerDialog.Actions.Primary onClick={continueToDetails}>
+              {t("agents.create.continue")}
             </LayerDialog.Actions.Primary>
           ) : (
             <LayerDialog.Actions.Primary onClick={submit} loading={create.isPending}>

@@ -9,9 +9,19 @@ import {
 } from "../src/lib/activity.ts";
 import {
   ALL_GRANTABLE,
-  canRelease,
-  DEFAULT_SCOPES,
+  ALWAYS_GATED_TOOLS,
+  autoApprovalCount,
+  DEFAULT_MODE,
+  isAutoApproved,
+  isKeyMode,
+  isManualModeRequest,
+  KEY_MODES,
+  MODE_RISK,
+  MODE_RULES,
   mcpSnippet,
+  modeVariant,
+  sameScopes,
+  scopesForMode,
   scopeVariant,
   sortScopes,
 } from "../src/lib/agents.ts";
@@ -62,15 +72,76 @@ describe("activity", () => {
   });
 });
 
-describe("agent scopes", () => {
-  it("starts read-only and flags publish/rollback keys", () => {
-    expect(DEFAULT_SCOPES).toEqual(["site:read", "content:read"]);
-    expect(canRelease(DEFAULT_SCOPES)).toBe(false);
-    expect(canRelease(["content:write", "site:rollback"])).toBe(true);
-    expect(canRelease(["*"])).toBe(true);
+describe("agent modes (ADR-0015)", () => {
+  it("offers the four key modes, never bypass, with edits as the default", () => {
+    expect(KEY_MODES).toEqual(["plan", "manual", "edits", "auto"]);
+    expect(DEFAULT_MODE).toBe("edits");
+    expect(isKeyMode("auto")).toBe(true);
+    expect(isKeyMode("bypass")).toBe(false);
+    expect(isKeyMode(undefined)).toBe(false);
+  });
+
+  it("prefills scopes like the server's scopesForMode", () => {
+    expect(scopesForMode("plan")).toEqual(["site:read", "content:read", "preview:create"]);
+    for (const mode of ["manual", "edits", "auto"] as const) {
+      expect(scopesForMode(mode)).toEqual([
+        "site:read",
+        "content:read",
+        "preview:create",
+        "content:write",
+        "site:publish",
+        "site:rollback",
+      ]);
+    }
+    expect(sameScopes(["content:read", "site:read"], ["site:read", "content:read"])).toBe(true);
+    expect(sameScopes(["site:read"], ["site:read", "content:read"])).toBe(false);
     expect(ALL_GRANTABLE).not.toContain("*");
   });
 
+  it("ranks risk and tone by autonomy and documents what waits", () => {
+    expect(MODE_RISK).toMatchObject({
+      plan: "safest",
+      manual: "safest",
+      edits: "recommended",
+      auto: "caution",
+    });
+    expect(KEY_MODES.map(modeVariant)).toEqual(["secondary", "success", "info", "warning"]);
+    expect(MODE_RULES.auto).toEqual({ edits: "free", publish: "lowRisk", rollback: "waits" });
+    expect(MODE_RULES.manual.edits).toBe("waits");
+    expect(MODE_RULES.plan.edits).toBe("denied");
+    expect(ALWAYS_GATED_TOOLS).not.toContain("publish");
+  });
+
+  it("recognises auto-approved publishes and manual-mode requests", () => {
+    const auto = {
+      decision: "allow" as const,
+      reason: "auto mode: published without approval (2 article change(s) only)",
+    };
+    expect(isAutoApproved(auto)).toBe(true);
+    expect(autoApprovalCount(auto.reason)).toBe(2);
+    expect(autoApprovalCount("auto mode: published without approval")).toBeUndefined();
+    expect(
+      isAutoApproved({ decision: "allow", reason: "auto mode: published without approval" }),
+    ).toBe(true);
+    expect(isAutoApproved({ ...auto, decision: "deny" })).toBe(false);
+    expect(
+      isAutoApproved({
+        decision: "approval-required",
+        reason: "auto mode waits for a person: it removes content",
+      }),
+    ).toBe(false);
+    expect(isAutoApproved({ decision: "allow" })).toBe(false);
+    expect(isManualModeRequest("manual mode: update_entry needs a person's approval")).toBe(true);
+    expect(isManualModeRequest('Publish "Sprint 7"?')).toBe(false);
+  });
+
+  it("searches activity by mode", () => {
+    const rows = [row({ id: 1, mode: "auto" }), row({ id: 2, mode: "plan" })];
+    expect(filterActivity(rows, { ...NO_FILTER, search: "auto" }).map((r) => r.id)).toEqual([1]);
+  });
+});
+
+describe("agent scopes", () => {
   it("orders and colours scopes by group", () => {
     expect(sortScopes(["site:publish", "content:read", "*", "content:write"])).toEqual([
       "*",
@@ -91,7 +162,7 @@ describe("agent scopes", () => {
       headers: { "x-api-key": "k_123" },
     });
     expect(mcpSnippet("claude", "https://x.dev/mcp")).toContain('"x-api-key: <your agent key>"');
-    expect(mcpSnippet("stdio", "https://x.dev/mcp")).toContain("cloudhal mcp");
+    expect(mcpSnippet("stdio", "https://x.dev/mcp")).toContain("cloudhal mcp --mode edits");
   });
 });
 

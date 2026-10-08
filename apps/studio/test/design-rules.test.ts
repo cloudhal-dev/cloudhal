@@ -148,7 +148,41 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "ClipboardText",
     "Banner",
     "CodeHighlighted",
+    "Collapsible",
   ],
+  // Agent modes (§2g, ADR-0015): mode-first create flow, change-mode dialog, badges, explainer.
+  "components/CreateAgentKeyDialog.tsx#modes": [
+    "ModePicker",
+    "AutoModeConfirm",
+    "BypassHint",
+    "ModeBadge",
+    "scopesForMode",
+  ],
+  "components/AgentModes.tsx": [
+    "Radio",
+    "Badge",
+    "Tooltip",
+    "Banner",
+    "Checkbox",
+    "LayerCard",
+    "Table",
+  ],
+  "components/ChangeAgentModeDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "ModePicker",
+    "AutoModeConfirm",
+    "BypassHint",
+    "ModeBadge",
+    "Banner",
+    "useToast",
+  ],
+  "routes/AgentsPage.tsx#modes": ["ModeBadge", "HowModesWorkCard", "ChangeAgentModeDialog"],
+  "components/Audit.tsx#modes": ["ModeBadge", "AutoApprovedBadge"],
+  "routes/ActivityPage.tsx#modes": ["DecisionCell", "ActorCell"],
+  "components/ActivityDetailDialog.tsx#modes": ["ModeBadge", "DecisionCell"],
+  "components/RecentActivity.tsx#modes": ["DecisionCell"],
+  "routes/ApprovalsPage.tsx#modes": ["ModeBadge", "isManualModeRequest"],
   "components/ActivityDetailDialog.tsx": ["LayerDialog", "Banner", "CodeHighlighted"],
   "components/SnapshotDiffDialog.tsx": ["LayerDialog", "Tabs", "Badge", "Table", "Empty"],
   "components/EditorLayout.tsx": ["Grid", "Tabs", "Tooltip"],
@@ -321,6 +355,27 @@ describe("design rules (DESIGN.md)", () => {
       .filter((f) => /<LayerDialog\.Content[^>]*>\s*(?:\{|<>)/.test(f.text))
       .map((f) => f.file);
     expect(offenders).toEqual([]);
+  });
+
+  it("mode pickers are Kumo radio cards over the key modes only (bypass is local, ADR-0015)", () => {
+    const modes = files.find((f) => f.file === "components/AgentModes.tsx") as { text: string };
+    const picker = modes.text.slice(modes.text.indexOf("export function ModePicker"));
+    expect(picker).toMatch(/<Radio\.Group[\s\S]*appearance="card"/);
+    expect(picker).toMatch(/KEY_MODES\.map/);
+    // Nothing in Studio may offer or send bypass for a key.
+    const offenders = files
+      .filter((f) => /value=["{]+["']?bypass|mode:\s*["']bypass/.test(f.text))
+      .map((f) => f.file);
+    expect(offenders).toEqual([]);
+  });
+
+  it("every screen that can pick Auto asks for consent first", () => {
+    const pickers = uiFiles.filter(
+      (f) => /<ModePicker\b/.test(f.text) && f.file !== "components/AgentModes.tsx",
+    );
+    expect(pickers.length).toBeGreaterThan(0);
+    const missing = pickers.filter((f) => !/<AutoModeConfirm\b/.test(f.text)).map((f) => f.file);
+    expect(missing).toEqual([]);
   });
 
   it("never injects HTML (approval prompts and skill text can carry agent-written titles)", () => {

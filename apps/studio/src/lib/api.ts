@@ -57,6 +57,8 @@ export interface AuditRow {
   outcome?: "ok" | "error" | "pending";
   snapshotId?: string;
   durationMs?: number;
+  /** Agent mode the call ran under (ADR-0015); absent for people and for older rows. */
+  mode?: AgentMode;
 }
 export type AuditDecision = AuditRow["decision"];
 export type AuditOutcome = NonNullable<AuditRow["outcome"]>;
@@ -78,12 +80,22 @@ export type AgentScope =
   | "site:rollback"
   | "*";
 
+/**
+ * How independently an agent works (ADR-0015, `packages/agent-runtime/src/modes.ts`). A mode never
+ * grants scopes; it narrows them and decides where a person approves.
+ */
+export type AgentMode = "plan" | "manual" | "edits" | "auto" | "bypass";
+/** Modes an API key can hold: `bypass` exists only for the local `cloudhal mcp --mode bypass`. */
+export type KeyMode = Exclude<AgentMode, "bypass">;
+
 export interface AgentKeySummary {
   id: string;
   name: string | null;
   /** First characters of the key, for recognition. */
   start: string | null;
   scopes: AgentScope[];
+  /** Keys created before modes read as `edits` on the server. */
+  mode: KeyMode;
   createdAt: string;
   expiresAt: string | null;
   enabled: boolean;
@@ -291,8 +303,15 @@ export const api = {
   },
   agentKeys: {
     list: () => request<AgentKeySummary[]>("/api/agent-keys"),
-    create: (input: { name: string; scopes: AgentScope[] }) =>
+    /** Without `scopes` the server grants what the mode needs (`scopesForMode`). */
+    create: (input: { name: string; mode?: KeyMode; scopes?: AgentScope[] }) =>
       request<CreatedAgentKey>("/api/agent-keys", { method: "POST", ...json(input) }),
+    /** Audited; applies on the agent's next call. 400 for `bypass` or an unknown mode. */
+    setMode: (id: string, mode: KeyMode) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...json({ mode }),
+      }),
     remove: (id: string) =>
       request<void>(`/api/agent-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),
   },
