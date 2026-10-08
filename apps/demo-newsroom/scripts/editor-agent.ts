@@ -5,6 +5,8 @@
  *   node scripts/editor-agent.ts --project ../my-newsroom        # local: `cloudhal mcp` in that project
  *   node scripts/editor-agent.ts --url https://<admin>/mcp       # deployed; needs CLOUDHAL_API_KEY
  *   node scripts/editor-agent.ts ... --no-publish                # write + preview only
+ *   node scripts/editor-agent.ts ... --yes                       # a person already approved this
+ *                                                                # publish elsewhere; answer "yes"
  *
  * Publishing stops for a person: the server asks for approval and this script relays the question
  * to your terminal. Without a terminal (CI) the answer is "decline".
@@ -64,6 +66,13 @@ function parseFrontmatterOnly(markdown: string): Record<string, string> {
 async function loadPosts(dir: string): Promise<Post[]> {
   const files = (await readdir(dir)).filter((f) => f.endsWith(".md")).sort();
   return Promise.all(files.map(async (f) => parsePost(await readFile(path.join(dir, f), "utf8"))));
+}
+
+/** `--yes` stands for a person who already approved this publish; the question is still logged. */
+async function approve(question: string, preApproved: boolean): Promise<boolean> {
+  if (!preApproved) return ask(question);
+  console.log(`  approval: ${question}\n  → yes (--yes: approved by the person running this)`);
+  return true;
 }
 
 async function ask(question: string): Promise<boolean> {
@@ -269,6 +278,7 @@ async function main() {
       project: { type: "string" },
       content: { type: "string" },
       "no-publish": { type: "boolean" },
+      yes: { type: "boolean" },
     },
   });
   const client = new Client(
@@ -276,7 +286,7 @@ async function main() {
     { capabilities: { elicitation: { form: {} } }, versionNegotiation: { mode: "auto" } },
   );
   client.setRequestHandler("elicitation/create", async (req) =>
-    (await ask(req.params.message))
+    (await approve(req.params.message, values.yes ?? false))
       ? { action: "accept", content: { confirm: true } }
       : { action: "decline" },
   );
