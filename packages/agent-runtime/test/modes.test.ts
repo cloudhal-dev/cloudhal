@@ -156,6 +156,47 @@ describe("agent modes", () => {
     ).toMatchObject({ code: "too-many", lowRisk: false, text: "it changes more than 20 articles" });
     expect(check({ added: [], changed: [], removed: [] }).code).toBe("nothing");
   });
+
+  it("media rides along with its article only when the store says so (RFC-0004 §6.3)", () => {
+    expect(scopesForMode("edits")).toContain("asset:upload");
+    expect(scopesForMode("plan")).not.toContain("asset:upload");
+    const entry = { id: "e1", kind: "contentEntry" };
+    const photo = { id: "asset_photo01", kind: "asset" };
+    const pdf = { id: "asset_paper01", kind: "asset" };
+    const riding = new Set([photo.id]);
+    const withPhoto = checkAutoPublish(
+      { added: [entry, photo], changed: [], removed: [] },
+      { ridingAssets: riding },
+    );
+    // The image does not count toward the limit; its article does.
+    expect(withPhoto).toMatchObject({ code: "low-risk", lowRisk: true, changes: 1 });
+    const withPdf = checkAutoPublish(
+      { added: [entry, photo, pdf], changed: [], removed: [] },
+      { ridingAssets: riding },
+    );
+    expect(withPdf).toMatchObject({ code: "media", lowRisk: false });
+    expect(describeAutoCheck(withPdf)).toBe(
+      "it adds or changes media that is not part of an article change",
+    );
+    // A metadata edit of an existing asset is never riding along.
+    expect(
+      checkAutoPublish(
+        { added: [entry], changed: [{ after: photo }], removed: [] },
+        { ridingAssets: riding },
+      ).code,
+    ).toBe("media");
+    // Without the store's verdict, every asset waits.
+    expect(checkAutoPublish({ added: [entry, photo], changed: [], removed: [] }).code).toBe(
+      "media",
+    );
+    // Pages still count as structure first.
+    expect(
+      checkAutoPublish(
+        { added: [photo, { id: "p", kind: "page" }], changed: [], removed: [] },
+        { ridingAssets: riding },
+      ).code,
+    ).toBe("structure");
+  });
 });
 
 describe("time-boxed elevation (ADR-0016)", () => {

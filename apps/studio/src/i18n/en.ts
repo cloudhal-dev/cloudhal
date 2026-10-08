@@ -539,6 +539,8 @@ export const en = {
       "site:read": "See sites and snapshots",
       "content:read": "Read pages and articles",
       "content:write": "Create, edit and delete pages and articles",
+      "asset:upload": "Upload media and edit its own uploads",
+      "asset:manage": "Edit, retire and delete any media",
       "site:write": "Change site settings",
       "preview:create": "Render draft previews",
       "site:publish": "Publish a snapshot to the live site",

@@ -134,6 +134,8 @@ export type AgentScope =
   | "preview:create"
   | "site:publish"
   | "site:rollback"
+  | "asset:upload"
+  | "asset:manage"
   | "*";
 
 /**
