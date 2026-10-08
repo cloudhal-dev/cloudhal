@@ -30,6 +30,8 @@ Run `deploy` again at any time: it reuses the D1 database, R2 bucket and secrets
 CLOUDHAL_API_KEY=<key> node apps/demo-newsroom/scripts/editor-agent.ts --url https://<studio-host>/mcp
 ```
 
+Or keep the key in a file git ignores and pass `--key-file examples/newsroom/.cloudhal/deploy/agent-key` (chmod 600).
+
 Every change it makes is a snapshot you can diff and roll back in Studio; the Activity tab shows each call it made and your approval.
 
 `pnpm --filter @cloudhal/demo-newsroom test` runs the agent against an in-memory Cloudhal MCP server (approval, decline, idempotent re-runs).

@@ -3,7 +3,7 @@
  * `content/posts/*.md` through Cloudhal's own MCP tools — the same path any AI agent takes.
  *
  *   node scripts/editor-agent.ts --project ../my-newsroom        # local: `cloudhal mcp` in that project
- *   node scripts/editor-agent.ts --url https://<admin>/mcp       # deployed; needs CLOUDHAL_API_KEY
+ *   node scripts/editor-agent.ts --url https://<admin>/mcp       # deployed; CLOUDHAL_API_KEY or --key-file
  *   node scripts/editor-agent.ts ... --no-publish                # write + preview only
  *   node scripts/editor-agent.ts ... --yes                       # a person already approved this
  *                                                                # publish elsewhere; answer "yes"
@@ -279,6 +279,7 @@ async function main() {
       content: { type: "string" },
       "no-publish": { type: "boolean" },
       yes: { type: "boolean" },
+      "key-file": { type: "string" },
     },
   });
   const client = new Client(
@@ -291,10 +292,13 @@ async function main() {
       : { action: "decline" },
   );
   if (values.url) {
-    const key = process.env.CLOUDHAL_API_KEY;
+    // Key from the environment, or a file kept out of git (e.g. <project>/.cloudhal/deploy/agent-key).
+    const key =
+      process.env.CLOUDHAL_API_KEY ??
+      (values["key-file"] ? (await readFile(values["key-file"], "utf8")).trim() : undefined);
     if (!key)
       throw new Error(
-        "set CLOUDHAL_API_KEY to an agent key with content:write (and site:publish to publish)",
+        "set CLOUDHAL_API_KEY or pass --key-file: an agent key with content:write (and site:publish to publish)",
       );
     await client.connect(
       new StreamableHTTPClientTransport(new URL(values.url), {
