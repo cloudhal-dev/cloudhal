@@ -10,7 +10,7 @@
   },
   "type": "module",
   "scripts": {
-    "check": "biome check . && turbo run typecheck && turbo run test",
+    "check": "biome check . && turbo run typecheck && turbo run test --concurrency=3",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "design:lint": "node apps/studio/scripts/design-lint.ts",
