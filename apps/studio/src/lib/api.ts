@@ -245,6 +245,12 @@ export interface TermPreview {
   };
 }
 
+/** A new taxonomy as Studio sends it (the server adds ids, revision and timestamps). */
+export type NewTaxonomy = Omit<
+  Taxonomy,
+  "id" | "siteId" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
+>;
+
 /** An entry as a governance preview lists it. */
 export interface EntrySummary {
   id: string;
@@ -627,6 +633,12 @@ export const api = {
   },
   taxonomies: {
     list: (siteId: string) => request<Taxonomy[]>(`/api/sites/${siteId}/taxonomies`),
+    /** One snapshot; 400 `reserved_key`, 409 `path_conflict` or a taken key, 422 `invalid_labels`. */
+    create: (siteId: string, taxonomy: NewTaxonomy) =>
+      request<{ taxonomy: Taxonomy; snapshot: Snapshot }>(`/api/sites/${siteId}/taxonomies`, {
+        method: "POST",
+        ...json(taxonomy),
+      }),
     update: (taxonomy: Taxonomy) =>
       request<{ taxonomy: Taxonomy; snapshot: Snapshot }>(
         `/api/sites/${taxonomy.siteId}/taxonomies/${taxonomy.id}`,
