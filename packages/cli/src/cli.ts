@@ -5,6 +5,7 @@ import { deploy } from "./commands/deploy.ts";
 import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
+import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "./commands/media.ts";
 import { describeMigration, migrateTags } from "./commands/migrate.ts";
 import { transferOwner } from "./commands/owner.ts";
 import { snapshot } from "./commands/snapshot.ts";
@@ -32,6 +33,11 @@ Usage:
   cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
                                                           move entry tags into tag terms (RFC-0002);
                                                           resumable; --revert <id> undoes a run
+  cloudhal media import-urls [--dry-run] [--include-markdown] [--allow-host <host>]… | --revert <id>
+                                                          copy linked images into the media library
+                                                          (RFC-0004); revertible
+  cloudhal media verify [<assetId>]                       recompute media checksums
+  cloudhal media gc [--dry-run]                           delete unreferenced media bytes (> 24 h old)
   cloudhal --help
 `;
 
@@ -59,6 +65,8 @@ export async function main(argv: string[]): Promise<number> {
       studio: { type: "string" },
       revert: { type: "string" },
       to: { type: "string" },
+      "include-markdown": { type: "boolean" },
+      "allow-host": { type: "string", multiple: true },
     },
   });
   const [command, ...rest] = positionals;
@@ -221,6 +229,36 @@ export async function main(argv: string[]): Promise<number> {
       });
       for (const line of describeMigration(result)) console.log(line);
       return 0;
+    }
+    case "media": {
+      const [what, arg] = rest;
+      if (what === "import-urls") {
+        if (values.revert !== undefined && values["dry-run"])
+          throw new Error("--dry-run and --revert cannot be combined");
+        const result = await mediaImportUrls({
+          projectDir,
+          ...(values["dry-run"] ? { dryRun: true } : {}),
+          ...(values["include-markdown"] ? { includeMarkdown: true } : {}),
+          ...(values.revert !== undefined ? { revert: values.revert } : {}),
+          ...(values["allow-host"]?.length ? { allowHosts: values["allow-host"] } : {}),
+        });
+        for (const line of describeMediaImport(result)) console.log(line);
+        return 0;
+      }
+      if (what === "verify") {
+        const r = await mediaVerify({ projectDir, ...(arg ? { assetId: arg } : {}) });
+        console.log(`checked ${r.checked}: ${r.ok.length} ok, ${r.problems.length} problem(s)`);
+        for (const p of r.problems) console.log(`  ${p.assetId}: ${p.problem}`);
+        return r.problems.length ? 1 : 0;
+      }
+      if (what === "gc") {
+        const r = await mediaGc({ projectDir, ...(values["dry-run"] ? { dryRun: true } : {}) });
+        console.log(
+          `${r.dryRun ? "would delete" : "deleted"} ${r.collected.length} unreferenced file(s)`,
+        );
+        return 0;
+      }
+      throw new Error("usage: cloudhal media import-urls|verify|gc");
     }
     case "mcp": {
       const server = await mcp({

@@ -60,6 +60,11 @@ export interface SafeFetchOptions {
   readonly totalTimeoutMs?: number;
   /** Test seam; defaults to `isPublicAddress`. */
   readonly isAllowedAddress?: (address: string) => boolean;
+  /**
+   * Streams the body to this callback instead of buffering it (`cloudhal media verify` hashes
+   * multi-gigabyte external files this way); `bytes` is then empty and `size` counts the body.
+   */
+  readonly onChunk?: (chunk: Uint8Array) => void;
 }
 
 export interface SafeFetchResult {
@@ -72,6 +77,8 @@ export interface SafeFetchResult {
   readonly chain: readonly string[];
   /** The vetted address the last hop connected to (pinning transports). */
   readonly address?: string;
+  /** Bytes received (also when streamed to `onChunk`). */
+  readonly size: number;
 }
 
 // ───────────────────────────── addresses ─────────────────────────────
@@ -272,8 +279,9 @@ async function readBody(
   body: ReadableStream<Uint8Array> | null,
   maxBytes: number,
   signal: AbortSignal,
-): Promise<Uint8Array> {
-  if (!body) return new Uint8Array(0);
+  onChunk?: (chunk: Uint8Array) => void,
+): Promise<{ bytes: Uint8Array; size: number }> {
+  if (!body) return { bytes: new Uint8Array(0), size: 0 };
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -295,7 +303,8 @@ async function readBody(
           },
         );
       }
-      chunks.push(value);
+      if (onChunk) onChunk(value);
+      else chunks.push(value);
     }
   } catch (e) {
     if (e instanceof InvariantError) throw e;
@@ -304,13 +313,13 @@ async function readBody(
   } finally {
     signal.removeEventListener("abort", onAbort);
   }
-  const out = new Uint8Array(total);
+  const out = new Uint8Array(onChunk ? 0 : total);
   let at = 0;
   for (const c of chunks) {
     out.set(c, at);
     at += c.byteLength;
   }
-  return out;
+  return { bytes: out, size: total };
 }
 
 function withTimeout<T>(
@@ -433,9 +442,15 @@ export async function safeFetch(
           },
         );
       }
-      const bytes = await readBody(res.body, options.maxBytes, controller.signal);
+      const { bytes, size } = await readBody(
+        res.body,
+        options.maxBytes,
+        controller.signal,
+        options.onChunk,
+      );
       return {
         bytes,
+        size,
         contentType,
         url: url.toString(),
         chain,

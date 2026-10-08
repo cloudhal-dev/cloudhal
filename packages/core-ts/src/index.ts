@@ -24,6 +24,15 @@ export * from "./filter.ts";
 export * from "./hash.ts";
 export * from "./ids.ts";
 export * from "./menu.ts";
+export {
+  importMediaUrls,
+  type LoadedSource,
+  MEDIA_MIGRATION,
+  type MediaImportOptions,
+  type MediaImportResult,
+  type MediaRevertResult,
+  revertMediaImport,
+} from "./media-import.ts";
 export * from "./names.ts";
 export * from "./preview-token.ts";
 export {

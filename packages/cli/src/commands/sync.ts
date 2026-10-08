@@ -4,7 +4,13 @@
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { exportSite, importSite, type SiteBundle, withPrimaryDomain } from "@cloudhal/core-ts";
+import {
+  exportSite,
+  importSite,
+  mediaBlobKey,
+  type SiteBundle,
+  withPrimaryDomain,
+} from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
 
@@ -74,8 +80,31 @@ export async function pushSite(
     }
   }
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
-  const bundle = await exportSite(local, cfg.siteId);
-  await local.close();
+  let bundle: SiteBundle;
+  try {
+    bundle = await exportSite(local, cfg.siteId);
+    // Media bytes first (RFC-0004 §4.7): the deployment refuses a bundle whose media it lacks.
+    let uploaded = 0;
+    for (const m of bundle.media ?? []) {
+      const mediaUrl = new URL(`/api/admin/sites/${cfg.siteId}/media/${m.sha256}`, url);
+      const head = await f(mediaUrl, { method: "HEAD", headers: auth });
+      if (head.status === 200) continue;
+      const bytes = await local.blobs.get(mediaBlobKey(cfg.siteId, m.sha256));
+      if (!bytes)
+        throw new Error(`local media ${m.sha256} is missing; run \`cloudhal media verify\``);
+      const put = await f(mediaUrl, {
+        method: "PUT",
+        headers: { ...auth, "content-type": "application/octet-stream" },
+        body: bytes,
+      });
+      if (!put.ok)
+        throw new Error(`uploading media failed (${put.status}): ${brief(await put.text())}`);
+      uploaded++;
+    }
+    if (uploaded) log(`media: ${uploaded} file(s) uploaded`);
+  } finally {
+    await local.close();
+  }
   url.searchParams.set("mode", options.replace ? "replace" : "bootstrap");
   const res = await f(url, {
     method: "PUT",
@@ -129,6 +158,22 @@ export async function pullSite(options: SyncOptions): Promise<{ message: string 
   const bundle = (await res.json()) as SiteBundle;
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   try {
+    // Media bytes first (RFC-0004 §4.7), verified by SHA-256 as they land.
+    let downloaded = 0;
+    for (const m of bundle.media ?? []) {
+      const key = mediaBlobKey(cfg.siteId, m.sha256);
+      if (await local.blobs.head(key)) continue;
+      const got = await f(new URL(`/api/admin/sites/${cfg.siteId}/media/${m.sha256}`, url), {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!got.ok) throw new Error(`downloading media failed (${got.status})`);
+      await local.blobs.put(key, new Uint8Array(await got.arrayBuffer()), {
+        sha256: m.sha256,
+        contentType: m.mediaType,
+      });
+      downloaded++;
+    }
+    if (downloaded) log(`media: ${downloaded} file(s) downloaded`);
     const result = await importSite(local, bundle, {
       mode: options.replace ? "replace" : "bootstrap",
       log,
