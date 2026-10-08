@@ -6,6 +6,7 @@
  */
 import type { Menu, MenuItem, Site } from "@cloudhal/core-contracts";
 import { InvariantError } from "./errors.ts";
+import { ID_PREFIX, newId } from "./ids.ts";
 
 export const MENU_LIMITS = { maxDepth: 6, perLevel: 100, total: 500, labelLength: 100 } as const;
 
@@ -21,6 +22,11 @@ export const MENU_MAX_OPS = 50;
 
 export function defaultMaxDepth(key: string): number {
   return MENU_DEFAULT_DEPTH[key] ?? 3;
+}
+
+/** A new item id (`item_…`), for editors that build items before saving (Studio). */
+export function newMenuItemId(): string {
+  return newId(ID_PREFIX.menuItem);
 }
 
 /** A node an item links to by id. */

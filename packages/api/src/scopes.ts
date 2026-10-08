@@ -24,6 +24,7 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
 
 const S = "/api/sites/:siteId";
 const T = `${S}/terms/:termId`;
+const M = `${S}/menus`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -112,6 +113,17 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/redirects/:redirectId`, "site:read"],
   ["PUT", `${S}/redirects/:redirectId`, "site:write"],
   ["DELETE", `${S}/redirects/:redirectId`, "site:write"],
+  // navigation menus (RFC-0003 §5): reads site:read, writes site:write (Editor and above, ADR-0019)
+  ["GET", M, "site:read"],
+  ["POST", M, "site:write"],
+  ["POST", `${M}/from-pages`, "site:write"],
+  ["POST", `${M}/preview`, "site:read"],
+  ["GET", `${M}/references`, "site:read"],
+  ["GET", `${M}/:menuId`, "site:read"],
+  ["PUT", `${M}/:menuId`, "site:write"],
+  ["DELETE", `${M}/:menuId`, "site:write"],
+  ["GET", `${M}/:menuId/resolve`, "site:read"],
+  ["POST", `${M}/:menuId/ops`, "site:write"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

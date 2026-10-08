@@ -1,6 +1,7 @@
 import { type Approval, describeOwnOnly, holds } from "@cloudhal/agent-runtime";
-import type { ContentEntry, NodeRef, Site, Snapshot } from "@cloudhal/core-contracts";
+import type { ContentEntry, Menu, NodeRef, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, SnapshotDiff } from "@cloudhal/core-ts";
+import { menuDelta } from "@cloudhal/core-ts/menu";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, missingScope, notFound } from "../errors.ts";
@@ -24,6 +25,50 @@ export interface AssignmentDelta {
   removed: string[];
   /** Set when the primary term changed; `null` = none. */
   primary?: { from: string | null; to: string | null };
+}
+
+/** How one menu changed between two snapshots (RFC-0003 §6.3 counts, for the diff dialog). */
+export interface MenuDiffSummary {
+  menuId: string;
+  key: string;
+  change: "added" | "changed" | "removed";
+  added: number;
+  removed: number;
+  moved: number;
+  changed: number;
+  /** Items before and after. */
+  before: number;
+  after: number;
+}
+
+/** Menu deltas of every menu node in a diff (read from the blobs; a site has a handful). */
+async function menuDiffs(store: SiteGraphStore, diff: SnapshotDiff): Promise<MenuDiffSummary[]> {
+  const pairs: [NodeRef | undefined, NodeRef | undefined, MenuDiffSummary["change"]][] = [
+    ...diff.added.filter((n) => n.kind === "menu").map((n) => [undefined, n, "added"] as const),
+    ...diff.changed
+      .filter((c) => c.after.kind === "menu")
+      .map((c) => [c.before, c.after, "changed"] as const),
+    ...diff.removed.filter((n) => n.kind === "menu").map((n) => [n, undefined, "removed"] as const),
+  ] as [NodeRef | undefined, NodeRef | undefined, MenuDiffSummary["change"]][];
+  const out: MenuDiffSummary[] = [];
+  for (const [before, after, change] of pairs) {
+    const a = before ? await store.readSnapshotNode<Menu>(before) : undefined;
+    const b = after ? await store.readSnapshotNode<Menu>(after) : undefined;
+    const menu = (b ?? a) as Menu;
+    const d = menuDelta(a, b ?? { items: [] });
+    out.push({
+      menuId: menu.id,
+      key: menu.key,
+      change,
+      added: d.added.length,
+      removed: d.removed.length,
+      moved: d.moved.length,
+      changed: d.changed.length,
+      before: d.before,
+      after: d.after,
+    });
+  }
+  return out;
 }
 
 /** Entries whose bodies are compared; larger diffs list the first ones only. */
@@ -142,8 +187,14 @@ export const snapshots: Hono<Env> = new Hono<Env>()
       if (!snap || snap.siteId !== siteId) throw notFound("snapshot not found");
     }
     const diff = await store.diffSnapshots(param(c, "snapshotId"), param(c, "otherId"));
-    if (c.req.query("assignments") !== "1") return c.json(diff);
-    return c.json({ ...diff, assignments: await assignmentDeltas(store, diff) });
+    // `?assignments=1`: term changes of entries; `?menus=1`: menu deltas (RFC-0003 §8).
+    return c.json({
+      ...diff,
+      ...(c.req.query("assignments") === "1"
+        ? { assignments: await assignmentDeltas(store, diff) }
+        : {}),
+      ...(c.req.query("menus") === "1" ? { menus: await menuDiffs(store, diff) } : {}),
+    });
   })
   .post("/:snapshotId/publish", async (c) => {
     const store = c.get("store");

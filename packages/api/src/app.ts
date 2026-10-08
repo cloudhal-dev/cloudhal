@@ -19,6 +19,7 @@ import { entries } from "./routes/entries.ts";
 import { agentModesInfo, instanceRoutes, invitesInfo, rolesInfo } from "./routes/instance.ts";
 import { inviteRoutes } from "./routes/invites.ts";
 import { memberRoutes } from "./routes/members.ts";
+import { menus } from "./routes/menus.ts";
 import { migrations } from "./routes/migrations.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
@@ -228,6 +229,8 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/terms", terms);
   app.route("/api/sites/:siteId/redirects", redirects);
   app.route("/api/sites/:siteId/migrations", migrations);
+  // RFC-0003 §5: navigation menus (people; agents use the MCP menu tools).
+  app.route("/api/sites/:siteId/menus", menus);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

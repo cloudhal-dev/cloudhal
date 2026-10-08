@@ -77,5 +77,13 @@ describe("ROUTE_SCOPES (I15)", () => {
       "site:publish:own",
     );
     expect(requirementFor("DELETE", "/api/sites")).toBeUndefined();
+    // RFC-0003 menus: reads for every member, writes for Editor and above.
+    expect(requirementFor("GET", "/api/sites/site_x/menus/references")).toBe("site:read");
+    expect(requirementFor("POST", "/api/sites/site_x/menus/preview")).toBe("site:read");
+    expect(requirementFor("POST", "/api/sites/site_x/menus/from-pages")).toBe("site:write");
+    expect(requirementFor("PUT", "/api/sites/site_x/menus/menu_y")).toBe("site:write");
+    expect(requirementFor("POST", "/api/sites/site_x/menus/menu_y/ops")).toBe("site:write");
+    expect(requirementFor("DELETE", "/api/sites/site_x/menus/menu_y")).toBe("site:write");
+    expect(requirementFor("GET", "/api/sites/site_x/menus/menu_y/resolve")).toBe("site:read");
   });
 });

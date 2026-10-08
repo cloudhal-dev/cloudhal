@@ -374,6 +374,38 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
             }),
         },
         {
+          name: "read menus",
+          allowed: roles,
+          run: (p) => call("GET", `/api/sites/${siteId}/menus`, { cookie: p.cookie }),
+        },
+        {
+          name: "preview a menu",
+          allowed: roles,
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus/preview`, {
+              cookie: p.cookie,
+              body: { menus: [{ key: "primary" }] },
+            }),
+        },
+        {
+          name: "create a menu (RFC-0003: Editor and above)",
+          allowed: ["editor", "administrator", "owner"],
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus`, {
+              cookie: p.cookie,
+              body: { key: `menu-${p.role}`, items: [] },
+            }),
+        },
+        {
+          name: "create a menu from pages",
+          allowed: ["editor", "administrator", "owner"],
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus/from-pages`, {
+              cookie: p.cookie,
+              body: { key: `pages-${p.role}`, dryRun: true },
+            }),
+        },
+        {
           name: "tags migration",
           allowed: ["administrator", "owner"],
           run: (p) =>
