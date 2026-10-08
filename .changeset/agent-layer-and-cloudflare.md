@@ -8,7 +8,7 @@
 "@cloudhal/core-ts": minor
 "@cloudhal/mcp-server": minor
 "@cloudhal/storage": minor
-"@cloudhal/ui": minor
+"create-cloudhal": minor
 ---
 
 Agent layer and Cloudflare deployment.

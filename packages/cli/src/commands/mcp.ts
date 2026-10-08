@@ -5,10 +5,10 @@
  */
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { AuditLog, type LoadedSkill, loadSkills, type Scope } from "@cloudhal/agent-runtime";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { serveCloudhalStdio } from "@cloudhal/mcp-server/stdio";
+import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 
 export interface McpOptions {
@@ -32,12 +32,9 @@ async function exists(p: string): Promise<boolean> {
 
 /** Where the official skills live when running from the monorepo or an installed package. */
 export async function resolveSkillsDir(projectDir: string): Promise<string | undefined> {
-  const candidates = [
-    path.join(projectDir, "skills"),
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../skills/official"),
-  ];
-  for (const dir of candidates) if (await exists(dir)) return dir;
-  return undefined;
+  const own = path.join(projectDir, "skills");
+  if (await exists(own)) return own;
+  return assetDir("skills");
 }
 
 export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> }> {

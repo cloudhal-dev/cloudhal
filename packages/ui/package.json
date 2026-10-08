@@ -45,5 +45,6 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@types/node": "catalog:"
-  }
+  },
+  "private": true
 }

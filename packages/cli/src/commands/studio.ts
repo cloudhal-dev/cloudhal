@@ -1,10 +1,10 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { createApi } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
@@ -16,9 +16,6 @@ export interface StudioOptions {
   /** Skip authentication (local scripts only). */
   readonly noAuth?: boolean;
 }
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_STUDIO_DIST = path.resolve(here, "../../../../apps/studio/dist");
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -38,7 +35,7 @@ export async function studio(
 ): Promise<{ url: string; stop(): Promise<void> }> {
   const cfg = await readProjectConfig(options.projectDir);
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
-  const studioDist = options.studioDist ?? DEFAULT_STUDIO_DIST;
+  const studioDist = options.studioDist ?? (await assetDir("studio")) ?? "";
   const serveStudio = await exists(path.join(studioDist, "index.html"));
 
   const skillsDir = await resolveSkillsDir(options.projectDir);

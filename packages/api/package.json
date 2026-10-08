@@ -1,7 +1,7 @@
 {
   "name": "@cloudhal/api",
   "version": "0.0.1",
-  "description": "Cloudhal HTTP API (Hono): sites, pages, entries, snapshots, auth \u2014 runs on Node and Cloudflare Workers",
+  "description": "Cloudhal HTTP API (Hono): sites, pages, entries, snapshots, auth — runs on Node and Cloudflare Workers",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -16,8 +16,8 @@
     "./auth/node": "./src/auth-node.ts"
   },
   "files": [
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -57,5 +57,29 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@modelcontextprotocol/client": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./node": {
+        "types": "./dist/src/node.d.ts",
+        "default": "./dist/src/node.js"
+      },
+      "./auth": {
+        "types": "./dist/src/auth.d.ts",
+        "default": "./dist/src/auth.js"
+      },
+      "./auth/node": {
+        "types": "./dist/src/auth-node.d.ts",
+        "default": "./dist/src/auth-node.js"
+      }
+    }
   }
 }

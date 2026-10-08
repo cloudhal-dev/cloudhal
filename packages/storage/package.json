@@ -19,9 +19,8 @@
     "./migrations/*": "./migrations/*"
   },
   "files": [
-    "src",
-    "migrations",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -48,5 +47,38 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./sqlite": {
+        "types": "./dist/src/sql/better-sqlite3.d.ts",
+        "default": "./dist/src/sql/better-sqlite3.js"
+      },
+      "./d1": {
+        "types": "./dist/src/sql/d1.d.ts",
+        "default": "./dist/src/sql/d1.js"
+      },
+      "./r2": {
+        "types": "./dist/src/blob/r2.d.ts",
+        "default": "./dist/src/blob/r2.js"
+      },
+      "./fs": {
+        "types": "./dist/src/blob/fs.d.ts",
+        "default": "./dist/src/blob/fs.js"
+      },
+      "./testing": {
+        "types": "./dist/src/testing.d.ts",
+        "default": "./dist/src/testing.js"
+      },
+      "./migrations/*": "./dist/migrations/*"
+    }
   }
 }

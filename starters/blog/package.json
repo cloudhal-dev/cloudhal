@@ -5,9 +5,13 @@
   "description": "Cloudhal blog starter (Astro). Copied by `cloudhal init`.",
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "cloudhal dev",
+    "build": "cloudhal build",
+    "studio": "cloudhal studio",
+    "snapshot": "cloudhal snapshot",
+    "mcp": "cloudhal mcp",
+    "deploy": "cloudhal deploy",
+    "astro": "astro"
   },
   "dependencies": {
     "@cloudhal/astro-renderer": "workspace:*",
@@ -16,7 +20,8 @@
     "astro": "catalog:",
     "better-sqlite3": "catalog:",
     "tailwindcss": "catalog:",
-    "@astrojs/cloudflare": "catalog:"
+    "@astrojs/cloudflare": "catalog:",
+    "@cloudhal/cli": "workspace:*"
   },
   "devDependencies": {
     "wrangler": "catalog:",

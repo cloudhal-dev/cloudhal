@@ -1,7 +1,7 @@
 {
   "name": "@cloudhal/cli",
   "version": "0.0.1",
-  "description": "cloudhal \u2014 create, run and build Cloudhal sites locally",
+  "description": "cloudhal — create, run and build Cloudhal sites locally",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -16,9 +16,8 @@
     ".": "./src/index.ts"
   },
   "files": [
-    "bin",
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -47,5 +46,20 @@
     "@modelcontextprotocol/client": "catalog:",
     "wrangler": "catalog:",
     "@cloudflare/workers-types": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      }
+    },
+    "bin": {
+      "cloudhal": "./dist/bin/cloudhal.js"
+    }
   }
 }

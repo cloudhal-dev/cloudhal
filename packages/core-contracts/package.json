@@ -15,9 +15,9 @@
     "./bundle": "./scripts/bundle.ts"
   },
   "files": [
+    "dist",
     "schemas",
-    "src",
-    "!src/**/*.test.ts"
+    "README.md"
   ],
   "scripts": {
     "bundle": "tsx scripts/bundle.ts",
@@ -38,5 +38,22 @@
   "dependencies": {
     "ajv": "catalog:",
     "ajv-formats": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./schemas/*": "./schemas/*",
+      "./bundle": {
+        "types": "./dist/scripts/bundle.d.ts",
+        "default": "./dist/scripts/bundle.js"
+      }
+    }
   }
 }

@@ -14,8 +14,8 @@
     "./workerd-prelude": "./src/workerd-prelude.ts"
   },
   "files": [
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -35,5 +35,21 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./admin": {
+        "types": "./dist/src/admin-worker.d.ts",
+        "default": "./dist/src/admin-worker.js"
+      },
+      "./workerd-prelude": {
+        "types": "./dist/src/workerd-prelude.d.ts",
+        "default": "./dist/src/workerd-prelude.js"
+      }
+    }
   }
 }

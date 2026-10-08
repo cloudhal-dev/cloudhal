@@ -16,8 +16,8 @@
     "./http": "./src/http.ts"
   },
   "files": [
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -38,5 +38,29 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@modelcontextprotocol/client": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./tools": {
+        "types": "./dist/src/tools.d.ts",
+        "default": "./dist/src/tools.js"
+      },
+      "./stdio": {
+        "types": "./dist/src/stdio.d.ts",
+        "default": "./dist/src/stdio.js"
+      },
+      "./http": {
+        "types": "./dist/src/http.d.ts",
+        "default": "./dist/src/http.js"
+      }
+    }
   }
 }

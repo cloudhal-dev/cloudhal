@@ -1,0 +1,37 @@
+{
+  "name": "create-cloudhal",
+  "version": "0.0.1",
+  "description": "Create a Cloudhal site: npm create cloudhal@latest",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/create-cloudhal"
+  },
+  "type": "module",
+  "bin": {
+    "create-cloudhal": "./bin/create-cloudhal.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cloudhal/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "bin": {
+      "create-cloudhal": "./dist/bin/create-cloudhal.js"
+    }
+  }
+}
