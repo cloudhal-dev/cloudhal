@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "asset_01HZX8K3Q9FT",
+  "siteId": "site_01HZX8K3Q9EF",
+  "kind": "image",
+  "mediaType": "image/png",
+  "bytes": 10240,
+  "sha256": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
+  "slug": "divider",
+  "storage": {
+    "kind": "blob"
+  },
+  "image": {
+    "width": 1200,
+    "height": 24
+  },
+  "decorative": true,
+  "status": "active",
+  "uploadedBy": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9YZ",
+    "name": "Newsroom Agent"
+  },
+  "source": {
+    "kind": "fetch",
+    "url": "https://images.example.org/assets/divider.png?v=2",
+    "fetchedAt": "2026-10-08T10:00:00Z"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-08T10:00:00Z",
+  "updatedAt": "2026-10-08T10:00:00Z"
+}

@@ -60,10 +60,14 @@
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": ["src", "alt"],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "alt": { "type": "string", "maxLength": 500 },
         "width": { "type": "integer", "minimum": 1 },

@@ -13,6 +13,7 @@ export const ROOT_SCHEMAS = [
   "taxonomy",
   "term",
   "redirect",
+  "asset",
   "menu",
 ] as const;
 

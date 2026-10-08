@@ -356,13 +356,17 @@ export const PageSchema = {
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": [
         "src",
         "alt"
       ],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": {
           "type": "string",
           "minLength": 1,
@@ -788,13 +792,17 @@ export const SectionSchema = {
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": [
         "src",
         "alt"
       ],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": {
           "type": "string",
           "minLength": 1,
@@ -1014,13 +1022,17 @@ export const ContentEntrySchema = {
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": [
         "src",
         "alt"
       ],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": {
           "type": "string",
           "minLength": 1,
@@ -1702,13 +1714,17 @@ export const TermSchema = {
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": [
         "src",
         "alt"
       ],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": {
           "type": "string",
           "minLength": 1,
@@ -1961,6 +1977,493 @@ export const RedirectSchema = {
       "enum": [
         1
       ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
+export const AssetSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/asset.schema.json",
+  "title": "Asset",
+  "description": "A media file of a site (image, video, audio, document, data) as a graph node: its bytes are identified by SHA-256 and stored once per site in the blob store under a content-addressed key, or kept elsewhere (`storage.kind: external`, e.g. a Zenodo or Hugging Face file). Pages, entries and terms refer to it by id (`ImageRef.assetId`, markdown `asset:<id>`). Snapshotted like every node, so a deleted asset's bytes stay while any snapshot references it (RFC-0004).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "kind",
+    "mediaType",
+    "bytes",
+    "sha256",
+    "slug",
+    "storage",
+    "status",
+    "uploadedBy",
+    "source",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/Id"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "kind": {
+      "type": "string",
+      "description": "What the file is, derived from the sniffed media type (never chosen by the client). `other` is allowed for external storage only.",
+      "enum": [
+        "image",
+        "video",
+        "audio",
+        "document",
+        "data",
+        "other"
+      ]
+    },
+    "mediaType": {
+      "type": "string",
+      "description": "MIME type of the stored bytes as sniffed by the server (RFC 6838, lower case, no parameters), e.g. image/webp, text/csv. Served as Content-Type.",
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$",
+      "maxLength": 255
+    },
+    "bytes": {
+      "type": "integer",
+      "description": "Size of the stored bytes. For external files: the size the source reports or the uploader declares.",
+      "minimum": 0
+    },
+    "sha256": {
+      "$ref": "#/$defs/Sha256",
+      "description": "SHA-256 of the stored bytes (lower-case hex): the blob key, the public URL prefix, the ETag and the checksum shown with downloads. Unique per site. For external files see `storage.checksum`."
+    },
+    "originalSha256": {
+      "$ref": "#/$defs/Sha256",
+      "description": "SHA-256 of the bytes as uploaded, present only when the server changed them (image metadata stripping)."
+    },
+    "slug": {
+      "$ref": "#/$defs/Slug",
+      "description": "File name in the public URL, without extension: /media/<sha256[0..16]>/<slug>.<ext>. May change; the old URL then answers 301 to the new one."
+    },
+    "storage": {
+      "$ref": "#/$defs/AssetStorage"
+    },
+    "image": {
+      "$ref": "#/$defs/AssetImage"
+    },
+    "title": {
+      "type": "object",
+      "description": "Display title per locale (download lists, library search).",
+      "propertyNames": {
+        "$ref": "#/$defs/Locale"
+      },
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "alt": {
+      "type": "object",
+      "description": "Alternative text per locale. An `ImageRef.alt` that is not empty overrides it for one use.",
+      "propertyNames": {
+        "$ref": "#/$defs/Locale"
+      },
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "decorative": {
+      "type": "boolean",
+      "description": "The image carries no information and renders with alt=\"\". Absent means false; the store never writes false."
+    },
+    "caption": {
+      "type": "object",
+      "description": "Caption per locale (plain text), the default for figures that show this asset.",
+      "propertyNames": {
+        "$ref": "#/$defs/Locale"
+      },
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    "credit": {
+      "type": "string",
+      "description": "Who made it, as shown next to it (e.g. 'Photo: Ayşe Yılmaz').",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "license": {
+      "$ref": "#/$defs/AssetLicense"
+    },
+    "status": {
+      "type": "string",
+      "description": "active: listed and pickable. retired: hidden from the library and pickers and cannot be newly referenced; existing references keep rendering.",
+      "enum": [
+        "active",
+        "retired"
+      ]
+    },
+    "uploadedBy": {
+      "$ref": "#/$defs/Actor"
+    },
+    "source": {
+      "$ref": "#/$defs/AssetSource"
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
+    "AssetImage": {
+      "type": "object",
+      "description": "Intrinsic size and placeholders of an image. Present for every image stored as a blob.",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "animated": {
+          "type": "boolean",
+          "description": "Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."
+        },
+        "blurhash": {
+          "type": "string",
+          "description": "BlurHash of the image for themes that decode it client-side.",
+          "pattern": "^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"
+        },
+        "lqip": {
+          "type": "string",
+          "description": "Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.",
+          "pattern": "^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$",
+          "maxLength": 4096
+        }
+      }
+    },
+    "AssetLicense": {
+      "description": "Terms the asset may be reused under: an SPDX license expression or a license URL.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "SpdxLicense",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "spdx"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "description": "SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "UrlLicense",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "url"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "url"
+              ]
+            },
+            "url": {
+              "$ref": "#/$defs/HttpsUrl"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        }
+      ]
+    },
+    "AssetSource": {
+      "description": "How the asset came in. Immutable after create.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "UploadSource",
+          "description": "Bytes uploaded by a person (REST) or an agent (MCP upload_asset).",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "upload"
+              ]
+            },
+            "filename": {
+              "type": "string",
+              "description": "Original file name as sent (never used as a storage key or served).",
+              "pattern": "^[^/\\\\\\u0000-\\u001f\\u007f]+$",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "FetchSource",
+          "description": "Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "url",
+            "fetchedAt"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "fetch"
+              ]
+            },
+            "url": {
+              "$ref": "#/$defs/HttpsUrl"
+            },
+            "fetchedAt": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ImportSource",
+          "description": "Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "from"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "import"
+              ]
+            },
+            "from": {
+              "type": "string",
+              "description": "The reference it was imported from: a URL or a site path.",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "importer": {
+              "$ref": "#/$defs/Slug"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "LinkSource",
+          "description": "An external file registered by URL without copying its bytes (storage.kind external).",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "link"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "AssetStorage": {
+      "description": "Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "BlobStorage",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "blob"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ExternalStorage",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "url",
+            "checksum"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "external"
+              ]
+            },
+            "url": {
+              "$ref": "#/$defs/HttpsUrl",
+              "description": "Direct download URL of the file."
+            },
+            "landingPage": {
+              "$ref": "#/$defs/HttpsUrl",
+              "description": "Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."
+            },
+            "checksum": {
+              "type": "string",
+              "description": "How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).",
+              "enum": [
+                "computed",
+                "declared"
+              ]
+            },
+            "verifiedAt": {
+              "$ref": "#/$defs/Timestamp",
+              "description": "When the URL last produced bytes with this SHA-256 (checksum `computed`)."
+            }
+          }
+        }
+      ]
+    },
+    "HttpsUrl": {
+      "type": "string",
+      "description": "Absolute https URL without credentials, whitespace or backslashes.",
+      "pattern": "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$",
+      "maxLength": 2048
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Sha256": {
+      "type": "string",
+      "description": "Lower-case hex SHA-256 digest.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Slug": {
+      "type": "string",
+      "description": "Lower-case URL segment.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128
     },
     "Timestamp": {
       "type": "string",
@@ -2328,5 +2831,6 @@ export const schemas = {
   "taxonomy": TaxonomySchema,
   "term": TermSchema,
   "redirect": RedirectSchema,
+  "asset": AssetSchema,
   "menu": MenuSchema,
 } as const;

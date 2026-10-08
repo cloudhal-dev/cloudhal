@@ -6,6 +6,7 @@
 
 pub mod generated;
 
+pub use generated::asset::Asset;
 pub use generated::content_entry::ContentEntry;
 pub use generated::menu::Menu;
 pub use generated::page::Page;

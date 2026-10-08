@@ -1,0 +1,11 @@
+{
+  "reason": "ImageRef.src stays required: the store writes the asset's media URL so readers that do not resolve assets keep working",
+  "data": {
+    "id": "sec_01HZX8K3Q9AS",
+    "kind": "image",
+    "image": {
+      "assetId": "asset_01HZX8K3Q9PH",
+      "alt": "Ferries"
+    }
+  }
+}

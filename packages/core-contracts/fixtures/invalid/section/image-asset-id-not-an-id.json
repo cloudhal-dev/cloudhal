@@ -1,0 +1,12 @@
+{
+  "reason": "assetId is an Id (prefix_ + 6-32 alphanumerics), not a URL or a hash",
+  "data": {
+    "id": "sec_01HZX8K3Q9AS",
+    "kind": "image",
+    "image": {
+      "assetId": "/media/9f2c4e1a7b3d5f60/x.jpg",
+      "src": "/media/9f2c4e1a7b3d5f60/x.jpg",
+      "alt": "Ferries"
+    }
+  }
+}

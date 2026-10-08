@@ -1,6 +1,7 @@
 import type { ErrorObject } from "ajv";
 import type { RootSchemaName } from "../scripts/schema-list.ts";
 import type {
+  Asset,
   ContentEntry,
   Menu,
   Page,
@@ -27,6 +28,7 @@ export interface ContractTypes {
   taxonomy: Taxonomy;
   term: Term;
   redirect: Redirect;
+  asset: Asset;
   menu: Menu;
 }
 
@@ -41,6 +43,7 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   taxonomy: v.validateTaxonomy,
   term: v.validateTerm,
   redirect: v.validateRedirect,
+  asset: v.validateAsset,
   menu: v.validateMenu,
 };
 

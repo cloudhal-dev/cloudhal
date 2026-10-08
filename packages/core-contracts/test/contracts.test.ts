@@ -74,6 +74,7 @@ const NODE_SCHEMAS = [
   "taxonomy",
   "term",
   "redirect",
+  "asset",
   "menu",
 ] as const;
 

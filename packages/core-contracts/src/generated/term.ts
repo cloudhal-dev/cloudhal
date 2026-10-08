@@ -140,12 +140,16 @@ export interface Seo {
   ogImage?: ImageRef;
 }
 /**
- * Reference to a media asset. src may be a relative asset path or an absolute URL.
+ * Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.
  *
  * This interface was referenced by `Term`'s JSON-Schema
  * via the `definition` "ImageRef".
  */
 export interface ImageRef {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  assetId?: string;
   src: string;
   alt: string;
   width?: number;
