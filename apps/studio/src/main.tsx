@@ -5,9 +5,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppLink } from "./components/AppLink.tsx";
 import { CodeProvider } from "./components/CodeProvider.tsx";
+import { reloadForNewDeploy } from "./components/RouteStates.tsx";
 import { I18nProvider } from "./i18n/index.tsx";
 import { createStudioRouter } from "./router.tsx";
 import "./styles.css";
+
+// A deploy replaced the hashed chunks this tab was built against: reload once to get the new ones.
+window.addEventListener("vite:preloadError", (event) => {
+  if (reloadForNewDeploy()) event.preventDefault();
+});
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000 } },

@@ -3,23 +3,42 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   redirect,
 } from "@tanstack/react-router";
+import { RouteError, RoutePending } from "./components/RouteStates.tsx";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
-import { ActivityPage } from "./routes/ActivityPage.tsx";
-import { AgentsPage } from "./routes/AgentsPage.tsx";
-import { ArticleEditorPage } from "./routes/ArticleEditorPage.tsx";
-import { ArticlesPage } from "./routes/ArticlesPage.tsx";
-import { LoginPage } from "./routes/LoginPage.tsx";
-import { PageEditorPage } from "./routes/PageEditorPage.tsx";
-import { PagesPage } from "./routes/PagesPage.tsx";
-import { SiteOverviewPage } from "./routes/SiteOverviewPage.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
-import { SitesPage } from "./routes/SitesPage.tsx";
 import { SiteTabsLayout } from "./routes/SiteTabsLayout.tsx";
-import { SnapshotsPage } from "./routes/SnapshotsPage.tsx";
+
+/**
+ * Screens load on demand (one chunk each); the shells above stay in the main bundle so the frame
+ * renders immediately. `defaultPreload: "intent"` fetches a screen's chunk on hover/focus.
+ */
+const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
+const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
+const ArticleEditorPage = lazyRouteComponent(
+  () => import("./routes/ArticleEditorPage.tsx"),
+  "ArticleEditorPage",
+);
+const ArticlesPage = lazyRouteComponent(() => import("./routes/ArticlesPage.tsx"), "ArticlesPage");
+const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
+const PageEditorPage = lazyRouteComponent(
+  () => import("./routes/PageEditorPage.tsx"),
+  "PageEditorPage",
+);
+const PagesPage = lazyRouteComponent(() => import("./routes/PagesPage.tsx"), "PagesPage");
+const SiteOverviewPage = lazyRouteComponent(
+  () => import("./routes/SiteOverviewPage.tsx"),
+  "SiteOverviewPage",
+);
+const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
+const SnapshotsPage = lazyRouteComponent(
+  () => import("./routes/SnapshotsPage.tsx"),
+  "SnapshotsPage",
+);
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -133,7 +152,13 @@ const routeTree = rootRoute.addChildren([
 ]);
 
 export function createStudioRouter(queryClient: QueryClient) {
-  return createRouter({ routeTree, context: { queryClient }, defaultPreload: "intent" });
+  return createRouter({
+    routeTree,
+    context: { queryClient },
+    defaultPreload: "intent",
+    defaultPendingComponent: RoutePending,
+    defaultErrorComponent: RouteError,
+  });
 }
 
 declare module "@tanstack/react-router" {
