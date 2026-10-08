@@ -39,11 +39,33 @@ export const KEY_EVENTS = {
   "agent-key.mode": "agentKeyMode",
   "agent-key.elevate": "agentKeyElevate",
   "agent-key.elevation-end": "agentKeyElevationEnd",
+  "agent-key.narrow": "agentKeyNarrow",
+  "agent-key.revoke": "agentKeyRevoke",
 } as const;
 export type KeyEvent = keyof typeof KEY_EVENTS;
 
 export function isKeyEvent(tool: string): tool is KeyEvent {
   return Object.hasOwn(KEY_EVENTS, tool);
+}
+
+/**
+ * Membership events (RFC-0005 §10.1, `site_id` NULL): the deployment's own activity feed on the
+ * Team page lists them, with their label key under `tools`.
+ */
+export const MEMBER_EVENTS = {
+  "member.invite": "memberInvite",
+  "member.invite-revoke": "memberInviteRevoke",
+  "member.invite-accept": "memberInviteAccept",
+  "member.role": "memberRole",
+  "member.remove": "memberRemove",
+  "member.transfer-ownership": "memberTransferOwnership",
+  "member.password-reset": "memberPasswordReset",
+  "member.password-reset-complete": "memberPasswordResetComplete",
+} as const;
+export type MemberEvent = keyof typeof MEMBER_EVENTS;
+
+export function isMemberEvent(tool: string): tool is MemberEvent {
+  return Object.hasOwn(MEMBER_EVENTS, tool);
 }
 
 /** An elevation grant's audit reason ends with `requested by the agent (appr_…)` (ADR-0016). */

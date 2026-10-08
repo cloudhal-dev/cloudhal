@@ -81,7 +81,7 @@ export const tr: Messages = {
     approvals: {
       title: "Onaylar",
       description:
-        "Agent'ların yayınlama, geri alma ve silme istekleri, Manuel moddaki düzenlemeleri ve daha fazla bağımsızlık istekleri bir kişi karar verene kadar burada bekler.",
+        "Agent'ların yayınlama, geri alma ve silme istekleri, Manuel moddaki düzenlemeleri, daha fazla bağımsızlık istekleri ve kişilerin rollerinin tek başına yapamadığı yayınlar, karar verebilecek biri karar verene kadar burada bekler.",
     },
     settings: {
       title: "Ayarlar",
@@ -110,6 +110,11 @@ export const tr: Messages = {
       title: "Yönlendirmeler",
       description:
         "Eski adresler ve ziyaretçileri nereye gönderdikleri. Slug değişikliği, birleştirme ve kaldırma bunları kendiliğinden ekler; sen de ekleyebilirsin.",
+    },
+    team: {
+      title: "Ekip",
+      description:
+        "Bu Studio'da kimlerin, hangi rolle çalıştığı. Kişiler tek kullanımlık bir davet bağlantısıyla katılır; agent'ları hiçbir zaman kendilerinden fazlasını yapamaz.",
     },
   },
   nav: {
@@ -141,6 +146,7 @@ export const tr: Messages = {
     siteSettings: "Ayarlar",
     taxonomy: "Kategoriler ve etiketler",
     redirects: "Yönlendirmeler",
+    team: "Ekip",
   },
   commands: {
     placeholder: "Bir komut yaz…",
@@ -156,6 +162,7 @@ export const tr: Messages = {
     createAgentKey: "Agent anahtarı oluştur",
     goSkills: "Skill'lere git",
     goAccount: "Hesap ayarlarına git",
+    goTeam: "Ekibe git",
     goSiteSettings: "Site ayarlarına git",
     goApprovals: "Onaylara git",
     goTaxonomy: "Kategorilere ve etiketlere git",
@@ -279,6 +286,7 @@ export const tr: Messages = {
     sortTitle: "Başlık",
     saved: "Kaydedildi",
     sendToReview: "İncelemeye gönder",
+    submitForReview: "İncelemeye sun",
     backToDraft: "Taslağa döndür",
     archive: "Arşivle",
     restore: "Taslağa geri al",
@@ -516,10 +524,32 @@ export const tr: Messages = {
     search: "Anahtarlarda ara",
     columns: {
       name: "Ad",
+      owner: "Oluşturan",
       mode: "Mod",
       scopes: "Yetkiler",
       created: "Oluşturulma",
       status: "Durum",
+    },
+    views: { mine: "Senin anahtarların", all: "Tüm anahtarlar" },
+    all: {
+      title: "Bu kurulumdaki tüm agent anahtarları",
+      description:
+        "Yönetici olarak herhangi bir anahtarın yükseltmesini bitirebilir ya da anahtarı iptal edebilirsin. Modunu değiştirmek ve yükseltmek yalnızca anahtarı oluşturan kişiye ait.",
+      search: "Anahtar ya da kişi ara",
+      empty: "Henüz agent anahtarı yok",
+      emptyDescription:
+        "Kişilerin oluşturduğu anahtarlar, kimin oluşturduğuyla birlikte burada görünür.",
+      unknownOwner: "Ayrılmış üye",
+      elevateOnlyCreator:
+        "Bu anahtarı yalnızca onu oluşturan kişi yükseltebilir. Sen yükseltmeyi bitirebilir ya da anahtarı iptal edebilirsin.",
+    },
+    roleCap: "Rolün, agent anahtarlarına en fazla {mode} modunu verebilir.",
+    narrowed: {
+      badge: "Rolle daraltıldı",
+      hint: "Oluşturan kişinin rolü bu anahtarın şu an yapabileceklerini sınırlıyor; çalıştığı yetkiler bunlar.",
+      hintRole:
+        "Oluşturan kişinin rolü artık {role}, bu yüzden anahtar bu yetkilerle çalışıyor. Sonradan terfi etse de anahtar yeniden genişlemez.",
+      stored: "Verilen: {scopes}",
     },
     active: "Etkin",
     disabled: "Devre dışı",
@@ -551,6 +581,11 @@ export const tr: Messages = {
       "preview:create": "Taslak önizlemesi oluşturur",
       "site:publish": "Bir snapshot'ı canlı siteye yayınlar",
       "site:rollback": "Canlı siteyi geri alır",
+      "content:write:own": "Makale oluşturur ve kendi makalelerini değiştirir",
+      "content:draft:own": "Taslak yazar ve incelemeye gönderir",
+      "site:publish:own": "Tüm değişiklikler kendisininse yayınlar",
+      "asset:upload": "Dosya yükler",
+      "asset:manage": "Herhangi bir dosyayı değiştirir ve siler",
     },
     modes: {
       legend: "Mod",
@@ -730,6 +765,13 @@ export const tr: Messages = {
       },
       submit: "Anahtar oluştur",
       failed: "Anahtar oluşturulamadı",
+      scopeAboveRole: "Rolün bu yetkiyi bir anahtara veremez.",
+      scopeNarrowed: "Rolün {scope} yetkisini yalnızca kendi işin için verir.",
+      errors: {
+        scopeAboveRole:
+          "Rolün bu yetkilerin bazılarını bir anahtara veremez. İşaretlerini kaldırıp yeniden dene.",
+        modeAboveRole: "Rolün bu moddaki anahtarlara izin vermiyor. Daha az bağımsız bir mod seç.",
+      },
     },
     reveal: {
       title: "Yeni anahtarını kopyala",
@@ -788,6 +830,9 @@ export const tr: Messages = {
     notEnabledTitle: "Bu sunucu etkinlik kaydı tutmuyor",
     notEnabledDescription:
       "Agent ve insan araç çağrılarının hepsini kaydetmek için Studio'yu cloudhal studio ile çalıştır.",
+    ownOnlyTitle: "Senin etkinliğin",
+    ownOnly:
+      "Bu sitede senin ve agent'larının yaptıklarını görüyorsun. Editörler ve üstü herkesin etkinliğini görür.",
     viewEvent: "Ayrıntıları göster",
     detail: {
       when: "Zaman",
@@ -870,6 +915,8 @@ export const tr: Messages = {
       memberSince: "{date} tarihinden beri üye",
       actorId: "Aktör kimliği",
       actorIdHint: "Etkinlik kaydı ve snapshot'lar seni bununla tanır.",
+      role: "Rol",
+      roleHint: "Burada neler yapabileceğin. Bir Yönetici ya da Sahip değiştirebilir.",
       saved: "Profil kaydedildi",
       failed: "Profilin kaydedilemedi",
       errors: {
@@ -962,6 +1009,7 @@ export const tr: Messages = {
       server: "Bu sunucu",
       serverDescription: "Bu Studio kurulumunun çalıştırdıkları.",
       features: {
+        members: "Ekip ve roller",
         agentKeys: "Agent anahtarları",
         mcp: "MCP sunucusu",
         activity: "Etkinlik kaydı",
@@ -971,6 +1019,8 @@ export const tr: Messages = {
         elevationRequests: "Yükseltme istekleri",
       },
       featureHints: {
+        members:
+          "Kişiler davet bağlantısıyla katılır ve bir rolle çalışır: Sahip, Yönetici, Editör, Yazar ya da Katkıcı.",
         agentKeys: "Agent'lar ve CI işleri oluşturduğun anahtarlarla giriş yapar.",
         mcp: "Agent'lar /mcp adresinden bağlanır.",
         activity: "Her araç çağrısı site bazında kaydedilir.",
@@ -1146,6 +1196,16 @@ export const tr: Messages = {
       "Bir yükseltme bitmek üzereyken ya da bir agent yükseltme istediğinde burada görünür.",
     settings: "Bildirim ayarları",
     openAgents: "Agent'ları aç",
+    openTeam: "Ekibi aç",
+    memberJoined: {
+      title: "{name} katıldı",
+      body: "davetini kabul etti.",
+      toast: "Davetini kabul etti ve artık {role} olarak çalışıyor.",
+    },
+    roleChanged: {
+      title: "Rolün artık {role}",
+      body: "{name} değiştirdi. Senin ve agent'larının yapabilecekleri de buna göre değişti.",
+    },
     ending: {
       title: "Yükseltme bitmek üzere",
       sentence:
@@ -1246,6 +1306,32 @@ export const tr: Messages = {
     prompt: "İstek",
     approve: "Onayla",
     deny: "Reddet",
+    withdraw: "Geri çek",
+    withdrawn: "İstek geri çekildi",
+    decide: {
+      own_request: "Kendi isteğini onaylayamazsın. Rolü buna izin veren biri karar verir.",
+      not_key_creator:
+        "Bu agent'a daha fazla bağımsızlığı yalnızca anahtarını oluşturan kişi verebilir.",
+      mode_above_role:
+        "Rolün agent anahtarlarına en fazla {mode} modunu verebilir, bu yüzden bunu veremezsin.",
+      missing_scope: "Rolün bu değişikliği yapamıyor, bu yüzden onaylayamazsın.",
+      not_own: "İçinde sana ait olmayan işler var. Bir Editör ya da üstü karar verir.",
+    },
+    role: {
+      waiting: "Bir Editör bekleniyor",
+      yours: "Bunu sen istedin. İstersen geri çekebilirsin.",
+      prompt: "{name} siteyi yayınlamak istiyor.",
+      foreign:
+        "Başka birinin yayınlanmış {count} makalesini içeriyor ve rolü yalnızca kendi işini yayınlayabiliyor.",
+      structure:
+        "Sayfaları, kategorileri, etiketleri ya da yönlendirmeleri değiştiriyor; rolü bunları tek başına yayınlayamaz.",
+      generic: "Rolü bu değişiklikleri tek başına yayınlayamıyor.",
+      published: "Onaylandı ve yayınlandı",
+      publishedDescription: "{name} tarafından istenen yayın artık canlıda.",
+      stateChanged: "Bu istekten sonra site değişti",
+      stateChangedDescription:
+        "İstek artık sitenin durumuyla eşleşmediği için kapatıldı. Güncel hâli kendin yayınlayabilirsin.",
+    },
     approved: "İstek onaylandı",
     approvedDescription: "{agent} artık bu çağrıyı bir kez yapabilir.",
     denied: "İstek reddedildi",
@@ -1264,7 +1350,7 @@ export const tr: Messages = {
     columns: {
       request: "İstek",
       status: "Durum",
-      agent: "Agent",
+      agent: "İsteyen",
       requested: "İstendi",
       decided: "Karar",
     },
@@ -1322,6 +1408,16 @@ export const tr: Messages = {
     agentKeyMode: "Agent anahtarının modunu değiştir",
     agentKeyElevate: "Agent anahtarını yükselt",
     agentKeyElevationEnd: "Yükseltmeyi bitir",
+    agentKeyNarrow: "Agent anahtarını daralt",
+    agentKeyRevoke: "Agent anahtarını iptal et",
+    memberInvite: "Üye davet et",
+    memberInviteRevoke: "Daveti iptal et",
+    memberInviteAccept: "Daveti kabul et",
+    memberRole: "Üyenin rolünü değiştir",
+    memberRemove: "Üyeyi çıkar",
+    memberTransferOwnership: "Sahipliği devret",
+    memberPasswordReset: "Şifre sıfırlama bağlantısı oluştur",
+    memberPasswordResetComplete: "Şifreyi sıfırla",
   },
   preview: {
     title: "Önizleme",
@@ -1881,5 +1977,424 @@ export const tr: Messages = {
     emptyFiltered: "Bu kaynaktan yönlendirme yok",
     emptyDescription:
       "Slug değişiklikleri, birleştirmeler ve kaldırmalar buraya kendiliğinden yönlendirme ekler. Taşınan adresler için sen de ekleyebilirsin.",
+  },
+  roles: {
+    yours: "Senin rolün",
+    names: {
+      owner: "Sahip",
+      administrator: "Yönetici",
+      editor: "Editör",
+      author: "Yazar",
+      contributor: "Katkıcı",
+    },
+    plural: {
+      owner: "Sahip",
+      administrator: "Yöneticiler",
+      editor: "Editörler",
+      author: "Yazarlar",
+      contributor: "Katkıcılar",
+    },
+    summaries: {
+      owner:
+        "Sahipliği devretmek dahil her şey. Her zaman tek bir Sahip vardır; sahiplik yalnızca devredilerek el değiştirir.",
+      administrator:
+        "Kurulumu yönetir: ekip, roller, site ayarları ve alan adları, herkesin agent anahtarları. Her şeyi düzenler ve yayınlar.",
+      editor:
+        "Her şeyi düzenler ve yayınlar, sitenin yapısını kurar (sayfalar, kategoriler, yönlendirmeler), geri alır; Yazar ve Katkıcı davet eder.",
+      author:
+        "Kendi makalelerini yazar, düzenler ve yayınlar. Daha fazlası bir Editörün onayını bekler.",
+      contributor:
+        "Taslak yazar ve incelemeye sunar. Yayınlamayı bir Editör yapar; yayınlanan işini artık değiştiremez.",
+    },
+    explainer: {
+      role: "Rol",
+      columns: {
+        articles: "Makaleler",
+        publish: "Yayın",
+        structure: "Yapı",
+        team: "Ekip",
+      },
+      levels: {
+        all: "Tümü",
+        own: "Kendi",
+        drafts: "Taslak",
+        none: "Yok",
+        invite: "Davet",
+        full: "Yönetir",
+      },
+      hints: {
+        articles: {
+          all: "Tüm makaleleri yazar ve düzenler, yazar olarak başkasını da gösterebilir.",
+          own: "Makale yazar ve yayınlanmış olsun olmasın kendi makalelerini düzenler.",
+          drafts: "Taslak yazar ve bir Editör yayınlayana kadar kendi taslaklarını düzenler.",
+          none: "Makaleleri değiştiremez.",
+        },
+        publish: {
+          all: "Her şeyi yayınlar ve geri alır.",
+          own: "Tüm görünür değişiklikler kendisininse yayınlar; fazlası bir isteğe dönüşür.",
+          none: "İncelemeye sunar; yayını başkası yapar.",
+        },
+        structure: {
+          all: "Sayfalar, kategoriler ve etiketler, yönlendirmeler.",
+          none: "Sayfaları, kategorileri ve yönlendirmeleri görür ama değiştirmez.",
+        },
+        team: {
+          full: "Davet eder, rolleri değiştirir, kişileri çıkarır; site ayarları, alan adları ve herkesin agent anahtarları.",
+          invite: "Yazar ve Katkıcı davet eder.",
+          none: "Ekipte kimlerin olduğunu görür.",
+        },
+      },
+    },
+  },
+  gating: {
+    readOnlyTitle: "Bunu görüntüleyebilirsin",
+    entryNotOwn:
+      "Bu makale başka birine ait. Onu yazarı ve Editör ya da üstü roller değiştirebilir.",
+    entryPublished:
+      "Bu makale yayınlandı. Katkıcılar yayınlanmış işi değiştiremez; bir Editör değiştirebilir.",
+    entryDelete:
+      "Yalnızca yazarı (rolü izin verdiği sürece) ve Editör ya da üstü roller silebilir.",
+    abilities: {
+      entries: {
+        create: "Makale yazmak için en az {role} rolü gerekir.",
+        editOwnPublished:
+          "Makale yayınlamak için en az {role} rolü gerekir. İncelemeden sonra seninkileri bir Editör yayınlar.",
+        editAny: "Başkalarının makalelerini değiştirmek için en az {role} rolü gerekir.",
+      },
+      pages: { write: "Sayfaları değiştirmek için en az {role} rolü gerekir." },
+      publish: {
+        own: "Yayınlamak için en az {role} rolü gerekir. İşini incelemeye sun; bir Editör yayınlar.",
+        any: "Başkalarının işini yayınlamak için en az {role} rolü gerekir.",
+      },
+      rollback: "Siteyi geri almak için en az {role} rolü gerekir.",
+      structure: {
+        write:
+          "Kategorileri, etiketleri ve yönlendirmeleri değiştirmek için en az {role} rolü gerekir.",
+      },
+      assets: {
+        upload: "Dosya yüklemek için en az {role} rolü gerekir.",
+        manage: "Tüm dosyaları yönetmek için en az {role} rolü gerekir.",
+      },
+      activity: { all: "Tüm ekibin etkinliğini görmek için en az {role} rolü gerekir." },
+      settings: {
+        write: "Site ayarlarını ve alan adlarını değiştirmek için en az {role} rolü gerekir.",
+      },
+      members: {
+        invite: "Kişi davet etmek için en az {role} rolü gerekir.",
+        manage: "Rolleri değiştirmek ya da kişileri çıkarmak için en az {role} rolü gerekir.",
+      },
+      agents: {
+        manage: "Başkalarının agent anahtarlarını yönetmek için en az {role} rolü gerekir.",
+      },
+      ownership: { transfer: "Sahipliği yalnızca {role} devredebilir." },
+    },
+  },
+  publishing: {
+    request: "Yayın iste",
+    requestCommand: "Snapshot al ve yayın iste",
+    requestTitle: "Yayın istensin mi?",
+    requestDescription:
+      "Değişikliklerin başkalarının işini ya da sitenin yapısındaki değişiklikleri içeriyor; bu yüzden yayını bir Editör onaylar. Studio şimdi bir snapshot alır, istek Onaylar ekranında bekler.",
+    sendRequest: "İsteği gönder",
+    requestOption: "Yayın iste",
+    requestOptionDescription: "Canlıya çıkmadan önce bir Editör Onaylar ekranında onaylar.",
+    requested: "Yayın istendi",
+    requestedDescription:
+      "Değişikliklerin sana ait olmayan işler içeriyor, bu yüzden yayını bir Editörün onaylaması gerekiyor. İsteği Onaylar ekranında bulabilirsin.",
+    openRequest: "Onayları aç",
+    refused: "Yayınlayamazsın",
+  },
+  members: {
+    invite: "Kişi davet et",
+    search: "Kişi ara",
+    you: "Sen",
+    someone: "Biri",
+    menu: "{name} için işlemler",
+    tabs: { members: "Üyeler", activity: "Etkinlik" },
+    columns: { member: "Üye", role: "Rol", joined: "Katılma", actions: "İşlemler" },
+    empty: "Henüz üye yok",
+    emptyDescription: "Bir Studio'daki ilk hesap Sahip olur. Kişileri buradan davet et.",
+    noMatches: "“{query}” ile eşleşen kimse yok",
+    notEnabledTitle: "Bu sunucuda ekip yok",
+    notEnabledDescription:
+      "Roller ve davetler hesaplı bir Studio gerektirir (cloudhal studio ya da dağıtılmış admin Worker). Onlar olmadan giriş yapan herkes her şeyi yapabilir.",
+    changeRole: "Rolü değiştir…",
+    resetLink: "Şifre sıfırlama bağlantısı oluştur…",
+    transferOwnership: "Sahipliği devret…",
+    rank: {
+      self: "Kendi rolünü değiştiremez ya da kendini çıkaramazsın.",
+      owner_role: "Sahip rolü yalnızca sahiplik devredilerek el değiştirir.",
+      target_is_owner: "Sahibin rolü düşürülemez ve Sahip çıkarılamaz. Önce sahipliği devret.",
+      role_too_high: "Rolün bu rolü veremez.",
+      not_allowed: "Üyeleri yalnızca Yöneticiler ve Sahip yönetebilir.",
+    },
+    roles: {
+      title: "Roller",
+      description:
+        "Her rolün yapabildikleri. Agent anahtarları hiçbir zaman onları oluşturan kişiden fazlasını yapamaz.",
+    },
+    how: {
+      title: "Davetler nasıl çalışır",
+      single:
+        "Her bağlantı bir kez çalışır. Önce kim açarsa o katılır; bu yüzden bağlantıyı yalnızca davet ettiğin kişiyle paylaş.",
+      bound:
+        "Bağlantı tek bir e-posta adresine ve tek bir role bağlıdır; davet edilen kişi ikisini de değiştiremez.",
+      expiry:
+        "Bağlantılar varsayılan olarak {default} sonra geçersiz olur. Yönetici davetleri en geç {admin} içinde sona erer.",
+      keys: "Bir kişinin agent anahtarları rolünü asla aşmaz; rolü düştüğünde anahtarlar da hemen daralır.",
+      owner:
+        "Tek bir Sahip vardır. Sahiplik yalnızca bir Yöneticiye, Sahibin şifresiyle devredilir.",
+    },
+    invites: {
+      title: "Bekleyen davetler",
+      description:
+        "Henüz kullanılmamış bağlantılar. Birini iptal edersen hemen çalışmaz hâle gelir.",
+      empty: "Bekleyen davet yok",
+      emptyDescription:
+        "Oluşturduğun davet bağlantıları kullanılana, iptal edilene ya da süresi dolana kadar burada görünür.",
+      columns: {
+        email: "E-posta",
+        role: "Rol",
+        expires: "Bitiş",
+        inviter: "Davet eden",
+        actions: "İşlemler",
+      },
+      byLink: "Bağlantı",
+      byEmail: "E-postayla gönderildi",
+      expired: "Süresi doldu",
+      incomplete: "Tamamlanmadı",
+      incompleteHint:
+        "Bağlantı kullanıldı ama hesap oluşturulamadı. Yeni bir bağlantı için yeniden davet et.",
+      you: "Sen",
+      someone: "Eski bir üye",
+      reinvite: "Yeniden davet et",
+      menu: "{email} daveti için işlemler",
+      revoke: "İptal et",
+      revokeTitle: "Bu davet iptal edilsin mi?",
+      revokeDescription:
+        "{email} için bağlantı hemen çalışmaz hâle gelir. Daha sonra yeniden davet edebilirsin.",
+      revoked: "Davet iptal edildi",
+      revokedDescription: "{email} için bağlantı artık çalışmıyor.",
+    },
+    role: {
+      title: "{name} kişisinin rolünü değiştir",
+      description:
+        "Bir sonraki tıklamasında ya da agent çağrısında geçerli olur. Etkinlik kaydına yazılır.",
+      member: "Üye",
+      newRole: "Yeni rol",
+      change: "Rol değişikliği",
+      now: "Şu an",
+      immediate: "Hemen geçerli olur",
+      demotionTitle: "Agent anahtarları da daralır",
+      demotion:
+        "{role} olarak anahtarlarında yalnızca bu rolün izin verdiği yetkiler ve modlar kalır; rolün üstündeki bir yükseltme biter. Sonradan terfi etse de anahtarlar yeniden genişlemez.",
+      submit: "Rolü değiştir",
+      failed: "Rol değiştirilemedi",
+      changed: "Rol değişti",
+      changedDescription: "{name} artık {to}.",
+      narrowedTitle: "Agent anahtarları daraltıldı",
+      narrowedDescription:
+        "Agent anahtarlarından {count} tanesi artık yalnızca yeni rolün izin verdiklerini yapıyor.",
+      narrowedBanner: "Daraltılan agent anahtarı: {count}",
+      narrowedBannerDescription:
+        "Aşağıdaki her anahtarda yalnızca yeni rolün izin verdikleri kaldı. Agent'lar bunu bir sonraki çağrılarında fark eder.",
+      narrowedMode: "Mod",
+      narrowedScopes: "Artık şu yetkilerle çalışıyor",
+      elevationEnded: "Yeni rol izin vermediği için yükseltmesi sona erdi.",
+      done: "Tamam",
+    },
+    remove: {
+      menu: "Ekipten çıkar…",
+      title: "{name} ekipten çıkarılsın mı?",
+      description: "Erişimini hemen kaybeder. Bu, etkinlik kaydına yazılır.",
+      signOut: "Tüm cihazlarda oturumu kapatılır.",
+      keys: "Agent anahtarları devre dışı kalır (kayıt için saklanır, silinebilir).",
+      keysCount: "Devre dışı kalacak agent anahtarı: {count}.",
+      invites: "Gönderdiği ve hâlâ bekleyen davetler iptal edilir.",
+      invitesCount: "İptal edilecek bekleyen daveti: {count}.",
+      requests: "Agent'larının beklettiği istekler reddedilir.",
+      kept: "Makaleleri ve etkinliği kalır. Yeniden davet edersen erişimi geri gelir.",
+      submit: "Çıkar",
+      failed: "Ekipten çıkarılamadı",
+      done: "{name} ekipten çıkarıldı",
+      doneDescription:
+        "Devre dışı kalan anahtar: {keys} · iptal edilen davet: {invites} · reddedilen istek: {requests}.",
+    },
+    reset: {
+      title: "Şifre sıfırlama bağlantısı oluşturulsun mu?",
+      description:
+        "{name} bu bağlantıyla yeni bir şifre belirleyebilir. Henüz e-posta yok; bağlantıyı sen paylaşırsın.",
+      once: "Bir kez çalışır ve bir saat içinde sona erer.",
+      signsOut: "Yeni şifre belirlendiğinde tüm cihazlarda oturumu kapanır.",
+      replaces: "Yeni bir bağlantı öncekini geçersiz kılar.",
+      submit: "Bağlantı oluştur",
+      failed: "Bağlantı oluşturulamadı",
+      revealTitle: "Sıfırlama bağlantısını kopyala",
+      revealDescription: "Bağlantıyı {name} kişisine özelden, doğrudan mesajla gönder.",
+      warningTitle: "Bu bağlantıyı bir daha göremeyeceksin",
+      warning:
+        "Şimdi kopyala. Bağlantıyı açan herkes bu hesabın şifresini belirleyebilir; asla ortak bir kanalda paylaşma.",
+      link: "Sıfırlama bağlantısı",
+      expires: "{relative} sona erer ({absolute}).",
+      done: "Bağlantıyı kopyaladım",
+    },
+    transfer: {
+      title: "Sahiplik {name} kişisine devredilsin mi?",
+      description:
+        "Sahip, sahipliği devretmek dahil her şeyi yapabilir. Her zaman tek bir Sahip vardır.",
+      warningTitle: "Bunu kendin geri alamazsın",
+      warning:
+        "{name} Sahip olur, sen Yönetici olursun. Sahipliği sana yalnızca {name} geri verebilir.",
+      to: "Yeni Sahip",
+      youBecome: "Hemen Yönetici olursun.",
+      keys: "Agent anahtarların bir Yöneticinin yapabilecekleriyle sınırlanır.",
+      onlyThey: "Sahipliği yeniden yalnızca yeni Sahip devredebilir.",
+      password: "Şifren",
+      passwordHint: "Sen olduğunu doğrulamak için şifreni yeniden gir.",
+      passwordRequired: "Şifreni gir",
+      wrongPassword: "Şifre doğru değil",
+      notAdministrator:
+        "Sahiplik bir Yöneticiye devredilir. Önce onu Yönetici yap, sonra yeniden dene.",
+      needsAdministrator: "Sahiplik yalnızca bir Yöneticiye devredilir. Önce rolünü değiştir.",
+      submit: "Sahipliği devret",
+      failed: "Sahiplik devredilemedi",
+      done: "Sahiplik devredildi",
+      doneDescription: "Artık {name} Sahip. Sen Yöneticisin.",
+    },
+    activity: {
+      empty: "Henüz ekip olayı yok",
+      emptyDescription:
+        "Davetler, rol değişiklikleri, çıkarmalar ve sahiplik devirleri burada görünür.",
+      restrictedTitle: "Ekip etkinliği Editörler ve üstü içindir",
+    },
+  },
+  invites: {
+    create: {
+      title: "Birini davet et",
+      reinviteTitle: "Yeniden davet et",
+      description: "Seçtiğin rolle hesabını oluşturması için tek kullanımlık bir bağlantı alır.",
+      step: "Adım 1/2 · Kim ve hangi rolle",
+      email: "E-posta",
+      emailHint: "Hesap bu adresle oluşturulur; davet edilen kişi bunu değiştiremez.",
+      emailPlaceholder: "ad@ornek.com",
+      role: "Rol",
+      roleHint: "Yalnızca senin rolünün verebileceği roller listelenir.",
+      expiry: "Bağlantının geçerlilik süresi",
+      expiryHint: "Onun için yeterli olan en kısa süreyi seç.",
+      expiryAdmin: "Yönetici davetleri en geç {max} içinde sona erer.",
+      explainer: "Her rolün yapabildikleri",
+      delivery: "Nasıl gönderilsin",
+      deliveryLink: "Bağlantıyı kopyala",
+      deliveryLinkHint: "Bağlantıyı sen, özelden paylaşırsın.",
+      deliveryEmail: "E-postayla gönder",
+      deliveryEmailHint: "Studio bağlantıyı e-postayla gönderir; sen görmezsin.",
+      submit: "Davet bağlantısı oluştur",
+      send: "Daveti gönder",
+      failed: "Davet oluşturulamadı",
+    },
+    reveal: {
+      title: "Davet bağlantısını kopyala",
+      sentTitle: "Davet gönderildi",
+      description: "{email} için, {role} olarak. Adım 2/2.",
+      warningTitle: "Bu bağlantıyı bir daha göremeyeceksin",
+      warning:
+        "Şimdi kopyala ve özelden, doğrudan mesajla paylaş; ortak bir kanala koyma. Bağlantıyı önce kim açarsa {role} olarak o katılır.",
+      link: "Davet bağlantısı",
+      summary: "Davet",
+      expires: "{relative} sona erer ({absolute}).",
+      private: "Yanlış kişiye ulaşırsa Bekleyen davetler listesinden iptal et.",
+      done: "Bağlantıyı kopyaladım",
+      sent: "{email} adresine gönderildi",
+      sentDescription: "Bağlantı bir kez çalışır. Bekleyen davetler listesinden iptal edebilirsin.",
+    },
+    errors: {
+      emailRequired: "Bir e-posta adresi gir",
+      emailInvalid: "ad@ornek.com gibi geçerli bir e-posta adresi gir",
+      rank: "Rolün birini {role} olarak davet edemez.",
+      invalid_expiry: "Bu süre bu rol için izinli değil. Daha kısa bir süre seç.",
+      delivery_unavailable: "Bu sunucu e-posta gönderemiyor. Bunun yerine bağlantıyı kopyala.",
+      already_member: "{email} zaten ekipte.",
+      too_many_invites: "Bekleyen davet sayısı çok fazla. Önce bazılarını iptal et.",
+      rate_limited: "Son bir saatte çok sayıda davet oluşturdun. Biraz sonra yeniden dene.",
+    },
+  },
+  inviteAccept: {
+    titleGeneric: "Bir Cloudhal Studio'ya katıl",
+    title: "{name} ekibine katıl",
+    descriptionGeneric: "Davetin açılıyor…",
+    descriptionDead: "Bu bağlantı artık çalışmıyor.",
+    description: "{inviter} seni {role} olarak davet etti.",
+    someone: "Biri",
+    summary: "Davetin",
+    as: "Katılacağın rol",
+    expires: "Bu davet {relative} sona erer ({absolute}).",
+    emailHint: "Davet bu adres için.",
+    nameHint: "Değişikliklerinin ve onaylarının yanında görünür.",
+    existingTitle: "Zaten bir hesabın var",
+    existing: "Bu hesapla katılmak için şifresini gir.",
+    submit: "Daveti kabul et",
+    toSignIn: "Giriş sayfasına git",
+    signOutFirst: "Önce oturumu kapat, sonra daveti kabul et.",
+    welcome: "{name} ekibine hoş geldin",
+    welcomeDescription: "{role} olarak giriş yaptın.",
+    missingTitle: "Bu bağlantı eksik",
+    missing:
+      "Sana gönderilen bağlantının tamamını aç; # işaretinden sonraki kısım eksik. Yine çalışmazsa yeni bir davet iste.",
+    goneTitle: "Bu davet kullanılamıyor",
+    gone: "Kullanılmış, iptal edilmiş ya da süresi dolmuş. Seni davet eden kişiden yeni bir davet iste.",
+    otherSessionTitle: "{email} olarak giriş yapmışsın",
+    otherSessionTitleGeneric: "Başka biri olarak giriş yapmışsın",
+    otherSession: "Bu davet {email} için. Oturumu kapat, sonra kabul et.",
+    alreadyMemberTitle: "Zaten ekiptesin",
+    alreadyMember: "Bu hesap zaten üye. Bunun yerine giriş yap.",
+    errors: {
+      nameRequired: "Adını yaz",
+      nameTooLong: "En fazla {max} karakter kullan",
+      weakPassword: "En az 8 karakter kullan",
+      wrongPassword: "Bu hesabın şifresi bu değil",
+    },
+  },
+  resetPassword: {
+    title: "Yeni bir şifre belirle",
+    description: "{name} hesabı için.",
+    descriptionGeneric: "Sıfırlama bağlantın açılıyor…",
+    descriptionDead: "Bu bağlantı artık çalışmıyor.",
+    expires: "Bu bağlantı {relative} sona erer ({absolute}).",
+    signsOut: "Tüm cihazlarda oturumun kapanır; sonra yeni şifrenle giriş yap.",
+    submit: "Yeni şifreyi kaydet",
+    doneTitle: "Şifre değişti",
+    doneDescription: "Yeni şifrenle giriş yap.",
+    changed: "Şifren belirlendi",
+    changedDescription: "Tüm cihazlarda oturumun kapatıldı.",
+    missingTitle: "Bu bağlantı eksik",
+    missing: "Sana gönderilen bağlantının tamamını aç; # işaretinden sonraki kısım eksik.",
+    goneTitle: "Bu sıfırlama bağlantısı kullanılamıyor",
+    gone: "Kullanılmış ya da süresi dolmuş. Bir Yöneticiden yeni bağlantı iste.",
+  },
+  passwords: {
+    new: "Yeni şifre",
+    confirm: "Şifreyi tekrarla",
+    strength: "Güç: {level}",
+    levels: {
+      empty: "—",
+      tooShort: "çok kısa",
+      weak: "zayıf",
+      fair: "orta",
+      strong: "güçlü",
+    },
+    advice: {
+      empty: "En az {min} karakter. Birbiriyle ilgisiz birkaç kelime güçlü bir şifre olur.",
+      tooShort: "En az {min} karakter.",
+      weak: "Uzun olan daha güçlüdür: 12 karakter ya da daha fazlasını veya birkaç ilgisiz kelimeyi dene.",
+      fair: "İyi. Birkaç karakter daha eklersen güçlü olur.",
+      strong: "Güçlü şifre.",
+    },
+    errors: {
+      required: "Bir şifre gir",
+      tooShort: "En az {min} karakter kullan",
+      tooLong: "En fazla {max} karakter kullan",
+      confirmRequired: "Şifreyi tekrarla",
+      mismatch: "Şifreler eşleşmiyor",
+    },
   },
 };

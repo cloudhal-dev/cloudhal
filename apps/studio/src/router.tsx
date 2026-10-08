@@ -29,6 +29,12 @@ const ArticleEditorPage = lazyRouteComponent(
 );
 const ArticlesPage = lazyRouteComponent(() => import("./routes/ArticlesPage.tsx"), "ArticlesPage");
 const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
+const InvitePage = lazyRouteComponent(() => import("./routes/InvitePage.tsx"), "InvitePage");
+const ResetPasswordPage = lazyRouteComponent(
+  () => import("./routes/ResetPasswordPage.tsx"),
+  "ResetPasswordPage",
+);
+const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
   () => import("./routes/PageEditorPage.tsx"),
   "PageEditorPage",
@@ -78,6 +84,20 @@ const loginRoute = createRoute({
   path: "/login",
   component: LoginPage,
 });
+/**
+ * Public token pages (RFC-0005 §7): the link's secret is in the fragment (`#chinv_…`, `#chrst_…`),
+ * which the page takes and strips at once; no session needed.
+ */
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invite",
+  component: InvitePage,
+});
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset-password",
+  component: ResetPasswordPage,
+});
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -113,6 +133,14 @@ const accountSettingsRoute = createRoute({
   getParentRoute: () => accountRoute,
   path: "/account",
   component: AccountPage,
+});
+/** Settings › Team (RFC-0005): members, invites; `?view=activity` for the deployment's events. */
+const teamRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/team",
+  validateSearch: (search: Record<string, unknown>): { view?: "activity" } =>
+    search.view === "activity" ? { view: "activity" } : {},
+  component: MembersPage,
 });
 
 // Site surface
@@ -210,8 +238,10 @@ const articleEditorRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  inviteRoute,
+  resetPasswordRoute,
   indexRoute,
-  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute]),
+  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute, teamRoute]),
   siteRoute.addChildren([
     siteIndexRoute,
     pagesRoute,

@@ -5,6 +5,7 @@ import {
   PageCrumbsSlot,
   PageFrameProvider,
   Sidebar,
+  Text,
 } from "@cloudhal/ui";
 import {
   MagnifyingGlass,
@@ -13,15 +14,16 @@ import {
   Translate,
   UserCircle,
   UserGear,
+  UsersThree,
 } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { LOCALES, type Locale, useI18n } from "../i18n/index.tsx";
-import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { NotificationsBell } from "./NotificationsBell.tsx";
+import { RoleBadge } from "./Roles.tsx";
+import { useMe } from "./useMe.ts";
 
 export interface PaletteCommand {
   id: string;
@@ -54,7 +56,8 @@ export function AppFrame({
 }) {
   const { t, locale, setLocale } = useI18n();
   const navigate = useNavigate();
-  const me = useQuery({ queryKey: ["me"], queryFn: api.me });
+  const me = useMe();
+  const role = me.data?.role ?? undefined;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -111,8 +114,27 @@ export function AppFrame({
                     <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
+                    {/* Who is signed in and their staff role (RFC-0005 §10.3). The trigger keeps
+                        the name alone so it never truncates to a few letters. */}
+                    {role && (
+                      <>
+                        <div
+                          className="grid min-w-44 gap-1.5 px-2 py-1.5"
+                          data-testid="account-menu-role"
+                        >
+                          <Text size="sm" bold truncate as="span">
+                            {me.data?.actor.name ?? t("nav.account")}
+                          </Text>
+                          <RoleBadge value={role} />
+                        </div>
+                        <DropdownMenu.Separator />
+                      </>
+                    )}
                     <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
                       {t("nav.account")}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item icon={UsersThree} onClick={() => navigate({ to: "/team" })}>
+                      {t("nav.team")}
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                       icon={SquaresFour}
