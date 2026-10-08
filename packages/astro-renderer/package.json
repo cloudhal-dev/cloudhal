@@ -12,6 +12,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./source": "./src/source.ts",
+    "./routing": "./src/routing.ts",
+    "./seo": "./src/seo.ts",
+    "./feeds": "./src/feeds.ts",
     "./integration": "./src/integration.ts",
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
@@ -71,6 +74,18 @@
       "./source": {
         "types": "./dist/src/source.d.ts",
         "default": "./dist/src/source.js"
+      },
+      "./routing": {
+        "types": "./dist/src/routing.d.ts",
+        "default": "./dist/src/routing.js"
+      },
+      "./seo": {
+        "types": "./dist/src/seo.d.ts",
+        "default": "./dist/src/seo.js"
+      },
+      "./feeds": {
+        "types": "./dist/src/feeds.d.ts",
+        "default": "./dist/src/feeds.js"
       },
       "./integration": {
         "types": "./dist/src/integration.d.ts",

@@ -12,6 +12,8 @@ export interface GraphSource {
   pageByPath(path: string, locale?: string): Promise<Page | undefined>;
   entries(collection: string, locale?: string): Promise<ContentEntry[]>;
   entryBySlug(collection: string, slug: string, locale?: string): Promise<ContentEntry | undefined>;
+  /** Every visible entry of a locale, newest first, across collections (feeds, sitemaps). */
+  allEntries(locale?: string): Promise<ContentEntry[]>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -70,6 +72,12 @@ export class LiveSource implements GraphSource {
     locale?: string,
   ): Promise<ContentEntry | undefined> {
     return (await this.entries(collection, locale)).find((e) => e.slug === slug);
+  }
+  async allEntries(locale?: string): Promise<ContentEntry[]> {
+    const loc = locale ?? (await this.site()).defaultLocale;
+    return visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
+      .filter((e) => e.locale === loc)
+      .sort(byNewest);
   }
 }
 
@@ -146,5 +154,10 @@ export class SnapshotSource implements GraphSource {
     locale?: string,
   ): Promise<ContentEntry | undefined> {
     return (await this.entries(collection, locale)).find((e) => e.slug === slug);
+  }
+  async allEntries(locale?: string): Promise<ContentEntry[]> {
+    const { site, entries } = await this.#load();
+    const loc = locale ?? site.defaultLocale;
+    return entries.filter((e) => e.locale === loc).sort(byNewest);
   }
 }

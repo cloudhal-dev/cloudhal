@@ -142,7 +142,7 @@ describe("cloudhal init → dev → snapshot → build", () => {
       await local.close();
 
       const edited = await (await fetch(new URL("/about", server.url))).text();
-      expect(edited).toContain("<title>About (edited live)</title>");
+      expect(edited).toContain("<title>About (edited live) · ");
       expect((await fetch(new URL("/nope", server.url))).status).toBe(404);
 
       // A brand-new page needs a new route: the integration watches the data dir and clears
@@ -189,6 +189,17 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(index).toContain("<h1>E2E Site</h1>");
     expect(index).not.toContain("Changed after publish");
     const post = await readFile(path.join(r.outDir, "posts", "hello-world", "index.html"), "utf8");
-    expect(post).toContain("<title>Hello, world</title>");
+    expect(post).toContain("<title>Hello, world · ");
+    // search and link-preview basics in the static build
+    expect(post).toMatch(/<link rel="canonical" href="[^"]+\/posts\/hello-world">/);
+    expect(post).toContain('<meta property="og:type" content="article">');
+    expect(post).toContain('"@type":"BlogPosting"');
+    const rss = await readFile(path.join(r.outDir, "rss.xml"), "utf8");
+    expect(rss).toContain("<title>Hello, world</title>");
+    expect(rss).not.toContain("Changed after publish");
+    expect(await readFile(path.join(r.outDir, "sitemap.xml"), "utf8")).toContain(
+      "/posts/hello-world</loc>",
+    );
+    expect(await readFile(path.join(r.outDir, "robots.txt"), "utf8")).toContain("Sitemap:");
   });
 });

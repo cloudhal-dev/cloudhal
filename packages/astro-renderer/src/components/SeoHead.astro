@@ -1,0 +1,21 @@
+---
+/**
+ * Everything search engines and link previews read from `<head>` (see `seo.ts`). Put it inside
+ * the layout's `<head>`; themes decide layout, not SEO rules.
+ */
+import type { HeadMeta } from "../seo.ts";
+import { jsonLdText } from "../seo.ts";
+
+interface Props {
+  meta: HeadMeta;
+}
+const { meta } = Astro.props;
+---
+<title>{meta.title}</title>
+{meta.description && <meta name="description" content={meta.description} />}
+<link rel="canonical" href={meta.canonical} />
+{meta.robots && <meta name="robots" content={meta.robots} />}
+{meta.openGraph.map(([property, content]) => <meta property={property} content={content} />)}
+{meta.twitter.map(([name, content]) => <meta name={name} content={content} />)}
+{meta.feeds.map((f) => <link rel="alternate" type="application/rss+xml" title={f.title} href={f.href} />)}
+{meta.jsonLd.map((doc) => <script type="application/ld+json" is:inline set:html={jsonLdText(doc)} />)}

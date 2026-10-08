@@ -88,8 +88,20 @@ describe("Site Worker on workerd", () => {
     // agent-written content cannot bring scripts: CSP on every HTML response, no inline scripts
     expect(res.headers.get("content-security-policy")).toContain("script-src 'self'");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
+    // no inline JavaScript; JSON-LD is a data block (not executed, not subject to script-src)
+    expect(html).not.toMatch(/<script(?![^>]*\b(?:src=|type="application\/ld\+json"))[^>]*>/);
+    expect(html).toContain('<script type="application/ld+json">');
     expect((await get("/posts/hello-world")).status).toBe(200);
+    // feeds and sitemap are served (and edge-cached) like pages
+    const rss = await get("/rss.xml");
+    expect(rss.status).toBe(200);
+    expect(rss.headers.get("content-type")).toContain("application/rss+xml");
+    expect(rss.headers.get("cache-tag")).toBe(`cloudhal-site-${siteId}`);
+    expect(await rss.text()).toContain("/posts/hello-world</link>");
+    const sitemap = await get("/sitemap.xml");
+    expect(sitemap.status).toBe(200);
+    expect(await sitemap.text()).toContain("/posts/hello-world</loc>");
+    expect(await (await get("/robots.txt")).text()).toContain("/sitemap.xml");
     const missing = await get("/nope");
     expect(missing.status).toBe(404);
     // a page that does not exist yet must not stay cached past the publish that creates it
@@ -103,7 +115,8 @@ describe("Site Worker on workerd", () => {
       ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
     });
   const aboutTitle = async (p = "/about") =>
-    (await (await get(p)).text()).match(/<title>([^<]*)<\/title>/)?.[1];
+    // "About · Edge Site" → "About"
+    (await (await get(p)).text()).match(/<title>([^<]*)<\/title>/)?.[1]?.replace(/ · .*$/, "");
 
   it("keeps drafts invisible, flips on publish and back on rollback", async () => {
     const v1 = (await remote.getSite(siteId))?.publishedSnapshotId as string;
@@ -141,7 +154,7 @@ describe("Site Worker on workerd", () => {
     const token = await mintPreviewToken(PREVIEW_SECRET, { site: siteId, target: "live" });
     const res = await get(`/about?cloudhal-preview=${token}`);
     const html = await res.text();
-    expect(html).toContain("<title>About (draft)</title>");
+    expect(html).toContain("<title>About (draft) · ");
     expect(res.headers.get("x-cloudhal-mode")).toBe("preview");
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(res.headers.get("x-robots-tag")).toBe("noindex");

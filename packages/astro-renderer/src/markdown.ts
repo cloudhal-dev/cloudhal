@@ -1,7 +1,7 @@
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { Marked } from "marked";
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** Link targets markdown may produce. Everything else (javascript:, data:, vbscript:, …) is dropped. */
@@ -57,12 +57,24 @@ export function renderBody(body: { format: "markdown" | "html"; value: string })
   return body.format === "markdown" ? renderMarkdown(body.value) : body.value;
 }
 
+/** The cover image above the body: eager (it is the largest image above the fold), safe src only. */
+function coverFigure(image: ContentEntry["coverImage"]): string {
+  const src = image ? safeSrc(image.src) : undefined;
+  if (!image || !src) return "";
+  const size =
+    image.width && image.height ? ` width="${image.width}" height="${image.height}"` : "";
+  return `<figure class="ch-cover"><img src="${escapeHtml(src)}" alt="${escapeHtml(image.alt)}"${size} fetchpriority="high" decoding="async"></figure>`;
+}
+
 /**
  * An article: a header (title, summary, publication date) followed by the body. A leading `# H1`
  * that repeats the title is dropped so authors may write it either way.
  */
 export function renderEntryArticle(
-  entry: Pick<ContentEntry, "id" | "title" | "summary" | "body" | "publishedAt" | "createdAt">,
+  entry: Pick<
+    ContentEntry,
+    "id" | "title" | "summary" | "body" | "publishedAt" | "createdAt" | "coverImage"
+  >,
   locale = "en",
 ): string {
   let body = entry.body;
@@ -76,5 +88,5 @@ export function renderEntryArticle(
     ? `<time datetime="${escapeHtml(when)}">${escapeHtml(new Date(when).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" }))}</time>`
     : "";
   const summary = entry.summary ? `<p class="ch-summary">${escapeHtml(entry.summary)}</p>` : "";
-  return `<article class="ch-article" data-entry-id="${escapeHtml(entry.id)}"><header class="ch-article-header"><h1>${escapeHtml(entry.title)}</h1>${summary}${date}</header><div class="ch-richtext">${renderBody(body)}</div></article>`;
+  return `<article class="ch-article" data-entry-id="${escapeHtml(entry.id)}"><header class="ch-article-header"><h1>${escapeHtml(entry.title)}</h1>${summary}${date}</header>${coverFigure(entry.coverImage)}<div class="ch-richtext">${renderBody(body)}</div></article>`;
 }
