@@ -14,8 +14,11 @@
       "dependsOn": ["^typecheck", "gen:ts"],
       "outputs": []
     },
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
     "test": {
-      "dependsOn": ["gen:ts"],
+      "dependsOn": ["gen:ts", "transit"],
       "outputs": []
     },
     "check": {
