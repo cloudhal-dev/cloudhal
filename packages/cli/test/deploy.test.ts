@@ -216,6 +216,9 @@ describe("cloudhal deploy", () => {
     });
     const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
       app.fetch(new Request(input, init))) as typeof fetch;
+    // The first `d1 info` fails as a transient API error would; `d1 create` then finds the
+    // database already there, and the deploy reads its id again instead of stopping.
+    let infoFailures = 1;
     const wrangler: WranglerRunner = async (args) => {
       const ok = (stdout = "", records: Record<string, unknown>[] = []) => ({
         code: 0,
@@ -223,6 +226,20 @@ describe("cloudhal deploy", () => {
         stderr: "",
         records,
       });
+      if (args[0] === "d1" && args[1] === "info" && infoFailures-- > 0)
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "A request to the Cloudflare API failed",
+          records: [],
+        };
+      if (args[0] === "d1" && args[1] === "create")
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "A database with that name already exists",
+          records: [],
+        };
       if (args[0] === "d1" && args[1] === "info")
         return ok(JSON.stringify({ uuid: "11111111-2222-3333-4444-555555555555" }));
       if (args[0] === "deploy" && args.includes("-c"))

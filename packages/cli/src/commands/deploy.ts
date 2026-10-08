@@ -145,7 +145,13 @@ async function ensureResources(
   let databaseId = await info();
   if (!databaseId) {
     log(`creating D1 database ${names.database}`);
-    await must(run, ["d1", "create", names.database], cwd);
+    const created = await run(["d1", "create", names.database], { cwd });
+    // A failed `d1 info` (e.g. a transient API error) must not stop a redeploy: the database is
+    // already there, so read its id again.
+    if (created.code !== 0 && !/already exists/i.test(created.stderr + created.stdout))
+      throw new Error(
+        `wrangler d1 create ${names.database} failed:\n${created.stderr.slice(-2000)}`,
+      );
     databaseId = await info();
     if (!databaseId) throw new Error(`could not read the id of D1 database ${names.database}`);
   }
