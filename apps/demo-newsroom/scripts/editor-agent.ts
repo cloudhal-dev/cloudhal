@@ -92,19 +92,85 @@ type ToolResult = {
   structuredContent?: unknown;
 };
 
+type Call = <T>(name: string, args: Record<string, unknown>) => Promise<T>;
+
+interface TermView {
+  id: string;
+  slug: string;
+  status: string;
+}
+
 /**
- * Interim (RFC-0002): on a site with a `tag` taxonomy the store turns `tags` into term ids and
- * stores `tags: []`, so the slugs can't be compared until this agent reads terms over MCP. Until
- * then, the same number of tag terms counts as unchanged; sites without taxonomies (the deployed
- * newsroom) still compare slugs.
+ * The site's vocabulary, read before writing (RFC-0002): agents reuse terms, propose the tags
+ * they need (a person approves them before they go public) and file articles under an existing
+ * category — categories are people-only. Sites without taxonomies keep plain `tags`.
  */
-function sameTags(
-  existing: { tags?: string[]; terms?: { tag?: { ids: string[] } } },
-  wanted: string[],
-): boolean {
-  if ((existing.tags ?? []).length > 0 || !existing.terms?.tag)
-    return (existing.tags ?? []).join(",") === wanted.join(",");
-  return existing.terms.tag.ids.length === wanted.length;
+interface Vocabulary {
+  legacy: boolean;
+  /** tag slug → term id (active and proposed). */
+  tags: Map<string, string>;
+  slugOf: Map<string, string>;
+  /** Category to file articles under when they have none yet. */
+  categoryId?: string;
+}
+
+async function allTerms(call: Call, siteId: string, taxonomy: string): Promise<TermView[]> {
+  const out: TermView[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await call<{ terms: TermView[]; nextCursor?: string }>("list_terms", {
+      siteId,
+      taxonomy,
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    });
+    out.push(...page.terms);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return out;
+}
+
+const humanize = (slug: string) => slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+async function prepareVocabulary(
+  call: Call,
+  siteId: string,
+  posts: Post[],
+  log: (line: string) => void,
+): Promise<Vocabulary> {
+  const { taxonomies } = await call<{ taxonomies: { key: string }[] }>("list_taxonomies", {
+    siteId,
+  });
+  const keys = new Set(taxonomies.map((t) => t.key));
+  const vocab: Vocabulary = { legacy: !keys.has("tag"), tags: new Map(), slugOf: new Map() };
+  if (keys.has("tag")) {
+    for (const t of await allTerms(call, siteId, "tag")) {
+      vocab.tags.set(t.slug, t.id);
+      vocab.slugOf.set(t.id, t.slug);
+    }
+    for (const slug of [...new Set(posts.flatMap((p) => p.tags))]) {
+      if (vocab.tags.has(slug)) continue;
+      const users = posts.filter((p) => p.tags.includes(slug)).map((p) => p.slug);
+      const { term, existing } = await call<{ term: TermView; existing: boolean }>("propose_term", {
+        siteId,
+        taxonomy: "tag",
+        name: humanize(slug),
+        slug,
+        reason: `Used by the newsroom article${users.length > 1 ? "s" : ""} ${users.join(", ")}`,
+      });
+      vocab.tags.set(slug, term.id);
+      vocab.slugOf.set(term.id, term.slug);
+      if (!existing) log(`  proposed tag ${slug} (a person approves it before it is public)`);
+    }
+  }
+  if (keys.has("category")) {
+    const categories = (await allTerms(call, siteId, "category")).filter(
+      (t) => t.status === "active",
+    );
+    const category = categories.find((t) => t.slug === "news") ?? categories[0];
+    if (category) vocab.categoryId = category.id;
+  }
+  return vocab;
 }
 
 export async function runEditorAgent(options: {
@@ -128,7 +194,7 @@ export async function runEditorAgent(options: {
   published: boolean;
 }> {
   const log = options.log ?? console.log;
-  const call = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
+  const call: Call = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
     const r = (await options.client.callTool({ name, arguments: args })) as ToolResult;
     if (r.isError) throw new Error(`${name}: ${r.content.map((c) => c.text ?? "").join(" ")}`);
     return r.structuredContent as T;
@@ -194,12 +260,29 @@ export async function runEditorAgent(options: {
       summary?: string;
       body: { value: string };
       tags?: string[];
-      terms?: { tag?: { ids: string[] } };
+      terms?: { tag?: { ids: string[] }; category?: { ids: string[]; primary?: string } };
       author: { kind: string; id: string };
     }[];
   }>("list_entries", { siteId, collection: "posts" });
   const posts = await loadPosts(options.postsDir);
+  const vocab = await prepareVocabulary(call, siteId, posts, log);
   const wanted = new Set(posts.map((p) => p.slug));
+  /** What to send for an article's terms; a category a person already chose is kept. */
+  const termsFor = (post: Post, existing?: (typeof entries)[number]) => {
+    if (vocab.legacy) return { tags: post.tags };
+    const terms: Record<string, unknown> = {
+      tag: { set: post.tags.map((t) => vocab.tags.get(t)) },
+    };
+    if (vocab.categoryId && !existing?.terms?.category?.primary)
+      terms.category = { set: [vocab.categoryId], primary: vocab.categoryId };
+    return { terms };
+  };
+  const sameTerms = (existing: (typeof entries)[number], post: Post) => {
+    if (vocab.legacy) return (existing.tags ?? []).join(",") === post.tags.join(",");
+    const slugs = (existing.terms?.tag?.ids ?? []).map((id) => vocab.slugOf.get(id) ?? id);
+    const filed = !vocab.categoryId || Boolean(existing.terms?.category?.primary);
+    return filed && slugs.join(",") === post.tags.join(",");
+  };
   const created: string[] = [];
   const updated: string[] = [];
   const archived: string[] = [];
@@ -212,7 +295,7 @@ export async function runEditorAgent(options: {
       existing.title === post.title &&
       (existing.summary ?? "") === post.summary &&
       existing.body.value === post.body &&
-      sameTags(existing, post.tags);
+      sameTerms(existing, post);
     if (existing && unchanged) {
       entry = existing;
       if (existing.status === "published") {
@@ -228,7 +311,7 @@ export async function runEditorAgent(options: {
           title: post.title,
           summary: post.summary,
           body: post.body,
-          tags: post.tags,
+          ...termsFor(post, existing),
         })
       ).entry;
       updated.push(post.slug);
@@ -241,7 +324,7 @@ export async function runEditorAgent(options: {
           title: post.title,
           summary: post.summary,
           body: post.body,
-          tags: post.tags,
+          ...termsFor(post),
         })
       ).entry;
       created.push(post.slug);

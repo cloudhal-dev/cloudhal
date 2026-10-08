@@ -13,22 +13,11 @@ import { parsePost, runEditorAgent } from "../scripts/editor-agent.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/**
- * The deployed newsroom predates taxonomies (it has none), so it does not require a category. A
- * fresh starter site does; until the editor agent assigns `terms.category` over MCP (Sprint 11B),
- * these tests model the deployed site by making the category optional.
- */
-async function likeDeployedNewsroom(store: SiteGraphStore, siteId: string): Promise<void> {
-  const category = await store.getTaxonomyByKey(siteId, "category");
-  if (category?.required) await store.updateTaxonomy({ ...category, required: false });
-}
-
 async function setup(answer: "accept" | "decline") {
   const sql = await BetterSqlite3Driver.open(":memory:");
   await migrate(sql, migrations);
   const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
   const site = await seedStarterSite(store, { name: "Starter", slug: "newsroom" });
-  await likeDeployedNewsroom(store, site.id);
   const audit = new AuditLog(sql);
   const server = createCloudhalMcpServer({
     store,
@@ -101,6 +90,18 @@ describe("newsroom editor agent", () => {
         .sort(),
     ).toEqual(slugs);
     expect(posts.find((p) => p.slug === "hello-world")?.status).toBe("archived");
+    // filed under the site's vocabulary: News as primary category, tags as terms; tags the site
+    // did not have yet are proposed (a person approves them before they are public)
+    const news = await store.getTermBySlug(site.id, "category", "news");
+    const filed = posts.filter((p) => p.status === "published");
+    for (const p of filed) {
+      expect(p.terms?.category).toEqual({ ids: [news?.id], primary: news?.id });
+      expect(p.tags).toEqual([]);
+    }
+    const tags = await store.listTerms(site.id, { taxonomy: "tag" });
+    const proposed = tags.filter((t) => t.status === "proposed");
+    expect(proposed.length).toBeGreaterThan(0);
+    for (const t of proposed) expect(t.proposedBy?.id).toBe("agent_newsroom01");
     const home = (await store.listPages(site.id)).find((p) => p.path === "/");
     expect(home?.title).toBe("Cloudhal Newsroom");
     // every mutation snapshotted, and the agent is the recorded author
@@ -161,7 +162,6 @@ describe("newsroom editor agent with Studio approvals", () => {
     await migrate(sql, migrations);
     const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
     const site = await seedStarterSite(store, { name: "Starter", slug: "newsroom" });
-    await likeDeployedNewsroom(store, site.id);
     const approvals = new ApprovalStore(sql);
     const server = createCloudhalMcpServer({
       store,
