@@ -77,7 +77,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "InputGroup",
     "Input",
     "InputArea",
-    "TagInput",
+    "ArticleTermsCard",
     "ApprovalDialog",
     "DeleteResource",
     "SkeletonLine",
@@ -389,6 +389,138 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "routes/PageEditorPage.tsx#seo": ["PageSeoCard", "validateSeo", "cleanSeo", "primaryHostname"],
   "routes/PagesPage.tsx#seo": ["Badge", "Tooltip", "EyeSlash"],
   "routes/ArticlesPage.tsx#seo": ["ImagePreview", "previewImageUrl"],
+  // Categories, tags and redirects (§2p, RFC-0002 §8).
+  "routes/TaxonomyPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "ListToolbar",
+    "Tabs",
+    "Table",
+    "TableSkeleton",
+    "Empty",
+    "Pagination",
+    "DropdownMenu",
+    "Tooltip",
+    "Banner",
+    "SectionCard",
+    "SettingRow",
+    "GovernanceDialog",
+    "CreateTermDialog",
+    "TaxonomyHealthCard",
+    "TagsMigrationBanner",
+    "IndexBadge",
+    "ActorCell",
+    "termTree",
+  ],
+  "routes/TermEditorPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "EditorLayout",
+    "SectionCard",
+    "SectionEmpty",
+    "Input",
+    "TagInput",
+    "InputArea",
+    "InsetPanel",
+    "CoverImageCard",
+    "SeoFields",
+    "DetailsCard",
+    "DangerZoneCard",
+    "DropdownMenu",
+    "GovernanceDialog",
+    "IndexBadge",
+    "validateTerm",
+  ],
+  "routes/RedirectsPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "ListToolbar",
+    "Toolbar",
+    "Select",
+    "Table",
+    "TableSkeleton",
+    "Empty",
+    "Pagination",
+    "DropdownMenu",
+    "Tooltip",
+    "Badge",
+    "RelativeTime",
+    "ConfirmDialog",
+    "RedirectDialog",
+    "servedPaths",
+  ],
+  "components/GovernanceDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Banner",
+    "InsetPanel",
+    "Badge",
+    "SkeletonLine",
+    "InputGroup",
+    "Checkbox",
+    "TermCombobox",
+    "Status",
+  ],
+  "components/TermPickers.tsx": [
+    "Combobox",
+    "Combobox.TriggerInput",
+    "Combobox.TriggerMultipleWithInput",
+    "Combobox.Chip",
+    "Autocomplete",
+    "Autocomplete.InputGroup",
+    "Select",
+    "TermChip",
+    "TermChipList",
+    "Badge",
+    "tagSuggestions",
+  ],
+  "components/CreateTermDialog.tsx": [
+    "LayerDialog",
+    "Input",
+    "InputGroup",
+    "Switch",
+    "Banner",
+    "TermCombobox",
+    "similarTerms",
+    "validateSlug",
+  ],
+  "components/RedirectDialog.tsx": [
+    "LayerDialog",
+    "Radio",
+    "InputGroup",
+    "Input",
+    "Banner",
+    "InsetPanel",
+    "externalHost",
+    "validateRedirect",
+  ],
+  "components/TaxonomyHealthCard.tsx": ["SectionCard", "SectionEmpty", "Badge", "taxonomyReport"],
+  "components/TagsMigration.tsx": ["Banner", "Banner.Action", "LayerDialog", "InsetPanel"],
+  "components/ArticleTerms.tsx": [
+    "SectionCard",
+    "CategoryPicker",
+    "TagPicker",
+    "TagInput",
+    "Banner",
+    "withAssignment",
+  ],
+  "components/Taxonomy.tsx": ["Badge", "Tooltip", "Link", "IndexStatus"],
+  "routes/ArticleEditorPage.tsx#taxonomy": [
+    "ArticleTermsCard",
+    "TagsMigrationBanner",
+    "useTaxonomyData",
+    "missingPrimaries",
+  ],
+  "routes/ArticlesPage.tsx#taxonomy": [
+    "Select",
+    "Toolbar",
+    "Badge",
+    "Tooltip",
+    "facetFilter",
+    "TagsMigrationBanner",
+  ],
+  "routes/SiteShell.tsx#taxonomy": ["useTaxonomyData", "Signpost", "Tag"],
+  "components/SnapshotDiffDialog.tsx#taxonomy": ["AssignmentDeltas", "useTaxonomyData"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -445,6 +577,9 @@ const REQUIRED_SOMEWHERE = [
   "ImagePreview",
   "SearchResultPreview",
   "SocialCardPreview",
+  "Combobox",
+  "Autocomplete",
+  "TermChip",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -608,20 +743,83 @@ describe("design rules (DESIGN.md)", () => {
   });
 
   it("every save path in the editors validates search and image fields first (§2o)", () => {
-    for (const file of ["routes/ArticleEditorPage.tsx", "routes/PageEditorPage.tsx"]) {
+    // `valid(status)` also checks the required primary category for the status being saved (§2p).
+    for (const file of [
+      "routes/ArticleEditorPage.tsx",
+      "routes/PageEditorPage.tsx",
+      "routes/TermEditorPage.tsx",
+    ]) {
       const text = (files.find((f) => f.file === file) as { text: string }).text;
       const saves = text.match(/save\.mutate\(/g) ?? [];
-      const guarded = text.match(/if \(valid\(\)\) save\.mutate\(/g) ?? [];
+      const guarded = text.match(/if \(valid\([^)]*\)\) save\.mutate\(/g) ?? [];
       expect(saves.length, file).toBeGreaterThan(0);
       expect(guarded.length, `${file}: unguarded save.mutate`).toBe(saves.length);
-      expect(text, file).toMatch(/if \(valid\(\)\) setPublishOpen\(true\)/);
+      if (file !== "routes/TermEditorPage.tsx")
+        expect(text, file).toMatch(/if \(valid\([^)]*\)\) setPublishOpen\(true\)/);
     }
+    // Review and publish check the status they move to (RFC-0002 invariant 2).
+    const article = files.find((f) => f.file === "routes/ArticleEditorPage.tsx") as {
+      text: string;
+    };
+    expect(article.text).toMatch(
+      /if \(valid\(next\)\) save\.mutate\(\{ \.\.\.draft, status: next \}\)/,
+    );
+    expect(article.text).toMatch(/if \(valid\("published"\)\) setPublishOpen\(true\)/);
   });
 
   it("the noindex switch always comes with its warning (§2o)", () => {
     const seo = files.find((f) => f.file === "components/Seo.tsx") as { text: string };
-    expect(seo.text).toMatch(/<Switch[\s\S]*?applySeo\(page, \{ noindex: checked \}\)/);
+    expect(seo.text).toMatch(/<Switch[\s\S]*?patchSeo\(seo, \{ noindex: checked \}\)/);
     expect(seo.text).toMatch(/\{seo\.noindex && \(\s*<Banner\s+variant="alert"/);
+  });
+
+  it("governance operations run only through the dialog that previews them (§2p)", () => {
+    // Rename, merge, retire, move, visibility and reject go through GovernanceDialog, which shows
+    // the dry run first; approving a proposal is the one direct call (non-destructive, like
+    // approving a non-destructive agent request).
+    const governing = uiFiles.filter((f) => /api\.terms\.govern\(/.test(f.text));
+    expect(governing.map((f) => f.file).sort()).toEqual([
+      "components/GovernanceDialog.tsx",
+      "routes/TaxonomyPage.tsx",
+      "routes/TermEditorPage.tsx",
+    ]);
+    for (const f of governing.filter((x) => x.file !== "components/GovernanceDialog.tsx"))
+      for (const m of f.text.matchAll(/api\.terms\.govern\([^)]*\)/g))
+        expect(m[0], f.file).toMatch(/decision: "approve"/);
+    const dialog = governing.find((f) => f.file === "components/GovernanceDialog.tsx") as {
+      text: string;
+    };
+    // Preview first; the action stays disabled until it is in, and over the limit or when a
+    // required category would be lost.
+    expect(dialog.text).toMatch(/api\.terms\.preview\(/);
+    expect(dialog.text).toMatch(
+      /disabled=\{!ready \|\| Boolean\(tooLarge\) \|\| Boolean\(blocked\)\}/,
+    );
+    // "One change, one snapshot; live with the next publish", the 400 limit and the 410 copy.
+    expect(dialog.text).toMatch(/t\("governance\.oneSnapshot"\)/);
+    expect(dialog.text).toMatch(/governance\.tooLarge\.description/);
+    expect(dialog.text).toMatch(/governance\.gone\.description/);
+  });
+
+  it("people confirm an external redirect target by its host (§2p, RFC-0002 security)", () => {
+    const dialog = files.find((f) => f.file === "components/RedirectDialog.tsx") as {
+      text: string;
+    };
+    expect(dialog.text).toMatch(/const external = externalHost\(to\)/);
+    expect(dialog.text).toMatch(
+      /if \(external && step === "form"[\s\S]*?\) \{\s*setStep\("confirm"\)/,
+    );
+    expect(dialog.text).toMatch(/redirects\.external\.confirm/);
+  });
+
+  it("migrated articles save terms from the pickers, never free tags (§2p)", () => {
+    const editor = files.find((f) => f.file === "routes/ArticleEditorPage.tsx") as {
+      text: string;
+    };
+    expect(editor.text).not.toMatch(/<TagInput\b/);
+    const card = files.find((f) => f.file === "components/ArticleTerms.tsx") as { text: string };
+    // The free TagInput only appears for sites without taxonomies (legacy `tags`).
+    expect(card.text).toMatch(/!migrated \? \(\s*<TagInput/);
   });
 
   it("every screen that can pick Auto asks for consent first", () => {
