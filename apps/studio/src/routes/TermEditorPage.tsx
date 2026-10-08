@@ -41,6 +41,8 @@ import {
   type DetailRow,
   DetailsCard,
   EditorLayout,
+  PreviewToggle,
+  usePreviewVisible,
 } from "../components/EditorLayout.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { GovernanceDialog, type GovernanceTarget } from "../components/GovernanceDialog.tsx";
@@ -53,6 +55,7 @@ import {
   useTaxonomyData,
   VisibilityBadge,
 } from "../components/Taxonomy.tsx";
+import { TermArchivePreview } from "../components/TermArchivePreview.tsx";
 import { useToast } from "../components/Toast.ts";
 import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -80,7 +83,8 @@ const ALT_ERROR: Record<AltNameError["code"], MessageKey> = {
  * Site › Categories & tags › a term (DESIGN.md §2p): names and synonyms per locale, the archive
  * introduction (markdown), the image (the cover-image card) and search settings per locale (the
  * SEO fields), placement (parent, position), indexing and the read-only slug history with its
- * redirects. Slug, parent, visibility and retirement change only through the governance dialogs.
+ * redirects, and a live preview of the archive page with the unsaved text and what its address
+ * answers. Slug, parent, visibility and retirement change only through the governance dialogs.
  */
 export function TermEditorPage() {
   const t = useT();
@@ -97,6 +101,7 @@ export function TermEditorPage() {
   const [showErrors, setShowErrors] = useState(false);
   const [locale, setLocale] = useState<string | undefined>();
   const [governance, setGovernance] = useState<GovernanceTarget | undefined>();
+  const [previewVisible, setPreviewVisible] = usePreviewVisible();
   useEffect(() => {
     if (detail.data) setDraft(detail.data.term);
   }, [detail.data]);
@@ -219,8 +224,11 @@ export function TermEditorPage() {
         </span>
       }
       actions={
-        retired ? undefined : (
+        retired ? (
+          <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} live />
+        ) : (
           <>
+            <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} live />
             {saved.status === "proposed" && (
               <Button
                 variant="secondary"
@@ -340,6 +348,8 @@ export function TermEditorPage() {
         </div>
       )}
       <EditorLayout
+        previewVisible={previewVisible}
+        preview={<TermArchivePreview term={draft} rev={saved.rev} path={path} />}
         main={
           <>
             <SectionCard

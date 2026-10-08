@@ -1318,6 +1318,9 @@ export const en = {
     show: "Show preview",
     hide: "Hide preview",
     toggleHint: "Show the last saved version next to the form",
+    toggleHintLive: "Show the page with your unsaved changes next to the form",
+    openSaved: "Open the saved version in a new tab",
+    failed: "Preview unavailable",
   },
   diff: {
     title: "Changes in {name}",
@@ -1692,6 +1695,10 @@ export const en = {
       thin: "{path} has {count} of the {min} published articles it needs; until then it is served with noindex, follow.",
       empty: "{path} has no published articles and answers 404 until one is filed.",
       noindex: "{path} is hidden from search engines in its search settings.",
+    },
+    preview: {
+      statusHint:
+        "What {path} answers with these changes: {status}. The preview always shows the page, even before it is public.",
     },
     placement: {
       title: "Placement",

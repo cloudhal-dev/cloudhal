@@ -129,6 +129,44 @@ describe("term editor", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("previews the archive live: the unsaved text goes to the server, the state comes back", async () => {
+    const previewed: Record<string, unknown>[] = [];
+    serve(editorRoutes(), (call) => {
+      if (!call.url.endsWith("/terms/term_js000001/preview")) return undefined;
+      previewed.push(call.body ?? {});
+      const seo = (call.body?.labels as { en?: { seo?: { noindex?: boolean } } })?.en?.seo;
+      return {
+        body: {
+          html: `<!doctype html><h1>${(call.body as { labels: { en: { name: string } } }).labels.en.name}</h1>`,
+          archive: {
+            status: 200,
+            indexable: false,
+            reason: seo?.noindex ? "noindex" : "thin",
+            total: 2,
+            minEntriesToIndex: 3,
+            path: "/tag/javascript",
+          },
+        },
+      };
+    });
+    render(wrap(<TermEditorPage />));
+    const state = await screen.findByTestId("preview-archive");
+    expect(state).toHaveAttribute("data-status", "200");
+    expect(within(state).getByText("Not indexed: 2 of 3")).toBeInTheDocument();
+    expect(within(state).getByText("HTTP 200")).toBeInTheDocument();
+    const frame = screen.getByTitle("Preview of /tag/javascript");
+    expect(frame).toHaveAttribute("sandbox", "");
+    expect(frame.getAttribute("srcdoc")).toContain("<h1>JavaScript</h1>");
+
+    // typing renames the archive in the preview without saving
+    fireEvent.change(screen.getByTestId("term-name"), { target: { value: "JS & friends" } });
+    await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain("<h1>JS & friends</h1>"), {
+      timeout: 3000,
+    });
+    expect(previewed.at(-1)).toMatchObject({ labels: { en: { name: "JS & friends" } } });
+    expect(previewed.every((b) => !("slug" in b) && !("status" in b))).toBe(true);
+  });
 });
 
 describe("redirects screen", () => {

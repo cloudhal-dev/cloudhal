@@ -38,6 +38,16 @@ export interface PreviewPanelLabels {
 export interface PreviewPanelProps {
   /** URL of the preview document (same origin; served with a sandboxing CSP). */
   src: string;
+  /**
+   * A draft document rendered by the server from unsaved changes (it carries the preview CSP in a
+   * meta tag). When set, the frame shows it instead of `src`, updating in place as it changes;
+   * `undefined` while the first one loads. "Open in new tab" still opens `src` (the saved version).
+   */
+  srcDoc?: string | undefined;
+  /** Draft mode from the start: show `srcDoc` (a skeleton until the first one arrives), never `src`. */
+  live?: boolean;
+  /** With `srcDoc`: the frame shows a document but a newer one is on its way. */
+  stale?: boolean;
   /** Bump to reload the frame, e.g. the document's `rev` after each save. */
   version?: string | number | undefined;
   labels: PreviewPanelLabels;
@@ -63,6 +73,9 @@ function withVersion(src: string, version: string | number | undefined, nonce: n
  */
 export function PreviewPanel({
   src,
+  srcDoc,
+  stale = false,
+  live = false,
   version,
   labels,
   status,
@@ -77,10 +90,19 @@ export function PreviewPanel({
   const [box, setBox] = useState({ width: 0, height: 0 });
   const viewport = useRef<HTMLDivElement>(null);
   const url = withVersion(src, version, nonce);
+  const draft = live || srcDoc !== undefined;
 
-  // A new URL means a new document is loading.
+  // A new URL means a new document is loading. A draft document swaps in place (no skeleton on
+  // every keystroke); only a reload remounts it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the effect must re-run when the URL changes
-  useEffect(() => setLoading(true), [url]);
+  useEffect(() => {
+    if (!draft) setLoading(true);
+  }, [url]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a reload remounts the draft frame
+  useEffect(() => {
+    if (draft) setLoading(true);
+  }, [nonce]);
+  const waiting = draft ? srcDoc === undefined : false;
 
   useLayoutEffect(() => {
     const el = viewport.current;
@@ -131,7 +153,7 @@ export function PreviewPanel({
             variant="ghost"
             size="sm"
             aria-label={labels.reload}
-            loading={loading}
+            loading={loading || waiting || stale}
             onClick={() => setNonce((n) => n + 1)}
           />
           <LinkButton
@@ -154,7 +176,7 @@ export function PreviewPanel({
             fill && "min-h-0 flex-1",
           )}
           style={fill ? undefined : { height }}
-          aria-busy={loading}
+          aria-busy={loading || waiting || stale}
           data-device={device}
         >
           <div
@@ -165,9 +187,9 @@ export function PreviewPanel({
             style={{ width: Math.min(box.width || deviceWidth, deviceWidth * scale) }}
           >
             <iframe
-              key={url}
+              key={draft ? `draft.${nonce}` : url}
               title={labels.frameTitle}
-              src={url}
+              {...(draft ? { srcDoc } : { src: url })}
               sandbox=""
               referrerPolicy="no-referrer"
               onLoad={() => setLoading(false)}
@@ -183,7 +205,7 @@ export function PreviewPanel({
               }}
             />
           </div>
-          {loading && (
+          {(loading || waiting) && (
             <div
               className="absolute inset-0 flex flex-col gap-4 bg-kumo-base px-8 py-10"
               role="status"

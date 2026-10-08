@@ -1339,6 +1339,9 @@ export const tr: Messages = {
     show: "Önizlemeyi göster",
     hide: "Önizlemeyi gizle",
     toggleHint: "Son kaydedilen sürümü formun yanında göster",
+    toggleHintLive: "Sayfayı kaydedilmemiş değişikliklerinle formun yanında göster",
+    openSaved: "Kaydedilen sürümü yeni sekmede aç",
+    failed: "Önizleme alınamadı",
   },
   diff: {
     title: "{name} içindeki değişiklikler",
@@ -1516,7 +1519,7 @@ export const tr: Messages = {
       proposed: "İnceleme bekleyenler ({count})",
       review: "İncele",
       missingPrimary: "Birincil {singular} seçilmemiş makaleler ({count})",
-      missingPrimaryHint: "Biri seçilene kadar incelemeye gönderilemez, yayımlanamazlar.",
+      missingPrimaryHint: "Biri seçilene kadar incelemeye gönderilemez, yayınlanamazlar.",
       unfiled: "{Singular} seçilmemiş makaleler ({count})",
       unfiledHint: "Bir arşivde ve içerik yolunda görünsünler diye birini seç.",
       noIntro: "Giriş metni olmayan dizindeki arşivler ({count})",
@@ -1723,6 +1726,10 @@ export const tr: Messages = {
       thin: "{path} için gereken {min} yayınlanmış makaleden {count} tanesi var; o zamana kadar noindex, follow ile sunulur.",
       empty: "{path} adresinde yayınlanmış makale yok; bir makale eklenene kadar 404 döner.",
       noindex: "{path} arama ayarlarından arama motorlarına kapatıldı.",
+    },
+    preview: {
+      statusHint:
+        "Bu değişikliklerle {path} adresinin yanıtı: {status}. Önizleme, sayfa herkese açık olmasa da sayfayı gösterir.",
     },
     placement: {
       title: "Yerleşim",

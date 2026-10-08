@@ -13,7 +13,7 @@ import {
   slugify,
   suggestTerms,
 } from "@cloudhal/core-ts/names";
-import type { TermListItem, TermUsage } from "./api.ts";
+import type { TermListItem, TermPreview, TermUsage } from "./api.ts";
 import {
   cleanImageRef,
   type ImageRefErrors,
@@ -218,6 +218,25 @@ export function indexStatus(
   if (published < tax.minEntriesToIndex)
     return { kind: "thin", published, min: tax.minEntriesToIndex };
   return { kind: "indexed", published };
+}
+
+/**
+ * The indexing state of an archive as the server's preview reports it (the renderer's
+ * `archiveState`), in the shape `IndexBadge` shows.
+ */
+export function archiveIndexStatus(archive: TermPreview["archive"]): IndexStatus {
+  switch (archive.reason) {
+    case "indexed":
+      return { kind: "indexed", published: archive.total };
+    case "thin":
+      return { kind: "thin", published: archive.total, min: archive.minEntriesToIndex };
+    case "noindex":
+      return { kind: "noindex" };
+    case "empty":
+      return { kind: "empty" };
+    default:
+      return { kind: "none", reason: archive.reason };
+  }
 }
 
 /** Published entries per term, summed over each term's subtree when `hierarchical`. */

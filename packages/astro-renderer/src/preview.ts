@@ -166,7 +166,7 @@ const ARCHIVE_WORDS: Record<
     breadcrumb: "Sayfa yolu",
     feed: "RSS beslemesi",
     posts: (n) => `${n} yazı`,
-    empty: "Burada henüz yayımlanmış bir şey yok.",
+    empty: "Burada henüz yayınlanmış bir şey yok.",
     newer: "← Daha yeni",
     older: "Daha eski →",
     pageOf: (page, pages) => `Sayfa ${page} / ${pages}`,
