@@ -34,6 +34,16 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  MediaDropZone,
+  type MediaDropZoneLabels,
+  type MediaDropZoneProps,
+  MediaGrid,
+  MediaKindFrame,
+  MediaTile,
+  type MediaTileProps,
+  useFileChooser,
+} from "./blocks/Media.tsx";
+export {
   MenuTree,
   type MenuTreeBlock,
   type MenuTreeEvent,

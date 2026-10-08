@@ -22,8 +22,11 @@ export interface ImagePreviewProps {
   /**
    * `card`: the 1.91:1 frame social networks crop to (Open Graph), labels shown in the frame.
    * `thumb`: a 16:9, 3.5 rem list thumbnail with icons only.
+   * `tile`: a 4:3 frame filling its container, icons only (media library tiles, §2u).
    */
-  size?: "card" | "thumb";
+  size?: "card" | "thumb" | "tile";
+  /** `cover` crops to the frame (default); `contain` shows the whole image (media previews). */
+  fit?: "cover" | "contain";
   labels: ImagePreviewLabels;
   /** A muted line under the frame, e.g. the image's size (`card` only). */
   caption?: ReactNode;
@@ -44,6 +47,7 @@ export function ImagePreview({
   src,
   alt,
   size = "card",
+  fit = "cover",
   labels,
   caption,
   errorHint,
@@ -65,14 +69,21 @@ export function ImagePreview({
     report.current?.(status);
   }, [status]);
   const thumb = size === "thumb";
-  const iconSize = thumb ? 16 : 32;
+  const tile = size === "tile";
+  // Tiles and thumbnails show icons only; their name is next to them.
+  const compact = thumb || tile;
+  const iconSize = thumb ? 16 : tile ? 24 : 32;
   const note = status === "error" ? errorHint : caption;
   const frame = (
     <div
       data-image-status={status}
       className={cn(
         "relative min-w-0 overflow-hidden bg-kumo-recessed ring ring-kumo-hairline",
-        thumb ? "aspect-video w-14 shrink-0 rounded-md" : "aspect-[1.91/1] w-full rounded-lg",
+        thumb
+          ? "aspect-video w-14 shrink-0 rounded-md"
+          : tile
+            ? "aspect-[4/3] w-full rounded-md"
+            : "aspect-[1.91/1] w-full rounded-lg",
         className,
       )}
     >
@@ -81,10 +92,14 @@ export function ImagePreview({
           key={src}
           src={src}
           alt={alt}
-          loading={thumb ? "lazy" : "eager"}
+          loading={compact ? "lazy" : "eager"}
           decoding="async"
           referrerPolicy="no-referrer"
-          className={cn("size-full object-cover", status === "loading" && "invisible")}
+          className={cn(
+            "size-full",
+            fit === "contain" ? "object-contain" : "object-cover",
+            status === "loading" && "invisible",
+          )}
           onLoad={(e) => {
             const img = e.currentTarget;
             settle("loaded");
@@ -98,19 +113,19 @@ export function ImagePreview({
         <div
           className={cn(
             "absolute inset-0 flex flex-col items-center justify-center text-center text-kumo-subtle",
-            thumb ? "gap-0" : "gap-1.5 px-4",
+            compact ? "gap-0" : "gap-1.5 px-4",
           )}
           role={status === "loading" ? "status" : undefined}
-          title={thumb ? labelFor(status, labels) : undefined}
+          title={compact ? labelFor(status, labels) : undefined}
         >
           {status === "loading" ? (
-            <Loader size={thumb ? "sm" : "base"} />
+            <Loader size={compact ? "sm" : "base"} />
           ) : status === "error" ? (
             <ImageBroken size={iconSize} aria-hidden />
           ) : (
             <ImageIcon size={iconSize} aria-hidden />
           )}
-          {thumb ? (
+          {compact ? (
             <span className="sr-only">{labelFor(status, labels)}</span>
           ) : (
             <Text as="span" variant="secondary" size="sm">
@@ -121,7 +136,7 @@ export function ImagePreview({
       )}
     </div>
   );
-  if (thumb || !note) return frame;
+  if (compact || !note) return frame;
   return (
     <div className="grid min-w-0 gap-1.5">
       {frame}
