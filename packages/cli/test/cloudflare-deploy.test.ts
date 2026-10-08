@@ -110,6 +110,7 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     const cfg = await readProjectConfig(projectDir);
     const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
     const bundle = await exportSite(local, siteId);
+    const newsId = (await local.store.getTermBySlug(siteId, "category", "news"))?.id as string;
     await local.close();
     const pushed = await adminFetch(`/api/admin/sites/${siteId}/bundle`, {
       method: "PUT",
@@ -206,7 +207,16 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
       },
     });
     expect(created.isError, JSON.stringify(created.content)).toBeFalsy();
-    const { entry } = created.structuredContent as { entry: { id: string; rev: number } };
+    const { entry: draft } = created.structuredContent as { entry: { id: string; rev: number } };
+    // A published entry needs a primary category (RFC-0002 invariant 2). Until the MCP tools take
+    // `terms`, the owner files the draft under the seeded "News" category in Studio (REST).
+    const filed = await adminFetch(`/api/sites/${siteId}/entries/${draft.id}`, {
+      method: "PUT",
+      headers: { cookie, "content-type": "application/json", ...browser },
+      body: JSON.stringify({ ...draft, terms: { category: { ids: [newsId], primary: newsId } } }),
+    });
+    expect(filed.status, await filed.clone().text()).toBe(200);
+    const entry = (await filed.json()) as { id: string; rev: number };
     const ready = await client.callTool({
       name: "update_entry",
       arguments: { siteId, entryId: entry.id, rev: entry.rev, status: "published" },

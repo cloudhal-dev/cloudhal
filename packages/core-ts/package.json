@@ -1,7 +1,7 @@
 {
   "name": "@cloudhal/core-ts",
   "version": "0.0.1",
-  "description": "Cloudhal Site Graph core (TypeScript): load/save nodes with optimistic locking, snapshots, diff, publish and rollback",
+  "description": "Cloudhal Site Graph core (TypeScript): load/save nodes with optimistic locking, snapshots, diff, publish and rollback; taxonomies, terms and redirects",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -11,7 +11,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./local": "./src/local.ts"
+    "./local": "./src/local.ts",
+    "./filter": "./src/filter.ts"
   },
   "files": [
     "dist",
@@ -55,6 +56,10 @@
       "./local": {
         "types": "./dist/src/local.d.ts",
         "default": "./dist/src/local.js"
+      },
+      "./filter": {
+        "types": "./dist/src/filter.d.ts",
+        "default": "./dist/src/filter.js"
       }
     }
   }

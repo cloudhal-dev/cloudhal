@@ -3,9 +3,36 @@
  */
 export * from "./domains.ts";
 export * from "./errors.ts";
+export * from "./filter.ts";
 export * from "./hash.ts";
 export * from "./ids.ts";
+export * from "./names.ts";
 export * from "./preview-token.ts";
+export {
+  ancestorPaths,
+  joinTarget,
+  matchRedirect,
+  normalisePath,
+  type RedirectMatch,
+  splitTarget,
+} from "./redirects.ts";
 export * from "./seed.ts";
 export * from "./store.ts";
 export * from "./sync.ts";
+export {
+  TAGS_MIGRATION,
+  TAGS_MIGRATION_BATCH,
+  type TagsMigrationResult,
+  type TagsRevertResult,
+} from "./tags-migration.ts";
+export {
+  type DefaultTaxonomyOptions,
+  type EntryQuery,
+  GOVERNANCE_ENTRY_LIMIT,
+  type GovernanceResult,
+  MAX_TERM_DEPTH,
+  MAX_TERM_IDS_PER_ENTRY,
+  type ReviewDecision,
+  type TermQuery,
+  type TermUsage,
+} from "./taxonomy.ts";

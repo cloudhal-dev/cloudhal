@@ -13,9 +13,16 @@ export interface DiffRow {
   to?: number;
 }
 
-const KIND_ORDER: Record<NodeRef["kind"], number> = { site: 0, page: 1, contentEntry: 2 };
+const KIND_ORDER: Record<NodeRef["kind"], number> = {
+  site: 0,
+  taxonomy: 1,
+  term: 2,
+  page: 3,
+  contentEntry: 4,
+  redirect: 5,
+};
 
-/** Flattens the API diff into rows grouped by change, site first, then pages, then articles. */
+/** Flattens the API diff into rows grouped by change: site, taxonomies, terms, pages, articles, redirects. */
 export function diffRows(diff: SnapshotDiff): Record<Change, DiffRow[]> {
   const sort = (rows: DiffRow[]) =>
     rows.sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.id.localeCompare(b.id));

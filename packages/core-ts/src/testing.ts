@@ -7,6 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ConflictError, UniqueConstraintError } from "./errors.ts";
 import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
+import { racingDriver, taxonomySuite } from "./testing-taxonomy.ts";
 
 export interface StoreFactory {
   create(): Promise<{ sql: SqlDriver; blobs: BlobStore }>;
@@ -238,6 +239,18 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
       const other = await store.createSnapshot(site.id, { actor: human, reason: "manual" });
       await expect(store.rollback(rolled, other.id, human)).rejects.toThrow(/not an ancestor/);
       await expect(store.publish(rolled, "snap_doesnotexist1")).rejects.toThrow(/not found/);
+    });
+
+    taxonomySuite({
+      store: () => store,
+      sql: () => sql,
+      blobs: () => blobs,
+      racing: (hook, when) =>
+        new SiteGraphStore({
+          sql: racingDriver(sql, hook, when),
+          blobs,
+          now: () => new Date(Date.UTC(2026, 9, 7, 20, 0, tick++)),
+        }),
     });
   });
 }

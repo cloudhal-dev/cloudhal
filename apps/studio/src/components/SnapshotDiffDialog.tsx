@@ -65,6 +65,8 @@ function useNodeNames(siteId: string, enabled: boolean) {
         ? { title: page.title, detail: page.path, href: `/sites/${siteId}/pages/${page.id}` }
         : {};
     }
+    // Taxonomies, terms and redirects are named by their kind badge until Studio lists them.
+    if (row.kind !== "contentEntry") return {};
     const entry = entries.data?.find((e) => e.id === row.id);
     return entry
       ? {

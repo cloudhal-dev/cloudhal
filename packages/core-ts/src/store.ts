@@ -5,8 +5,11 @@ import {
   type NodeRef,
   type Page,
   type Project,
+  type Redirect,
   type Site,
   type Snapshot,
+  type Taxonomy,
+  type Term,
 } from "@cloudhal/core-contracts";
 import {
   type BlobStore,
@@ -23,19 +26,46 @@ import {
 } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
+import type { Resolution } from "./names.ts";
+import {
+  type Cond,
+  casUpdateStatement,
+  insertNodeStatement,
+  OpBatch,
+  type Row,
+  runOpBatch,
+} from "./node-sql.ts";
+import { type Creatable, type NodeKind, type SiteNode, uniquenessKey } from "./nodes.ts";
+import type { RedirectMatch } from "./redirects.ts";
+import {
+  migrateTagsToTerms,
+  revertTagsToTerms,
+  type TagsMigrationResult,
+  type TagsRevertResult,
+} from "./tags-migration.ts";
+import {
+  canonicalTerms,
+  type DefaultTaxonomyOptions,
+  type EntryQuery,
+  type GovernanceResult,
+  type ReviewDecision,
+  TaxonomyEngine,
+  type TermQuery,
+  type TermUsage,
+} from "./taxonomy.ts";
 
-export type NodeKind = NodeRef["kind"];
-export type SiteNode = Site | Page | ContentEntry;
-
-type Row = {
-  id: string;
-  site_id: string;
-  kind: NodeKind;
-  key: string;
-  rev: number;
-  hash: string;
-  body: string;
-};
+export {
+  type Creatable,
+  isNodeKind,
+  NODE_KINDS,
+  NODE_SPEC,
+  type NodeKind,
+  type NodeSpec,
+  type NodeTypes,
+  type SiteNode,
+  siteIdOf,
+  uniquenessKey,
+} from "./nodes.ts";
 
 export interface SiteGraphStoreOptions {
   readonly sql: SqlDriver;
@@ -51,15 +81,12 @@ export interface SiteGraphStoreOptions {
   readonly onHookError?: (error: unknown) => void;
 }
 
-/** Fields the store fills in on create. */
-type Creatable<
-  T extends { id: string; rev: number; createdAt: string; updatedAt: string; schemaVersion: 1 },
-> = Omit<T, "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"> & { id?: string };
-
 export interface SnapshotInput {
   readonly actor: Actor;
   readonly reason: Snapshot["reason"];
   readonly label?: string;
+  /** Namespaced keys (e.g. `cloudhal.migration`), kept on the snapshot. */
+  readonly metadata?: Record<string, string>;
 }
 
 export interface SnapshotDiff {
@@ -79,31 +106,17 @@ function firstPublication(
   return entry.status === "published" && !entry.publishedAt ? { publishedAt: ts } : {};
 }
 
-export function uniquenessKey(node: SiteNode): string {
-  if ("pageIds" in node) return "site";
-  if ("path" in node) return `${node.locale}:${node.path}`;
-  return `${node.collection}:${node.locale}:${node.slug}`;
-}
-
-export function kindOf(node: SiteNode): NodeKind {
-  if ("pageIds" in node) return "site";
-  if ("path" in node) return "page";
-  return "contentEntry";
-}
-
-export function siteIdOf(node: SiteNode): string {
-  return "pageIds" in node ? node.id : node.siteId;
-}
-
 /**
- * The Site Graph store: typed CRUD with optimistic locking, snapshots, diff, publish, rollback.
- * Every multi-statement write is one atomic `batch()`; see ADR-0002 and RFC-0001.
+ * The Site Graph store: typed CRUD with optimistic locking, snapshots, diff, publish, rollback,
+ * taxonomies, terms and redirects. Every multi-statement write is one atomic `batch()`; see
+ * ADR-0002, RFC-0001 and RFC-0002.
  */
 export class SiteGraphStore {
   readonly #sql: SqlDriver;
   readonly #blobs: BlobStore;
   readonly #now: () => Date;
   readonly #newId: (prefix: string) => string;
+  readonly #tax: TaxonomyEngine;
 
   constructor(options: SiteGraphStoreOptions) {
     this.#sql = options.sql;
@@ -112,6 +125,11 @@ export class SiteGraphStore {
     this.#newId = options.idGen ?? newId;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
+    this.#tax = new TaxonomyEngine({
+      sql: this.#sql,
+      stamp: () => this.#stamp(),
+      newId: (prefix) => this.#newId(prefix),
+    });
   }
 
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
@@ -173,41 +191,6 @@ export class SiteGraphStore {
 
   // ───────────────────────────── nodes (site / page / contentEntry) ─────────────────────────────
 
-  async #insertNodeStatement(node: SiteNode, ts: string): Promise<SqlStatement> {
-    return {
-      sql: "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      params: [
-        node.id,
-        siteIdOf(node),
-        kindOf(node),
-        uniquenessKey(node),
-        node.rev,
-        await nodeHash(node),
-        canonicalJson(node),
-        ts,
-        ts,
-      ],
-    };
-  }
-
-  async #casUpdateStatement(next: SiteNode, expectedRev: number): Promise<SqlStatement> {
-    return {
-      // Scoped by kind and site too: a body of one kind (or site) can never overwrite another's row.
-      sql: "UPDATE nodes SET key = ?, rev = ?, hash = ?, body = ?, updated_at = ? WHERE id = ? AND rev = ? AND kind = ? AND site_id = ?",
-      params: [
-        uniquenessKey(next),
-        next.rev,
-        await nodeHash(next),
-        canonicalJson(next),
-        next.updatedAt,
-        next.id,
-        expectedRev,
-        kindOf(next),
-        siteIdOf(next),
-      ],
-    };
-  }
-
   async #getNode<T extends SiteNode>(kind: NodeKind, id: string): Promise<T | undefined> {
     const row = await this.#sql.get<Row>("SELECT * FROM nodes WHERE id = ? AND kind = ?", [
       id,
@@ -231,7 +214,11 @@ export class SiteGraphStore {
       updatedAt: ts,
     };
     assertValid("site", site);
-    await this.#runInsert(await this.#insertNodeStatement(site, ts), "site", uniquenessKey(site));
+    await this.#runUnique(
+      await insertNodeStatement("site", site, ts),
+      "site",
+      uniquenessKey("site", site),
+    );
     return site;
   }
 
@@ -251,16 +238,17 @@ export class SiteGraphStore {
   async updateSite(site: Site): Promise<Site> {
     const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
     assertValid("site", next);
-    const r = await this.#sql.run(...stmt(await this.#casUpdateStatement(next, site.rev)));
+    const s = await casUpdateStatement("site", next, site.rev);
+    const r = await this.#sql.run(s.sql, s.params ?? []);
     if (r.changes !== 1)
       throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
     return next;
   }
 
   /**
-   * Creates a page and appends it to `Site.pageIds` atomically. The site update (CAS) runs first;
-   * the page insert is conditional on the site having reached the new revision, so on a stale
-   * site revision neither statement changes anything and a ConflictError is thrown.
+   * Creates a page and appends it to `Site.pageIds` atomically: one batch with the site CAS, the
+   * page insert (guarded on the site's new hash and on archive paths, invariant 13) and an
+   * assertion, so a stale site revision changes nothing and raises a ConflictError.
    */
   async createPage(site: Site, input: Creatable<Page>): Promise<{ page: Page; site: Site }> {
     const ts = this.#stamp();
@@ -281,24 +269,24 @@ export class SiteGraphStore {
       updatedAt: ts,
     };
     assertValid("site", nextSite);
-    const insert = await this.#insertNodeStatement(page, ts);
-    // The guard checks the site's new content hash, not just `rev + 1`: a stale caller whose rev is
-    // exactly one behind would otherwise see `rev + 1` already present and insert anyway.
-    const siteHash = await nodeHash(nextSite);
-    const results = await this.#batchUnique(
-      [
-        await this.#casUpdateStatement(nextSite, site.rev),
-        {
-          sql: `INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at)
-                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)`,
-          params: [...(insert.params ?? []), site.id, siteHash],
-        },
-      ],
-      "page",
-      uniquenessKey(page),
-    );
-    if (results[0]?.changes !== 1)
-      throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
+    await this.#tax.checkPagePath(page);
+    const plan = await this.#tax.planPathChange(site, ts, {
+      locale: page.locale,
+      wasPublished: false,
+      isPublished: page.status === "published",
+      oldPath: undefined,
+      newPath: page.path,
+      source: { kind: "page", id: page.id },
+    });
+    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
+    await batch.update("site", site, nextSite);
+    await batch.insert("page", page, this.#tax.pageGuard(page));
+    await plan?.emit(batch);
+    await runOpBatch(this.#sql, batch, {
+      uniqueKind: "page",
+      uniqueKey: uniquenessKey("page", page),
+      diagnose: () => this.#tax.checkPagePath(page),
+    });
     return { page, site: nextSite };
   }
 
@@ -314,16 +302,51 @@ export class SiteGraphStore {
     return rows.map((r) => JSON.parse(r.body) as Page);
   }
 
+  /**
+   * CAS update. The path may not enter an archive base path (invariant 13); a published page in the
+   * default locale whose path changes leaves a 301 redirect (RFC-0002 accepted answer 5).
+   */
   async updatePage(page: Page): Promise<Page> {
-    const next: Page = { ...page, rev: page.rev + 1, updatedAt: this.#stamp() };
+    const ts = this.#stamp();
+    const next: Page = { ...page, rev: page.rev + 1, updatedAt: ts };
     assertValid("page", next);
-    const r = await this.#runUnique(
-      await this.#casUpdateStatement(next, page.rev),
-      "page",
-      uniquenessKey(next),
-    );
-    if (r.changes !== 1)
-      throw new ConflictError("page", page.id, page.rev, await this.#revOf(page.id));
+    const stored = await this.getPage(page.id);
+    if (!stored || stored.rev !== page.rev)
+      throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    await this.#tax.checkPagePath(next);
+    const site = await this.getSite(next.siteId);
+    if (!site) throw new NotFoundError("site", next.siteId);
+    const sameLocale = stored.locale === next.locale;
+    const plan = await this.#tax.planPathChange(site, ts, {
+      locale: next.locale,
+      wasPublished: sameLocale && stored.status === "published",
+      isPublished: next.status === "published",
+      oldPath: sameLocale ? stored.path : undefined,
+      newPath: next.path,
+      source: { kind: "page", id: next.id },
+    });
+    const key = uniquenessKey("page", next);
+    if (!plan) {
+      const r = await this.#runUnique(
+        await casUpdateStatement("page", next, page.rev, this.#tax.pageGuard(next)),
+        "page",
+        key,
+      );
+      if (r.changes !== 1) {
+        const rev = await this.#revOf(page.id);
+        if (rev === page.rev) await this.#tax.checkPagePath(next);
+        throw new ConflictError("page", page.id, page.rev, rev);
+      }
+      return next;
+    }
+    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
+    await batch.update("page", stored, next, this.#tax.pageGuard(next));
+    await plan.emit(batch);
+    await runOpBatch(this.#sql, batch, {
+      uniqueKind: "page",
+      uniqueKey: key,
+      diagnose: () => this.#tax.checkPagePath(next),
+    });
     return next;
   }
 
@@ -339,7 +362,7 @@ export class SiteGraphStore {
     assertValid("site", nextSite);
     const siteHash = await nodeHash(nextSite);
     const results = await this.#sql.batch([
-      await this.#casUpdateStatement(nextSite, site.rev),
+      await casUpdateStatement("site", nextSite, site.rev),
       {
         sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'page' AND site_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
         params: [page.id, page.rev, site.id, site.id, siteHash],
@@ -355,6 +378,11 @@ export class SiteGraphStore {
     return nextSite;
   }
 
+  /**
+   * Creates an entry. Term assignments are checked (RFC-0002 invariants 1–5) and the insert is
+   * guarded on every referenced term still being assignable; a deprecated non-empty `tags` is
+   * translated into `terms.tag` (§4.4).
+   */
   async createContentEntry(input: Creatable<ContentEntry>): Promise<ContentEntry> {
     const ts = this.#stamp();
     const entry: ContentEntry = {
@@ -366,28 +394,29 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(input, ts),
     };
-    assertValid("content-entry", entry);
-    await this.#runInsert(
-      await this.#insertNodeStatement(entry, ts),
-      "contentEntry",
-      uniquenessKey(entry),
-    );
-    return entry;
+    return this.#writeEntry(undefined, entry, ts);
   }
 
   async getContentEntry(id: string): Promise<ContentEntry | undefined> {
     return this.#getNode<ContentEntry>("contentEntry", id);
   }
 
-  async listContentEntries(siteId: string, collection?: string): Promise<ContentEntry[]> {
-    const rows = await this.#sql.all<Row>(
-      "SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry' ORDER BY created_at, id",
-      [siteId],
+  /**
+   * Entries of a site in creation order. The string form filters by collection; the query form
+   * also takes a locale, statuses and a filter expression (RFC-0002 §5), all compiled to SQL.
+   */
+  async listContentEntries(siteId: string, query?: string | EntryQuery): Promise<ContentEntry[]> {
+    return this.#tax.listEntries(
+      siteId,
+      typeof query === "string" ? { collection: query } : (query ?? {}),
     );
-    const all = rows.map((r) => JSON.parse(r.body) as ContentEntry);
-    return collection ? all.filter((e) => e.collection === collection) : all;
   }
 
+  /**
+   * CAS update with the same assignment checks as create. A published entry in the default locale
+   * whose slug (or collection) changes leaves a 301 redirect, with older redirects re-pointed
+   * (RFC-0002 §4.5).
+   */
   async updateContentEntry(entry: ContentEntry): Promise<ContentEntry> {
     const ts = this.#stamp();
     const next: ContentEntry = {
@@ -396,15 +425,60 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(entry, ts),
     };
-    assertValid("content-entry", next);
-    const r = await this.#runUnique(
-      await this.#casUpdateStatement(next, entry.rev),
-      "contentEntry",
-      uniquenessKey(next),
-    );
-    if (r.changes !== 1)
-      throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
-    return next;
+    return this.#writeEntry(entry, next, ts);
+  }
+
+  async #writeEntry(
+    prev: ContentEntry | undefined,
+    draft: ContentEntry,
+    ts: string,
+  ): Promise<ContentEntry> {
+    assertValid("content-entry", canonicalTerms(draft));
+    const site = await this.getSite(draft.siteId);
+    if (!site) throw new NotFoundError("site", draft.siteId);
+    let stored: ContentEntry | undefined;
+    if (prev) {
+      stored = await this.getContentEntry(prev.id);
+      if (!stored || stored.rev !== prev.rev)
+        throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
+    }
+    const { entry, newTerms, guard } = await this.#tax.prepareEntry(draft, site, ts);
+    const key = uniquenessKey("contentEntry", entry);
+    const sameLocale = stored?.locale === entry.locale;
+    const plan = await this.#tax.planPathChange(site, ts, {
+      locale: entry.locale,
+      wasPublished:
+        !!stored && sameLocale && (stored.status === "published" || !!stored.publishedAt),
+      isPublished: entry.status === "published",
+      oldPath: stored && sameLocale ? `/${stored.collection}/${stored.slug}` : undefined,
+      newPath: `/${entry.collection}/${entry.slug}`,
+      source: { kind: "contentEntry", id: entry.id },
+    });
+    if (newTerms.length === 0 && !plan) {
+      const statement = stored
+        ? await casUpdateStatement("contentEntry", entry, stored.rev, guard)
+        : await insertNodeStatement("contentEntry", entry, ts, guard);
+      const r = await this.#runUnique(statement, "contentEntry", key);
+      if (r.changes !== 1) {
+        const rev = await this.#revOf(entry.id);
+        if (stored && rev !== stored.rev)
+          throw new ConflictError("contentEntry", entry.id, stored.rev, rev);
+        await this.#tax.diagnoseEntry(entry);
+        throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
+      }
+      return entry;
+    }
+    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
+    for (const term of newTerms) await batch.insert("term", term, this.#tax.termSlugGuard(term));
+    if (stored) await batch.update("contentEntry", stored, entry, guard);
+    else await batch.insert("contentEntry", entry, guard);
+    await plan?.emit(batch);
+    await runOpBatch(this.#sql, batch, {
+      uniqueKind: "contentEntry",
+      uniqueKey: key,
+      diagnose: () => this.#tax.diagnoseEntry(entry),
+    });
+    return entry;
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
@@ -416,9 +490,155 @@ export class SiteGraphStore {
       throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
   }
 
+  // ───────────────────────────── taxonomies (RFC-0002) ─────────────────────────────
+
+  /** People only (structural). Key unique per site and not reserved; archive paths free (invariant 13). */
+  createTaxonomy(input: Creatable<Taxonomy>): Promise<Taxonomy> {
+    return this.#tax.createTaxonomy(input);
+  }
+
+  /** `category` and `tag` with the RFC-0002 §1 settings, for those missing. Returns both. */
+  createDefaultTaxonomies(site: Site, options?: DefaultTaxonomyOptions): Promise<Taxonomy[]> {
+    return this.#tax.createDefaultTaxonomies(site, options);
+  }
+
+  getTaxonomy(id: string): Promise<Taxonomy | undefined> {
+    return this.#tax.getTaxonomy(id);
+  }
+
+  getTaxonomyByKey(siteId: string, key: string): Promise<Taxonomy | undefined> {
+    return this.#tax.getTaxonomyByKey(siteId, key);
+  }
+
+  listTaxonomies(siteId: string): Promise<Taxonomy[]> {
+    return this.#tax.listTaxonomies(siteId);
+  }
+
+  /** CAS. The key is immutable; moving an enabled archive base path leaves a prefix redirect. */
+  updateTaxonomy(taxonomy: Taxonomy): Promise<Taxonomy> {
+    return this.#tax.updateTaxonomy(taxonomy);
+  }
+
+  // ───────────────────────────── terms ─────────────────────────────
+
+  /** `reclaim` (people only) frees a slug held by a slug history or a retired term, and its redirect. */
+  createTerm(input: Creatable<Term>, options?: { reclaim?: boolean }): Promise<Term> {
+    return this.#tax.createTerm(input, options);
+  }
+
+  getTerm(id: string): Promise<Term | undefined> {
+    return this.#tax.getTerm(id);
+  }
+
+  /** Follows `slugHistory`, so old slugs still find the term. */
+  getTermBySlug(siteId: string, key: string, slug: string): Promise<Term | undefined> {
+    return this.#tax.getTermBySlug(siteId, key, slug);
+  }
+
+  listTerms(siteId: string, query?: TermQuery): Promise<Term[]> {
+    return this.#tax.listTerms(siteId, query);
+  }
+
+  /** Labels, image, position and metadata; never slug, status, parent, visibility or merge state. */
+  updateTerm(term: Term): Promise<Term> {
+    return this.#tax.updateTerm(term);
+  }
+
+  termUsage(siteId: string, key?: string): Promise<Map<string, TermUsage>> {
+    return this.#tax.termUsage(siteId, key);
+  }
+
+  resolveTerms(siteId: string, key: string, inputs: readonly string[]): Promise<Resolution[]> {
+    return this.#tax.resolveTerms(siteId, key, inputs);
+  }
+
+  // ───────────────────────────── governance (one batch each; the caller snapshots once) ─────────────────────────────
+
+  renameTerm(term: Term, slug: string, options?: { reclaim?: boolean }): Promise<GovernanceResult> {
+    return this.#tax.renameTerm(term, slug, options);
+  }
+
+  mergeTerms(sources: readonly Term[], target: Term): Promise<GovernanceResult> {
+    return this.#tax.mergeTerms(sources, target);
+  }
+
+  retireTerm(term: Term, options?: { redirectTo?: Term }): Promise<GovernanceResult> {
+    return this.#tax.retireTerm(term, options);
+  }
+
+  setTermParent(term: Term, parentId: string | null): Promise<GovernanceResult> {
+    return this.#tax.setTermParent(term, parentId);
+  }
+
+  setTermVisibility(term: Term, visibility: Term["visibility"]): Promise<GovernanceResult> {
+    return this.#tax.setTermVisibility(term, visibility);
+  }
+
+  reviewTerm(term: Term, decision: ReviewDecision): Promise<GovernanceResult> {
+    return this.#tax.reviewTerm(term, decision);
+  }
+
+  // ───────────────────────────── redirects ─────────────────────────────
+
+  createRedirect(input: Creatable<Redirect>): Promise<Redirect> {
+    return this.#tax.createRedirect(input);
+  }
+
+  getRedirect(id: string): Promise<Redirect | undefined> {
+    return this.#tax.getRedirect(id);
+  }
+
+  updateRedirect(redirect: Redirect): Promise<Redirect> {
+    return this.#tax.updateRedirect(redirect);
+  }
+
+  deleteRedirect(redirect: Redirect): Promise<void> {
+    return this.#tax.deleteRedirect(redirect);
+  }
+
+  /** Ordered by `from`. */
+  listRedirects(siteId: string): Promise<Redirect[]> {
+    return this.#tax.listRedirects(siteId);
+  }
+
+  /** Exact `from` first, then the longest prefix redirect above `path` (rest appended to `to`). */
+  redirectFor(siteId: string, path: string): Promise<RedirectMatch | undefined> {
+    return this.#tax.redirectFor(siteId, path);
+  }
+
+  // ───────────────────────────── migration (RFC-0002 Compatibility) ─────────────────────────────
+
+  /** `tags` → `terms.tag`, resumable and idempotent; snapshots before and after. */
+  migrateTagsToTerms(
+    siteId: string,
+    actor: Actor,
+    options?: { dryRun?: boolean },
+  ): Promise<TagsMigrationResult> {
+    return migrateTagsToTerms(this.#migrationContext(), siteId, actor, options);
+  }
+
+  /** Restores `tags` for entries unchanged since the migration and removes what it created. */
+  revertTagsToTerms(
+    siteId: string,
+    migrationId: string,
+    options?: { actor?: Actor },
+  ): Promise<TagsRevertResult> {
+    return revertTagsToTerms(this.#migrationContext(), siteId, migrationId, options);
+  }
+
+  #migrationContext() {
+    return {
+      store: this,
+      sql: this.#sql,
+      stamp: () => this.#stamp(),
+      newId: (prefix: string) => this.#newId(prefix),
+      termSlugGuard: (term: Term): Cond => this.#tax.termSlugGuard(term),
+    };
+  }
+
   // ───────────────────────────── snapshots ─────────────────────────────
 
-  /** All node refs of a site at this instant (site, pages, content entries), sorted by id. */
+  /** All node refs of a site at this instant, sorted by id. */
   async currentNodeRefs(siteId: string): Promise<NodeRef[]> {
     const rows = await this.#sql.all<Pick<Row, "id" | "kind" | "rev" | "hash">>(
       "SELECT id, kind, rev, hash FROM nodes WHERE site_id = ? ORDER BY id",
@@ -469,6 +689,7 @@ export class SiteGraphStore {
         removed: diff.removed.length,
       },
       createdAt: this.#stamp(),
+      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
     };
     assertValid("snapshot", snapshot);
     await this.#sql.run(
@@ -620,31 +841,14 @@ export class SiteGraphStore {
 
   // ───────────────────────────── helpers ─────────────────────────────
 
-  async #runInsert(statement: SqlStatement, kind: NodeKind, key: string): Promise<void> {
-    await this.#runUnique(statement, kind, key);
-  }
-
-  async #runUnique(statement: SqlStatement, kind: NodeKind, key: string) {
+  async #runUnique(statement: SqlStatement, kind: string, key: string) {
     try {
-      return await this.#sql.run(...stmt(statement));
+      return await this.#sql.run(statement.sql, statement.params ?? []);
     } catch (e) {
       if (isUniqueViolation(e)) throw new UniqueConstraintError(kind, key);
       throw e;
     }
   }
-
-  async #batchUnique(statements: SqlStatement[], kind: NodeKind, key: string) {
-    try {
-      return await this.#sql.batch(statements);
-    } catch (e) {
-      if (isUniqueViolation(e)) throw new UniqueConstraintError(kind, key);
-      throw e;
-    }
-  }
-}
-
-function stmt(s: SqlStatement): [string, readonly import("@cloudhal/storage").SqlValue[]] {
-  return [s.sql, s.params ?? []];
 }
 
 /** Set difference of node refs by id; a node is "changed" when its hash differs. */

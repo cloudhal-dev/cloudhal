@@ -508,7 +508,7 @@ export const en = {
         "Bypass, where nothing waits for a person, isn't available for keys. It exists only for the local server on your own machine:",
       autoTitle: "Small publishes go live without you",
       autoDescription:
-        "In Auto mode, a publish that only adds or edits articles goes live right away: nothing removed, no pages or site settings changed, at most {limit} changes. Activity marks it as auto-approved and you can roll it back in one click. Larger publishes, rollback and deletions still wait for you.",
+        "In Auto mode, a publish that only adds or edits articles goes live right away: nothing removed, no pages, site settings, taxonomies or redirects changed, at most {limit} changes. Activity marks it as auto-approved and you can roll it back in one click. Larger publishes, rollback and deletions still wait for you.",
       autoConfirm: "I understand that this agent can publish without my approval",
       autoConfirmRequired: "Confirm that you understand what Auto mode does",
     },
@@ -1141,7 +1141,7 @@ export const en = {
     autoCheck: {
       "removes-content": "it removes content",
       nothing: "there is nothing new to publish",
-      structure: "it changes pages or site settings",
+      structure: "it changes pages, site settings, taxonomies or redirects",
       "too-many": "it carries {changes} changes and auto mode stops at {limit}",
     },
     noHistory: "No decisions yet",
@@ -1266,7 +1266,14 @@ export const en = {
     nothingToCompare: "Nothing to compare with",
     nothingToCompareDescription:
       "This is the site's first snapshot and no other version is live, so there is nothing to compare it with yet.",
-    kinds: { site: "Site settings", page: "Page", contentEntry: "Article" },
+    kinds: {
+      site: "Site settings",
+      page: "Page",
+      contentEntry: "Article",
+      taxonomy: "Taxonomy",
+      term: "Term",
+      redirect: "Redirect",
+    },
     gone: "No longer exists",
     revs: "rev {from} → {to}",
     rev: "rev {rev}",

@@ -85,6 +85,10 @@ export interface Term {
    * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
    */
   parentId?: string;
+  /**
+   * Order among sibling terms (same taxonomy and parent), lowest first, for menus and sidebars. Terms without a position follow, by name.
+   */
+  position?: number;
   image?: ImageRef;
   /**
    * Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.

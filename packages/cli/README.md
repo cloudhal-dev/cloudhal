@@ -12,7 +12,13 @@ cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on 
 cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
 cloudhal push [--replace] [--admin-url <url>]           local site → deployment
 cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
+cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
+                                                        entry tags → tag terms (RFC-0002)
 ```
+
+### Migrating tags to terms (RFC-0002)
+
+`cloudhal migrate tags-to-terms` moves the deprecated `ContentEntry.tags` of the local site into terms of the `tag` taxonomy. It snapshots the site first (`before tags-to-terms`; its id is the migration id), creates the default `category` and `tag` taxonomies if they are missing (`category` is not required on an existing site), creates one active tag per distinct slug, rewrites entries in batches of 200 and snapshots again (`tags-to-terms`). An interrupted run resumes; a second run does nothing. Nothing goes live until you publish. `--dry-run` reports what would change; `--revert <id>` restores the tags of entries nobody edited since, then removes the terms and taxonomies the run created that are no longer used.
 
 ### Deploying to Cloudflare (ADR-0012)
 

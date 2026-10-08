@@ -16,8 +16,13 @@ export const ID_PREFIX = {
   page: "page",
   section: "sec",
   contentEntry: "entry",
+  taxonomy: "tax",
+  term: "term",
+  redirect: "redir",
   snapshot: "snap",
   user: "user",
   agent: "agent",
   system: "sys",
+  /** Governance operations (`op_guards.op_id`, `GovernanceResult.opId`). */
+  operation: "op",
 } as const;

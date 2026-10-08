@@ -35,6 +35,7 @@ import {
   NotFoundError,
   previewUrl,
   primaryOrigin,
+  termName,
 } from "@cloudhal/core-ts";
 import { elevationTools } from "./elevation-tools.ts";
 
@@ -115,14 +116,46 @@ function quote(text: string, max = 60): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-async function describeChanges(ctx: ToolContext, diff: SnapshotDiff): Promise<string[]> {
+const KIND_LABEL: Record<string, string> = {
+  site: "site",
+  page: "page",
+  contentEntry: "article",
+  taxonomy: "taxonomy",
+  term: "term",
+  redirect: "redirect",
+};
+
+async function describeChanges(
+  ctx: ToolContext,
+  diff: SnapshotDiff,
+  site?: Site,
+): Promise<string[]> {
+  const locale = site?.defaultLocale;
   const title = async (ref: { id: string; kind: string }) => {
-    if (ref.kind === "page") return (await ctx.store.getPage(ref.id))?.title;
-    if (ref.kind === "contentEntry") return (await ctx.store.getContentEntry(ref.id))?.title;
-    if (ref.kind === "site") return "site settings";
-    return undefined;
+    switch (ref.kind) {
+      case "page":
+        return (await ctx.store.getPage(ref.id))?.title;
+      case "contentEntry":
+        return (await ctx.store.getContentEntry(ref.id))?.title;
+      case "site":
+        return "site settings";
+      case "taxonomy": {
+        const t = await ctx.store.getTaxonomy(ref.id);
+        return t ? ((locale ? t.labels[locale]?.plural : undefined) ?? t.key) : undefined;
+      }
+      case "term": {
+        const t = await ctx.store.getTerm(ref.id);
+        return t ? termName(t, locale) : undefined;
+      }
+      case "redirect": {
+        const r = await ctx.store.getRedirect(ref.id);
+        return r ? `${r.from} → ${r.to}` : undefined;
+      }
+      default:
+        return undefined;
+    }
   };
-  const label = (kind: string) => (kind === "contentEntry" ? "article" : kind);
+  const label = (kind: string) => KIND_LABEL[kind] ?? kind;
   const out: string[] = [];
   const groups: [string, { id: string; kind: string }[]][] = [
     ["+", diff.added],
@@ -779,7 +812,7 @@ function rawTools(): ToolDefinition[] {
         const site = await requireSite(ctx, a.siteId as string);
         // What the person approves is what goes live: the current state against the live snapshot.
         const diff = await ctx.store.pendingChanges(site.id);
-        const lines = await describeChanges(ctx, diff);
+        const lines = await describeChanges(ctx, diff, site);
         const counts = `+${diff.added.length} added, ~${diff.changed.length} changed, −${diff.removed.length} removed`;
         return `Publish "${quote(site.name)}" to production (${counts} since the live version)?${lines.length ? `\n${lines.join("\n")}` : ""}`;
       },

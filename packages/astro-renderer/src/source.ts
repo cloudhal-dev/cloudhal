@@ -1,5 +1,16 @@
-import type { ContentEntry, NodeRef, Page, Site, Snapshot } from "@cloudhal/core-contracts";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import type {
+  ContentEntry,
+  NodeRef,
+  Page,
+  Redirect,
+  Site,
+  Snapshot,
+  Taxonomy,
+  Term,
+} from "@cloudhal/core-contracts";
+import type { RedirectMatch, SiteGraphStore } from "@cloudhal/core-ts";
+import { matchRedirect, termName } from "@cloudhal/core-ts";
+import { matches, parseFilter, resolveFilter } from "@cloudhal/core-ts/filter";
 
 /**
  * What a renderer needs from a site, independent of whether it reads live nodes (dev) or a
@@ -14,10 +25,94 @@ export interface GraphSource {
   entryBySlug(collection: string, slug: string, locale?: string): Promise<ContentEntry | undefined>;
   /** Every visible entry of a locale, newest first, across collections (feeds, sitemaps). */
   allEntries(locale?: string): Promise<ContentEntry[]>;
+  /** The site's taxonomies (RFC-0002). */
+  taxonomies(): Promise<Taxonomy[]>;
+  /**
+   * Terms of a taxonomy that may be shown, by `position`, then name. Snapshot mode (and live mode
+   * without drafts): active and public only. Live mode with drafts: every non-retired term.
+   */
+  terms(key: string): Promise<Term[]>;
+  /** A shown term by its current slug (old slugs answer with a redirect, not a term). */
+  termBySlug(key: string, slug: string): Promise<Term | undefined>;
+  /**
+   * Visible entries matching a filter expression (RFC-0002 §5), newest first. Unknown terms match
+   * nothing (a published snapshot must keep rendering) and are logged.
+   */
+  entriesByFilter(
+    filter: string,
+    options?: { locale?: string; limit?: number },
+  ): Promise<ContentEntry[]>;
+  /** Visible entries assigned to a term (with `descendants`, also to its sub-terms), newest first. */
+  entriesByTerm(
+    key: string,
+    slug: string,
+    options?: { locale?: string; limit?: number; descendants?: boolean },
+  ): Promise<ContentEntry[]>;
+  /** The redirect for a request path: exact first, then the longest prefix redirect. */
+  redirectFor(path: string): Promise<RedirectMatch | undefined>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
   return (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt);
+}
+
+function byPosition(locale: string) {
+  return (a: Term, b: Term) =>
+    (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
+    termName(a, locale).localeCompare(termName(b, locale)) ||
+    a.slug.localeCompare(b.slug);
+}
+
+function shown(term: Term, includeDrafts: boolean): boolean {
+  return includeDrafts
+    ? term.status !== "retired"
+    : term.status === "active" && term.visibility === "public";
+}
+
+function termFilter(key: string, slug: string, descendants: boolean): string {
+  return `${key}:${slug}${descendants ? ">*" : ""}`;
+}
+
+/** Resolves a filter against a vocabulary; unknown terms match nothing and are logged. */
+function compile(filter: string, taxonomies: Taxonomy[], terms: Term[]) {
+  const resolved = resolveFilter(
+    parseFilter(filter),
+    { taxonomies, terms },
+    { unknown: "match-nothing" },
+  );
+  if (resolved.unknown.length > 0)
+    console.warn(
+      `cloudhal: filter "${filter}" names unknown terms: ${resolved.unknown.join(", ")}`,
+    );
+  return resolved;
+}
+
+/**
+ * Interim compatibility (RFC-0002 rollout): SEO tags, JSON-LD keywords and RSS categories still read
+ * the deprecated `ContentEntry.tags`, which the store now writes as `[]` once tags became terms.
+ * Until the renderer reads `terms` itself (rollout step 5), an entry without legacy tags shows the
+ * slugs of its active, public `tag` terms there — the same values the old field carried.
+ */
+function withLegacyTags(
+  entries: ContentEntry[],
+  taxonomies: Taxonomy[],
+  terms: Term[],
+): ContentEntry[] {
+  const tagTax = taxonomies.find((t) => t.key === "tag");
+  if (!tagTax) return entries;
+  const slugs = new Map(
+    terms
+      .filter(
+        (t) => t.taxonomyId === tagTax.id && t.status === "active" && t.visibility === "public",
+      )
+      .map((t) => [t.id, t.slug]),
+  );
+  return entries.map((e) => {
+    const ids = e.terms?.tag?.ids;
+    if (e.tags.length > 0 || !ids) return e;
+    const tags = ids.map((id) => slugs.get(id)).filter((s): s is string => s !== undefined);
+    return tags.length > 0 ? { ...e, tags } : e;
+  });
 }
 
 function visible<T extends { status: Page["status"] }>(nodes: T[], includeDrafts: boolean): T[] {
@@ -57,13 +152,21 @@ export class LiveSource implements GraphSource {
     return (await this.pages()).find((p) => p.path === path && p.locale === loc);
   }
 
+  async #legacy(entries: ContentEntry[]): Promise<ContentEntry[]> {
+    const [taxonomies, terms] = await Promise.all([
+      this.#store.listTaxonomies(this.#siteId),
+      this.#store.listTerms(this.#siteId, { taxonomy: "tag" }),
+    ]);
+    return withLegacyTags(entries, taxonomies, terms);
+  }
+
   async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
     const all = visible(
       await this.#store.listContentEntries(this.#siteId, collection),
       this.#includeDrafts,
     );
-    return all.filter((e) => e.locale === loc).sort(byNewest);
+    return this.#legacy(all.filter((e) => e.locale === loc).sort(byNewest));
   }
 
   async entryBySlug(
@@ -75,10 +178,69 @@ export class LiveSource implements GraphSource {
   }
   async allEntries(locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
-    return visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
-      .filter((e) => e.locale === loc)
-      .sort(byNewest);
+    return this.#legacy(
+      visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
+        .filter((e) => e.locale === loc)
+        .sort(byNewest),
+    );
   }
+
+  taxonomies(): Promise<Taxonomy[]> {
+    return this.#store.listTaxonomies(this.#siteId);
+  }
+
+  async terms(key: string): Promise<Term[]> {
+    const loc = (await this.site()).defaultLocale;
+    return (await this.#store.listTerms(this.#siteId, { taxonomy: key }))
+      .filter((t) => shown(t, this.#includeDrafts))
+      .sort(byPosition(loc));
+  }
+
+  async termBySlug(key: string, slug: string): Promise<Term | undefined> {
+    return (await this.terms(key)).find((t) => t.slug === slug);
+  }
+
+  async entriesByFilter(
+    filter: string,
+    options: { locale?: string; limit?: number } = {},
+  ): Promise<ContentEntry[]> {
+    const loc = options.locale ?? (await this.site()).defaultLocale;
+    const [taxonomies, terms, entries] = await Promise.all([
+      this.#store.listTaxonomies(this.#siteId),
+      this.#store.listTerms(this.#siteId),
+      this.#store.listContentEntries(this.#siteId, { locale: loc }),
+    ]);
+    const f = compile(filter, taxonomies, terms);
+    const out = visible(entries, this.#includeDrafts)
+      .filter((e) => matches(f, e))
+      .sort(byNewest);
+    return withLegacyTags(
+      options.limit === undefined ? out : out.slice(0, options.limit),
+      taxonomies,
+      terms,
+    );
+  }
+
+  entriesByTerm(
+    key: string,
+    slug: string,
+    options: { locale?: string; limit?: number; descendants?: boolean } = {},
+  ): Promise<ContentEntry[]> {
+    return this.entriesByFilter(termFilter(key, slug, options.descendants === true), options);
+  }
+
+  redirectFor(path: string): Promise<RedirectMatch | undefined> {
+    return this.#store.redirectFor(this.#siteId, path);
+  }
+}
+
+interface Loaded {
+  site: Site;
+  pages: Page[];
+  entries: ContentEntry[];
+  taxonomies: Taxonomy[];
+  terms: Term[];
+  redirects: Redirect[];
 }
 
 /** Reads exactly the node bodies captured in a snapshot (immutable; only published nodes are rendered). */
@@ -86,7 +248,7 @@ export class SnapshotSource implements GraphSource {
   readonly mode = "snapshot";
   readonly #store: SiteGraphStore;
   readonly #snapshot: Snapshot;
-  #cache: Promise<{ site: Site; pages: Page[]; entries: ContentEntry[] }> | undefined;
+  #cache: Promise<Loaded> | undefined;
 
   constructor(store: SiteGraphStore, snapshot: Snapshot) {
     this.#store = store;
@@ -103,7 +265,8 @@ export class SnapshotSource implements GraphSource {
     return this.#snapshot;
   }
 
-  #load() {
+  /** Reads the snapshot's nodes once; kinds this renderer does not know are ignored. */
+  #load(): Promise<Loaded> {
     this.#cache ??= (async () => {
       const read = <T>(refs: NodeRef[]) =>
         Promise.all(refs.map((r) => this.#store.readSnapshotNode<T & Site>(r)));
@@ -116,13 +279,25 @@ export class SnapshotSource implements GraphSource {
       const entries = (await read<ContentEntry>(
         this.#snapshot.nodes.filter((n) => n.kind === "contentEntry"),
       )) as unknown as ContentEntry[];
+      const byKind = async <T>(kind: string) =>
+        (await read<T>(
+          this.#snapshot.nodes.filter((n) => (n.kind as string) === kind),
+        )) as unknown as T[];
+      const [taxonomies, terms, redirects] = await Promise.all([
+        byKind<Taxonomy>("taxonomy"),
+        byKind<Term>("term"),
+        byKind<Redirect>("redirect"),
+      ]);
       const order = new Map((site as Site).pageIds.map((id, i) => [id, i]));
       return {
         site: site as Site,
         pages: visible(pages, false).sort(
           (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
         ),
-        entries: visible(entries, false),
+        entries: withLegacyTags(visible(entries, false), taxonomies, terms),
+        taxonomies,
+        terms,
+        redirects,
       };
     })();
     return this.#cache;
@@ -159,5 +334,45 @@ export class SnapshotSource implements GraphSource {
     const { site, entries } = await this.#load();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  async taxonomies(): Promise<Taxonomy[]> {
+    return (await this.#load()).taxonomies;
+  }
+
+  async terms(key: string): Promise<Term[]> {
+    const { site, taxonomies, terms } = await this.#load();
+    const tax = taxonomies.find((t) => t.key === key);
+    if (!tax) return [];
+    return terms
+      .filter((t) => t.taxonomyId === tax.id && shown(t, false))
+      .sort(byPosition(site.defaultLocale));
+  }
+
+  async termBySlug(key: string, slug: string): Promise<Term | undefined> {
+    return (await this.terms(key)).find((t) => t.slug === slug);
+  }
+
+  async entriesByFilter(
+    filter: string,
+    options: { locale?: string; limit?: number } = {},
+  ): Promise<ContentEntry[]> {
+    const { site, entries, taxonomies, terms } = await this.#load();
+    const loc = options.locale ?? site.defaultLocale;
+    const f = compile(filter, taxonomies, terms);
+    const out = entries.filter((e) => e.locale === loc && matches(f, e)).sort(byNewest);
+    return options.limit === undefined ? out : out.slice(0, options.limit);
+  }
+
+  entriesByTerm(
+    key: string,
+    slug: string,
+    options: { locale?: string; limit?: number; descendants?: boolean } = {},
+  ): Promise<ContentEntry[]> {
+    return this.entriesByFilter(termFilter(key, slug, options.descendants === true), options);
+  }
+
+  async redirectFor(path: string): Promise<RedirectMatch | undefined> {
+    return matchRedirect((await this.#load()).redirects, path);
   }
 }
