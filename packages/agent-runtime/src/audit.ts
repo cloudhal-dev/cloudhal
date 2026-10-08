@@ -13,6 +13,8 @@ export interface AuditEntry {
   outcome?: "ok" | "error" | "pending" | undefined;
   snapshotId?: string | undefined;
   durationMs?: number | undefined;
+  /** Agent mode the call ran under (ADR-0015). */
+  mode?: string | undefined;
 }
 
 export interface AuditRow extends AuditEntry {
@@ -52,7 +54,7 @@ export class AuditLog {
 
   async record(entry: AuditEntry): Promise<number> {
     const r = await this.#sql.run(
-      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         entry.at,
         entry.actor.kind,
@@ -67,6 +69,7 @@ export class AuditLog {
         entry.outcome ?? null,
         entry.snapshotId ?? null,
         entry.durationMs ?? null,
+        entry.mode ?? null,
       ],
     );
     return r.lastRowId ?? 0;
@@ -117,6 +120,7 @@ export class AuditLog {
       outcome: (r.outcome as AuditEntry["outcome"] | null) ?? undefined,
       snapshotId: (r.snapshot_id as string | null) ?? undefined,
       durationMs: (r.duration_ms as number | null) ?? undefined,
+      mode: (r.mode as string | null) ?? undefined,
     }));
   }
 }

@@ -1,5 +1,15 @@
 import { apiKey } from "@better-auth/api-key";
-import { ALL_SCOPES, defaultScopes, type Principal, type Scope } from "@cloudhal/agent-runtime";
+import {
+  type AgentMode,
+  ALL_SCOPES,
+  DEFAULT_AGENT_MODE,
+  defaultScopes,
+  isAgentMode,
+  type Principal,
+  REMOTE_AGENT_MODES,
+  type Scope,
+  scopesForMode,
+} from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import { type Auth, betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -62,15 +72,21 @@ export interface AgentKeySummary {
   createdAt: string;
   expiresAt: string | null;
   enabled: boolean;
+  /** How independently the agent works (ADR-0015). */
+  mode: AgentMode;
 }
 
 export interface AgentKeyService {
   /** Mints a key for the caller's user; the plain key is returned exactly once. */
+  /** `scopes` defaults to what the mode needs (`scopesForMode`). */
   create(input: {
     headers: Headers;
     name: string;
-    scopes: Scope[];
+    mode?: AgentMode;
+    scopes?: Scope[];
   }): Promise<AgentKeySummary & { key: string }>;
+  /** Changes a key's mode; takes effect on the agent's next call. */
+  setMode(input: { headers: Headers; id: string; mode: AgentMode }): Promise<AgentKeySummary>;
   list(input: { headers: Headers }): Promise<AgentKeySummary[]>;
   delete(input: { headers: Headers; id: string }): Promise<void>;
 }
@@ -168,6 +184,20 @@ interface ApiKeyRow {
   createdAt: Date | string;
   expiresAt?: Date | string | null;
   enabled?: boolean | null;
+  metadata?: Record<string, unknown> | string | null;
+}
+
+function modeOf(row: ApiKeyRow): AgentMode {
+  let meta = row.metadata;
+  if (typeof meta === "string") {
+    try {
+      meta = JSON.parse(meta) as Record<string, unknown>;
+    } catch {
+      meta = null;
+    }
+  }
+  const mode = (meta as Record<string, unknown> | null | undefined)?.mode;
+  return isAgentMode(mode) ? mode : DEFAULT_AGENT_MODE;
 }
 
 interface VerifiedApiKey {
@@ -186,6 +216,7 @@ function toSummary(row: ApiKeyRow): AgentKeySummary {
     createdAt: iso(row.createdAt) ?? new Date(0).toISOString(),
     expiresAt: iso(row.expiresAt),
     enabled: row.enabled !== false,
+    mode: modeOf(row),
   };
 }
 
@@ -204,16 +235,27 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
   const api = instance.api as unknown as {
     verifyApiKey(input: { body: { key: string } }): Promise<VerifiedApiKey>;
     createApiKey(input: {
-      body: { name: string; userId: string; permissions: Record<string, string[]> };
+      body: {
+        name: string;
+        userId: string;
+        permissions: Record<string, string[]>;
+        metadata?: Record<string, unknown>;
+      };
     }): Promise<ApiKeyRow & { key: string }>;
+    updateApiKey(input: {
+      body: { keyId: string; userId: string; metadata: Record<string, unknown> };
+    }): Promise<ApiKeyRow>;
     listApiKeys(input: { headers: Headers }): Promise<{ apiKeys: ApiKeyRow[]; total: number }>;
     deleteApiKey(input: { headers: Headers; body: { keyId: string } }): Promise<unknown>;
   };
 
   const agentKeys: AgentKeyService = {
-    async create({ headers, name, scopes }) {
+    async create({ headers, name, mode = DEFAULT_AGENT_MODE, scopes: requested }) {
       const session = await instance.api.getSession({ headers });
       if (!session) throw new AuthError("sign in to create agent keys");
+      if (!REMOTE_AGENT_MODES.includes(mode))
+        throw new AuthError(`mode "${mode}" is not available for API keys (bypass is local only)`);
+      const scopes = requested ?? scopesForMode(mode);
       const bad = scopes.filter((s) => !ALL_SCOPES.includes(s));
       if (bad.length) throw new AuthError(`unknown scopes: ${bad.join(", ")}`);
       // Server-side call (no request/headers): permissions are a server-only property.
@@ -222,9 +264,22 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
           name,
           userId: session.user.id,
           permissions: { [API_KEY_PERMISSION_RESOURCE]: scopes },
+          metadata: { mode },
         },
       });
       return { ...toSummary(row), key: row.key };
+    },
+    async setMode({ headers, id, mode }) {
+      const session = await instance.api.getSession({ headers });
+      if (!session) throw new AuthError("sign in to change agent keys");
+      if (!REMOTE_AGENT_MODES.includes(mode))
+        throw new AuthError(`mode "${mode}" is not available for API keys (bypass is local only)`);
+      const own = (await api.listApiKeys({ headers })).apiKeys.find((k) => k.id === id);
+      if (!own) throw new AuthError("unknown agent key");
+      const row = await api.updateApiKey({
+        body: { keyId: id, userId: session.user.id, metadata: { mode } },
+      });
+      return toSummary(row);
     },
     async list({ headers }) {
       return (await api.listApiKeys({ headers })).apiKeys.map(toSummary);
@@ -250,7 +305,11 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
         name: verified.key.name ?? "API key",
       };
       const granted = verified.key.permissions?.[API_KEY_PERMISSION_RESOURCE];
-      return { actor, scopes: granted ? (granted as Scope[]) : defaultScopes(actor) };
+      return {
+        actor,
+        scopes: granted ? (granted as Scope[]) : defaultScopes(actor),
+        mode: modeOf(verified.key),
+      };
     }
     const session = await instance.api.getSession({ headers: c.req.raw.headers });
     if (!session) return undefined;

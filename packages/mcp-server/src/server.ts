@@ -14,8 +14,10 @@
  * - **Audit** — every decision and call is recorded (see `runTool`).
  */
 import {
+  type AgentMode,
   type ApprovalStore,
   type AuditLog,
+  effectiveMode,
   type LoadedSkill,
   PolicyEngine,
   type Principal,
@@ -111,6 +113,22 @@ Workflow: list_sites → list_pages / list_entries → get_page / get_entry (not
 
 If you are following a Cloudhal skill (read it from the skill:// resources), send its name in the request \`_meta["cloudhal.skill"]\`; your calls are then limited to the scopes that skill declared.`;
 
+const MODE_TEXT: Record<AgentMode, string> = {
+  plan: "You are in PLAN mode: read and preview only. Do not try to change anything; describe the changes you would make so a person can decide.",
+  manual:
+    "You are in MANUAL mode: every change you make waits for a person's approval before it happens.",
+  edits:
+    "You are in EDITS mode: you may create and edit content freely (every change is snapshotted); publishing, rollback and deletions wait for a person.",
+  auto: "You are in AUTO mode: content edits are free, and a publish that only adds or edits a few articles goes live without waiting; anything larger, rollback and deletions wait for a person.",
+  bypass:
+    "You are in BYPASS mode on a local project: nothing waits for approval. Be careful — this is the developer's own machine and data.",
+};
+
+function modeInstructions(principal: Principal): string {
+  const mode = effectiveMode(principal);
+  return mode ? MODE_TEXT[mode] : "You are acting for a signed-in person.";
+}
+
 function errorResult(text: string): CallToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
@@ -143,7 +161,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
     },
     {
       capabilities: { tools: {}, resources: {} },
-      instructions: INSTRUCTIONS,
+      instructions: `${INSTRUCTIONS}\n\n${modeInstructions(options.principal)}`,
       requestState: { verify: codec.verify },
     },
   );
@@ -173,33 +191,35 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
     def.requiresApproval || def.annotations.destructiveHint === true;
 
   for (const def of tools) {
-    const inputSchema = gated(def)
-      ? {
-          ...def.inputSchema,
-          properties: {
-            ...(def.inputSchema.properties as Record<string, unknown>),
-            ...(options.approvals
-              ? {
-                  approvalId: {
-                    type: "string",
-                    pattern: "^appr_[A-Z0-9]{10,40}$",
-                    description:
-                      "After a person approved your earlier request in Studio: the approvalId it returned. Same arguments as that request.",
-                  },
-                }
-              : {}),
-            ...(fallback
-              ? {
-                  confirmToken: {
-                    type: "string",
-                    description:
-                      "Only after a person approved this exact call: the token the server handed back with the approval request.",
-                  },
-                }
-              : {}),
-          },
-        }
-      : def.inputSchema;
+    // Any tool that writes can need a person (manual mode makes every write gated).
+    const inputSchema =
+      gated(def) || (options.approvals && def.annotations.readOnlyHint !== true)
+        ? {
+            ...def.inputSchema,
+            properties: {
+              ...(def.inputSchema.properties as Record<string, unknown>),
+              ...(options.approvals
+                ? {
+                    approvalId: {
+                      type: "string",
+                      pattern: "^appr_[A-Z0-9]{10,40}$",
+                      description:
+                        "After a person approved your earlier request in Studio: the approvalId it returned. Same arguments as that request.",
+                    },
+                  }
+                : {}),
+              ...(fallback
+                ? {
+                    confirmToken: {
+                      type: "string",
+                      description:
+                        "Only after a person approved this exact call: the token the server handed back with the approval request.",
+                    },
+                  }
+                : {}),
+            },
+          }
+        : def.inputSchema;
 
     server.registerTool(
       def.name,
@@ -224,7 +244,10 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
         const argsHash = await sha256Hex(canonicalJson(args));
         const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
         // Approvals are bound to the content the person saw, not just to the arguments.
-        const stateHash = gated(def) && siteId ? await options.store.stateHash(siteId) : "";
+        const stateHash =
+          def.annotations.readOnlyHint !== true && siteId
+            ? await options.store.stateHash(siteId)
+            : "";
         const matches = (state: ApprovalState | undefined) =>
           state?.tool === def.name && state.args === argsHash && state.state === stateHash;
 

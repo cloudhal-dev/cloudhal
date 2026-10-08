@@ -514,7 +514,17 @@ export class SiteGraphStore {
     const live = site.publishedSnapshotId
       ? await this.getSnapshot(site.publishedSnapshotId)
       : undefined;
-    return diffNodeRefs(live?.nodes ?? [], await this.currentNodeRefs(siteId));
+    const diff = diffNodeRefs(live?.nodes ?? [], await this.currentNodeRefs(siteId));
+    // Publishing itself rewrites the site node (its pointer, rev and timestamp). That is not a
+    // change a person needs to approve, so a site node that differs only there is left out.
+    const siteChange = diff.changed.find((c) => c.after.kind === "site");
+    if (siteChange) {
+      const before = await this.readSnapshotNode<Site>(siteChange.before);
+      const strip = ({ publishedSnapshotId: _p, rev: _r, updatedAt: _u, ...rest }: Site) => rest;
+      if (canonicalJson(strip(before)) === canonicalJson(strip(site)))
+        return { ...diff, changed: diff.changed.filter((c) => c !== siteChange) };
+    }
+    return diff;
   }
 
   async diffSnapshots(fromId: string, toId: string): Promise<SnapshotDiff> {

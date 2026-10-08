@@ -5,7 +5,14 @@
  */
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { AuditLog, type LoadedSkill, loadSkills, type Scope } from "@cloudhal/agent-runtime";
+import {
+  type AgentMode,
+  AuditLog,
+  DEFAULT_AGENT_MODE,
+  type LoadedSkill,
+  loadSkills,
+  type Scope,
+} from "@cloudhal/agent-runtime";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { serveCloudhalStdio } from "@cloudhal/mcp-server/stdio";
 import { assetDir } from "../assets.ts";
@@ -19,6 +26,8 @@ export interface McpOptions {
   readonly skillsDir?: string;
   /** Base URL of a running `cloudhal dev`, for preview links. */
   readonly previewUrl?: string;
+  /** Agent mode (ADR-0015). Default `edits`; `bypass` is allowed here because this is local. */
+  readonly mode?: AgentMode;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -47,6 +56,8 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
     principal: {
       actor: { kind: "agent", id: "agent_localstdio", name: "local MCP client" },
       scopes: [...(options.scopes ?? ["*"])],
+      mode: options.mode ?? DEFAULT_AGENT_MODE,
+      local: true,
     },
     audit: new AuditLog(local.sql),
     skills,

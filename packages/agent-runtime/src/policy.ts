@@ -1,4 +1,5 @@
 import type { Actor } from "@cloudhal/core-contracts";
+import type { AgentMode } from "./modes.ts";
 
 /** Scopes follow `area:verb`; `*` grants everything (local human sessions). */
 export type Scope =
@@ -43,12 +44,28 @@ export interface Principal {
   scopes: Scope[];
   /** Skill the agent declared it is running (its frontmatter decides extra approvals). */
   skill?: { name: string; scopes: string[]; approval: string[] } | undefined;
+  /** Agents only: how independently it works (ADR-0015). Absent = `edits`; people have none. */
+  mode?: AgentMode | undefined;
+  /** True for the local stdio server (the developer's own machine); enables `bypass`. */
+  local?: boolean | undefined;
+}
+
+/** The mode that actually applies: `bypass` only counts locally, remote keys fall back to `edits`. */
+export function effectiveMode(principal: Principal): AgentMode | undefined {
+  if (principal.actor.kind !== "agent") return undefined;
+  const mode = principal.mode ?? "edits";
+  return mode === "bypass" && !principal.local ? "edits" : mode;
 }
 
 export type Decision =
   | { kind: "allow" }
   | { kind: "deny"; reason: string }
-  | { kind: "approval-required"; reason: string };
+  | {
+      kind: "approval-required";
+      reason: string;
+      /** `auto` mode: the caller may skip the person when the change is low risk. */
+      autoApprove?: "low-risk-publish";
+    };
 
 /**
  * The single place that decides whether a tool call may run (ADR-0004). Humans and agents share
@@ -87,16 +104,28 @@ export class PolicyEngine {
           reason: `skill ${principal.skill.name} did not declare ${outside.join(", ")}`,
         };
     }
+    const mode = effectiveMode(principal);
+    const writes = tool.annotations.readOnlyHint !== true;
+    if (mode === "plan" && writes)
+      return { kind: "deny", reason: "plan mode is read-only: propose the change instead" };
     const needsApproval =
       tool.requiresApproval ||
       tool.annotations.destructiveHint === true ||
-      (principal.skill?.approval ?? []).includes(toolName);
-    if (needsApproval && !options.confirmed) {
+      (principal.skill?.approval ?? []).includes(toolName) ||
+      (mode === "manual" && writes);
+    if (needsApproval && !options.confirmed && mode !== "bypass") {
+      const reason =
+        mode === "manual" && writes && !tool.requiresApproval && !tool.annotations.destructiveHint
+          ? `manual mode: ${toolName} needs a person's approval`
+          : tool.annotations.destructiveHint
+            ? `${toolName} is destructive`
+            : `${toolName} requires approval`;
+      // `auto` lets a low-risk publish through; rollback and deletions always wait for a person.
+      const auto = mode === "auto" && toolName === "publish";
       return {
         kind: "approval-required",
-        reason: tool.annotations.destructiveHint
-          ? `${toolName} is destructive`
-          : `${toolName} requires approval`,
+        reason,
+        ...(auto ? { autoApprove: "low-risk-publish" as const } : {}),
       };
     }
     return { kind: "allow" };

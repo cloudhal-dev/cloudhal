@@ -169,3 +169,66 @@ describe("MCP over HTTP", () => {
     expect((await app.request("/api/me", { headers: { "x-api-key": key } })).status).toBe(401);
   });
 });
+
+describe("agent modes on API keys (ADR-0015)", () => {
+  it("creates keys by mode, changes the mode for the next call, audits it, refuses bypass", async () => {
+    const { app, siteId, cookie, connect, audit } = await setup();
+    const post = (body: unknown) =>
+      app.request("/api/agent-keys", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(body),
+      });
+    expect((await post({ name: "x", mode: "bypass" })).status).toBe(400);
+    expect((await post({ name: "x", mode: "yolo" })).status).toBe(400);
+    const res = await post({ name: "planner", mode: "plan" });
+    expect(res.status).toBe(201);
+    const key = (await res.json()) as { id: string; key: string; mode: string; scopes: string[] };
+    expect(key.mode).toBe("plan");
+    expect(key.scopes).toEqual(["site:read", "content:read", "preview:create"]);
+
+    const client = await connect({ "x-api-key": key.key });
+    expect(client.getInstructions()).toContain("PLAN mode");
+    const denied = await client.callTool({
+      name: "create_entry",
+      arguments: { siteId, slug: "p", title: "p", body: "b" },
+    });
+    expect((denied.content[0] as { text: string }).text).toMatch(
+      /missing scope content:write|plan mode/,
+    );
+
+    // owner switches it to edits — but the key's scopes stay what they were (a mode never grants)
+    const patch = await app.request(`/api/agent-keys/${key.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ mode: "edits" }),
+    });
+    expect(patch.status, await patch.clone().text()).toBe(200);
+    expect(((await patch.json()) as { mode: string }).mode).toBe("edits");
+    const listed = (await (
+      await app.request("/api/agent-keys", { headers: { cookie } })
+    ).json()) as { id: string; mode: string }[];
+    expect(listed.find((k) => k.id === key.id)?.mode).toBe("edits");
+    const again = await connect({ "x-api-key": key.key });
+    expect(again.getInstructions()).toContain("EDITS mode");
+
+    expect(
+      (
+        await app.request(`/api/agent-keys/${key.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({ mode: "bypass" }),
+        })
+      ).status,
+    ).toBe(400);
+    const rows = await audit.list({ limit: 50 });
+    expect(rows.find((r) => r.tool === "agent-key.mode")).toMatchObject({
+      reason: "planner: plan → edits",
+      mode: "edits",
+    });
+
+    // keys created before modes existed read as `edits`
+    const legacy = await post({ name: "old-style", scopes: ["site:read", "content:read"] });
+    expect(((await legacy.json()) as { mode: string }).mode).toBe("edits");
+  });
+});

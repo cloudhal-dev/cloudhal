@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import type { Scope } from "@cloudhal/agent-runtime";
+import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
 import { build, dev } from "./commands/astro.ts";
 import { deploy } from "./commands/deploy.ts";
 import { init } from "./commands/init.ts";
@@ -16,7 +16,7 @@ Usage:
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
-  cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
+  cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
   cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare (uses wrangler login)
   cloudhal push [--replace] [--admin-url <url>]           local site → deployment
@@ -41,6 +41,7 @@ export async function main(argv: string[]): Promise<number> {
       scopes: { type: "string" },
       skills: { type: "string" },
       "preview-url": { type: "string" },
+      mode: { type: "string" },
       "dry-run": { type: "boolean" },
       replace: { type: "boolean" },
       "admin-url": { type: "string" },
@@ -150,6 +151,12 @@ export async function main(argv: string[]): Promise<number> {
           : {}),
         ...(values.skills ? { skillsDir: values.skills } : {}),
         ...(values["preview-url"] ? { previewUrl: values["preview-url"] } : {}),
+        ...(values.mode
+          ? (() => {
+              if (!isAgentMode(values.mode)) throw new Error(`unknown --mode "${values.mode}"`);
+              return { mode: values.mode };
+            })()
+          : {}),
       });
       await new Promise<void>((resolve) => {
         for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => resolve());

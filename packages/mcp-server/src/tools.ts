@@ -16,6 +16,7 @@ import type {
   ToolAnnotations,
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
+import { effectiveMode, isLowRiskPublish } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, Page, Section, Site, Snapshot } from "@cloudhal/core-contracts";
 import {
@@ -833,6 +834,8 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
 
 export interface CallResult {
   decision: Decision;
+  /** Set when `auto` mode let a low-risk publish through without a person. */
+  autoApproved?: string;
   /** Present when the call needs a human decision before running. */
   approvalPrompt?: string;
   result?: unknown;
@@ -849,7 +852,7 @@ export async function runTool(
   deps: { policy: PolicyEngine; audit?: AuditLog | undefined; confirmed?: boolean | undefined },
 ): Promise<CallResult> {
   const started = Date.now();
-  const decision = deps.policy.evaluate(ctx.principal, def.name, {
+  let decision = deps.policy.evaluate(ctx.principal, def.name, {
     confirmed: deps.confirmed ?? false,
   });
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
@@ -860,6 +863,7 @@ export async function runTool(
     tool: def.name,
     skill: ctx.principal.skill?.name,
     input: args,
+    mode: effectiveMode(ctx.principal),
   };
   if (decision.kind === "deny") {
     await deps.audit?.record({
@@ -870,7 +874,18 @@ export async function runTool(
     });
     return { decision };
   }
-  if (decision.kind === "approval-required") {
+  // `auto` mode: a publish that only adds or edits a few articles goes live without a person.
+  let autoNote: string | undefined;
+  if (
+    decision.kind === "approval-required" &&
+    decision.autoApprove === "low-risk-publish" &&
+    siteId
+  ) {
+    const risk = isLowRiskPublish(await ctx.store.pendingChanges(siteId));
+    if (risk.lowRisk) autoNote = `auto mode: published without approval (${risk.reason})`;
+    else decision = { ...decision, reason: `auto mode waits for a person: ${risk.reason}` };
+  }
+  if (decision.kind === "approval-required" && !autoNote) {
     const approvalPrompt = def.approvalPrompt
       ? await def.approvalPrompt(args, ctx)
       : decision.reason;
@@ -891,8 +906,9 @@ export async function runTool(
       outcome: "ok",
       snapshotId,
       durationMs: Date.now() - started,
+      ...(autoNote ? { reason: autoNote } : {}),
     });
-    return { decision, result };
+    return { decision: { kind: "allow" }, result, ...(autoNote ? { autoApproved: autoNote } : {}) };
   } catch (e) {
     await deps.audit?.record({
       ...base,

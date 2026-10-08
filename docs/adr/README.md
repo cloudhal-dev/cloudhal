@@ -31,3 +31,4 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0012](0012-cloudflare-deployment.md) | Cloudflare: site + admin Workers, pointer-flip publishing, Workers Cache, signed previews |
 | [0013](0013-npm-packaging.md) | npm packaging: sources in the repo, dist in tarballs; CLI ships Studio/starters/skills; create-cloudhal |
 | [0014](0014-out-of-band-approvals.md) | Approvals in Studio: single use, bound to the call and the content state; no agent self-approval |
+| [0015](0015-agent-modes.md) | Agent modes: plan, manual, edits, auto (low-risk publishes), bypass (local only) |
