@@ -41,13 +41,17 @@ const MONOREPO: Record<AssetKind, string> = {
   skills: "../../skills/official",
 };
 
-/** The directory for an asset kind, or undefined when neither layout has it. */
+/**
+ * The directory for an asset kind, or undefined when neither layout has it. Running from source
+ * (the monorepo) prefers the live monorepo folders — a `dist/assets` left by an earlier
+ * `build:packages` would be stale; running from `dist/` (published) prefers the shipped copy.
+ */
 export async function assetDir(kind: AssetKind): Promise<string | undefined> {
   const root = await packageRoot();
-  for (const candidate of [
-    path.join(root, "dist/assets", kind),
-    path.resolve(root, MONOREPO[kind]),
-  ])
+  const shipped = path.join(root, "dist/assets", kind);
+  const monorepo = path.resolve(root, MONOREPO[kind]);
+  const fromDist = here.split(path.sep).includes("dist");
+  for (const candidate of fromDist ? [shipped, monorepo] : [monorepo, shipped])
     if (await exists(candidate)) return candidate;
   return undefined;
 }

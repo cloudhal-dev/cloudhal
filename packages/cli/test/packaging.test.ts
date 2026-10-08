@@ -95,8 +95,10 @@ describe("starter dependencies outside the monorepo", () => {
     ).toThrow(/x/);
   });
 
-  it("finds Studio, starters and skills from the source layout", async () => {
-    expect(await assetDir("starters")).toMatch(/starters$/);
-    expect(await assetDir("skills")).toMatch(/skills[\\/]official$|assets[\\/]skills$/);
+  it("from source, prefers the live monorepo folders over a stale dist/assets copy", async () => {
+    expect(await assetDir("starters")).toBe(path.join(ROOT, "starters"));
+    expect(await assetDir("skills")).toBe(path.join(ROOT, "skills/official"));
+    const studio = await assetDir("studio");
+    if (studio) expect(studio).toBe(path.join(ROOT, "apps/studio/dist"));
   });
 });
