@@ -3,10 +3,12 @@
  * functions over graph nodes (the starter's endpoints only fetch and wrap them), so the rules —
  * published only, noindex respected, canonical elsewhere excluded — live in one tested place.
  */
-import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
-import { renderBody } from "./markdown.ts";
+import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
+import type { ArchiveSummary, ArchiveView } from "./archive.ts";
+import { markdownText, renderBody } from "./markdown.ts";
 import { entryPath } from "./routing.ts";
 import { absoluteUrl } from "./seo.ts";
+import { entryTaxonomy, type TaxonomyIndex } from "./taxonomy.ts";
 
 export const FEED_LIMIT = 50;
 
@@ -34,6 +36,24 @@ export interface FeedOptions {
   feedPath?: string;
   /** Channel description (e.g. the home page's SEO description); defaults to the site name. */
   description?: string;
+  /** Channel title; defaults to the site name. */
+  title?: string;
+  /** Channel link path (the page the feed mirrors); defaults to the home page. */
+  linkPath?: string;
+  /**
+   * The site's terms: each item lists its public category and tag names as `<category>`. Without
+   * it (or for an entry not migrated to terms) the deprecated `tags` are the categories.
+   */
+  taxonomy?: TaxonomyIndex;
+}
+
+/** Category names of an item: public terms (section first), else legacy tags. */
+function itemCategories(entry: ContentEntry, index: TaxonomyIndex | undefined): string[] {
+  const shown = entryTaxonomy(index, entry);
+  const names = shown.groups
+    .flatMap((g) => (g.taxonomy.key === "tag" ? [] : g.terms))
+    .map((t) => t.name);
+  return [...new Set([...names, ...shown.keywords])];
 }
 
 /** RSS 2.0 with full content (`content:encoded`), as feed readers and Ghost/WordPress readers expect. */
@@ -54,7 +74,7 @@ export function rssXml(options: FeedOptions): string {
         `<guid isPermaLink="true">${xml(url)}</guid>`,
         `<pubDate>${date}</pubDate>`,
         `<dc:creator>${cdata(author)}</dc:creator>`,
-        ...e.tags.map((t) => `<category>${xml(t)}</category>`),
+        ...itemCategories(e, options.taxonomy).map((t) => `<category>${xml(t)}</category>`),
         e.summary ? `<description>${cdata(e.summary)}</description>` : "",
         image ? `<media:content url="${xml(image)}" medium="image"/>` : "",
         `<content:encoded>${cdata(renderBody(e.body))}</content:encoded>`,
@@ -68,8 +88,8 @@ export function rssXml(options: FeedOptions): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">',
     "<channel>",
-    `<title>${xml(site.name)}</title>`,
-    `<link>${xml(`${origin}/`)}</link>`,
+    `<title>${xml(options.title ?? site.name)}</title>`,
+    `<link>${xml(`${origin}${options.linkPath ?? "/"}`)}</link>`,
     `<description>${xml(options.description ?? site.name)}</description>`,
     `<language>${xml(site.defaultLocale)}</language>`,
     `<atom:link href="${xml(self)}" rel="self" type="application/rss+xml"/>`,
@@ -85,20 +105,46 @@ export function rssXml(options: FeedOptions): string {
     .join("\n");
 }
 
+/**
+ * A term's feed (`<archive>/rss.xml`, RFC-0002 §7): the archive's published entries, titled after
+ * the term, linking to its archive, described by its SEO description or intro.
+ */
+export function archiveFeedXml(
+  options: Omit<FeedOptions, "entries" | "feedPath" | "title" | "linkPath" | "description"> & {
+    archive: ArchiveView;
+  },
+): string {
+  const { archive, ...rest } = options;
+  const label = archive.term.labels[archive.locale];
+  const description =
+    label?.seo?.description ?? (label?.description ? markdownText(label.description) : undefined);
+  return rssXml({
+    ...rest,
+    entries: archive.entries,
+    title: `${archive.shown.name} · ${options.site.name}`,
+    linkPath: archive.root,
+    ...(archive.feedPath ? { feedPath: archive.feedPath } : {}),
+    ...(description ? { description } : {}),
+  });
+}
+
 export interface SitemapUrl {
   loc: string;
   lastmod: string;
 }
 
 /**
- * What belongs in `sitemap.xml`: published pages and entries of the default locale; pages asking
- * for `noindex`, or canonicalised to another URL, are left out (a sitemap lists canonical URLs).
+ * What belongs in `sitemap.xml`: published pages and entries of the default locale, and the
+ * indexable term archives (page 1 only, `lastmod` = the later of the newest listed entry and the
+ * term; see `archiveSummaries` — pass it published entries). Pages and archives asking for
+ * `noindex`, or canonicalised to another URL, are left out (a sitemap lists canonical URLs).
  */
 export function sitemapUrls(
   site: Site,
   pages: Page[],
   entries: ContentEntry[],
   origin: string,
+  archives: readonly ArchiveSummary[] = [],
 ): SitemapUrl[] {
   const urls: SitemapUrl[] = [];
   const seen = new Set<string>();
@@ -113,9 +159,45 @@ export function sitemapUrls(
   for (const entry of published(entries)) {
     const path = entryPath(entry);
     if (entry.locale !== site.defaultLocale || seen.has(path)) continue;
+    seen.add(path);
     urls.push({ loc: `${origin}${path}`, lastmod: entry.updatedAt });
   }
+  for (const archive of archives) {
+    if (!archive.indexable || seen.has(archive.path)) continue;
+    const own = `${origin}${archive.path}`;
+    const canonical = absoluteUrl(origin, archive.term.labels[site.defaultLocale]?.seo?.canonical);
+    if (canonical && canonical !== own) continue;
+    seen.add(archive.path);
+    urls.push({ loc: own, lastmod: archive.lastmod });
+  }
   return urls;
+}
+
+/**
+ * The site's redirects as a `_redirects` file (Cloudflare Workers/Pages static assets, Netlify):
+ * static hosts that read it answer with real 301/302s, where Astro's meta-refresh pages are only a
+ * fallback. Exact redirects come first, then prefix redirects as `from` + `from/*` splats, longest
+ * first (hosts apply the first match).
+ */
+export function redirectsFile(redirects: readonly Redirect[]): string {
+  const exact = redirects.filter((r) => r.match === "exact");
+  const prefix = redirects
+    .filter((r) => r.match === "prefix")
+    .sort((a, b) => b.from.length - a.from.length || a.from.localeCompare(b.from));
+  const splat = (to: string) => {
+    const i = to.search(/[?#]/);
+    const head = (i < 0 ? to : to.slice(0, i)).replace(/\/+$/, "");
+    return `${head}/:splat${i < 0 ? "" : to.slice(i)}`;
+  };
+  const lines = [
+    "# Generated by Cloudhal from the rendered snapshot's Redirect nodes (RFC-0002). Do not edit.",
+    ...exact.map((r) => `${r.from} ${r.to} ${r.status}`),
+    ...prefix.flatMap((r) => [
+      `${r.from} ${r.to} ${r.status}`,
+      `${r.from === "/" ? "" : r.from}/* ${splat(r.to)} ${r.status}`,
+    ]),
+  ];
+  return `${lines.join("\n")}\n`;
 }
 
 export function sitemapXml(urls: SitemapUrl[]): string {

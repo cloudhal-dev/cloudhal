@@ -12,6 +12,7 @@ import { env } from "cloudflare:workers";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import { siteCacheTag } from "./cache-tags.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
 import type { GraphSource } from "./source.ts";
@@ -54,7 +55,7 @@ export function resetSource(): void {
   resolver?.invalidate();
 }
 
-export const CACHE_TAG_PREFIX = "cloudhal-site-";
+export { CACHE_TAG_PREFIX } from "./cache-tags.ts";
 
 /**
  * Resolves the source for this request and sets caching/preview headers on the response.
@@ -87,7 +88,8 @@ export async function getSource(
   // Published: browsers revalidate, the edge keeps it until a publish purges the tag.
   h.set("cache-control", "public, max-age=0, must-revalidate");
   h.set("cloudflare-cdn-cache-control", "public, max-age=31536000");
-  h.set("cache-tag", `${CACHE_TAG_PREFIX}${siteId}`);
+  // Pages add per-node tags next to this one (`addCacheTags`, `cache-tags.ts`).
+  h.set("cache-tag", siteCacheTag(siteId));
   h.set("x-cloudhal-mode", "published");
   h.set("x-cloudhal-snapshot", resolution.snapshotId);
   if (resolution.previewError) {

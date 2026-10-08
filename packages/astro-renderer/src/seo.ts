@@ -4,8 +4,10 @@
  * gets the same, tested output and themes only decide where to render `<SeoHead>`.
  */
 import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
-import { safeSrc } from "./markdown.ts";
+import type { ArchiveView } from "./archive.ts";
+import { markdownText, safeSrc } from "./markdown.ts";
 import { entryPath } from "./routing.ts";
+import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
 
 export interface HeadMeta {
   /** `<title>`. */
@@ -133,8 +135,36 @@ export function pageHead(site: Site, page: Page, origin: string): HeadMeta {
   };
 }
 
-/** `<head>` for an article (content entry). The summary is the description until entries get SEO fields. */
-export function entryHead(site: Site, entry: ContentEntry, origin: string): HeadMeta {
+/** `DefinedTerm` (schema.org) for a shown term, in its taxonomy's `DefinedTermSet`. */
+export function definedTerm(term: ShownTerm, origin: string, locale: string): object {
+  const labels = term.taxonomy.labels;
+  const set = labels[locale] ?? Object.values(labels).find(Boolean);
+  return {
+    "@type": "DefinedTerm",
+    name: term.name,
+    termCode: term.slug,
+    ...(term.href ? { url: `${origin}${term.href}` } : {}),
+    inDefinedTermSet: { "@type": "DefinedTermSet", name: set?.plural ?? term.taxonomy.key },
+  };
+}
+
+/** Breadcrumb items for shown terms that have an archive. */
+function termCrumbs(trail: readonly ShownTerm[], origin: string) {
+  return trail.flatMap((t) => (t.href ? [{ name: t.name, url: `${origin}${t.href}` }] : []));
+}
+
+/**
+ * `<head>` for an article (content entry). The summary is the description until entries get SEO
+ * fields. With the entry's terms (`entryTaxonomy`), the primary category becomes the section
+ * (`article:section`, `articleSection`, `about`, breadcrumb) and public tags the keywords; without
+ * them (or for an un-migrated entry) the deprecated `tags` are the keywords.
+ */
+export function entryHead(
+  site: Site,
+  entry: ContentEntry,
+  origin: string,
+  taxonomy: EntryTaxonomy = entryTaxonomy(undefined, entry),
+): HeadMeta {
   const url = `${origin}${entryPath(entry)}`;
   const description = clip(entry.summary);
   const imageUrl = absoluteUrl(origin, entry.coverImage?.src);
@@ -153,7 +183,13 @@ export function entryHead(site: Site, entry: ContentEntry, origin: string): Head
   );
   if (entry.publishedAt) base.openGraph.push(["article:published_time", entry.publishedAt]);
   base.openGraph.push(["article:modified_time", entry.updatedAt]);
-  for (const tag of entry.tags) base.openGraph.push(["article:tag", tag]);
+  if (taxonomy.section) base.openGraph.push(["article:section", taxonomy.section.name]);
+  for (const tag of taxonomy.keywords) base.openGraph.push(["article:tag", tag]);
+  const keywords = taxonomy.tags.length
+    ? taxonomy.tags.map((t) => definedTerm(t, origin, entry.locale))
+    : taxonomy.keywords.length
+      ? taxonomy.keywords.join(", ")
+      : undefined;
   const publisher = { "@type": "Organization", name: site.name, url: `${origin}/` };
   // A person's byline is a Person; work done by an agent or the system is credited to the site.
   const author =
@@ -178,16 +214,111 @@ export function entryHead(site: Site, entry: ContentEntry, origin: string): Head
         ...(entry.publishedAt ? { datePublished: entry.publishedAt } : {}),
         dateModified: entry.updatedAt,
         inLanguage: entry.locale,
-        ...(entry.tags.length ? { keywords: entry.tags.join(", ") } : {}),
+        ...(taxonomy.section
+          ? {
+              articleSection: taxonomy.section.name,
+              about: definedTerm(taxonomy.section, origin, entry.locale),
+            }
+          : {}),
+        ...(keywords ? { keywords } : {}),
         author,
         publisher,
       },
       breadcrumbs([
         { name: site.name, url: `${origin}/` },
+        ...termCrumbs(taxonomy.trail, origin),
         { name: entry.title, url },
       ]),
     ],
     feeds: siteFeeds(site, origin),
+  };
+}
+
+const PAGE_WORD: Record<string, string> = { en: "Page", tr: "Sayfa" };
+
+/** "Page 2" in the locale's language (English for languages without a translation). */
+export function pageLabel(locale: string, page: number): string {
+  return `${PAGE_WORD[locale.split("-")[0] ?? locale] ?? PAGE_WORD.en} ${page}`;
+}
+
+/**
+ * `<head>` for a term archive page (RFC-0002 §7). Every page is self-canonical; page 1 carries the
+ * description (`seo.description`, else the intro as text) and the JSON-LD (`CollectionPage` about
+ * the term as a `DefinedTerm`, its `ItemList`, and a `BreadcrumbList` through the ancestors), and
+ * later pages get a "Page n" title and neither. Thin archives are `noindex,follow`.
+ */
+export function archiveHead(site: Site, view: ArchiveView, origin: string): HeadMeta {
+  const { locale, shown } = view;
+  const label = view.term.labels[locale];
+  const first = view.page === 1;
+  const own = `${origin}${view.path}`;
+  const canonical = (first ? absoluteUrl(origin, label?.seo?.canonical) : undefined) ?? own;
+  const title = first
+    ? (label?.seo?.title ?? `${shown.name} · ${site.name}`)
+    : `${label?.seo?.title ?? shown.name} – ${pageLabel(locale, view.page)} · ${site.name}`;
+  const description = first
+    ? clip(
+        label?.seo?.description ??
+          (label?.description ? markdownText(label.description) : undefined),
+      )
+    : undefined;
+  const imageRef = label?.seo?.ogImage ?? view.term.image;
+  const imageUrl = absoluteUrl(origin, imageRef?.src);
+  const image = imageUrl ? { url: imageUrl, alt: imageRef?.alt ?? "" } : undefined;
+  const root = `${origin}${view.root}`;
+  const jsonLd: object[] = first
+    ? [
+        {
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: shown.name,
+          url: own,
+          ...(description ? { description } : {}),
+          ...(image ? { image: image.url } : {}),
+          inLanguage: locale,
+          isPartOf: { "@type": "WebSite", name: site.name, url: `${origin}/` },
+          about: definedTerm(shown, origin, locale),
+          mainEntity: {
+            "@type": "ItemList",
+            numberOfItems: view.total,
+            itemListElement: view.entries.map((e, i) => ({
+              "@type": "ListItem",
+              position: (view.page - 1) * view.perPage + i + 1,
+              url: `${origin}${entryPath(e)}`,
+            })),
+          },
+        },
+        breadcrumbs([
+          { name: site.name, url: `${origin}/` },
+          ...termCrumbs(view.trail, origin),
+          { name: shown.name, url: root },
+        ]),
+      ]
+    : [];
+  return {
+    title,
+    ...(description ? { description } : {}),
+    canonical,
+    ...(view.indexable ? {} : { robots: "noindex,follow" }),
+    lang: locale,
+    ...cards(
+      "website",
+      {
+        title: first ? (label?.seo?.title ?? shown.name) : title,
+        url: canonical,
+        ...(description ? { description } : {}),
+        ...(image ? { image } : {}),
+      },
+      site,
+      locale,
+    ),
+    jsonLd,
+    feeds: [
+      ...siteFeeds(site, origin),
+      ...(view.feedPath
+        ? [{ title: `${shown.name} · ${site.name}`, href: `${origin}${view.feedPath}` }]
+        : []),
+    ],
   };
 }
 

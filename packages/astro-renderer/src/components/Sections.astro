@@ -1,7 +1,8 @@
 ---
 /**
  * Renders a page's sections by `kind`. Themes override any component through `components`;
- * `entries` supplies collection data for contentList sections (keyed by collection name).
+ * `entries` supplies collection data for contentList sections, keyed by collection name — or by
+ * section id for a section with a `filter`, whose entries the page resolved on their own.
  */
 import type { ContentEntry, Section } from "@cloudhal/core-contracts";
 import ContentList from "./ContentList.astro";
@@ -28,6 +29,6 @@ const resolved = { ...defaults, ...components } as Record<
   const Component = resolved[section.kind];
   if (!Component) return <div data-unknown-section={section.kind} />;
   return section.kind === "contentList"
-    ? <Component section={section} entries={entries[section.collection] ?? []} />
+    ? <Component section={section} entries={entries[section.id] ?? entries[section.collection] ?? []} />
     : <Component section={section} />;
 })}

@@ -8,6 +8,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build, init, readProjectConfig, snapshot } from "../src/index.ts";
+import { applyTaxonomyFixture } from "./taxonomy-fixture.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STARTER_NODE_MODULES = path.resolve(here, "../../../starters/blog/node_modules");
@@ -46,6 +47,21 @@ async function spawnDev(
     });
   });
   return { child, url };
+}
+
+/** Runs `cloudhal build` as a child process; resolves when it exits 0. */
+async function spawnBuild(projectDir: string): Promise<void> {
+  const { VITEST: _v, NODE_ENV: _n, ...env } = process.env;
+  const child = spawn(process.execPath, [BIN, "build"], {
+    cwd: projectDir,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  child.stdout?.on("data", (c: Buffer) => (output += c.toString()));
+  child.stderr?.on("data", (c: Buffer) => (output += c.toString()));
+  const code = await new Promise<number | null>((resolve) => child.once("exit", resolve));
+  if (code !== 0) throw new Error(`cloudhal build exited with ${code}:\n${output.slice(-4000)}`);
 }
 
 describe("cloudhal init → dev → snapshot → build", () => {
@@ -144,6 +160,10 @@ describe("cloudhal init → dev → snapshot → build", () => {
       const edited = await (await fetch(new URL("/about", server.url))).text();
       expect(edited).toContain("<title>About (edited live) · ");
       expect((await fetch(new URL("/nope", server.url))).status).toBe(404);
+      // the seeded category's archive is served live too (one post: thin, so noindex)
+      const archive = await fetch(new URL("/category/news", server.url));
+      expect(archive.status).toBe(200);
+      expect(await archive.text()).toContain('<meta name="robots" content="noindex,follow">');
 
       // A brand-new page needs a new route: the integration watches the data dir and clears
       // Astro's dev route cache. Poll because the file watcher is asynchronous.
@@ -201,5 +221,117 @@ describe("cloudhal init → dev → snapshot → build", () => {
       "/posts/hello-world</loc>",
     );
     expect(await readFile(path.join(r.outDir, "robots.txt"), "utf8")).toContain("Sitemap:");
+    // the seed's category and tag are on the post and have (thin) archives
+    expect(post).toContain('<a class="ch-chip" href="/category/news" rel="tag">News</a>');
+    expect(post).toContain('<a class="ch-chip" href="/tag/cloudhal" rel="tag">Cloudhal</a>');
+    expect(await readFile(path.join(r.outDir, "tag", "cloudhal", "index.html"), "utf8")).toContain(
+      "<h1>Cloudhal</h1>",
+    );
+  });
+
+  it("build writes category/tag archives, term feeds, sitemap entries and redirects (RFC-0002)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    await applyTaxonomyFixture(local.store, cfg.siteId);
+    // a content list filtered by a term (RFC-0002 §5) on the home page
+    const home = (await local.store.listPages(cfg.siteId)).find((p) => p.path === "/");
+    if (!home) throw new Error("no home page");
+    await local.store.updatePage({
+      ...home,
+      sections: [
+        ...home.sections,
+        {
+          id: "sec_home0weekly",
+          kind: "contentList",
+          collection: "posts",
+          limit: 2,
+          sort: "newest",
+          filter: "tag:weekly-digest",
+        },
+      ],
+    });
+    await local.close();
+    await snapshot({ projectDir, label: "taxonomy", publish: true });
+    // The real bin, in its own process: Node caches Astro's prerender entry (and with it the
+    // `getStaticPaths` results) per process, so a second in-process build would reuse the first's.
+    await spawnBuild(projectDir);
+    const outDir = path.join(projectDir, "dist");
+    const read = (...p: string[]) => readFile(path.join(outDir, ...p), "utf8");
+
+    // an indexable category archive (22 posts ≥ minEntriesToIndex 3), 20 per page
+    const news = await read("category", "news", "index.html");
+    expect(news).toContain("<h1>News</h1>");
+    expect(news).not.toContain('name="robots"');
+    expect(news).toMatch(/<link rel="canonical" href="[^"]+\/category\/news">/);
+    expect(news).toContain('"@type":"CollectionPage"');
+    expect(news).toContain('"@type":"BreadcrumbList"');
+    expect(news).toContain('href="/posts/hello-world"');
+    expect(news).toContain('<a href="/category/news/page/2" rel="next">');
+    expect(news).toMatch(
+      /<link rel="alternate" type="application\/rss\+xml" title="News · [^"]+" href="[^"]+\/category\/news\/rss\.xml">/,
+    );
+    // page 2 is its own canonical, without JSON-LD; page 1 has no duplicate
+    const page2 = await read("category", "news", "page", "2", "index.html");
+    expect(page2).toMatch(/<link rel="canonical" href="[^"]+\/category\/news\/page\/2">/);
+    expect(page2).toContain("<title>News – Page 2 · ");
+    expect(page2).not.toContain("application/ld+json");
+    expect(page2).toContain('<a href="/category/news" rel="prev">');
+    expect(page2).toContain(">Issue 1</a>");
+    expect(await read("category", "news", "page", "1", "index.html")).toContain(
+      'content="0;url=/category/news"',
+    );
+    // a thin archive (1 post < 3) is served but not indexed, and left out of the sitemap
+    expect(await read("tag", "cloudhal", "index.html")).toContain(
+      '<meta name="robots" content="noindex,follow">',
+    );
+    // proposed (404) and retired (410) terms have no page in a static build
+    await expect(read("tag", "proposed-idea", "index.html")).rejects.toThrow(/ENOENT/);
+    await expect(read("tag", "old-topic", "index.html")).rejects.toThrow(/ENOENT/);
+    // a per-term feed
+    const feed = await read("category", "news", "rss.xml");
+    expect(feed).toContain("<title>News · ");
+    expect(feed).toMatch(/<link>[^<]+\/category\/news<\/link>/);
+    expect(feed).toContain("<title>Issue 21</title>");
+    expect(feed).toContain("<category>News</category>");
+    expect(feed).toContain("<category>Weekly</category>");
+    // redirects: meta-refresh pages for the old paths, real ones in _redirects
+    expect(await read("tag", "weekly", "index.html")).toContain(
+      'content="0;url=/tag/weekly-digest"',
+    );
+    expect(await read("tag", "weekly", "page", "2", "index.html")).toContain(
+      'content="0;url=/tag/weekly-digest/page/2"',
+    );
+    expect(await read("tag", "weekly-digest", "page", "2", "index.html")).toContain(">Issue 1</a>");
+    expect(await read("posts", "issue-05", "index.html")).toContain(
+      'content="0;url=/posts/issue-05-renamed"',
+    );
+    const redirects = await read("_redirects");
+    expect(redirects).toContain("/posts/issue-05 /posts/issue-05-renamed 301\n");
+    expect(redirects).toContain("/tag/weekly /tag/weekly-digest 301\n");
+    expect(redirects).toContain("/tag/weekly/* /tag/weekly-digest/:splat 301\n");
+    // sitemap: indexable archives only, with lastmod
+    const sitemap = await read("sitemap.xml");
+    expect(sitemap).toMatch(/\/category\/news<\/loc><lastmod>\d{4}-/);
+    expect(sitemap).toContain("/tag/weekly-digest</loc>");
+    expect(sitemap).not.toContain("/tag/cloudhal</loc>");
+    expect(sitemap).not.toContain("/page/2</loc>");
+    // posts: breadcrumb through the primary category, chips, related posts, header categories
+    const post = await read("posts", "issue-03", "index.html");
+    expect(post).toMatch(/aria-label="Breadcrumb"[\s\S]*href="\/category\/news">News<\/a>/);
+    expect(post).toContain('<a class="ch-chip" href="/tag/weekly-digest" rel="tag">Weekly</a>');
+    expect(post).toContain('"articleSection":"News"');
+    expect(post).toContain('<meta property="article:tag" content="Weekly">');
+    expect(post).toMatch(/Related posts[\s\S]*href="\/posts\/issue-21"/);
+    expect(post).toMatch(/aria-label="Main"[\s\S]*href="\/category\/news"/);
+    // the filtered list shows the tag's newest posts only
+    const index = await read("index.html");
+    const start = index.indexOf('data-section-id="sec_home0weekly"');
+    const weekly = index.slice(start, index.indexOf("</section>", start));
+    expect(start).toBeGreaterThan(0);
+    expect(weekly).toMatch(/>Issue 21<\/a>[\s\S]*>Issue 20<\/a>/);
+    expect(weekly).not.toContain("Hello, world");
+    expect(weekly).not.toContain("Issue 19");
+    // the proposed tag is never shown on its post
+    expect(await read("posts", "issue-01", "index.html")).not.toContain("proposed-idea");
   });
 });

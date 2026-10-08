@@ -35,6 +35,11 @@ export interface GraphSource {
   /** A shown term by its current slug (old slugs answer with a redirect, not a term). */
   termBySlug(key: string, slug: string): Promise<Term | undefined>;
   /**
+   * Every term of a taxonomy (or of the site, without `key`) in any status: proposed, internal and
+   * retired terms included. Routes need them to tell a 404 from a 410; never list them publicly.
+   */
+  vocabulary(key?: string): Promise<Term[]>;
+  /**
    * Visible entries matching a filter expression (RFC-0002 §5), newest first. Unknown terms match
    * nothing (a published snapshot must keep rendering) and are logged.
    */
@@ -50,6 +55,8 @@ export interface GraphSource {
   ): Promise<ContentEntry[]>;
   /** The redirect for a request path: exact first, then the longest prefix redirect. */
   redirectFor(path: string): Promise<RedirectMatch | undefined>;
+  /** Every redirect of the site (static builds write them out; see `redirectsFile`). */
+  redirects(): Promise<Redirect[]>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -85,34 +92,6 @@ function compile(filter: string, taxonomies: Taxonomy[], terms: Term[]) {
       `cloudhal: filter "${filter}" names unknown terms: ${resolved.unknown.join(", ")}`,
     );
   return resolved;
-}
-
-/**
- * Interim compatibility (RFC-0002 rollout): SEO tags, JSON-LD keywords and RSS categories still read
- * the deprecated `ContentEntry.tags`, which the store now writes as `[]` once tags became terms.
- * Until the renderer reads `terms` itself (rollout step 5), an entry without legacy tags shows the
- * slugs of its active, public `tag` terms there — the same values the old field carried.
- */
-function withLegacyTags(
-  entries: ContentEntry[],
-  taxonomies: Taxonomy[],
-  terms: Term[],
-): ContentEntry[] {
-  const tagTax = taxonomies.find((t) => t.key === "tag");
-  if (!tagTax) return entries;
-  const slugs = new Map(
-    terms
-      .filter(
-        (t) => t.taxonomyId === tagTax.id && t.status === "active" && t.visibility === "public",
-      )
-      .map((t) => [t.id, t.slug]),
-  );
-  return entries.map((e) => {
-    const ids = e.terms?.tag?.ids;
-    if (e.tags.length > 0 || !ids) return e;
-    const tags = ids.map((id) => slugs.get(id)).filter((s): s is string => s !== undefined);
-    return tags.length > 0 ? { ...e, tags } : e;
-  });
 }
 
 function visible<T extends { status: Page["status"] }>(nodes: T[], includeDrafts: boolean): T[] {
@@ -152,21 +131,13 @@ export class LiveSource implements GraphSource {
     return (await this.pages()).find((p) => p.path === path && p.locale === loc);
   }
 
-  async #legacy(entries: ContentEntry[]): Promise<ContentEntry[]> {
-    const [taxonomies, terms] = await Promise.all([
-      this.#store.listTaxonomies(this.#siteId),
-      this.#store.listTerms(this.#siteId, { taxonomy: "tag" }),
-    ]);
-    return withLegacyTags(entries, taxonomies, terms);
-  }
-
   async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
     const all = visible(
       await this.#store.listContentEntries(this.#siteId, collection),
       this.#includeDrafts,
     );
-    return this.#legacy(all.filter((e) => e.locale === loc).sort(byNewest));
+    return all.filter((e) => e.locale === loc).sort(byNewest);
   }
 
   async entryBySlug(
@@ -178,11 +149,9 @@ export class LiveSource implements GraphSource {
   }
   async allEntries(locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
-    return this.#legacy(
-      visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
-        .filter((e) => e.locale === loc)
-        .sort(byNewest),
-    );
+    return visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
+      .filter((e) => e.locale === loc)
+      .sort(byNewest);
   }
 
   taxonomies(): Promise<Taxonomy[]> {
@@ -200,6 +169,10 @@ export class LiveSource implements GraphSource {
     return (await this.terms(key)).find((t) => t.slug === slug);
   }
 
+  vocabulary(key?: string): Promise<Term[]> {
+    return this.#store.listTerms(this.#siteId, key === undefined ? {} : { taxonomy: key });
+  }
+
   async entriesByFilter(
     filter: string,
     options: { locale?: string; limit?: number } = {},
@@ -214,11 +187,7 @@ export class LiveSource implements GraphSource {
     const out = visible(entries, this.#includeDrafts)
       .filter((e) => matches(f, e))
       .sort(byNewest);
-    return withLegacyTags(
-      options.limit === undefined ? out : out.slice(0, options.limit),
-      taxonomies,
-      terms,
-    );
+    return options.limit === undefined ? out : out.slice(0, options.limit);
   }
 
   entriesByTerm(
@@ -231,6 +200,10 @@ export class LiveSource implements GraphSource {
 
   redirectFor(path: string): Promise<RedirectMatch | undefined> {
     return this.#store.redirectFor(this.#siteId, path);
+  }
+
+  redirects(): Promise<Redirect[]> {
+    return this.#store.listRedirects(this.#siteId);
   }
 }
 
@@ -294,7 +267,7 @@ export class SnapshotSource implements GraphSource {
         pages: visible(pages, false).sort(
           (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
         ),
-        entries: withLegacyTags(visible(entries, false), taxonomies, terms),
+        entries: visible(entries, false),
         taxonomies,
         terms,
         redirects,
@@ -353,6 +326,14 @@ export class SnapshotSource implements GraphSource {
     return (await this.terms(key)).find((t) => t.slug === slug);
   }
 
+  async vocabulary(key?: string): Promise<Term[]> {
+    const { site, taxonomies, terms } = await this.#load();
+    if (key === undefined) return [...terms].sort(byPosition(site.defaultLocale));
+    const tax = taxonomies.find((t) => t.key === key);
+    if (!tax) return [];
+    return terms.filter((t) => t.taxonomyId === tax.id).sort(byPosition(site.defaultLocale));
+  }
+
   async entriesByFilter(
     filter: string,
     options: { locale?: string; limit?: number } = {},
@@ -374,5 +355,9 @@ export class SnapshotSource implements GraphSource {
 
   async redirectFor(path: string): Promise<RedirectMatch | undefined> {
     return matchRedirect((await this.#load()).redirects, path);
+  }
+
+  async redirects(): Promise<Redirect[]> {
+    return (await this.#load()).redirects;
   }
 }

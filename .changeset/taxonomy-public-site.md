@@ -1,0 +1,9 @@
+---
+"@cloudhal/astro-renderer": minor
+"@cloudhal/cli": minor
+---
+
+Taxonomy and redirects on the public site (RFC-0002 §7, rollout step 5).
+
+- `@cloudhal/astro-renderer`: entries are read through their `terms` (the `withLegacyTags` shim is removed; entries without `terms.tag` keep their deprecated `tags` as keywords). New `taxonomy` (`taxonomyIndex`, `loadTaxonomyIndex`, `entryTaxonomy`, `archiveMembers`, `relatedEntries`), `archive` (`parseArchivePath`, `archiveState`, `archiveSummaries`, `DEFAULT_ARCHIVE_PAGE_SIZE`) and `cache-tags` (`addCacheTags`, `cloudhal-node-<id>`, `cloudhal-term-<id>`) modules. `routing` gains `resolveRoute` (page → entry → archive → redirect → 410 → 404, query kept on redirects), `staticPaths`, `redirectPaths`, `redirectLocation` and `categoryNavLinks`; `seo` gains `archiveHead` (`CollectionPage`, `ItemList`, `BreadcrumbList`; self-canonical pagination; thin archives `noindex,follow`) and `entryHead` takes the entry's terms (`article:section`, `articleSection`, `about`, `keywords` as `DefinedTerm`s, breadcrumb through the primary category); `feeds` gains `archiveFeedXml`, `redirectsFile` and an `archives` argument to `sitemapUrls`, and RSS categories name the public category and tags. `GraphSource` gains `vocabulary()` and `redirects()`. Static builds write `dist/_redirects`; the purge endpoint accepts `{ "tags": [...] }`; `getSource` (Node) keeps one source per `CLOUDHAL_SOURCE`. A `ContentList` section's `filter` is honoured (`Sections` reads entries by section id first).
+- `@cloudhal/cli` (blog starter): `/category/<slug>` and `/tag/<slug>` archives with pagination, per-term feeds at `…/rss.xml`, archives in the sitemap, redirects before 404 (and 410 for retired terms), category and tag chips, a breadcrumb and related posts on articles, and top-level categories in the header (`NAV_CATEGORIES`, `ARCHIVE_PAGE_SIZE`, `RELATED_POSTS` in `src/theme.ts`).

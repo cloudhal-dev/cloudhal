@@ -2,6 +2,7 @@ import config from "virtual:cloudhal/config";
 import { rssXml } from "@cloudhal/astro-renderer/feeds";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
+import { loadTaxonomyIndex } from "@cloudhal/astro-renderer/taxonomy";
 import type { APIRoute } from "astro";
 
 /** The site's RSS 2.0 feed: the newest published articles of every collection. */
@@ -16,6 +17,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     site,
     origin: siteOrigin(site, url),
     entries: await source.allEntries(),
+    taxonomy: await loadTaxonomyIndex(source),
     ...(home?.seo?.description ? { description: home.seo.description } : {}),
   });
   return new Response(body, { headers });
