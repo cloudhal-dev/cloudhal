@@ -1235,6 +1235,7 @@ export const tr: Messages = {
       structure:
         "sayfaları, menüleri, site ayarlarını, sınıflandırmaları ya da yönlendirmeleri değiştiriyor",
       "too-many": "{changes} değişiklik içeriyor ve otomatik modun sınırı {limit}",
+      media: "bir makale değişikliğine ait olmayan medya ekliyor ya da değiştiriyor",
     },
     noHistory: "Henüz karar yok",
     noHistoryDescription:
@@ -1370,6 +1371,7 @@ export const tr: Messages = {
       term: "Terim",
       redirect: "Yönlendirme",
       menu: "Menü",
+      asset: "Medya",
     },
     gone: "Artık mevcut değil",
     revs: "rev {from} → {to}",

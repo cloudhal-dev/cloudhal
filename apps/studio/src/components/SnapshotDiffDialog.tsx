@@ -150,6 +150,9 @@ function useNodeNames(siteId: string, enabled: boolean) {
       const r = redirects.data?.find((x) => x.id === row.id);
       return r ? { title: `${r.from} → ${r.to}`, href: `/sites/${siteId}/redirects` } : {};
     }
+    // Media (RFC-0004): Studio has no asset routes yet (they follow the roles backend), so the
+    // row shows its id under the "Media" badge until the library can name it.
+    if (row.kind === "asset") return { title: row.id };
     const entry = entries.data?.find((e) => e.id === row.id);
     return entry
       ? {
