@@ -97,6 +97,8 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
     });
 
     it("article workflow: draft → review → published → snapshot → publish → build-visible", async () => {
+      // Starter sites require a primary category from review on (RFC-0002).
+      const news = await store.getTermBySlug(siteId, "category", "news");
       const created = await call(`/api/sites/${siteId}/entries`, {
         ...auth,
         method: "POST",
@@ -109,6 +111,7 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
           body: { format: "markdown", value: "# Hi" },
           fields: {},
           tags: [],
+          terms: { category: { ids: [news?.id], primary: news?.id } },
         }),
       });
       expect(created.status).toBe(201);

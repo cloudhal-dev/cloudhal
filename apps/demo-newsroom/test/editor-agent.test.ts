@@ -13,11 +13,22 @@ import { parsePost, runEditorAgent } from "../scripts/editor-agent.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/**
+ * The deployed newsroom predates taxonomies (it has none), so it does not require a category. A
+ * fresh starter site does; until the editor agent assigns `terms.category` over MCP (Sprint 11B),
+ * these tests model the deployed site by making the category optional.
+ */
+async function likeDeployedNewsroom(store: SiteGraphStore, siteId: string): Promise<void> {
+  const category = await store.getTaxonomyByKey(siteId, "category");
+  if (category?.required) await store.updateTaxonomy({ ...category, required: false });
+}
+
 async function setup(answer: "accept" | "decline") {
   const sql = await BetterSqlite3Driver.open(":memory:");
   await migrate(sql, migrations);
   const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
   const site = await seedStarterSite(store, { name: "Starter", slug: "newsroom" });
+  await likeDeployedNewsroom(store, site.id);
   const audit = new AuditLog(sql);
   const server = createCloudhalMcpServer({
     store,
@@ -150,6 +161,7 @@ describe("newsroom editor agent with Studio approvals", () => {
     await migrate(sql, migrations);
     const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
     const site = await seedStarterSite(store, { name: "Starter", slug: "newsroom" });
+    await likeDeployedNewsroom(store, site.id);
     const approvals = new ApprovalStore(sql);
     const server = createCloudhalMcpServer({
       store,

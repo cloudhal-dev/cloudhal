@@ -92,6 +92,21 @@ type ToolResult = {
   structuredContent?: unknown;
 };
 
+/**
+ * Interim (RFC-0002): on a site with a `tag` taxonomy the store turns `tags` into term ids and
+ * stores `tags: []`, so the slugs can't be compared until this agent reads terms over MCP. Until
+ * then, the same number of tag terms counts as unchanged; sites without taxonomies (the deployed
+ * newsroom) still compare slugs.
+ */
+function sameTags(
+  existing: { tags?: string[]; terms?: { tag?: { ids: string[] } } },
+  wanted: string[],
+): boolean {
+  if ((existing.tags ?? []).length > 0 || !existing.terms?.tag)
+    return (existing.tags ?? []).join(",") === wanted.join(",");
+  return existing.terms.tag.ids.length === wanted.length;
+}
+
 export async function runEditorAgent(options: {
   client: Client;
   postsDir: string;
@@ -179,6 +194,7 @@ export async function runEditorAgent(options: {
       summary?: string;
       body: { value: string };
       tags?: string[];
+      terms?: { tag?: { ids: string[] } };
       author: { kind: string; id: string };
     }[];
   }>("list_entries", { siteId, collection: "posts" });
@@ -196,7 +212,7 @@ export async function runEditorAgent(options: {
       existing.title === post.title &&
       (existing.summary ?? "") === post.summary &&
       existing.body.value === post.body &&
-      (existing.tags ?? []).join(",") === post.tags.join(",");
+      sameTags(existing, post.tags);
     if (existing && unchanged) {
       entry = existing;
       if (existing.status === "published") {
