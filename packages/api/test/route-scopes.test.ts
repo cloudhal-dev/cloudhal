@@ -85,5 +85,19 @@ describe("ROUTE_SCOPES (I15)", () => {
     expect(requirementFor("POST", "/api/sites/site_x/menus/menu_y/ops")).toBe("site:write");
     expect(requirementFor("DELETE", "/api/sites/site_x/menus/menu_y")).toBe("site:write");
     expect(requirementFor("GET", "/api/sites/site_x/menus/menu_y/resolve")).toBe("site:read");
+    // RFC-0004 media: reads for every member, uploads asset:upload, management asset:manage,
+    // takedown the Owner.
+    const a = "/api/sites/site_x/assets";
+    expect(requirementFor("GET", a)).toBe("site:read");
+    expect(requirementFor("GET", `${a}/asset_y/content`)).toBe("site:read");
+    expect(requirementFor("POST", `${a}/uploads`)).toBe("asset:upload");
+    expect(requirementFor("PUT", `${a}/uploads/upl_y`)).toBe("asset:upload");
+    expect(requirementFor("PUT", `${a}/asset_y`)).toBe("asset:upload");
+    expect(requirementFor("POST", `${a}/asset_y/retire`)).toBe("asset:manage");
+    expect(requirementFor("DELETE", `${a}/asset_y`)).toBe("asset:manage");
+    expect(requirementFor("POST", `${a}/asset_y/purge`)).toBe("owner");
+    expect(requirementFor("POST", `/api/sites/site_x/media/${"a".repeat(64)}/lift-purge`)).toBe(
+      "owner",
+    );
   });
 });

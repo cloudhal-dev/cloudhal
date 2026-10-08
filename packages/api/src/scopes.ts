@@ -25,6 +25,7 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
 const S = "/api/sites/:siteId";
 const T = `${S}/terms/:termId`;
 const M = `${S}/menus`;
+const A = `${S}/assets`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -130,6 +131,20 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", `${M}/:menuId`, "site:write"],
   ["GET", `${M}/:menuId/resolve`, "site:read"],
   ["POST", `${M}/:menuId/ops`, "site:write"],
+  // media library (RFC-0004 §6.1, ADR-0020): reads site:read; uploads and edits of one's own
+  // uploads asset:upload (the handler checks "own"); status changes and deletes asset:manage;
+  // takedown and lifting it the Owner (§4.6), audited
+  ["GET", A, "site:read"],
+  ["POST", `${A}/uploads`, "asset:upload"],
+  ["PUT", `${A}/uploads/:uploadId`, "asset:upload"],
+  ["GET", `${A}/:assetId`, "site:read"],
+  ["GET", `${A}/:assetId/content`, "site:read"],
+  ["PUT", `${A}/:assetId`, "asset:upload"],
+  ["POST", `${A}/:assetId/retire`, "asset:manage"],
+  ["POST", `${A}/:assetId/restore`, "asset:manage"],
+  ["DELETE", `${A}/:assetId`, "asset:manage"],
+  ["POST", `${A}/:assetId/purge`, "owner"],
+  ["POST", `${S}/media/:sha256/lift-purge`, "owner"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

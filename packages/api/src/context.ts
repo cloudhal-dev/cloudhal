@@ -12,6 +12,7 @@ import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { MailSender } from "./mail.ts";
+import type { UploadSecret } from "./uploads.ts";
 
 /** Resolves who is calling: a session cookie, an API key, … Returns undefined for anonymous. */
 export type ActorResolver = (c: Context) => Promise<Actor | undefined>;
@@ -99,5 +100,7 @@ export type Env = {
     policy: () => PolicyEngine;
     mail: MailSender | undefined;
     now: () => Date;
+    /** Signs upload tickets (RFC-0004 §5.5): the preview secret, the MCP state key, or random. */
+    uploadSecret: UploadSecret;
   };
 };
