@@ -27,7 +27,7 @@ import {
 import { BlobIntegrityError, readAllBytes, sha256OfBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
-import { apiError, badRequest, notFound, unauthorized } from "../errors.ts";
+import { apiError, badRequest, notFound } from "../errors.ts";
 import { actorOf, requireSite } from "../governance.ts";
 import { personOf } from "../own.ts";
 import { param } from "../params.ts";
@@ -472,8 +472,8 @@ export const assets: Hono<Env> = new Hono<Env>()
   .post("/uploads", async (c) => {
     const store = c.get("store");
     const site = await requireSite(c);
-    const actor = c.get("actor");
-    if (!actor) throw unauthorized();
+    // Signed in (the route guard), or the API's own actor on a server without auth (local tools).
+    const actor = actorOf(c);
     const body = await jsonObject(c);
     const files = body.files;
     if (!Array.isArray(files) || files.length === 0)
@@ -547,8 +547,8 @@ export const assets: Hono<Env> = new Hono<Env>()
   .put("/uploads/:uploadId", async (c) => {
     const store = c.get("store");
     const site = await requireSite(c);
-    const actor = c.get("actor");
-    if (!actor) throw unauthorized();
+    // Signed in (the route guard), or the API's own actor on a server without auth (local tools).
+    const actor = actorOf(c);
     const ticket = await store.getUploadTicket(param(c, "uploadId"));
     if (!ticket || ticket.siteId !== site.id) throw notFound("upload not found");
     // The same person (session or key) that asked for it: a leaked URL alone is useless.
