@@ -16,6 +16,7 @@ import {
 } from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
 import {
+  ClockCountdown,
   Copy,
   DotsThree,
   Info,
@@ -24,13 +25,21 @@ import {
   Plus,
   Robot,
   SlidersHorizontal,
+  Stop,
   Trash,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { HowModesWorkCard, ModeBadge } from "../components/AgentModes.tsx";
+import { HowModesWorkCard } from "../components/AgentModes.tsx";
 import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
+import { ElevateAgentKeyDialog } from "../components/ElevateAgentKeyDialog.tsx";
+import {
+  ElevatedKeysBanner,
+  KeyModeCell,
+  useElevationExpiry,
+  useEndElevation,
+} from "../components/Elevation.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
@@ -38,26 +47,19 @@ import { ScopeBadge } from "../components/ScopeBadge.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useAgentModeRules } from "../components/useAgentModeRules.ts";
+import { useNow } from "../components/useNow.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
-import {
-  DEFAULT_MODE,
-  isKeyMode,
-  mcpSnippet,
-  type SnippetKind,
-  sameScopes,
-  sortScopes,
-} from "../lib/agents.ts";
+import { mcpSnippet, ownModeOf, type SnippetKind, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
+import { activeElevation, modesAbove } from "../lib/elevation.ts";
 
 const matches = (k: AgentKeySummary, q: string) =>
   (k.name ?? "").toLowerCase().includes(q) ||
   (k.start ?? "").toLowerCase().includes(q) ||
   (k.mode ?? "").includes(q) ||
+  (k.elevation?.mode ?? "").includes(q) ||
   k.scopes.some((s) => s.includes(q));
-
-/** Keys from servers that predate modes read as `edits`, like the server does. */
-const modeOf = (k: AgentKeySummary) => (isKeyMode(k.mode) ? k.mode : DEFAULT_MODE);
 
 /**
  * A key's scopes: one quiet "Mode default" badge (scopes in its tooltip) when they are exactly what
@@ -67,7 +69,7 @@ function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
   const t = useT();
   const rules = useAgentModeRules();
   const scopes = sortScopes(agentKey.scopes);
-  if (sameScopes(scopes, rules.scopesFor(modeOf(agentKey)))) {
+  if (sameScopes(scopes, rules.scopesFor(ownModeOf(agentKey)))) {
     return (
       <span data-scopes="mode-default" className="inline-flex">
         <Tooltip
@@ -152,15 +154,25 @@ export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
 
 function KeyMenu({
   agentKey,
+  elevated,
   onChangeMode,
+  onElevate,
+  onEndElevation,
   onRevoke,
 }: {
   agentKey: AgentKeySummary;
+  /** An elevation is in force: offer to end it. */
+  elevated: boolean;
   onChangeMode: () => void;
+  onElevate: () => void;
+  onEndElevation: () => void;
   onRevoke: () => void;
 }) {
   const t = useT();
   const toast = useToast();
+  const { modes } = useAgentModeRules();
+  // Nothing is above Auto for a remote key (bypass is local only), so there is nothing to offer.
+  const canElevate = modesAbove(ownModeOf(agentKey), modes).length > 0;
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger
@@ -178,6 +190,23 @@ function KeyMenu({
         <DropdownMenu.Item icon={SlidersHorizontal} onClick={onChangeMode}>
           {t("agents.changeMode.menu")}
         </DropdownMenu.Item>
+        {canElevate ? (
+          <DropdownMenu.Item icon={ClockCountdown} onClick={onElevate}>
+            {t("agents.elevate.menu")}
+          </DropdownMenu.Item>
+        ) : (
+          // A disabled item takes no pointer events, so the tooltip hangs on a wrapper.
+          <Tooltip content={t("agents.elevate.menuDisabled")} side="left" render={<div />}>
+            <DropdownMenu.Item icon={ClockCountdown} disabled>
+              {t("agents.elevate.menu")}
+            </DropdownMenu.Item>
+          </Tooltip>
+        )}
+        {elevated && (
+          <DropdownMenu.Item icon={Stop} onClick={onEndElevation}>
+            {t("agents.elevation.endMenu")}
+          </DropdownMenu.Item>
+        )}
         <DropdownMenu.Item
           icon={Copy}
           onClick={async () => {
@@ -210,8 +239,13 @@ export function AgentsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [toRevoke, setToRevoke] = useState<AgentKeySummary | undefined>();
   const [toChange, setToChange] = useState<AgentKeySummary | undefined>();
+  const [toElevate, setToElevate] = useState<AgentKeySummary | undefined>();
   const endpoint = mcpEndpoint(window.location.origin);
   const notEnabled = isNotEnabled(keys.error);
+  // "42 min left" ages on its own; the list refetches the moment an elevation runs out.
+  const now = useNow();
+  useElevationExpiry(keys.data);
+  const endElevation = useEndElevation();
 
   const revoke = useMutation({
     mutationFn: (key: AgentKeySummary) => api.agentKeys.remove(key.id),
@@ -259,6 +293,12 @@ export function AgentsPage() {
             retrying={keys.isFetching}
           />
         )}
+        <ElevatedKeysBanner
+          keys={keys.data}
+          now={now}
+          onEnd={(elevated) => endElevation.mutate(elevated)}
+          ending={endElevation.isPending}
+        />
         <ListToolbar
           search={paging.search}
           onSearch={paging.setSearch}
@@ -317,7 +357,7 @@ export function AgentsPage() {
                         </div>
                       </Table.Cell>
                       <Table.Cell className="whitespace-nowrap">
-                        <ModeBadge mode={modeOf(k)} />
+                        <KeyModeCell agentKey={k} now={now} />
                       </Table.Cell>
                       <Table.Cell>
                         <KeyScopes agentKey={k} />
@@ -352,7 +392,13 @@ export function AgentsPage() {
                       <Table.Cell sticky="right" className="text-right">
                         <KeyMenu
                           agentKey={k}
+                          elevated={
+                            activeElevation({ mode: ownModeOf(k), elevation: k.elevation }, now) !==
+                            undefined
+                          }
                           onChangeMode={() => setToChange(k)}
+                          onElevate={() => setToElevate(k)}
+                          onEndElevation={() => endElevation.mutate([k])}
                           onRevoke={() => setToRevoke(k)}
                         />
                       </Table.Cell>
@@ -376,6 +422,10 @@ export function AgentsPage() {
       <ChangeAgentModeDialog
         agentKey={toChange}
         onOpenChange={(o) => !o && setToChange(undefined)}
+      />
+      <ElevateAgentKeyDialog
+        agentKey={toElevate}
+        onOpenChange={(o) => !o && setToElevate(undefined)}
       />
       <DeleteResource
         open={toRevoke !== undefined}

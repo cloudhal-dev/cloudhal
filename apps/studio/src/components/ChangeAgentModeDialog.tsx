@@ -1,12 +1,14 @@
 import { Banner, LayerDialog, Text } from "@cloudhal/ui";
-import { ArrowRight, Info, WarningCircle } from "@phosphor-icons/react";
+import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { useI18n } from "../i18n/index.tsx";
 import { DEFAULT_MODE, isKeyMode } from "../lib/agents.ts";
 import { type AgentKeySummary, api, type KeyMode } from "../lib/api.ts";
+import { activeElevation, formatUntil, isMoreAutonomous } from "../lib/elevation.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
 import { useToast } from "./Toast.ts";
+import { useNow } from "./useNow.ts";
 
 /**
  * Row-menu "Change mode" (DESIGN.md §2g): the same mode cards as the create dialog, the change as
@@ -21,8 +23,9 @@ export function ChangeAgentModeDialog({
   agentKey: AgentKeySummary | undefined;
   onOpenChange: (open: boolean) => void;
 }) {
-  const t = useT();
+  const { t, locale } = useI18n();
   const qc = useQueryClient();
+  const now = useNow();
   const toast = useToast();
   // Keep showing the last key while the dialog animates closed.
   const last = useRef(currentKey);
@@ -33,12 +36,17 @@ export function ChangeAgentModeDialog({
   const [autoConfirmed, setAutoConfirmed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const name = agentKey?.name ?? t("agents.unnamed");
+  // A time-boxed elevation (ADR-0016) survives a change of the own mode only while it is higher.
+  const inForce = agentKey
+    ? activeElevation({ mode: from, elevation: agentKey.elevation }, now)
+    : undefined;
 
   const change = useMutation({
     mutationFn: ({ id, next }: { id: string; next: KeyMode }) => api.agentKeys.setMode(id, next),
     onSuccess: async (updated) => {
+      // The whole summary: an elevation the new mode reaches is gone from it.
       qc.setQueryData<AgentKeySummary[]>(["agent-keys"], (keys) =>
-        keys?.map((k) => (k.id === updated.id ? { ...k, ...updated } : k)),
+        keys?.map((k) => (k.id === updated.id ? updated : k)),
       );
       onOpenChange(false);
       toast.success(
@@ -89,6 +97,32 @@ export function ChangeAgentModeDialog({
         </LayerDialog.Description>
         <LayerDialog.Body>
           <div className="grid gap-5" data-testid="change-mode">
+            {inForce && (
+              <div
+                data-testid="change-mode-elevation"
+                data-elevation-outcome={isMoreAutonomous(inForce.mode, mode) ? "keeps" : "ends"}
+              >
+                <Banner
+                  variant="default"
+                  size="sm"
+                  icon={<ClockCountdown weight="fill" />}
+                  title={t("agents.changeMode.elevatedTitle", {
+                    mode: t(`agents.modes.names.${inForce.mode}`),
+                    time: formatUntil(inForce.until, locale, { now }),
+                  })}
+                  description={
+                    isMoreAutonomous(inForce.mode, mode)
+                      ? t("agents.changeMode.elevationKeeps", {
+                          time: formatUntil(inForce.until, locale, { now }),
+                          mode: t(`agents.modes.names.${mode}`),
+                        })
+                      : t("agents.changeMode.elevationEnds", {
+                          mode: t(`agents.modes.names.${mode}`),
+                        })
+                  }
+                />
+              </div>
+            )}
             <ModePicker
               value={mode}
               onValueChange={choose}

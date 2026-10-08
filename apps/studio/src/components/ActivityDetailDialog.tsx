@@ -101,9 +101,26 @@ export function ActivityDetailDialog({
                 {row.mode && row.actor.kind === "agent" && (
                   <Row label={t("activity.detail.mode")}>
                     <div className="grid gap-1">
-                      <ModeBadge mode={row.mode} />
+                      <ModeBadge mode={row.mode} elevation={row.elevation} />
                       <Text variant="secondary" size="sm">
                         {t("activity.detail.modeHint")}
+                      </Text>
+                    </div>
+                  </Row>
+                )}
+                {row.elevation && row.actor.kind === "agent" && (
+                  <Row label={t("activity.detail.elevation")}>
+                    <div className="grid gap-1" data-testid="activity-elevation">
+                      <Text as="span">
+                        {t("agents.elevation.marker", {
+                          from: t(`agents.modes.names.${row.elevation.from}`),
+                          time: absoluteTime(row.elevation.until, locale),
+                        })}
+                      </Text>
+                      <Text variant="secondary" size="sm">
+                        {t("activity.detail.elevationHint", {
+                          from: t(`agents.modes.names.${row.elevation.from}`),
+                        })}
                       </Text>
                     </div>
                   </Row>

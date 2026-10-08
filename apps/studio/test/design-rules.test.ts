@@ -177,7 +177,35 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Banner",
     "useToast",
   ],
-  "routes/AgentsPage.tsx#modes": ["ModeBadge", "HowModesWorkCard", "ChangeAgentModeDialog"],
+  "routes/AgentsPage.tsx#modes": ["KeyModeCell", "HowModesWorkCard", "ChangeAgentModeDialog"],
+  // Time-boxed elevation (§2g, ADR-0016): row action, timer badge, summary banner, end now.
+  "routes/AgentsPage.tsx#elevation": [
+    "ElevateAgentKeyDialog",
+    "ElevatedKeysBanner",
+    "useEndElevation",
+    "useElevationExpiry",
+    "DropdownMenu.Item",
+    "Tooltip",
+  ],
+  "components/ElevateAgentKeyDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "ModePicker",
+    "AutoModeConfirm",
+    "ModeBadge",
+    "Tabs",
+    "Input",
+    "Select",
+    "Banner",
+    "useToast",
+    "modesAbove",
+    "elevationSummary",
+  ],
+  "components/Elevation.tsx": ["ModeBadge", "Badge", "Tooltip", "Banner", "Banner.Action"],
+  "components/ChangeAgentModeDialog.tsx#elevation": ["Banner", "activeElevation"],
+  "components/AgentModes.tsx#elevation": ["ClockCountdown", "AuditElevation"],
+  "components/Audit.tsx#elevation": ["elevation"],
+  "components/ActivityDetailDialog.tsx#elevation": ["elevation"],
   "components/Audit.tsx#modes": ["ModeBadge", "AutoApprovedBadge"],
   "routes/ActivityPage.tsx#modes": ["DecisionCell", "ActorCell"],
   "components/ActivityDetailDialog.tsx#modes": ["ModeBadge", "DecisionCell"],
@@ -368,6 +396,27 @@ describe("design rules (DESIGN.md)", () => {
       .filter((f) => /value=["{]+["']?bypass|mode:\s*["']bypass/.test(f.text))
       .map((f) => f.file);
     expect(offenders).toEqual([]);
+  });
+
+  it("elevation offers only modes above the key's own and never sends bypass (ADR-0016)", () => {
+    const dialog = files.find((f) => f.file === "components/ElevateAgentKeyDialog.tsx") as {
+      text: string;
+    };
+    // The picker is narrowed to `modesAbove(own, rules.modes)`; the rules only yield key modes.
+    expect(dialog.text).toMatch(/const targets = modesAbove\(own, rules\.modes\)/);
+    expect(dialog.text).toMatch(/<ModePicker[\s\S]*?only=\{targets\}/);
+    // The request carries the chosen card's mode, and only when it is one of those targets.
+    expect(dialog.text).toMatch(/!targets\.includes\(mode\)/);
+    expect(dialog.text).not.toMatch(/bypass/);
+  });
+
+  it("every screen that can elevate a key asks for consent before Auto", () => {
+    const elevating = uiFiles.filter((f) => /api\.agentKeys\.elevate\b/.test(f.text));
+    expect(elevating.map((f) => f.file)).toEqual(["components/ElevateAgentKeyDialog.tsx"]);
+    for (const f of elevating) {
+      expect(f.text, f.file).toMatch(/<AutoModeConfirm\b/);
+      expect(f.text, f.file).toMatch(/needsConsent && !autoConfirmed\) return/);
+    }
   });
 
   it("every screen that can pick Auto asks for consent first", () => {
