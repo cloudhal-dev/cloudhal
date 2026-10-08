@@ -7,3 +7,4 @@ export * from "./audit.ts";
 export * from "./modes.ts";
 export * from "./policy.ts";
 export * from "./skills.ts";
+export * from "./taxonomy.ts";

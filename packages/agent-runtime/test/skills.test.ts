@@ -35,6 +35,12 @@ describe("skill loader", () => {
     expect(publish.cloudhal.approval).toEqual(["publish"]);
     expect(await publish.references()).toEqual(["editorial-checklist.md"]);
     expect((await publish.body()).length).toBeGreaterThan(200);
+    // RFC-0002: articles are filed under existing terms, never free tags
+    expect(await publish.body()).toContain("list_taxonomies");
+    expect(await publish.reference("editorial-checklist.md")).toContain("propose_term");
+    const edit = skills.find((s) => s.manifest.name === "safe-edit") as (typeof skills)[number];
+    expect(await edit.references()).toEqual(["retagging.md"]);
+    expect(edit.cloudhal.scopes).not.toContain("site:write");
     const bootstrap = skills.find(
       (s) => s.manifest.name === "site-bootstrap",
     ) as (typeof skills)[number];
