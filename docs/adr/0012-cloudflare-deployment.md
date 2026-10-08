@@ -30,3 +30,13 @@ Sprint 6 puts a Cloudhal site on Cloudflare. Publishing and rollback must be ins
 - Positive: agent → approval → live in one request; rollback is instant; previews are safe; the whole loop is tested on workerd in CI.
 - Negative: on-demand SSR on cache misses (bounded by the edge cache); two Workers to deploy; the generated admin entry needs `@cloudhal/cloudflare/workerd-prelude` first — esbuild does not initialise lazily-wrapped zod before `@modelcontextprotocol/core` evaluates (remove when fixed upstream).
 - Risks: Workers Cache purge rate limits are the Free-tier limits — purges are per publish, not per edit. Enabling D1 read replication later requires `withSession("first-primary")` for the pointer read. Real deployment was not exercised from CI (no account); the dry run bundles both Workers with the real wrangler.
+
+## Addendum (2026-10-08): custom domains
+`cloudhal domain set <host> [--studio <host>]` stores hostnames in `cloudhal.json` (`domains.site`, `domains.studio`). `cloudhal deploy` then adds `routes: [{ pattern, custom_domain: true }]` to the site and admin Worker configs. Wrangler creates the DNS record and certificate; the zone must be in the same account.
+
+After the deploy, the site domain becomes the site's primary hostname, set through `PUT /api/admin/sites/:id/domains` with the deploy token and mirrored locally. The workers.dev hostname stays as a secondary domain.
+
+Removing the domain from `cloudhal.json` restores workers.dev as primary on the next deploy. Deploy state remembers the last custom domain for this. Custom Domains that already exist in the account are not deleted by wrangler; the CLI says so.
+
+Studio needs nothing extra, because Better Auth's base URL is the request origin. Not exercised against a real zone in CI (no account): the deploy test checks the generated routes and the domain switch against an in-process admin API.
+

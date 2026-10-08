@@ -44,8 +44,13 @@ const storageBindings = (n: DeploymentNames) => {
   };
 };
 
+/** Cloudflare Custom Domain routes (wrangler creates the DNS record and certificate). */
+function customDomain(hostname: string | undefined) {
+  return hostname ? { routes: [{ pattern: hostname, custom_domain: true }] } : {};
+}
+
 /** The site Worker's config, written to the project root (`wrangler.jsonc`) before `astro build`. */
-export function siteWorkerConfig(n: DeploymentNames & { siteId: string }) {
+export function siteWorkerConfig(n: DeploymentNames & { siteId: string; domain?: string }) {
   return {
     $schema: "node_modules/wrangler/config-schema.json",
     name: workerNames(n).site,
@@ -54,6 +59,7 @@ export function siteWorkerConfig(n: DeploymentNames & { siteId: string }) {
     compatibility_flags: ["nodejs_compat"],
     ...storageBindings(n),
     vars: { CLOUDHAL_SITE_ID: n.siteId },
+    ...customDomain(n.domain),
     // Workers Cache: published pages are cached until a publish purges `cloudhal-site-<id>`.
     cache: { enabled: true },
     observability: { enabled: true },
@@ -61,7 +67,9 @@ export function siteWorkerConfig(n: DeploymentNames & { siteId: string }) {
 }
 
 /** The admin Worker's config (API + auth + MCP + Studio assets). */
-export function adminWorkerConfig(n: DeploymentNames & { studioDir: string; main: string }) {
+export function adminWorkerConfig(
+  n: DeploymentNames & { studioDir: string; main: string; domain?: string },
+) {
   const names = workerNames(n);
   return {
     $schema: "node_modules/wrangler/config-schema.json",
@@ -72,6 +80,7 @@ export function adminWorkerConfig(n: DeploymentNames & { studioDir: string; main
     compatibility_flags: ["nodejs_compat"],
     ...storageBindings(n),
     services: [{ binding: "SITE", service: names.site }],
+    ...customDomain(n.domain),
     assets: {
       directory: n.studioDir,
       binding: "ASSETS",

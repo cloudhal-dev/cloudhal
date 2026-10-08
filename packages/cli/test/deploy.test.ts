@@ -14,6 +14,7 @@ import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { WranglerRunner } from "../src/cloudflare/wrangler.ts";
+import { domain } from "../src/commands/domain.ts";
 import { deploy, init, pullSite, pushSite, readProjectConfig } from "../src/index.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -198,5 +199,90 @@ describe("cloudhal deploy", () => {
     await local.close();
     const same = await pushSite({ projectDir, fetch: fakeFetch });
     expect(same.message).toContain('"unchanged":true');
+  });
+
+  it("routes custom domains to both Workers and makes the site's one primary; removing restores workers.dev", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const blobs = new MemoryBlobStore();
+    const remote = new SiteGraphStore({ sql, blobs });
+    await remote.init();
+    const cfg = await readProjectConfig(projectDir);
+    const secrets = JSON.parse(
+      await readFile(path.join(projectDir, cfg.dataDir, "deploy/secrets.json"), "utf8"),
+    ) as Record<string, string>;
+    const app = createApi({
+      store: remote,
+      admin: { deployToken: secrets.CLOUDHAL_DEPLOY_TOKEN as string, storage: { sql, blobs } },
+    });
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+      app.fetch(new Request(input, init))) as typeof fetch;
+    const wrangler: WranglerRunner = async (args) => {
+      const ok = (stdout = "", records: Record<string, unknown>[] = []) => ({
+        code: 0,
+        stdout,
+        stderr: "",
+        records,
+      });
+      if (args[0] === "d1" && args[1] === "info")
+        return ok(JSON.stringify({ uuid: "11111111-2222-3333-4444-555555555555" }));
+      if (args[0] === "deploy" && args.includes("-c"))
+        return ok("", [{ type: "deploy", targets: ["deploy-me-admin.acme.workers.dev"] }]);
+      if (args[0] === "deploy")
+        return ok("", [{ type: "deploy", targets: ["https://deploy-me-site.acme.workers.dev"] }]);
+      return ok();
+    };
+    const run = () =>
+      deploy({ projectDir, studioDir, wrangler, fetch: fakeFetch, healthTimeoutMs: 5000 });
+
+    // the command validates and normalises what a person types
+    await expect(domain({ projectDir, set: { site: "not a host" } })).rejects.toThrow(
+      /not a hostname/,
+    );
+    await expect(domain({ projectDir, set: { site: "x.acme.workers.dev" } })).rejects.toThrow(
+      /workers\.dev/,
+    );
+    await expect(
+      domain({ projectDir, set: { site: "a.example.com", studio: "A.example.com" } }),
+    ).rejects.toThrow(/different hostnames/);
+    expect(
+      await domain({
+        projectDir,
+        set: { site: "https://News.Example.com/", studio: "studio.example.com" },
+      }),
+    ).toEqual({ site: "news.example.com", studio: "studio.example.com" });
+    expect((await readProjectConfig(projectDir)).domains).toEqual({
+      site: "news.example.com",
+      studio: "studio.example.com",
+    });
+
+    const r = await run();
+    expect(r).toMatchObject({
+      customSiteUrl: "https://news.example.com",
+      customStudioUrl: "https://studio.example.com",
+    });
+    const siteCfg = await jsonc(path.join(projectDir, "wrangler.jsonc"));
+    expect(siteCfg.routes).toEqual([{ pattern: "news.example.com", custom_domain: true }]);
+    const adminCfg = await jsonc(r.adminConfig);
+    expect(adminCfg.routes).toEqual([{ pattern: "studio.example.com", custom_domain: true }]);
+    // the custom domain is primary on the deployment and locally; workers.dev stays secondary
+    const expected = [
+      { hostname: "news.example.com", primary: true },
+      { hostname: "deploy-me-site.acme.workers.dev", primary: false },
+    ];
+    expect((await remote.getSite(cfg.siteId))?.domains).toEqual(expected);
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    expect((await local.store.getSite(cfg.siteId))?.domains).toEqual(expected);
+    await local.close();
+
+    // removing it: no routes, and workers.dev is primary again
+    expect(await domain({ projectDir, remove: ["site", "studio"] })).toBeUndefined();
+    expect((await readProjectConfig(projectDir)).domains).toBeUndefined();
+    const again = await run();
+    expect(again.customSiteUrl).toBeUndefined();
+    expect((await jsonc(path.join(projectDir, "wrangler.jsonc"))).routes).toBeUndefined();
+    expect((await remote.getSite(cfg.siteId))?.domains[0]).toEqual({
+      hostname: "deploy-me-site.acme.workers.dev",
+      primary: true,
+    });
   });
 });

@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
 import { build, dev } from "./commands/astro.ts";
 import { deploy } from "./commands/deploy.ts";
+import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
 import { snapshot } from "./commands/snapshot.ts";
@@ -19,6 +20,8 @@ Usage:
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
   cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare (uses wrangler login)
+  cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
+                                                          custom domains for the next deploy
   cloudhal push [--replace] [--admin-url <url>]           local site → deployment
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
   cloudhal --help
@@ -45,6 +48,7 @@ export async function main(argv: string[]): Promise<number> {
       "dry-run": { type: "boolean" },
       replace: { type: "boolean" },
       "admin-url": { type: "string" },
+      studio: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -126,9 +130,48 @@ export async function main(argv: string[]): Promise<number> {
         console.log(
           `\nSite:   ${r.siteUrl ?? "(see wrangler output)"}\nStudio: ${r.adminUrl ?? "(see wrangler output)"}`,
         );
+        if (r.customSiteUrl || r.customStudioUrl)
+          console.log(
+            `Custom: ${[r.customSiteUrl, r.customStudioUrl].filter(Boolean).join(" · ")} (DNS and certificate can take a few minutes)`,
+          );
         if (r.setupUrl)
           console.log(`\nLocal site pushed. Create the owner account (once) at:\n  ${r.setupUrl}`);
       }
+      return 0;
+    }
+    case "domain": {
+      const [action, arg] = rest;
+      let result: Awaited<ReturnType<typeof domain>>;
+      if (action === "set") {
+        if (!arg && !values.studio)
+          throw new Error("usage: cloudhal domain set <hostname> [--studio <hostname>]");
+        result = await domain({
+          projectDir,
+          set: {
+            ...(arg ? { site: arg } : {}),
+            ...(values.studio ? { studio: values.studio } : {}),
+          },
+        });
+      } else if (action === "remove") {
+        const which = arg ?? "all";
+        if (!["site", "studio", "all"].includes(which))
+          throw new Error("usage: cloudhal domain remove [site|studio|all]");
+        result = await domain({
+          projectDir,
+          remove: which === "all" ? ["site", "studio"] : [which as DomainTarget],
+        });
+      } else if (action === undefined) {
+        result = await domain({ projectDir });
+      } else {
+        throw new Error(`unknown domain action "${action}" (set, remove)`);
+      }
+      console.log(
+        result
+          ? `site:   ${result.site ? `https://${result.site}` : "(workers.dev)"}\nstudio: ${result.studio ? `https://${result.studio}` : "(workers.dev)"}`
+          : "no custom domains; the Workers answer on workers.dev",
+      );
+      if (action)
+        console.log("run `cloudhal deploy` to apply (the zone must be in your Cloudflare account)");
       return 0;
     }
     case "push":

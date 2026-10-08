@@ -5,13 +5,18 @@
  *
  * - `GET  /api/admin/sites/:siteId/bundle` → SiteBundle (export)
  * - `PUT  /api/admin/sites/:siteId/bundle?mode=bootstrap|replace` ← SiteBundle (import)
+ * - `PUT  /api/admin/sites/:siteId/domains` ← {primary} — the custom domain `cloudhal deploy` just
+ *   routed becomes the site's primary hostname (preview links, canonical URLs); others stay secondary
  */
 import {
   exportSite,
   importSite,
+  isHostname,
+  normalizeHostname,
   type SiteBundle,
   type StoragePair,
   SyncConflictError,
+  withPrimaryDomain,
 } from "@cloudhal/core-ts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -40,6 +45,22 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
       if (!(await c.get("store").getSite(siteId)))
         return c.json({ error: "not_found", message: "site not found" }, 404);
       return c.json(await exportSite(storage, siteId));
+    })
+    .put("/sites/:siteId/domains", async (c) => {
+      const body = ((await c.req.json().catch(() => ({}))) ?? {}) as { primary?: unknown };
+      if (typeof body.primary !== "string") throw badRequest("primary is required");
+      const hostname = normalizeHostname(body.primary);
+      if (!isHostname(hostname)) throw badRequest(`"${body.primary}" is not a hostname`);
+      const store = c.get("store");
+      const site = await store.getSite(param(c, "siteId"));
+      if (!site) return c.json({ error: "not_found", message: "site not found" }, 404);
+      const current = site.domains.find((d) => d.primary)?.hostname;
+      if (current === hostname) return c.json({ domains: site.domains, changed: false });
+      const updated = await store.updateSite({
+        ...site,
+        domains: withPrimaryDomain(site.domains, hostname),
+      });
+      return c.json({ domains: updated.domains, changed: true });
     })
     .put("/sites/:siteId/bundle", async (c) => {
       const mode = c.req.query("mode") ?? "bootstrap";

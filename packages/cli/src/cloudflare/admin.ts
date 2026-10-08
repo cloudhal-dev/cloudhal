@@ -24,6 +24,8 @@ export async function prepareAdminWorker(options: {
   /** Built Studio (`apps/studio/dist`). */
   studioDir: string;
   skillsDir?: string | undefined;
+  /** Custom domain for Studio (Cloudflare Custom Domain). */
+  domain?: string | undefined;
 }): Promise<PreparedAdmin> {
   const dir = path.join(options.projectDir, options.dataDir, "deploy", "admin");
   await mkdir(dir, { recursive: true });
@@ -45,6 +47,7 @@ export async function prepareAdminWorker(options: {
       ...options.names,
       main: "./worker.ts",
       studioDir: path.relative(dir, options.studioDir) || ".",
+      ...(options.domain ? { domain: options.domain } : {}),
     }),
     "Cloudhal admin Worker (API, auth, MCP, Studio)",
   );

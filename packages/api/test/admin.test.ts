@@ -16,6 +16,48 @@ async function backend() {
   return { sql, blobs, store };
 }
 
+describe("admin domains endpoint", () => {
+  it("makes a hostname primary behind the deploy token, keeping others as secondary", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Domains", slug: "domains" });
+    await b.store.updateSite({
+      ...site,
+      domains: [{ hostname: "domains.acme.workers.dev", primary: true }],
+    });
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const put = (body: unknown, token = TOKEN) =>
+      app.request(`/api/admin/sites/${site.id}/domains`, {
+        method: "PUT",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await put({ primary: "news.example.com" }, "nope")).status).toBe(401);
+    expect((await put({ primary: "not a host" })).status).toBe(400);
+    expect((await put({})).status).toBe(400);
+    const res = await put({ primary: "https://News.Example.com/" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      changed: true,
+      domains: [
+        { hostname: "news.example.com", primary: true },
+        { hostname: "domains.acme.workers.dev", primary: false },
+      ],
+    });
+    expect(
+      ((await (await put({ primary: "news.example.com" })).json()) as { changed: boolean }).changed,
+    ).toBe(false);
+    expect(
+      (
+        await app.request("/api/admin/sites/site_missing000001/domains", {
+          method: "PUT",
+          headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+          body: JSON.stringify({ primary: "a.example.com" }),
+        })
+      ).status,
+    ).toBe(404);
+  });
+});
+
 describe("admin bundle endpoints", () => {
   it("exports from one deployment and imports into another, behind the deploy token", async () => {
     const a = await backend();

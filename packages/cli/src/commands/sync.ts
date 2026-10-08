@@ -4,7 +4,7 @@
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { exportSite, importSite, type SiteBundle } from "@cloudhal/core-ts";
+import { exportSite, importSite, type SiteBundle, withPrimaryDomain } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
 
@@ -84,6 +84,35 @@ export async function pushSite(
   if (!res.ok) throw new Error(`push failed (${res.status}): ${brief(body)}`);
   log(`pushed: ${body}`);
   return { pushed: true, message: body };
+}
+
+/**
+ * Makes `hostname` the deployed site's primary domain (preview links, canonical URLs) and mirrors
+ * it in the local store. Used by `cloudhal deploy` once a custom domain is routed.
+ */
+export async function setPrimaryDomain(
+  options: SyncOptions & { hostname: string },
+): Promise<{ changed: boolean }> {
+  const { cfg, url, token, fetch: f } = await target(options);
+  const res = await f(new URL(`/api/admin/sites/${cfg.siteId}/domains`, url), {
+    method: "PUT",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ primary: options.hostname }),
+  });
+  const body = await res.text();
+  if (!res.ok) throw new Error(`setting the site's domain failed (${res.status}): ${brief(body)}`);
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  try {
+    const site = await local.store.getSite(cfg.siteId);
+    if (site && site.domains.find((d) => d.primary)?.hostname !== options.hostname)
+      await local.store.updateSite({
+        ...site,
+        domains: withPrimaryDomain(site.domains, options.hostname),
+      });
+  } finally {
+    await local.close();
+  }
+  return { changed: (JSON.parse(body) as { changed?: boolean }).changed === true };
 }
 
 export async function pullSite(options: SyncOptions): Promise<{ message: string }> {

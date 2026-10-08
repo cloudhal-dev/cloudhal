@@ -28,7 +28,7 @@ import {
 import { deployedUrls, must, type WranglerRunner, wranglerRunner } from "../cloudflare/wrangler.ts";
 import { readProjectConfig } from "../config.ts";
 import { resolveSkillsDir } from "./mcp.ts";
-import { pushSite } from "./sync.ts";
+import { pushSite, setPrimaryDomain } from "./sync.ts";
 
 export const SECRET_KEYS = [
   "BETTER_AUTH_SECRET",
@@ -45,6 +45,8 @@ export interface DeployState {
   adminUrl?: string;
   siteUrl?: string;
   deployedAt?: string;
+  /** The custom site domain this deploy routed, so removing it later restores workers.dev. */
+  siteDomain?: string;
 }
 
 export interface DeployOptions {
@@ -191,6 +193,9 @@ export interface DeployResult {
   pushed?: boolean;
   /** First deploy only: open it to create the owner account. */
   setupUrl?: string;
+  /** Custom domains from cloudhal.json, routed by this deploy. */
+  customSiteUrl?: string;
+  customStudioUrl?: string;
 }
 
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
@@ -225,7 +230,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   // 3. site Worker
   await writeWranglerConfig(
     siteConfigPath(options.projectDir),
-    siteWorkerConfig({ ...withIds, siteId: cfg.siteId }),
+    siteWorkerConfig({
+      ...withIds,
+      siteId: cfg.siteId,
+      ...(cfg.domains?.site ? { domain: cfg.domains.site } : {}),
+    }),
     `Cloudhal site Worker for ${site.name}`,
   );
   log("building the site Worker");
@@ -238,6 +247,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     names: withIds,
     studioDir,
     skillsDir: await resolveSkillsDir(options.projectDir),
+    domain: cfg.domains?.studio,
   });
 
   if (options.dryRun) {
@@ -289,6 +299,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ...(adminUrl ? { adminUrl } : {}),
     ...(siteUrl ? { siteUrl } : {}),
     deployedAt: new Date().toISOString(),
+    ...(cfg.domains?.site ? { siteDomain: cfg.domains.site } : {}),
   });
 
   // 5. first deploy: push the local site
@@ -314,6 +325,27 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       ...(options.fetch ? { fetch: options.fetch } : {}),
     });
     pushed = result.pushed;
+    // A custom domain becomes the site's primary hostname (the workers.dev one stays secondary).
+    if (cfg.domains?.site) {
+      await setPrimaryDomain({
+        projectDir: options.projectDir,
+        hostname: cfg.domains.site,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      });
+      log(
+        `site domain: https://${cfg.domains.site} (Cloudflare issues the certificate on first use)`,
+      );
+    } else if (previous?.siteDomain && siteUrl) {
+      // The custom domain was removed from cloudhal.json: workers.dev is primary again.
+      await setPrimaryDomain({
+        projectDir: options.projectDir,
+        hostname: new URL(siteUrl).hostname,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      });
+      log(
+        `site domain ${previous.siteDomain} removed from cloudhal.json; if Cloudflare still lists it under the Worker's Domains & Routes, remove it there`,
+      );
+    }
   }
   // First deploy: the owner account can only be created through this one-time link.
   const setupUrl =
@@ -329,5 +361,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     adminUrl,
     pushed,
     ...(setupUrl ? { setupUrl } : {}),
+    ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
+    ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
   };
 }
