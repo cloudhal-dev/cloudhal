@@ -23,6 +23,12 @@ export const KNOWN_TOOLS = [
   "rollback",
   "request_elevation",
   "get_mode",
+  // RFC-0003 navigation menus
+  "list_menus",
+  "get_menu",
+  "update_menu",
+  "set_menu",
+  "delete_menu",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 

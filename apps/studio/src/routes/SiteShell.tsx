@@ -13,6 +13,7 @@ import {
   Signpost,
   SquaresFour,
   Tag,
+  TreeStructure,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
@@ -107,6 +108,11 @@ export function SiteShell() {
       id: "taxonomy",
       label: t("commands.goTaxonomy"),
       run: () => navigate({ to: "/sites/$siteId/taxonomy", params: { siteId } }),
+    },
+    {
+      id: "navigation",
+      label: t("commands.goNavigation"),
+      run: () => navigate({ to: "/sites/$siteId/navigation", params: { siteId } }),
     },
     {
       id: "redirects",
@@ -282,6 +288,14 @@ export function SiteShell() {
                 tooltip={t("nav.siteSettings")}
               >
                 {t("nav.siteSettings")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={TreeStructure}
+                href={`${base}/navigation`}
+                active={is(`${base}/navigation`)}
+                tooltip={t("nav.navigation")}
+              >
+                {t("nav.navigation")}
               </Sidebar.MenuButton>
               <Sidebar.MenuButton
                 icon={Signpost}

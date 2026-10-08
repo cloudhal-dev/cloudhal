@@ -53,6 +53,10 @@ const TermEditorPage = lazyRouteComponent(
   () => import("./routes/TermEditorPage.tsx"),
   "TermEditorPage",
 );
+const NavigationPage = lazyRouteComponent(
+  () => import("./routes/NavigationPage.tsx"),
+  "NavigationPage",
+);
 const RedirectsPage = lazyRouteComponent(
   () => import("./routes/RedirectsPage.tsx"),
   "RedirectsPage",
@@ -167,6 +171,20 @@ const termEditorRoute = createRoute({
   path: "/taxonomy/$termId",
   component: TermEditorPage,
 });
+/** Site › Settings › Navigation (RFC-0003 §8): `?menu=<key>&item=<itemId>`. */
+const navigationRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/navigation",
+  validateSearch: (search: Record<string, unknown>): { menu?: string; item?: string } => {
+    const menu = slugParam(search.menu);
+    const item =
+      typeof search.item === "string" && /^item_[A-Za-z0-9]{6,32}$/.test(search.item)
+        ? search.item
+        : undefined;
+    return { ...(menu ? { menu } : {}), ...(item ? { item } : {}) };
+  },
+  component: NavigationPage,
+});
 /** Site › Settings › Redirects. */
 const redirectsRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -225,6 +243,7 @@ const routeTree = rootRoute.addChildren([
     taxonomyRoute,
     termEditorRoute,
     redirectsRoute,
+    navigationRoute,
   ]),
 ]);
 

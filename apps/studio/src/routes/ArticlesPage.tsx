@@ -32,6 +32,7 @@ import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
@@ -98,6 +99,10 @@ export function ArticlesPage() {
     queryFn: () => api.entries.list(siteId, "posts"),
   });
   const [toDelete, setToDelete] = useState<ContentEntry | undefined>();
+  const deleteRefs = useMenuReferences(
+    siteId,
+    toDelete ? { kind: "contentEntry", id: toDelete.id } : undefined,
+  );
   const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const paging = usePaging(
     sorted,
@@ -413,6 +418,7 @@ export function ArticlesPage() {
         onOpenChange={(o) => !o && setToDelete(undefined)}
         resourceType={t("editor.article")}
         resourceName={toDelete?.slug ?? ""}
+        notice={<MenuDeleteNotice refs={deleteRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           if (toDelete) await remove.mutateAsync(toDelete);

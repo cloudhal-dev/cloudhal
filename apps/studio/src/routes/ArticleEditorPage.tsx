@@ -32,6 +32,7 @@ import {
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -93,6 +94,8 @@ export function ArticleEditorPage() {
   const [coverStatus, setCoverStatus] = useState<ImagePreviewStatus>("empty");
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Menus linking here (RFC-0003): named in the delete dialog, listed in the "In menus" card.
+  const menuRefs = useMenuReferences(siteId, { kind: "contentEntry", id: entryId });
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
   useEffect(() => {
     if (query.data) setDraft(query.data);
@@ -391,6 +394,7 @@ export function ArticleEditorPage() {
               host={host}
               coverStatus={coverStatus}
             />
+            <UsedInMenusCard siteId={siteId} kind="contentEntry" id={draft.id} />
             <DetailsCard rows={details} />
             <DangerZoneCard
               title={t("editor.deleteArticleTitle")}
@@ -419,6 +423,7 @@ export function ArticleEditorPage() {
         onOpenChange={setDeleteOpen}
         resourceType={t("editor.article")}
         resourceName={draft.slug}
+        notice={<MenuDeleteNotice refs={menuRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           await remove.mutateAsync(draft);
