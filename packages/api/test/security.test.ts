@@ -169,3 +169,72 @@ describe("input hardening", () => {
     void app;
   });
 });
+
+describe("approvals API (H1)", () => {
+  it("lists pending requests and lets a person decide once; decisions are audited", async () => {
+    const { ApprovalStore, AuditLog } = await import("@cloudhal/agent-runtime");
+    const { sql, store, site } = await setup();
+    const approvals = new ApprovalStore(sql);
+    const audit = new AuditLog(sql);
+    const app = createApi({
+      store,
+      audit,
+      resolveActor: async (c) =>
+        c.req.header("x-test-as") === "human"
+          ? human
+          : c.req.header("x-test-as") === "agent"
+            ? agent
+            : undefined,
+      mcp: { stateKey: "approvals-api-state-key-0123456789abcdef", approvals, audit },
+    });
+    const req = await approvals.request({
+      siteId: site.id,
+      tool: "publish",
+      argsHash: "h",
+      actor: agent,
+      prompt: 'Publish "Sec" to production?',
+      stateHash: await store.stateHash(site.id),
+    });
+    const h = (who: string) => ({ "x-test-as": who });
+    const list = (await (
+      await app.request(`/api/sites/${site.id}/approvals?status=pending`, { headers: h("human") })
+    ).json()) as { items: { id: string }[] };
+    expect(list.items.map((a) => a.id)).toEqual([req.id]);
+    expect(
+      (
+        await app.request(`/api/sites/${site.id}/approvals/${req.id}/approve`, {
+          method: "POST",
+          headers: h("agent"),
+        })
+      ).status,
+    ).toBe(403);
+    const ok = await app.request(`/api/sites/${site.id}/approvals/${req.id}/approve`, {
+      method: "POST",
+      headers: h("human"),
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { status: string }).status).toBe("approved");
+    expect(
+      (
+        await app.request(`/api/sites/${site.id}/approvals/${req.id}/deny`, {
+          method: "POST",
+          headers: h("human"),
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await app.request(`/api/sites/site_other0000001/approvals/${req.id}/approve`, {
+          method: "POST",
+          headers: h("human"),
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await app.request(`/api/sites/${site.id}/approvals?status=nope`, { headers: h("human") }))
+        .status,
+    ).toBe(400);
+    const rows = await audit.list({ siteId: site.id });
+    expect(rows[0]).toMatchObject({ tool: "publish", decision: "allow", actor: { id: human.id } });
+  });
+});

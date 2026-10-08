@@ -21,7 +21,7 @@ import {
   NotFoundError,
   UniqueConstraintError,
 } from "./errors.ts";
-import { canonicalJson, nodeHash } from "./hash.ts";
+import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
 
 export type NodeKind = NodeRef["kind"];
@@ -496,6 +496,25 @@ export class SiteGraphStore {
     const bytes = await this.#blobs.get(`nodes/${ref.hash}.json`);
     if (!bytes) throw new NotFoundError("blob", ref.hash);
     return JSON.parse(new TextDecoder().decode(bytes)) as T;
+  }
+
+  /**
+   * A digest of the site's current content (every node's id, rev and hash). Approvals are bound to
+   * it: if anything changes between "may I publish?" and the publish, the approval no longer holds.
+   */
+  async stateHash(siteId: string): Promise<string> {
+    const refs = await this.currentNodeRefs(siteId);
+    return sha256Hex(refs.map((r) => `${r.id}@${r.rev}:${r.hash}`).join("\n"));
+  }
+
+  /** What would change if the current state were published, against the live snapshot. */
+  async pendingChanges(siteId: string): Promise<SnapshotDiff> {
+    const site = await this.getSite(siteId);
+    if (!site) throw new NotFoundError("site", siteId);
+    const live = site.publishedSnapshotId
+      ? await this.getSnapshot(site.publishedSnapshotId)
+      : undefined;
+    return diffNodeRefs(live?.nodes ?? [], await this.currentNodeRefs(siteId));
   }
 
   async diffSnapshots(fromId: string, toId: string): Promise<SnapshotDiff> {

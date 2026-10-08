@@ -1,6 +1,6 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { AuditLog, loadSkills } from "@cloudhal/agent-runtime";
+import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { createApi } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
@@ -52,6 +52,7 @@ export async function studio(
     mcp: {
       stateKey: crypto.getRandomValues(new Uint8Array(32)),
       audit: new AuditLog(local.sql),
+      approvals: new ApprovalStore(local.sql),
       skills: skillsDir ? await loadSkills(skillsDir) : [],
     },
   };

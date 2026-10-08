@@ -9,6 +9,7 @@
  * CLOUDHAL_DEPLOY_TOKEN (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
 import {
+  ApprovalStore,
   AuditLog,
   type LoadedSkill,
   type SkillSource,
@@ -104,6 +105,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         workers: { waitUntil: (p) => ctx.waitUntil(p) },
       });
       const audit = new AuditLog(sql);
+      const approvals = new ApprovalStore(sql);
       const app = createApi({
         store,
         resolveActor: auth.resolveActor,
@@ -117,6 +119,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           audit,
           skills,
           previewSecret: env.CLOUDHAL_PREVIEW_SECRET,
+          approvals,
           // Remote clients must speak the stateless 2026-07-28 protocol or be served statelessly.
           legacy: "stateless",
         },

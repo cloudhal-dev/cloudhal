@@ -7,6 +7,7 @@ import { errorHandler, unauthorized } from "./errors.ts";
 import { activity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
 import { instanceRoutes } from "./routes/instance.ts";
 import { pages } from "./routes/pages.ts";
@@ -57,6 +58,7 @@ export function createApi(deps: ApiDeps) {
     c.set("store", deps.store);
     c.set("audit", deps.audit ?? deps.mcp?.audit);
     c.set("previewSecret", deps.preview?.secret);
+    c.set("approvals", deps.mcp?.approvals);
     if (deps.resolvePrincipal) {
       const principal = await deps.resolvePrincipal(c);
       c.set("principal", principal);
@@ -172,6 +174,7 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/snapshots", snapshots);
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);
+  app.route("/api/sites/:siteId/approvals", approvals);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

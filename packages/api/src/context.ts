@@ -1,4 +1,4 @@
-import type { AuditLog, LoadedSkill, Principal } from "@cloudhal/agent-runtime";
+import type { ApprovalStore, AuditLog, LoadedSkill, Principal } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { Context } from "hono";
@@ -16,6 +16,8 @@ export interface McpMountOptions {
   readonly skills?: LoadedSkill[] | undefined;
   readonly previewBaseUrl?: string | undefined;
   readonly confirmTokenFallback?: boolean | undefined;
+  /** Out-of-band approvals for agents' gated calls; also mounts `/api/sites/:id/approvals`. */
+  readonly approvals?: ApprovalStore | undefined;
   readonly legacy?: "stateless" | "reject" | undefined;
   /** Same secret as `ApiDeps.preview`: lets `preview_page` return signed links to the deployed site. */
   readonly previewSecret?: string | undefined;
@@ -63,5 +65,6 @@ export type Env = {
     store: SiteGraphStore;
     audit: AuditLog | undefined;
     previewSecret: string | undefined;
+    approvals: ApprovalStore | undefined;
   };
 };
