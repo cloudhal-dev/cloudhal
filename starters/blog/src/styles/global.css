@@ -13,6 +13,18 @@
 .ch-hero__cta {
   @apply mt-6 inline-block rounded bg-zinc-900 px-4 py-2 text-white;
 }
+.ch-article-header {
+  @apply space-y-2 border-b border-zinc-200 pt-8 pb-6;
+}
+.ch-article-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-summary {
+  @apply text-lg text-zinc-600;
+}
+.ch-article-header time {
+  @apply text-sm text-zinc-500;
+}
 .ch-richtext {
   @apply space-y-4 py-6 leading-relaxed;
 }

@@ -1,6 +1,6 @@
 ---
 import config from "virtual:cloudhal/config";
-import { renderBody } from "@cloudhal/astro-renderer/markdown";
+import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import Base from "../../layouts/Base.astro";
 
@@ -14,8 +14,8 @@ if (!source) return new Response("This site has not been published yet.", { stat
 const site = await source.site();
 const entry = await source.entryBySlug("posts", Astro.params.slug as string);
 if (!entry) return new Response(null, { status: 404 });
-const html = renderBody(entry.body);
+const html = renderEntryArticle(entry, site.defaultLocale);
 ---
 <Base site={site} title={entry.title} description={entry.summary}>
-  <article class="ch-richtext" data-entry-id={entry.id} set:html={html} />
+  <Fragment set:html={html} />
 </Base>

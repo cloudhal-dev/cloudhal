@@ -1,5 +1,5 @@
 import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
-import { renderBody, renderMarkdown } from "./markdown.ts";
+import { renderEntryArticle, renderMarkdown } from "./markdown.ts";
 
 function esc(s: string): string {
   return s.replace(
@@ -76,7 +76,7 @@ export function renderPagePreview(
 
 /** Full HTML document for an article preview. */
 export function renderEntryPreview(site: Site, entry: ContentEntry): PreviewDocument {
-  const body = `<article class="ch-richtext" data-entry-id="${esc(entry.id)}">${renderBody(entry.body)}</article>`;
+  const body = renderEntryArticle(entry, site.defaultLocale);
   return {
     title: entry.title,
     path: `/${entry.collection}/${entry.slug}`,
@@ -97,7 +97,8 @@ const PREVIEW_CSS =
   "p,ul,ol{margin:0 0 1em}a{color:#0969da}img{max-width:100%;height:auto;border-radius:6px}" +
   "pre,code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}pre{overflow:auto;padding:12px;border:1px solid var(--line);border-radius:6px}" +
   "blockquote{margin:0 0 1em;padding-left:1em;border-left:3px solid var(--line);color:var(--muted)}" +
-  "section+section{margin-top:2.5rem}small,time,.muted{color:var(--muted)}";
+  "section+section{margin-top:2.5rem}small,time,.muted{color:var(--muted)}" +
+  ".ch-article-header{margin-bottom:2rem}.ch-article-header h1{margin-bottom:.3em}.ch-summary{font-size:1.15rem;color:var(--muted)}";
 
 function document(
   site: Site,
