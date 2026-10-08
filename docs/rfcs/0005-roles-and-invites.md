@@ -1,5 +1,5 @@
 # RFC-0005: Staff roles and invites
-- Status: Draft
+- Status: Accepted (2026-10-08, Halil — including the recommended answers to the open questions)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-08
 - Related: ADR-0004 (MCP, layered approval), ADR-0010 (Better Auth), ADR-0011 (policy engine), ADR-0014 (out-of-band approvals), ADR-0015 (agent modes), ADR-0016 (time-boxed elevation), ADR-0017 / RFC-0002 (taxonomy governance, bylines follow-up), RFC-0003 (menus), RFC-0004 (assets), `docs/security/threat-model.md`
 - Sources: Better Auth 1.7.7 as installed (`better-auth/dist/plugins/organization/{types.d.mts,access/statement.mjs,routes/crud-invites.mjs,routes/crud-members.mjs}`, `plugins/admin/routes.mjs`, `api/routes/sign-up.mjs`) · https://www.better-auth.com/docs/plugins/organization (access control, `createAccessControl`, invitations, `organizationHooks`, `additionalFields`) · https://www.better-auth.com/docs/plugins/admin (`createUser`, `revokeUserSessions`, `banUser`) · https://ghost.org/help/managing-your-team/ · https://docs.ghost.org/staff · https://ghost.org/help/transfer-publication-ownership/
