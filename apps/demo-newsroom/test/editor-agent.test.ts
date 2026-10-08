@@ -59,7 +59,7 @@ describe("newsroom editor agent", () => {
     const files = (await readdir(path.join(ROOT, "content/posts"))).filter((f) =>
       f.endsWith(".md"),
     );
-    expect(files.length).toBeGreaterThanOrEqual(5);
+    expect(files.length).toBeGreaterThanOrEqual(6);
     for (const f of files) {
       const post = parsePost(await readFile(path.join(ROOT, "content/posts", f), "utf8"));
       expect(`${post.slug}.md`).toBe(f);
@@ -70,7 +70,7 @@ describe("newsroom editor agent", () => {
   it("writes the newsroom through MCP and publishes only after approval", async () => {
     const { store, site, audit, client, prompts } = await setup("accept");
     const r = await run(client);
-    expect(r.created).toHaveLength(5);
+    expect(r.created).toHaveLength(6);
     expect(r.published).toBe(true);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toMatch(/^Publish "Starter" to production/);
@@ -87,6 +87,7 @@ describe("newsroom editor agent", () => {
       "agents-through-mcp",
       "contracts-in-two-languages",
       "offline-dev-with-astro",
+      "publishing-on-cloudflare",
       "storage-on-sqlite-and-d1",
       "studio-on-kumo",
     ]);
@@ -103,10 +104,18 @@ describe("newsroom editor agent", () => {
       ),
     ).toBe(true);
 
-    // re-running updates in place and is safe
-    const again = await run(client, false);
-    expect(again.created).toHaveLength(0);
-    expect(again.updated).toHaveLength(5);
+    // re-running with nothing new changes nothing and does not ask to publish again
+    const snapshotsBefore = (await store.listSnapshots(site.id, 200)).length;
+    const again = await run(client);
+    expect(again).toMatchObject({
+      created: [],
+      updated: [],
+      archived: [],
+      homeUpdated: false,
+      published: false,
+    });
+    expect(prompts).toHaveLength(1);
+    expect((await store.listSnapshots(site.id, 200)).length).toBe(snapshotsBefore);
   });
 
   it("does not publish when the person declines", async () => {

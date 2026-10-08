@@ -90,7 +90,13 @@ export async function runEditorAgent(options: {
   siteFile?: string;
   publish: boolean;
   log?: (line: string) => void;
-}): Promise<{ created: string[]; updated: string[]; published: boolean }> {
+}): Promise<{
+  created: string[];
+  updated: string[];
+  archived: string[];
+  homeUpdated: boolean;
+  published: boolean;
+}> {
   const log = options.log ?? console.log;
   const call = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
     const r = (await options.client.callTool({ name, arguments: args })) as ToolResult;
@@ -104,19 +110,29 @@ export async function runEditorAgent(options: {
   const siteId = site.id;
   log(`site ${site.name} (${siteId})`);
 
+  let homeUpdated = false;
   if (options.siteFile) {
     const fm = parseFrontmatterOnly(await readFile(options.siteFile, "utf8"));
     const { pages } = await call<{
       pages: {
         id: string;
         path: string;
+        title: string;
         rev: number;
         sections: Record<string, unknown>[];
         seo?: Record<string, unknown>;
       }[];
     }>("list_pages", { siteId });
     const home = pages.find((p) => p.path === "/");
-    if (home && fm.name) {
+    const hero = home?.sections.find((sec) => sec.kind === "hero") as
+      | { heading?: string; subheading?: string }
+      | undefined;
+    const alreadySet =
+      home?.title === fm.name &&
+      hero?.heading === fm.name &&
+      (!fm.tagline || hero?.subheading === fm.tagline);
+    if (home && fm.name && !alreadySet) {
+      homeUpdated = true;
       const sections = home.sections.map((s) =>
         s.kind === "hero"
           ? { ...s, heading: fm.name, ...(fm.tagline ? { subheading: fm.tagline } : {}) }
@@ -139,17 +155,39 @@ export async function runEditorAgent(options: {
   }
 
   const { entries } = await call<{
-    entries: { id: string; slug: string; rev: number; status: string }[];
+    entries: {
+      id: string;
+      slug: string;
+      rev: number;
+      status: string;
+      title: string;
+      summary?: string;
+      body: { value: string };
+      tags?: string[];
+    }[];
   }>("list_entries", { siteId, collection: "posts" });
   const posts = await loadPosts(options.postsDir);
   const wanted = new Set(posts.map((p) => p.slug));
   const created: string[] = [];
   const updated: string[] = [];
+  const archived: string[] = [];
 
   for (const post of posts) {
     const existing = entries.find((e) => e.slug === post.slug);
     let entry: { id: string; rev: number };
-    if (existing) {
+    const unchanged =
+      existing &&
+      existing.title === post.title &&
+      (existing.summary ?? "") === post.summary &&
+      existing.body.value === post.body &&
+      (existing.tags ?? []).join(",") === post.tags.join(",");
+    if (existing && unchanged) {
+      entry = existing;
+      if (existing.status === "published") {
+        log(`  unchanged ${post.slug}`);
+        continue;
+      }
+    } else if (existing) {
       entry = (
         await call<{ entry: { id: string; rev: number } }>("update_entry", {
           siteId,
@@ -201,21 +239,27 @@ export async function runEditorAgent(options: {
   // Starter content that isn't part of the newsroom is archived, not deleted (deletion needs approval).
   for (const e of entries.filter((x) => !wanted.has(x.slug) && x.status !== "archived")) {
     await call("update_entry", { siteId, entryId: e.id, rev: e.rev, status: "archived" });
+    archived.push(e.slug);
     log(`  archived ${e.slug}`);
   }
 
-  if (!options.publish) return { created, updated, published: false };
+  const summary = { created, updated, archived, homeUpdated };
+  if (!options.publish) return { ...summary, published: false };
+  if (!created.length && !updated.length && !archived.length && !homeUpdated) {
+    log("  nothing changed; not asking to publish");
+    return { ...summary, published: false };
+  }
   const r = (await options.client.callTool({
     name: "publish",
     arguments: { siteId, label: `Newsroom: ${posts.length} articles` },
   })) as ToolResult;
   if (r.isError) {
     log(`  not published: ${r.content.map((c) => c.text ?? "").join(" ")}`);
-    return { created, updated, published: false };
+    return { ...summary, published: false };
   }
   const { snapshot } = r.structuredContent as { snapshot: { id: string } };
   log(`  published snapshot ${snapshot.id}`);
-  return { created, updated, published: true };
+  return { ...summary, published: true };
 }
 
 async function main() {
