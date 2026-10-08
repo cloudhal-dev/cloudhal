@@ -13,7 +13,7 @@ import {
   RASTER_TYPES,
 } from "@cloudhal/core-ts/media";
 import { type AssetListItem, type AssetPatch, api } from "./api.ts";
-import type { ImageRef } from "./seo.ts";
+import { type ImageRef, previewImageUrl } from "./seo.ts";
 
 export type AssetKind = Asset["kind"];
 
@@ -110,6 +110,19 @@ export function assetPreviewUrl(siteId: string, asset: Asset): string | undefine
   if (asset.storage.kind === "external")
     return /^https:\/\//.test(asset.storage.url) ? asset.storage.url : undefined;
   return api.assets.contentUrl(siteId, asset.id);
+}
+
+/**
+ * Where Studio previews an image slot: a library file from the private content route (drafts
+ * included; its `src` is the public media path, live only once published), an address through
+ * `previewImageUrl` (site paths from the primary domain).
+ */
+export function imageRefPreviewUrl(
+  siteId: string,
+  ref: Pick<ImageRef, "src" | "assetId">,
+  host: string | undefined,
+): string | undefined {
+  return ref.assetId ? api.assets.contentUrl(siteId, ref.assetId) : previewImageUrl(ref.src, host);
 }
 
 /** An image slot pointing at an asset (RFC-0004 §2.2): the store keeps `src`/size canonical. */

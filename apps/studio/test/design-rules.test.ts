@@ -423,7 +423,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Badge",
     "SettingRow",
     "CharacterCount",
-    "previewImageUrl",
+    "imageRefPreviewUrl",
     "truncateForSearch",
     "searchBreadcrumb",
   ],
@@ -436,7 +436,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   ],
   "routes/PageEditorPage.tsx#seo": ["PageSeoCard", "validateSeo", "cleanSeo", "primaryHostname"],
   "routes/PagesPage.tsx#seo": ["Badge", "Tooltip", "EyeSlash"],
-  "routes/ArticlesPage.tsx#seo": ["ImagePreview", "previewImageUrl"],
+  "routes/ArticlesPage.tsx#seo": ["ImagePreview", "imageRefPreviewUrl"],
   // Categories, tags and redirects (§2p, RFC-0002 §8).
   "routes/TaxonomyPage.tsx": [
     "PageLayout",
@@ -982,7 +982,9 @@ describe("design rules (DESIGN.md)", () => {
       "routes/ArticlesPage.tsx",
     ]);
     for (const f of users) {
-      expect(f.text, f.file).toMatch(/previewImageUrl\(|assetPreviewUrl\(|useObjectUrl\(/);
+      expect(f.text, f.file).toMatch(
+        /previewImageUrl\(|imageRefPreviewUrl\(|assetPreviewUrl\(|useObjectUrl\(/,
+      );
       expect(f.text, f.file).not.toMatch(/<ImagePreview[^>]*src=\{[^}]*\.src\}/);
     }
     // The content route is the only asset source, and it is Studio's own (same origin).

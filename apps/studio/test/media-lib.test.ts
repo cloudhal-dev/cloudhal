@@ -12,6 +12,7 @@ import {
   checkFile,
   formatSize,
   imageRefFor,
+  imageRefPreviewUrl,
   needsAlt,
   readImageInfo,
   slugify,
@@ -107,6 +108,19 @@ describe("showing files (§2u)", () => {
     expect(
       assetPreviewUrl("site_1", asset({ kind: "data", mediaType: "text/csv", image: undefined })),
     ).toBeUndefined();
+  });
+
+  it("previews an image slot from the content route when it is a library file", () => {
+    expect(
+      imageRefPreviewUrl(
+        "site_1",
+        { assetId: "asset_photo01", src: "/media/abab/x.jpg" },
+        "example.com",
+      ),
+    ).toBe("/api/sites/site_1/assets/asset_photo01/content");
+    expect(imageRefPreviewUrl("site_1", { src: "/images/a.jpg" }, "example.com")).toBe(
+      "https://example.com/images/a.jpg",
+    );
   });
 
   it("an image slot pointing at a file carries assetId, the URL and the size", () => {

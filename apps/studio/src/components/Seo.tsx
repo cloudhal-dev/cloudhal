@@ -19,13 +19,13 @@ import {
 import { EyeSlash, Image as ImageIcon, MagnifyingGlass, Trash } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
 import { type MessageKey, useT } from "../i18n/index.tsx";
+import { imageRefPreviewUrl } from "../lib/media.ts";
 import {
   descriptionStatus,
   type ImageRef,
   type ImageRefErrors,
   type LengthStatus,
   patchSeo,
-  previewImageUrl,
   SEO_LIMITS,
   type Seo,
   type SeoErrors,
@@ -192,7 +192,7 @@ export function ArticleSeoPreviewCard({
   const description = summary ? truncateForSearch(summary).text : t("seo.preview.noSummary");
   const path = `/${entry.collection}/${entry.slug}`;
   const cover = entry.coverImage;
-  const coverUrl = cover ? previewImageUrl(cover.src, host) : undefined;
+  const coverUrl = cover ? imageRefPreviewUrl(entry.siteId, cover, host) : undefined;
   const titleState = titleStatus(entry.title);
   const summaryState = descriptionStatus(summary);
   const imageState: LengthStatus | "broken" = !cover
