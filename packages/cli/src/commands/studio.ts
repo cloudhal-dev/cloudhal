@@ -42,6 +42,13 @@ export async function studio(
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     requireAuth: !options.noAuth,
+    // The Studio dev server (vite, :5173) proxies /api here during Studio development.
+    trustedOrigins: [
+      "http://localhost:5173",
+      ...(process.env.CLOUDHAL_TRUSTED_ORIGINS?.split(",") ?? []),
+    ],
+    // Without auth anyone who can reach the port could write; answer localhost names only.
+    ...(options.noAuth ? { allowedHosts: ["localhost", "127.0.0.1", "[::1]"] } : {}),
     mcp: {
       stateKey: crypto.getRandomValues(new Uint8Array(32)),
       audit: new AuditLog(local.sql),

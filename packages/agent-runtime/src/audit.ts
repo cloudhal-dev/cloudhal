@@ -19,6 +19,30 @@ export interface AuditRow extends AuditEntry {
   id: number;
 }
 
+const MAX_INPUT = 4000;
+
+/** Inputs are stored as JSON; oversized ones become a valid `{ truncated, preview }` object. */
+export function auditInput(input: unknown): string | null {
+  if (input === undefined) return null;
+  const json = JSON.stringify(input) ?? "null";
+  if (json.length <= MAX_INPUT) return json;
+  return JSON.stringify({
+    truncated: true,
+    bytes: json.length,
+    preview: json.slice(0, MAX_INPUT - 200),
+  });
+}
+
+function parseAuditInput(raw: string | null): unknown {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // rows written before inputs were truncated safely
+    return { truncated: true, preview: raw };
+  }
+}
+
 /** Append-only record of every policy decision and tool call (table `audit`, migration 0003). */
 export class AuditLog {
   readonly #sql: SqlDriver;
@@ -39,7 +63,7 @@ export class AuditLog {
         entry.decision,
         entry.reason ?? null,
         entry.skill ?? null,
-        entry.input === undefined ? null : JSON.stringify(entry.input).slice(0, 4000),
+        auditInput(entry.input),
         entry.outcome ?? null,
         entry.snapshotId ?? null,
         entry.durationMs ?? null,
@@ -89,7 +113,7 @@ export class AuditLog {
       decision: r.decision as AuditEntry["decision"],
       reason: (r.reason as string | null) ?? undefined,
       skill: (r.skill as string | null) ?? undefined,
-      input: r.input ? JSON.parse(r.input as string) : undefined,
+      input: parseAuditInput(r.input as string | null),
       outcome: (r.outcome as AuditEntry["outcome"] | null) ?? undefined,
       snapshotId: (r.snapshot_id as string | null) ?? undefined,
       durationMs: (r.duration_ms as number | null) ?? undefined,

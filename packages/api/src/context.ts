@@ -44,6 +44,13 @@ export interface ApiDeps {
   readonly agentKeys?: AgentKeyService;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */
   readonly authHandler?: (request: Request) => Promise<Response>;
+  /**
+   * Extra origins (besides this server's own) allowed to make cookie-authenticated, state-changing
+   * requests, e.g. the Studio dev server. Same-origin requests are always allowed.
+   */
+  readonly trustedOrigins?: readonly string[];
+  /** Only answer requests whose Host is one of these (e.g. localhost when auth is off). */
+  readonly allowedHosts?: readonly string[];
   /** When true (default), mutating routes require an actor. */
   readonly requireAuth?: boolean;
 }

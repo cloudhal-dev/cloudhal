@@ -181,7 +181,8 @@ export class SiteGraphStore {
 
   async #casUpdateStatement(next: SiteNode, expectedRev: number): Promise<SqlStatement> {
     return {
-      sql: "UPDATE nodes SET key = ?, rev = ?, hash = ?, body = ?, updated_at = ? WHERE id = ? AND rev = ?",
+      // Scoped by kind and site too: a body of one kind (or site) can never overwrite another's row.
+      sql: "UPDATE nodes SET key = ?, rev = ?, hash = ?, body = ?, updated_at = ? WHERE id = ? AND rev = ? AND kind = ? AND site_id = ?",
       params: [
         uniquenessKey(next),
         next.rev,
@@ -190,6 +191,8 @@ export class SiteGraphStore {
         next.updatedAt,
         next.id,
         expectedRev,
+        kindOf(next),
+        siteIdOf(next),
       ],
     };
   }
@@ -327,8 +330,8 @@ export class SiteGraphStore {
     const results = await this.#sql.batch([
       await this.#casUpdateStatement(nextSite, site.rev),
       {
-        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
-        params: [page.id, page.rev, site.id, siteHash],
+        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'page' AND site_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
+        params: [page.id, page.rev, site.id, site.id, siteHash],
       },
     ]);
     if (results[0]?.changes !== 1)
@@ -387,10 +390,10 @@ export class SiteGraphStore {
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
-    const r = await this.#sql.run("DELETE FROM nodes WHERE id = ? AND rev = ?", [
-      entry.id,
-      entry.rev,
-    ]);
+    const r = await this.#sql.run(
+      "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
+      [entry.id, entry.rev, entry.siteId],
+    );
     if (r.changes !== 1)
       throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
   }
