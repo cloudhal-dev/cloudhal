@@ -9,6 +9,7 @@ import {
   Globe,
   HandPalm,
   House,
+  Images,
   Robot,
   Signpost,
   SquaresFour,
@@ -107,6 +108,11 @@ export function SiteShell() {
       id: "taxonomy",
       label: t("commands.goTaxonomy"),
       run: () => navigate({ to: "/sites/$siteId/taxonomy", params: { siteId } }),
+    },
+    {
+      id: "media",
+      label: t("commands.goMedia"),
+      run: () => navigate({ to: "/sites/$siteId/media", params: { siteId } }),
     },
     {
       id: "navigation",
@@ -224,6 +230,14 @@ export function SiteShell() {
               >
                 {t("nav.taxonomy")}
                 {proposedTerms > 0 && <Sidebar.MenuBadge>{proposedTerms}</Sidebar.MenuBadge>}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={Images}
+                href={`${base}/media`}
+                active={is(`${base}/media`)}
+                tooltip={t("nav.media")}
+              >
+                {t("nav.media")}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

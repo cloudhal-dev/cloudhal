@@ -24,9 +24,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
-    // The only chunk above 500 kB is Kumo's lazily loaded WASM highlighting engine (~620 kB, fetched
-    // only when a code block renders). The initial load is ~230 kB of app code + vendor chunks.
-    chunkSizeWarningLimit: 650,
+    // Two chunks are above 500 kB: Kumo's lazily loaded WASM highlighting engine (~620 kB, fetched
+    // only when a code block renders) and the shared UI chunk (Kumo components and the Cloudhal
+    // blocks, ~670 kB with the media library's). The initial load is ~230 kB of app code + vendor.
+    chunkSizeWarningLimit: 700,
     rolldownOptions: {
       output: {
         codeSplitting: {

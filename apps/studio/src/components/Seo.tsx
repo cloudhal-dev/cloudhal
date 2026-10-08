@@ -21,7 +21,6 @@ import { type ReactNode, useState } from "react";
 import { type MessageKey, useT } from "../i18n/index.tsx";
 import {
   descriptionStatus,
-  editImageRef,
   type ImageRef,
   type ImageRefErrors,
   type LengthStatus,
@@ -35,6 +34,7 @@ import {
   truncateForSearch,
 } from "../lib/seo.ts";
 import { setOptional } from "../lib/util.ts";
+import { ImageRefField } from "./MediaPicker.tsx";
 import { SettingRow } from "./Settings.tsx";
 
 /** "142 / 160" under a field; warning colour once past the length search results show. */
@@ -91,23 +91,15 @@ function CheckBadge({ status }: { status: LengthStatus | "broken" }) {
 
 // ---- cover image --------------------------------------------------------------------------------
 
-const SRC_ERROR: Record<NonNullable<ImageRefErrors["src"]>, MessageKey> = {
-  required: "seo.cover.errors.required",
-  insecure: "seo.cover.errors.insecure",
-  invalid: "seo.cover.errors.invalid",
-  tooLong: "seo.cover.errors.tooLong",
-};
-const ALT_ERROR: Record<NonNullable<ImageRefErrors["alt"]>, MessageKey> = {
-  required: "seo.cover.errors.altRequired",
-  tooLong: "seo.cover.errors.altTooLong",
-};
-
 /**
- * Article › Cover image (DESIGN.md §2o): the image in a 1.91:1 share frame next to its URL and
- * required alt text. The URL `Input` is the source slot — an upload or library picker replaces it
- * later without changing the rest of the card.
+ * Article › Cover image (DESIGN.md §2o, §2u): the image in a 1.91:1 share frame next to its source
+ * — a media-library file chosen with the picker, or (under "Use an image address instead") an
+ * address — and the alt text for this use. The fields are `ImageRefField`, shared with the term
+ * image and the page sections.
  */
 export function CoverImageCard({
+  siteId,
+  defaultLocale,
   image,
   savedSrc,
   host,
@@ -119,6 +111,8 @@ export function CoverImageCard({
   title,
   description,
 }: {
+  siteId: string;
+  defaultLocale: string;
   image: ImageRef | undefined;
   /** The saved image's source: dimensions are recorded only for a newly chosen image. */
   savedSrc: string | undefined;
@@ -135,13 +129,6 @@ export function CoverImageCard({
   description?: string;
 }) {
   const t = useT();
-  const [touched, setTouched] = useState({ src: false, alt: false });
-  const src = image?.src ?? "";
-  const alt = image?.alt ?? "";
-  const url = previewImageUrl(src, host);
-  const sitePath = src.trim().startsWith("/");
-  const srcError = (showErrors || touched.src) && errors.src ? t(SRC_ERROR[errors.src]) : undefined;
-  const altError = (showErrors || touched.alt) && errors.alt ? t(ALT_ERROR[errors.alt]) : undefined;
   return (
     <SectionCard
       id={id}
@@ -154,10 +141,7 @@ export function CoverImageCard({
             variant="ghost"
             size="sm"
             icon={<Trash />}
-            onClick={() => {
-              setTouched({ src: false, alt: false });
-              onChange(undefined);
-            }}
+            onClick={() => onChange(undefined)}
             data-testid="cover-remove"
           >
             {t("seo.cover.remove")}
@@ -165,72 +149,18 @@ export function CoverImageCard({
         ) : undefined
       }
     >
-      <div className="@container">
-        <div className="grid items-start gap-5 @md:grid-cols-5">
-          <div className="min-w-0 @md:col-span-2" data-testid="cover-preview">
-            <ImagePreview
-              src={url}
-              alt={alt}
-              labels={{
-                empty: t("seo.cover.empty"),
-                loading: t("seo.cover.loading"),
-                error: t("seo.cover.broken"),
-              }}
-              caption={
-                image?.width && image.height
-                  ? t("seo.cover.size", { width: image.width, height: image.height })
-                  : undefined
-              }
-              errorHint={
-                sitePath
-                  ? host
-                    ? t("seo.cover.brokenPathHost", { host })
-                    : t("seo.cover.brokenPathNoDomain")
-                  : t("seo.cover.brokenHint")
-              }
-              onStatusChange={onStatusChange}
-              onLoad={(size) => {
-                if (!image || image.src === savedSrc) return;
-                if (image.width === size.width && image.height === size.height) return;
-                onChange({ ...image, ...size });
-              }}
-            />
-          </div>
-          <div className="grid min-w-0 gap-5 @md:col-span-3">
-            <Input
-              label={t("seo.cover.url")}
-              value={src}
-              placeholder={t("seo.cover.urlPlaceholder")}
-              onValueChange={(v) => onChange(editImageRef(image, { src: v }))}
-              onBlur={() => setTouched((x) => ({ ...x, src: true }))}
-              description={t("seo.cover.urlHint")}
-              error={srcError}
-              maxLength={SEO_LIMITS.srcMax}
-              inputMode="url"
-              spellCheck={false}
-              required={false}
-              className="w-full font-mono"
-              data-testid="cover-src"
-            />
-            <InputArea
-              label={t("seo.cover.alt")}
-              value={alt}
-              placeholder={t("seo.cover.altPlaceholder")}
-              onValueChange={(v) => onChange(editImageRef(image, { alt: v }))}
-              onBlur={() => setTouched((x) => ({ ...x, alt: true }))}
-              description={t("seo.cover.altHint")}
-              error={altError}
-              maxLength={SEO_LIMITS.altMax}
-              autoResize
-              minRows={2}
-              maxRows={4}
-              required={image !== undefined ? undefined : false}
-              className="w-full"
-              data-testid="cover-alt"
-            />
-          </div>
-        </div>
-      </div>
+      <ImageRefField
+        siteId={siteId}
+        defaultLocale={defaultLocale}
+        image={image}
+        savedSrc={savedSrc}
+        host={host}
+        errors={errors}
+        showErrors={showErrors}
+        onChange={onChange}
+        onStatusChange={onStatusChange}
+        testId="cover"
+      />
     </SectionCard>
   );
 }

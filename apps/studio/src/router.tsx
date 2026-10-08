@@ -63,6 +63,8 @@ const NavigationPage = lazyRouteComponent(
   () => import("./routes/NavigationPage.tsx"),
   "NavigationPage",
 );
+const MediaPage = lazyRouteComponent(() => import("./routes/MediaPage.tsx"), "MediaPage");
+const AssetPage = lazyRouteComponent(() => import("./routes/AssetPage.tsx"), "AssetPage");
 const RedirectsPage = lazyRouteComponent(
   () => import("./routes/RedirectsPage.tsx"),
   "RedirectsPage",
@@ -213,6 +215,17 @@ const navigationRoute = createRoute({
   },
   component: NavigationPage,
 });
+/** Site › Content › Media (RFC-0004 §8): the library, and one file's page. */
+const mediaRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/media",
+  component: MediaPage,
+});
+const assetRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/media/$assetId",
+  component: AssetPage,
+});
 /** Site › Settings › Redirects. */
 const redirectsRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -274,6 +287,8 @@ const routeTree = rootRoute.addChildren([
     termEditorRoute,
     redirectsRoute,
     navigationRoute,
+    mediaRoute,
+    assetRoute,
   ]),
 ]);
 

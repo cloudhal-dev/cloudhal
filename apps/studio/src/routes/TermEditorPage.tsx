@@ -451,6 +451,8 @@ export function TermEditorPage() {
                 />
               </SectionCard>
               <CoverImageCard
+                siteId={siteId}
+                defaultLocale={defaultLocale}
                 id="term-image"
                 title={t("termEditor.image.title")}
                 description={t("termEditor.image.description")}

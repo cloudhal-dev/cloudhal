@@ -29,6 +29,15 @@ export const KNOWN_TOOLS = [
   "update_menu",
   "set_menu",
   "delete_menu",
+  // RFC-0004 media
+  "list_assets",
+  "get_asset",
+  "upload_asset",
+  "fetch_asset_url",
+  "update_asset",
+  "retire_asset",
+  "restore_asset",
+  "delete_asset",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 
@@ -72,6 +81,25 @@ export type MemberEvent = keyof typeof MEMBER_EVENTS;
 
 export function isMemberEvent(tool: string): tool is MemberEvent {
   return Object.hasOwn(MEMBER_EVENTS, tool);
+}
+
+/**
+ * People's changes to media files over REST (RFC-0004 §6.3, `routes/assets.ts`), with their label
+ * key under `tools`; the site's Activity lists them next to the agents' asset tools.
+ */
+export const ASSET_EVENTS = {
+  "asset.upload": "assetUpload",
+  "asset.update": "assetUpdate",
+  "asset.retire": "assetRetire",
+  "asset.restore": "assetRestore",
+  "asset.delete": "assetDelete",
+  "asset.purge": "assetPurge",
+  "asset.lift-purge": "assetLiftPurge",
+} as const;
+export type AssetEvent = keyof typeof ASSET_EVENTS;
+
+export function isAssetEvent(tool: string): tool is AssetEvent {
+  return Object.hasOwn(ASSET_EVENTS, tool);
 }
 
 /** An elevation grant's audit reason ends with `requested by the agent (appr_…)` (ADR-0016). */

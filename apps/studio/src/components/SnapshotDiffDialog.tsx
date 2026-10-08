@@ -24,7 +24,7 @@ import {
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { useI18n, useT } from "../i18n/index.tsx";
 import { type AssignmentDelta, api } from "../lib/api.ts";
 import {
   CHANGES,
@@ -34,6 +34,7 @@ import {
   diffBases,
   diffRows,
 } from "../lib/diff.ts";
+import { assetTitle, formatSize, typeLabel } from "../lib/media.ts";
 import type { MenuDiffSummary } from "../lib/menus.ts";
 import { archivePath } from "../lib/taxonomy.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
@@ -114,6 +115,7 @@ const CHANGE_STYLE: Record<
 
 /** Resolves node ids to titles and editor links using the site's current pages and articles. */
 function useNodeNames(siteId: string, enabled: boolean) {
+  const { locale } = useI18n();
   const site = useQuery({
     queryKey: ["site", siteId],
     queryFn: () => api.sites.get(siteId),
@@ -133,6 +135,12 @@ function useNodeNames(siteId: string, enabled: boolean) {
   const redirects = useQuery({
     queryKey: taxonomyKeys.redirects(siteId),
     queryFn: () => api.redirects.list(siteId),
+    enabled,
+  });
+  // Media (RFC-0004): the library names a file — retired ones too; deleted ones are gone.
+  const assets = useQuery({
+    queryKey: ["assets", siteId, "diff"],
+    queryFn: () => api.assets.list(siteId, { limit: 200 }),
     enabled,
   });
   return (row: DiffRow): { title?: string; href?: string; detail?: string } => {
@@ -172,9 +180,16 @@ function useNodeNames(siteId: string, enabled: boolean) {
       const r = redirects.data?.find((x) => x.id === row.id);
       return r ? { title: `${r.from} → ${r.to}`, href: `/sites/${siteId}/redirects` } : {};
     }
-    // Media (RFC-0004): Studio has no asset routes yet (they follow the roles backend), so the
-    // row shows its id under the "Media" badge until the library can name it.
-    if (row.kind === "asset") return { title: row.id };
+    if (row.kind === "asset") {
+      const item = assets.data?.assets.find((a) => a.asset.id === row.id);
+      return item
+        ? {
+            title: assetTitle(item.asset, locale, site.data?.defaultLocale),
+            detail: `${typeLabel(item.asset.mediaType)} · ${formatSize(item.asset.bytes, locale)}`,
+            href: `/sites/${siteId}/media/${item.asset.id}`,
+          }
+        : {};
+    }
     const entry = entries.data?.find((e) => e.id === row.id);
     return entry
       ? {

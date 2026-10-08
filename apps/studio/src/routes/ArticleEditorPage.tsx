@@ -398,6 +398,8 @@ export function ArticleEditorPage() {
               missing={missing}
             />
             <CoverImageCard
+              siteId={siteId}
+              defaultLocale={site.data?.defaultLocale ?? draft.locale}
               image={draft.coverImage}
               savedSrc={query.data?.coverImage?.src}
               host={host}

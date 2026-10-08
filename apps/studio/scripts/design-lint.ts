@@ -60,6 +60,8 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/TermEditorPage.tsx": "editor",
   "routes/RedirectsPage.tsx": "list",
   "routes/NavigationPage.tsx": "editor",
+  "routes/MediaPage.tsx": "list",
+  "routes/AssetPage.tsx": "editor",
   "routes/LoginPage.tsx": "auth",
   "routes/MembersPage.tsx": "list",
   "routes/InvitePage.tsx": "token",
