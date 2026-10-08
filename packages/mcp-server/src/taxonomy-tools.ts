@@ -19,10 +19,10 @@ import {
 } from "@cloudhal/core-contracts";
 import type { GovernanceResult, Resolution, TermUsage } from "@cloudhal/core-ts";
 import {
+  REPORT_THRESHOLDS as CORE_REPORT_THRESHOLDS,
   canonicalJson,
-  editDistance,
+  taxonomyReport as coreTaxonomyReport,
   foldName,
-  pluralForms,
   slugify,
   splitTarget,
   termName,
@@ -282,16 +282,26 @@ async function existingMatch(
   return undefined;
 }
 
+/** A term's folded names and slug (`main`) and synonyms (`alt`), for `list_terms` search. */
+function forms(t: Term): { main: string[]; alt: string[] } {
+  const main = new Set<string>([t.slug]);
+  const alt = new Set<string>();
+  for (const label of Object.values(t.labels)) {
+    if (!label) continue;
+    main.add(foldName(label.name));
+    for (const a of label.altNames ?? []) alt.add(foldName(a));
+  }
+  return { main: [...main].filter(Boolean), alt: [...alt].filter(Boolean) };
+}
+
 // ───────────────────────────── taxonomy_report ─────────────────────────────
 
-/** Thresholds of `taxonomy_report` (returned with it). */
+/**
+ * Thresholds of `taxonomy_report` (returned with it): the core report's own, plus how many findings
+ * of one kind are listed.
+ */
 export const REPORT_THRESHOLDS = {
-  /** Near-duplicates: edit distance at most this, and less than half the shorter name. */
-  maxEditDistance: 2,
-  /** A category holding at least this share of the taxonomy's articles… */
-  oversizedShare: 0.5,
-  /** …and at least this many articles, without sub-categories, is worth splitting. */
-  oversizedMinEntries: 20,
+  ...CORE_REPORT_THRESHOLDS,
   /** Findings listed per kind (counts are complete). */
   maxPerKind: 50,
 } as const;
@@ -305,7 +315,8 @@ type FindingKind =
   | "oversized-category"
   | "proposed"
   | "no-intro"
-  | "missing-primary";
+  | "missing-primary"
+  | "unfiled";
 
 interface Finding {
   kind: FindingKind;
@@ -314,52 +325,11 @@ interface Finding {
   detail: string;
 }
 
-function forms(t: Term): { main: string[]; alt: string[] } {
-  const main = new Set<string>([t.slug]);
-  const alt = new Set<string>();
-  for (const label of Object.values(t.labels)) {
-    if (!label) continue;
-    main.add(foldName(label.name));
-    for (const a of label.altNames ?? []) alt.add(foldName(a));
-  }
-  return { main: [...main].filter(Boolean), alt: [...alt].filter(Boolean) };
-}
-
-const compact = (s: string) => s.replace(/-/g, "");
-
-/** Why two terms of one taxonomy look like the same concept, if they do. */
-function duplicateReason(
-  a: Term,
-  b: Term,
-): { kind: "near-duplicate" | "synonym-collision"; detail: string } | undefined {
-  const fa = forms(a);
-  const fb = forms(b);
-  const altHit =
-    fa.alt.find((x) => fb.main.includes(x) || fb.alt.includes(x)) ??
-    fb.alt.find((x) => fa.main.includes(x));
-  if (altHit)
-    return {
-      kind: "synonym-collision",
-      detail: `"${altHit}" is a synonym of one and a name, slug or synonym of the other; merge them`,
-    };
-  const pa = new Set(fa.main.flatMap(pluralForms));
-  const plural = fb.main.flatMap(pluralForms).find((x) => pa.has(x));
-  if (plural)
-    return { kind: "near-duplicate", detail: `singular and plural of "${plural}"; merge them` };
-  for (const x of fa.main)
-    for (const y of fb.main) {
-      const cx = compact(x);
-      const cy = compact(y);
-      const d = editDistance(cx, cy, REPORT_THRESHOLDS.maxEditDistance);
-      if (d <= REPORT_THRESHOLDS.maxEditDistance && d * 2 < Math.min(cx.length, cy.length))
-        return {
-          kind: "near-duplicate",
-          detail: `"${x}" and "${y}" differ by ${d} character${d === 1 ? "" : "s"}; merge them if they mean the same`,
-        };
-    }
-  return undefined;
-}
-
+/**
+ * The hygiene report agents read. The findings come from core-ts `taxonomyReport` — the function
+ * Studio's "Vocabulary health" card calls with the same terms, usage and entries — and are only
+ * worded here (a detail with the next step), so both surfaces always agree.
+ */
 async function taxonomyReport(ctx: ToolContext, site: Site, only?: string) {
   const locale = site.defaultLocale;
   const taxonomies = (await ctx.store.listTaxonomies(site.id)).filter(
@@ -377,96 +347,83 @@ async function taxonomyReport(ctx: ToolContext, site: Site, only?: string) {
   for (const tax of taxonomies) {
     const usage: Map<string, TermUsage> = await ctx.store.termUsage(site.id, tax.key);
     const terms = await ctx.store.listTerms(site.id, { taxonomy: tax.key });
-    const live = terms.filter((t) => t.status !== "retired");
-    const use = (t: Term) => usage.get(t.id) ?? { total: 0, published: 0 };
-    const ref = (t: Term) => termRef(t, locale);
-    const childrenOf = (t: Term) => live.filter((x) => x.parentId === t.id);
-    const subtree = (t: Term): Term[] => [t, ...childrenOf(t).flatMap(subtree)];
-    const filed = entries.filter((e) => (e.terms?.[tax.key]?.ids.length ?? 0) > 0).length;
+    const report = coreTaxonomyReport({ taxonomy: tax, terms, usage, entries, locale });
+    const byId = new Map(terms.map((t) => [t.id, t]));
+    const use = (id: string) => usage.get(id) ?? { total: 0, published: 0 };
+    const each = (ids: readonly string[], kind: FindingKind, detail: (t: Term) => string) => {
+      for (const id of ids) {
+        const t = byId.get(id);
+        if (t) add({ kind, taxonomy: tax.key, terms: [termRef(t, locale)], detail: detail(t) });
+      }
+    };
+    const entryList = (ids: readonly string[]) =>
+      `${ids.slice(0, 10).join(", ")}${ids.length > 10 ? ", …" : ""}`;
 
-    for (const t of live) {
-      const u = use(t);
-      if (t.status === "proposed") {
+    each(
+      report.proposed,
+      "proposed",
+      (t) =>
+        `proposed${t.proposedBy ? ` by ${t.proposedBy.name ?? t.proposedBy.id}` : ""} on ${t.createdAt.slice(0, 10)}, used by ${articles(use(t.id).total)}${t.metadata?.["cloudhal.reason"] ? `: "${quote(t.metadata["cloudhal.reason"], 80)}"` : ""}; a person approves, rejects or merges it`,
+    );
+    each(
+      report.emptyCategories,
+      "empty-category",
+      () =>
+        "no published article in it or below it; its archive answers 404 — file articles under it, or merge or retire it",
+    );
+    each(report.oversizedCategories, "oversized-category", (t) => {
+      const total = use(t.id).total;
+      return `${articles(total)} (${Math.round((100 * total) / Math.max(report.filed, 1))}% of filed articles) and no sub-categories; consider splitting it (a person creates categories)`;
+    });
+    each(report.unused, "unused", () => "no article uses it; retire it or file articles under it");
+    each(
+      report.singleUse,
+      "single-use",
+      () => "used by one article only; reuse it or merge it into a broader term",
+    );
+    each(
+      report.noIntro,
+      "no-intro",
+      () => "indexed archive without an intro text; add one with update_term",
+    );
+    for (const d of report.nearDuplicates) {
+      const source = byId.get(d.source);
+      const target = byId.get(d.target);
+      if (!source || !target) continue;
+      const pair = [termRef(source, locale), termRef(target, locale)];
+      const merge = `merge "${termName(source, locale)}" into "${termName(target, locale)}"`;
+      if (d.reason === "synonym")
         add({
-          kind: "proposed",
+          kind: "synonym-collision",
           taxonomy: tax.key,
-          terms: [ref(t)],
-          detail: `proposed${t.proposedBy ? ` by ${t.proposedBy.name ?? t.proposedBy.id}` : ""} on ${t.createdAt.slice(0, 10)}, used by ${articles(u.total)}${t.metadata?.["cloudhal.reason"] ? `: "${quote(t.metadata["cloudhal.reason"], 80)}"` : ""}; a person approves, rejects or merges it`,
+          terms: pair,
+          detail: `"${d.forms[0]}" is a synonym of one and a name, slug or synonym of the other; ${merge}`,
         });
-        continue;
-      }
-      if (tax.hierarchical) {
-        const published = subtree(t).reduce((n, x) => n + use(x).published, 0);
-        if (published === 0)
-          add({
-            kind: "empty-category",
-            taxonomy: tax.key,
-            terms: [ref(t)],
-            detail: `no published article in it or below it; its archive answers 404 — file articles under it, or merge or retire it`,
-          });
-        if (
-          childrenOf(t).length === 0 &&
-          u.total >= REPORT_THRESHOLDS.oversizedMinEntries &&
-          filed > 0 &&
-          u.total / filed >= REPORT_THRESHOLDS.oversizedShare
-        )
-          add({
-            kind: "oversized-category",
-            taxonomy: tax.key,
-            terms: [ref(t)],
-            detail: `${articles(u.total)} (${Math.round((100 * u.total) / filed)}% of filed articles) and no sub-categories; consider splitting it (a person creates categories)`,
-          });
-      } else if (u.total === 0)
+      else
         add({
-          kind: "unused",
+          kind: "near-duplicate",
           taxonomy: tax.key,
-          terms: [ref(t)],
-          detail: "no article uses it; retire it or file articles under it",
-        });
-      if (u.total === 1)
-        add({
-          kind: "single-use",
-          taxonomy: tax.key,
-          terms: [ref(t)],
-          detail: "used by one article only; reuse it or merge it into a broader term",
-        });
-      if (
-        isPublic(t) &&
-        u.published >= tax.minEntriesToIndex &&
-        !t.labels[locale]?.description?.trim()
-      )
-        add({
-          kind: "no-intro",
-          taxonomy: tax.key,
-          terms: [ref(t)],
-          detail: `indexed archive (${u.published} published) without an intro text; add one with update_term`,
+          terms: pair,
+          detail:
+            d.reason === "plural"
+              ? `singular and plural ("${d.forms[0]}" / "${d.forms[1]}"); ${merge}`
+              : `"${d.forms[0]}" and "${d.forms[1]}" differ by ${d.distance ?? 0} character${d.distance === 1 ? "" : "s"}; ${merge} if they mean the same`,
         });
     }
-    const pairable = live.slice(0, 2000);
-    for (let i = 0; i < pairable.length; i++)
-      for (let j = i + 1; j < pairable.length; j++) {
-        const a = pairable[i] as Term;
-        const b = pairable[j] as Term;
-        const why = duplicateReason(a, b);
-        if (why) add({ ...why, taxonomy: tax.key, terms: [ref(a), ref(b)] });
-      }
-    if (tax.required) {
-      const missing = entries.filter(
-        (e) =>
-          (!tax.collections || tax.collections.includes(e.collection)) &&
-          !e.terms?.[tax.key]?.primary,
-      );
-      if (missing.length > 0)
-        add({
-          kind: "missing-primary",
-          taxonomy: tax.key,
-          terms: [],
-          detail: `${articles(missing.length)} without a primary ${tax.key} (they cannot go to review or published): ${missing
-            .slice(0, 10)
-            .map((e) => e.id)
-            .join(", ")}${missing.length > 10 ? ", …" : ""}`,
-        });
-    }
+    if (report.missingPrimary.length > 0)
+      add({
+        kind: "missing-primary",
+        taxonomy: tax.key,
+        terms: [],
+        detail: `${articles(report.missingPrimary.length)} without a primary ${tax.key} (they cannot go to review or published): ${entryList(report.missingPrimary)}`,
+      });
+    if (report.unfiled.length > 0)
+      add({
+        kind: "unfiled",
+        taxonomy: tax.key,
+        terms: [],
+        detail: `${articles(report.unfiled.length)} without any ${tax.key}; file them so readers find them in its archives: ${entryList(report.unfiled)}`,
+      });
   }
   return { findings, counts, thresholds: REPORT_THRESHOLDS };
 }
@@ -1127,7 +1084,7 @@ export function taxonomyTools(): ToolDefinition[] {
       name: "taxonomy_report",
       title: "Taxonomy hygiene report",
       description:
-        "Findings about the vocabulary: single-use and unused terms, near-duplicates (edit distance ≤ 2, singular/plural) and synonym collisions, empty or oversized categories, archives without an intro, articles without a required primary term, and the backlog of proposed terms. Read-only: suggest merges or retirements to a person.",
+        "Findings about the vocabulary: single-use and unused terms, near-duplicates (edit distance ≤ 2, singular/plural) and synonym collisions, empty or oversized categories, archives without an intro, articles without a required primary term or without any category, and the backlog of proposed terms. Near-duplicates name the term to merge away first and the one to keep second. The same report as Studio's vocabulary health card. Read-only: suggest merges or retirements to a person.",
       inputSchema: obj({ siteId: id, taxonomy: TAXONOMY_KEY }, ["siteId"]),
       outputSchema: obj(
         {
@@ -1147,6 +1104,7 @@ export function taxonomyTools(): ToolDefinition[] {
                     "proposed",
                     "no-intro",
                     "missing-primary",
+                    "unfiled",
                   ],
                 },
                 taxonomy: { type: "string" },

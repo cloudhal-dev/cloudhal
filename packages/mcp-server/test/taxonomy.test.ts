@@ -793,7 +793,8 @@ describe("RFC-0002 over MCP", () => {
     }[];
     const of = (kind: string) =>
       findings.filter((f) => f.kind === kind).map((f) => f.terms.map((x) => x.slug).join("+"));
-    expect(of("near-duplicate")).toEqual(expect.arrayContaining(["llm+llms", "a-i+ai-tag"]));
+    // source (merge away) first, the term to keep second
+    expect(of("near-duplicate")).toEqual(expect.arrayContaining(["llms+llm", "ai-tag+a-i"]));
     expect(of("single-use")).toContain("javascript");
     expect(of("unused")).toContain("machine-learning");
     expect(of("empty-category")).toEqual(expect.arrayContaining(["sports", "football"]));

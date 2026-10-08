@@ -82,6 +82,13 @@ describe("Categories & tags: tree and filters", () => {
     // The aside explains the rules and the hygiene of this taxonomy.
     expect(screen.getByText("How categories work")).toBeInTheDocument();
     expect(screen.getByText("Vocabulary health")).toBeInTheDocument();
+    // The card shows core-ts taxonomyReport, the same findings MCP taxonomy_report words: News is
+    // indexed (5 published in its sub-tree) without an intro text, Tech has nothing published.
+    const health = screen.getByTestId("health");
+    expect(health.querySelector('[data-health="no-intro"]')).toHaveTextContent(
+      "Indexed archives without an intro (1)News",
+    );
+    expect(health.querySelector('[data-health="empty"]')).toHaveTextContent("Tech");
   });
 
   it("filters tags by status; proposed carries a count and a review banner", async () => {

@@ -100,8 +100,9 @@ export function TaxonomyPage() {
   const toast = useToast();
   const data = useTaxonomyData(siteId);
   const entries = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
+    // Every collection, as MCP `taxonomy_report` reads them (a taxonomy may apply to any).
+    queryKey: ["entries", siteId, "all"],
+    queryFn: () => api.entries.list(siteId),
   });
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
