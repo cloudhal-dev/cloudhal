@@ -8,10 +8,13 @@ import {
   type Approval,
   ELEVATION_MAX_MINUTES,
   ELEVATION_MIN_MINUTES,
+  ELEVATION_NOTICE_MINUTES,
   effectiveMode,
   elevationProblem,
+  endsSoon,
   isAgentMode,
   isMoreAutonomous,
+  minutesLeft,
   REMOTE_AGENT_MODES,
 } from "@cloudhal/agent-runtime";
 import { canonicalJson, sha256Hex } from "@cloudhal/core-ts";
@@ -104,8 +107,16 @@ export function elevationTools(): ToolDefinition[] {
           elevation: {
             type: "object",
             additionalProperties: false,
-            properties: { from: { type: "string" }, until: { type: "string" } },
-            required: ["from", "until"],
+            properties: {
+              from: { type: "string" },
+              until: { type: "string" },
+              minutesLeft: { type: "number" },
+              endingSoon: {
+                type: "boolean",
+                description: `true in the last ${ELEVATION_NOTICE_MINUTES} minutes: finish or hand over what depends on this mode.`,
+              },
+            },
+            required: ["from", "until", "minutesLeft", "endingSoon"],
           },
           canRequestElevation: { type: "boolean" },
           requestableModes: { type: "array", items: { type: "string" } },
@@ -120,11 +131,20 @@ export function elevationTools(): ToolDefinition[] {
         if (mode === null)
           return { mode, ownMode: null, canRequestElevation: false, requestableModes: [] };
         const own = ownMode(ctx);
+        const at = ctx.now?.() ?? new Date();
         const latest = cannotRequest(ctx) ? undefined : await latestRequest(ctx);
         return {
           mode,
           ownMode: own,
-          ...(ctx.principal.elevation ? { elevation: ctx.principal.elevation } : {}),
+          ...(ctx.principal.elevation
+            ? {
+                elevation: {
+                  ...ctx.principal.elevation,
+                  minutesLeft: minutesLeft(ctx.principal.elevation.until, at),
+                  endingSoon: endsSoon(ctx.principal.elevation.until, at),
+                },
+              }
+            : {}),
           canRequestElevation: cannotRequest(ctx) === undefined,
           requestableModes: REMOTE_AGENT_MODES.filter(
             (m) => isMoreAutonomous(m, own) && isMoreAutonomous(m, mode),

@@ -59,6 +59,8 @@ export interface ToolContext {
   principal: Principal;
   /** Out-of-band approvals (HTTP): where `request_elevation` files its request. */
   approvals?: ApprovalStore | undefined;
+  /** Clock (tests); defaults to the system time. */
+  now?: (() => Date) | undefined;
   /** Base URL of a running `cloudhal dev` server, when known (preview links). */
   previewBaseUrl?: string | undefined;
   /** Shared preview secret: signed links to the deployed site (preferred over `previewBaseUrl`). */

@@ -36,7 +36,7 @@ An owner can **elevate** an API key to a more autonomous mode for a bounded time
 ## Consequences
 - Positive: autonomy can be granted for exactly as long as it is needed, and it is revoked without anyone remembering to. The audit shows who granted what and which calls used it.
 - Negative: the effective mode now depends on the clock. Tests inject `now` (`AuthOptions.now`). Clock skew between isolates is negligible at minute granularity.
-- Follow-ups: notify the owner shortly before an elevation ends.
+- Follow-ups: email/webhook delivery of notifications (needs a mail/webhook capability).
 
 ## Addendum (2026-10-08): agents ask for an elevation
 An agent that needs more autonomy for a task asks for it instead of failing or nagging in chat:
@@ -62,4 +62,13 @@ An agent that needs more autonomy for a task asks for it instead of failing or n
   - The grant's audit row carries `input: {requestId, keyId, minutes}`.
   - A 409 says which case applies: `conflict` when the request is no longer pending, and `elevation_conflict` when it is still pending but the key cannot take it.
   - Ending an elevation early is audited with its `elevation`.
+
+## Addendum (2026-10-08): told before it ends
+- **`GET /api/notifications`** (people only) is derived from the current state on every request. Nothing is stored and nothing runs on a schedule. It lists:
+  - the owner's elevations ending within `ELEVATION_NOTICE_MINUTES` (10), as `elevation-ending` with `minutesLeft`;
+  - agents' pending elevation requests for the owner's keys, as `elevation-request`.
+
+  Items have stable ids (`elevation-ending:<key>:<until>`, `elevation-request:<approval>`), so a client shows each one once. Extending is simply a new elevation that replaces the one in force. The notice window is reported as `agentModes.elevation.noticeMinutes` in `/api/instance`.
+- **The agent** sees `elevation.minutesLeft` and `elevation.endingSoon` in `get_mode`.
+- Delivery beyond Studio (email, webhooks, push) is left for later. Studio polls and can raise browser notifications while it is open.
 

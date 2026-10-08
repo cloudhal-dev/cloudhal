@@ -10,6 +10,7 @@ import { agentKeys } from "./routes/agent-keys.ts";
 import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
 import { agentModesInfo, instanceRoutes } from "./routes/instance.ts";
+import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
 import { previewLinks } from "./routes/preview-links.ts";
 import { sites } from "./routes/sites.ts";
@@ -112,6 +113,7 @@ export function createApi(deps: ApiDeps) {
     "/api/skills",
     "/api/agent-keys",
     "/api/agent-keys/*",
+    "/api/notifications",
   ])
     app.use(path, peopleOnly);
 
@@ -120,6 +122,7 @@ export function createApi(deps: ApiDeps) {
       store: deps.store,
       ...deps.mcp,
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
+      now: deps.now,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -172,6 +175,7 @@ export function createApi(deps: ApiDeps) {
     ),
   );
 
+  app.route("/api/notifications", notificationRoutes(deps.now ?? (() => new Date())));
   app.route("/api/sites", sites);
   app.route("/api/sites/:siteId/pages", pages);
   app.route("/api/sites/:siteId/entries", entries);

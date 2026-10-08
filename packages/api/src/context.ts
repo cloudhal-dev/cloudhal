@@ -55,6 +55,8 @@ export interface ApiDeps {
   readonly allowedHosts?: readonly string[];
   /** When true (default), mutating routes require an actor. */
   readonly requireAuth?: boolean;
+  /** Clock for time-based answers such as `/api/notifications` (tests). */
+  readonly now?: () => Date;
 }
 
 export type Env = {

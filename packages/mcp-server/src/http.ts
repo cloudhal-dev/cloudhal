@@ -10,6 +10,8 @@ import { createCloudhalMcpServer } from "./server.ts";
 
 export interface HttpOptions {
   store: SiteGraphStore;
+  /** Clock for time-based answers (`get_mode`); tests inject one. */
+  now?: (() => Date) | undefined;
   audit?: AuditLog | undefined;
   skills?: LoadedSkill[] | undefined;
   previewBaseUrl?: string | undefined;
@@ -42,6 +44,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         skills: options.skills,
         previewBaseUrl: options.previewBaseUrl,
         previewSecret: options.previewSecret,
+        now: options.now,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,
         approvals: options.approvals,

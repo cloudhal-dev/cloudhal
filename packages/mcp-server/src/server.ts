@@ -67,6 +67,8 @@ export interface CloudhalMcpOptions {
    * agent, so an agent could approve itself (security review H1). Local use only, opt-in.
    */
   confirmTokenFallback?: boolean | undefined;
+  /** Clock for time-based answers (`get_mode`); tests inject one. */
+  now?: (() => Date) | undefined;
   /** Approval tokens/state expire after this many seconds. Default 600. */
   approvalTtlSeconds?: number | undefined;
   tools?: ToolDefinition[] | undefined;
@@ -318,6 +320,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           store: options.store,
           principal,
           approvals: options.approvals,
+          now: options.now,
           previewBaseUrl: options.previewBaseUrl,
           previewSecret: options.previewSecret,
         };

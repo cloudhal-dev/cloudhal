@@ -29,6 +29,7 @@ async function setup(now?: () => Date, withApprovals = false) {
     resolvePrincipal: auth.resolvePrincipal,
     authHandler: auth.handler,
     mcp: { stateKey: "http-test-key-at-least-thirty-two-bytes-long", audit, approvals },
+    ...(now ? { now } : {}),
     agentKeys: auth.agentKeys,
   });
 
@@ -523,5 +524,90 @@ describe("agents asking for an elevation (ADR-0016)", () => {
       arguments: { siteId, mode: "auto", minutes: 60, reason: "why not" },
     });
     expect((nope.content as { text: string }[])[0]?.text).toMatch(/only agents ask/);
+  });
+});
+
+describe("notifications before an elevation ends", () => {
+  it("lists ending elevations and pending requests for the owner; the agent is told too", async () => {
+    let clock = Date.parse("2026-10-08T10:00:00Z");
+    const { app, siteId, cookie, connect } = await setup(() => new Date(clock), true);
+    const json = (method: string, path: string, body?: unknown) =>
+      app.request(path, {
+        method,
+        headers: { "content-type": "application/json", cookie },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const notifications = async () =>
+      (await (await json("GET", "/api/notifications")).json()) as {
+        items: Record<string, unknown>[];
+        noticeMinutes: number;
+      };
+    const desk = (await (await json("POST", "/api/agent-keys", { name: "desk" })).json()) as {
+      id: string;
+      key: string;
+    };
+    const planner = (await (
+      await json("POST", "/api/agent-keys", { name: "planner", mode: "plan" })
+    ).json()) as { id: string; key: string };
+
+    expect(await notifications()).toEqual({ items: [], noticeMinutes: 10 });
+    await json("POST", `/api/agent-keys/${desk.id}/elevation`, { mode: "auto", minutes: 60 });
+    // the agent asks for one too
+    const client = await connect({ "x-api-key": planner.key });
+    const filed = await client.callTool({
+      name: "request_elevation",
+      arguments: { siteId, mode: "edits", minutes: 30, reason: "fix typos in three posts" },
+    });
+    const approvalId = (filed.structuredContent as { request: { id: string } }).request.id;
+
+    // an hour-long elevation is not ending yet; the request is listed
+    let page = await notifications();
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        id: `elevation-request:${approvalId}`,
+        kind: "elevation-request",
+        approvalId,
+        siteId,
+        keyId: planner.id,
+        mode: "edits",
+        minutes: 30,
+        reason: "fix typos in three posts",
+        agent: expect.objectContaining({ kind: "agent", name: "planner" }),
+      }),
+    ]);
+
+    // nine minutes before the end it shows up, soonest first
+    clock = Date.parse("2026-10-08T10:51:00Z");
+    page = await notifications();
+    expect(page.items.map((n) => n.kind)).toEqual(["elevation-ending", "elevation-request"]);
+    expect(page.items[0]).toEqual({
+      id: `elevation-ending:${desk.id}:2026-10-08T11:00:00.000Z`,
+      kind: "elevation-ending",
+      keyId: desk.id,
+      keyName: "desk",
+      mode: "auto",
+      from: "edits",
+      until: "2026-10-08T11:00:00.000Z",
+      minutesLeft: 9,
+    });
+    // the agent sees the same through get_mode
+    const agent = await connect({ "x-api-key": desk.key });
+    const mode = await agent.callTool({ name: "get_mode", arguments: {} });
+    expect(mode.structuredContent).toMatchObject({
+      mode: "auto",
+      elevation: { minutesLeft: 9, endingSoon: true },
+    });
+
+    // extending is a new elevation; then it is no longer "ending"
+    await json("POST", `/api/agent-keys/${desk.id}/elevation`, { mode: "auto", minutes: 60 });
+    page = await notifications();
+    expect(page.items.map((n) => n.kind)).toEqual(["elevation-request"]);
+    // once decided, the request is gone; agents cannot read notifications
+    await json("POST", `/api/sites/${siteId}/approvals/${approvalId}/deny`);
+    expect((await notifications()).items).toEqual([]);
+    expect(
+      (await app.request("/api/notifications", { headers: { "x-api-key": desk.key } })).status,
+    ).toBe(403);
+    expect((await app.request("/api/notifications")).status).toBe(401);
   });
 });

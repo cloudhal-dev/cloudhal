@@ -148,3 +148,18 @@ export function activeElevation(
   const until = Date.parse(elevation.until);
   return Number.isFinite(until) && until > now.getTime() ? elevation : undefined;
 }
+
+/** How long before an elevation ends that owners and the agent are told (Studio notifications, `get_mode`). */
+export const ELEVATION_NOTICE_MINUTES = 10;
+
+/** Whole minutes left until `until` (rounded up; 0 once it has ended). */
+export function minutesLeft(until: string, now: Date): number {
+  const ms = Date.parse(until) - now.getTime();
+  return Number.isFinite(ms) && ms > 0 ? Math.ceil(ms / 60_000) : 0;
+}
+
+/** True during the last `ELEVATION_NOTICE_MINUTES` of an elevation. */
+export function endsSoon(until: string, now: Date): boolean {
+  const left = minutesLeft(until, now);
+  return left > 0 && left <= ELEVATION_NOTICE_MINUTES;
+}
