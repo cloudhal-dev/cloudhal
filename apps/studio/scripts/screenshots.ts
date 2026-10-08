@@ -29,6 +29,10 @@ interface Options {
   routes: string[];
   base: string;
   wait: number;
+  /** `SHOTS_SCHEME=dark|light`: emulated colour scheme (default: the browser's, light). */
+  scheme: "dark" | "light" | undefined;
+  /** `SHOTS_LOCALE=tr`: Studio's language for the run. */
+  locale: string | undefined;
 }
 
 function parse(argv: string[]): Options {
@@ -38,6 +42,11 @@ function parse(argv: string[]): Options {
     routes: [],
     base: process.env.STUDIO_URL ?? "http://localhost:5173",
     wait: Number(process.env.SHOTS_WAIT ?? 2000),
+    scheme:
+      process.env.SHOTS_SCHEME === "dark" || process.env.SHOTS_SCHEME === "light"
+        ? process.env.SHOTS_SCHEME
+        : undefined,
+    locale: process.env.SHOTS_LOCALE || undefined,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
@@ -148,6 +157,11 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
     await cdp.send("Runtime.enable");
     await cdp.send("Page.enable");
     await metrics(height);
+    // SHOTS_SCHEME=dark renders the dark theme (Studio follows prefers-color-scheme).
+    if (opts.scheme)
+      await cdp.send("Emulation.setEmulatedMedia", {
+        features: [{ name: "prefers-color-scheme", value: opts.scheme }],
+      });
     if (process.env.STUDIO_EMAIL && process.env.STUDIO_PASSWORD) {
       await cdp.send("Page.navigate", { url: `${opts.base}/login` });
       await sleep(1500);
@@ -159,6 +173,16 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
         `fetch('/api/auth/sign-in/email',{method:'POST',headers:{'content-type':'application/json'},body:${JSON.stringify(body)}}).then(r=>r.status)`,
       );
       if (status !== 200) problems.push(`sign-in failed (${status})`);
+    }
+    // SHOTS_LOCALE=tr picks Studio's language (stored per browser, read on load).
+    if (opts.locale) {
+      if (!process.env.STUDIO_EMAIL) {
+        await cdp.send("Page.navigate", { url: `${opts.base}/login` });
+        await sleep(800);
+      }
+      await cdp.evaluate(
+        `localStorage.setItem('cloudhal.studio.locale', ${JSON.stringify(opts.locale)})`,
+      );
     }
     for (const route of opts.routes) {
       const [p, action] = route.split("@") as [string, string | undefined];
@@ -181,7 +205,8 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
       const shot = (await cdp.send("Page.captureScreenshot", { format: "png" })) as {
         result?: { data?: string };
       };
-      const name = `${p.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}${action ? "_action" : ""}_${width}.png`;
+      const tag = `${opts.scheme ? `_${opts.scheme}` : ""}${opts.locale ? `_${opts.locale}` : ""}`;
+      const name = `${p.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}${action ? "_action" : ""}${tag}_${width}.png`;
       const file = path.join(opts.out, name);
       writeFileSync(file, Buffer.from(shot.result?.data ?? "", "base64"));
       const notes = [
