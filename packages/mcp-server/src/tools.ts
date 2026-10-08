@@ -53,6 +53,13 @@ import {
   toToolError,
 } from "./common.ts";
 import { elevationTools } from "./elevation-tools.ts";
+import {
+  menuChangeSummary,
+  menuHint,
+  menuItemsHiddenBy,
+  menuTools,
+  publishMenuLines,
+} from "./menu-tools.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
 import {
   applyTermsInput,
@@ -99,6 +106,7 @@ const KIND_LABEL: Record<string, string> = {
   taxonomy: "taxonomy",
   term: "term",
   redirect: "redirect",
+  menu: "menu",
 };
 
 /**
@@ -132,6 +140,8 @@ async function describeChanges(
         const r = await ctx.store.getRedirect(ref.id);
         return r ? `${r.from} → ${r.to}` : undefined;
       }
+      case "menu":
+        return (await ctx.store.getMenu(ref.id))?.key;
       default:
         return undefined;
     }
@@ -140,6 +150,7 @@ async function describeChanges(
     ref: { id: string; kind: string },
     before?: SnapshotDiff["added"][number],
   ) => {
+    if (ref.kind === "menu") return menuChangeSummary(ctx, ref, before);
     if (ref.kind !== "contentEntry") return "";
     const now = await ctx.store.getContentEntry(ref.id);
     if (!now) return "";
@@ -241,15 +252,20 @@ export function hoistDefs(schema: JsonSchema): JsonSchema {
 /** All tools, in the deterministic order `tools/list` exposes them. */
 export function defineTools(): ToolDefinition[] {
   const raw = rawTools();
-  // Taxonomy, term and redirect tools (RFC-0002 §6.2) follow the article tools.
+  // Taxonomy, term and redirect tools (RFC-0002 §6.2), then menu tools (RFC-0003 §6.1), follow
+  // the article tools.
   const at = raw.findIndex((t) => t.name === "delete_entry") + 1;
-  return [...raw.slice(0, at), ...taxonomyTools(), ...raw.slice(at), ...elevationTools()].map(
-    (t) => ({
-      ...t,
-      inputSchema: hoistDefs(t.inputSchema),
-      outputSchema: hoistDefs(t.outputSchema),
-    }),
-  );
+  return [
+    ...raw.slice(0, at),
+    ...taxonomyTools(),
+    ...menuTools(),
+    ...raw.slice(at),
+    ...elevationTools(),
+  ].map((t) => ({
+    ...t,
+    inputSchema: hoistDefs(t.inputSchema),
+    outputSchema: hoistDefs(t.outputSchema),
+  }));
 }
 
 function rawTools(): ToolDefinition[] {
@@ -350,7 +366,7 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "path", "title"],
       ),
-      outputSchema: obj({ page: PAGE, site: SITE, snapshot: SNAPSHOT }, [
+      outputSchema: obj({ page: PAGE, site: SITE, snapshot: SNAPSHOT, hint: { type: "string" } }, [
         "page",
         "site",
         "snapshot",
@@ -376,7 +392,8 @@ function rawTools(): ToolDefinition[] {
             ...(a.seo ? { seo: a.seo as Seo } : {}),
           });
           const snapshot = await autoSnapshot(ctx, site.id, "create_page");
-          return { ...result, snapshot };
+          const hint = await menuHint(ctx, site.id, { kind: "page", id: result.page.id });
+          return { ...result, snapshot, ...(hint ? { hint } : {}) };
         } catch (e) {
           mapError(e);
         }
@@ -453,7 +470,10 @@ function rawTools(): ToolDefinition[] {
       scopes: ["content:write"],
       approvalPrompt: async (a, ctx) => {
         const page = await ctx.store.getPage(a.pageId as string);
-        return `Delete page "${page?.title ?? a.pageId}" (${page?.path ?? ""})? This removes it from navigation; earlier snapshots keep a copy.`;
+        const menus = page
+          ? await menuItemsHiddenBy(ctx, page.siteId, { kind: "page", id: page.id })
+          : "";
+        return `Delete page "${page?.title ?? a.pageId}" (${page?.path ?? ""})? This removes it from navigation; earlier snapshots keep a copy.${menus}`;
       },
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
@@ -563,7 +583,10 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "slug", "title", "body"],
       ),
-      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT }, ["entry", "snapshot"]),
+      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT, hint: { type: "string" } }, [
+        "entry",
+        "snapshot",
+      ]),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -596,7 +619,8 @@ function rawTools(): ToolDefinition[] {
           });
           await reportDeltas(ctx, undefined, entry);
           const snapshot = await autoSnapshot(ctx, site.id, "create_entry");
-          return { entry, snapshot };
+          const hint = await menuHint(ctx, site.id, { kind: "contentEntry", id: entry.id });
+          return { entry, snapshot, ...(hint ? { hint } : {}) };
         } catch (e) {
           mapError(e);
         }
@@ -736,8 +760,13 @@ function rawTools(): ToolDefinition[] {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (entry && entry.siteId === a.siteId) await entryLimitCheck(ctx, "delete", entry);
       },
-      approvalPrompt: async (a, ctx) =>
-        `Delete article "${(await ctx.store.getContentEntry(a.entryId as string))?.title ?? a.entryId}"? Earlier snapshots keep a copy.`,
+      approvalPrompt: async (a, ctx) => {
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        const menus = entry
+          ? await menuItemsHiddenBy(ctx, entry.siteId, { kind: "contentEntry", id: entry.id })
+          : "";
+        return `Delete article "${entry?.title ?? a.entryId}"? Earlier snapshots keep a copy.${menus}`;
+      },
       handler: async (a, ctx) => {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (!entry || entry.siteId !== a.siteId)
@@ -928,7 +957,10 @@ function rawTools(): ToolDefinition[] {
         const site = await requireSite(ctx, a.siteId as string);
         // What the person approves is what goes live: the current state against the live snapshot.
         const diff = await ctx.store.pendingChanges(site.id);
-        const lines = await describeChanges(ctx, diff, site);
+        const lines = [
+          ...(await describeChanges(ctx, diff, site)),
+          ...(await publishMenuLines(ctx, site)),
+        ];
         const counts = `+${diff.added.length} added, ~${diff.changed.length} changed, −${diff.removed.length} removed`;
         return `Publish "${quote(site.name)}" to production (${counts} since the live version)?${lines.length ? `\n${lines.join("\n")}` : ""}`;
       },

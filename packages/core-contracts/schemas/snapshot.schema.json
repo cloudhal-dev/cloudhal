@@ -48,7 +48,7 @@
         "id": { "$ref": "common.schema.json#/$defs/Id" },
         "kind": {
           "type": "string",
-          "enum": ["site", "page", "contentEntry", "taxonomy", "term", "redirect"]
+          "enum": ["site", "page", "contentEntry", "taxonomy", "term", "redirect", "menu"]
         },
         "rev": { "$ref": "common.schema.json#/$defs/Revision" },
         "hash": {

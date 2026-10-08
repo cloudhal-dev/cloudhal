@@ -121,3 +121,27 @@ a.ch-chip {
 .ch-related h2 {
   @apply text-xl font-semibold;
 }
+
+/* Navigation menus (RFC-0003): dropdowns and nested items as disclosures, no JavaScript. */
+.ch-nav-menu {
+  @apply relative;
+}
+.ch-nav-menu summary {
+  @apply cursor-pointer list-none;
+}
+.ch-nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+.ch-nav-menu summary::after {
+  content: "▾";
+  @apply ml-1 text-xs;
+}
+.ch-nav-menu > ul {
+  @apply absolute z-10 mt-2 min-w-40 space-y-1 rounded border border-zinc-200 bg-white p-2 shadow-sm;
+}
+footer .ch-nav-menu > ul {
+  @apply bottom-full mb-2;
+}
+.ch-nav-menu .ch-nav-menu > ul {
+  @apply static mt-1 border-0 p-0 pl-3 shadow-none;
+}

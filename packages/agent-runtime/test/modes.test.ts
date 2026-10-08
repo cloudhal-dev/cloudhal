@@ -138,14 +138,14 @@ describe("agent modes", () => {
     expect(check({ added: [{ id: "p", kind: "page" }], changed: [], removed: [] }).code).toBe(
       "structure",
     );
-    // taxonomy, term and redirect changes wait for a person too (RFC-0002 §6.4)
-    for (const kind of ["taxonomy", "term", "redirect"])
+    // taxonomy, term, redirect and menu changes wait for a person too (RFC-0002 §6.4, RFC-0003 §6.4)
+    for (const kind of ["taxonomy", "term", "redirect", "menu"])
       expect(
         check({ added: [entry("e1")], changed: [{ after: { id: "x", kind } }], removed: [] }),
       ).toMatchObject({
         code: "structure",
         lowRisk: false,
-        text: "it changes pages, site settings, taxonomies or redirects",
+        text: "it changes pages, menus, site settings, taxonomies or redirects",
       });
     expect(
       check({

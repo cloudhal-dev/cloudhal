@@ -18,6 +18,7 @@
     "./taxonomy": "./src/taxonomy.ts",
     "./archive": "./src/archive.ts",
     "./cache-tags": "./src/cache-tags.ts",
+    "./navigation": "./src/navigation.ts",
     "./integration": "./src/integration.ts",
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
@@ -101,6 +102,10 @@
       "./cache-tags": {
         "types": "./dist/src/cache-tags.d.ts",
         "default": "./dist/src/cache-tags.js"
+      },
+      "./navigation": {
+        "types": "./dist/src/navigation.d.ts",
+        "default": "./dist/src/navigation.js"
       },
       "./integration": {
         "types": "./dist/src/integration.d.ts",

@@ -12,6 +12,7 @@
 import { assertValid } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
+import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
 
 /**
@@ -53,6 +54,17 @@ async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void
       throw new Error(`node ${row.id}: columns do not match its body`);
     if ((await nodeHash(body)) !== row.hash)
       throw new Error(`node ${row.id}: hash does not match its body`);
+    if (kind === "menu") {
+      // RFC-0003 §4.2: the tree rules the schema cannot express; targets are not checked (hidden
+      // items are a legal state), and labels of a locale the site dropped are kept.
+      const siteRow = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId);
+      const menu = body as NodeTypes["menu"];
+      try {
+        if (siteRow) validateMenuTree(menu, JSON.parse(siteRow.body), menu);
+      } catch (e) {
+        throw new Error(`node ${row.id}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
   }
   for (const row of bundle.snapshots) {
     let body: { id?: string; siteId?: string };

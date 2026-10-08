@@ -8,6 +8,13 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build, init, readProjectConfig, snapshot } from "../src/index.ts";
+import {
+  applyMenuFixture,
+  DEFAULT_FOOTER,
+  derivedHeader,
+  footerOf,
+  headerOf,
+} from "./menu-fixture.ts";
 import { applyTaxonomyFixture } from "./taxonomy-fixture.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -333,5 +340,90 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(weekly).not.toContain("Issue 19");
     // the proposed tag is never shown on its post
     expect(await read("posts", "issue-01", "index.html")).not.toContain("proposed-idea");
+    // no menu yet: the derived header, byte for byte as before RFC-0003
+    const aboutTitle = "About (edited live)"; // retitled by the dev test above
+    expect(headerOf(page2)).toBe(
+      derivedHeader("E2E Site", [
+        { href: "/about", label: aboutTitle },
+        { href: "/category/news", label: "News", current: true },
+      ]),
+    );
+    expect(headerOf(await read("about", "index.html"))).toBe(
+      derivedHeader("E2E Site", [
+        { href: "/about", label: aboutTitle, current: true },
+        { href: "/category/news", label: "News" },
+      ]),
+    );
+    expect(footerOf(page2)).toBe(DEFAULT_FOOTER);
+  });
+
+  it("build renders the primary and footer menus, hides an item whose page is gone, and falls back to the derived header (RFC-0003)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const dataDir = path.join(projectDir, cfg.dataDir);
+    const outDir = path.join(projectDir, "dist");
+    const read = (...p: string[]) => readFile(path.join(outDir, ...p), "utf8");
+    let local = await openLocalStore(dataDir);
+    const fx = await applyMenuFixture(local.store, cfg.siteId);
+    await local.close();
+    await snapshot({ projectDir, label: "menus", publish: true });
+    await spawnBuild(projectDir);
+
+    const about = headerOf(await read("about", "index.html"));
+    expect(about).toContain(
+      '<a href="/about" aria-current="page" class="text-zinc-900">Who we are</a>',
+    );
+    expect(about).toContain('<a href="/team" class="hover:text-zinc-900">Team</a>');
+    expect(about).toContain(
+      '<details class="ch-nav-menu"><summary class="hover:text-zinc-900"><span>Topics</span></summary><ul><li><a href="/category/news" class="hover:text-zinc-900">News</a></li><li><a href="/" class="hover:text-zinc-900">Blog</a></li></ul></details>',
+    );
+    expect(about).toContain(
+      '<a href="https://github.com/cloudhal-dev" class="hover:text-zinc-900" rel="noopener noreferrer" target="_blank">GitHub</a>',
+    );
+    // the derived categories are gone: the menu replaces the header
+    expect(about.match(/href="\/category\/news"/g)).toHaveLength(1);
+    // context match: a post in News marks the News item (aria-current="true") and opens its trail
+    expect(headerOf(await read("posts", "issue-03", "index.html"))).toContain(
+      '<summary class="text-zinc-900"><span>Topics</span></summary><ul><li><a href="/category/news" aria-current="true" class="text-zinc-900">News</a>',
+    );
+    // the home page lists posts, so "Blog" links to it (answer 5)
+    expect(headerOf(await read("index.html"))).toContain(
+      '<a href="/" aria-current="page" class="text-zinc-900">Blog</a>',
+    );
+    const footer = footerOf(await read("about", "index.html"));
+    expect(footer).toContain(
+      '<nav class="flex flex-wrap gap-4" aria-label="Footer"><a href="https://status.example.com" class="hover:text-zinc-700" rel="noopener noreferrer">Status</a></nav>',
+    );
+    expect(footer).not.toContain("/rss.xml");
+
+    // Deleting the page never writes the menu; its item is simply not rendered any more.
+    local = await openLocalStore(dataDir);
+    const site = await local.store.getSite(cfg.siteId);
+    await local.store.deletePage(site as NonNullable<typeof site>, fx.team);
+    expect((await local.store.getMenu(fx.primary.id))?.rev).toBe(0);
+    await local.close();
+    await snapshot({ projectDir, label: "team page deleted", publish: true });
+    await spawnBuild(projectDir);
+    const after = headerOf(await read("about", "index.html"));
+    expect(after).not.toContain("/team");
+    expect(after).toContain(">Who we are</a>");
+    await expect(read("team", "index.html")).rejects.toThrow(/ENOENT/);
+
+    // Without menus the site renders today's derived header and footer again.
+    local = await openLocalStore(dataDir);
+    for (const key of ["primary", "footer"]) {
+      const menu = await local.store.getMenuByKey(cfg.siteId, key);
+      if (menu) await local.store.deleteMenu(menu);
+    }
+    await local.close();
+    await snapshot({ projectDir, label: "menus deleted", publish: true });
+    await spawnBuild(projectDir);
+    const page2 = await read("category", "news", "page", "2", "index.html");
+    expect(headerOf(page2)).toBe(
+      derivedHeader("E2E Site", [
+        { href: "/about", label: "About (edited live)" },
+        { href: "/category/news", label: "News", current: true },
+      ]),
+    );
+    expect(footerOf(page2)).toBe(DEFAULT_FOOTER);
   });
 });

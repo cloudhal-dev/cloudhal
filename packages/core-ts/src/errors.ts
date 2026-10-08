@@ -84,8 +84,18 @@ export type InvariantCode =
   | "path_conflict"
   /** Invariant 14: a redirect from a served path, to itself, into a loop, or 302 outside manual. */
   | "invalid_redirect"
-  /** A governance operation would touch more than 400 entries (or 1,000 statements). */
-  | "too_large";
+  /** A governance operation would touch more than 400 entries (or 1,000 statements); a menu over 500 items or 100 per level. */
+  | "too_large"
+  /** RFC-0003 invariant 9: a menu item targets a node that does not exist in the site (or a retired term). */
+  | "unknown_target"
+  /** RFC-0003: a menu operation names an item id the menu does not have. */
+  | "unknown_item"
+  /** RFC-0003 invariants 6, 7: a label is empty, too long, has control characters, a locale the site lacks, or the default locale is missing. */
+  | "invalid_label"
+  /** RFC-0003 invariants 2, 3, 8: duplicate or malformed item ids, an empty group, a bad external link or operation. */
+  | "invalid_menu"
+  /** RFC-0003 invariant 1: the site already has a menu under this key. */
+  | "key_taken";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

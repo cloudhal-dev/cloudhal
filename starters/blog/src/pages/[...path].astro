@@ -3,7 +3,8 @@
  * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
  * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
  * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
- * or 404. Term feeds live next door in `[...path]/rss.xml.ts`.
+ * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
+ * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
  */
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
@@ -11,17 +12,21 @@ import { addCacheTags, nodeCacheTag, termCacheTag } from "@cloudhal/astro-render
 import { Sections } from "@cloudhal/astro-renderer/components";
 import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import {
-  categoryNavLinks,
-  navLinks,
-  resolveRoute,
-  staticPaths,
-} from "@cloudhal/astro-renderer/routing";
+  type ActiveRoute,
+  activeItem,
+  derivedNavigation,
+  markActive,
+  markCurrent,
+  navigationCacheTags,
+} from "@cloudhal/astro-renderer/navigation";
+import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { archiveHead, entryHead, pageHead, siteOrigin } from "@cloudhal/astro-renderer/seo";
 import {
   entryTaxonomy,
   loadTaxonomyIndex,
   relatedEntries,
+  termAncestors,
 } from "@cloudhal/astro-renderer/taxonomy";
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import Archive from "../components/Archive.astro";
@@ -29,7 +34,14 @@ import Breadcrumbs from "../components/Breadcrumbs.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
 import Base from "../layouts/Base.astro";
-import { ARCHIVE_PAGE_SIZE, components, NAV_CATEGORIES, RELATED_POSTS, strings } from "../theme.ts";
+import {
+  ARCHIVE_PAGE_SIZE,
+  collectionIndex,
+  components,
+  NAV_CATEGORIES,
+  RELATED_POSTS,
+  strings,
+} from "../theme.ts";
 
 export async function getStaticPaths() {
   const source = await getSource(config);
@@ -56,20 +68,39 @@ const origin = siteOrigin(site, Astro.url);
 const locale = site.defaultLocale;
 const t = strings(locale);
 const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);
-const needsEntries = NAV_CATEGORIES || (route.kind === "entry" && RELATED_POSTS > 0);
+const primary = await source.navigation("primary", locale, { collectionIndex });
+const footerMenu = await source.navigation("footer", locale, { collectionIndex });
+const derivedCategories = !primary && NAV_CATEGORIES;
+const needsEntries = derivedCategories || (route.kind === "entry" && RELATED_POSTS > 0);
 const all = needsEntries ? await source.allEntries() : [];
-const categories = NAV_CATEGORIES
+const categories = derivedCategories
   ? archiveSummaries(
       index,
       all.filter((e) => e.status === "published"),
     ).filter((a) => a.taxonomy.key === "category" && !a.term.parentId)
   : [];
-const nav = [
-  ...navLinks(site, await source.pages(), path),
-  ...categoryNavLinks(categories, path, locale),
-];
+// The active item: exact path, longest prefix, then the entry's category or collection.
+const activeRoute: ActiveRoute = {
+  path,
+  ...(route.kind === "entry" ? { entry: route.entry } : {}),
+  ...(route.kind === "archive" ? { archiveTermId: route.archive.term.id } : {}),
+};
+const ancestors = (id: string) => {
+  const term = index.terms.get(id);
+  return term ? termAncestors(index, term).map((a) => a.id) : [];
+};
+const nav = primary
+  ? markActive(primary, activeItem(primary, activeRoute, ancestors))
+  : markCurrent(derivedNavigation(site, await source.pages(), categories, locale), path);
+const footer = footerMenu
+  ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
+  : undefined;
 // Per-node edge-cache tags next to the site tag (published responses on Cloudflare only).
-const tags = categories.map((a) => termCacheTag(a.term.id));
+const tags = [
+  ...categories.map((a) => termCacheTag(a.term.id)),
+  ...navigationCacheTags(primary),
+  ...navigationCacheTags(footerMenu),
+];
 
 let entries: Record<string, ContentEntry[]> = {};
 let terms = entryTaxonomy(undefined, { tags: [] });
@@ -117,7 +148,7 @@ const meta =
       ? entryHead(site, route.entry, origin, terms)
       : archiveHead(site, route.archive, origin);
 ---
-<Base site={site} meta={meta} nav={nav}>
+<Base site={site} meta={meta} nav={nav} footer={footer}>
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} />
   )}

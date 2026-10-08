@@ -301,6 +301,8 @@ pub enum NodeRefKind {
     Term,
     #[serde(rename = "redirect")]
     Redirect,
+    #[serde(rename = "menu")]
+    Menu,
 }
 impl ::std::fmt::Display for NodeRefKind {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -311,6 +313,7 @@ impl ::std::fmt::Display for NodeRefKind {
             Self::Taxonomy => f.write_str("taxonomy"),
             Self::Term => f.write_str("term"),
             Self::Redirect => f.write_str("redirect"),
+            Self::Menu => f.write_str("menu"),
         }
     }
 }
@@ -324,6 +327,7 @@ impl ::std::str::FromStr for NodeRefKind {
             "taxonomy" => Ok(Self::Taxonomy),
             "term" => Ok(Self::Term),
             "redirect" => Ok(Self::Redirect),
+            "menu" => Ok(Self::Menu),
             _ => Err("invalid value".into()),
         }
     }

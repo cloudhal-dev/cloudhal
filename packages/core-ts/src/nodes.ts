@@ -4,6 +4,7 @@
  */
 import type {
   ContentEntry,
+  Menu,
   NodeRef,
   Page,
   Redirect,
@@ -14,7 +15,15 @@ import type {
 } from "@cloudhal/core-contracts";
 import { ID_PREFIX } from "./ids.ts";
 
-export const NODE_KINDS = ["site", "page", "contentEntry", "taxonomy", "term", "redirect"] as const;
+export const NODE_KINDS = [
+  "site",
+  "page",
+  "contentEntry",
+  "taxonomy",
+  "term",
+  "redirect",
+  "menu",
+] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
 /** Node kind → contract type. */
@@ -25,6 +34,7 @@ export interface NodeTypes {
   taxonomy: Taxonomy;
   term: Term;
   redirect: Redirect;
+  menu: Menu;
 }
 export type SiteNode = NodeTypes[NodeKind];
 
@@ -77,6 +87,8 @@ export const NODE_SPEC: { readonly [K in NodeKind]: NodeSpec<K> } = {
     key: (n) => n.from,
     siteId: (n) => n.siteId,
   },
+  // RFC-0003: one node per menu key; the key is immutable.
+  menu: { schema: "menu", prefix: ID_PREFIX.menu, key: (n) => n.key, siteId: (n) => n.siteId },
 };
 
 export function isNodeKind(kind: string): kind is NodeKind {
