@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   Field,
   Grid,
+  type ImagePreviewStatus,
   InlineCopyText,
   Input,
   InputArea,
@@ -33,11 +34,14 @@ import {
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
+import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
+import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
+import { primaryHostname } from "../lib/site-settings.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
@@ -61,6 +65,11 @@ function duplicateOf(entry: ContentEntry, title: string): NewEntry {
 
 const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
+/** What is sent: the cover image's fields trimmed. */
+function forSave(entry: ContentEntry): ContentEntry {
+  return entry.coverImage ? { ...entry, coverImage: cleanImageRef(entry.coverImage) } : entry;
+}
+
 export function ArticleEditorPage() {
   const t = useT();
   const { siteId, entryId } = useParams({ from: "/sites/$siteId/articles/$entryId" });
@@ -71,7 +80,11 @@ export function ArticleEditorPage() {
     queryKey: ["entry", siteId, entryId],
     queryFn: () => api.entries.get(siteId, entryId),
   });
+  const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const host = primaryHostname(site.data?.domains ?? []);
   const [draft, setDraft] = useState<ContentEntry | undefined>();
+  const [showErrors, setShowErrors] = useState(false);
+  const [coverStatus, setCoverStatus] = useState<ImagePreviewStatus>("empty");
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
@@ -81,9 +94,10 @@ export function ArticleEditorPage() {
   const dirty = isDirty(draft, query.data);
 
   const save = useMutation({
-    mutationFn: (entry: ContentEntry) => api.entries.update(entry),
+    mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry)),
     onSuccess: async (saved) => {
       setDraft(saved);
+      setShowErrors(false);
       qc.setQueryData(["entry", siteId, entryId], saved);
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
       toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
@@ -134,7 +148,18 @@ export function ArticleEditorPage() {
   }
   const set = <K extends keyof ContentEntry>(key: K, value: ContentEntry[K]) =>
     setDraft({ ...draft, [key]: value });
-  const changeStatus = (next: PublishStatus) => save.mutate({ ...draft, status: next });
+  const coverErrors = validateImageRef(draft.coverImage);
+  /** Every save path checks the cover image first; an invalid one never leaves Studio. */
+  const valid = () => {
+    if (!hasErrors(coverErrors)) return true;
+    setShowErrors(true);
+    toast.error(t("seo.fixErrors"));
+    document.getElementById("cover-image")?.scrollIntoView?.({ block: "center" });
+    return false;
+  };
+  const changeStatus = (next: PublishStatus) => {
+    if (valid()) save.mutate({ ...draft, status: next });
+  };
   const title = draft.title || t("articles.untitled");
   const words = wordCount(draft.body.value);
   const details: DetailRow[] = [
@@ -195,7 +220,9 @@ export function ArticleEditorPage() {
             status={draft.status}
             busy={save.isPending}
             onChange={changeStatus}
-            onPublish={() => setPublishOpen(true)}
+            onPublish={() => {
+              if (valid()) setPublishOpen(true);
+            }}
             menu={
               <>
                 <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
@@ -213,7 +240,9 @@ export function ArticleEditorPage() {
           />
           <Button
             variant="primary"
-            onClick={() => save.mutate(draft)}
+            onClick={() => {
+              if (valid()) save.mutate(draft);
+            }}
             loading={save.isPending}
             disabled={!dirty}
             data-testid="save"
@@ -276,6 +305,13 @@ export function ArticleEditorPage() {
                 label={t("editor.summary")}
                 value={draft.summary ?? ""}
                 onValueChange={(v) => setDraft(setOptional(draft, "summary", v))}
+                description={
+                  <CountedHint
+                    hint={t("editor.summaryHint")}
+                    count={draft.summary?.trim().length ?? 0}
+                    recommended={SEO_LIMITS.descriptionRecommended}
+                  />
+                }
                 required={false}
                 autoResize
                 minRows={2}
@@ -283,6 +319,15 @@ export function ArticleEditorPage() {
                 className="w-full"
               />
             </SectionCard>
+            <CoverImageCard
+              image={draft.coverImage}
+              savedSrc={query.data?.coverImage?.src}
+              host={host}
+              errors={coverErrors}
+              showErrors={showErrors}
+              onChange={(image) => setDraft(setOptional(draft, "coverImage", image))}
+              onStatusChange={setCoverStatus}
+            />
             <SectionCard
               title={t("editor.bodyTitle")}
               actions={
@@ -306,6 +351,12 @@ export function ArticleEditorPage() {
         }
         aside={
           <>
+            <ArticleSeoPreviewCard
+              entry={draft}
+              siteName={site.data?.name ?? ""}
+              host={host}
+              coverStatus={coverStatus}
+            />
             <DetailsCard rows={details} />
             <DangerZoneCard
               title={t("editor.deleteArticleTitle")}

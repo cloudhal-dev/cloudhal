@@ -359,6 +359,36 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "routes/AccountPage.tsx#notifications": ["NotificationSettings"],
   "components/Elevation.tsx#notifications": ["useExtendElevation", "endsWithin"],
   "routes/AgentsPage.tsx#notifications": ["useExtendElevation", "noticeMinutes"],
+  // Search and sharing (§2o): cover image, search/social preview, page SEO panel, list markers.
+  "components/Seo.tsx": [
+    "SectionCard",
+    "ImagePreview",
+    "SearchResultPreview",
+    "SocialCardPreview",
+    "InsetPanel",
+    "Input",
+    "InputArea",
+    "Switch",
+    "Banner",
+    "Collapsible",
+    "Tabs",
+    "Badge",
+    "SettingRow",
+    "CharacterCount",
+    "previewImageUrl",
+    "truncateForSearch",
+    "searchBreadcrumb",
+  ],
+  "routes/ArticleEditorPage.tsx#seo": [
+    "CoverImageCard",
+    "ArticleSeoPreviewCard",
+    "CountedHint",
+    "validateImageRef",
+    "primaryHostname",
+  ],
+  "routes/PageEditorPage.tsx#seo": ["PageSeoCard", "validateSeo", "cleanSeo", "primaryHostname"],
+  "routes/PagesPage.tsx#seo": ["Badge", "Tooltip", "EyeSlash"],
+  "routes/ArticlesPage.tsx#seo": ["ImagePreview", "previewImageUrl"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -412,6 +442,9 @@ const REQUIRED_SOMEWHERE = [
   "Collapsible",
   "Switch",
   "NotificationBell",
+  "ImagePreview",
+  "SearchResultPreview",
+  "SocialCardPreview",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -550,6 +583,45 @@ describe("design rules (DESIGN.md)", () => {
       /if \(decision === "approve" && elevationRequestOf\(request\)\) setGranting\(request\);\s*else if/,
     );
     expect(page.text).toMatch(/<ApproveElevationDialog\b/);
+  });
+
+  it("images are drawn only by ImagePreview, from a validated source (§2o)", () => {
+    // The one <img> lives in the ImagePreview block, without referrer.
+    const UI_BLOCKS = path.resolve(here, "../../../packages/ui/src/blocks");
+    const withImg = walk(UI_BLOCKS)
+      .filter((f) => /<img\b/.test(readFileSync(f, "utf8")))
+      .map((f) => path.basename(f));
+    expect(withImg).toEqual(["SeoPreview.tsx"]);
+    const block = readFileSync(path.join(UI_BLOCKS, "SeoPreview.tsx"), "utf8");
+    expect(block).toMatch(/<img\b[^>]*referrerPolicy="no-referrer"/);
+    // Screens pass ImagePreview a URL that went through previewImageUrl (safe source, site
+    // paths resolved against the primary domain) — never a raw stored src.
+    const users = uiFiles.filter((f) => /<ImagePreview\b/.test(f.text));
+    expect(users.map((f) => f.file).sort()).toEqual([
+      "components/Seo.tsx",
+      "routes/ArticlesPage.tsx",
+    ]);
+    for (const f of users) {
+      expect(f.text, f.file).toMatch(/previewImageUrl\(/);
+      expect(f.text, f.file).not.toMatch(/<ImagePreview[^>]*src=\{[^}]*\.src\}/);
+    }
+  });
+
+  it("every save path in the editors validates search and image fields first (§2o)", () => {
+    for (const file of ["routes/ArticleEditorPage.tsx", "routes/PageEditorPage.tsx"]) {
+      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      const saves = text.match(/save\.mutate\(/g) ?? [];
+      const guarded = text.match(/if \(valid\(\)\) save\.mutate\(/g) ?? [];
+      expect(saves.length, file).toBeGreaterThan(0);
+      expect(guarded.length, `${file}: unguarded save.mutate`).toBe(saves.length);
+      expect(text, file).toMatch(/if \(valid\(\)\) setPublishOpen\(true\)/);
+    }
+  });
+
+  it("the noindex switch always comes with its warning (§2o)", () => {
+    const seo = files.find((f) => f.file === "components/Seo.tsx") as { text: string };
+    expect(seo.text).toMatch(/<Switch[\s\S]*?applySeo\(page, \{ noindex: checked \}\)/);
+    expect(seo.text).toMatch(/\{seo\.noindex && \(\s*<Banner\s+variant="alert"/);
   });
 
   it("every screen that can pick Auto asks for consent first", () => {

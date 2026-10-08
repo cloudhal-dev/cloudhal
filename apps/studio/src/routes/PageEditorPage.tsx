@@ -47,11 +47,14 @@ import {
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
+import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewPage } from "../lib/api.ts";
+import { cleanSeo, hasErrors, validateSeo } from "../lib/seo.ts";
+import { primaryHostname } from "../lib/site-settings.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 
 const KINDS: Section["kind"][] = ["hero", "richText", "image", "contentList"];
@@ -200,7 +203,10 @@ export function PageEditorPage() {
     queryKey: ["page", siteId, pageId],
     queryFn: () => api.pages.get(siteId, pageId),
   });
+  const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const host = primaryHostname(site.data?.domains ?? []);
   const [draft, setDraft] = useState<Page | undefined>();
+  const [showErrors, setShowErrors] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [removeIndex, setRemoveIndex] = useState<number | undefined>();
@@ -210,9 +216,10 @@ export function PageEditorPage() {
   }, [query.data]);
   const dirty = isDirty(draft, query.data);
   const save = useMutation({
-    mutationFn: (page: Page) => api.pages.update(page),
+    mutationFn: (page: Page) => api.pages.update(cleanSeo(page)),
     onSuccess: async (saved) => {
       setDraft(saved);
+      setShowErrors(false);
       qc.setQueryData(["page", siteId, pageId], saved);
       await qc.invalidateQueries({ queryKey: ["pages", siteId] });
       toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
@@ -255,6 +262,15 @@ export function PageEditorPage() {
     );
   }
 
+  const seoErrors = validateSeo(draft.seo);
+  /** Every save path checks the SEO fields first; an invalid canonical never leaves Studio. */
+  const valid = () => {
+    if (!hasErrors(seoErrors)) return true;
+    setShowErrors(true);
+    toast.error(t("seo.fixErrors"));
+    document.getElementById("seo")?.scrollIntoView?.({ block: "center" });
+    return false;
+  };
   const updateSection = (i: number, s: Section) =>
     setDraft({ ...draft, sections: draft.sections.map((x, j) => (j === i ? s : x)) });
   const move = (i: number, dir: -1 | 1) => {
@@ -327,8 +343,12 @@ export function PageEditorPage() {
           <StatusActions
             status={draft.status}
             busy={save.isPending}
-            onChange={(next: PublishStatus) => save.mutate({ ...draft, status: next })}
-            onPublish={() => setPublishOpen(true)}
+            onChange={(next: PublishStatus) => {
+              if (valid()) save.mutate({ ...draft, status: next });
+            }}
+            onPublish={() => {
+              if (valid()) setPublishOpen(true);
+            }}
             menu={
               <>
                 <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
@@ -346,7 +366,9 @@ export function PageEditorPage() {
           />
           <Button
             variant="primary"
-            onClick={() => save.mutate(draft)}
+            onClick={() => {
+              if (valid()) save.mutate(draft);
+            }}
             loading={save.isPending}
             disabled={!dirty}
             data-testid="save"
@@ -386,6 +408,14 @@ export function PageEditorPage() {
                 />
               </Grid>
             </SectionCard>
+            <PageSeoCard
+              page={draft}
+              siteName={site.data?.name ?? ""}
+              host={host}
+              errors={seoErrors}
+              showErrors={showErrors}
+              onChange={setDraft}
+            />
             <div className="grid gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="flex items-center gap-2">
