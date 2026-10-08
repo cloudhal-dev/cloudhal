@@ -833,7 +833,7 @@ export const tr: Messages = {
     },
     domains: {
       description:
-        "Bu siteyi sunan alan adları. Önizleme bağlantıları ve kanonik URL'ler birincil alan adını kullanır.",
+        "Bu siteyi sunan alan adları. Önizleme bağlantıları birincil alan adını kullanır.",
       dnsHint:
         "Buraya eklenen alan adı siteye kaydedilir. DNS kaydını dağıtımına ayrıca yönlendirmen gerekir.",
       columns: { hostname: "Alan adı", role: "Rol" },

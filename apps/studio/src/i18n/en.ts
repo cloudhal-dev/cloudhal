@@ -823,8 +823,7 @@ export const en = {
       },
     },
     domains: {
-      description:
-        "Hostnames that serve this site. The primary domain is used for preview links and canonical URLs.",
+      description: "Hostnames that serve this site. The primary domain is used for preview links.",
       dnsHint:
         "Adding a domain here records it on the site. Point its DNS at your deployment separately.",
       columns: { hostname: "Hostname", role: "Role" },
