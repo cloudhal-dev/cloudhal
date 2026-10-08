@@ -115,4 +115,57 @@ describe("copySite", () => {
     await expect(importSite(await pair(), missing)).rejects.toThrow(/missing blob/);
     await expect(importSite(await pair(), { ...bundle, format: "nope" })).rejects.toThrow(/format/);
   });
+
+  it("rejects rows whose columns or contents disagree with their bodies (security review L6)", async () => {
+    const src = await pair();
+    const site = await seedStarterSite(src.store, { name: "Rows", slug: "rows" });
+    await src.store.createSnapshot(site.id, { actor, reason: "manual" });
+    const bundle = JSON.parse(JSON.stringify(await exportSite(src, site.id)));
+    const page = bundle.nodes.find((n: { kind: string }) => n.kind === "page");
+    const variants: [string, (b: typeof bundle) => void, RegExp][] = [
+      [
+        "invalid body",
+        (b) => {
+          const n = b.nodes.find((x: { id: string }) => x.id === page.id);
+          n.body = JSON.stringify({ ...JSON.parse(n.body), path: "not a path" });
+        },
+        /not a valid page/,
+      ],
+      [
+        "kind swap",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === page.id).kind = "contentEntry";
+        },
+        /not a valid content-entry|columns/,
+      ],
+      [
+        "stale hash",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === page.id).hash = "0".repeat(64);
+        },
+        /hash does not match/,
+      ],
+      [
+        "rev mismatch",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === page.id).rev = 99;
+        },
+        /columns do not match/,
+      ],
+      [
+        "snapshot of another site",
+        (b) => {
+          const s0 = b.snapshots[0];
+          s0.body = JSON.stringify({ ...JSON.parse(s0.body), siteId: "site_other000001" });
+        },
+        /snapshot .* columns/,
+      ],
+    ];
+    for (const [name, mutate, error] of variants) {
+      const b = JSON.parse(JSON.stringify(bundle));
+      mutate(b);
+      await expect(importSite(await pair(), b), name).rejects.toThrow(error);
+    }
+    await expect(importSite(await pair(), bundle)).resolves.toBeDefined();
+  });
 });

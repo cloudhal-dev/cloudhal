@@ -125,7 +125,8 @@ export async function main(argv: string[]): Promise<number> {
         console.log(
           `\nSite:   ${r.siteUrl ?? "(see wrangler output)"}\nStudio: ${r.adminUrl ?? "(see wrangler output)"}`,
         );
-        console.log(r.pushed ? "Local site pushed. Open Studio and create the owner account." : "");
+        if (r.setupUrl)
+          console.log(`\nLocal site pushed. Create the owner account (once) at:\n  ${r.setupUrl}`);
       }
       return 0;
     }

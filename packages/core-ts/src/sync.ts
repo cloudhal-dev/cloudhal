@@ -8,8 +8,67 @@
  * copy therefore refuses to overwrite a target whose nodes differ from the source unless
  * `mode: "replace"` is given. Snapshots are immutable and only ever added.
  */
+
+import { assertValid, type RootSchemaName } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
-import { canonicalJson, sha256Hex } from "./hash.ts";
+import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
+import { kindOf, type SiteNode, siteIdOf, uniquenessKey } from "./store.ts";
+
+const SCHEMA_OF: Record<string, RootSchemaName> = {
+  site: "site",
+  page: "page",
+  contentEntry: "content-entry",
+};
+
+/**
+ * A bundle is untrusted input (whoever holds the deployment token): every row must be a valid
+ * contract document whose columns agree with its body, for this site only.
+ */
+async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void> {
+  for (const row of bundle.nodes) {
+    const schema = SCHEMA_OF[row.kind];
+    if (!schema) throw new Error(`node ${row.id}: unknown kind ${row.kind}`);
+    let body: SiteNode;
+    try {
+      body = JSON.parse(row.body) as SiteNode;
+    } catch {
+      throw new Error(`node ${row.id}: body is not JSON`);
+    }
+    try {
+      assertValid(schema, body);
+    } catch (e) {
+      throw new Error(
+        `node ${row.id}: not a valid ${schema} (${e instanceof Error ? e.message.slice(0, 200) : e})`,
+      );
+    }
+    if (
+      body.id !== row.id ||
+      body.rev !== row.rev ||
+      kindOf(body) !== row.kind ||
+      siteIdOf(body) !== row.site_id ||
+      row.site_id !== siteId ||
+      uniquenessKey(body) !== row.key
+    )
+      throw new Error(`node ${row.id}: columns do not match its body`);
+    if ((await nodeHash(body)) !== row.hash)
+      throw new Error(`node ${row.id}: hash does not match its body`);
+  }
+  for (const row of bundle.snapshots) {
+    let body: { id?: string; siteId?: string };
+    try {
+      body = JSON.parse(row.body) as { id?: string; siteId?: string };
+    } catch {
+      throw new Error(`snapshot ${row.id}: body is not JSON`);
+    }
+    try {
+      assertValid("snapshot", body);
+    } catch {
+      throw new Error(`snapshot ${row.id}: not a valid snapshot`);
+    }
+    if (body.id !== row.id || body.siteId !== siteId || row.site_id !== siteId)
+      throw new Error(`snapshot ${row.id}: columns do not match its body`);
+  }
+}
 
 export interface StoragePair {
   sql: SqlDriver;
@@ -150,6 +209,7 @@ export async function importSite(
     bundle.snapshots.some((s) => s.site_id !== siteId)
   )
     throw new Error("bundle contains rows of another site");
+  await assertValidRows(siteId, bundle);
 
   // 1. Blobs: verify content addressing so a bundle cannot plant mismatched bodies.
   let blobs = 0;

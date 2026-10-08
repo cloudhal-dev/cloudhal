@@ -81,6 +81,7 @@ describe("cloudhal deploy", () => {
       "CLOUDHAL_DEPLOY_TOKEN",
       "CLOUDHAL_PREVIEW_SECRET",
       "CLOUDHAL_PURGE_TOKEN",
+      "CLOUDHAL_SETUP_TOKEN",
       "MCP_STATE_KEY",
     ]);
     for (const v of Object.values(secrets)) expect(v.length).toBeGreaterThanOrEqual(32);
@@ -151,6 +152,15 @@ describe("cloudhal deploy", () => {
       adminUrl: "https://deploy-me-admin.acme.workers.dev",
       pushed: true,
     });
+    // the owner account can only be created through the one-time setup link
+    expect(first.setupUrl).toBe(
+      `https://deploy-me-admin.acme.workers.dev/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`,
+    );
+    // wrangler's secret files existed only during the deploy
+    const leftovers = (await import("node:fs/promises")).readdir(
+      path.join(projectDir, cfg.dataDir, "deploy"),
+    );
+    expect((await leftovers).filter((f) => f.endsWith("-secrets.json"))).toEqual([]);
     const siteCfg = await jsonc(path.join(projectDir, "wrangler.jsonc"));
     expect((siteCfg.d1_databases as { database_id: string }[])[0]?.database_id).toBe(
       "11111111-2222-3333-4444-555555555555",
@@ -175,6 +185,7 @@ describe("cloudhal deploy", () => {
       healthTimeoutMs: 5000,
     });
     expect(second.pushed).toBe(false);
+    expect(second.setupUrl).toBeUndefined();
     expect(calls[0]).toBe("d1 info deploy-me-db --json");
     expect(calls).not.toContain("d1 create deploy-me-db");
     expect((await remote.getPage(about?.id as string))?.title).toBe("Edited in production");

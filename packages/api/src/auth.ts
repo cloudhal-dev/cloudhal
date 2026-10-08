@@ -23,6 +23,12 @@ export interface AuthOptions {
    * - `open`: anybody (local development, demos).
    */
   readonly signUp?: "first-user" | "closed" | "open";
+  /**
+   * With `first-user`: the first account must present this token (header `x-cloudhal-setup-token`),
+   * so whoever finds a fresh deployment's Studio first cannot claim it. `cloudhal deploy` prints a
+   * one-time setup link. Ignored once an owner exists.
+   */
+  readonly setupToken?: string | undefined;
   /** @deprecated use `signUp: "closed"`. */
   readonly disableSignUp?: boolean;
   /**
@@ -99,6 +105,14 @@ function createInstance(options: AuthOptions) {
           throw new APIError("FORBIDDEN", {
             message: "Sign-up is closed: this Studio already has an owner. Ask them for access.",
           });
+        if (options.setupToken) {
+          const given = ctx.headers?.get(SETUP_TOKEN_HEADER) ?? "";
+          if (!constantTimeEqual(given, options.setupToken))
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Creating the owner account needs the setup link printed by `cloudhal deploy`.",
+            });
+        }
       }),
     },
     ...(options.workers
@@ -127,6 +141,16 @@ function createInstance(options: AuthOptions) {
 }
 
 export const API_KEY_HEADER = "x-api-key";
+export const SETUP_TOKEN_HEADER = "x-cloudhal-setup-token";
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a);
+  const eb = new TextEncoder().encode(b);
+  if (ea.length !== eb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ea.length; i++) diff |= (ea[i] as number) ^ (eb[i] as number);
+  return diff === 0;
+}
 
 /** Caller-facing auth failure (maps to 400/401 in the API). */
 export class AuthError extends Error {

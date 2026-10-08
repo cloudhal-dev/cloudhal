@@ -80,7 +80,7 @@ export function kindOf(node: SiteNode): NodeKind {
   return "contentEntry";
 }
 
-function siteIdOf(node: SiteNode): string {
+export function siteIdOf(node: SiteNode): string {
   return "pageIds" in node ? node.id : node.siteId;
 }
 
@@ -522,6 +522,19 @@ export class SiteGraphStore {
     if (!from) throw new NotFoundError("snapshot", fromId);
     if (!to) throw new NotFoundError("snapshot", toId);
     return diffNodeRefs(from.nodes, to.nodes);
+  }
+
+  /**
+   * Runs the `onPublished` hook (cache purge) for a pointer change that did not go through
+   * `publish` — e.g. a site imported with `cloudhal push --replace`.
+   */
+  async notifyPublished(site: Site): Promise<void> {
+    if (!this.#onPublished) return;
+    try {
+      await this.#onPublished(site);
+    } catch (e) {
+      this.#onHookError(e);
+    }
   }
 
   /** Points production at a snapshot (CAS on the site). */

@@ -32,6 +32,8 @@ export interface AdminEnv {
   CLOUDHAL_PREVIEW_SECRET?: string;
   CLOUDHAL_PURGE_TOKEN?: string;
   CLOUDHAL_DEPLOY_TOKEN?: string;
+  /** One-time token the first account must present (see `cloudhal deploy` output). */
+  CLOUDHAL_SETUP_TOKEN?: string;
   /** `first-user` (default: only the owner can sign up), `closed` or `open`. */
   CLOUDHAL_SIGNUP?: string;
 }
@@ -102,6 +104,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
             ? env.CLOUDHAL_SIGNUP
             : "first-user",
+        setupToken: env.CLOUDHAL_SETUP_TOKEN,
         workers: { waitUntil: (p) => ctx.waitUntil(p) },
       });
       const audit = new AuditLog(sql);

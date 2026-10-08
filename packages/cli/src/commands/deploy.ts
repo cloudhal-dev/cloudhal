@@ -11,7 +11,7 @@
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
  */
-import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { assetDir } from "../assets.ts";
@@ -36,6 +36,7 @@ export const SECRET_KEYS = [
   "CLOUDHAL_PREVIEW_SECRET",
   "CLOUDHAL_PURGE_TOKEN",
   "CLOUDHAL_DEPLOY_TOKEN",
+  "CLOUDHAL_SETUP_TOKEN",
 ] as const;
 export type DeploySecrets = Record<(typeof SECRET_KEYS)[number], string>;
 
@@ -188,6 +189,8 @@ export interface DeployResult {
   siteUrl?: string | undefined;
   adminUrl?: string | undefined;
   pushed?: boolean;
+  /** First deploy only: open it to create the owner account. */
+  setupUrl?: string;
 }
 
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
@@ -219,18 +222,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   // 2. secrets
   const secrets = await loadOrCreateSecrets(dir);
-  const siteSecretsFile = path.join(dir, "site-secrets.json");
-  await writeFile(
-    siteSecretsFile,
-    JSON.stringify({
-      CLOUDHAL_PREVIEW_SECRET: secrets.CLOUDHAL_PREVIEW_SECRET,
-      CLOUDHAL_PURGE_TOKEN: secrets.CLOUDHAL_PURGE_TOKEN,
-    }),
-    { mode: 0o600 },
-  );
-  const adminSecretsFile = path.join(dir, "admin-secrets.json");
-  await writeFile(adminSecretsFile, JSON.stringify(secrets), { mode: 0o600 });
-
   // 3. site Worker
   await writeWranglerConfig(
     siteConfigPath(options.projectDir),
@@ -264,19 +255,34 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     return { dryRun: true, names, siteConfig, adminConfig: admin.configPath };
   }
 
-  log(`deploying ${names.site}`);
-  const siteDeploy = await must(
-    run,
-    ["deploy", "--secrets-file", siteSecretsFile],
-    options.projectDir,
-  );
+  // Secrets go to wrangler through files that exist only while it runs (0600, then removed).
+  const siteSecretsFile = path.join(dir, "site-secrets.json");
+  const adminSecretsFile = path.join(dir, "admin-secrets.json");
+  const writeSecret = async (file: string, value: object) => {
+    await writeFile(file, JSON.stringify(value), { mode: 0o600 });
+    await chmod(file, 0o600);
+  };
+  let siteDeploy: Awaited<ReturnType<typeof must>>;
+  let adminDeploy: Awaited<ReturnType<typeof must>>;
+  try {
+    await writeSecret(siteSecretsFile, {
+      CLOUDHAL_PREVIEW_SECRET: secrets.CLOUDHAL_PREVIEW_SECRET,
+      CLOUDHAL_PURGE_TOKEN: secrets.CLOUDHAL_PURGE_TOKEN,
+    });
+    await writeSecret(adminSecretsFile, secrets);
+    log(`deploying ${names.site}`);
+    siteDeploy = await must(run, ["deploy", "--secrets-file", siteSecretsFile], options.projectDir);
+    log(`deploying ${names.admin}`);
+    adminDeploy = await must(
+      run,
+      ["deploy", "-c", admin.configPath, "--secrets-file", adminSecretsFile],
+      admin.dir,
+    );
+  } finally {
+    await rm(siteSecretsFile, { force: true });
+    await rm(adminSecretsFile, { force: true });
+  }
   const siteUrl = deployedUrls(siteDeploy.records)[0];
-  log(`deploying ${names.admin}`);
-  const adminDeploy = await must(
-    run,
-    ["deploy", "-c", admin.configPath, "--secrets-file", adminSecretsFile],
-    admin.dir,
-  );
   const adminUrl = deployedUrls(adminDeploy.records)[0];
   await writeDeployState(options.projectDir, cfg.dataDir, {
     name: base.name,
@@ -309,6 +315,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     });
     pushed = result.pushed;
   }
+  // First deploy: the owner account can only be created through this one-time link.
+  const setupUrl =
+    pushed && adminUrl
+      ? `${adminUrl.replace(/\/$/, "")}/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`
+      : undefined;
   return {
     dryRun: false,
     names,
@@ -317,5 +328,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     siteUrl,
     adminUrl,
     pushed,
+    ...(setupUrl ? { setupUrl } : {}),
   };
 }

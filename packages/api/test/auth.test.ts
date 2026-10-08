@@ -118,7 +118,7 @@ describe("sign-up policy", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: email, email, password: "correct horse battery" }),
     });
-  const make = async (signUpMode?: "first-user" | "closed" | "open") => {
+  const make = async (signUpMode?: "first-user" | "closed" | "open", setupToken?: string) => {
     const db = new Database(":memory:");
     const store = new SiteGraphStore({
       sql: new BetterSqlite3Driver(db),
@@ -130,6 +130,7 @@ describe("sign-up policy", () => {
       baseURL: "http://localhost",
       secret: "test-secret-test-secret-test-secret",
       ...(signUpMode ? { signUp: signUpMode } : {}),
+      ...(setupToken ? { setupToken } : {}),
     });
     return createApi({ store, resolveActor: auth.resolveActor, authHandler: auth.handler });
   };
@@ -147,5 +148,24 @@ describe("sign-up policy", () => {
     const open = await make("open");
     expect((await signUp(open, "a@example.com")).status).toBe(200);
     expect((await signUp(open, "b@example.com")).status).toBe(200);
+  });
+
+  it("with a setup token, only its holder can create the owner account (M4)", async () => {
+    const token = "owner-setup-token-0123456789abcdefghijkl";
+    const app = await make("first-user", token);
+    const withToken = (value: string) =>
+      app.request("/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-cloudhal-setup-token": value },
+        body: JSON.stringify({
+          name: "o",
+          email: "owner@example.com",
+          password: "correct horse battery",
+        }),
+      });
+    expect((await signUp(app, "squatter@example.com")).status).toBe(403);
+    expect((await withToken("wrong-token")).status).toBe(403);
+    expect((await withToken(token)).status).toBe(200);
+    expect((await withToken(token)).status).toBe(403); // owner exists: closed for everyone
   });
 });
