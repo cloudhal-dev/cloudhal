@@ -133,8 +133,14 @@ export interface ContentListSection {
   collection: Slug;
   limit: number;
   sort: "newest" | "oldest" | "title";
+  /**
+   * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
+   */
+  filter?: string;
 }
 /**
+ * Search and social metadata of a routable node (page, term archive).
+ *
  * This interface was referenced by `Page`'s JSON-Schema
  * via the `definition` "Seo".
  */
@@ -143,6 +149,7 @@ export interface Seo {
   description?: string;
   noindex?: boolean;
   canonical?: string;
+  ogImage?: ImageRef;
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

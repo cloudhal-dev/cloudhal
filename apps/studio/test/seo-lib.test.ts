@@ -41,7 +41,9 @@ describe("limits", () => {
       "../../../packages/core-contracts/schemas",
     );
     const read = (name: string) => JSON.parse(readFileSync(path.join(schemas, name), "utf8"));
-    const seo = read("page.schema.json").$defs.Seo.properties;
+    // RFC-0002 moved Seo to common.schema.json (shared by pages and terms)
+    const seo = (read("common.schema.json").$defs.Seo ?? read("page.schema.json").$defs.Seo)
+      .properties;
     const image = read("common.schema.json").$defs.ImageRef.properties;
     expect(SEO_LIMITS.titleMax).toBe(seo.title.maxLength);
     expect(SEO_LIMITS.descriptionMax).toBe(seo.description.maxLength);

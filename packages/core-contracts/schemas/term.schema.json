@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/term.schema.json",
+  "title": "Term",
+  "description": "One concept in a taxonomy (a category, a tag, a series). Content refers to terms by id, independent of locale; names, synonyms, archive intro and SEO are per locale. Renames, merges and retirements keep the id and leave redirects behind; `proposedBy` records the actor that proposed it (RFC-0002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "taxonomyId",
+    "slug",
+    "status",
+    "visibility",
+    "labels",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "taxonomyId": { "$ref": "common.schema.json#/$defs/Id" },
+    "slug": {
+      "$ref": "common.schema.json#/$defs/Slug",
+      "description": "URL segment of the term's archive; unique within its taxonomy, together with every slug in any term's slugHistory."
+    },
+    "status": {
+      "type": "string",
+      "description": "active: usable and public (subject to visibility). proposed: created by an agent, waiting for a person; assignable but never public. retired: no new assignments, no archive.",
+      "enum": ["active", "proposed", "retired"]
+    },
+    "visibility": {
+      "type": "string",
+      "description": "internal terms have no archive, feed or sitemap entry and are not shown on entries; themes and filters may still use them.",
+      "enum": ["public", "internal"]
+    },
+    "labels": {
+      "type": "object",
+      "description": "Names per locale. Must contain the site's default locale.",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/Locale" },
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/TermLabel" }
+    },
+    "parentId": {
+      "$ref": "common.schema.json#/$defs/Id",
+      "description": "Parent term in the same taxonomy; only in hierarchical taxonomies. No cycles."
+    },
+    "image": { "$ref": "common.schema.json#/$defs/ImageRef" },
+    "slugHistory": {
+      "type": "array",
+      "description": "Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.",
+      "items": { "$ref": "common.schema.json#/$defs/Slug" },
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true
+    },
+    "mergedInto": {
+      "$ref": "common.schema.json#/$defs/Id",
+      "description": "Set when this term was merged into another active term of the same taxonomy; status is then 'retired'."
+    },
+    "proposedBy": { "$ref": "common.schema.json#/$defs/Actor" },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "TermLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "altNames": {
+          "type": "array",
+          "description": "Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "minItems": 1,
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "description": {
+          "type": "string",
+          "description": "Markdown introduction shown at the top of the archive.",
+          "maxLength": 20000
+        },
+        "seo": { "$ref": "common.schema.json#/$defs/Seo" }
+      }
+    }
+  }
+}

@@ -61,4 +61,8 @@ export interface ContentListSection {
   collection: Slug;
   limit: number;
   sort: "newest" | "oldest" | "title";
+  /**
+   * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
+   */
+  filter?: string;
 }

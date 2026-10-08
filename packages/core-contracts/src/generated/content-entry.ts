@@ -83,9 +83,18 @@ export interface ContentEntry {
     [k: string]: unknown | undefined;
   };
   /**
+   * @deprecated
+   * Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2.
+   *
    * @maxItems 50
    */
   tags: Slug[];
+  /**
+   * Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object.
+   */
+  terms?: {
+    [k: string]: TermAssignment | undefined;
+  };
   author: Actor;
   coverImage?: ImageRef;
   publishedAt?: Timestamp;
@@ -101,6 +110,23 @@ export interface ContentEntry {
 export interface Body {
   format: "markdown" | "html";
   value: string;
+}
+/**
+ * Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "TermAssignment".
+ */
+export interface TermAssignment {
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  ids: [Id, ...Id[]];
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  primary?: string;
 }
 /**
  * This interface was referenced by `ContentEntry`'s JSON-Schema

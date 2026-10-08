@@ -80,6 +80,24 @@
         "external": { "type": "boolean" }
       }
     },
+    "Path": {
+      "type": "string",
+      "description": "Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
+    },
+    "Seo": {
+      "type": "object",
+      "description": "Search and social metadata of a routable node (page, term archive).",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 500 },
+        "noindex": { "type": "boolean" },
+        "canonical": { "type": "string", "maxLength": 2048 },
+        "ogImage": { "$ref": "#/$defs/ImageRef" }
+      }
+    },
     "PublishStatus": {
       "type": "string",
       "description": "Editorial lifecycle of a page or content entry.",

@@ -6,7 +6,7 @@
  */
 
 import type { ErrorObject } from "ajv";
-import type { Project, Site, Page, Section, ContentEntry, Snapshot, SkillManifest } from "./index.ts";
+import type { Project, Site, Page, Section, ContentEntry, Snapshot, SkillManifest, Taxonomy, Term, Redirect } from "./index.ts";
 
 export interface StandaloneValidator<T> {
   (data: unknown): data is T;
@@ -20,3 +20,6 @@ export declare const validateSection: StandaloneValidator<Section>;
 export declare const validateContentEntry: StandaloneValidator<ContentEntry>;
 export declare const validateSnapshot: StandaloneValidator<Snapshot>;
 export declare const validateSkillManifest: StandaloneValidator<SkillManifest>;
+export declare const validateTaxonomy: StandaloneValidator<Taxonomy>;
+export declare const validateTerm: StandaloneValidator<Term>;
+export declare const validateRedirect: StandaloneValidator<Redirect>;

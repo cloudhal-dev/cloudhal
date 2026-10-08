@@ -4,10 +4,13 @@ import type {
   ContentEntry,
   Page,
   Project,
+  Redirect,
   Section,
   Site,
   SkillManifest,
   Snapshot,
+  Taxonomy,
+  Term,
 } from "./generated/index.ts";
 import * as v from "./generated/validators.js";
 
@@ -20,6 +23,9 @@ export interface ContractTypes {
   "content-entry": ContentEntry;
   snapshot: Snapshot;
   "skill-manifest": SkillManifest;
+  taxonomy: Taxonomy;
+  term: Term;
+  redirect: Redirect;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -30,6 +36,9 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   "content-entry": v.validateContentEntry,
   snapshot: v.validateSnapshot,
   "skill-manifest": v.validateSkillManifest,
+  taxonomy: v.validateTaxonomy,
+  term: v.validateTerm,
+  redirect: v.validateRedirect,
 };
 
 export class ContractValidationError extends Error {

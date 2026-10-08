@@ -109,3 +109,15 @@ fn snapshot() {
 fn skill_manifest() {
     check::<cloudhal_schema::SkillManifest>("skill-manifest");
 }
+#[test]
+fn taxonomy() {
+    check::<cloudhal_schema::Taxonomy>("taxonomy");
+}
+#[test]
+fn term() {
+    check::<cloudhal_schema::Term>("term");
+}
+#[test]
+fn redirect() {
+    check::<cloudhal_schema::Redirect>("redirect");
+}

@@ -35,22 +35,10 @@
       "type": "array",
       "items": { "$ref": "section.schema.json" }
     },
-    "seo": { "$ref": "#/$defs/Seo" },
+    "seo": { "$ref": "common.schema.json#/$defs/Seo" },
     "rev": { "$ref": "common.schema.json#/$defs/Revision" },
     "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
     "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
     "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
-  },
-  "$defs": {
-    "Seo": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "title": { "type": "string", "maxLength": 300 },
-        "description": { "type": "string", "maxLength": 500 },
-        "noindex": { "type": "boolean" },
-        "canonical": { "type": "string", "maxLength": 2048 }
-      }
-    }
   }
 }
