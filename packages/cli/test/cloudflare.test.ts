@@ -3,6 +3,7 @@
  * Publishing and rollback are pointer flips seen by the next request; drafts stay invisible
  * except behind a signed preview link; the purge endpoint is authenticated. RFC-0002: archives,
  * term feeds and redirects answer with real status codes, and responses carry per-node cache tags.
+ * RFC-0003: menus render per request, follow publishes, and hide items whose page is gone.
  */
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
@@ -18,6 +19,13 @@ import { createTestHarness } from "wrangler";
 import { buildSiteWorker } from "../src/cloudflare/build.ts";
 import { siteConfigPath, siteWorkerConfig, writeWranglerConfig } from "../src/cloudflare/config.ts";
 import { init, readProjectConfig, snapshot } from "../src/index.ts";
+import {
+  applyMenuFixture,
+  DEFAULT_FOOTER,
+  derivedHeader,
+  footerOf,
+  headerOf,
+} from "./menu-fixture.ts";
 import { applyTaxonomyFixture } from "./taxonomy-fixture.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -284,5 +292,61 @@ describe("Site Worker on workerd", () => {
     expect(await post.text()).toContain(
       '<a class="ch-chip" href="/category/news" rel="tag">News</a>',
     );
+  });
+
+  it("renders menus per request, hides an item whose page was deleted, and falls back to the derived header (RFC-0003)", async () => {
+    const publishNow = async (label: string) => {
+      const snap = await remote.createSnapshot(siteId, { actor: human, reason: "publish", label });
+      const site = await remote.getSite(siteId);
+      await remote.publish(site as NonNullable<typeof site>, snap.id);
+      await purge(PURGE_TOKEN);
+      return snap;
+    };
+    const fx = await applyMenuFixture(remote, siteId);
+    const snap = await publishNow("menus");
+    const res = await get("/about");
+    const html = await res.text();
+    expect(res.status, html.slice(0, 300)).toBe(200);
+    expect(res.headers.get("x-cloudhal-snapshot")).toBe(snap.id);
+    const header = headerOf(html);
+    expect(header).toContain(
+      '<a href="/about" aria-current="page" class="text-zinc-900">Who we are</a>',
+    );
+    expect(header).toContain('<a href="/team" class="hover:text-zinc-900">Team</a>');
+    expect(header).toContain("<span>Topics</span>");
+    expect(header).toContain('rel="noopener noreferrer" target="_blank">GitHub</a>');
+    expect(footerOf(html)).toContain(">Status</a>");
+    // pages that render a menu carry its node tag and the tags of the terms it shows
+    const tags = res.headers.get("cache-tag")?.split(",") ?? [];
+    expect(tags[0]).toBe(`cloudhal-site-${siteId}`);
+    expect(tags).toContain(`cloudhal-node-${fx.primary.id}`);
+    expect(tags).toContain(`cloudhal-node-${fx.footer.id}`);
+    expect(tags).toContain(`cloudhal-term-${fx.newsTermId}`);
+
+    // the page goes, the menu stays untouched, and the next publish renders without the item
+    const site = await remote.getSite(siteId);
+    await remote.deletePage(site as NonNullable<typeof site>, fx.team);
+    expect((await remote.getMenu(fx.primary.id))?.rev).toBe(0);
+    await publishNow("team deleted");
+    const after = await (await get("/about")).text();
+    expect(headerOf(after)).not.toContain('href="/team"');
+    expect(headerOf(after)).toContain(">Who we are</a>");
+    expect((await get("/team")).status).toBe(404);
+
+    // no menus: the derived header and footer again
+    await remote.deleteMenu(
+      (await remote.getMenu(fx.primary.id)) as NonNullable<typeof fx.primary>,
+    );
+    await remote.deleteMenu(fx.footer);
+    await publishNow("menus deleted");
+    const derived = await (await get("/about")).text();
+    const about = (await remote.listPages(siteId)).find((p) => p.path === "/about");
+    expect(headerOf(derived)).toBe(
+      derivedHeader("Edge Site", [
+        { href: "/about", label: about?.title ?? "About", current: true },
+        { href: "/category/news", label: "News" },
+      ]),
+    );
+    expect(footerOf(derived)).toBe(DEFAULT_FOOTER);
   });
 });

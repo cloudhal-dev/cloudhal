@@ -1,5 +1,6 @@
 import type {
   ContentEntry,
+  Menu,
   NodeRef,
   Page,
   Redirect,
@@ -11,6 +12,7 @@ import type {
 import type { RedirectMatch, SiteGraphStore } from "@cloudhal/core-ts";
 import { matchRedirect, termName } from "@cloudhal/core-ts";
 import { matches, parseFilter, resolveFilter } from "@cloudhal/core-ts/filter";
+import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
 
 /**
  * What a renderer needs from a site, independent of whether it reads live nodes (dev) or a
@@ -57,6 +59,17 @@ export interface GraphSource {
   redirectFor(path: string): Promise<RedirectMatch | undefined>;
   /** Every redirect of the site (static builds write them out; see `redirectsFile`). */
   redirects(): Promise<Redirect[]>;
+  /** The menu stored under `key`, if the site has one (raw node, RFC-0003). */
+  menu(key: string): Promise<Menu | undefined>;
+  /**
+   * The menu under `key` resolved for a locale (default: the site's): only shown items, with labels
+   * and hrefs. Undefined: no menu under `key` (themes fall back to `derivedNavigation`).
+   */
+  navigation(
+    key: string,
+    locale?: string,
+    options?: NavigationOptions,
+  ): Promise<Navigation | undefined>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -205,6 +218,39 @@ export class LiveSource implements GraphSource {
   redirects(): Promise<Redirect[]> {
     return this.#store.listRedirects(this.#siteId);
   }
+
+  menu(key: string): Promise<Menu | undefined> {
+    return this.#store.getMenuByKey(this.#siteId, key);
+  }
+
+  async navigation(
+    key: string,
+    locale?: string,
+    options: NavigationOptions = {},
+  ): Promise<Navigation | undefined> {
+    const menu = await this.menu(key);
+    if (!menu) return undefined;
+    const site = await this.site();
+    const [pages, entries, taxonomies, terms] = await Promise.all([
+      this.#store.listPages(this.#siteId),
+      this.#store.listContentEntries(this.#siteId),
+      this.#store.listTaxonomies(this.#siteId),
+      this.#store.listTerms(this.#siteId),
+    ]);
+    return navigationFor(
+      menu,
+      {
+        site,
+        pages,
+        entries,
+        taxonomies,
+        terms,
+        includeDrafts: this.#includeDrafts,
+        ...(options.collectionIndex ? { collectionIndex: options.collectionIndex } : {}),
+      },
+      locale ?? site.defaultLocale,
+    );
+  }
 }
 
 interface Loaded {
@@ -214,6 +260,7 @@ interface Loaded {
   taxonomies: Taxonomy[];
   terms: Term[];
   redirects: Redirect[];
+  menus: Menu[];
 }
 
 /** Reads exactly the node bodies captured in a snapshot (immutable; only published nodes are rendered). */
@@ -256,10 +303,11 @@ export class SnapshotSource implements GraphSource {
         (await read<T>(
           this.#snapshot.nodes.filter((n) => (n.kind as string) === kind),
         )) as unknown as T[];
-      const [taxonomies, terms, redirects] = await Promise.all([
+      const [taxonomies, terms, redirects, menus] = await Promise.all([
         byKind<Taxonomy>("taxonomy"),
         byKind<Term>("term"),
         byKind<Redirect>("redirect"),
+        byKind<Menu>("menu"),
       ]);
       const order = new Map((site as Site).pageIds.map((id, i) => [id, i]));
       return {
@@ -271,6 +319,7 @@ export class SnapshotSource implements GraphSource {
         taxonomies,
         terms,
         redirects,
+        menus,
       };
     })();
     return this.#cache;
@@ -359,5 +408,32 @@ export class SnapshotSource implements GraphSource {
 
   async redirects(): Promise<Redirect[]> {
     return (await this.#load()).redirects;
+  }
+
+  async menu(key: string): Promise<Menu | undefined> {
+    return (await this.#load()).menus.find((m) => m.key === key);
+  }
+
+  async navigation(
+    key: string,
+    locale?: string,
+    options: NavigationOptions = {},
+  ): Promise<Navigation | undefined> {
+    const loaded = await this.#load();
+    const menu = loaded.menus.find((m) => m.key === key);
+    if (!menu) return undefined;
+    // Only published pages and entries are loaded: anything else resolves as missing (hidden).
+    return navigationFor(
+      menu,
+      {
+        site: loaded.site,
+        pages: loaded.pages,
+        entries: loaded.entries,
+        taxonomies: loaded.taxonomies,
+        terms: loaded.terms,
+        ...(options.collectionIndex ? { collectionIndex: options.collectionIndex } : {}),
+      },
+      locale ?? loaded.site.defaultLocale,
+    );
   }
 }

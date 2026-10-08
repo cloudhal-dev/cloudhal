@@ -1,16 +1,23 @@
 ---
 import { SeoHead } from "@cloudhal/astro-renderer/components";
-import type { NavLink } from "@cloudhal/astro-renderer/routing";
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
 import type { Site } from "@cloudhal/core-contracts";
+import NavLink from "../components/NavLink.astro";
+import NavMenu from "../components/NavMenu.astro";
 import "../styles/global.css";
 
 interface Props {
   site: Site;
   meta: HeadMeta;
-  nav: NavLink[];
+  /** The `primary` menu, or the derived header when the site has none (RFC-0003 §7.3). */
+  nav: ActiveNavItem[];
+  /** The `footer` menu; undefined keeps the default footer links. */
+  footer?: ActiveNavItem[] | undefined;
 }
-const { site, meta, nav } = Astro.props;
+const { site, meta, nav, footer } = Astro.props;
+const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
+const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
 <!doctype html>
 <html lang={meta.lang}>
@@ -25,15 +32,13 @@ const { site, meta, nav } = Astro.props;
       <a href="/" class="text-lg font-semibold">{site.name}</a>
       {nav.length > 0 && (
         <nav class="flex flex-wrap gap-4 text-sm text-zinc-600" aria-label="Main">
-          {nav.map((link) => (
-            <a
-              href={link.href}
-              aria-current={link.current ? "page" : undefined}
-              class={link.current ? "text-zinc-900" : "hover:text-zinc-900"}
-            >
-              {link.label}
-            </a>
-          ))}
+          {nav.map((item) =>
+            item.children.length > 0 ? (
+              <NavMenu item={item} {...header} />
+            ) : (
+              <NavLink item={item} {...header} />
+            ),
+          )}
         </nav>
       )}
     </header>
@@ -42,7 +47,21 @@ const { site, meta, nav } = Astro.props;
     </main>
     <footer class="mx-auto flex max-w-3xl justify-between gap-4 px-4 py-8 text-xs text-zinc-500">
       <span>Built with Cloudhal</span>
-      <a href="/rss.xml" class="hover:text-zinc-700">RSS</a>
+      {footer ? (
+        footer.length > 0 && (
+          <nav class="flex flex-wrap gap-4" aria-label="Footer">
+            {footer.map((item) =>
+              item.children.length > 0 ? (
+                <NavMenu item={item} {...below} />
+              ) : (
+                <NavLink item={item} {...below} />
+              ),
+            )}
+          </nav>
+        )
+      ) : (
+        <a href="/rss.xml" class="hover:text-zinc-700">RSS</a>
+      )}
     </footer>
   </body>
 </html>

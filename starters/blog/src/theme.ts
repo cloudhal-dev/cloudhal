@@ -4,6 +4,7 @@
  *   export const components = { hero: MyHero };
  */
 import type { SectionComponents } from "@cloudhal/astro-renderer/components/Sections.astro";
+import type { CollectionIndexHook } from "@cloudhal/astro-renderer/navigation";
 
 export const components: SectionComponents = {};
 
@@ -11,11 +12,18 @@ export const components: SectionComponents = {};
 export const ARCHIVE_PAGE_SIZE = 20;
 
 /**
- * Append the site's top-level categories (by `position`, then name) to the header after its
- * top-level pages. Only categories whose archive is served (active, public, with posts) appear.
- * Set to `false` for a pages-only menu.
+ * Sites without a `primary` menu get a derived header: their top-level pages, then (with this
+ * flag) the top-level categories (by `position`, then name) whose archive is served (active,
+ * public, with posts). Set to `false` for a pages-only header. A `primary` menu replaces it.
  */
 export const NAV_CATEGORIES = true;
+
+/**
+ * Where this theme serves a collection's index, for menu items that link to a collection
+ * (RFC-0003 §7.1). Return `undefined` to use the default: the first published page that lists the
+ * collection (the blog's home page lists `posts`); without one the item is hidden.
+ */
+export const collectionIndex: CollectionIndexHook = () => undefined;
 
 /** "Related posts" under an article: entries sharing its primary category or tags (0 hides it). */
 export const RELATED_POSTS = 3;
