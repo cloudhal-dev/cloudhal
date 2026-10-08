@@ -6,6 +6,8 @@
  */
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
+import type { AgentMode, AutoCheck } from "./modes.ts";
+import type { ApprovalCause } from "./policy.ts";
 
 export type ApprovalStatus = "pending" | "approved" | "denied" | "consumed" | "expired";
 
@@ -16,6 +18,12 @@ export interface Approval {
   input?: unknown;
   actor: Actor;
   prompt: string;
+  /** The mode the agent worked in when it asked (ADR-0015). */
+  mode?: AgentMode | undefined;
+  /** Why a person must decide. */
+  cause?: ApprovalCause | undefined;
+  /** For an `auto`-mode publish: the low-risk check that sent it to a person. */
+  autoCheck?: AutoCheck | undefined;
   status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;
@@ -32,6 +40,9 @@ export interface ApprovalRequest {
   actor: Actor;
   prompt: string;
   stateHash: string;
+  mode?: AgentMode | undefined;
+  cause?: ApprovalCause | undefined;
+  autoCheck?: AutoCheck | undefined;
 }
 
 export type RedeemResult =
@@ -56,6 +67,14 @@ function newApprovalId(): string {
   return `appr_${Array.from(bytes, (b) => alphabet[b % 32]).join("")}`;
 }
 
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 export class ApprovalStore {
   readonly #sql: SqlDriver;
   readonly #ttlMs: number;
@@ -72,7 +91,7 @@ export class ApprovalStore {
     const id = newApprovalId();
     const expires = new Date(now.getTime() + this.#ttlMs).toISOString();
     await this.#sql.run(
-      "INSERT INTO approvals (id, site_id, tool, args_hash, input, actor_kind, actor_id, actor_name, prompt, state_hash, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+      "INSERT INTO approvals (id, site_id, tool, args_hash, input, actor_kind, actor_id, actor_name, prompt, state_hash, status, created_at, expires_at, mode, cause, auto_check) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
       [
         id,
         req.siteId ?? null,
@@ -86,6 +105,9 @@ export class ApprovalStore {
         req.stateHash,
         now.toISOString(),
         expires,
+        req.mode ?? null,
+        req.cause ?? null,
+        req.autoCheck ? JSON.stringify(req.autoCheck) : null,
       ],
     );
     return (await this.get(id)) as Approval;
@@ -184,6 +206,9 @@ export class ApprovalStore {
         ...(r.actor_name ? { name: r.actor_name as string } : {}),
       },
       prompt: r.prompt as string,
+      ...(r.mode ? { mode: r.mode as AgentMode } : {}),
+      ...(r.cause ? { cause: r.cause as ApprovalCause } : {}),
+      ...(r.auto_check ? { autoCheck: parseJson(r.auto_check as string) as AutoCheck } : {}),
       status: status === "pending" && (r.expires_at as string) <= now ? "expired" : status,
       createdAt: r.created_at as string,
       expiresAt: r.expires_at as string,

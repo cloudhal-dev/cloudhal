@@ -35,21 +35,57 @@ export interface PendingChange {
   kind: string;
 }
 
+/** Why `auto` mode did or did not let a publish through, as data (Studio words it itself). */
+export type AutoCheckCode = "low-risk" | "removes-content" | "nothing" | "structure" | "too-many";
+
+/** The `auto`-mode check behind a publish (stored on audit rows and approvals, ADR-0015). */
+export interface AutoCheck {
+  rule: "low-risk-publish";
+  lowRisk: boolean;
+  code: AutoCheckCode;
+  /** Pending changes the publish would carry (added + edited + removed). */
+  changes: number;
+  /** `AUTO_PUBLISH_LIMIT` at the time of the check. */
+  limit: number;
+}
+
+const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
+  "low-risk": (c) => `${c.changes} article change(s) only`,
+  "removes-content": () => "it removes content",
+  nothing: () => "nothing to publish",
+  structure: () => "it changes pages or site settings",
+  "too-many": (c) => `it changes more than ${c.limit} articles`,
+};
+
+/** English wording of a check, for agents and audit reasons. */
+export function describeAutoCheck(check: AutoCheck): string {
+  return AUTO_CHECK_TEXT[check.code](check);
+}
+
 /**
  * Low risk = only articles added or edited, nothing removed, no pages or site settings touched,
  * and at most `AUTO_PUBLISH_LIMIT` changes. Anything else waits for a person even in `auto`.
  */
-export function isLowRiskPublish(diff: {
+export function checkAutoPublish(diff: {
   added: PendingChange[];
   changed: { after: PendingChange }[];
   removed: PendingChange[];
-}): { lowRisk: boolean; reason: string } {
+}): AutoCheck {
   const touched = [...diff.added, ...diff.changed.map((c) => c.after)];
-  if (diff.removed.length > 0) return { lowRisk: false, reason: "it removes content" };
-  if (touched.length === 0) return { lowRisk: false, reason: "nothing to publish" };
-  if (touched.some((n) => n.kind !== "contentEntry"))
-    return { lowRisk: false, reason: "it changes pages or site settings" };
-  if (touched.length > AUTO_PUBLISH_LIMIT)
-    return { lowRisk: false, reason: `it changes more than ${AUTO_PUBLISH_LIMIT} articles` };
-  return { lowRisk: true, reason: `${touched.length} article change(s) only` };
+  const base = {
+    rule: "low-risk-publish" as const,
+    changes: touched.length + diff.removed.length,
+    limit: AUTO_PUBLISH_LIMIT,
+  };
+  const code: AutoCheckCode =
+    diff.removed.length > 0
+      ? "removes-content"
+      : touched.length === 0
+        ? "nothing"
+        : touched.some((n) => n.kind !== "contentEntry")
+          ? "structure"
+          : touched.length > AUTO_PUBLISH_LIMIT
+            ? "too-many"
+            : "low-risk";
+  return { ...base, code, lowRisk: code === "low-risk" };
 }

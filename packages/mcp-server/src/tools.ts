@@ -9,6 +9,7 @@
 
 import type {
   AuditLog,
+  AutoCheck,
   Decision,
   PolicyEngine,
   Principal,
@@ -16,7 +17,7 @@ import type {
   ToolAnnotations,
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
-import { effectiveMode, isLowRiskPublish } from "@cloudhal/agent-runtime";
+import { checkAutoPublish, describeAutoCheck, effectiveMode } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, Page, Section, Site, Snapshot } from "@cloudhal/core-contracts";
 import {
@@ -834,8 +835,10 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
 
 export interface CallResult {
   decision: Decision;
-  /** Set when `auto` mode let a low-risk publish through without a person. */
+  /** Set when `auto` mode let a low-risk publish through without a person (English, for the agent). */
   autoApproved?: string;
+  /** The `auto`-mode check behind a publish, whichever way it went. */
+  autoCheck?: AutoCheck;
   /** Present when the call needs a human decision before running. */
   approvalPrompt?: string;
   result?: unknown;
@@ -875,16 +878,23 @@ export async function runTool(
     return { decision };
   }
   // `auto` mode: a publish that only adds or edits a few articles goes live without a person.
+  let autoCheck: AutoCheck | undefined;
   let autoNote: string | undefined;
   if (
     decision.kind === "approval-required" &&
     decision.autoApprove === "low-risk-publish" &&
     siteId
   ) {
-    const risk = isLowRiskPublish(await ctx.store.pendingChanges(siteId));
-    if (risk.lowRisk) autoNote = `auto mode: published without approval (${risk.reason})`;
-    else decision = { ...decision, reason: `auto mode waits for a person: ${risk.reason}` };
+    autoCheck = checkAutoPublish(await ctx.store.pendingChanges(siteId));
+    if (autoCheck.lowRisk)
+      autoNote = `auto mode: published without approval (${describeAutoCheck(autoCheck)})`;
+    else
+      decision = {
+        ...decision,
+        reason: `auto mode waits for a person: ${describeAutoCheck(autoCheck)}`,
+      };
   }
+  const checked = autoCheck ? { autoCheck } : {};
   if (decision.kind === "approval-required" && !autoNote) {
     const approvalPrompt = def.approvalPrompt
       ? await def.approvalPrompt(args, ctx)
@@ -893,9 +903,11 @@ export async function runTool(
       ...base,
       decision: "approval-required",
       reason: decision.reason,
+      cause: decision.cause,
+      ...checked,
       outcome: "pending",
     });
-    return { decision, approvalPrompt };
+    return { decision, approvalPrompt, ...checked };
   }
   try {
     const result = await def.handler(args, ctx);
@@ -907,8 +919,14 @@ export async function runTool(
       snapshotId,
       durationMs: Date.now() - started,
       ...(autoNote ? { reason: autoNote } : {}),
+      ...checked,
     });
-    return { decision: { kind: "allow" }, result, ...(autoNote ? { autoApproved: autoNote } : {}) };
+    return {
+      decision: { kind: "allow" },
+      result,
+      ...(autoNote ? { autoApproved: autoNote } : {}),
+      ...checked,
+    };
   } catch (e) {
     await deps.audit?.record({
       ...base,

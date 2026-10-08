@@ -17,7 +17,7 @@ Every agent principal has a **mode**, stored with its API key (metadata) and cho
 | `auto` | free | **low-risk publishes go live without a person**; others wait | waits |
 | `bypass` | free | free | free — **local stdio only** |
 
-- **Low risk** (`isLowRiskPublish`): only articles added or edited, nothing removed, no pages or site settings changed, at most 20 changes — measured against the live version (`SiteGraphStore.pendingChanges`, which ignores the publish pointer itself). Such publishes are audited as `auto mode: published without approval (…)`.
+- **Low risk** (`checkAutoPublish`): only articles added or edited, nothing removed, no pages or site settings changed, at most 20 changes — measured against the live version (`SiteGraphStore.pendingChanges`, which ignores the publish pointer itself). Such publishes are audited as `auto mode: published without approval (…)`.
 - **`bypass` never applies to API keys**: creating or switching a key to it is refused, and a remote principal claiming it is treated as `edits` (`effectiveMode`). `cloudhal mcp --mode bypass` is the only way to get it.
 - Keys without a stored mode read as `edits` (the previous behaviour). Mode changes take effect on the agent's next call and are audited (`agent-key.mode`, `old → new`). Every audit row records the mode the call ran under (migration 0007).
 - The MCP server tells the agent its mode in the server instructions so it can plan accordingly.
@@ -34,3 +34,11 @@ Every agent principal has a **mode**, stored with its API key (metadata) and cho
 - Positive: owners pick a behaviour they understand; agents learn their limits up front; the audit says which mode allowed what.
 - Negative: `manual` makes agents slow (every write waits); `auto` publishes without a person by design.
 - Follow-ups: time-boxed elevation ("auto for 1 hour"), proposals (plan mode leaving a draft change set for review), per-site modes.
+
+## Addendum (2026-10-08): policy detail as data
+Clients should not parse English reasons. Migration 0008 adds structured fields:
+
+- **Approvals** record `mode` (the mode the agent worked in), `cause` (`tool` | `destructive` | `skill` | `manual-mode`: why a person must decide) and, for an `auto`-mode publish that the low-risk rule held back, `autoCheck`.
+- **Audit rows** record `cause` on `approval-required` rows and `autoCheck` on any publish the `auto` rule looked at. `autoCheck = { rule: "low-risk-publish", lowRisk, code, changes, limit }`, where `code` is `low-risk` | `removes-content` | `nothing` | `structure` | `too-many`. An `allow` row with `autoCheck.lowRisk` is a publish that went live without a person. The English `reason` stays for agents and older readers.
+- **`GET /api/instance`** reports `agentModes { modes, default, scopes, autoPublishLimit }`, so Studio applies the server's rules instead of a copy. Studio falls back to its own copy (and to reason text for older rows) when a server omits them.
+

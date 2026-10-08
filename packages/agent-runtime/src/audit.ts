@@ -1,5 +1,7 @@
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
+import type { AutoCheck } from "./modes.ts";
+import type { ApprovalCause } from "./policy.ts";
 
 export interface AuditEntry {
   at: string;
@@ -15,6 +17,13 @@ export interface AuditEntry {
   durationMs?: number | undefined;
   /** Agent mode the call ran under (ADR-0015). */
   mode?: string | undefined;
+  /** Why the call waited for a person (`approval-required` rows). */
+  cause?: ApprovalCause | undefined;
+  /**
+   * The `auto`-mode check behind a publish: `lowRisk` on an `allow` row means it went live without
+   * a person; on an `approval-required` row it says why it waited.
+   */
+  autoCheck?: AutoCheck | undefined;
 }
 
 export interface AuditRow extends AuditEntry {
@@ -45,6 +54,14 @@ function parseAuditInput(raw: string | null): unknown {
   }
 }
 
+function parseAutoCheck(raw: string): AutoCheck | undefined {
+  try {
+    return JSON.parse(raw) as AutoCheck;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Append-only record of every policy decision and tool call (table `audit`, migration 0003). */
 export class AuditLog {
   readonly #sql: SqlDriver;
@@ -54,7 +71,7 @@ export class AuditLog {
 
   async record(entry: AuditEntry): Promise<number> {
     const r = await this.#sql.run(
-      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         entry.at,
         entry.actor.kind,
@@ -70,6 +87,8 @@ export class AuditLog {
         entry.snapshotId ?? null,
         entry.durationMs ?? null,
         entry.mode ?? null,
+        entry.cause ?? null,
+        entry.autoCheck ? JSON.stringify(entry.autoCheck) : null,
       ],
     );
     return r.lastRowId ?? 0;
@@ -121,6 +140,8 @@ export class AuditLog {
       snapshotId: (r.snapshot_id as string | null) ?? undefined,
       durationMs: (r.duration_ms as number | null) ?? undefined,
       mode: (r.mode as string | null) ?? undefined,
+      ...(r.cause ? { cause: r.cause as ApprovalCause } : {}),
+      ...(r.auto_check ? { autoCheck: parseAutoCheck(r.auto_check as string) } : {}),
     }));
   }
 }

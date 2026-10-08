@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkAutoPublish,
+  describeAutoCheck,
   effectiveMode,
-  isLowRiskPublish,
   PolicyEngine,
   type Principal,
   scopesForMode,
@@ -83,6 +84,17 @@ describe("agent modes", () => {
     expect(engine.evaluate(agent("auto"), "delete_entry")).not.toHaveProperty("autoApprove");
   });
 
+  it("says why a person must decide", () => {
+    const cause = (mode: Parameters<typeof agent>[0], tool: string) =>
+      (engine.evaluate(agent(mode), tool) as { cause?: string }).cause;
+    expect(cause("edits", "publish")).toBe("tool");
+    expect(cause("auto", "rollback")).toBe("tool");
+    expect(cause("edits", "delete_entry")).toBe("destructive");
+    expect(cause("manual", "update_entry")).toBe("manual-mode");
+    expect(cause("manual", "delete_entry")).toBe("destructive");
+    expect(cause("edits", "update_entry")).toBeUndefined();
+  });
+
   it("bypass works only locally; a remote key in bypass behaves like edits", () => {
     expect(Object.values(kinds(agent("bypass", true))).every((k) => k === "allow")).toBe(true);
     expect(kinds(agent("bypass"))).toEqual(kinds(agent("edits")));
@@ -108,24 +120,29 @@ describe("agent modes", () => {
     expect(scopesForMode("plan")).toEqual(["site:read", "content:read", "preview:create"]);
     expect(scopesForMode("auto")).toContain("site:publish");
     const entry = (id: string) => ({ id, kind: "contentEntry" });
-    expect(
-      isLowRiskPublish({ added: [entry("e1")], changed: [{ after: entry("e2") }], removed: [] })
-        .lowRisk,
-    ).toBe(true);
-    expect(isLowRiskPublish({ added: [], changed: [], removed: [entry("e1")] })).toMatchObject({
+    const check = (diff: Parameters<typeof checkAutoPublish>[0]) => {
+      const c = checkAutoPublish(diff);
+      return { code: c.code, lowRisk: c.lowRisk, changes: c.changes, text: describeAutoCheck(c) };
+    };
+    expect(check({ added: [entry("e1")], changed: [{ after: entry("e2") }], removed: [] })).toEqual(
+      { code: "low-risk", lowRisk: true, changes: 2, text: "2 article change(s) only" },
+    );
+    expect(check({ added: [], changed: [], removed: [entry("e1")] })).toEqual({
+      code: "removes-content",
       lowRisk: false,
-      reason: "it removes content",
+      changes: 1,
+      text: "it removes content",
     });
+    expect(check({ added: [{ id: "p", kind: "page" }], changed: [], removed: [] }).code).toBe(
+      "structure",
+    );
     expect(
-      isLowRiskPublish({ added: [{ id: "p", kind: "page" }], changed: [], removed: [] }).lowRisk,
-    ).toBe(false);
-    expect(
-      isLowRiskPublish({
+      check({
         added: Array.from({ length: 21 }, (_, i) => entry(`e${i}`)),
         changed: [],
         removed: [],
-      }).lowRisk,
-    ).toBe(false);
-    expect(isLowRiskPublish({ added: [], changed: [], removed: [] }).lowRisk).toBe(false);
+      }),
+    ).toMatchObject({ code: "too-many", lowRisk: false, text: "it changes more than 20 articles" });
+    expect(check({ added: [], changed: [], removed: [] }).code).toBe("nothing");
   });
 });

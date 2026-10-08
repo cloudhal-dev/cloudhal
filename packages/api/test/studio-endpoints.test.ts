@@ -189,6 +189,38 @@ describe("instance and skills", () => {
         deployTransfer: false,
         approvals: false,
       },
+      agentModes: {
+        modes: ["plan", "manual", "edits", "auto"],
+        default: "edits",
+        scopes: {
+          plan: ["site:read", "content:read", "preview:create"],
+          manual: [
+            "site:read",
+            "content:read",
+            "preview:create",
+            "content:write",
+            "site:publish",
+            "site:rollback",
+          ],
+          edits: [
+            "site:read",
+            "content:read",
+            "preview:create",
+            "content:write",
+            "site:publish",
+            "site:rollback",
+          ],
+          auto: [
+            "site:read",
+            "content:read",
+            "preview:create",
+            "content:write",
+            "site:publish",
+            "site:rollback",
+          ],
+        },
+        autoPublishLimit: 20,
+      },
     });
     const skills = (await (
       await app.request("/api/skills", { headers: { "x-test-user": "1" } })

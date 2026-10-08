@@ -6,6 +6,7 @@ import { migration0004AuditActorName } from "./0004_audit_actor_name.ts";
 import { migration0005AuthRateLimit } from "./0005_auth_rate_limit.ts";
 import { migration0006Approvals } from "./0006_approvals.ts";
 import { migration0007AuditMode } from "./0007_audit_mode.ts";
+import { migration0008PolicyDetail } from "./0008_policy_detail.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -16,4 +17,5 @@ export const migrations: readonly Migration[] = [
   migration0005AuthRateLimit,
   migration0006Approvals,
   migration0007AuditMode,
+  migration0008PolicyDetail,
 ];

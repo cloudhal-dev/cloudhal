@@ -47,6 +47,13 @@ describe("agent modes over MCP", () => {
     // the seed's pages are not live yet → that first publish touches pages and must wait
     const first = await call("publish", { siteId: site.id });
     expect(first.text).toMatch(/^approval pending:/);
+    // the approval says, as data, which mode asked and why auto did not let it through
+    const [waiting] = await approvals.list({ siteId: site.id, status: "pending" });
+    expect(waiting).toMatchObject({
+      mode: "auto",
+      cause: "tool",
+      autoCheck: { rule: "low-risk-publish", lowRisk: false, code: "structure", limit: 20 },
+    });
     // publish the starter once as a person would, then an article-only publish is low risk
     const owner = { kind: "human" as const, id: "user_owner000001" };
     const s0 = await store.createSnapshot(site.id, { actor: owner, reason: "publish" });
@@ -64,6 +71,7 @@ describe("agent modes over MCP", () => {
     expect(row).toMatchObject({
       mode: "auto",
       reason: expect.stringMatching(/^auto mode: published without approval/),
+      autoCheck: { rule: "low-risk-publish", lowRisk: true, code: "low-risk", changes: 1 },
     });
     expect(await approvals.list({ siteId: site.id, status: "pending" })).toHaveLength(1); // only the first
 
@@ -78,6 +86,11 @@ describe("agent modes over MCP", () => {
     // rollback never skips the person
     const rb = await call("rollback", { siteId: site.id, snapshotId: s0.id });
     expect(rb.text).toMatch(/^approval pending:/);
+    const rbApproval = (await approvals.list({ siteId: site.id, status: "pending" })).find(
+      (a) => a.tool === "rollback",
+    );
+    expect(rbApproval).toMatchObject({ mode: "auto", cause: "tool" });
+    expect(rbApproval?.autoCheck).toBeUndefined();
   });
 
   it("plan: read and preview only", async () => {
@@ -96,6 +109,11 @@ describe("agent modes over MCP", () => {
       /^approval pending: manual mode: create_entry needs a person's approval/,
     );
     const id = ask.text.match(/approvalId: (appr_\w+)/)?.[1] as string;
+    expect(await approvals.get(id)).toMatchObject({ mode: "manual", cause: "manual-mode" });
+    expect((await audit.list({ siteId: site.id }))[0]).toMatchObject({
+      decision: "approval-required",
+      cause: "manual-mode",
+    });
     await approvals.decide(id, "approved", { kind: "human", id: "user_owner000001" });
     const done = await call("create_entry", { ...article(site.id, "manual-one"), approvalId: id });
     expect(done.isError, done.text).toBeFalsy();

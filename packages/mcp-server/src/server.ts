@@ -335,6 +335,9 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
               actor: principal.actor,
               prompt,
               stateHash,
+              mode: effectiveMode(principal),
+              cause: outcome.decision.cause,
+              ...(outcome.autoCheck ? { autoCheck: outcome.autoCheck } : {}),
             });
             return errorResult(
               `approval pending: ${prompt}\nA person must approve request ${pending.id} in Cloudhal Studio (site → Activity → Approvals). After it is approved, call ${def.name} again with the same arguments plus approvalId "${pending.id}". It expires ${pending.expiresAt}.\napprovalId: ${pending.id}`,

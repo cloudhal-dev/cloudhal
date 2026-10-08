@@ -9,7 +9,7 @@ import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
-import { instanceRoutes } from "./routes/instance.ts";
+import { agentModesInfo, instanceRoutes } from "./routes/instance.ts";
 import { pages } from "./routes/pages.ts";
 import { previewLinks } from "./routes/preview-links.ts";
 import { sites } from "./routes/sites.ts";
@@ -164,6 +164,7 @@ export function createApi(deps: ApiDeps) {
           deployTransfer: Boolean(deps.admin),
           approvals: Boolean(deps.mcp?.approvals),
         },
+        agentModes: agentModesInfo(),
       }),
       deps.mcp?.skills ?? [],
     ),

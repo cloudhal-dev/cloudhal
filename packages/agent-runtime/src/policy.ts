@@ -57,12 +57,17 @@ export function effectiveMode(principal: Principal): AgentMode | undefined {
   return mode === "bypass" && !principal.local ? "edits" : mode;
 }
 
+/** Why a call waits for a person (stored on approvals and audit rows). */
+export type ApprovalCause = "tool" | "destructive" | "skill" | "manual-mode";
+
 export type Decision =
   | { kind: "allow" }
   | { kind: "deny"; reason: string }
   | {
       kind: "approval-required";
       reason: string;
+      /** Why a person must decide: the tool always asks, it is destructive, the skill asks, or manual mode. */
+      cause: ApprovalCause;
       /** `auto` mode: the caller may skip the person when the change is low risk. */
       autoApprove?: "low-risk-publish";
     };
@@ -114,17 +119,26 @@ export class PolicyEngine {
       (principal.skill?.approval ?? []).includes(toolName) ||
       (mode === "manual" && writes);
     if (needsApproval && !options.confirmed && mode !== "bypass") {
-      const reason =
-        mode === "manual" && writes && !tool.requiresApproval && !tool.annotations.destructiveHint
-          ? `manual mode: ${toolName} needs a person's approval`
-          : tool.annotations.destructiveHint
-            ? `${toolName} is destructive`
-            : `${toolName} requires approval`;
+      // A tool that always asks (publish, rollback) says so first; then plain destructive ones.
+      const cause: ApprovalCause = tool.requiresApproval
+        ? "tool"
+        : tool.annotations.destructiveHint
+          ? "destructive"
+          : (principal.skill?.approval ?? []).includes(toolName)
+            ? "skill"
+            : "manual-mode";
+      const reason = {
+        "manual-mode": `manual mode: ${toolName} needs a person's approval`,
+        destructive: `${toolName} is destructive`,
+        tool: `${toolName} requires approval`,
+        skill: `${toolName} requires approval`,
+      }[cause];
       // `auto` lets a low-risk publish through; rollback and deletions always wait for a person.
       const auto = mode === "auto" && toolName === "publish";
       return {
         kind: "approval-required",
         reason,
+        cause,
         ...(auto ? { autoApprove: "low-risk-publish" as const } : {}),
       };
     }
