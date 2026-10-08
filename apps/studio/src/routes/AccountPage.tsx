@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { NotificationSettings } from "../components/NotificationSettings.tsx";
 import { PasswordField } from "../components/PasswordField.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
@@ -64,7 +65,7 @@ import {
 /** Sessions shown before "Show all". */
 const SESSION_LIMIT = 5;
 
-const SECTIONS = ["profile", "password", "sessions", "access", "server"] as const;
+const SECTIONS = ["profile", "password", "sessions", "notifications", "access", "server"] as const;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -756,6 +757,7 @@ export function AccountPage() {
         <ProfileSection me={me.data} pending={me.isPending} />
         <PasswordSection />
         <SessionsSection currentToken={me.data?.session.token} />
+        <NotificationSettings />
         <AccessSection
           instance={instance.data}
           pending={instance.isPending}

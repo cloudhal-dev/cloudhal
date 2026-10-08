@@ -21,6 +21,7 @@ import { LOCALES, type Locale, useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
+import { NotificationsBell } from "./NotificationsBell.tsx";
 
 export interface PaletteCommand {
   id: string;
@@ -33,7 +34,7 @@ export interface PaletteCommand {
  * switcher in `Sidebar.Header`, nav in `Sidebar.Content` (or `Sidebar.Loading` until data is
  * ready), user menu + `Sidebar.Trigger` in `Sidebar.Footer`, `Sidebar.Rail` for drag/peek, and
  * a slim sticky top bar: the page's breadcrumbs (Kumo `Breadcrumbs` are `h-12`, like the bar),
- * search (⌘K, `/`), the surface's actions (site: Publish) and the language.
+ * search (⌘K, `/`), the surface's actions (site: Publish), the notification bell and the language.
  */
 export function AppFrame({
   actions,
@@ -174,6 +175,8 @@ export function AppFrame({
                 </kbd>
               </Button>
               {actions}
+              {/* What needs the person: elevations about to end, agents asking (§2n). */}
+              <NotificationsBell />
               <span className="hidden sm:flex">
                 <LanguageSwitch size="sm" />
               </span>

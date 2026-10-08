@@ -33,6 +33,13 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  NotificationBell,
+  type NotificationBellProps,
+  NotificationItem,
+  type NotificationItemProps,
+  type NotificationTone,
+} from "./blocks/NotificationPanel.tsx";
+export {
   PageCrumbsSlot,
   PageFrameProvider,
   PageLayout,
