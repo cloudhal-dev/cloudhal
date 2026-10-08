@@ -45,6 +45,7 @@ import {
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { GovernanceDialog, type GovernanceTarget } from "../components/GovernanceDialog.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { CountedHint, CoverImageCard, SeoFields } from "../components/Seo.tsx";
@@ -57,6 +58,7 @@ import {
 } from "../components/Taxonomy.tsx";
 import { TermArchivePreview } from "../components/TermArchivePreview.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
@@ -113,6 +115,8 @@ export function TermEditorPage() {
   const defaultLocale = data.defaultLocale;
   const activeLocale = locale ?? defaultLocale;
 
+  // Terms are structure: Editors and above change them; others read (RFC-0005 §2.2, §2s).
+  const structure = useGate("structure.write");
   const save = useMutation({
     mutationFn: (term: Term) => api.terms.update(cleanTerm(term, defaultLocale)),
     onSuccess: async ({ term }) => {
@@ -235,6 +239,8 @@ export function TermEditorPage() {
                 icon={<Check />}
                 loading={approve.isPending}
                 onClick={() => approve.mutate(saved)}
+                disabled={structure.reason !== undefined}
+                title={structure.reason}
               >
                 {t("taxonomy.review.approve")}
               </Button>
@@ -251,6 +257,7 @@ export function TermEditorPage() {
                         icon={<DotsThree weight="bold" />}
                         aria-label={t("editor.moreActions")}
                         data-testid="term-actions"
+                        disabled={structure.reason !== undefined}
                       />
                     }
                   />
@@ -298,7 +305,8 @@ export function TermEditorPage() {
                 if (valid()) save.mutate(draft);
               }}
               loading={save.isPending}
-              disabled={!dirty}
+              disabled={!dirty || structure.reason !== undefined}
+              title={structure.reason}
               data-testid="save"
             >
               {t("common.save")}
@@ -308,6 +316,7 @@ export function TermEditorPage() {
       }
     >
       <ErrorBanner error={save.error ?? approve.error} />
+      {!retired && <ViewOnlyBanner reason={structure.reason} />}
       {retired && (
         <Banner
           variant="secondary"
@@ -347,276 +356,278 @@ export function TermEditorPage() {
           />
         </div>
       )}
-      <EditorLayout
-        previewVisible={previewVisible}
-        preview={<TermArchivePreview term={draft} rev={saved.rev} path={path} />}
-        main={
-          <>
-            <SectionCard
-              id="names"
-              title={t("termEditor.names.title")}
-              icon={<TextAa size={16} />}
-              description={t("termEditor.names.description")}
-            >
-              <Input
-                label={t("termEditor.names.name", { locale: activeLocale })}
-                value={label?.name ?? ""}
-                onValueChange={(v) => setDraft(editLabel(draft, activeLocale, { name: v }))}
-                description={
-                  activeLocale === defaultLocale
-                    ? t("termEditor.names.nameHintDefault")
-                    : t("termEditor.names.nameHint", { locale: defaultLocale })
-                }
-                error={nameError}
-                maxLength={TERM_LIMITS.nameMax}
-                required={activeLocale === defaultLocale}
-                disabled={retired}
-                className="w-full"
-                data-testid="term-name"
+      <ReadOnly reason={structure.reason} className="min-w-0">
+        <EditorLayout
+          previewVisible={previewVisible}
+          preview={<TermArchivePreview term={draft} rev={saved.rev} path={path} />}
+          main={
+            <>
+              <SectionCard
+                id="names"
+                title={t("termEditor.names.title")}
+                icon={<TextAa size={16} />}
+                description={t("termEditor.names.description")}
+              >
+                <Input
+                  label={t("termEditor.names.name", { locale: activeLocale })}
+                  value={label?.name ?? ""}
+                  onValueChange={(v) => setDraft(editLabel(draft, activeLocale, { name: v }))}
+                  description={
+                    activeLocale === defaultLocale
+                      ? t("termEditor.names.nameHintDefault")
+                      : t("termEditor.names.nameHint", { locale: defaultLocale })
+                  }
+                  error={nameError}
+                  maxLength={TERM_LIMITS.nameMax}
+                  required={activeLocale === defaultLocale}
+                  disabled={retired}
+                  className="w-full"
+                  data-testid="term-name"
+                />
+                <TagInput
+                  label={t("termEditor.names.altNames")}
+                  value={label?.altNames ?? []}
+                  onValueChange={(values: string[]) =>
+                    setDraft(
+                      editLabel(draft, activeLocale, {
+                        ...(label ? {} : { name: "" }),
+                        altNames: values.length
+                          ? ([...new Set(values.map((v) => v.trim()).filter(Boolean))] as [
+                              string,
+                              ...string[],
+                            ])
+                          : undefined,
+                      }),
+                    )
+                  }
+                  maxValues={TERM_LIMITS.altNamesMax}
+                  description={t("termEditor.names.altNamesHint")}
+                  error={
+                    altError
+                      ? t(ALT_ERROR[altError.code], {
+                          value: altError.value,
+                          other: altError.other ?? "",
+                        })
+                      : undefined
+                  }
+                  labels={{
+                    removeValue: (v: string) => t("pickers.remove", { name: v }),
+                    maxValuesReached: (max: number) => t("pickers.atMost", { max }),
+                  }}
+                  disabled={retired}
+                  className="w-full"
+                  data-testid="term-altnames"
+                />
+              </SectionCard>
+              <SectionCard
+                id="introduction"
+                title={t("termEditor.intro.title")}
+                icon={<Notepad size={16} />}
+                description={t("termEditor.intro.description", { path })}
+              >
+                <InputArea
+                  aria-label={t("termEditor.intro.title")}
+                  value={label?.description ?? ""}
+                  onValueChange={(v) =>
+                    setDraft(editLabel(draft, activeLocale, { description: v || undefined }))
+                  }
+                  description={
+                    <CountedHint
+                      hint={t("termEditor.intro.hint")}
+                      count={label?.description?.length ?? 0}
+                      recommended={TERM_LIMITS.descriptionMax}
+                    />
+                  }
+                  error={
+                    show(localeErrors.description) ? t("termEditor.errors.introTooLong") : undefined
+                  }
+                  autoResize
+                  minRows={4}
+                  maxRows={16}
+                  disabled={retired}
+                  className="w-full font-mono"
+                  data-testid="term-intro"
+                />
+              </SectionCard>
+              <CoverImageCard
+                id="term-image"
+                title={t("termEditor.image.title")}
+                description={t("termEditor.image.description")}
+                image={draft.image}
+                savedSrc={saved.image?.src}
+                host={host}
+                errors={errors.image ?? {}}
+                showErrors={showErrors}
+                onChange={(image) => {
+                  const { image: _i, ...rest } = draft;
+                  setDraft(image ? { ...rest, image } : rest);
+                }}
               />
-              <TagInput
-                label={t("termEditor.names.altNames")}
-                value={label?.altNames ?? []}
-                onValueChange={(values: string[]) =>
-                  setDraft(
-                    editLabel(draft, activeLocale, {
-                      ...(label ? {} : { name: "" }),
-                      altNames: values.length
-                        ? ([...new Set(values.map((v) => v.trim()).filter(Boolean))] as [
-                            string,
-                            ...string[],
-                          ])
-                        : undefined,
-                    }),
+              <SectionCard
+                id="seo"
+                title={t("termEditor.seo.title")}
+                icon={<MagnifyingGlass size={16} />}
+                description={t("termEditor.seo.description", { locale: activeLocale })}
+              >
+                <SeoFields
+                  kind="archive"
+                  seo={label?.seo}
+                  onChange={(seo) => setDraft(editLabel(draft, activeLocale, { seo }))}
+                  fallbackTitle={label?.name || name}
+                  path={path}
+                  siteName={data.site.data?.name ?? ""}
+                  host={host}
+                  errors={localeErrors.seo ?? {}}
+                  showErrors={showErrors}
+                />
+              </SectionCard>
+            </>
+          }
+          aside={
+            <>
+              <SectionCard
+                id="indexing"
+                title={t("termEditor.indexing.title")}
+                icon={<MagnifyingGlass size={16} />}
+                actions={<IndexBadge status={status} />}
+              >
+                <Text variant="secondary">
+                  {status.kind === "indexed"
+                    ? t("termEditor.indexing.indexed", { count: status.published, path })
+                    : status.kind === "thin"
+                      ? t("termEditor.indexing.thin", {
+                          count: status.published,
+                          min: status.min,
+                          path,
+                        })
+                      : status.kind === "empty"
+                        ? t("termEditor.indexing.empty", { path })
+                        : status.kind === "noindex"
+                          ? t("termEditor.indexing.noindex", { path })
+                          : t(`taxonomy.index.noneHint.${status.reason}`)}
+                </Text>
+              </SectionCard>
+              <SectionCard
+                id="placement"
+                title={t("termEditor.placement.title")}
+                icon={<TreeStructure size={16} />}
+              >
+                {tax.hierarchical && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="grid min-w-0 gap-0.5">
+                      <Text variant="secondary" size="sm" as="span">
+                        {t("governance.move.parent")}
+                      </Text>
+                      <Text as="span" truncate>
+                        {parent ? data.name(parent) : t("governance.move.topLevel")}
+                      </Text>
+                    </span>
+                    {!retired && (
+                      <Button variant="secondary" size="sm" onClick={() => open("move")}>
+                        {t("taxonomy.menu.move")}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <Input
+                  type="number"
+                  label={t("termEditor.placement.position")}
+                  value={draft.position === undefined ? "" : String(draft.position)}
+                  onValueChange={(v) => {
+                    const { position: _p, ...rest } = draft;
+                    setDraft(v === "" ? rest : { ...rest, position: Number(v) });
+                  }}
+                  description={t("termEditor.placement.positionHint")}
+                  error={
+                    show(errors.position)
+                      ? t("termEditor.errors.position", { max: TERM_LIMITS.positionMax })
+                      : undefined
+                  }
+                  min={0}
+                  max={TERM_LIMITS.positionMax}
+                  required={false}
+                  disabled={retired}
+                  className="w-full"
+                  data-testid="term-position"
+                />
+              </SectionCard>
+              <SectionCard
+                id="slug-history"
+                title={t("termEditor.history.title")}
+                icon={<ClockCounterClockwise size={16} />}
+                actions={
+                  retired ? undefined : (
+                    <Button variant="ghost" size="sm" onClick={() => open("rename")}>
+                      {t("taxonomy.menu.rename")}
+                    </Button>
                   )
                 }
-                maxValues={TERM_LIMITS.altNamesMax}
-                description={t("termEditor.names.altNamesHint")}
-                error={
-                  altError
-                    ? t(ALT_ERROR[altError.code], {
-                        value: altError.value,
-                        other: altError.other ?? "",
-                      })
-                    : undefined
-                }
-                labels={{
-                  removeValue: (v: string) => t("pickers.remove", { name: v }),
-                  maxValuesReached: (max: number) => t("pickers.atMost", { max }),
-                }}
-                disabled={retired}
-                className="w-full"
-                data-testid="term-altnames"
-              />
-            </SectionCard>
-            <SectionCard
-              id="introduction"
-              title={t("termEditor.intro.title")}
-              icon={<Notepad size={16} />}
-              description={t("termEditor.intro.description", { path })}
-            >
-              <InputArea
-                aria-label={t("termEditor.intro.title")}
-                value={label?.description ?? ""}
-                onValueChange={(v) =>
-                  setDraft(editLabel(draft, activeLocale, { description: v || undefined }))
-                }
-                description={
-                  <CountedHint
-                    hint={t("termEditor.intro.hint")}
-                    count={label?.description?.length ?? 0}
-                    recommended={TERM_LIMITS.descriptionMax}
+                flush={(saved.slugHistory?.length ?? 0) === 0}
+              >
+                {(saved.slugHistory?.length ?? 0) === 0 ? (
+                  <SectionEmpty
+                    icon={<ClockCounterClockwise size={32} className="text-kumo-inactive" />}
+                    title={t("termEditor.history.empty")}
+                    description={t("termEditor.history.emptyDescription", { path })}
                   />
-                }
-                error={
-                  show(localeErrors.description) ? t("termEditor.errors.introTooLong") : undefined
-                }
-                autoResize
-                minRows={4}
-                maxRows={16}
-                disabled={retired}
-                className="w-full font-mono"
-                data-testid="term-intro"
-              />
-            </SectionCard>
-            <CoverImageCard
-              id="term-image"
-              title={t("termEditor.image.title")}
-              description={t("termEditor.image.description")}
-              image={draft.image}
-              savedSrc={saved.image?.src}
-              host={host}
-              errors={errors.image ?? {}}
-              showErrors={showErrors}
-              onChange={(image) => {
-                const { image: _i, ...rest } = draft;
-                setDraft(image ? { ...rest, image } : rest);
-              }}
-            />
-            <SectionCard
-              id="seo"
-              title={t("termEditor.seo.title")}
-              icon={<MagnifyingGlass size={16} />}
-              description={t("termEditor.seo.description", { locale: activeLocale })}
-            >
-              <SeoFields
-                kind="archive"
-                seo={label?.seo}
-                onChange={(seo) => setDraft(editLabel(draft, activeLocale, { seo }))}
-                fallbackTitle={label?.name || name}
-                path={path}
-                siteName={data.site.data?.name ?? ""}
-                host={host}
-                errors={localeErrors.seo ?? {}}
-                showErrors={showErrors}
-              />
-            </SectionCard>
-          </>
-        }
-        aside={
-          <>
-            <SectionCard
-              id="indexing"
-              title={t("termEditor.indexing.title")}
-              icon={<MagnifyingGlass size={16} />}
-              actions={<IndexBadge status={status} />}
-            >
-              <Text variant="secondary">
-                {status.kind === "indexed"
-                  ? t("termEditor.indexing.indexed", { count: status.published, path })
-                  : status.kind === "thin"
-                    ? t("termEditor.indexing.thin", {
-                        count: status.published,
-                        min: status.min,
-                        path,
-                      })
-                    : status.kind === "empty"
-                      ? t("termEditor.indexing.empty", { path })
-                      : status.kind === "noindex"
-                        ? t("termEditor.indexing.noindex", { path })
-                        : t(`taxonomy.index.noneHint.${status.reason}`)}
-              </Text>
-            </SectionCard>
-            <SectionCard
-              id="placement"
-              title={t("termEditor.placement.title")}
-              icon={<TreeStructure size={16} />}
-            >
-              {tax.hierarchical && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="grid min-w-0 gap-0.5">
-                    <Text variant="secondary" size="sm" as="span">
-                      {t("governance.move.parent")}
+                ) : (
+                  <div className="grid gap-3" data-testid="slug-history">
+                    <Text variant="secondary" size="sm">
+                      {t("termEditor.history.description")}
                     </Text>
-                    <Text as="span" truncate>
-                      {parent ? data.name(parent) : t("governance.move.topLevel")}
-                    </Text>
-                  </span>
-                  {!retired && (
-                    <Button variant="secondary" size="sm" onClick={() => open("move")}>
-                      {t("taxonomy.menu.move")}
-                    </Button>
-                  )}
-                </div>
-              )}
-              <Input
-                type="number"
-                label={t("termEditor.placement.position")}
-                value={draft.position === undefined ? "" : String(draft.position)}
-                onValueChange={(v) => {
-                  const { position: _p, ...rest } = draft;
-                  setDraft(v === "" ? rest : { ...rest, position: Number(v) });
-                }}
-                description={t("termEditor.placement.positionHint")}
-                error={
-                  show(errors.position)
-                    ? t("termEditor.errors.position", { max: TERM_LIMITS.positionMax })
-                    : undefined
-                }
-                min={0}
-                max={TERM_LIMITS.positionMax}
-                required={false}
-                disabled={retired}
-                className="w-full"
-                data-testid="term-position"
-              />
-            </SectionCard>
-            <SectionCard
-              id="slug-history"
-              title={t("termEditor.history.title")}
-              icon={<ClockCounterClockwise size={16} />}
-              actions={
-                retired ? undefined : (
-                  <Button variant="ghost" size="sm" onClick={() => open("rename")}>
-                    {t("taxonomy.menu.rename")}
-                  </Button>
-                )
-              }
-              flush={(saved.slugHistory?.length ?? 0) === 0}
-            >
-              {(saved.slugHistory?.length ?? 0) === 0 ? (
-                <SectionEmpty
-                  icon={<ClockCounterClockwise size={32} className="text-kumo-inactive" />}
-                  title={t("termEditor.history.empty")}
-                  description={t("termEditor.history.emptyDescription", { path })}
-                />
-              ) : (
-                <div className="grid gap-3" data-testid="slug-history">
-                  <Text variant="secondary" size="sm">
-                    {t("termEditor.history.description")}
-                  </Text>
-                  <InsetPanel>
-                    <div className="grid divide-y divide-kumo-hairline">
-                      {[...(saved.slugHistory ?? [])].reverse().map((old) => {
-                        const from = archivePath(tax, old);
-                        const r = redirects.find((x) => x.from === from);
-                        return (
-                          <div
-                            key={old}
-                            className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0"
-                          >
-                            <Text variant="mono" as="span">
-                              {from}
-                            </Text>
-                            {r ? (
-                              <>
-                                <ArrowRight
-                                  size={14}
-                                  className="shrink-0 text-kumo-subtle"
-                                  aria-hidden
-                                />
-                                <Text variant="mono-secondary" as="span">
-                                  {r.to}
-                                </Text>
-                                <Badge variant="outline">{r.status}</Badge>
-                              </>
-                            ) : (
-                              <Text variant="secondary" size="sm" as="span">
-                                {t("termEditor.history.reserved")}
+                    <InsetPanel>
+                      <div className="grid divide-y divide-kumo-hairline">
+                        {[...(saved.slugHistory ?? [])].reverse().map((old) => {
+                          const from = archivePath(tax, old);
+                          const r = redirects.find((x) => x.from === from);
+                          return (
+                            <div
+                              key={old}
+                              className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0"
+                            >
+                              <Text variant="mono" as="span">
+                                {from}
                               </Text>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </InsetPanel>
-                </div>
+                              {r ? (
+                                <>
+                                  <ArrowRight
+                                    size={14}
+                                    className="shrink-0 text-kumo-subtle"
+                                    aria-hidden
+                                  />
+                                  <Text variant="mono-secondary" as="span">
+                                    {r.to}
+                                  </Text>
+                                  <Badge variant="outline">{r.status}</Badge>
+                                </>
+                              ) : (
+                                <Text variant="secondary" size="sm" as="span">
+                                  {t("termEditor.history.reserved")}
+                                </Text>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </InsetPanel>
+                  </div>
+                )}
+              </SectionCard>
+              <DetailsCard rows={details} />
+              {!retired && saved.status === "active" && (
+                <DangerZoneCard
+                  title={t("termEditor.retire.title", {
+                    singular: singular.toLocaleLowerCase(uiLocale),
+                  })}
+                  description={t("termEditor.retire.description")}
+                  actionLabel={t("taxonomy.menu.retire")}
+                  onAction={() => open("retire")}
+                />
               )}
-            </SectionCard>
-            <DetailsCard rows={details} />
-            {!retired && saved.status === "active" && (
-              <DangerZoneCard
-                title={t("termEditor.retire.title", {
-                  singular: singular.toLocaleLowerCase(uiLocale),
-                })}
-                description={t("termEditor.retire.description")}
-                actionLabel={t("taxonomy.menu.retire")}
-                onAction={() => open("retire")}
-              />
-            )}
-          </>
-        }
-      />
+            </>
+          }
+        />
+      </ReadOnly>
       <GovernanceDialog
         target={governance}
         tax={tax}

@@ -50,7 +50,12 @@ export function liveNotifications(
   now: number = Date.now(),
 ): StudioNotification[] {
   return (items ?? []).filter((i) =>
-    i.kind === "elevation-ending" ? Date.parse(i.until) > now : Date.parse(i.expiresAt) > now,
+    i.kind === "elevation-ending"
+      ? Date.parse(i.until) > now
+      : i.kind === "elevation-request"
+        ? Date.parse(i.expiresAt) > now
+        : // Member events do not expire here; the server lists the last seven days.
+          true,
   );
 }
 
@@ -137,11 +142,12 @@ export function extensionInput(
 
 // ---- Where an item leads ---------------------------------------------------------------------
 
-/** Agents for an ending elevation; the site's Approvals for a request. */
+/** Agents for an ending elevation; the site's Approvals for a request; Team for member events. */
 export function notificationHref(item: StudioNotification): string {
-  return item.kind === "elevation-ending"
-    ? "/agents"
-    : `/sites/${encodeURIComponent(item.siteId)}/approvals`;
+  if (item.kind === "elevation-ending") return "/agents";
+  if (item.kind === "elevation-request")
+    return `/sites/${encodeURIComponent(item.siteId)}/approvals`;
+  return "/team";
 }
 
 // ---- Words -----------------------------------------------------------------------------------

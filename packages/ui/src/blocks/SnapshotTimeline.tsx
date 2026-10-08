@@ -25,6 +25,13 @@ export interface SnapshotTimelineProps {
   onRollback?: ((snapshot: Snapshot) => void) | undefined;
   /** Opens a diff of this snapshot against its predecessor or the live one. */
   onCompare?: ((snapshot: Snapshot) => void) | undefined;
+  /**
+   * The person's role cannot publish: the button stays in place, disabled, with this reason as its
+   * tooltip ("Only Authors and above can publish"). DESIGN.md §2s.
+   */
+  publishDisabledReason?: string | undefined;
+  /** The same for rolling back. */
+  rollbackDisabledReason?: string | undefined;
   labels: SnapshotTimelineLabels;
   emptyIcon?: ReactNode;
   /** CTA under the empty state (e.g. the page's "Create snapshot" button). */
@@ -50,6 +57,8 @@ export function SnapshotTimeline({
   onPublish,
   onRollback,
   onCompare,
+  publishDisabledReason,
+  rollbackDisabledReason,
   labels,
   emptyIcon,
   emptyContents,
@@ -140,12 +149,24 @@ export function SnapshotTimeline({
               )}
               <Table.Cell sticky="right" className="w-0 whitespace-nowrap text-right">
                 {!isLive && onPublish && !isOlderThanLive && (
-                  <Button variant="secondary" size="sm" onClick={() => onPublish(s)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onPublish(s)}
+                    disabled={publishDisabledReason !== undefined}
+                    title={publishDisabledReason}
+                  >
                     {labels.publish}
                   </Button>
                 )}
                 {!isLive && onRollback && isOlderThanLive && (
-                  <Button variant="secondary-destructive" size="sm" onClick={() => onRollback(s)}>
+                  <Button
+                    variant="secondary-destructive"
+                    size="sm"
+                    onClick={() => onRollback(s)}
+                    disabled={rollbackDisabledReason !== undefined}
+                    title={rollbackDisabledReason}
+                  >
                     {labels.rollBack}
                   </Button>
                 )}

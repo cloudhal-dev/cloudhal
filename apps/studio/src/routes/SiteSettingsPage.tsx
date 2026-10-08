@@ -38,8 +38,10 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { NAME_MAX, validateName } from "../lib/account.ts";
 import { absoluteTime } from "../lib/activity.ts";
@@ -800,6 +802,9 @@ export function SiteSettingsPage() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
   const reload = () => void site.refetch();
+  // The Site node carries domains: Administrators change it (RFC-0005 §1); everyone reads it and
+  // may still create preview links (`preview:create`).
+  const settings = useGate("settings.write");
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.settings.title") }]} />}
@@ -807,12 +812,15 @@ export function SiteSettingsPage() {
       description={t("pageHeaders.settings.description")}
     >
       <ErrorBanner error={site.error} onRetry={reload} retrying={site.isFetching} />
+      <ViewOnlyBanner reason={settings.reason} />
       <SettingsLayout
         title={t("common.onThisPage")}
         sections={SECTIONS.map((id) => ({ id, label: t(`siteSettings.sections.${id}`) }))}
       >
-        <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
-        <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
+        <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
+          <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
+          <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
+        </ReadOnly>
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>

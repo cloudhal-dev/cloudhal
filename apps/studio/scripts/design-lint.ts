@@ -60,11 +60,22 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/TermEditorPage.tsx": "editor",
   "routes/RedirectsPage.tsx": "list",
   "routes/LoginPage.tsx": "auth",
+  "routes/MembersPage.tsx": "list",
+  "routes/InvitePage.tsx": "token",
+  "routes/ResetPasswordPage.tsx": "token",
   "routes/SiteShell.tsx": "shell",
   "routes/AccountShell.tsx": "shell",
 };
 
-export type Template = "list" | "queue" | "dashboard" | "settings" | "editor" | "auth" | "shell";
+export type Template =
+  | "list"
+  | "queue"
+  | "dashboard"
+  | "settings"
+  | "editor"
+  | "auth"
+  | "token"
+  | "shell";
 
 /** What each template must be composed from (names must appear in the file). DESIGN.md §2a–2f. */
 export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
@@ -74,6 +85,9 @@ export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
   settings: ["PageLayout", "crumbs=", "title=", "SettingsLayout", "SettingsSection"],
   editor: ["PageLayout", "crumbs=", "title=", "EditorLayout", "SectionCard"],
   auth: ["AuthLayout", "Tabs", "Input", "Button"],
+  // Public token pages (`/invite`, `/reset-password`, DESIGN.md §2r): the auth frame without tabs,
+  // the link's state as a Banner, skeleton lines while it is inspected, a new-password field.
+  token: ["AuthLayout", "takeHashToken", "Banner", "Button", "Input", "LinkSkeleton|SkeletonLine"],
   shell: ["AppFrame", "Sidebar.Group", "Sidebar.MenuButton", "SidebarSwitcher"],
 };
 

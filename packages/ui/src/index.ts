@@ -17,6 +17,7 @@ export {
   type OutcomeBadgeProps,
 } from "./blocks/AuditBadges.tsx";
 export { AuthLayout, type AuthLayoutProps } from "./blocks/AuthLayout.tsx";
+export { Avatar, type AvatarProps, type AvatarSize } from "./blocks/Avatar.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
 export {
   InsetPanel,

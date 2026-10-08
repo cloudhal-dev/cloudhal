@@ -64,17 +64,23 @@ function createServer(agentModes?: unknown) {
     );
   });
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) =>
-    url === "/api/instance"
-      ? agentModes
-        ? new Response(JSON.stringify({ signUp: "first-user", features: {}, agentModes }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          })
-        : new Response(JSON.stringify({ error: "not_found", message: url }), {
-            status: 404,
-            headers: { "content-type": "application/json" },
-          })
-      : fetch(url, init),
+    // `/api/me` (the role caps, RFC-0005) answers like a server without roles.
+    url === "/api/me"
+      ? new Response(JSON.stringify({ error: "not_found", message: url }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        })
+      : url === "/api/instance"
+        ? agentModes
+          ? new Response(JSON.stringify({ signUp: "first-user", features: {}, agentModes }), {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            })
+          : new Response(JSON.stringify({ error: "not_found", message: url }), {
+              status: 404,
+              headers: { "content-type": "application/json" },
+            })
+        : fetch(url, init),
   );
   return fetch;
 }

@@ -1,8 +1,9 @@
 import { Sidebar, SidebarSwitcher } from "@cloudhal/ui";
-import { Robot, SquaresFour, UserGear } from "@phosphor-icons/react";
+import { Robot, SquaresFour, UserGear, UsersThree } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { AppFrame } from "../components/AppFrame.tsx";
+import { useMembers } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, isNotEnabled } from "../lib/api.ts";
 
@@ -18,6 +19,7 @@ export function AccountShell() {
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const skills = useQuery({ queryKey: ["skills"], queryFn: api.skills.list });
+  const members = useMembers();
   return (
     <AppFrame
       loading={sites.isPending}
@@ -90,6 +92,15 @@ export function AccountShell() {
             <Sidebar.GroupLabel>{t("nav.settings")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
               <Sidebar.MenuButton
+                icon={UsersThree}
+                href="/team"
+                active={pathname === "/team"}
+                tooltip={t("nav.team")}
+              >
+                {t("nav.team")}
+                {members.data && <Sidebar.MenuBadge>{members.data.length}</Sidebar.MenuBadge>}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
                 icon={UserGear}
                 href="/account"
                 active={pathname === "/account"}
@@ -109,6 +120,7 @@ export function AccountShell() {
           label: t("commands.goSkills"),
           run: () => navigate({ to: "/agents/skills" }),
         },
+        { id: "team", label: t("commands.goTeam"), run: () => navigate({ to: "/team" }) },
         {
           id: "account",
           label: t("commands.goAccount"),

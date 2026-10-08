@@ -46,11 +46,13 @@ import {
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewPage } from "../lib/api.ts";
 import { cleanSeo, hasErrors, validateSeo } from "../lib/seo.ts";
@@ -215,6 +217,8 @@ export function PageEditorPage() {
     if (query.data) setDraft(query.data);
   }, [query.data]);
   const dirty = isDirty(draft, query.data);
+  // Pages are structure: Editors and above; others read them (RFC-0005 §2.2, DESIGN.md §2s).
+  const readOnlyReason = useGate("pages.write").reason;
   const save = useMutation({
     mutationFn: (page: Page) => api.pages.update(cleanSeo(page)),
     onSuccess: async (saved) => {
@@ -349,19 +353,32 @@ export function PageEditorPage() {
             onPublish={() => {
               if (valid()) setPublishOpen(true);
             }}
+            readOnlyReason={readOnlyReason}
             menu={
-              <>
-                <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
-                  {t("editor.duplicate")}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  icon={Trash}
-                  variant="danger"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  {t("editor.deletePage")}
-                </DropdownMenu.Item>
-              </>
+              readOnlyReason ? (
+                // Disabled items take no pointer events, so the tooltip hangs on a wrapper.
+                <Tooltip content={readOnlyReason} side="left" render={<div />}>
+                  <DropdownMenu.Item icon={Copy} disabled>
+                    {t("editor.duplicate")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                    {t("editor.deletePage")}
+                  </DropdownMenu.Item>
+                </Tooltip>
+              ) : (
+                <>
+                  <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
+                    {t("editor.duplicate")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    icon={Trash}
+                    variant="danger"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    {t("editor.deletePage")}
+                  </DropdownMenu.Item>
+                </>
+              )
             }
           />
           <Button
@@ -370,7 +387,8 @@ export function PageEditorPage() {
               if (valid()) save.mutate(draft);
             }}
             loading={save.isPending}
-            disabled={!dirty}
+            disabled={!dirty || readOnlyReason !== undefined}
+            title={readOnlyReason}
             data-testid="save"
           >
             {t("common.save")}
@@ -379,6 +397,7 @@ export function PageEditorPage() {
       }
     >
       <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
+      <ViewOnlyBanner reason={readOnlyReason} />
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -390,7 +409,12 @@ export function PageEditorPage() {
           />
         }
         main={
-          <>
+          // Read-only for roles below Editor: one disabled fieldset turns every field off (§2s).
+          <fieldset
+            disabled={readOnlyReason !== undefined}
+            className="grid min-w-0 content-start gap-6"
+            data-read-only={readOnlyReason ? "true" : undefined}
+          >
             <SectionCard title={t("editor.page")}>
               <Grid variant="2up" gap="none" className={FIELD_ROW}>
                 <Input
@@ -471,7 +495,7 @@ export function PageEditorPage() {
                 })
               )}
             </div>
-          </>
+          </fieldset>
         }
         aside={
           <>
@@ -500,6 +524,7 @@ export function PageEditorPage() {
               description={t("editor.deletePageHint")}
               actionLabel={t("editor.deletePage")}
               onAction={() => setDeleteOpen(true)}
+              disabledReason={readOnlyReason}
             />
           </>
         }

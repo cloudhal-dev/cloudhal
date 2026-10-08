@@ -7,6 +7,7 @@ import { api, type TagsMigrationResult } from "../lib/api.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { invalidateTaxonomy } from "./Taxonomy.tsx";
 import { useToast } from "./Toast.ts";
+import { useGate } from "./useMe.ts";
 
 /**
  * The one-time offer to move a site's legacy `tags` to terms (RFC-0002, Compatibility &
@@ -15,6 +16,8 @@ import { useToast } from "./Toast.ts";
 export function TagsMigrationBanner({ siteId }: { siteId: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // The migration rewrites the site's vocabulary: Administrators (`site:settings`, RFC-0005).
+  const gate = useGate("settings.write");
   return (
     <>
       <Banner
@@ -22,7 +25,12 @@ export function TagsMigrationBanner({ siteId }: { siteId: string }) {
         title={t("migration.banner.title")}
         description={t("migration.banner.description")}
         action={
-          <Banner.Action variant="secondary" onClick={() => setOpen(true)}>
+          <Banner.Action
+            variant="secondary"
+            onClick={() => setOpen(true)}
+            disabled={!gate.allowed}
+            title={gate.reason}
+          >
             {t("migration.banner.action")}
           </Banner.Action>
         }

@@ -3,7 +3,14 @@ import { ActorBadge, Badge, DecisionBadge, OutcomeBadge, Text, Tooltip } from "@
 import { ArrowRight, Robot } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
-import { isKeyEvent, isKnownTool, KEY_EVENTS, requestedByAgent } from "../lib/activity.ts";
+import {
+  isKeyEvent,
+  isKnownTool,
+  isMemberEvent,
+  KEY_EVENTS,
+  MEMBER_EVENTS,
+  requestedByAgent,
+} from "../lib/activity.ts";
 import { isAutoApproved } from "../lib/agents.ts";
 import type {
   AgentMode,
@@ -11,8 +18,10 @@ import type {
   AuditElevation,
   AuditOutcome,
   AuditRow,
+  Role,
 } from "../lib/api.ts";
 import { AutoApprovedBadge, ModeBadge } from "./AgentModes.tsx";
+import { RoleBadge } from "./Roles.tsx";
 
 /**
  * Human-readable label for an MCP tool name ("update_page" → "Update page") or a person's action
@@ -26,7 +35,9 @@ export function useToolLabel() {
         ? t(`tools.${tool}`)
         : isKeyEvent(tool)
           ? t(`tools.${KEY_EVENTS[tool]}`)
-          : tool,
+          : isMemberEvent(tool)
+            ? t(`tools.${MEMBER_EVENTS[tool]}`)
+            : tool,
     [t],
   );
 }
@@ -79,10 +90,13 @@ export function ActorCell({
   actor,
   mode,
   elevation,
+  role,
 }: {
   actor: Actor;
   mode?: AgentMode | undefined;
   elevation?: AuditElevation | undefined;
+  /** A person's staff role (RFC-0005 §10.3: Approvals and Activity show it next to the name). */
+  role?: Role | undefined;
 }) {
   const t = useT();
   return (
@@ -92,6 +106,7 @@ export function ActorCell({
         {actor.name ?? actor.id}
       </Text>
       {mode && actor.kind === "agent" && <ModeBadge mode={mode} subtle elevation={elevation} />}
+      {role && actor.kind === "human" && <RoleBadge value={role} />}
     </div>
   );
 }

@@ -521,6 +521,104 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   ],
   "routes/SiteShell.tsx#taxonomy": ["useTaxonomyData", "Signpost", "Tag"],
   "components/SnapshotDiffDialog.tsx#taxonomy": ["AssignmentDeltas", "useTaxonomyData"],
+  // Staff roles and invites (§2q–§2s, RFC-0005): Team page, invite flow, token pages, gating.
+  "routes/MembersPage.tsx": [
+    "PageLayout",
+    "Crumbs",
+    "ListToolbar",
+    "LayerCard",
+    "Table",
+    "TableSkeleton",
+    "Empty",
+    "SectionCard",
+    "SectionEmpty",
+    "Pagination",
+    "DropdownMenu",
+    "Tooltip",
+    "Badge",
+    "RelativeTime",
+    "ConfirmDialog",
+    "RoleBadge",
+    "RoleList",
+    "InviteDialog",
+    "ChangeRoleDialog",
+    "RemoveMemberDialog",
+    "ResetLinkDialog",
+    "TransferOwnershipDialog",
+    "ActivityList",
+    "useGate",
+  ],
+  "components/InviteDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Input",
+    "Select",
+    "Radio",
+    "Banner",
+    "ClipboardText",
+    "InsetPanel",
+    "RoleExplainer",
+    "invitePresets",
+    "invitableRoles",
+  ],
+  "components/MemberDialogs.tsx": [
+    "LayerDialog",
+    "LayerDialog.Alert",
+    "LayerDialog.Actions.Primary",
+    "Select",
+    "Banner",
+    "InsetPanel",
+    "ClipboardText",
+    "PasswordField",
+    "Avatar",
+    "RoleBadge",
+    "ModeBadge",
+    "ScopeBadge",
+    "keysNarrowed",
+  ],
+  "components/Roles.tsx": ["Badge", "Tooltip", "Table", "roleCan"],
+  "components/Gating.tsx": ["Banner", "fieldset"],
+  "components/NewPassword.tsx": ["Meter", "PasswordField", "passwordStrength"],
+  "routes/InvitePage.tsx": [
+    "AuthLayout",
+    "Banner",
+    "Banner.Action",
+    "Input",
+    "InsetPanel",
+    "PasswordField",
+    "NewPasswordFields",
+    "Button",
+    "SkeletonLine",
+    "RoleBadge",
+    "takeHashToken",
+  ],
+  "routes/ResetPasswordPage.tsx": [
+    "AuthLayout",
+    "Banner",
+    "Input",
+    "InsetPanel",
+    "NewPasswordFields",
+    "Button",
+    "takeHashToken",
+  ],
+  "components/AppFrame.tsx#roles": ["RoleBadge", "useMe"],
+  "routes/AccountShell.tsx#roles": ["UsersThree", "useMembers"],
+  "routes/AccountPage.tsx#roles": ["Avatar", "RoleBadge"],
+  "routes/AgentsPage.tsx#roles": ["AllKeys", "OthersKeyMenu", "RoleBadge", "effectiveScopes"],
+  "components/CreateAgentKeyDialog.tsx#roles": ["scopeOptions", "roleScopes"],
+  "components/AgentModes.tsx#roles": ["keyModes", "RoleCapHint"],
+  "routes/ApprovalsPage.tsx#roles": ["canDecide", "useDecideReason", "cannotDecideMessage"],
+  "routes/ActivityPage.tsx#roles": ["useCan", "useMemberRoles", "ActivitySource"],
+  "components/SitePublish.tsx#roles": ["usePublishMode", "usePublishSite"],
+  "routes/SnapshotsPage.tsx#roles": ["usePublishMode", "publishDisabledReason"],
+  "components/StatusActions.tsx#roles": ["allowed", "publishReason", "readOnlyReason"],
+  "routes/ArticleEditorPage.tsx#roles": ["entryAccess", "ViewOnlyBanner"],
+  "routes/PageEditorPage.tsx#roles": ["useGate", "ViewOnlyBanner"],
+  "routes/TaxonomyPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
+  "routes/TermEditorPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
+  "routes/RedirectsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
+  "routes/SiteSettingsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
+  "components/NotificationsBell.tsx#roles": ["MemberJoinedItem", "RoleChangedItem"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -580,6 +678,8 @@ const REQUIRED_SOMEWHERE = [
   "Combobox",
   "Autocomplete",
   "TermChip",
+  "Avatar",
+  "Meter",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -645,8 +745,8 @@ describe("design rules (DESIGN.md)", () => {
     const dialog = files.find((f) => f.file === "components/ElevateAgentKeyDialog.tsx") as {
       text: string;
     };
-    // The picker is narrowed to `modesAbove(own, rules.modes)`; the rules only yield key modes.
-    expect(dialog.text).toMatch(/const targets = modesAbove\(own, rules\.modes\)/);
+    // The picker is narrowed to `modesAbove(own, rules.keyModes)`: key modes up to the role's cap.
+    expect(dialog.text).toMatch(/const targets = modesAbove\(own, rules\.keyModes\)/);
     expect(dialog.text).toMatch(/<ModePicker[\s\S]*?only=\{targets\}/);
     // The request carries the chosen card's mode, and only when it is one of those targets.
     expect(dialog.text).toMatch(/!targets\.includes\(mode\)/);
@@ -820,6 +920,70 @@ describe("design rules (DESIGN.md)", () => {
     const card = files.find((f) => f.file === "components/ArticleTerms.tsx") as { text: string };
     // The free TagInput only appears for sites without taxonomies (legacy `tags`).
     expect(card.text).toMatch(/!migrated \? \(\s*<TagInput/);
+  });
+
+  it("invite and reset tokens come from the fragment and travel only in POST bodies (RFC-0005 §7.1)", () => {
+    const roles = readFileSync(path.join(SRC, "lib/roles.ts"), "utf8");
+    const take = roles.slice(roles.indexOf("export function takeHashToken"));
+    // read from location.hash, stripped at once with replaceState
+    expect(take).toMatch(/window\.location\.hash[\s\S]*window\.history\.replaceState\(/);
+    for (const file of ["routes/InvitePage.tsx", "routes/ResetPasswordPage.tsx"]) {
+      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      expect(text, file).toMatch(/useState\(\(\) => takeHashToken\(/);
+      expect(text, file).not.toMatch(/searchParams|location\.search|\?token=/);
+    }
+    const api = readFileSync(path.join(SRC, "lib/api.ts"), "utf8");
+    for (const route of [
+      "/api/invites/inspect",
+      "/api/invites/accept",
+      "/api/password-reset/inspect",
+      "/api/password-reset/complete",
+    ])
+      expect(api).toMatch(
+        new RegExp(`"${route.replaceAll("/", "\\/")}",\\s*\\{\\s*method: "POST"`),
+      );
+    // no screen builds a URL with a token in it
+    const offenders = uiFiles
+      .filter((f) => /[?&]token=|\/(?:invite|reset-password)\?/.test(f.text))
+      .map((f) => f.file);
+    expect(offenders).toEqual([]);
+  });
+
+  it("gating reads abilities from /api/me, never role names (RFC-0005 I16)", () => {
+    // Screens ask `useCan` / `useGate` what the person may do; only the role screens name roles.
+    const allowed = new Set([
+      "components/Roles.tsx",
+      "components/MemberDialogs.tsx",
+      "components/InviteDialog.tsx",
+      "routes/MembersPage.tsx",
+    ]);
+    const offenders = uiFiles
+      .filter((f) => !allowed.has(f.file))
+      .filter((f) => /\brole\s*[!=]==\s*"(?:administrator|editor|author|contributor)"/.test(f.text))
+      .map((f) => f.file);
+    expect(offenders).toEqual([]);
+    // A disabled gated control always carries the reason for its tooltip.
+    for (const f of uiFiles) {
+      for (const m of f.text.matchAll(/disabled=\{!(\w+)\.allowed[^}]*\}/g)) {
+        const after = f.text.slice(m.index ?? 0, (m.index ?? 0) + 200);
+        expect(after, `${f.file}: ${m[0]} needs title={${m[1]}.reason}`).toMatch(
+          new RegExp(`title=\\{${m[1]}\\.reason\\}`),
+        );
+      }
+    }
+  });
+
+  it("the Team page and the public token pages are routed", () => {
+    const router = readFileSync(path.join(SRC, "router.tsx"), "utf8");
+    expect(router).toMatch(/path: "\/team"/);
+    expect(router).toMatch(/path: "\/invite"/);
+    expect(router).toMatch(/path: "\/reset-password"/);
+    // the token pages need no session
+    const invite = router.slice(
+      router.indexOf("const inviteRoute"),
+      router.indexOf("const indexRoute"),
+    );
+    expect(invite).not.toMatch(/requireSession/);
   });
 
   it("every screen that can pick Auto asks for consent first", () => {

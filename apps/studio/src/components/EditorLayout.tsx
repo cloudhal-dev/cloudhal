@@ -161,11 +161,14 @@ export function DangerZoneCard({
   description,
   actionLabel,
   onAction,
+  disabledReason,
 }: {
   title: string;
   description: string;
   actionLabel: string;
   onAction: () => void;
+  /** The person's role cannot do this here: the action stays, disabled, with the reason (§2s). */
+  disabledReason?: string | undefined;
 }) {
   const t = useT();
   return (
@@ -179,7 +182,13 @@ export function DangerZoneCard({
             {description}
           </Text>
         </div>
-        <Button variant="secondary-destructive" icon={<Trash />} onClick={onAction}>
+        <Button
+          variant="secondary-destructive"
+          icon={<Trash />}
+          onClick={onAction}
+          disabled={disabledReason !== undefined}
+          title={disabledReason}
+        >
           {actionLabel}
         </Button>
       </div>

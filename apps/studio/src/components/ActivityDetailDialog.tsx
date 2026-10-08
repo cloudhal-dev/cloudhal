@@ -31,7 +31,8 @@ export function ActivityDetailDialog({
   row: current,
   onOpenChange,
 }: {
-  siteId: string;
+  /** The site the event belongs to; deployment events (members, invites) have none. */
+  siteId?: string | undefined;
   /** The event to show; `undefined` closes the dialog (it stays mounted to animate). */
   row: AuditRow | undefined;
   onOpenChange: (open: boolean) => void;
@@ -173,7 +174,7 @@ export function ActivityDetailDialog({
                     </Text>
                   </Row>
                 )}
-                {row.snapshotId && (
+                {row.snapshotId && siteId && (
                   <Row label={t("activity.detail.snapshot")}>
                     <div className="flex flex-wrap items-center gap-2">
                       <InlineCopyText>{row.snapshotId}</InlineCopyText>

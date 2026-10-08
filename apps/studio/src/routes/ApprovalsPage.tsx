@@ -18,7 +18,9 @@ import {
   ClockCountdown,
   ClockCounterClockwise,
   HandPalm,
+  Hourglass,
   Info,
+  LockSimple,
   X,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,11 +42,20 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useMe, useMemberRoles, useRoleRules, useSelf } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
-import { type Approval, api, isNotEnabled, type KeyMode } from "../lib/api.ts";
+import {
+  type Approval,
+  api,
+  errorCode,
+  errorDetail,
+  isNotEnabled,
+  type KeyMode,
+  type Role,
+} from "../lib/api.ts";
 import {
   elevationRequestOf,
   expiresSoon,
@@ -76,6 +87,9 @@ function usePromptText() {
         if (short) return text.short;
         return elevation.reason ? `${text.sentence} “${elevation.reason}”` : text.sentence;
       }
+      // A person's own request (cause `role`): the server's line is English; say who asks.
+      if (request.cause === "role")
+        return t("approvals.role.prompt", { name: request.actor.name ?? request.actor.id });
       if (!isManualModeRequest(request) || needsConfirmation(request.tool)) return request.prompt;
       const tool = label(request.tool);
       return short
@@ -86,6 +100,62 @@ function usePromptText() {
   );
 }
 
+/** Whose request it is, from the signed-in person's side (RFC-0005 §6). */
+interface Requester {
+  /** The person filed it themselves (cause `role`): they may withdraw it, never approve it. */
+  mine: boolean;
+  /** One of the person's own keys' agents filed it: they may always deny it. */
+  myAgent: boolean;
+}
+
+/**
+ * Why the person cannot approve a request the server marked `canDecide: false`, in their language.
+ * The list carries only the boolean; the 403 `cannot_decide` codes (`details.code`) name the same
+ * cases, and `cannotDecideMessage` maps those.
+ */
+function useDecideReason() {
+  const t = useT();
+  const rules = useRoleRules();
+  const me = useMe().data;
+  return (request: Approval, who: Requester): string => {
+    if (who.mine) return t("approvals.decide.own_request");
+    if (request.tool === "request_elevation") {
+      if (!who.myAgent) return t("approvals.decide.not_key_creator");
+      const cap = me?.role ? rules.modeCaps[me.role] : undefined;
+      return t("approvals.decide.mode_above_role", {
+        mode: cap ? t(`agents.modes.names.${cap}`) : "",
+      });
+    }
+    if (request.tool === "publish") return t("approvals.decide.not_own");
+    return t("approvals.decide.missing_scope");
+  };
+}
+
+/** A 403 `cannot_decide` in the person's language (`details.code`). */
+function cannotDecideMessage(t: ReturnType<typeof useT>, error: unknown): string | undefined {
+  if (errorCode(error) !== "cannot_decide") return undefined;
+  const code = errorDetail(error, "code");
+  const known = ["own_request", "not_key_creator", "mode_above_role", "missing_scope", "not_own"];
+  return code && known.includes(code)
+    ? t(`approvals.decide.${code as "own_request"}`, { mode: "" })
+    : t("approvals.decide.missing_scope");
+}
+
+/** A person's own publish request (cause `role`): what the server's English reason means. */
+function useRoleRequestText() {
+  const t = useT();
+  return (request: Approval) => {
+    // The list may not carry `reason`; the server's prompt ends with it ("… (requested by X: <reason>)").
+    const reason = request.reason ?? request.prompt;
+    const foreign = /(\d+) published article/.exec(reason)?.[1];
+    return foreign
+      ? t("approvals.role.foreign", { count: Number(foreign) })
+      : /pages|settings|taxonom|terms|redirects/.test(reason)
+        ? t("approvals.role.structure")
+        : t("approvals.role.generic");
+  };
+}
+
 /** One pending request: who asks for what, the server's question as plain text, and the decision. */
 function PendingRequest({
   request,
@@ -93,6 +163,8 @@ function PendingRequest({
   onDecide,
   ownMode,
   now,
+  who,
+  role,
 }: {
   request: Approval;
   busy: Decision | undefined;
@@ -100,45 +172,85 @@ function PendingRequest({
   /** Elevation requests: the key's own mode, for "Edits → Auto". */
   ownMode: KeyMode | undefined;
   now: number;
+  who: Requester;
+  /** The requester's staff role, when a person asked. */
+  role: Role | undefined;
 }) {
   const t = useT();
   const promptText = usePromptText();
+  const decideReason = useDecideReason();
+  const roleText = useRoleRequestText();
   const args = formatArguments(request.input);
   const soon = expiresSoon(request.expiresAt);
   const elevation = elevationRequestOf(request);
   const manual = isManualModeRequest(request) && !needsConfirmation(request.tool);
   const heldBack = autoCheckHeldBack(request);
   const prompt = promptText(request);
+  const byRole = request.cause === "role";
+  // Older servers omit `canDecide`: everyone could decide there.
+  const blocked = request.canDecide === false;
+  const reason = blocked ? decideReason(request, who) : undefined;
+  // The requester withdraws; the key's creator may always deny their own agent's request.
+  const mayDeny = !blocked || who.mine || who.myAgent;
   return (
-    <div className="grid gap-3 px-5 py-4" data-approval-id={request.id} data-tool={request.tool}>
+    <div
+      className="grid gap-3 px-5 py-4"
+      data-approval-id={request.id}
+      data-tool={request.tool}
+      data-can-decide={blocked ? "false" : "true"}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-start gap-x-6 gap-y-2">
           {elevation ? <ElevationRequestCell /> : <ToolCell tool={request.tool} />}
           {/* The actor's badge says it is an agent; aligned with the tool's label line. */}
-          <ActorCell actor={request.actor} />
+          <ActorCell actor={request.actor} role={role} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="secondary"
             icon={<X />}
             loading={busy === "deny"}
-            disabled={busy !== undefined}
+            disabled={busy !== undefined || !mayDeny}
+            title={mayDeny ? undefined : reason}
             onClick={() => onDecide("deny")}
           >
-            {t("approvals.deny")}
+            {who.mine ? t("approvals.withdraw") : t("approvals.deny")}
           </Button>
-          <Button
-            variant="primary"
-            icon={<CheckCircle />}
-            loading={busy === "approve"}
-            disabled={busy !== undefined}
-            onClick={() => onDecide("approve")}
-          >
-            {t("approvals.approve")}
-          </Button>
+          {!who.mine && (
+            <Button
+              variant="primary"
+              icon={<CheckCircle />}
+              loading={busy === "approve"}
+              disabled={busy !== undefined || blocked}
+              title={reason}
+              onClick={() => onDecide("approve")}
+            >
+              {t("approvals.approve")}
+            </Button>
+          )}
         </div>
       </div>
-      {elevation ? (
+      {byRole ? (
+        // A person asked for more than their role does alone (RFC-0005 §6): say it in words.
+        <div className="grid gap-1.5" data-role-request="true">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning" icon={<Hourglass />}>
+              {t("approvals.role.waiting")}
+            </Badge>
+            {who.mine && (
+              <Text variant="secondary" size="sm" as="span">
+                {t("approvals.role.yours")}
+              </Text>
+            )}
+          </div>
+          <Text>
+            {t("approvals.role.prompt", { name: request.actor.name ?? request.actor.id })}
+          </Text>
+          <Text variant="secondary" size="sm">
+            {roleText(request)}
+          </Text>
+        </div>
+      ) : elevation ? (
         // An agent asks for more autonomy: never the server's English line, the reason as text.
         <ElevationRequestDetails request={request} elevation={elevation} ownMode={ownMode} />
       ) : manual ? (
@@ -199,6 +311,14 @@ function PendingRequest({
         {elevation && !cannotTake(ownMode, elevation) && (
           <UntilIfApprovedNow minutes={elevation.minutes} now={now} />
         )}
+        {blocked && !who.mine && (
+          <span className="flex items-center gap-1.5" data-decide-reason>
+            <LockSimple size={14} className="text-kumo-subtle" aria-hidden />
+            <Text variant="secondary" size="sm" as="span">
+              {reason}
+            </Text>
+          </span>
+        )}
       </div>
       <Collapsible.Root>
         <Collapsible.DefaultTrigger>{t("approvals.arguments")}</Collapsible.DefaultTrigger>
@@ -239,11 +359,14 @@ function HistoryTable({
   rows,
   pending,
   meId,
+  roles,
 }: {
   rows: Approval[];
   pending: boolean;
   /** The signed-in person's actor id, to say "by you". */
   meId: string | undefined;
+  /** People's roles by actor id, for the badge next to a person's name. */
+  roles?: Map<string, Role> | undefined;
 }) {
   const t = useT();
   const promptText = usePromptText();
@@ -301,7 +424,7 @@ function HistoryTable({
                     />
                   </Table.Cell>
                   <Table.Cell className="min-w-44 max-w-64">
-                    <ActorCell actor={r.actor} />
+                    <ActorCell actor={r.actor} role={roles?.get(r.actor.id)} />
                   </Table.Cell>
                   <Table.Cell className="whitespace-nowrap">
                     <RelativeTime iso={r.createdAt} />
@@ -351,6 +474,12 @@ export function ApprovalsPage() {
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
+  const self = useSelf();
+  const roles = useMemberRoles();
+  const whoFor = (request: Approval): Requester => ({
+    mine: request.actor.kind === "human" && request.actor.id === me.data?.actor.id,
+    myAgent: request.actor.kind === "agent" && self.agentIds.has(request.actor.id),
+  });
   const [confirming, setConfirming] = useState<Approval | undefined>();
   const [granting, setGranting] = useState<Approval | undefined>();
   const now = useNow();
@@ -369,20 +498,43 @@ export function ApprovalsPage() {
   const decide = useMutation({
     mutationFn: ({ request, decision }: { request: Approval; decision: Decision }) =>
       api.approvals.decide(siteId, request.id, decision),
-    onSuccess: async (_r, { request, decision }) => {
+    onSuccess: async (result, { request, decision }) => {
       setConfirming(undefined);
       const agent = request.actor.name ?? request.actor.id;
-      if (decision === "approve")
+      if (decision === "approve" && result.published)
+        // A person's publish request runs on approval, with the approver's rights (RFC-0005 §6).
+        toast.success(
+          t("approvals.role.published"),
+          t("approvals.role.publishedDescription", { name: agent }),
+        );
+      else if (decision === "approve")
         toast.success(t("approvals.approved"), t("approvals.approvedDescription", { agent }));
+      else if (whoFor(request).mine) toast.success(t("approvals.withdrawn"));
       else toast.success(t("approvals.denied"), t("approvals.deniedDescription", { agent }));
       // The bell lists pending elevation requests too (§2n).
       await Promise.all([
         qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
         qc.invalidateQueries({ queryKey: ["notifications"] }),
+        ...(result.published
+          ? [
+              qc.invalidateQueries({ queryKey: ["site", siteId] }),
+              qc.invalidateQueries({ queryKey: ["snapshots", siteId] }),
+            ]
+          : []),
       ]);
     },
     onError: async (error) => {
-      if (isNoLongerPending(error)) {
+      const refusal = cannotDecideMessage(t, error);
+      if (errorCode(error) === "state_changed") {
+        // The site moved on after a person's publish request: the server closed it.
+        setConfirming(undefined);
+        toast.error(t("approvals.role.stateChanged"), t("approvals.role.stateChangedDescription"));
+        await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+      } else if (refusal) {
+        setConfirming(undefined);
+        toast.error(t("approvals.failed"), refusal);
+        await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+      } else if (isNoLongerPending(error)) {
         setConfirming(undefined);
         toast.error(t("approvals.noLongerPending"), t("approvals.noLongerPendingDescription"));
         await Promise.all([
@@ -472,13 +624,20 @@ export function ApprovalsPage() {
                       onDecide={(d) => onDecide(r, d)}
                       ownMode={ownModeOf(r)}
                       now={now}
+                      who={whoFor(r)}
+                      role={roles.get(r.actor.id)}
                     />
                   ))}
                 </div>
               )}
             </SectionCard>
           </div>
-          <HistoryTable rows={history} pending={all.isPending} meId={me.data?.actor.id} />
+          <HistoryTable
+            rows={history}
+            pending={all.isPending}
+            meId={me.data?.actor.id}
+            roles={roles}
+          />
         </div>
       )}
       <ApproveRequestDialog

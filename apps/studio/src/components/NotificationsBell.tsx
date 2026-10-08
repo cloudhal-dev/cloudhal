@@ -17,12 +17,19 @@ import {
   ClockCountdown,
   GearSix,
   Robot,
+  ShieldStar,
   Stop,
+  UserPlus,
 } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
-import type { ElevationEndingNotification, ElevationRequestNotification } from "../lib/api.ts";
+import type {
+  ElevationEndingNotification,
+  ElevationRequestNotification,
+  MemberJoinedNotification,
+  RoleChangedNotification,
+} from "../lib/api.ts";
 import { formatUntil } from "../lib/elevation.ts";
 import {
   DEFAULT_EXTEND_MINUTES,
@@ -38,6 +45,7 @@ import { ModeBadge } from "./AgentModes.tsx";
 import { useEndElevation, useExtendElevation } from "./Elevation.tsx";
 import { AgentReason, useShortDuration } from "./ElevationRequest.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
+import { RoleBadge } from "./Roles.tsx";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 import { useNotificationAlerts, useNotifications } from "./useNotifications.ts";
 import { useNow } from "./useNow.ts";
@@ -211,6 +219,84 @@ function RequestItem({
   );
 }
 
+/** "Ada joined as Editor" — someone the person invited accepted (RFC-0005 §7). */
+function MemberJoinedItem({
+  item,
+  onNavigate,
+}: {
+  item: MemberJoinedNotification;
+  onNavigate: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <NotificationItem
+      icon={<UserPlus size={16} />}
+      tone="success"
+      title={t("notifications.memberJoined.title", { name: item.name ?? t("members.someone") })}
+      meta={<RelativeTime iso={item.at} size="xs" />}
+      actions={
+        <LinkButton
+          href={notificationHref(item)}
+          variant="ghost"
+          size="sm"
+          icon={ArrowRight}
+          onClick={onNavigate}
+        >
+          {t("notifications.openTeam")}
+        </LinkButton>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-1.5" data-notification={item.id}>
+        <RoleBadge value={item.role} />
+        <Text variant="secondary" size="sm" as="span">
+          {t("notifications.memberJoined.body")}
+        </Text>
+      </div>
+    </NotificationItem>
+  );
+}
+
+/** "Your role is now Author" — someone changed the person's role (RFC-0005 open question 4). */
+function RoleChangedItem({
+  item,
+  onNavigate,
+}: {
+  item: RoleChangedNotification;
+  onNavigate: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <NotificationItem
+      icon={<ShieldStar size={16} />}
+      tone="info"
+      title={t("notifications.roleChanged.title", { role: t(`roles.names.${item.to}`) })}
+      meta={<RelativeTime iso={item.at} size="xs" />}
+      actions={
+        <LinkButton
+          href={notificationHref(item)}
+          variant="ghost"
+          size="sm"
+          icon={ArrowRight}
+          onClick={onNavigate}
+        >
+          {t("notifications.openTeam")}
+        </LinkButton>
+      }
+    >
+      <div className="grid gap-1.5" data-notification={item.id}>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <RoleBadge value={item.from} tooltip={false} />
+          <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+          <RoleBadge value={item.to} />
+        </span>
+        <Text variant="secondary" size="sm">
+          {t("notifications.roleChanged.body", { name: item.by.name ?? item.by.id })}
+        </Text>
+      </div>
+    </NotificationItem>
+  );
+}
+
 /**
  * The top bar's bell (DESIGN.md §1, §2n): a count of what needs the person — elevations about to
  * end, agents asking for one — and a panel to act on them right there. It also hosts the one-time
@@ -264,8 +350,12 @@ export function NotificationsBell() {
         items.map((item) =>
           item.kind === "elevation-ending" ? (
             <EndingItem key={item.id} item={item} now={now} onNavigate={close} />
-          ) : (
+          ) : item.kind === "elevation-request" ? (
             <RequestItem key={item.id} item={item} onNavigate={close} />
+          ) : item.kind === "member-joined" ? (
+            <MemberJoinedItem key={item.id} item={item} onNavigate={close} />
+          ) : (
+            <RoleChangedItem key={item.id} item={item} onNavigate={close} />
           ),
         )
       )}
