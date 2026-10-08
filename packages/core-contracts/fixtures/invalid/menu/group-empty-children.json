@@ -1,0 +1,23 @@
+{
+  "reason": "an empty list is never stored: omit children instead (here: a group needs children)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "menu_01HZX8K3Q9BD",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "footer",
+    "maxDepth": 2,
+    "items": [
+      {
+        "id": "item_01HZX8K3Q9X1",
+        "kind": "group",
+        "labels": {
+          "en": "More"
+        },
+        "children": []
+      }
+    ],
+    "rev": 0,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T09:00:00Z"
+  }
+}

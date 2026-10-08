@@ -1,0 +1,13 @@
+{
+  "reason": "items is required (an empty menu is [])",
+  "data": {
+    "schemaVersion": 1,
+    "id": "menu_01HZX8K3Q9BD",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "footer",
+    "maxDepth": 2,
+    "rev": 0,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T09:00:00Z"
+  }
+}

@@ -1,6 +1,7 @@
 //! GENERATED FILE — DO NOT EDIT. One module per root contract.
 
 pub mod content_entry;
+pub mod menu;
 pub mod page;
 pub mod project;
 pub mod redirect;

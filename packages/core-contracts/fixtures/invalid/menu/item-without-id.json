@@ -1,0 +1,19 @@
+{
+  "reason": "every item has a stable id (diffs, ops, active state)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "menu_01HZX8K3Q9BD",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "footer",
+    "maxDepth": 2,
+    "items": [
+      {
+        "kind": "page",
+        "pageId": "page_01HZX8K3Q9AB"
+      }
+    ],
+    "rev": 0,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T09:00:00Z"
+  }
+}
