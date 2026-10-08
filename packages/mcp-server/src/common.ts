@@ -21,6 +21,7 @@ import {
   NotFoundError,
   UniqueConstraintError,
 } from "@cloudhal/core-ts";
+import type { FetchTransport } from "@cloudhal/core-ts/media";
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -48,6 +49,27 @@ export interface ToolDefinition {
    */
   own?: "entry" | "changeset";
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
+  /**
+   * What the audit log keeps of the arguments (default: all of them, truncated). `upload_asset`
+   * replaces its base64 payload with its size, so file bytes never land in the audit table.
+   */
+  auditArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+}
+
+/** Media settings of a deployment for the asset tools (RFC-0004 §5.6–§5.7). */
+export interface MediaToolOptions {
+  /**
+   * How `fetch_asset_url` reaches the network: `nodeTransport()` from `@cloudhal/core-ts/media-node`
+   * on Node (resolves, checks and pins every address), `workersTransport()` (the default) on Workers.
+   */
+  fetchTransport?: FetchTransport | undefined;
+  /** Hosts agents may fetch from, for every site (each site may add `cloudhal.media.allowHosts`). */
+  allowHosts?: readonly string[] | undefined;
+  /** This deployment's own hosts (Studio, admin API, workers.dev): never fetched. */
+  blockedHosts?: readonly string[] | undefined;
+  /** Per agent key per day (default 100 assets and 500 MB; audited as a denial when exceeded). */
+  agentDailyAssets?: number | undefined;
+  agentDailyBytes?: number | undefined;
 }
 
 export interface ToolContext {
@@ -70,6 +92,8 @@ export interface ToolContext {
   ownership?: OwnershipResolver | undefined;
   /** Set by `runTool`: the own limit this call runs under (absent = full scope). */
   limit?: OwnLimit | undefined;
+  /** Media settings (fetch transport, host lists, daily limits). */
+  media?: MediaToolOptions | undefined;
 }
 
 /**
@@ -200,7 +224,21 @@ function invariantHint(e: InvariantError): string | undefined {
     case "invalid_labels":
       return "names and synonyms must not repeat another term's name, synonym or slug; reuse that term or pick another name";
     case "too_large":
-      return "split the operation, or ask a person for the staged job";
+      return typeof e.details.limit === "number"
+        ? "use a smaller file; larger files are uploaded by a person in Studio"
+        : "split the operation, or ask a person for the staged job";
+    case "unknown_asset":
+      return "call list_assets for this site's files, or add one with upload_asset or fetch_asset_url";
+    case "retired_asset":
+      return "pick another file (list_assets), or ask a person to restore this one";
+    case "in_use":
+      return "remove those uses first (update_entry, update_page), or retire the file instead";
+    case "fetch_blocked":
+      return "use a public https address of the file itself; internal hosts, IP addresses and redirects into them are refused";
+    case "reserved_path":
+      return "paths under /media/<16 hex digits>/ belong to media files";
+    case "retry":
+      return "call the tool again in a few seconds";
     default:
       return undefined;
   }

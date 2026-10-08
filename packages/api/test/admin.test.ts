@@ -58,6 +58,60 @@ describe("admin domains endpoint", () => {
   });
 });
 
+describe("admin media endpoints (RFC-0004 §4.7)", () => {
+  it("moves verified bytes before the bundle, which refuses to import without them", async () => {
+    const a = await backend();
+    const b = await backend();
+    const site = await seedStarterSite(a.store, { name: "Media", slug: "media" });
+    const { asset } = await a.store.ingestAsset({
+      siteId: site.id,
+      bytes: new TextEncoder().encode("hour,ferries\n06,12\n"),
+      filename: "hourly.csv",
+      uploadedBy: human,
+      source: { kind: "upload" },
+    });
+    const appA = createApi({ store: a.store, admin: { deployToken: TOKEN, storage: a } });
+    const appB = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const auth = { authorization: `Bearer ${TOKEN}` };
+    const path = `/api/admin/sites/${site.id}/media/${asset.sha256}`;
+    const bundle = await (
+      await appA.request(`/api/admin/sites/${site.id}/bundle`, { headers: auth })
+    ).text();
+    const importInto = () =>
+      appB.request(`/api/admin/sites/${site.id}/bundle?mode=bootstrap`, {
+        method: "PUT",
+        headers: { ...auth, "content-type": "application/json" },
+        body: bundle,
+      });
+    const refused = await importInto();
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).toMatch(/missing 1 media file/);
+    expect((await appB.request(path, { method: "HEAD", headers: auth })).status).toBe(404);
+    const bytes = await (await appA.request(path, { headers: auth })).arrayBuffer();
+    expect(new TextDecoder().decode(bytes)).toBe("hour,ferries\n06,12\n");
+    expect((await appA.request(path)).status).toBe(401);
+    // A body that does not hash to the URL's SHA-256 stores nothing.
+    const wrong = await appB.request(path, {
+      method: "PUT",
+      headers: { ...auth, "content-length": "5" },
+      body: "wrong",
+    });
+    expect(wrong.status).toBe(400);
+    expect((await appB.request(path, { method: "HEAD", headers: auth })).status).toBe(404);
+    const put = await appB.request(path, {
+      method: "PUT",
+      headers: { ...auth, "content-length": String(bytes.byteLength) },
+      body: bytes,
+    });
+    expect(put.status).toBe(201);
+    expect((await importInto()).status).toBe(200);
+    expect((await b.store.getAsset(asset.id))?.sha256).toBe(asset.sha256);
+    expect(
+      (await appB.request(`/api/admin/sites/${site.id}/media/not-a-sha`, { headers: auth })).status,
+    ).toBe(400);
+  });
+});
+
 describe("admin bundle endpoints", () => {
   it("exports from one deployment and imports into another, behind the deploy token", async () => {
     const a = await backend();

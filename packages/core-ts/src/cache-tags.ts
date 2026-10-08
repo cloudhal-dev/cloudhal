@@ -13,6 +13,10 @@
  *   id, everything that lists the site's entries as a whole (the site feed, the sitemap, pages with
  *   a `ContentList` section). A new, removed or re-filed entry changes these without changing any
  *   node they already carry a tag for.
+ * - `cloudhal-media-<siteId>` and `cloudhal-asset-<id>` — media responses (RFC-0004 §7.4). They never
+ *   carry the site tag, so purging pages leaves media cached; a publish purges the asset tags of
+ *   media that left the live snapshot or changed slug or status, a takedown purges its asset at
+ *   once, and `cloudhal-media-<siteId>` is the operator's "purge all media" lever.
  *
  * Tags are plain ASCII and far below Cloudflare's 1024-character limit per tag.
  */
@@ -20,14 +24,18 @@ export const CACHE_TAG_PREFIX = "cloudhal-site-";
 export const NODE_TAG_PREFIX = "cloudhal-node-";
 export const TERM_TAG_PREFIX = "cloudhal-term-";
 export const LIST_TAG_PREFIX = "cloudhal-list-";
+export const MEDIA_TAG_PREFIX = "cloudhal-media-";
+export const ASSET_TAG_PREFIX = "cloudhal-asset-";
 
 export const siteCacheTag = (siteId: string) => `${CACHE_TAG_PREFIX}${siteId}`;
 export const nodeCacheTag = (id: string) => `${NODE_TAG_PREFIX}${id}`;
 export const termCacheTag = (id: string) => `${TERM_TAG_PREFIX}${id}`;
 /** The listing tag of a term (its archive and feed) or, with the site id, of the whole site. */
 export const listCacheTag = (termOrSiteId: string) => `${LIST_TAG_PREFIX}${termOrSiteId}`;
+export const mediaCacheTag = (siteId: string) => `${MEDIA_TAG_PREFIX}${siteId}`;
+export const assetCacheTag = (assetId: string) => `${ASSET_TAG_PREFIX}${assetId}`;
 
 /** Whether a tag is one Cloudhal sets (the purge endpoint refuses anything else). */
 export function isCloudhalCacheTag(tag: string): boolean {
-  return /^cloudhal-(?:site|node|term|list)-[A-Za-z0-9_]{1,64}$/.test(tag);
+  return /^cloudhal-(?:site|node|term|list|media|asset)-[A-Za-z0-9_]{1,64}$/.test(tag);
 }

@@ -12,6 +12,7 @@ import type {
 } from "@cloudhal/agent-runtime";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
+import type { MediaToolOptions } from "./common.ts";
 import { createCloudhalMcpServer } from "./server.ts";
 
 export interface HttpOptions {
@@ -22,6 +23,8 @@ export interface HttpOptions {
   skills?: LoadedSkill[] | undefined;
   previewBaseUrl?: string | undefined;
   previewSecret?: string | undefined;
+  /** Media settings for the asset tools (RFC-0004). */
+  media?: MediaToolOptions | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
   confirmTokenFallback?: boolean | undefined;
@@ -52,6 +55,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         skills: options.skills,
         previewBaseUrl: options.previewBaseUrl,
         previewSecret: options.previewSecret,
+        media: options.media,
         now: options.now,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,

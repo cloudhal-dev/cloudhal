@@ -91,6 +91,7 @@ describe("agent modes (ADR-0015)", () => {
         "content:read",
         "preview:create",
         "content:write",
+        "asset:upload",
         "site:publish",
         "site:rollback",
       ]);

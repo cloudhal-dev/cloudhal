@@ -76,7 +76,7 @@ export interface Actor {
  */
 export interface NodeRef {
   id: Id;
-  kind: "site" | "page" | "contentEntry" | "taxonomy" | "term" | "redirect" | "menu";
+  kind: "site" | "page" | "contentEntry" | "taxonomy" | "term" | "redirect" | "menu" | "asset";
   rev: Revision;
   /**
    * Lower-case hex SHA-256 of the node's canonical JSON.

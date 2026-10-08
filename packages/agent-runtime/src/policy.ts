@@ -314,6 +314,6 @@ export function defaultScopes(actor: Actor): Scope[] {
     case "system":
       return ["*"];
     case "agent":
-      return ["site:read", "content:read", "content:write", "preview:create"];
+      return ["site:read", "content:read", "content:write", "preview:create", "asset:upload"];
   }
 }

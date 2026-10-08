@@ -84,6 +84,11 @@ export class SiteResolver {
     };
   }
 
+  /** The store sources read from (the media route needs its blobs and ledger). */
+  get store(): SiteGraphStore {
+    return this.#o.store;
+  }
+
   /** Forget the cached pointer (e.g. after a publish handled in the same isolate). */
   invalidate(): void {
     this.#pointer = undefined;

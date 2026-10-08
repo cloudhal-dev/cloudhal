@@ -1282,7 +1282,8 @@ export const SnapshotSchema = {
             "taxonomy",
             "term",
             "redirect",
-            "menu"
+            "menu",
+            "asset"
           ]
         },
         "rev": {

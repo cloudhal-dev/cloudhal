@@ -40,6 +40,7 @@ import {
   ResourceTemplate,
   type ServerContext,
 } from "@modelcontextprotocol/server";
+import type { MediaToolOptions } from "./common.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
 
 export interface CloudhalMcpOptions {
@@ -52,6 +53,8 @@ export interface CloudhalMcpOptions {
   previewBaseUrl?: string | undefined;
   /** Preview secret shared with the deployed site: `preview_page.url` becomes a signed link. */
   previewSecret?: string | undefined;
+  /** Media settings for the asset tools (fetch transport, host lists, daily limits; RFC-0004). */
+  media?: MediaToolOptions | undefined;
   /**
    * HMAC key (≥ 32 bytes) for the approval state. Every instance that may receive a retried round
    * must share it: a random per-process key is fine for stdio, a configured secret for HTTP.
@@ -360,6 +363,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           previewBaseUrl: options.previewBaseUrl,
           previewSecret: options.previewSecret,
           ownership: options.ownership,
+          media: options.media,
         };
         let outcome: Awaited<ReturnType<typeof runTool>>;
         try {

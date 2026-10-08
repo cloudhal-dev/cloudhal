@@ -7,6 +7,14 @@ export {
   readDeployState,
 } from "./commands/deploy.ts";
 export { findWorkspaceRoot, type InitOptions, init } from "./commands/init.ts";
+export {
+  describeMediaImport,
+  type MediaImportCliOptions,
+  mediaGc,
+  mediaImportUrls,
+  mediaVerify,
+  type VerifyResult,
+} from "./commands/media.ts";
 export { describeMigration, type MigrateTagsOptions, migrateTags } from "./commands/migrate.ts";
 export {
   type OwnerTransferOptions,

@@ -4,6 +4,7 @@ import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { createApi } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { resolveSkillsDir } from "./mcp.ts";
@@ -54,6 +55,7 @@ export async function studio(
       audit: new AuditLog(local.sql),
       approvals: new ApprovalStore(local.sql),
       skills: skillsDir ? await loadSkills(skillsDir) : [],
+      media: { fetchTransport: nodeTransport() },
     },
   };
   if (!options.noAuth) {

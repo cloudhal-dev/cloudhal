@@ -37,6 +37,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites/:siteId/bundle", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/bundle", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/domains", "deploy-token"],
+  // RFC-0004 §4.7: media bytes move before a bundle (GET also answers HEAD)
+  ["GET", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
+  ["PUT", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["POST", "/api/admin/owner", "deploy-token"],
 
   // deployment

@@ -52,6 +52,23 @@ describe("PolicyEngine", () => {
     expect(engine.evaluate({ ...p, scopes: ["*"] }, "publish")).toMatchObject({ kind: "deny" });
   });
 
+  it("asset:manage implies asset:upload (RFC-0004 §6.2, ADR-0018)", () => {
+    const media = new PolicyEngine([
+      { name: "upload_asset", scopes: ["asset:upload"], annotations: { readOnlyHint: false } },
+      { name: "retire_asset", scopes: ["asset:manage"], annotations: { readOnlyHint: false } },
+    ]);
+    const uploader = { actor: agent, scopes: defaultScopes(agent) };
+    expect(uploader.scopes).toContain("asset:upload");
+    expect(media.evaluate(uploader, "upload_asset")).toEqual({ kind: "allow" });
+    expect(media.evaluate(uploader, "retire_asset")).toMatchObject({
+      kind: "deny",
+      reason: "missing scope asset:manage",
+    });
+    const manager = { actor: agent, scopes: ["asset:manage" as const] };
+    expect(media.evaluate(manager, "upload_asset")).toEqual({ kind: "allow" });
+    expect(media.evaluate(manager, "retire_asset")).toEqual({ kind: "allow" });
+  });
+
   it("unknown tools are denied", () => {
     expect(engine.evaluate({ actor: human, scopes: ["*"] }, "nope")).toMatchObject({
       kind: "deny",

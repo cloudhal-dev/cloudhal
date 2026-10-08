@@ -15,6 +15,7 @@ import { purgeSiteCache } from "@cloudhal/cloudflare/purge";
 import type { Site } from "@cloudhal/core-contracts";
 import { copySite, mintPreviewToken, type PublishChange, SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { migrate, migrations } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
@@ -459,5 +460,136 @@ describe("Site Worker on workerd", () => {
     await publish("edit about");
     expect(results.at(-1)).toMatchObject({ mode: "tags", tags: [`cloudhal-site-${siteId}`] });
     expect(edge.size).toBe(0);
+  });
+
+  it("serves media immutably with checksums, renders covers by assetId, and keeps media cached across page publishes (RFC-0004)", async () => {
+    const raw = (p: string, init?: Parameters<typeof harness.fetch>[1]) =>
+      get(p, { redirect: "manual", ...init });
+    const purgeTags = (tags: string[]) =>
+      get("/__cloudhal/purge", {
+        method: "POST",
+        headers: { authorization: `Bearer ${PURGE_TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ tags }),
+      });
+    // An agent's upload (the store path upload_asset runs), used as the hello-world cover.
+    const image = makePng({ width: 1600, height: 900 });
+    const { asset } = await remote.ingestAsset({
+      siteId,
+      bytes: image,
+      filename: "Harbour at night.png",
+      uploadedBy: { kind: "agent", id: "agent_cftest00001", name: "bot" },
+      source: { kind: "upload" },
+      fields: { alt: { en: "The harbour at night" } },
+    });
+    const hello = (await remote.listContentEntries(siteId)).find((e) => e.slug === "hello-world");
+    if (!hello) throw new Error("no hello-world");
+    await remote.updateContentEntry({
+      ...hello,
+      coverImage: { assetId: asset.id, alt: "" } as NonNullable<typeof hello.coverImage>,
+    });
+    const snap = await remote.createSnapshot(siteId, { actor: human, reason: "publish" });
+    const before = (await remote.getSite(siteId)) as NonNullable<
+      Awaited<ReturnType<typeof remote.getSite>>
+    >;
+    await remote.publish(before, snap.id);
+    // What the admin Worker purges after this publish: the article that changed, never the new
+    // image's URL (an added asset has nothing cached) and never media through the site tag.
+    const plan = await remote.planCachePurge({
+      from: before.publishedSnapshotId as string,
+      to: snap.id,
+    });
+    expect(plan.mode).toBe("tags");
+    const tags = plan.mode === "tags" ? [...plan.tags] : [];
+    expect(tags).toContain(`cloudhal-node-${hello.id}`);
+    expect(tags).not.toContain(`cloudhal-asset-${asset.id}`);
+    expect((await purgeTags(tags)).status).toBe(200);
+
+    const prefix = asset.sha256.slice(0, 16);
+    const path = `/media/${prefix}/harbour-at-night.png`;
+    const res = await raw(path);
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(image);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(res.headers.get("cloudflare-cdn-cache-control")).toBe("public, max-age=31536000");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("etag")).toBe(`"${asset.sha256}"`);
+    expect(res.headers.get("repr-digest")).toBe(
+      `sha-256=:${Buffer.from(asset.sha256, "hex").toString("base64")}:`,
+    );
+    // Media carry their own tags, never the site tag that every publish purges.
+    expect(res.headers.get("cache-tag")).toBe(
+      `cloudhal-media-${siteId},cloudhal-asset-${asset.id}`,
+    );
+    const sum = await raw(`${path}.sha256`);
+    expect(await sum.text()).toBe(`${asset.sha256}  harbour-at-night.png\n`);
+    const part = await raw(path, { headers: { range: "bytes=0-7" } });
+    expect(part.status).toBe(206);
+    expect(part.headers.get("content-range")).toBe(`bytes 0-7/${image.byteLength}`);
+    expect(Array.from(new Uint8Array(await part.arrayBuffer()))).toEqual(
+      Array.from(image.slice(0, 8)),
+    );
+    expect((await raw(path, { headers: { "if-none-match": `"${asset.sha256}"` } })).status).toBe(
+      304,
+    );
+    const renamed = await raw(`/media/${prefix}/old-name.png`);
+    expect(renamed.status).toBe(301);
+    expect(renamed.headers.get("location")).toBe(path);
+    expect((await raw("/media/0000000000000000/nothing.png")).status).toBe(404);
+
+    // The article renders its cover from the asset, and social cards use the absolute media URL.
+    const html = await (await raw("/posts/hello-world")).text();
+    expect(html).toContain(
+      `<figure class="ch-cover"><img src="${path}" alt="The harbour at night" width="1600" height="900" loading="eager" decoding="async" fetchpriority="high"></figure>`,
+    );
+    // (the harness hands the Worker an http:// URL; production origins are https)
+    expect(html).toMatch(
+      new RegExp(`<meta property="og:image" content="https?://edge\\.example${path}">`),
+    );
+    expect(html).toContain('<meta property="og:image:width" content="1600">');
+
+    // A draft upload is not public; behind a preview link it is, privately, and links keep the token.
+    const draft = await remote.ingestAsset({
+      siteId,
+      bytes: makePng({ width: 32, height: 32 }),
+      filename: "draft.png",
+      uploadedBy: human,
+      source: { kind: "upload" },
+      fields: { decorative: true },
+    });
+    const draftPath = `/media/${draft.asset.sha256.slice(0, 16)}/draft.png`;
+    expect((await raw(draftPath)).status).toBe(404);
+    const token = await mintPreviewToken(PREVIEW_SECRET, { site: siteId, target: "live" });
+    const previewed = await raw(`${draftPath}?cloudhal-preview=${token}`);
+    expect(previewed.status).toBe(200);
+    expect(previewed.headers.get("cache-control")).toBe("private, no-store");
+    expect(previewed.headers.get("cache-tag")).toBeNull();
+    const about = (await remote.listPages(siteId)).find((p) => p.path === "/about");
+    await remote.updatePage({
+      ...(about as NonNullable<typeof about>),
+      sections: [
+        ...(about?.sections ?? []),
+        {
+          id: "sec_about0draftimg",
+          kind: "image",
+          image: { assetId: draft.asset.id, alt: "" } as never,
+        },
+      ],
+    });
+    const previewHtml = await (await raw(`/about?cloudhal-preview=${token}`)).text();
+    expect(previewHtml).toContain(
+      `src="${draftPath}?cloudhal-preview=${encodeURIComponent(token)}"`,
+    );
+
+    // Publishing pages again purges the site tag only; the media URL is untouched (a purge by
+    // asset tag is accepted for the media that do change).
+    expect(
+      (await purgeTags([`cloudhal-site-${siteId}`, `cloudhal-asset-${asset.id}`])).status,
+    ).toBe(200);
+    // A takedown answers 410 from every snapshot.
+    await remote.purgeBlob(siteId, asset.sha256, human, { text: "test takedown", legal: false });
+    const gone = await raw(path);
+    expect(gone.status).toBe(410);
+    expect(gone.headers.get("cache-control")).toBe("no-store");
   });
 });

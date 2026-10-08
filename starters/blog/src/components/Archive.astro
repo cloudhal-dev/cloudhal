@@ -6,6 +6,7 @@
  */
 import { type ArchiveView, viewPagePath } from "@cloudhal/astro-renderer/archive";
 import { renderMarkdown, safeSrc } from "@cloudhal/astro-renderer/markdown";
+import { imageAttributes, type MediaContext } from "@cloudhal/astro-renderer/media";
 import type { ThemeStrings } from "../theme.ts";
 import Breadcrumbs from "./Breadcrumbs.astro";
 import EntryList from "./EntryList.astro";
@@ -13,16 +14,30 @@ import EntryList from "./EntryList.astro";
 interface Props {
   archive: ArchiveView;
   t: ThemeStrings;
+  /** Resolves the term image and `asset:` links in the intro (RFC-0004). */
+  media?: MediaContext;
 }
-const { archive, t } = Astro.props;
+const { archive, t, media } = Astro.props;
 const label = archive.term.labels[archive.locale];
 const kind =
   archive.taxonomy.labels[archive.locale]?.singular ??
   Object.values(archive.taxonomy.labels)[0]?.singular;
 const first = archive.page === 1;
-const intro = first && label?.description ? renderMarkdown(label.description) : undefined;
+const intro = first && label?.description ? renderMarkdown(label.description, media) : undefined;
 const image = first && archive.term.image ? archive.term.image : undefined;
-const imageSrc = image ? safeSrc(image.src) : undefined;
+const asset = image?.assetId ? media?.assets?.get(image.assetId) : undefined;
+const attrs =
+  asset && image
+    ? imageAttributes(asset, image, {
+        locale: archive.locale,
+        defaultLocale: media?.defaultLocale ?? archive.locale,
+        transform: media?.transform ?? "none",
+        sizes: "(min-width: 48rem) 48rem, 100vw",
+        priority: true,
+        ...(media?.preview ? { preview: true } : {}),
+      })
+    : undefined;
+const imageSrc = image && !attrs ? safeSrc(image.src) : undefined;
 const crumbs = [
   { name: t.home, href: "/" },
   ...archive.trail.map((s) => ({ name: s.name, href: s.href })),
@@ -38,6 +53,19 @@ const crumbs = [
       <span>{t.posts(archive.total)}</span>
       {archive.feedPath && <a href={archive.feedPath}>{t.feed}</a>}
     </p>
+    {attrs && (
+      <img
+        class="ch-archive-image"
+        src={attrs.src}
+        srcset={attrs.srcset}
+        sizes={attrs.sizes}
+        alt={attrs.alt}
+        width={attrs.width || undefined}
+        height={attrs.height || undefined}
+        decoding="async"
+        style={attrs.style}
+      />
+    )}
     {image && imageSrc && (
       <img
         class="ch-archive-image"

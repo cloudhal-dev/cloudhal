@@ -4,11 +4,13 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  BlobIntegrityError,
   type BlobStore,
   SQL_LIMITS,
   type SqlDriver,
   StorageError,
   StorageLimitError,
+  sha256OfBytes,
 } from "./types.ts";
 
 export interface SqlDriverFactory {
@@ -167,6 +169,86 @@ export function describeBlobStoreConformance(label: string, factory: BlobStoreFa
       const bytes = new Uint8Array(1024).map((_, i) => i % 256);
       await store.put("bin", bytes);
       expect(Array.from((await store.get("bin")) as Uint8Array)).toEqual(Array.from(bytes));
+    });
+
+    // RFC-0004 §4.1: integrity, ranges, streams and key rules.
+    const media = enc.encode("content-addressed bytes");
+    const mediaSha = async () => sha256OfBytes(media);
+    const wrongSha = "0".repeat(64);
+    const streamOf = (...parts: Uint8Array[]) =>
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          for (const p of parts) c.enqueue(p);
+          c.close();
+        },
+      });
+
+    it("put with a mismatched sha256 stores nothing; a matching one stores", async () => {
+      await expect(store.put("media/s/a", media, { sha256: wrongSha })).rejects.toThrow(
+        BlobIntegrityError,
+      );
+      expect(await store.head("media/s/a")).toBeNull();
+      await store.put("media/s/a", media, { sha256: await mediaSha() });
+      expect(dec.decode((await store.get("media/s/a")) as Uint8Array)).toBe(
+        "content-addressed bytes",
+      );
+    });
+
+    it("refuses keys with '..', empty segments, backslashes or other characters", async () => {
+      for (const key of ["../x", "a/../b", "a//b", "/a", "a/", "a\\b", "", "a/./b", "a b", "ä"]) {
+        await expect(store.put(key, media), key).rejects.toThrow(StorageError);
+        await expect(store.get(key), key).rejects.toThrow(StorageError);
+      }
+    });
+
+    it("streams with ranges and suffixes (getStream)", async () => {
+      if (!store.getStream) return;
+      await store.put("media/s/r", media);
+      const read = async (s: { body: ReadableStream<Uint8Array> } | null) =>
+        dec.decode(await new Response(s?.body).arrayBuffer());
+      const whole = await store.getStream("media/s/r");
+      expect(whole?.size).toBe(media.byteLength);
+      expect(await read(whole)).toBe("content-addressed bytes");
+      const part = await store.getStream("media/s/r", { range: { offset: 8, length: 9 } });
+      expect(part?.range).toEqual({ offset: 8, length: 9 });
+      expect(part?.size).toBe(media.byteLength);
+      expect(await read(part)).toBe("addressed");
+      const open = await store.getStream("media/s/r", { range: { offset: 18 } });
+      expect(await read(open)).toBe("bytes");
+      const suffix = await store.getStream("media/s/r", { range: { suffix: 5 } });
+      expect(suffix?.range).toEqual({ offset: 18, length: 5 });
+      expect(await read(suffix)).toBe("bytes");
+      expect(await store.getStream("media/s/missing")).toBeNull();
+      await expect(
+        store.getStream("media/s/r", { range: { offset: media.byteLength } }),
+      ).rejects.toThrow(StorageError);
+    });
+
+    it("putStream verifies size and sha256 before anything is visible", async () => {
+      if (!store.putStream) return;
+      const sha256 = await mediaSha();
+      const size = media.byteLength;
+      await expect(
+        store.putStream("media/s/p", streamOf(media.slice(0, 5)), { size, sha256 }),
+      ).rejects.toThrow(BlobIntegrityError);
+      expect(await store.head("media/s/p")).toBeNull();
+      await expect(
+        store.putStream("media/s/p", streamOf(media, enc.encode("!")), { size, sha256 }),
+      ).rejects.toThrow(BlobIntegrityError);
+      expect(await store.head("media/s/p")).toBeNull();
+      await expect(
+        store.putStream("media/s/p", streamOf(media), { size, sha256: wrongSha }),
+      ).rejects.toThrow(BlobIntegrityError);
+      expect(await store.head("media/s/p")).toBeNull();
+      await store.putStream("media/s/p", streamOf(media.slice(0, 7), media.slice(7)), {
+        size,
+        sha256,
+        contentType: "text/plain",
+      });
+      expect(dec.decode((await store.get("media/s/p")) as Uint8Array)).toBe(
+        "content-addressed bytes",
+      );
+      expect(await store.list()).toEqual(["media/s/p"]);
     });
   });
 }

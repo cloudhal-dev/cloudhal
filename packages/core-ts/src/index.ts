@@ -1,6 +1,22 @@
 /**
  * @cloudhal/core-ts — the Site Graph core in TypeScript (until the Rust port, ADR-0001).
  */
+
+export {
+  type AssetFields,
+  type AssetPage,
+  type AssetQuery,
+  type AssetRefRow,
+  type AssetUsage,
+  type BlobLedgerRow,
+  canonicalAsset,
+  checkAssetRules,
+  type GcResult,
+  type IngestAssetInput,
+  type IngestAssetResult,
+  mediaBlobKey,
+  type StreamIngestInput,
+} from "./assets.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";
 export * from "./domains.ts";
@@ -8,6 +24,15 @@ export * from "./errors.ts";
 export * from "./filter.ts";
 export * from "./hash.ts";
 export * from "./ids.ts";
+export {
+  importMediaUrls,
+  type LoadedSource,
+  MEDIA_MIGRATION,
+  type MediaImportOptions,
+  type MediaImportResult,
+  type MediaRevertResult,
+  revertMediaImport,
+} from "./media-import.ts";
 export * from "./menu.ts";
 export * from "./names.ts";
 export * from "./preview-token.ts";

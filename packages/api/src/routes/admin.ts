@@ -9,17 +9,22 @@
  *   routed becomes the site's primary hostname (used for preview links); others stay secondary
  * - `POST /api/admin/owner` ← {email} → {from, to, name, email} — `cloudhal owner transfer`: the
  *   member with this email becomes the Owner (404 `not_found` when no such member)
+ * - `GET|HEAD /api/admin/sites/:siteId/media/:sha256` → the content's bytes (RFC-0004 §4.7)
+ * - `PUT  /api/admin/sites/:siteId/media/:sha256` ← raw bytes, verified against the SHA-256 before
+ *   anything is stored; bundles refuse to import until the media they list are here
  */
 import {
   exportSite,
   importSite,
   isHostname,
+  mediaBlobKey,
   normalizeHostname,
   type SiteBundle,
   type StoragePair,
   SyncConflictError,
   withPrimaryDomain,
 } from "@cloudhal/core-ts";
+import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest } from "../errors.ts";
@@ -33,6 +38,9 @@ export function timingSafeEqual(a: string, b: string): boolean {
   for (let i = 0; i < ea.length; i++) diff |= (ea[i] as number) ^ (eb[i] as number);
   return diff === 0;
 }
+
+/** One media PUT: the Workers request-body limit on Free and Pro (RFC-0004 answer 6). */
+const MAX_MEDIA_PUT = 100 * 1024 * 1024;
 
 /** The operator, as audit rows show them. */
 export const OPERATOR_ACTOR = { kind: "system" as const, id: "sys_operator01", name: "Operator" };
@@ -103,6 +111,45 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
           domains: withPrimaryDomain(site.domains, hostname),
         });
         return c.json({ domains: updated.domains, changed: true });
+      })
+      .get("/sites/:siteId/media/:sha256", async (c) => {
+        const sha256 = param(c, "sha256");
+        if (!/^[0-9a-f]{64}$/.test(sha256)) throw badRequest("sha256 must be 64 lower-case hex");
+        const key = mediaBlobKey(param(c, "siteId"), sha256);
+        const meta = await storage.blobs.head(key);
+        if (!meta) return c.json({ error: "not_found", message: "no such media" }, 404);
+        const headers = {
+          "content-type": "application/octet-stream",
+          "content-length": String(meta.size),
+          "cache-control": "no-store",
+        };
+        if (c.req.method === "HEAD") return new Response(null, { status: 200, headers });
+        const stream = storage.blobs.getStream ? await storage.blobs.getStream(key) : null;
+        const body = stream ? stream.body : await storage.blobs.get(key);
+        if (!body) return c.json({ error: "not_found", message: "no such media" }, 404);
+        return new Response(body, { status: 200, headers });
+      })
+      .put("/sites/:siteId/media/:sha256", async (c) => {
+        const sha256 = param(c, "sha256");
+        if (!/^[0-9a-f]{64}$/.test(sha256)) throw badRequest("sha256 must be 64 lower-case hex");
+        const key = mediaBlobKey(param(c, "siteId"), sha256);
+        const size = Number(c.req.header("content-length"));
+        if (!Number.isInteger(size) || size < 0 || size > MAX_MEDIA_PUT)
+          throw badRequest(`content-length must be given and at most ${MAX_MEDIA_PUT} bytes`);
+        if (await storage.blobs.head(key)) return c.json({ stored: false, existing: true });
+        const body = c.req.raw.body ?? new Response(new Uint8Array(0)).body;
+        try {
+          if (storage.blobs.putStream && body)
+            await storage.blobs.putStream(key, body, { size, sha256 });
+          else {
+            const bytes = body ? await readAllBytes(body, size) : new Uint8Array(0);
+            await storage.blobs.put(key, bytes, { sha256 });
+          }
+        } catch (e) {
+          if (e instanceof BlobIntegrityError) throw badRequest(e.message);
+          throw e;
+        }
+        return c.json({ stored: true, existing: false }, 201);
       })
       .put("/sites/:siteId/bundle", async (c) => {
         const mode = c.req.query("mode") ?? "bootstrap";

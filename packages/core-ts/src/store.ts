@@ -1,5 +1,6 @@
 import {
   type Actor,
+  type Asset,
   assertValid,
   type ContentEntry,
   type Menu,
@@ -19,19 +20,34 @@ import {
   type SqlDriver,
   type SqlStatement,
 } from "@cloudhal/storage";
+import {
+  AssetEngine,
+  type AssetPage,
+  type AssetQuery,
+  type AssetUsage,
+  type BlobLedgerRow,
+  type GcResult,
+  type IngestAssetInput,
+  type IngestAssetResult,
+  type StreamIngestInput,
+} from "./assets.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
+  InvariantError,
   isUniqueViolation,
   NotFoundError,
   UniqueConstraintError,
 } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
+import { fillMissingSrc } from "./media/refs.ts";
+import { isReservedMediaPath, MEDIA_LIMITS } from "./media/types.ts";
 import type { TargetRef } from "./menu.ts";
 import { MenuEngine } from "./menu-store.ts";
 import type { Resolution } from "./names.ts";
 import {
+  and,
   type Cond,
   casUpdateStatement,
   insertNodeStatement,
@@ -84,6 +100,13 @@ export interface SiteGraphStoreOptions {
    */
   readonly onPublished?: (site: Site, change: PublishChange) => Promise<void>;
   readonly onHookError?: (error: unknown) => void;
+  /** Media (RFC-0004): per-site quota of stored bytes (default 10 GB; 0 = unlimited). */
+  readonly media?: { readonly quotaBytes?: number };
+  /**
+   * Called after a takedown removed content (`purgeBlob`): deployments purge the edge cache of the
+   * asset's media URLs (`cloudhal-asset-<id>`). Failures go to `onHookError`.
+   */
+  readonly onMediaPurged?: (siteId: string, assetIds: string[]) => Promise<void>;
 }
 
 /**
@@ -132,6 +155,7 @@ export class SiteGraphStore {
   readonly #newId: (prefix: string) => string;
   readonly #tax: TaxonomyEngine;
   readonly #menus: MenuEngine;
+  readonly #assets: AssetEngine;
 
   constructor(options: SiteGraphStoreOptions) {
     this.#sql = options.sql;
@@ -140,10 +164,20 @@ export class SiteGraphStore {
     this.#newId = options.idGen ?? newId;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
+    this.#assets = new AssetEngine({
+      sql: this.#sql,
+      blobs: this.#blobs,
+      stamp: () => this.#stamp(),
+      newId: (prefix) => this.#newId(prefix),
+      quotaBytes: options.media?.quotaBytes ?? MEDIA_LIMITS.siteQuota,
+      onMediaPurged: options.onMediaPurged,
+      onHookError: (e) => this.#onHookError(e),
+    });
     this.#tax = new TaxonomyEngine({
       sql: this.#sql,
       stamp: () => this.#stamp(),
       newId: (prefix) => this.#newId(prefix),
+      refs: (siteId, draft, stored) => this.#assets.planRefs("term", siteId, draft, stored),
     });
     this.#menus = new MenuEngine({
       sql: this.#sql,
@@ -273,16 +307,20 @@ export class SiteGraphStore {
    */
   async createPage(site: Site, input: Creatable<Page>): Promise<{ page: Page; site: Site }> {
     const ts = this.#stamp();
-    const page: Page = {
+    const draft: Page = structuredClone({
       ...input,
       schemaVersion: 1,
       id: input.id ?? this.#newId(ID_PREFIX.page),
       rev: 0,
       createdAt: ts,
       updatedAt: ts,
-    };
-    assertValid("page", page);
-    if (page.siteId !== site.id) throw new Error("page.siteId must match site.id");
+    });
+    fillMissingSrc("page", draft);
+    assertValid("page", draft);
+    if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
+    checkReservedPath(draft.path);
+    const refs = await this.#assets.planRefs("page", site.id, draft, undefined);
+    const page = refs.node;
     const nextSite: Site = {
       ...site,
       pageIds: [...site.pageIds, page.id],
@@ -301,12 +339,16 @@ export class SiteGraphStore {
     });
     const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
     await batch.update("site", site, nextSite);
-    await batch.insert("page", page, this.#tax.pageGuard(page));
+    await batch.insert("page", page, and(this.#tax.pageGuard(page), refs.guard));
+    batch.append(...refs.statements(await nodeHash(page)));
     await plan?.emit(batch);
     await runOpBatch(this.#sql, batch, {
       uniqueKind: "page",
       uniqueKey: uniquenessKey("page", page),
-      diagnose: () => this.#tax.checkPagePath(page),
+      diagnose: async () => {
+        await this.#tax.checkPagePath(page);
+        await refs.diagnose();
+      },
     });
     return { page, site: nextSite };
   }
@@ -329,11 +371,15 @@ export class SiteGraphStore {
    */
   async updatePage(page: Page): Promise<Page> {
     const ts = this.#stamp();
-    const next: Page = { ...page, rev: page.rev + 1, updatedAt: ts };
-    assertValid("page", next);
+    const draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
+    fillMissingSrc("page", draft);
+    assertValid("page", draft);
+    checkReservedPath(draft.path);
     const stored = await this.getPage(page.id);
     if (!stored || stored.rev !== page.rev)
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
+    const next = refs.node;
     await this.#tax.checkPagePath(next);
     const site = await this.getSite(next.siteId);
     if (!site) throw new NotFoundError("site", next.siteId);
@@ -347,26 +393,40 @@ export class SiteGraphStore {
       source: { kind: "page", id: next.id },
     });
     const key = uniquenessKey("page", next);
+    const extra = refs.statements(await nodeHash(next));
     if (!plan) {
       const r = await this.#runUnique(
-        await casUpdateStatement("page", next, page.rev, this.#tax.pageGuard(next)),
+        await casUpdateStatement(
+          "page",
+          next,
+          page.rev,
+          and(this.#tax.pageGuard(next), refs.guard),
+        ),
         "page",
         key,
+        extra,
       );
       if (r.changes !== 1) {
         const rev = await this.#revOf(page.id);
-        if (rev === page.rev) await this.#tax.checkPagePath(next);
+        if (rev === page.rev) {
+          await this.#tax.checkPagePath(next);
+          await refs.diagnose();
+        }
         throw new ConflictError("page", page.id, page.rev, rev);
       }
       return next;
     }
     const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
-    await batch.update("page", stored, next, this.#tax.pageGuard(next));
+    await batch.update("page", stored, next, and(this.#tax.pageGuard(next), refs.guard));
+    batch.append(...extra);
     await plan.emit(batch);
     await runOpBatch(this.#sql, batch, {
       uniqueKind: "page",
       uniqueKey: key,
-      diagnose: () => this.#tax.checkPagePath(next),
+      diagnose: async () => {
+        await this.#tax.checkPagePath(next);
+        await refs.diagnose();
+      },
     });
     return next;
   }
@@ -388,6 +448,7 @@ export class SiteGraphStore {
         sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'page' AND site_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
         params: [page.id, page.rev, site.id, site.id, siteHash],
       },
+      this.#assets.dropRefsStatement(page.id),
     ]);
     if (results[0]?.changes !== 1)
       throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
@@ -454,6 +515,7 @@ export class SiteGraphStore {
     draft: ContentEntry,
     ts: string,
   ): Promise<ContentEntry> {
+    fillMissingSrc("contentEntry", draft);
     assertValid("content-entry", canonicalTerms(draft));
     const site = await this.getSite(draft.siteId);
     if (!site) throw new NotFoundError("site", draft.siteId);
@@ -463,7 +525,11 @@ export class SiteGraphStore {
       if (!stored || stored.rev !== prev.rev)
         throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
     }
-    const { entry, newTerms, guard } = await this.#tax.prepareEntry(draft, site, ts);
+    const refs = await this.#assets.planRefs("contentEntry", site.id, draft, stored);
+    const prepared = await this.#tax.prepareEntry(refs.node, site, ts);
+    const { entry, newTerms } = prepared;
+    const guard = and(prepared.guard, refs.guard);
+    const extra = refs.statements(await nodeHash(entry));
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
     const plan = await this.#tax.planPathChange(site, ts, {
@@ -479,12 +545,13 @@ export class SiteGraphStore {
       const statement = stored
         ? await casUpdateStatement("contentEntry", entry, stored.rev, guard)
         : await insertNodeStatement("contentEntry", entry, ts, guard);
-      const r = await this.#runUnique(statement, "contentEntry", key);
+      const r = await this.#runUnique(statement, "contentEntry", key, extra);
       if (r.changes !== 1) {
         const rev = await this.#revOf(entry.id);
         if (stored && rev !== stored.rev)
           throw new ConflictError("contentEntry", entry.id, stored.rev, rev);
         await this.#tax.diagnoseEntry(entry);
+        await refs.diagnose();
         throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
       }
       return entry;
@@ -493,28 +560,36 @@ export class SiteGraphStore {
     for (const term of newTerms) await batch.insert("term", term, this.#tax.termSlugGuard(term));
     if (stored) await batch.update("contentEntry", stored, entry, guard);
     else await batch.insert("contentEntry", entry, guard);
+    batch.append(...extra);
     await plan?.emit(batch);
     await runOpBatch(this.#sql, batch, {
       uniqueKind: "contentEntry",
       uniqueKey: key,
-      diagnose: () => this.#tax.diagnoseEntry(entry),
+      diagnose: async () => {
+        await this.#tax.diagnoseEntry(entry);
+        await refs.diagnose();
+      },
     });
     return entry;
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
-    const r = await this.#sql.run(
-      "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
-      [entry.id, entry.rev, entry.siteId],
-    );
-    if (r.changes !== 1)
+    const [r] = await this.#sql.batch([
+      {
+        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
+        params: [entry.id, entry.rev, entry.siteId],
+      },
+      this.#assets.dropRefsStatement(entry.id),
+    ]);
+    if (r?.changes !== 1)
       throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
   }
 
   // ───────────────────────────── taxonomies (RFC-0002) ─────────────────────────────
 
   /** People only (structural). Key unique per site and not reserved; archive paths free (invariant 13). */
-  createTaxonomy(input: Creatable<Taxonomy>): Promise<Taxonomy> {
+  async createTaxonomy(input: Creatable<Taxonomy>): Promise<Taxonomy> {
+    checkReservedPath(`${input.archive?.basePath ?? ""}/`);
     return this.#tax.createTaxonomy(input);
   }
 
@@ -536,15 +611,18 @@ export class SiteGraphStore {
   }
 
   /** CAS. The key is immutable; moving an enabled archive base path leaves a prefix redirect. */
-  updateTaxonomy(taxonomy: Taxonomy): Promise<Taxonomy> {
+  async updateTaxonomy(taxonomy: Taxonomy): Promise<Taxonomy> {
+    checkReservedPath(`${taxonomy.archive?.basePath ?? ""}/`);
     return this.#tax.updateTaxonomy(taxonomy);
   }
 
   // ───────────────────────────── terms ─────────────────────────────
 
   /** `reclaim` (people only) frees a slug held by a slug history or a retired term, and its redirect. */
-  createTerm(input: Creatable<Term>, options?: { reclaim?: boolean }): Promise<Term> {
-    return this.#tax.createTerm(input, options);
+  async createTerm(input: Creatable<Term>, options?: { reclaim?: boolean }): Promise<Term> {
+    const draft = structuredClone(input);
+    fillMissingSrc("term", draft);
+    return this.#tax.createTerm(draft, options);
   }
 
   getTerm(id: string): Promise<Term | undefined> {
@@ -561,8 +639,10 @@ export class SiteGraphStore {
   }
 
   /** Labels, image, position and metadata; never slug, status, parent, visibility or merge state. */
-  updateTerm(term: Term): Promise<Term> {
-    return this.#tax.updateTerm(term);
+  async updateTerm(term: Term): Promise<Term> {
+    const draft = structuredClone(term);
+    fillMissingSrc("term", draft);
+    return this.#tax.updateTerm(draft);
   }
 
   termUsage(siteId: string, key?: string): Promise<Map<string, TermUsage>> {
@@ -601,7 +681,8 @@ export class SiteGraphStore {
 
   // ───────────────────────────── redirects ─────────────────────────────
 
-  createRedirect(input: Creatable<Redirect>): Promise<Redirect> {
+  async createRedirect(input: Creatable<Redirect>): Promise<Redirect> {
+    checkReservedPath(input.from);
     return this.#tax.createRedirect(input);
   }
 
@@ -609,7 +690,8 @@ export class SiteGraphStore {
     return this.#tax.getRedirect(id);
   }
 
-  updateRedirect(redirect: Redirect): Promise<Redirect> {
+  async updateRedirect(redirect: Redirect): Promise<Redirect> {
+    checkReservedPath(redirect.from);
     return this.#tax.updateRedirect(redirect);
   }
 
@@ -705,6 +787,143 @@ export class SiteGraphStore {
     };
   }
 
+  // ───────────────────────────── assets (RFC-0004) ─────────────────────────────
+
+  /**
+   * The buffered upload path (MCP, imports, REST images): §5.2 inspection, takedown and quota
+   * checks, dedupe by content (`existing: true`), lease → put → stored → node insert.
+   */
+  ingestAsset(input: IngestAssetInput): Promise<IngestAssetResult> {
+    return this.#assets.ingestAsset(input);
+  }
+
+  /** The streamed path for large non-image files (REST upload tickets, §5.5). */
+  ingestAssetStream(input: StreamIngestInput): Promise<IngestAssetResult> {
+    return this.#assets.ingestAssetStream(input);
+  }
+
+  /** Inserts an asset node once its blob is stored (or an external file, people only). */
+  createAsset(input: Creatable<Asset>): Promise<{ asset: Asset; existing: boolean }> {
+    return this.#assets.createAsset(input);
+  }
+
+  getAsset(id: string): Promise<Asset | undefined> {
+    return this.#assets.getAsset(id);
+  }
+
+  getAssetBySha256(siteId: string, sha256: string): Promise<Asset | undefined> {
+    return this.#assets.getAssetBySha256(siteId, sha256);
+  }
+
+  /** The asset behind a media URL's 16-hex prefix. */
+  getAssetByPrefix(siteId: string, prefix16: string): Promise<Asset | undefined> {
+    return this.#assets.getAssetByPrefix(siteId, prefix16);
+  }
+
+  getAssets(siteId: string, ids: readonly string[]): Promise<Map<string, Asset>> {
+    return this.#assets.getAssets(siteId, ids);
+  }
+
+  /** Newest first, filtered, keyset-paginated. */
+  listAssets(siteId: string, query?: AssetQuery): Promise<AssetPage> {
+    return this.#assets.listAssets(siteId, query);
+  }
+
+  /** Title, alt, caption, credit, license, slug, decorative, placeholders, metadata (CAS). */
+  updateAsset(asset: Asset): Promise<Asset> {
+    return this.#assets.updateAsset(asset);
+  }
+
+  /** Hidden from pickers and not newly referable; existing uses keep rendering (invariant 6). */
+  retireAsset(asset: Asset): Promise<Asset> {
+    return this.#assets.retireAsset(asset);
+  }
+
+  restoreAsset(asset: Asset): Promise<Asset> {
+    return this.#assets.restoreAsset(asset);
+  }
+
+  /** Invariant 9: refused while referenced (`in_use`); never deletes bytes. */
+  deleteAsset(asset: Asset): Promise<void> {
+    return this.#assets.deleteAsset(asset);
+  }
+
+  assetUsage(siteId: string, ids?: readonly string[]): Promise<Map<string, AssetUsage>> {
+    return this.#assets.assetUsage(siteId, ids);
+  }
+
+  /** Assets an actor added since an instant (per-key daily limits, RFC-0004 §5.6). */
+  assetUploadStats(actorId: string, since: string): Promise<{ count: number; bytes: number }> {
+    return this.#assets.uploadStats(actorId, since);
+  }
+
+  verifyExternalAsset(asset: Asset, result: { sha256: string; bytes: number }): Promise<Asset> {
+    return this.#assets.verifyExternalAsset(asset, result);
+  }
+
+  /** Upload lease (§4.5); `purged` refuses, `deleting` answers `retry`. */
+  leaseBlob(
+    siteId: string,
+    sha256: string,
+    until: string,
+    meta: { bytes: number; mediaType: string; originalSha256?: string },
+  ): Promise<"uploading" | "stored"> {
+    return this.#assets.leaseBlob(siteId, sha256, until, meta);
+  }
+
+  markBlobStored(
+    siteId: string,
+    meta: { sha256: string; bytes: number; mediaType: string; originalSha256?: string },
+  ): Promise<void> {
+    return this.#assets.markBlobStored(siteId, meta);
+  }
+
+  blobState(siteId: string, sha256: string): Promise<BlobLedgerRow | undefined> {
+    return this.#assets.blobState(siteId, sha256);
+  }
+
+  /** Deletes unreferenced, unleased content older than the grace period (default 24 h). */
+  collectMediaGarbage(
+    siteId: string,
+    options?: { graceHours?: number; limit?: number; dryRun?: boolean },
+  ): Promise<GcResult> {
+    return this.#assets.collectMediaGarbage(siteId, options);
+  }
+
+  /** Takedown (owner only; the caller checks and audits): 410, or 451 when `legal`. */
+  purgeBlob(
+    siteId: string,
+    sha256: string,
+    by: Actor,
+    reason: { text: string; legal: boolean },
+  ): Promise<{ asset?: Asset }> {
+    return this.#assets.purgeBlob(siteId, sha256, by, reason);
+  }
+
+  liftPurge(siteId: string, sha256: string, by: Actor): Promise<boolean> {
+    return this.#assets.liftPurge(siteId, sha256, by);
+  }
+
+  /** The stored bytes of a site's content (static builds, verification). */
+  readMediaBlob(siteId: string, sha256: string): Promise<Uint8Array | undefined> {
+    return this.#assets.readBlob(siteId, sha256);
+  }
+
+  /** Recomputes a stored blob's SHA-256 (`cloudhal media verify`). */
+  verifyMediaBlob(siteId: string, sha256: string): Promise<"ok" | "missing" | "mismatch"> {
+    return this.#assets.verifyBlob(siteId, sha256);
+  }
+
+  /** The added assets an `auto`-mode publish may carry with their articles (§6.3). */
+  ridingAssets(siteId: string, diff: SnapshotDiff): Promise<Set<string>> {
+    return this.#assets.ridingAssets(siteId, diff);
+  }
+
+  /** The blob store, for media routes and adapters that stream (`getStream`). */
+  get blobs(): BlobStore {
+    return this.#blobs;
+  }
+
   // ───────────────────────────── migration (RFC-0002 Compatibility) ─────────────────────────────
 
   /** `tags` → `terms.tag`, resumable and idempotent; snapshots before and after. */
@@ -791,17 +1010,26 @@ export class SiteGraphStore {
       ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
     };
     assertValid("snapshot", snapshot);
-    await this.#sql.run(
-      "INSERT INTO snapshots (id, site_id, parent_id, site_rev, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        snapshot.id,
-        siteId,
-        snapshot.parentId ?? null,
-        snapshot.siteRev,
-        canonicalJson(snapshot),
-        snapshot.createdAt,
-      ],
+    // Snapshots record the content their blob assets need, in the same batch (RFC-0004 §4.4).
+    const blobs = this.#assets.snapshotBlobsStatement(
+      snapshot.id,
+      siteId,
+      rows.filter((r) => r.kind === "asset").map((r) => r.body),
     );
+    await this.#sql.batch([
+      {
+        sql: "INSERT INTO snapshots (id, site_id, parent_id, site_rev, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        params: [
+          snapshot.id,
+          siteId,
+          snapshot.parentId ?? null,
+          snapshot.siteRev,
+          canonicalJson(snapshot),
+          snapshot.createdAt,
+        ],
+      },
+      ...(blobs ? [blobs] : []),
+    ]);
     return snapshot;
   }
 
@@ -954,14 +1182,31 @@ export class SiteGraphStore {
 
   // ───────────────────────────── helpers ─────────────────────────────
 
-  async #runUnique(statement: SqlStatement, kind: string, key: string) {
+  /** One write (plus anchored index statements, in one batch); unique violations mapped. */
+  async #runUnique(
+    statement: SqlStatement,
+    kind: string,
+    key: string,
+    extra: readonly SqlStatement[] = [],
+  ): Promise<{ changes: number }> {
     try {
-      return await this.#sql.run(statement.sql, statement.params ?? []);
+      if (extra.length === 0) return await this.#sql.run(statement.sql, statement.params ?? []);
+      const [first] = await this.#sql.batch([statement, ...extra]);
+      return { changes: first?.changes ?? 0 };
     } catch (e) {
       if (isUniqueViolation(e)) throw new UniqueConstraintError(kind, key);
       throw e;
     }
   }
+}
+
+/** Invariant 12 (RFC-0004): `/media/<16 hex>/…` belongs to the media route. */
+function checkReservedPath(path: string | undefined): void {
+  if (path && isReservedMediaPath(path))
+    throw new InvariantError(
+      "reserved_path",
+      `${path} is reserved for media URLs (/media/<16 hex>/…); choose another path`,
+    );
 }
 
 /** Set difference of node refs by id; a node is "changed" when its hash differs. */

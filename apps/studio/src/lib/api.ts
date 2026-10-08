@@ -104,7 +104,13 @@ export interface ElevationGrant {
 export type ApprovalCause = "tool" | "destructive" | "skill" | "manual-mode" | "role";
 
 /** Why `auto` mode did or did not let a publish through (packages/agent-runtime/src/modes.ts). */
-export type AutoCheckCode = "low-risk" | "removes-content" | "nothing" | "structure" | "too-many";
+export type AutoCheckCode =
+  | "low-risk"
+  | "removes-content"
+  | "nothing"
+  | "structure"
+  | "too-many"
+  | "media";
 export interface AutoCheck {
   rule: "low-risk-publish";
   lowRisk: boolean;

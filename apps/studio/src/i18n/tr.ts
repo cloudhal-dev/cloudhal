@@ -577,6 +577,8 @@ export const tr: Messages = {
       "site:read": "Siteleri ve snapshot'ları görür",
       "content:read": "Sayfaları ve makaleleri okur",
       "content:write": "Sayfa ve makale oluşturur, düzenler, siler",
+      "asset:upload": "Medya yükler ve kendi yüklediklerini düzenler",
+      "asset:manage": "Tüm medyayı düzenler, emekliye ayırır ve siler",
       "site:write": "Site ayarlarını değiştirir",
       "preview:create": "Taslak önizlemesi oluşturur",
       "site:publish": "Bir snapshot'ı canlı siteye yayınlar",
@@ -1295,6 +1297,7 @@ export const tr: Messages = {
       structure:
         "sayfaları, menüleri, site ayarlarını, sınıflandırmaları ya da yönlendirmeleri değiştiriyor",
       "too-many": "{changes} değişiklik içeriyor ve otomatik modun sınırı {limit}",
+      media: "bir makale değişikliğine ait olmayan medya ekliyor ya da değiştiriyor",
     },
     noHistory: "Henüz karar yok",
     noHistoryDescription:
@@ -1466,6 +1469,7 @@ export const tr: Messages = {
       term: "Terim",
       redirect: "Yönlendirme",
       menu: "Menü",
+      asset: "Medya",
     },
     gone: "Artık mevcut değil",
     revs: "rev {from} → {to}",

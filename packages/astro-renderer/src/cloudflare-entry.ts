@@ -11,12 +11,16 @@
  * - Redirects (RFC-0002) are answered by the routes themselves (real 301s, `no-store` here like
  *   every non-200), so a publish that adds or removes one needs no purge of its own.
  * - Preview responses get every internal link rewritten to keep the signed token, so navigation
- *   stays in preview without a cookie (the edge cache does not vary on cookies).
+ *   stays in preview without a cookie (the edge cache does not vary on cookies). Media URLs in
+ *   images, sources, video and audio keep it too, so draft media show (RFC-0004 §7.3).
+ * - `/media/<sha16>/<slug>.<ext>` (RFC-0004 §7.1) is answered here, before Astro: published media
+ *   are immutable and tagged `cloudhal-media-<siteId>` / `cloudhal-asset-<id>` (not the site tag),
+ *   so purging pages after a publish leaves them cached.
  */
 
 import { cache } from "cloudflare:workers";
 import { handle } from "@astrojs/cloudflare/handler";
-import { CACHE_TAG_PREFIX, resetSource } from "@cloudhal/astro-renderer/runtime";
+import { CACHE_TAG_PREFIX, resetSource, serveMedia } from "@cloudhal/astro-renderer/runtime";
 import { isCloudhalCacheTag } from "./cache-tags.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 
@@ -72,7 +76,7 @@ async function purge(
         !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
       )
         return Response.json(
-          { error: "tags must be 1–100 cloudhal-site-/node-/term-/list- cache tags" },
+          { error: "tags must be 1–100 cloudhal-site-/node-/term-/list-/media-/asset- cache tags" },
           { status: 400 },
         );
       tags = body.tags as string[];
@@ -95,19 +99,48 @@ async function purge(
   );
 }
 
+/** A site-relative URL with the preview token added; anything else unchanged. */
+function withToken(value: string, token: string): string {
+  if (!value.startsWith("/") || value.startsWith("//")) return value;
+  const url = new URL(value, "https://x");
+  url.searchParams.set(PREVIEW_PARAM, token);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 function keepPreviewInLinks(response: Response, token: string): Response {
   const rewrite = (attr: string) => ({
     element(el: Element) {
       const value = el.getAttribute(attr);
-      if (!value?.startsWith("/") || value.startsWith("//")) return;
-      const url = new URL(value, "https://x");
-      url.searchParams.set(PREVIEW_PARAM, token);
-      el.setAttribute(attr, `${url.pathname}${url.search}${url.hash}`);
+      if (value) el.setAttribute(attr, withToken(value, token));
     },
   });
+  // `srcset`: "<url> <descriptor>, …" — each candidate URL keeps the token.
+  const rewriteSrcset = {
+    element(el: Element) {
+      const value = el.getAttribute("srcset");
+      if (!value) return;
+      el.setAttribute(
+        "srcset",
+        value
+          .split(",")
+          .map((c) => {
+            const [u, ...rest] = c.trim().split(/\s+/);
+            return [withToken(u ?? "", token), ...rest].join(" ");
+          })
+          .join(", "),
+      );
+    },
+  };
   return new HTMLRewriter()
     .on("a[href]", rewrite("href"))
     .on("form[action]", rewrite("action"))
+    .on("img[src]", rewrite("src"))
+    .on("img[srcset]", rewriteSrcset)
+    .on("source[srcset]", rewriteSrcset)
+    .on("source[src]", rewrite("src"))
+    .on("video[src]", rewrite("src"))
+    .on("video[poster]", rewrite("poster"))
+    .on("audio[src]", rewrite("src"))
     .transform(response);
 }
 
@@ -154,6 +187,9 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
+      const siteId = env.CLOUDHAL_SITE_ID ?? options.siteId;
+      const media = siteId ? await serveMedia(request, { siteId }) : undefined;
+      if (media) return media;
       const response = withSecurityHeaders(
         cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
       );

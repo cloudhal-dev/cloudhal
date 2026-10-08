@@ -95,7 +95,40 @@ export type InvariantCode =
   /** RFC-0003 invariants 2, 3, 8: duplicate or malformed item ids, an empty group, a bad external link or operation. */
   | "invalid_menu"
   /** RFC-0003 invariant 1: the site already has a menu under this key. */
-  | "key_taken";
+  | "key_taken"
+  // ── RFC-0004 (assets and media) ──
+  /** The file's (sniffed) type is not accepted, or not from this actor (SVG from agents). */
+  | "unsupported_type"
+  /** The declared type or file extension disagrees with the sniffed type. */
+  | "type_mismatch"
+  /** An image over 12,000 px per side or 50 megapixels. */
+  | "too_many_pixels"
+  /** An SVG with script, event handlers, external references or a DTD. */
+  | "svg_unsafe"
+  /** Metadata that cannot be stripped safely (AVIF with Exif or XMP, answer 14). */
+  | "metadata_unsupported"
+  /** The site's media storage quota would be exceeded. */
+  | "quota_exceeded"
+  /** The content was taken down (invariant 11). */
+  | "purged"
+  /** Invariant 9: the asset is referenced; `details.uses` lists where. */
+  | "in_use"
+  /** Invariant 7: an `assetId` or `asset:<id>` that names no asset of this site. */
+  | "unknown_asset"
+  /** Invariant 6: a retired asset was newly referenced. */
+  | "retired_asset"
+  /** The server-side fetch refused the URL (scheme, host, address, redirect, allowlist). */
+  | "fetch_blocked"
+  /** The server-side fetch failed (network, status, size, time, content type). */
+  | "fetch_failed"
+  /** Garbage collection holds the content right now; try again in a few seconds. */
+  | "retry"
+  /** Invariant 12: the path is reserved for media URLs (`/media/<16 hex>/…`). */
+  | "reserved_path"
+  /** A site bundle references media bytes the target does not have. */
+  | "missing_media"
+  /** Invariants 4 and 5: the asset's fields break a kind, storage or immutability rule. */
+  | "invalid_asset";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

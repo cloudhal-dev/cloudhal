@@ -189,6 +189,14 @@ export class OpBatch {
     this.#planned.push({ kind, id: node.id, readRev: node.rev });
   }
 
+  /**
+   * Statements that are not node writes (an index rewrite such as `asset_refs`, RFC-0004 §4.4),
+   * run in order after the writes planned so far. The caller anchors them on a new hash.
+   */
+  append(...statements: SqlStatement[]): void {
+    this.#statements.push(...statements);
+  }
+
   /** The operation was planned on this node's content; it must not change before the batch. */
   expectUnchanged(id: string, hash: string): void {
     if (!this.#expect.has(id)) this.#expect.set(id, hash);
