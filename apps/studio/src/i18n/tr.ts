@@ -663,7 +663,7 @@ export const tr: Messages = {
     noHistoryDescription:
       "Onaylanan, reddedilen, kullanılan ve süresi dolan istekler burada listelenir.",
     requested: "İstendi",
-    expires: "Sona erer",
+    expires: "Bitiş",
     expiresSoon: "Yakında sona eriyor",
     arguments: "Argümanlar",
     noArguments: "Bu çağrının argümanı yok.",
