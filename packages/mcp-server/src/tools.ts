@@ -624,11 +624,17 @@ function rawTools(): ToolDefinition[] {
       scopes: ["site:read"],
       handler: async (a, ctx) => {
         try {
+          for (const id of [a.fromSnapshotId as string, a.toSnapshotId as string]) {
+            const snap = await ctx.store.getSnapshot(id);
+            if (!snap || snap.siteId !== a.siteId)
+              throw new ToolError("not_found", `snapshot ${id} not found`);
+          }
           return await ctx.store.diffSnapshots(
             a.fromSnapshotId as string,
             a.toSnapshotId as string,
           );
         } catch (e) {
+          if (e instanceof ToolError) throw e;
           mapError(e);
         }
       },

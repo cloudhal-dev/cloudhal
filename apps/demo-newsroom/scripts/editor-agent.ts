@@ -99,6 +99,12 @@ export async function runEditorAgent(options: {
   siteFile?: string;
   publish: boolean;
   log?: (line: string) => void;
+  /**
+   * When the server asks a person in Studio (agent keys), poll this long for the decision.
+   * Default 15 minutes; 0 = ask once and stop.
+   */
+  approvalWaitMs?: number;
+  approvalPollMs?: number;
 }): Promise<{
   created: string[];
   updated: string[];
@@ -258,10 +264,27 @@ export async function runEditorAgent(options: {
     log("  nothing changed; not asking to publish");
     return { ...summary, published: false };
   }
-  const r = (await options.client.callTool({
+  const publishArgs = { siteId, label: `Newsroom: ${posts.length} articles` };
+  let r = (await options.client.callTool({
     name: "publish",
-    arguments: { siteId, label: `Newsroom: ${posts.length} articles` },
+    arguments: publishArgs,
   })) as ToolResult;
+  const text = (x: ToolResult) => x.content.map((c) => c.text ?? "").join(" ");
+  const approvalId = r.isError ? text(r).match(/approvalId: (appr_\w+)/)?.[1] : undefined;
+  if (approvalId) {
+    // Agent keys never approve themselves: a person decides in Studio, then the same call is
+    // repeated with the approvalId.
+    log(`  waiting for a person to approve ${approvalId} in Studio (site → Activity → Approvals)`);
+    const deadline = Date.now() + (options.approvalWaitMs ?? 15 * 60_000);
+    for (;;) {
+      r = (await options.client.callTool({
+        name: "publish",
+        arguments: { ...publishArgs, approvalId },
+      })) as ToolResult;
+      if (!r.isError || !/still waiting/.test(text(r)) || Date.now() > deadline) break;
+      await new Promise((res) => setTimeout(res, options.approvalPollMs ?? 5000));
+    }
+  }
   if (r.isError) {
     log(`  not published: ${r.content.map((c) => c.text ?? "").join(" ")}`);
     return { ...summary, published: false };

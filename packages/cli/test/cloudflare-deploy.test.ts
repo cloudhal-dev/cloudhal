@@ -211,12 +211,33 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     });
     expect(ready.isError, JSON.stringify(ready.content)).toBeFalsy();
 
+    // An agent cannot approve its own publish: the request waits for a person in Studio.
+    const ask = await client.callTool({ name: "publish", arguments: { siteId, label: "edge" } });
+    expect(ask.isError).toBe(true);
+    const askText = (ask.content[0] as { text: string }).text;
+    expect(askText).toMatch(/^approval pending: Publish "Deployed Newsroom" to production/);
+    expect(prompts).toHaveLength(0); // the agent's own client is never asked
+    const approvalId = askText.match(/approvalId: (appr_\w+)/)?.[1] as string;
+    const pendingList = (await (
+      await adminFetch(`/api/sites/${siteId}/approvals?status=pending`, { headers: { cookie } })
+    ).json()) as { items: { id: string }[] };
+    expect(pendingList.items.map((a) => a.id)).toEqual([approvalId]);
+    // the agent key cannot approve it either (agents are refused on the REST API)
+    const selfApprove = await adminFetch(`/api/sites/${siteId}/approvals/${approvalId}/approve`, {
+      method: "POST",
+      headers: { "x-api-key": key, ...browser },
+    });
+    expect(selfApprove.status).toBe(403);
+    const approve = await adminFetch(`/api/sites/${siteId}/approvals/${approvalId}/approve`, {
+      method: "POST",
+      headers: { cookie, ...browser },
+    });
+    expect(approve.status, await approve.clone().text()).toBe(200);
     const published = await client.callTool({
       name: "publish",
-      arguments: { siteId, label: "edge" },
+      arguments: { siteId, label: "edge", approvalId },
     });
     expect(published.isError, JSON.stringify(published.content)).toBeFalsy();
-    expect(prompts[0]).toMatch(/^Publish "Deployed Newsroom" to production/);
     await client.close();
 
     // the site serves it immediately
@@ -239,6 +260,7 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
         "agent:publish:allow",
         "agent:publish:approval-required",
         "agent:create_entry:allow",
+        "human:publish:allow",
       ]),
     );
     expect(activity.items.find((a) => a.tool === "create_entry")?.actor.name).toBe(

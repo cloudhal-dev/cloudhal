@@ -1,11 +1,13 @@
 import { defaultScopes } from "@cloudhal/agent-runtime";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
 import { activity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
 import { instanceRoutes } from "./routes/instance.ts";
 import { pages } from "./routes/pages.ts";
@@ -22,10 +24,41 @@ export function createApi(deps: ApiDeps) {
   const app = new Hono<Env>();
   app.onError(errorHandler);
 
+  // DNS rebinding: a server without auth (local scripts) only answers its own host names.
+  if (deps.allowedHosts) {
+    const allowed = new Set(deps.allowedHosts.map((h) => h.toLowerCase()));
+    app.use("*", async (c, next) => {
+      const host = new URL(c.req.url).hostname.toLowerCase();
+      if (!allowed.has(host))
+        return c.json({ error: "forbidden", message: `host ${host} is not allowed` }, 403);
+      await next();
+    });
+  }
+
+  // CSRF: state-changing requests that may carry a session cookie must come from this origin (or a
+  // trusted one). Better Auth checks its own routes; /api/admin uses a bearer token, not cookies.
+  const trusted = new Set(deps.trustedOrigins ?? []);
+  app.use("/api/*", async (c, next) => {
+    const method = c.req.method;
+    const path = new URL(c.req.url).pathname;
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+    if (path.startsWith("/api/auth/") || path.startsWith("/api/admin/")) return next();
+    const origin = c.req.header("origin");
+    const own = new URL(c.req.url).origin;
+    const fetchSite = c.req.header("sec-fetch-site");
+    const ok =
+      origin !== undefined
+        ? origin === own || trusted.has(origin)
+        : fetchSite === undefined || fetchSite === "same-origin" || fetchSite === "none";
+    if (!ok) return c.json({ error: "forbidden", message: "cross-origin request refused" }, 403);
+    await next();
+  });
+
   app.use("*", async (c, next) => {
     c.set("store", deps.store);
     c.set("audit", deps.audit ?? deps.mcp?.audit);
     c.set("previewSecret", deps.preview?.secret);
+    c.set("approvals", deps.mcp?.approvals);
     if (deps.resolvePrincipal) {
       const principal = await deps.resolvePrincipal(c);
       c.set("principal", principal);
@@ -55,15 +88,31 @@ export function createApi(deps: ApiDeps) {
     return c.json({ actor });
   });
 
-  // Everything below requires an actor when auth is enabled.
-  app.use("/api/sites/*", async (c, next) => {
-    if (requireAuth && !c.get("actor")) throw unauthorized();
+  // Everything below requires an actor when auth is enabled. Agents (API keys) work through the
+  // MCP endpoint only, where the policy engine, approvals, snapshots and audit apply; the REST API
+  // is for people (Studio) and would otherwise give any key a person's powers.
+  const peopleOnly = createMiddleware<Env>(async (c, next) => {
+    const actor = c.get("actor");
+    if (requireAuth && !actor) throw unauthorized();
+    if (actor?.kind === "agent")
+      return c.json(
+        {
+          error: "forbidden",
+          message: "agent keys work through the MCP endpoint (/mcp), not the REST API",
+        },
+        403,
+      );
     await next();
   });
-  app.use("/api/sites", async (c, next) => {
-    if (requireAuth && !c.get("actor")) throw unauthorized();
-    await next();
-  });
+  for (const path of [
+    "/api/sites",
+    "/api/sites/*",
+    "/api/instance",
+    "/api/skills",
+    "/api/agent-keys",
+    "/api/agent-keys/*",
+  ])
+    app.use(path, peopleOnly);
 
   if (deps.mcp) {
     const mcp = createCloudhalMcpHandler({
@@ -125,6 +174,7 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/snapshots", snapshots);
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);
+  app.route("/api/sites/:siteId/approvals", approvals);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

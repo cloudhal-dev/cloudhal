@@ -14,8 +14,8 @@
     "./local": "./src/local.ts"
   },
   "files": [
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -40,6 +40,22 @@
   "peerDependenciesMeta": {
     "better-sqlite3": {
       "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./local": {
+        "types": "./dist/src/local.d.ts",
+        "default": "./dist/src/local.js"
+      }
     }
   }
 }

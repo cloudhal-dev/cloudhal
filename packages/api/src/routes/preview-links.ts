@@ -27,7 +27,13 @@ export const previewLinks: Hono<Env> = new Hono<Env>().post("/", async (c) => {
     if (!snap || snap.siteId !== site.id) throw notFound("snapshot not found");
     target = { snapshot: snapshotId };
   }
-  const path = typeof body.path === "string" && body.path.startsWith("/") ? body.path : "/";
+  // A site path only: "//host" or "/\\host" would turn the link into another origin.
+  if (
+    body.path !== undefined &&
+    (typeof body.path !== "string" || !/^\/(?![/\\])[^\s\\]*$/.test(body.path))
+  )
+    throw badRequest("path must be a site path starting with a single /");
+  const path = typeof body.path === "string" ? body.path : "/";
   if (
     body.ttlSeconds !== undefined &&
     (typeof body.ttlSeconds !== "number" || body.ttlSeconds <= 0)

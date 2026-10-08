@@ -5,7 +5,7 @@
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AuditLog, loadSkills } from "@cloudhal/agent-runtime";
+import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -25,6 +25,8 @@ async function connect(opts: {
   elicitation: boolean;
   answer?: () => Answer;
   prompts?: string[];
+  confirmTokenFallback?: boolean;
+  approvals?: ApprovalStore;
 }) {
   const server = createCloudhalMcpServer({
     store: opts.store,
@@ -33,6 +35,8 @@ async function connect(opts: {
     skills: await loadSkills(SKILLS),
     previewBaseUrl: "http://localhost:4321",
     stateKey: "e2e-test-key-at-least-thirty-two-bytes-long",
+    ...(opts.confirmTokenFallback ? { confirmTokenFallback: true } : {}),
+    ...(opts.approvals ? { approvals: opts.approvals } : {}),
   });
   const client = new Client(
     { name: "e2e", version: "1.0.0" },
@@ -74,7 +78,7 @@ describe("MCP client ↔ Cloudhal server", () => {
     expect(publish?.inputSchema).toMatchObject({ type: "object" });
     expect(
       (publish?.inputSchema as { properties?: Record<string, unknown> })?.properties,
-    ).toHaveProperty("confirmToken");
+    ).not.toHaveProperty("confirmToken"); // off by default: the token would reach the agent
     expect(tools.find((t) => t.name === "get_page")?.outputSchema).toMatchObject({
       type: "object",
     });
@@ -174,7 +178,12 @@ describe("MCP client ↔ Cloudhal server", () => {
   });
 
   it("falls back to a confirmToken for clients without elicitation, bound to the exact call", async () => {
-    const { client } = await connect({ store, audit, elicitation: false });
+    const { client } = await connect({
+      store,
+      audit,
+      elicitation: false,
+      confirmTokenFallback: true,
+    });
     const first = await client.callTool({ name: "publish", arguments: { siteId, label: "token" } });
     expect(first.isError).toBe(true);
     const text = (first.content[0] as { text: string }).text;
@@ -238,5 +247,116 @@ describe("MCP client ↔ Cloudhal server", () => {
       arguments: { siteId, pageId: "page_doesnotexist" },
     });
     expect((missing.content[0] as { text: string }).text).toMatch(/^not_found:/);
+  });
+
+  it("never hands a token to a client that cannot ask a person, unless enabled", async () => {
+    const { client } = await connect({ store, audit, elicitation: false });
+    const r = await client.callTool({ name: "publish", arguments: { siteId } });
+    expect(r.isError).toBe(true);
+    const text = (r.content[0] as { text: string }).text;
+    expect(text).toMatch(/cannot collect approval/);
+    expect(text).not.toMatch(/confirmToken/);
+  });
+
+  it("voids an elicited approval when the site changed after the question (H2)", async () => {
+    // The client approves, but before its retry reaches the server an edit lands.
+    let edited = false;
+    const { client } = await connect({
+      store,
+      audit,
+      elicitation: true,
+      answer: () => {
+        if (!edited) {
+          edited = true;
+          void (async () => {
+            const page = (await store.listPages(siteId))[0];
+            if (page) await store.updatePage({ ...page, title: "Changed after the question" });
+          })();
+        }
+        return "accept";
+      },
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    const r = await client.callTool({ name: "publish", arguments: { siteId } });
+    expect(r.isError).toBe(true);
+    expect((r.content[0] as { text: string }).text).toMatch(/site changed meanwhile/);
+    expect((await store.getSite(siteId))?.publishedSnapshotId).toBeUndefined();
+  });
+
+  it("agents wait for a person in Studio; approvals are single-use and state-bound (H1, H2)", async () => {
+    const approvals = new ApprovalStore(
+      await (async () => {
+        const { BetterSqlite3Driver } = await import("@cloudhal/storage/sqlite");
+        const { migrate, migrations } = await import("@cloudhal/storage");
+        const d = await BetterSqlite3Driver.open(":memory:");
+        await migrate(d, migrations);
+        return d;
+      })(),
+    );
+    // the agent's client would happily auto-accept — it must not matter
+    const { client } = await connect({
+      store,
+      audit,
+      elicitation: true,
+      answer: () => "accept",
+      approvals,
+    });
+    const ask = await client.callTool({ name: "publish", arguments: { siteId, label: "v1" } });
+    expect(ask.isError).toBe(true);
+    const text = (ask.content[0] as { text: string }).text;
+    expect(text).toMatch(/^approval pending: Publish "E2E Site"/);
+    const id = text.match(/approvalId: (appr_\w+)/)?.[1] as string;
+    expect(id).toBeDefined();
+    expect((await store.getSite(siteId))?.publishedSnapshotId).toBeUndefined();
+
+    const retry = () =>
+      client.callTool({ name: "publish", arguments: { siteId, label: "v1", approvalId: id } });
+    expect(((await retry()).content[0] as { text: string }).text).toMatch(/still waiting/);
+
+    const owner = { kind: "human" as const, id: "user_owner000001", name: "Owner" };
+    expect(await approvals.decide(id, "approved", owner)).toMatchObject({ status: "approved" });
+    // a different call cannot use it
+    const other = await client.callTool({
+      name: "publish",
+      arguments: { siteId, label: "other", approvalId: id },
+    });
+    expect((other.content[0] as { text: string }).text).toMatch(/different call/);
+
+    const done = await retry();
+    expect(done.isError, JSON.stringify(done.content)).toBeFalsy();
+    expect((await store.getSite(siteId))?.publishedSnapshotId).toBeDefined();
+    // single use
+    expect(((await retry()).content[0] as { text: string }).text).toMatch(/already used/);
+
+    // approved, then the agent edits before redeeming → void
+    const ask2 = await client.callTool({ name: "publish", arguments: { siteId, label: "v2" } });
+    const id2 = (ask2.content[0] as { text: string }).text.match(
+      /approvalId: (appr_\w+)/,
+    )?.[1] as string;
+    await approvals.decide(id2, "approved", owner);
+    const entries = await client.callTool({ name: "list_entries", arguments: { siteId } });
+    const e = (entries.structuredContent as { entries: { id: string; rev: number }[] }).entries[0];
+    await client.callTool({
+      name: "update_entry",
+      arguments: { siteId, entryId: e?.id, rev: e?.rev, title: "Sneaky change" },
+    });
+    const late = await client.callTool({
+      name: "publish",
+      arguments: { siteId, label: "v2", approvalId: id2 },
+    });
+    expect((late.content[0] as { text: string }).text).toMatch(/site changed/);
+
+    // denied stays denied
+    const ask3 = await client.callTool({ name: "publish", arguments: { siteId, label: "v3" } });
+    const id3 = (ask3.content[0] as { text: string }).text.match(
+      /approvalId: (appr_\w+)/,
+    )?.[1] as string;
+    await approvals.decide(id3, "denied", owner);
+    const denied = await client.callTool({
+      name: "publish",
+      arguments: { siteId, label: "v3", approvalId: id3 },
+    });
+    expect((denied.content[0] as { text: string }).text).toMatch(/denied/);
+    expect(await approvals.decide(id3, "approved", owner)).toBeUndefined();
   });
 });

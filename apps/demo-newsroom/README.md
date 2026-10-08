@@ -32,6 +32,6 @@ CLOUDHAL_API_KEY=<key> node apps/demo-newsroom/scripts/editor-agent.ts --url htt
 
 Or keep the key in a file git ignores and pass `--key-file examples/newsroom/.cloudhal/deploy/agent-key` (chmod 600).
 
-Every change it makes is a snapshot you can diff and roll back in Studio; the Activity tab shows each call it made and your approval.
+With an agent key the publish is never approved by the agent: the request appears in Studio under the site's **Activity → Approvals**, and the agent waits (up to 15 minutes) until you approve or deny it there. Every change it makes is a snapshot you can diff and roll back in Studio; the Activity tab shows each call it made and your approval.
 
 `pnpm --filter @cloudhal/demo-newsroom test` runs the agent against an in-memory Cloudhal MCP server (approval, decline, idempotent re-runs).

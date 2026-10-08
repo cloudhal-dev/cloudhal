@@ -21,7 +21,7 @@ import {
   NotFoundError,
   UniqueConstraintError,
 } from "./errors.ts";
-import { canonicalJson, nodeHash } from "./hash.ts";
+import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
 
 export type NodeKind = NodeRef["kind"];
@@ -181,7 +181,8 @@ export class SiteGraphStore {
 
   async #casUpdateStatement(next: SiteNode, expectedRev: number): Promise<SqlStatement> {
     return {
-      sql: "UPDATE nodes SET key = ?, rev = ?, hash = ?, body = ?, updated_at = ? WHERE id = ? AND rev = ?",
+      // Scoped by kind and site too: a body of one kind (or site) can never overwrite another's row.
+      sql: "UPDATE nodes SET key = ?, rev = ?, hash = ?, body = ?, updated_at = ? WHERE id = ? AND rev = ? AND kind = ? AND site_id = ?",
       params: [
         uniquenessKey(next),
         next.rev,
@@ -190,6 +191,8 @@ export class SiteGraphStore {
         next.updatedAt,
         next.id,
         expectedRev,
+        kindOf(next),
+        siteIdOf(next),
       ],
     };
   }
@@ -327,8 +330,8 @@ export class SiteGraphStore {
     const results = await this.#sql.batch([
       await this.#casUpdateStatement(nextSite, site.rev),
       {
-        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
-        params: [page.id, page.rev, site.id, siteHash],
+        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'page' AND site_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
+        params: [page.id, page.rev, site.id, site.id, siteHash],
       },
     ]);
     if (results[0]?.changes !== 1)
@@ -387,10 +390,10 @@ export class SiteGraphStore {
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
-    const r = await this.#sql.run("DELETE FROM nodes WHERE id = ? AND rev = ?", [
-      entry.id,
-      entry.rev,
-    ]);
+    const r = await this.#sql.run(
+      "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
+      [entry.id, entry.rev, entry.siteId],
+    );
     if (r.changes !== 1)
       throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
   }
@@ -493,6 +496,25 @@ export class SiteGraphStore {
     const bytes = await this.#blobs.get(`nodes/${ref.hash}.json`);
     if (!bytes) throw new NotFoundError("blob", ref.hash);
     return JSON.parse(new TextDecoder().decode(bytes)) as T;
+  }
+
+  /**
+   * A digest of the site's current content (every node's id, rev and hash). Approvals are bound to
+   * it: if anything changes between "may I publish?" and the publish, the approval no longer holds.
+   */
+  async stateHash(siteId: string): Promise<string> {
+    const refs = await this.currentNodeRefs(siteId);
+    return sha256Hex(refs.map((r) => `${r.id}@${r.rev}:${r.hash}`).join("\n"));
+  }
+
+  /** What would change if the current state were published, against the live snapshot. */
+  async pendingChanges(siteId: string): Promise<SnapshotDiff> {
+    const site = await this.getSite(siteId);
+    if (!site) throw new NotFoundError("site", siteId);
+    const live = site.publishedSnapshotId
+      ? await this.getSnapshot(site.publishedSnapshotId)
+      : undefined;
+    return diffNodeRefs(live?.nodes ?? [], await this.currentNodeRefs(siteId));
   }
 
   async diffSnapshots(fromId: string, toId: string): Promise<SnapshotDiff> {

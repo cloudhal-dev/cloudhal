@@ -1,0 +1,31 @@
+name: npm smoke test
+
+# What an npm user gets: pack every publishable package, then in an empty directory
+# `npm create cloudhal` → npm install → snapshot/build → cloudhal dev → deploy --dry-run.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  pull_request:
+    paths:
+      - "scripts/build-packages.ts"
+      - "scripts/smoke-pack.ts"
+      - "packages/*/package.json"
+      - "packages/cli/src/assets.ts"
+      - "packages/cli/src/commands/init.ts"
+      - "packages/create-cloudhal/**"
+      - "starters/**"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm smoke:pack

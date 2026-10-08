@@ -13,10 +13,17 @@ const REASONS = new Set<Snapshot["reason"]>([
   "import",
 ]);
 
+function snapshotLimit(raw: string | undefined): number {
+  if (raw === undefined) return 50;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 500) throw badRequest("limit must be 1–500");
+  return n;
+}
+
 export const snapshots: Hono<Env> = new Hono<Env>()
   .get("/", async (c) =>
     c.json(
-      await c.get("store").listSnapshots(param(c, "siteId"), Number(c.req.query("limit") ?? 50)),
+      await c.get("store").listSnapshots(param(c, "siteId"), snapshotLimit(c.req.query("limit"))),
     ),
   )
   .post("/", async (c) => {
@@ -44,9 +51,15 @@ export const snapshots: Hono<Env> = new Hono<Env>()
     if (!snap || snap.siteId !== param(c, "siteId")) throw notFound("snapshot not found");
     return c.json(snap);
   })
-  .get("/:snapshotId/diff/:otherId", async (c) =>
-    c.json(await c.get("store").diffSnapshots(param(c, "snapshotId"), param(c, "otherId"))),
-  )
+  .get("/:snapshotId/diff/:otherId", async (c) => {
+    const store = c.get("store");
+    const siteId = param(c, "siteId");
+    for (const id of [param(c, "snapshotId"), param(c, "otherId")]) {
+      const snap = await store.getSnapshot(id);
+      if (!snap || snap.siteId !== siteId) throw notFound("snapshot not found");
+    }
+    return c.json(await store.diffSnapshots(param(c, "snapshotId"), param(c, "otherId")));
+  })
   .post("/:snapshotId/publish", async (c) => {
     const store = c.get("store");
     const site = await store.getSite(param(c, "siteId"));

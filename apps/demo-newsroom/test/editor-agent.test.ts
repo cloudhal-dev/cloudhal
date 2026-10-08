@@ -125,3 +125,49 @@ describe("newsroom editor agent", () => {
     expect((await store.getSite(site.id))?.publishedSnapshotId).toBeUndefined();
   });
 });
+
+describe("newsroom editor agent with Studio approvals", () => {
+  it("waits for a person and publishes once approved", async () => {
+    const { ApprovalStore } = await import("@cloudhal/agent-runtime");
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const site = await seedStarterSite(store, { name: "Starter", slug: "newsroom" });
+    const approvals = new ApprovalStore(sql);
+    const server = createCloudhalMcpServer({
+      store,
+      approvals,
+      principal: {
+        actor: { kind: "agent", id: "agent_newsroom01", name: "Newsroom editor" },
+        scopes: ["*"],
+      },
+      stateKey: "newsroom-test-key-at-least-thirty-two-bytes",
+    });
+    const client = new Client({ name: "t", version: "1" }, { capabilities: {} });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st);
+    await client.connect(ct);
+    // a person approves the first pending request shortly after it appears
+    const approver = setInterval(async () => {
+      const [pending] = await approvals.list({ siteId: site.id, status: "pending" });
+      if (pending)
+        await approvals.decide(pending.id, "approved", { kind: "human", id: "user_owner000001" });
+    }, 20);
+    try {
+      const r = await runEditorAgent({
+        client,
+        postsDir: path.join(ROOT, "content/posts"),
+        siteFile: path.join(ROOT, "content/site.md"),
+        publish: true,
+        approvalPollMs: 25,
+        approvalWaitMs: 5000,
+        log: () => {},
+      });
+      expect(r.published).toBe(true);
+      expect((await store.getSite(site.id))?.publishedSnapshotId).toBeDefined();
+      expect((await approvals.list({ siteId: site.id }))[0]?.status).toBe("consumed");
+    } finally {
+      clearInterval(approver);
+    }
+  });
+});

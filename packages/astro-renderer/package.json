@@ -25,8 +25,8 @@
     "./cloudflare-entry": "./src/cloudflare-entry.ts"
   },
   "files": [
-    "src",
-    "!src/**/*.test.ts"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -56,6 +56,57 @@
   "peerDependenciesMeta": {
     "@astrojs/cloudflare": {
       "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./source": {
+        "types": "./dist/src/source.d.ts",
+        "default": "./dist/src/source.js"
+      },
+      "./integration": {
+        "types": "./dist/src/integration.d.ts",
+        "default": "./dist/src/integration.js"
+      },
+      "./components": {
+        "types": "./dist/src/components/index.d.ts",
+        "default": "./dist/src/components/index.js"
+      },
+      "./components/*": "./dist/src/components/*",
+      "./runtime": {
+        "workerd": {
+          "types": "./dist/src/runtime-workerd.d.ts",
+          "default": "./dist/src/runtime-workerd.js"
+        },
+        "default": {
+          "types": "./dist/src/runtime.d.ts",
+          "default": "./dist/src/runtime.js"
+        }
+      },
+      "./preview": {
+        "types": "./dist/src/preview.d.ts",
+        "default": "./dist/src/preview.js"
+      },
+      "./resolver": {
+        "types": "./dist/src/resolver.d.ts",
+        "default": "./dist/src/resolver.js"
+      },
+      "./markdown": {
+        "types": "./dist/src/markdown.d.ts",
+        "default": "./dist/src/markdown.js"
+      },
+      "./cloudflare-entry": {
+        "types": "./dist/src/cloudflare-entry.d.ts",
+        "default": "./dist/src/cloudflare-entry.js"
+      }
     }
   }
 }

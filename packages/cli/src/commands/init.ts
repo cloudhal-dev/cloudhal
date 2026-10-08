@@ -1,8 +1,8 @@
-import { access, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { seedStarterSite } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { assetDir, materializeDependencies, monorepoRoot, monorepoVersions } from "../assets.ts";
 import { writeProjectConfig } from "../config.ts";
 
 export interface InitOptions {
@@ -12,9 +12,6 @@ export interface InitOptions {
   readonly log?: (line: string) => void;
 }
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-/** Starters ship inside the monorepo; a published CLI resolves them from its own package later. */
-const STARTERS_DIR = path.resolve(here, "../../../../starters");
 const SKIP = new Set(["node_modules", "dist", ".astro", ".cloudhal", "cloudhal.json"]);
 
 async function exists(p: string): Promise<boolean> {
@@ -51,9 +48,11 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
   const log = options.log ?? (() => {});
   const projectDir = path.resolve(options.dir);
   const starter = options.starter ?? "blog";
-  const starterDir = path.join(STARTERS_DIR, starter);
+  const startersDir = await assetDir("starters");
+  if (!startersDir) throw new Error("no starters found in this cloudhal installation");
+  const starterDir = path.join(startersDir, starter);
   if (!(await exists(starterDir)))
-    throw new Error(`unknown starter "${starter}" (looked in ${STARTERS_DIR})`);
+    throw new Error(`unknown starter "${starter}" (looked in ${startersDir})`);
   if ((await exists(projectDir)) && (await readdir(projectDir)).length > 0) {
     throw new Error(`${projectDir} is not empty`);
   }
@@ -63,6 +62,9 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
     recursive: true,
     filter: (src) => !SKIP.has(path.basename(src)),
   });
+  // Published starters carry `_gitignore` (npm strips .gitignore from tarballs).
+  if (await exists(path.join(projectDir, "_gitignore")))
+    await rename(path.join(projectDir, "_gitignore"), path.join(projectDir, ".gitignore"));
   log(`copied starter "${starter}"`);
 
   const name = options.name ?? path.basename(projectDir);
@@ -71,12 +73,13 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
   const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as Record<string, unknown>;
   pkg.name = slug;
   pkg.private = true;
+  // Inside the monorepo workspace the starter keeps workspace:/catalog: links; anywhere else they
+  // become real versions so `npm install` works (published starters already have them).
   const inWorkspace = (await findWorkspaceRoot(projectDir)) !== undefined;
-  if (!inWorkspace) {
-    const deps = pkg.dependencies as Record<string, string>;
-    for (const [k, v] of Object.entries(deps)) if (v.startsWith("workspace:")) deps[k] = "^0.0.1";
-  }
-  await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  const repo = await monorepoRoot();
+  const out =
+    !inWorkspace && repo ? materializeDependencies(pkg, await monorepoVersions(repo)) : pkg;
+  await writeFile(pkgPath, `${JSON.stringify(out, null, 2)}\n`);
 
   const dataDir = ".cloudhal";
   const local = await openLocalStore(path.join(projectDir, dataDir));

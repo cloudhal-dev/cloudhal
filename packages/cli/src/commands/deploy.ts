@@ -13,8 +13,8 @@
  */
 import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { assetDir } from "../assets.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
@@ -59,9 +59,6 @@ export interface DeployOptions {
   /** How long to wait for a freshly deployed admin Worker to answer. Default 2 minutes. */
   readonly healthTimeoutMs?: number;
 }
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const MONOREPO_STUDIO = path.resolve(here, "../../../../apps/studio/dist");
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -208,7 +205,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const base: DeploymentNames = { name: options.name ?? previous?.name ?? site.slug };
   const names = workerNames(base);
 
-  const studioDir = options.studioDir ?? MONOREPO_STUDIO;
+  const studioDir = options.studioDir ?? (await assetDir("studio")) ?? "(no built Studio)";
   if (!(await exists(path.join(studioDir, "index.html"))))
     throw new Error(
       `built Studio not found at ${studioDir} (run \`pnpm --filter @cloudhal/studio build\`)`,
