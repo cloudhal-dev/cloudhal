@@ -337,6 +337,8 @@ describe("key list while elevated", () => {
   });
 
   it("ends an elevation from the row menu without a confirmation, with a toast", async () => {
+    // Pinned clock: `elevated(30)` is relative to NOW, not to the wall clock.
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: NOW });
     let current = elevated(30);
     const fetch = serve((url, init) => {
       if (url === "/api/agent-keys") return { status: 200, body: [current] };
@@ -363,6 +365,7 @@ describe("key list while elevated", () => {
   });
 
   it("ends every elevation from the summary banner", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: NOW });
     let keys = [
       elevated(30),
       elevated(10, {
