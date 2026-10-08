@@ -16,6 +16,8 @@ export {
   type IngestAssetResult,
   mediaBlobKey,
   type StreamIngestInput,
+  type UploadTicket,
+  type UploadTicketRequest,
 } from "./assets.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";

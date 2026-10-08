@@ -149,6 +149,27 @@ export interface GcResult {
   readonly dryRun: boolean;
 }
 
+/** What a person asks to upload (RFC-0004 §5.5); the server measures everything else. */
+export interface UploadTicketRequest {
+  /** Client-declared SHA-256 of the bytes as uploaded (required for streamed kinds). */
+  readonly sha256?: string | undefined;
+  readonly bytes: number;
+  /** Declared (normalised) media type; the sniffed type must agree at upload time. */
+  readonly mediaType: string;
+  /** JSON options carried to the upload: file name, `keepMetadata`, the asset's fields. */
+  readonly options: Readonly<Record<string, unknown>>;
+}
+
+/** A row of `media_uploads`: single use (`open` → `used`), bound to its actor and site. */
+export interface UploadTicket extends UploadTicketRequest {
+  readonly id: string;
+  readonly siteId: string;
+  readonly actor: { readonly kind: string; readonly id: string };
+  readonly state: "open" | "used";
+  readonly expiresAt: string;
+  readonly createdAt: string;
+}
+
 /** A node write's reference plan: the canonical node, its guard and its index rewrite. */
 export interface RefPlan<T> {
   readonly node: T;
@@ -1161,6 +1182,142 @@ export class AssetEngine {
     const r = await this.#sql.run(
       "DELETE FROM media_blobs WHERE site_id = ? AND sha256 = ? AND state = 'purged'",
       [siteId, sha256],
+    );
+    return r.changes === 1;
+  }
+
+  // ───────────────────────────── upload tickets (§5.5) ─────────────────────────────
+
+  /**
+   * The asset that already holds this content: its stored SHA-256, or the SHA-256 of the bytes as
+   * uploaded before metadata stripping (`original_sha256`), so a re-dropped photo needs no
+   * transfer. Refuses content that was taken down (`purged`).
+   */
+  async assetForUploadedContent(siteId: string, sha256: string): Promise<Asset | undefined> {
+    await this.#refusePurged(siteId, [sha256]);
+    const direct = await this.getAssetBySha256(siteId, sha256);
+    if (direct) return direct;
+    const row = await this.#sql.get<{ body: string }>(
+      `SELECT n.body FROM media_blobs b JOIN nodes n ON n.site_id = b.site_id AND n.kind = 'asset' AND n.key = b.sha256
+        WHERE b.site_id = ? AND b.original_sha256 = ? AND b.state = 'stored' LIMIT 1`,
+      [siteId, sha256],
+    );
+    return row ? (JSON.parse(row.body) as Asset) : undefined;
+  }
+
+  /**
+   * Opens one ticket per file, all or none: undefined when the actor would hold more than
+   * `maxOpen` open, unexpired tickets (all sites). One batch (AGENTS.md rule 4) that also drops
+   * tickets that expired more than a day ago. `o.now` is the caller's clock (the API's).
+   */
+  async openUploadTickets(
+    siteId: string,
+    actor: Pick<Actor, "kind" | "id">,
+    files: readonly UploadTicketRequest[],
+    o: { ttlMs: number; maxOpen: number; now?: Date | undefined },
+  ): Promise<UploadTicket[] | undefined> {
+    await this.#site(siteId);
+    const now = o.now?.toISOString() ?? this.#k.stamp();
+    const expiresAt = new Date(Date.parse(now) + o.ttlMs).toISOString();
+    const stale = new Date(Date.parse(now) - 24 * 3_600_000).toISOString();
+    const tickets: UploadTicket[] = files.map((f) => ({
+      id: this.#k.newId(ID_PREFIX.upload),
+      siteId,
+      actor: { kind: actor.kind, id: actor.id },
+      ...(f.sha256 ? { sha256: f.sha256 } : {}),
+      bytes: f.bytes,
+      mediaType: f.mediaType,
+      options: f.options,
+      state: "open",
+      expiresAt,
+      createdAt: now,
+    }));
+    const ids = json(tickets.map((t) => t.id));
+    // Every insert sees the same count (this batch's own rows excluded): all or nothing.
+    const guard =
+      "(SELECT count(*) FROM media_uploads WHERE actor_kind = ? AND actor_id = ? AND state = 'open' AND expires_at > ? AND id NOT IN (SELECT value FROM json_each(?))) + ? <= ?";
+    const statements: SqlStatement[] = [
+      { sql: "DELETE FROM media_uploads WHERE expires_at < ?", params: [stale] },
+      ...tickets.map((t) => ({
+        sql: `INSERT INTO media_uploads (id, site_id, actor_kind, actor_id, sha256, bytes, media_type, options, state, expires_at, created_at)
+              SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ? WHERE ${guard}`,
+        params: [
+          t.id,
+          siteId,
+          t.actor.kind,
+          t.actor.id,
+          t.sha256 ?? null,
+          t.bytes,
+          t.mediaType,
+          json(t.options),
+          t.expiresAt,
+          now,
+          actor.kind,
+          actor.id,
+          now,
+          ids,
+          tickets.length,
+          o.maxOpen,
+        ],
+      })),
+    ];
+    const results = await this.#sql.batch(statements);
+    const inserted = results.slice(1).reduce((n, r) => n + r.changes, 0);
+    return inserted === tickets.length ? tickets : undefined;
+  }
+
+  /** Open, unexpired tickets an actor holds (all sites). */
+  async openUploadCount(actor: Pick<Actor, "kind" | "id">, now?: Date): Promise<number> {
+    const r = await this.#sql.get<{ n: number }>(
+      "SELECT count(*) AS n FROM media_uploads WHERE actor_kind = ? AND actor_id = ? AND state = 'open' AND expires_at > ?",
+      [actor.kind, actor.id, now?.toISOString() ?? this.#k.stamp()],
+    );
+    return r?.n ?? 0;
+  }
+
+  async getUploadTicket(id: string): Promise<UploadTicket | undefined> {
+    const r = await this.#sql.get<{
+      id: string;
+      site_id: string;
+      actor_kind: string;
+      actor_id: string;
+      sha256: string | null;
+      bytes: number;
+      media_type: string;
+      options: string;
+      state: string;
+      expires_at: string;
+      created_at: string;
+    }>("SELECT * FROM media_uploads WHERE id = ?", [id]);
+    if (!r) return undefined;
+    let options: Record<string, unknown> = {};
+    try {
+      options = JSON.parse(r.options) as Record<string, unknown>;
+    } catch {
+      // not written by this code: no options
+    }
+    return {
+      id: r.id,
+      siteId: r.site_id,
+      actor: { kind: r.actor_kind, id: r.actor_id },
+      ...(r.sha256 ? { sha256: r.sha256 } : {}),
+      bytes: r.bytes,
+      mediaType: r.media_type,
+      options,
+      state: r.state === "open" ? "open" : "used",
+      expiresAt: r.expires_at,
+      createdAt: r.created_at,
+    };
+  }
+
+  /**
+   * Uses a ticket up (`open` → `used`, compare-and-set, unexpired): true exactly once per ticket,
+   * so a replayed or concurrent upload gets false.
+   */
+  async claimUploadTicket(id: string, now?: Date): Promise<boolean> {
+    const r = await this.#sql.run(
+      "UPDATE media_uploads SET state = 'used' WHERE id = ? AND state = 'open' AND expires_at > ?",
+      [id, now?.toISOString() ?? this.#k.stamp()],
     );
     return r.changes === 1;
   }
