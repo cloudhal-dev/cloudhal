@@ -101,6 +101,16 @@ export const tr: Messages = {
       title: "Hesap",
       description: "Profilin, nasıl giriş yaptığın ve bu Studio'ya başka kimlerin girebileceği.",
     },
+    taxonomy: {
+      title: "Kategoriler ve etiketler",
+      description:
+        "Makalelerin nasıl sınıflandığı ve nasıl bulunduğu. Yeniden adlandırma, birleştirme ve kaldırma tek değişiklik ve tek snapshot'tır; arkasında yönlendirme bırakır.",
+    },
+    redirects: {
+      title: "Yönlendirmeler",
+      description:
+        "Eski adresler ve ziyaretçileri nereye gönderdikleri. Slug değişikliği, birleştirme ve kaldırma bunları kendiliğinden ekler; sen de ekleyebilirsin.",
+    },
   },
   nav: {
     overview: "Genel bakış",
@@ -129,6 +139,8 @@ export const tr: Messages = {
     approvals: "Onaylar",
     settings: "Ayarlar",
     siteSettings: "Ayarlar",
+    taxonomy: "Kategoriler ve etiketler",
+    redirects: "Yönlendirmeler",
   },
   commands: {
     placeholder: "Bir komut yaz…",
@@ -146,6 +158,8 @@ export const tr: Messages = {
     goAccount: "Hesap ayarlarına git",
     goSiteSettings: "Site ayarlarına git",
     goApprovals: "Onaylara git",
+    goTaxonomy: "Kategorilere ve etiketlere git",
+    goRedirects: "Yönlendirmelere git",
   },
   overview: {
     liveSnapshotLabel: "Canlı snapshot",
@@ -183,6 +197,56 @@ export const tr: Messages = {
     },
     search: "Makalelerde ara",
     open: "Aç",
+    none: "—",
+    noCategory: "Kategori yok",
+    primary: "Ana kategori",
+    facets: {
+      label: "Makaleleri süz",
+      category: "Kategoriye göre süz",
+      tag: "Etikete göre süz",
+      allCategories: "Tüm {label}",
+      allTags: "Tüm {label}",
+      clear: "Süzgeçleri temizle",
+      empty: "Bu süzgeçlere uyan makale yok",
+      emptyDescription: "Başka bir kategori ya da etiket dene veya süzgeçleri temizle.",
+    },
+  },
+  articleTerms: {
+    title: "Kategoriler ve etiketler",
+    description:
+      "Kategoriler makaleyi bir yere koyar, etiketler onu anlatır. Ana kategori içerik yolunda (breadcrumb) ve makalenin üst verisinde görünür.",
+    legacyDescription:
+      "Bu site etiketleri hâlâ düz metin olarak tutuyor. Onlara ad, arşiv sayfası ve yönlendirme kazandırmak için kategorilere ve etiketlere taşı.",
+    legacyTitle: "Bu makalenin eski etiketleri",
+    legacyPending: "{tags} kaydettiğinde etikete dönüşür.",
+    required: "Bu makaleyi incelemeye göndermek ya da yayınlamak için bir {singular} seç.",
+    requiredToast: "Önce bir {singular} seç",
+    slugRedirect:
+      "Küçük harf, tireli. Bu makale yayınlandı: yeni bir slug, eski adresten bir yönlendirme bırakır.",
+  },
+  pickers: {
+    under: "{path} altında",
+    clear: "Temizle",
+    showOptions: "Seçenekleri göster",
+    noMatch: "Eşleşen bir şey yok",
+    remove: "Kaldır: {name}",
+    atMost: "En fazla {max}. Yenisini eklemek için birini çıkar.",
+    categoryHint: "En fazla {max}. Ad ve eş anlamlılarda aramak için yaz.",
+    categoryRequiredHint: "İncelemeye göndermek ya da yayınlamak için gerekli. En fazla {max}.",
+    categoryPlaceholder: "Kategori seç…",
+    noCategory: "Eşleşen kategori yok. Kategorileri Kategoriler ve etiketler sayfasından ekle.",
+    primary: "Ana kategori",
+    primaryHint: "İçerik yolunda görünür ve makalenin bölümü olarak kullanılır.",
+    primaryNone: "Birini seç…",
+    tagHint: "En fazla {max}. Önce var olan etiketler gelir; eş anlamlılarla da bulunurlar.",
+    tagPlaceholder: "Etiket ekle…",
+    tagFull: "Etiket sınırına ulaşıldı",
+    viaSynonym: "eş anlamlı: “{value}”",
+    similar: "benzer",
+    create: "“{name}” oluştur",
+    createNoSlug: "Bu adda adrese dönüşecek harf ya da rakam yok. Başka bir ad dene.",
+    nearDuplicate: "{names} ile çok benziyor. Aynı anlama geliyorsa var olan etiketi kullan.",
+    proposedChip: "Bir agent önerdi. Biri onaylayınca herkese açık sayfası olur.",
   },
   editor: {
     status: "Durum",
@@ -363,6 +427,13 @@ export const tr: Messages = {
     noindexBadge: "noindex",
     noindexBadgeHint: "Arama motorlarından gizli. Sayfanın arama ayarlarından değiştirebilirsin.",
     noCover: "Kapak görseli yok",
+    archive: {
+      seoTitleHint: "Terimin adını kullanmak için boş bırak.",
+      noindexHint: "Arşive noindex etiketi ekler. Arşive bağlantısıyla yine ulaşılabilir.",
+      noindexWarningTitle: "Bu arşiv arama motorlarından gizli",
+      noindexWarning:
+        "Arama motorlarından listelememeleri istenir ve site haritasından çıkar. İnsanların aramayla bulması gereken konularda bunu kapalı bırak.",
+    },
   },
   status: { draft: "Taslak", review: "İncelemede", published: "Yayında", archived: "Arşiv" },
   site: {
@@ -1299,5 +1370,516 @@ export const tr: Messages = {
     revs: "rev {from} → {to}",
     rev: "rev {rev}",
     columns: { item: "Öğe", revision: "Revizyon" },
+    assignments: {
+      added: "+ {taxonomy}: {name}",
+      removed: "− {taxonomy}: {name}",
+      primary: "Ana {taxonomy} → {name}",
+      none: "yok",
+    },
+  },
+  taxonomy: {
+    newTerm: "Yeni {singular}",
+    search: "{Plural} içinde ara",
+    columns: {
+      name: "Ad",
+      usage: "Makaleler",
+      lastUsed: "Son kullanım",
+      index: "Arama motorları",
+      visibility: "Görünürlük",
+    },
+    filters: {
+      all: "Tümü",
+      public: "Herkese açık",
+      internal: "Dahili",
+      proposed: "Önerilen",
+      retired: "Kaldırılmış",
+    },
+    state: {
+      proposed: "Önerildi",
+      proposedHint:
+        "Bir agent önerdi. Makalelere atanabilir ama biri onaylayana kadar herkese açık sayfası olmaz.",
+      internal: "Dahili",
+      internalHint:
+        "Arşivi, beslemesi ve site haritası kaydı yok; makalelerde görünmez. Temalar ve süzgeçler yine kullanabilir.",
+      retired: "Kaldırıldı",
+      mergedInto: "Şununla birleşti: {name}",
+    },
+    visibility: { public: "Açık", internal: "Dahili", none: "—" },
+    defaults: {
+      category: { singular: "Kategori", plural: "Kategoriler" },
+      tag: { singular: "Etiket", plural: "Etiketler" },
+    },
+    usage: {
+      value: "{published} / {total}",
+      hint: "{total} makalenin {published} tanesi yayında. Tıklayınca Makaleler'de açılır.",
+      none: "Yok",
+      never: "Hiç",
+    },
+    index: {
+      indexed: "Dizinde",
+      indexedHint:
+        "{count} yayınlanmış makale: arşiv arama sonuçlarında ve site haritasında yer alır.",
+      thin: "Dizinde değil: {count}/{min}",
+      thinHint:
+        "{min} yayınlanmış makaleden az olan arşivler noindex, follow ile sunulur ve site haritasına girmez.",
+      empty: "Boş",
+      emptyHint: "Yayınlanmış makale yok: buraya bir makale eklenene kadar arşiv 404 döner.",
+      noindex: "noindex",
+      noindexHint: "Arama ayarlarından arama motorlarına kapatıldı.",
+      none: {
+        internal: "Arşiv yok",
+        proposed: "Henüz açık değil",
+        retired: "Kaldırıldı",
+        archiveOff: "Arşivler kapalı",
+      },
+      noneHint: {
+        internal: "Dahili terimlerin herkese açık arşivi olmaz.",
+        proposed: "Önerilen terimlerin, biri onaylayana kadar herkese açık arşivi olmaz.",
+        retired:
+          "Kaldırılan terimlerin arşivi olmaz; eski bağlantılar yönlenir ya da 410 Gone döner.",
+        archiveOff: "Bu sınıflandırma arşiv sayfası yayınlamıyor.",
+      },
+    },
+    menu: {
+      label: "Terim işlemleri",
+      edit: "Düzenle",
+      view: "Görüntüle",
+      rename: "Slug'ı değiştir",
+      merge: "Şununla birleştir…",
+      mergeExisting: "Var olan bir terimle birleştir…",
+      move: "Taşı…",
+      makeInternal: "Dahili yap",
+      makePublic: "Herkese açık yap",
+      retire: "Kaldır",
+    },
+    review: {
+      waiting: "İnceleme bekleyen öneriler: {count}",
+      waitingDescription:
+        "Bunları agent'lar önerdi ({plural}). Herkese açık sayfası olsun diye onayla, var olan biriyle birleştir ya da reddet.",
+      open: "İncele",
+      approve: "Onayla",
+      approved: "{name} onaylandı",
+      failed: "Onaylanamadı",
+      reject: "Reddet",
+      merge: "Birleştir…",
+      rejectNamed: "Reddet: {name}",
+      proposedBy: "Öneren",
+    },
+    empty: {
+      all: "Henüz {singular} yok",
+      public: "Herkese açık {singular} yok",
+      internal: "Dahili {singular} yok",
+      proposed: "İnceleme bekleyen bir şey yok",
+      retired: "Kaldırılmış {singular} yok",
+      search: "Aramana uyan bir şey yok",
+      allDescription: "İlkini oluştur ya da agent'ların yazarken etiket önermesine izin ver.",
+      filteredDescription: "Başka bir süzgeç ya da arama dene.",
+      noTaxonomies: "Henüz kategori ya da etiket yok",
+      noTaxonomiesDescription:
+        "Bu site etiketleri hâlâ her makalede düz metin olarak tutuyor. Onları kategorilere ve etiketlere taşı; bir şey yazılmadan önce neyin değişeceğini görürsün.",
+    },
+    create: {
+      title: "Yeni {singular}",
+      description:
+        "Bir ad ver. Eş anlamlılar, giriş metni, görsel ve arama ayarları sonra düzenleyicisinde eklenebilir.",
+      descriptionTree:
+        "Bir ad ver ve başka bir kategorinin altına aitse üst kategorisini seç. Gerisi sonra düzenleyicisinde eklenebilir.",
+      name: "Ad ({locale})",
+      slugHint: "Arşivinin adresi. Sen değiştirene kadar addan türetilir.",
+      parentHint: "En üst düzeyde bırak ya da başka bir kategorinin altına koy.",
+      internal: "Dahili",
+      internalHint:
+        "Dahili terimlerin herkese açık sayfası olmaz; temalar ve süzgeçler yine kullanabilir.",
+      similarTitle: "Var olan bir terime benziyor",
+      similar: "Benzerleri: {names}. Aynı anlama geliyorsa onu kullan.",
+      submit: "Yeni {singular} oluştur",
+      created: "{name} oluşturuldu",
+    },
+    health: {
+      title: "Sözlük sağlığı",
+      description:
+        "Agent'ların etiketlemeden önce okuduğu raporun aynısı. Okurlar ve arama motorları bir konuyu tek sayfada bulsun.",
+      issues: "{count} madde",
+      clean: "Toparlanacak bir şey yok",
+      cleanDescription: "Şu an neredeyse aynı, tek kullanımlık ya da boş terim yok.",
+      nearDuplicates: "Neredeyse aynı olanlar ({count})",
+      nearDuplicatesHint:
+        "Büyük ihtimalle aynı konu. Birleştirince daha çok kullanılan kalır, diğeri ona yönlenir.",
+      mergeInto: "{source} → {target}",
+      merge: "Birleştir",
+      morePairs: "{count} çift daha",
+      reasons: {
+        similar: "Yazılışı neredeyse aynı",
+        plural: "Tekil ve çoğul",
+        synonym: "Birinin eş anlamlısı diğerinin adı",
+      },
+      proposed: "İnceleme bekleyenler ({count})",
+      review: "İncele",
+      uncategorised: "Kategorisiz makaleler ({count})",
+      uncategorisedHint: "Bir arşivde ve içerik yolunda görünsünler diye kategoriye koy.",
+      singleUse: "Bir kez kullanılanlar ({count})",
+      empty: "Boş kategoriler ({count})",
+      emptyHint: "bir makale eklenene kadar arşivleri 404 döner",
+      oversized: "Çok büyük kategoriler ({count})",
+      oversizedHint: "tüm makalelerin yarısından fazlası; alt kategoriler işe yarar",
+      andMore: " ve {count} tane daha",
+    },
+    rules: {
+      title: "{Plural} nasıl çalışır",
+      description: "Bu sınıflandırmanın kuralları. Agent'lar da aynılarını görür.",
+      structure: "Yapı",
+      tree: "Ağaç",
+      flat: "Düz liste",
+      treeHint: "Bir terim en fazla 5 düzey derinlikte bir üst terimin altında durabilir.",
+      flatHint: "Terimlerin üst terimi olmaz.",
+      newTerms: "Yeni terimler",
+      newTermsValue: {
+        none: "Yalnızca insanlar",
+        propose: "Agent'lar önerir",
+        free: "Agent'lar ekler",
+      },
+      newTermsHint: {
+        none: "Yalnızca insanlar oluşturur; agent'lar var olanlardan seçer.",
+        propose: "Agent'lar yenilerini önerir; biri onaylayınca herkese açık sayfaları olur.",
+        free: "Agent'lar doğrudan etkin terim ekleyebilir.",
+      },
+      perArticle: "Makale başına",
+      required: "Zorunlu · en fazla {max}",
+      optional: "İsteğe bağlı · en fazla {max}",
+      requiredHint:
+        "Bir makalenin incelemeye gitmesi ya da yayınlanması için ana olanıyla birlikte bir tane gerekir.",
+      optionalHint: "Makalelerde hiç olmayabilir.",
+      archive: "Arşivler",
+      archiveHint:
+        "{min} yayınlanmış makaleden itibaren dizine girer; daha az olan arşivler noindex olur.",
+      archiveOff: "Arşiv sayfası yayınlanmaz.",
+    },
+  },
+  governance: {
+    oneSnapshot: "Tek değişiklik, tek snapshot. Bir sonraki yayınla canlıya çıkar.",
+    conflict:
+      "Bu terim bu arada başka bir yerde değişti. Pencereyi kapat ve en güncel hâli üzerinde yeniden dene.",
+    rename: {
+      title: "Slug'ı değiştir: {name}",
+      description:
+        "Arşiv yeni adrese taşınır. Eski adres kalıcı bir yönlendirmeyle çalışmaya devam eder ve eski slug ayrılmış kalır.",
+      slug: "Yeni slug",
+      slugHint: "Küçük harfler, rakamlar ve tek tireler.",
+      reclaim: "Geri al: bu slug'ı önceki terimden kurtar ve yönlendirmesini kaldır",
+      history: "Önceki slug'lar: {slugs}",
+      confirm: "Değiştir",
+      errors: {
+        required: "Bir slug gir.",
+        invalid: "Küçük harf, rakam ve tek tire kullan.",
+        tooLong: "En fazla 128 karakter.",
+        taken: "Bu slug'ı başka bir terim kullanıyor.",
+        reserved:
+          "Bu slug'ı daha önce bir terim kullandı ve eski adresi yönleniyor. Burada kullanmak için aşağıdan geri al.",
+      },
+    },
+    merge: {
+      title: "Birleştir: {name} →",
+      description:
+        "Makaleleri seçtiğin terime geçer; o terim bunun adlarını ve slug'larını da devralır, böylece eski bağlantılar ve eş anlamlılar çalışmaya devam eder.",
+      target: "Şununla birleştir",
+      targetHint: "Aynı sınıflandırmadaki etkin bir terim.",
+      targetPlaceholder: "Terimlerde ara…",
+      confirm: "Birleştir",
+    },
+    reviewMerge: {
+      title: "Öneriyi birleştir: {name} →",
+      description:
+        "Öneri kaldırılır, makaleleri var olan terime geçer; o terim de bu adı eş anlamlı olarak saklar.",
+      confirm: "Birleştir",
+    },
+    retire: {
+      title: "Kaldır: {name}",
+      description:
+        "Tüm makalelerden çıkarılır ve bir daha atanamaz. Arşivi başka bir terime yönlenebilir.",
+      redirectTo: "Şuraya yönlendir…",
+      redirectToHint:
+        "Yönlendirme olmazsa arşivi 410 Gone döner; arama motorları onu kalıcı olarak düşürür.",
+      redirectToParentHint: "Bir seçim yapmazsan, herkese açıksa arşiv üst kategorisine yönlenir.",
+      noRedirect: "Yönlendirme yok",
+      redirectPlaceholder: "Terimlerde ara…",
+      confirm: "Kaldır",
+    },
+    move: {
+      title: "Taşı: {name}",
+      description:
+        "Yeni üst kategorisini seç. Makaleler ve adresler olduğu gibi kalır; menüler, içerik yolu ve üst kategorinin arşivi değişir.",
+      parent: "Üst kategori",
+      parentHint:
+        "En fazla {max} düzey derinlik. Bir kategori kendisinin ya da altındakilerin altına taşınamaz.",
+      parentPlaceholder: "Kategorilerde ara…",
+      topLevel: "En üst düzey",
+      confirm: "Taşı",
+    },
+    visibility: {
+      title: { internal: "Dahili yap: {name}", public: "Herkese açık yap: {name}" },
+      description: {
+        internal:
+          "Arşivi, beslemesi ve site haritası kaydı kalkar; makalelerde görünmez olur. Temalar ve süzgeçler yine kullanabilir.",
+        public:
+          "Herkese açık bir arşivi, beslemesi ve site haritası kaydı olur; makalelerde görünür.",
+      },
+      confirm: { internal: "Dahili yap", public: "Herkese açık yap" },
+    },
+    reject: {
+      title: "Öneriyi reddet: {name}",
+      description:
+        "Öneri kaldırılır ve onu taşıyan makalelerden çıkarılır. Agent reddedildiğini görür.",
+      confirm: "Reddet",
+    },
+    preview: {
+      waiting: "Neyin değişeceğini görmek için bir seçim yap.",
+      loading: "Neyin değişeceği hesaplanıyor",
+      articles: "Makaleler",
+      noArticles: "Bunu taşıyan makale yok.",
+      articlesMove:
+        "Bu makaleler aynı işlemde değişir. Tek değişiklik en fazla {limit} makaleye dokunabilir.",
+      articlesLose:
+        "Bu makalelerden aynı işlemde çıkarılır. Tek değişiklik en fazla {limit} makaleye dokunabilir.",
+      articlesKeep: "Bu makalelerde kalır; bağlantıları yeni adrese gider.",
+      more: "ve {count} tane daha",
+      redirects: "Yönlendirmeler",
+      noRedirects: "Yönlendirme oluşturulmaz.",
+      permanent: "301 kalıcı",
+      prefix: "Eski adresin altındaki sayfalar ve beslemeler de yeni adrese gider.",
+      repointed: "Eski adrese giden {count} yönlendirme artık yenisini gösteriyor.",
+    },
+    tooLarge: {
+      title: "Tek değişiklik için çok büyük",
+      description:
+        "Bu işlem {count} makaleyi değiştirir; tek değişiklik en fazla {limit} makaleye dokunabilir. Daha küçük adımlara böl ya da aşamalı işi iste.",
+    },
+    blocked: {
+      title: "Yayındaki ya da incelemedeki {count} makale tek kategorisini kaybeder",
+      description:
+        "Bu makalelerin bir kategorisi olmalı. Bunun yerine bu terimi başka biriyle birleştir ya da önce o makaleleri başka bir kategoriye koy.",
+    },
+    gone: {
+      title: "Arşivi 410 Gone döner",
+      description:
+        "{path} için yönlendirme olmaz; arama motorları onu kalıcı olarak düşürür. Ziyaretçileri başka bir yere göndermek için yukarıdan bir terim seç.",
+    },
+    hidden: {
+      title: "Arşivi artık herkese açık olmaz",
+      description: "Bir sonraki yayından sonra {path} 404 döner.",
+    },
+    appears: {
+      title: "Arşivi herkese açık olur",
+      description: "{path} bir sonraki yayınla canlıya çıkar.",
+    },
+    done: {
+      rename: "{name} yeniden adlandırıldı",
+      merge: "{name} birleştirildi",
+      reviewMerge: "{name} birleştirildi",
+      retire: "{name} kaldırıldı",
+      reject: "{name} reddedildi",
+      move: "{name} taşındı",
+      visibility: "Görünürlük değişti: {name}",
+      detail:
+        "Değişen makale: {entries}. Yönlendirme: {redirects}. Tek snapshot; bir sonraki yayınla canlıya çıkar.",
+    },
+  },
+  termEditor: {
+    language: "Dil",
+    default: "varsayılan",
+    names: {
+      title: "Adlar ve eş anlamlılar",
+      description:
+        "Okurların gördüğü ve insanların ya da agent'ların onu bulmak için yazabileceği adlar.",
+      name: "Ad ({locale})",
+      nameHintDefault: "Sitenin varsayılan dilinde zorunlu.",
+      nameHint: "{locale} adını göstermek için boş bırak.",
+      altNames: "Eş anlamlılar",
+      altNamesHint:
+        "Biri yazdığında ya da bir agent adla atadığında bu terimi bulan diğer adlar. Ayrı terim olarak hiç gösterilmez.",
+    },
+    intro: {
+      title: "Arşiv giriş metni",
+      description: "{path} adresinin en üstünde, yalnızca ilk sayfada gösterilen Markdown.",
+      hint: "Markdown. HTML metin olarak gösterilir.",
+    },
+    image: {
+      title: "Görsel",
+      description:
+        "Arşivde gösterilir ve bağlantı paylaşıldığında resmi olarak kullanılır. Zaten çevrimiçi olan bir görselin bağlantısını ver.",
+    },
+    seo: {
+      title: "Arama motorları ve paylaşım",
+      description: "Arşivin arama sonuçlarında nasıl göründüğü ({locale}).",
+    },
+    indexing: {
+      title: "Dizine ekleme",
+      indexed: "{path} arama motorlarında listeleniyor; {count} yayınlanmış makalesi var.",
+      thin: "{path} için gereken {min} yayınlanmış makaleden {count} tanesi var; o zamana kadar noindex, follow ile sunulur.",
+      empty: "{path} adresinde yayınlanmış makale yok; bir makale eklenene kadar 404 döner.",
+      noindex: "{path} arama ayarlarından arama motorlarına kapatıldı.",
+    },
+    placement: {
+      title: "Yerleşim",
+      position: "Sıra",
+      positionHint: "Kardeşler arasında küçük sayı önce gelir. Boş: ada göre sıralanır.",
+    },
+    history: {
+      title: "Slug geçmişi",
+      description: "Bu arşivin önceki adresleri. Ayrılmış kalırlar ve buraya yönlenirler.",
+      empty: "Önceki slug yok",
+      emptyDescription: "Adresi hep {path} oldu.",
+      reserved: "ayrılmış",
+    },
+    details: { taxonomy: "Sınıflandırma", visibility: "Görünürlük", usage: "Makaleler" },
+    retire: {
+      title: "Bu terimi kaldır ({singular})",
+      description: "Tüm makalelerden çıkarır; arşivi yönlenir ya da 410 Gone döner.",
+    },
+    retired: {
+      title: "Bu terim kaldırıldı",
+      merged: "Bu terim şununla birleştirildi: {name}",
+      description: "Arşivi yok ve atanamaz. Bir yönlendirme konduysa eski adresleri yönlenir.",
+    },
+    errors: {
+      nameRequired: "Sitenin varsayılan dilinde bir ad gir.",
+      nameTooLong: "En fazla 200 karakter.",
+      altTooLong: "“{value}” 200 karakterden uzun.",
+      altDuplicate: "“{value}” iki kez yazılmış ya da adı tekrar ediyor.",
+      altCollision:
+        "“{value}” zaten başka bir terimin adı: {other}. Bir eş anlamlı iki terimi gösteremez.",
+      introTooLong: "En fazla 20.000 karakter.",
+      position: "0 ile {max} arasında bir tam sayı kullan.",
+    },
+  },
+  migration: {
+    banner: {
+      title: "Etiketlerini kategorilere ve etiketlere taşı",
+      description:
+        "Bu sitedeki etiketler hâlâ düz metin. Onları ad, arşiv ve yönlendirme sahibi etiketlere dönüştür ve makaleleri kategorilere koymaya başla. Sonucu önce görürsün ve geri alabilirsin.",
+      action: "Taşımayı önizle",
+    },
+    dialog: {
+      title: "Etiketleri kategorilere ve etiketlere taşı",
+      description: "Bu bir deneme: sen çalıştırana kadar hiçbir şey yazılmaz.",
+      summary: "Taşıma ne yapar",
+      tags: "Bulunan etiketler",
+      entries: "Yeniden yazılan makaleler",
+      terms: "Etiketler",
+      termsValue: "{created} yeni, {reused} yeniden kullanılan",
+      taxonomies: "Oluşturulan sınıflandırmalar",
+      none: "Yok",
+      skipped: "{count} makale atlanıyor",
+      how: "Studio önce ve sonra birer snapshot alır. Bu sitede kategoriler başta isteğe bağlıdır, yani hiçbir şey engellenmez; sen yayınlayana kadar da hiçbir şey canlıya çıkmaz.",
+      upToDate: "Taşınacak bir şey yok",
+      upToDateDescription: "Tüm makaleler zaten etiket ve kategori kullanıyor.",
+      run: "Taşımayı çalıştır",
+    },
+    done: {
+      title: "Etiketler taşındı",
+      description: "Makalelerin artık etiket kullanıyor. Hazır olduğunda yayınla.",
+      toast: "Etiketler taşındı",
+      toastDetail: "{entries} makaledeki {tags} etiket; öncesi ve sonrası snapshot'larıyla.",
+      undoHint:
+        "Fikrini mi değiştirdin? Geri al, o zamandan beri kimsenin düzenlemediği makalelerde eski etiketleri geri getirir.",
+      undo: "Taşımayı geri al",
+      close: "Tamam",
+    },
+    revert: {
+      toast: "Taşıma geri alındı",
+      toastDetail: "{count} makalede eski etiketler geri geldi.",
+    },
+  },
+  redirects: {
+    new: "Yeni yönlendirme",
+    search: "Adreslerde ara",
+    menu: "İşlemler: {from}",
+    edit: "Düzenle",
+    filters: { reason: "Kaynak", all: "Tüm kaynaklar" },
+    reasons: {
+      "slug-change": "Slug değişikliği",
+      merge: "Birleştirme",
+      retire: "Kaldırma",
+      manual: "Elle",
+    },
+    columns: {
+      from: "Eski adres",
+      to: "Gönderdiği yer",
+      type: "Tür",
+      source: "Kaynak",
+      updated: "Güncellendi",
+    },
+    status: {
+      "301": "Kalıcı (301)",
+      "301Hint":
+        "Arama motorları eski adresin değerini yenisine taşır. Taşınma kalıcıysa bunu kullan.",
+      "302": "Geçici (302)",
+      "302Hint": "Kısa bir süre için, örneğin bir kampanyada; arama motorları eski adresi korur.",
+      short301: "301",
+      short302: "302",
+    },
+    match: {
+      exact: "Yalnızca bu adres",
+      exactHint: "Yalnızca tam olarak bu yol.",
+      prefix: "Bu adres ve altındaki her şey",
+      prefixHint: "Yolun geri kalanı korunur: /eski/a, /yeni/a adresine gider.",
+      prefixShort: "ve altı",
+    },
+    external: {
+      badge: "Dış",
+      title: "Ziyaretçiler başka bir siteye gönderilsin mi?",
+      description: "Yönlendirmeyi oluşturmadan önce hedefi kontrol et.",
+      leave: "Ziyaretçiler şu siteye gider: {host}",
+      warning:
+        "Eski adresi açan herkes senin denetlemediğin bir siteye gider. Agent'lar bunu asla oluşturamaz; yalnızca insanlar oluşturabilir.",
+      target: "Hedef",
+      host: "Alan adı",
+      confirm: "Şuraya yönlendir: {host}",
+    },
+    externalHint: "Ziyaretçileri bu sitenin dışına gönderir: {host}.",
+    dialog: {
+      createTitle: "Yeni yönlendirme",
+      editTitle: "Yönlendirmeyi düzenle",
+      description:
+        "Sitenin artık sunmadığı bir adresten gelen ziyaretçileri yeni bir adrese gönder.",
+      from: "Eski adres",
+      fromHint: "Bu sitede bir yol, örneğin /eski-sayfa. Sitenin hâlâ sunduğu bir adres olamaz.",
+      fromLocked: "Eski adres değiştirilemez. Bu yönlendirmeyi sil ve yerine yenisini oluştur.",
+      to: "Gönderdiği yer",
+      toHint: "Bu sitede bir yol (/yeni-sayfa) ya da bir https:// adresi.",
+      toExternal: "Bu sitenin dışında: {host}. Bir sonraki adımda onaylarsın.",
+      toPlaceholder: "/yeni-sayfa ya da https://…",
+      match: "Neye uygulanır",
+      status: "Tür",
+      automatic: "Otomatik yönlendirmeler her zaman kalıcıdır (301).",
+      note: "Not",
+      noteHint: "İsteğe bağlı. Bir sonraki bakan için neden var olduğu.",
+      create: "Yönlendirme oluştur",
+    },
+    errors: {
+      fromRequired: "Eski adresi gir.",
+      fromInvalid: "/ ile başlayan, boşluk, ? ya da # içermeyen bir yol kullan.",
+      fromTooLong: "En fazla 1.024 karakter.",
+      fromTaken: "Bu adresten bir yönlendirme zaten var. Onu düzenle.",
+      fromServed:
+        "Site bu adresi sunuyor. Bir yönlendirme bir sayfayı, yayınlanmış bir makaleyi ya da bir arşivi gizleyemez.",
+      toRequired: "Ziyaretçilerin nereye gideceğini gir.",
+      toInvalid: "/ ile başlayan bir yol ya da bir https:// adresi kullan.",
+      toInsecure: "https:// kullan.",
+      toTooLong: "En fazla 2.048 karakter.",
+      toSelf: "Ziyaretçileri aynı adrese gönderemez.",
+      toLoop: "Bu bir döngü olur: hedef buraya geri yönleniyor.",
+    },
+    saved: "Yönlendirme kaydedildi",
+    created: "Yönlendirme oluşturuldu: {from}",
+    deleted: "Yönlendirme silindi: {from}",
+    deleteTitle: "Yönlendirme silinsin mi: {from}",
+    deleteDescription: "Bir sonraki yayından sonra eski adres 404 döner.",
+    deleteAutomatic:
+      "Bunu bir adres değiştiğinde Studio oluşturdu. Bir sonraki yayından sonra eski adres 404 döner ve ona giden bağlantılar kırılır.",
+    deleteConfirm: "Yönlendirmeyi sil",
+    empty: "Henüz yönlendirme yok",
+    emptyFiltered: "Bu kaynaktan yönlendirme yok",
+    emptyDescription:
+      "Slug değişiklikleri, birleştirmeler ve kaldırmalar buraya kendiliğinden yönlendirme ekler. Taşınan adresler için sen de ekleyebilirsin.",
   },
 };

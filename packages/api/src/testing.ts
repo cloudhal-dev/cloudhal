@@ -97,8 +97,8 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
     });
 
     it("article workflow: draft → review → published → snapshot → publish → build-visible", async () => {
-      // Starter sites require a primary category from review on (RFC-0002).
-      const news = await store.getTermBySlug(siteId, "category", "news");
+      // The starter's category taxonomy is required: a review/published entry needs a primary one.
+      const news = (await store.getTermBySlug(siteId, "category", "news")) as { id: string };
       const created = await call(`/api/sites/${siteId}/entries`, {
         ...auth,
         method: "POST",
@@ -111,11 +111,20 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
           body: { format: "markdown", value: "# Hi" },
           fields: {},
           tags: [],
-          terms: { category: { ids: [news?.id], primary: news?.id } },
+          terms: { category: { ids: [news.id], primary: news.id } },
         }),
       });
       expect(created.status).toBe(201);
       let entry = created.body as ContentEntry;
+      // Without the category, publishing is refused as a 422 (RFC-0002 invariant 2), never a 500.
+      const { terms: _terms, ...uncategorised } = entry;
+      const refused = await call(`/api/sites/${siteId}/entries/${entry.id}`, {
+        ...auth,
+        method: "PUT",
+        body: JSON.stringify({ ...uncategorised, status: "review" }),
+      });
+      expect(refused.status).toBe(422);
+      expect((refused.body as { error: string }).error).toBe("required_term");
       expect(entry.author).toEqual(human);
 
       for (const status of ["review", "published"] as const) {

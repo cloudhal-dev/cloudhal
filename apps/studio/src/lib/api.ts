@@ -1,4 +1,15 @@
-import type { Actor, ContentEntry, NodeRef, Page, Site, Snapshot } from "@cloudhal/core-contracts";
+import type {
+  Actor,
+  ContentEntry,
+  NodeRef,
+  Page,
+  PublishStatus,
+  Redirect,
+  Site,
+  Snapshot,
+  Taxonomy,
+  Term,
+} from "@cloudhal/core-contracts";
 
 export interface ApiError {
   error: string;
@@ -170,6 +181,141 @@ export interface SnapshotDiff {
   added: NodeRef[];
   removed: NodeRef[];
   changed: Array<{ before: NodeRef; after: NodeRef }>;
+  /** With `?assignments=1`: how each added or changed entry's term assignments moved. */
+  assignments?: AssignmentDelta[];
+}
+
+/** One entry's term changes in one taxonomy between two snapshots (packages/api snapshots route). */
+export interface AssignmentDelta {
+  entryId: string;
+  taxonomy: string;
+  added: string[];
+  removed: string[];
+  /** Present when the primary term changed; `null` = none. */
+  primary?: { from: string | null; to: string | null };
+}
+
+// ---- taxonomy (RFC-0002 §6.1, packages/api/src/routes/{taxonomies,terms,redirects}.ts) ----------
+
+/** How many entries use a term (`termUsage`): all statuses, published, and the latest update. */
+export interface TermUsage {
+  total: number;
+  published: number;
+  lastUsedAt?: string;
+}
+
+export interface TermListItem {
+  term: Term;
+  usage: TermUsage;
+}
+
+export interface TermDetail {
+  term: Term;
+  usage: TermUsage;
+  /** Redirects whose source is this term (its earlier archive paths). */
+  redirects: Redirect[];
+}
+
+/** An entry as a governance preview lists it. */
+export interface EntrySummary {
+  id: string;
+  title: string;
+  collection: string;
+  slug: string;
+  locale: string;
+  status: PublishStatus;
+}
+
+export interface PlannedRedirect {
+  from: string;
+  to: string;
+  status: 301;
+  match: "prefix";
+  reason: "slug-change" | "merge" | "retire";
+}
+
+/** What a governance operation would do (`dryRun: true`); nothing is written. */
+export interface GovernancePreview {
+  entries: { count: number; items: EntrySummary[]; rewritten: boolean };
+  redirects: PlannedRedirect[];
+  /** Existing redirects that follow the term to its new path. */
+  repointed: number;
+  /** The operation would touch more entries than one batch may (400). */
+  tooLarge?: { entries: number; limit: number };
+  /** Review/published entries that would lose their required primary category. */
+  blocked?: { code: "required_term"; count: number; items: EntrySummary[] };
+  /** The public archive disappears without a redirect: 410 (retired) or 404 (made internal). */
+  archiveGone?: "gone" | "not_found";
+  /** The archive becomes public at this path. */
+  archiveAppears?: string;
+}
+
+export interface GovernanceResult {
+  opId: string;
+  terms: Term[];
+  entries: number;
+  redirects: Redirect[];
+}
+
+/** A governance answer: what changed and the one snapshot it took (`null` when nothing changed). */
+export interface GovernanceResponse {
+  result: GovernanceResult;
+  snapshot: Snapshot | null;
+}
+
+export type GovernanceOp =
+  | { op: "rename"; slug: string; reclaim?: boolean }
+  | { op: "merge"; into: string }
+  | { op: "retire"; redirectTo?: string }
+  | { op: "parent"; parentId: string | null }
+  | { op: "visibility"; visibility: Term["visibility"] }
+  | { op: "review"; decision: "approve" | "reject" }
+  | { op: "review"; decision: "merge"; into: string };
+
+function governanceBody(op: GovernanceOp, rev: number, dryRun: boolean): Record<string, unknown> {
+  const { op: _op, ...rest } = op;
+  return { ...rest, rev, ...(dryRun ? { dryRun: true } : {}) };
+}
+
+export type NewTerm = Omit<
+  Term,
+  "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion" | "siteId"
+> & { reclaim?: boolean };
+
+/** A manual redirect as a person enters it (the server sets `reason: "manual"`). */
+export type NewRedirect = Pick<Redirect, "from" | "to" | "status" | "match"> &
+  Partial<Pick<Redirect, "note">>;
+
+/** `POST /migrations/tags-to-terms` (packages/core-ts/src/tags-migration.ts). */
+export interface TagsMigrationResult {
+  migrationId: string;
+  dryRun: boolean;
+  resumed: boolean;
+  upToDate: boolean;
+  taxonomiesCreated: string[];
+  tags: string[];
+  termsCreated: number;
+  termsReused: number;
+  entries: number;
+  skipped: { entryId: string; reason: string }[];
+  beforeSnapshotId?: string;
+  afterSnapshotId?: string;
+}
+
+export interface TagsRevertResult {
+  migrationId: string;
+  restored: number;
+  edited: string[];
+  termsDeleted: number;
+  taxonomiesDeleted: string[];
+  snapshotId: string;
+}
+
+/** Entries query: collection, the RFC-0002 §5 filter, statuses. */
+export interface EntryListQuery {
+  collection?: string;
+  filter?: string;
+  status?: PublishStatus[];
 }
 
 /** Where agents reach this Studio's MCP server (streamable HTTP, same origin as the API). */
@@ -404,10 +550,17 @@ export const api = {
       }),
   },
   entries: {
-    list: (siteId: string, collection?: string) =>
-      request<ContentEntry[]>(
-        `/api/sites/${siteId}/entries${collection ? `?collection=${encodeURIComponent(collection)}` : ""}`,
-      ),
+    /** `filter` is sent encoded, so its `+` survives as `%2B` (RFC-0002 §5). 400 on an unknown term. */
+    list: (siteId: string, q?: string | EntryListQuery) => {
+      const o = typeof q === "string" ? { collection: q } : (q ?? {});
+      return request<ContentEntry[]>(
+        `/api/sites/${siteId}/entries${query({
+          collection: o.collection,
+          filter: o.filter,
+          status: o.status?.join(","),
+        })}`,
+      );
+    },
     get: (siteId: string, id: string) =>
       request<ContentEntry>(`/api/sites/${siteId}/entries/${id}`),
     create: (siteId: string, entry: NewEntry) =>
@@ -437,9 +590,83 @@ export const api = {
         { method: "POST" },
       ),
     get: (siteId: string, id: string) => request<Snapshot>(`/api/sites/${siteId}/snapshots/${id}`),
-    /** What changed going from snapshot `from` to snapshot `to`. */
-    diff: (siteId: string, from: string, to: string) =>
-      request<SnapshotDiff>(`/api/sites/${siteId}/snapshots/${from}/diff/${to}`),
+    /** What changed going from snapshot `from` to snapshot `to` (+ term assignment deltas). */
+    diff: (siteId: string, from: string, to: string, options: { assignments?: boolean } = {}) =>
+      request<SnapshotDiff>(
+        `/api/sites/${siteId}/snapshots/${from}/diff/${to}${options.assignments ? "?assignments=1" : ""}`,
+      ),
+  },
+  taxonomies: {
+    list: (siteId: string) => request<Taxonomy[]>(`/api/sites/${siteId}/taxonomies`),
+    update: (taxonomy: Taxonomy) =>
+      request<{ taxonomy: Taxonomy; snapshot: Snapshot }>(
+        `/api/sites/${taxonomy.siteId}/taxonomies/${taxonomy.id}`,
+        { method: "PUT", ...json(taxonomy) },
+      ),
+  },
+  terms: {
+    /** Terms with usage; `status` narrows, `q` matches names, synonyms and slugs. */
+    list: (siteId: string, q: { taxonomy?: string; status?: Term["status"][]; q?: string } = {}) =>
+      request<{ items: TermListItem[] }>(
+        `/api/sites/${siteId}/terms${query({ taxonomy: q.taxonomy, status: q.status?.join(","), q: q.q })}`,
+      ).then((r) => r.items),
+    get: (siteId: string, id: string) =>
+      request<TermDetail>(`/api/sites/${siteId}/terms/${encodeURIComponent(id)}`),
+    /** People create active, public terms directly; 409 `slug_taken`, 422 `invalid_labels`. */
+    create: (siteId: string, term: NewTerm) =>
+      request<{ term: Term; snapshot: Snapshot }>(`/api/sites/${siteId}/terms`, {
+        method: "POST",
+        ...json(term),
+      }),
+    /** Text and presentation only (names, synonyms, description, SEO, image, position). */
+    update: (term: Term) =>
+      request<{ term: Term; snapshot: Snapshot }>(
+        `/api/sites/${term.siteId}/terms/${encodeURIComponent(term.id)}`,
+        { method: "PUT", ...json(term) },
+      ),
+    /** Previews a governance operation without writing anything. */
+    preview: (term: Term, op: GovernanceOp) =>
+      request<{ preview: GovernancePreview }>(
+        `/api/sites/${term.siteId}/terms/${encodeURIComponent(term.id)}/${op.op}`,
+        { method: "POST", ...json(governanceBody(op, term.rev, true)) },
+      ).then((r) => r.preview),
+    /** One batch, one snapshot (RFC-0002 §4.3); 409 `too_large` over 400 entries. */
+    govern: (term: Term, op: GovernanceOp) =>
+      request<GovernanceResponse>(
+        `/api/sites/${term.siteId}/terms/${encodeURIComponent(term.id)}/${op.op}`,
+        { method: "POST", ...json(governanceBody(op, term.rev, false)) },
+      ),
+  },
+  redirects: {
+    list: (siteId: string) => request<Redirect[]>(`/api/sites/${siteId}/redirects`),
+    create: (siteId: string, input: NewRedirect) =>
+      request<{ redirect: Redirect; snapshot: Snapshot }>(`/api/sites/${siteId}/redirects`, {
+        method: "POST",
+        ...json(input),
+      }),
+    update: (redirect: Redirect) =>
+      request<{ redirect: Redirect; snapshot: Snapshot }>(
+        `/api/sites/${redirect.siteId}/redirects/${encodeURIComponent(redirect.id)}`,
+        { method: "PUT", ...json(redirect) },
+      ),
+    remove: (redirect: Redirect) =>
+      request<{ snapshot: Snapshot }>(
+        `/api/sites/${redirect.siteId}/redirects/${encodeURIComponent(redirect.id)}?rev=${redirect.rev}`,
+        { method: "DELETE" },
+      ),
+  },
+  migrations: {
+    /** `dryRun` writes nothing; a real run snapshots before and after. */
+    tagsToTerms: (siteId: string, dryRun: boolean) =>
+      request<TagsMigrationResult>(`/api/sites/${siteId}/migrations/tags-to-terms`, {
+        method: "POST",
+        ...json({ dryRun }),
+      }),
+    revertTagsToTerms: (siteId: string, migrationId: string) =>
+      request<TagsRevertResult>(`/api/sites/${siteId}/migrations/tags-to-terms/revert`, {
+        method: "POST",
+        ...json({ migrationId }),
+      }),
   },
   activity: {
     /** The site's audit trail, newest first; pass `nextBefore` back as `before` for older rows. */

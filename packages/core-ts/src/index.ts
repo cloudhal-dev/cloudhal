@@ -36,3 +36,4 @@ export {
   type TermQuery,
   type TermUsage,
 } from "./taxonomy.ts";
+export * from "./taxonomy-report.ts";

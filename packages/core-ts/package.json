@@ -12,7 +12,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./local": "./src/local.ts",
-    "./filter": "./src/filter.ts"
+    "./filter": "./src/filter.ts",
+    "./names": "./src/names.ts",
+    "./taxonomy-report": "./src/taxonomy-report.ts"
   },
   "files": [
     "dist",
@@ -60,6 +62,14 @@
       "./filter": {
         "types": "./dist/src/filter.d.ts",
         "default": "./dist/src/filter.js"
+      },
+      "./names": {
+        "types": "./dist/src/names.d.ts",
+        "default": "./dist/src/names.js"
+      },
+      "./taxonomy-report": {
+        "types": "./dist/src/taxonomy-report.d.ts",
+        "default": "./dist/src/taxonomy-report.js"
       }
     }
   }

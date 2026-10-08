@@ -1,5 +1,12 @@
 import { ContractValidationError } from "@cloudhal/core-contracts";
-import { ConflictError, NotFoundError, UniqueConstraintError } from "@cloudhal/core-ts";
+import {
+  ConflictError,
+  FilterError,
+  type InvariantCode,
+  InvariantError,
+  NotFoundError,
+  UniqueConstraintError,
+} from "@cloudhal/core-ts";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { AuthError } from "./auth.ts";
@@ -10,6 +17,35 @@ export interface ApiErrorBody {
   details?: unknown;
 }
 
+/**
+ * HTTP status of each RFC-0002 invariant code: 409 when the request collides with the site's
+ * current state (a slug or archive path someone holds, an operation too large for one batch), 400
+ * for a request that can never succeed as written, 422 for a well-formed request the data
+ * invariants refuse right now.
+ */
+export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 422> = {
+  too_large: 409,
+  slug_taken: 409,
+  path_conflict: 409,
+  reserved_key: 400,
+  immutable_field: 400,
+  primary_not_assigned: 422,
+  required_term: 422,
+  invalid_assignment: 422,
+  term_not_assignable: 422,
+  too_many_terms: 422,
+  invalid_parent: 422,
+  cycle: 422,
+  too_deep: 422,
+  invalid_status: 422,
+  not_allowed: 422,
+  invalid_labels: 422,
+  invalid_redirect: 422,
+};
+
+/** In a query string `+` must be sent as `%2B`: form encoding turns it into a space (RFC-0002 §5). */
+const PLUS_HINT = "In a query string, send '+' as %2B; a bare '+' arrives as a space.";
+
 /** Maps domain errors to HTTP responses. Everything else is a 500 with a generic message. */
 export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof HTTPException) return err.getResponse();
@@ -18,6 +54,23 @@ export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof ContractValidationError) {
     return c.json<ApiErrorBody>(
       { error: "validation", message: err.message, details: err.errors },
+      400,
+    );
+  }
+  if (err instanceof InvariantError) {
+    return c.json<ApiErrorBody>(
+      { error: err.code, message: err.message, details: err.details },
+      INVARIANT_STATUS[err.code] ?? 422,
+    );
+  }
+  if (err instanceof FilterError) {
+    const spaced = err.code === "syntax" && (c.req.query("filter") ?? "").includes(" ");
+    return c.json<ApiErrorBody>(
+      {
+        error: err.code,
+        message: spaced ? `${err.message}. ${PLUS_HINT}` : err.message,
+        details: { unknown: err.unknown },
+      },
       400,
     );
   }

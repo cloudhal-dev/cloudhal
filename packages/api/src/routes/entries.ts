@@ -1,15 +1,35 @@
 import { renderEntryPreview } from "@cloudhal/astro-renderer/preview";
-import type { ContentEntry } from "@cloudhal/core-contracts";
+import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { param } from "../params.ts";
 import { previewResponse } from "../preview.ts";
 
+const STATUSES = new Set<PublishStatus>(["draft", "review", "published", "archived"]);
+
+function statusList(raw: string | undefined): PublishStatus[] | undefined {
+  if (!raw) return undefined;
+  const values = raw.split(",").map((s) => s.trim()) as PublishStatus[];
+  for (const v of values) if (!STATUSES.has(v)) throw badRequest(`unknown status ${v}`);
+  return values;
+}
+
 export const entries: Hono<Env> = new Hono<Env>()
   .get("/", async (c) => {
-    const collection = c.req.query("collection");
-    return c.json(await c.get("store").listContentEntries(param(c, "siteId"), collection));
+    const collection = c.req.query("collection") || undefined;
+    const filter = c.req.query("filter") || undefined;
+    const locale = c.req.query("locale") || undefined;
+    const status = statusList(c.req.query("status"));
+    // `filter` is the RFC-0002 §5 language; a FilterError maps to 400 with suggestions.
+    return c.json(
+      await c.get("store").listContentEntries(param(c, "siteId"), {
+        ...(collection ? { collection } : {}),
+        ...(filter ? { filter } : {}),
+        ...(locale ? { locale } : {}),
+        ...(status ? { status } : {}),
+      }),
+    );
   })
   .post("/", async (c) => {
     const siteId = param(c, "siteId");

@@ -131,15 +131,24 @@ export function validateCanonical(input: string): CanonicalError | undefined {
  * empty object is dropped, so an untouched page keeps no `seo` at all.
  */
 export function applySeo(page: Page, patch: Partial<Seo>): Page {
-  const seo: Seo = { ...(page.seo ?? {}), ...patch };
+  const seo = patchSeo(page.seo, patch);
+  const next = { ...page };
+  if (!seo) delete next.seo;
+  else next.seo = seo;
+  return next;
+}
+
+/**
+ * Patches an SEO object (pages, term archives): a field set to an empty string and
+ * `noindex: false` are removed; `undefined` when nothing is left (the contract has no empty `seo`).
+ */
+export function patchSeo(current: Seo | undefined, patch: Partial<Seo>): Seo | undefined {
+  const seo: Seo = { ...(current ?? {}), ...patch };
   for (const key of ["title", "description", "canonical"] as const) {
     if (key in patch && !seo[key]?.trim()) delete seo[key];
   }
   if (seo.noindex === false) delete seo.noindex;
-  const next = { ...page };
-  if (Object.keys(seo).length === 0) delete next.seo;
-  else next.seo = seo;
-  return next;
+  return Object.keys(seo).length === 0 ? undefined : seo;
 }
 
 /** Trims the stored strings before saving. */

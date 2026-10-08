@@ -48,6 +48,19 @@ const SnapshotsPage = lazyRouteComponent(
   () => import("./routes/SnapshotsPage.tsx"),
   "SnapshotsPage",
 );
+const TaxonomyPage = lazyRouteComponent(() => import("./routes/TaxonomyPage.tsx"), "TaxonomyPage");
+const TermEditorPage = lazyRouteComponent(
+  () => import("./routes/TermEditorPage.tsx"),
+  "TermEditorPage",
+);
+const RedirectsPage = lazyRouteComponent(
+  () => import("./routes/RedirectsPage.tsx"),
+  "RedirectsPage",
+);
+
+const TERM_FILTERS = new Set(["all", "public", "internal", "proposed", "retired"]);
+const slugParam = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v) ? v : undefined;
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -122,7 +135,43 @@ const pagesRoute = createRoute({
 const articlesRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/articles",
+  /** `?category=<slug>&tag=<slug>`: the facet filters (linked from Categories & tags). */
+  validateSearch: (search: Record<string, unknown>): { category?: string; tag?: string } => {
+    const category = slugParam(search.category);
+    const tag = slugParam(search.tag);
+    return { ...(category ? { category } : {}), ...(tag ? { tag } : {}) };
+  },
   component: ArticlesPage,
+});
+/** Site › Categories & tags (RFC-0002 §8): `?taxonomy=<key>&filter=<status>`. */
+const taxonomyRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/taxonomy",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    taxonomy?: string;
+    filter?: "all" | "public" | "internal" | "proposed" | "retired";
+  } => {
+    const taxonomy = slugParam(search.taxonomy);
+    const filter =
+      typeof search.filter === "string" && TERM_FILTERS.has(search.filter)
+        ? (search.filter as "all")
+        : undefined;
+    return { ...(taxonomy ? { taxonomy } : {}), ...(filter ? { filter } : {}) };
+  },
+  component: TaxonomyPage,
+});
+const termEditorRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/taxonomy/$termId",
+  component: TermEditorPage,
+});
+/** Site › Settings › Redirects. */
+const redirectsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/redirects",
+  component: RedirectsPage,
 });
 const snapshotsRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -173,6 +222,9 @@ const routeTree = rootRoute.addChildren([
     siteSettingsRoute,
     pageEditorRoute,
     articleEditorRoute,
+    taxonomyRoute,
+    termEditorRoute,
+    redirectsRoute,
   ]),
 ]);
 

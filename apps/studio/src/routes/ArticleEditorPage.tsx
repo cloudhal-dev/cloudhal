@@ -5,7 +5,6 @@ import {
   DeleteResource,
   DropdownMenu,
   Field,
-  Grid,
   type ImagePreviewStatus,
   InlineCopyText,
   Input,
@@ -15,13 +14,13 @@ import {
   PageLayout,
   SectionCard,
   SkeletonLine,
-  TagInput,
   Text,
 } from "@cloudhal/ui";
 import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
   DangerZoneCard,
@@ -37,11 +36,14 @@ import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
+import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
+import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
 import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
+import { missingPrimaries } from "../lib/taxonomy.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
@@ -57,6 +59,7 @@ function duplicateOf(entry: ContentEntry, title: string): NewEntry {
     body: entry.body,
     fields: entry.fields,
     tags: entry.tags,
+    ...(entry.terms ? { terms: entry.terms } : {}),
     ...(entry.summary !== undefined ? { summary: entry.summary } : {}),
     ...(entry.coverImage ? { coverImage: entry.coverImage } : {}),
     ...(entry.metadata ? { metadata: entry.metadata } : {}),
@@ -81,9 +84,12 @@ export function ArticleEditorPage() {
     queryFn: () => api.entries.get(siteId, entryId),
   });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const taxonomy = useTaxonomyData(siteId);
   const host = primaryHostname(site.data?.domains ?? []);
   const [draft, setDraft] = useState<ContentEntry | undefined>();
   const [showErrors, setShowErrors] = useState(false);
+  /** Required taxonomies (keys) the last save attempt lacked a primary term for. */
+  const [missing, setMissing] = useState<string[]>([]);
   const [coverStatus, setCoverStatus] = useState<ImagePreviewStatus>("empty");
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -98,6 +104,7 @@ export function ArticleEditorPage() {
     onSuccess: async (saved) => {
       setDraft(saved);
       setShowErrors(false);
+      setMissing([]);
       qc.setQueryData(["entry", siteId, entryId], saved);
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
       toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
@@ -149,8 +156,32 @@ export function ArticleEditorPage() {
   const set = <K extends keyof ContentEntry>(key: K, value: ContentEntry[K]) =>
     setDraft({ ...draft, [key]: value });
   const coverErrors = validateImageRef(draft.coverImage);
-  /** Every save path checks the cover image first; an invalid one never leaves Studio. */
-  const valid = () => {
+  /**
+   * Every save path checks the cover image and — for review and published — the required primary
+   * category (RFC-0002 invariant 2) first; an article the server would refuse never leaves Studio.
+   */
+  const valid = (status: PublishStatus = draft.status) => {
+    const lacking = missingPrimaries(draft, taxonomy.taxonomies.data ?? [], status).map(
+      (x) => x.key,
+    );
+    setMissing(lacking);
+    if (lacking.length > 0) {
+      toast.error(
+        t("articleTerms.requiredToast", {
+          singular: taxonomy
+            .label(
+              (taxonomy.taxonomies.data ?? []).find((x) => x.key === lacking[0]) ?? {
+                key: lacking[0] ?? "",
+                labels: {},
+              },
+              "singular",
+            )
+            .toLocaleLowerCase(),
+        }),
+      );
+      document.getElementById("terms")?.scrollIntoView?.({ block: "center" });
+      return false;
+    }
     if (!hasErrors(coverErrors)) return true;
     setShowErrors(true);
     toast.error(t("seo.fixErrors"));
@@ -158,8 +189,9 @@ export function ArticleEditorPage() {
     return false;
   };
   const changeStatus = (next: PublishStatus) => {
-    if (valid()) save.mutate({ ...draft, status: next });
+    if (valid(next)) save.mutate({ ...draft, status: next });
   };
+  const migrated = (taxonomy.taxonomies.data?.length ?? 0) > 0;
   const title = draft.title || t("articles.untitled");
   const words = wordCount(draft.body.value);
   const details: DetailRow[] = [
@@ -221,7 +253,7 @@ export function ArticleEditorPage() {
             busy={save.isPending}
             onChange={changeStatus}
             onPublish={() => {
-              if (valid()) setPublishOpen(true);
+              if (valid("published")) setPublishOpen(true);
             }}
             menu={
               <>
@@ -253,6 +285,7 @@ export function ArticleEditorPage() {
       }
     >
       <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
+      {taxonomy.taxonomies.isSuccess && !migrated && <TagsMigrationBanner siteId={siteId} />}
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -278,29 +311,21 @@ export function ArticleEditorPage() {
                 }
                 className="w-full"
               />
-              <Grid variant="2up" gap="none" className="items-start gap-x-4 gap-y-5">
-                <Field label={t("editor.slug")} description={t("editor.slugHint")}>
-                  <InputGroup className="w-full">
-                    <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
-                    <InputGroup.Input
-                      aria-label={t("editor.slug")}
-                      value={draft.slug}
-                      onChange={(e) => set("slug", slugify((e.target as HTMLInputElement).value))}
-                    />
-                  </InputGroup>
-                </Field>
-                <TagInput
-                  label={t("editor.tags")}
-                  value={draft.tags}
-                  onValueChange={(tags: string[]) =>
-                    set("tags", [
-                      ...new Set(tags.map((x) => slugify(x)).filter((x) => x && x !== "untitled")),
-                    ])
-                  }
-                  description={t("editor.tagsHint")}
-                  className="w-full"
-                />
-              </Grid>
+              <Field
+                label={t("editor.slug")}
+                description={
+                  draft.publishedAt ? t("articleTerms.slugRedirect") : t("editor.slugHint")
+                }
+              >
+                <InputGroup className="w-full">
+                  <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
+                  <InputGroup.Input
+                    aria-label={t("editor.slug")}
+                    value={draft.slug}
+                    onChange={(e) => set("slug", slugify((e.target as HTMLInputElement).value))}
+                  />
+                </InputGroup>
+              </Field>
               <InputArea
                 label={t("editor.summary")}
                 value={draft.summary ?? ""}
@@ -319,6 +344,15 @@ export function ArticleEditorPage() {
                 className="w-full"
               />
             </SectionCard>
+            <ArticleTermsCard
+              entry={draft}
+              onChange={(next) => {
+                setDraft(next);
+                if (missing.length) setMissing([]);
+              }}
+              data={taxonomy}
+              missing={missing}
+            />
             <CoverImageCard
               image={draft.coverImage}
               savedSrc={query.data?.coverImage?.src}

@@ -20,19 +20,21 @@ import { EyeSlash, Image as ImageIcon, MagnifyingGlass, Trash } from "@phosphor-
 import { type ReactNode, useState } from "react";
 import { type MessageKey, useT } from "../i18n/index.tsx";
 import {
-  applySeo,
   descriptionStatus,
   editImageRef,
   type ImageRef,
   type ImageRefErrors,
   type LengthStatus,
+  patchSeo,
   previewImageUrl,
   SEO_LIMITS,
+  type Seo,
   type SeoErrors,
   searchBreadcrumb,
   titleStatus,
   truncateForSearch,
 } from "../lib/seo.ts";
+import { setOptional } from "../lib/util.ts";
 import { SettingRow } from "./Settings.tsx";
 
 /** "142 / 160" under a field; warning colour once past the length search results show. */
@@ -113,6 +115,9 @@ export function CoverImageCard({
   showErrors,
   onChange,
   onStatusChange,
+  id = "cover-image",
+  title,
+  description,
 }: {
   image: ImageRef | undefined;
   /** The saved image's source: dimensions are recorded only for a newly chosen image. */
@@ -123,7 +128,11 @@ export function CoverImageCard({
   /** After a save attempt every error shows, not only those of fields already left. */
   showErrors: boolean;
   onChange: (image: ImageRef | undefined) => void;
-  onStatusChange: (status: ImagePreviewStatus) => void;
+  onStatusChange?: ((status: ImagePreviewStatus) => void) | undefined;
+  /** Card anchor and heading for other images than an article's cover (a term's image). */
+  id?: string;
+  title?: string;
+  description?: string;
 }) {
   const t = useT();
   const [touched, setTouched] = useState({ src: false, alt: false });
@@ -135,10 +144,10 @@ export function CoverImageCard({
   const altError = (showErrors || touched.alt) && errors.alt ? t(ALT_ERROR[errors.alt]) : undefined;
   return (
     <SectionCard
-      id="cover-image"
-      title={t("seo.cover.title")}
+      id={id}
+      title={title ?? t("seo.cover.title")}
       icon={<ImageIcon size={16} />}
-      description={t("seo.cover.description")}
+      description={description ?? t("seo.cover.description")}
       actions={
         image ? (
           <Button
@@ -365,33 +374,43 @@ const CANONICAL_ERROR: Record<NonNullable<SeoErrors["canonical"]>, MessageKey> =
 };
 
 /**
- * Page › Search engines and sharing (DESIGN.md §2o): SEO title and meta description with
- * counters, the noindex `Switch` with its warning, the canonical URL under "Advanced", and the
- * search result preview.
+ * Search engines and sharing fields (DESIGN.md §2o) for any routable node — a page, a term
+ * archive: SEO title and meta description with counters, the noindex `Switch` with its warning,
+ * the canonical URL under "Advanced", and the search result preview. Empty fields are removed
+ * (`patchSeo`), so an untouched node keeps no `seo`.
  */
-export function PageSeoCard({
-  page,
+export function SeoFields({
+  seo: value,
+  onChange,
+  fallbackTitle,
+  path,
   siteName,
   host,
   errors,
   showErrors,
-  onChange,
+  kind = "page",
 }: {
-  page: Page;
+  seo: Seo | undefined;
+  onChange: (seo: Seo | undefined) => void;
+  /** The SEO title's placeholder and the preview's title when none is set. */
+  fallbackTitle: string;
+  /** The node's path on the site (`/about`, `/category/news`). */
+  path: string;
   siteName: string;
   host: string | undefined;
   errors: SeoErrors;
   showErrors: boolean;
-  onChange: (page: Page) => void;
+  /** Wording of the noindex hint and warning. */
+  kind?: "page" | "archive";
 }) {
   const t = useT();
-  const seo = page.seo ?? {};
+  const seo = value ?? {};
   const [advancedOpen, setAdvancedOpen] = useState(Boolean(seo.canonical));
   const [canonicalTouched, setCanonicalTouched] = useState(false);
   const title = seo.title ?? "";
   const description = seo.description ?? "";
   const canonical = seo.canonical ?? "";
-  const shownTitle = title.trim() || page.title.trim() || t("articles.untitled");
+  const shownTitle = title.trim() || fallbackTitle.trim() || t("articles.untitled");
   const shownDescription = description.trim()
     ? truncateForSearch(description).text
     : t("seo.preview.noDescription");
@@ -400,20 +419,15 @@ export function PageSeoCard({
       ? t(CANONICAL_ERROR[errors.canonical])
       : undefined;
   return (
-    <SectionCard
-      id="seo"
-      title={t("seo.page.title")}
-      icon={<MagnifyingGlass size={16} />}
-      description={t("seo.page.description")}
-    >
+    <>
       <Input
         label={t("seo.page.seoTitle")}
         value={title}
-        placeholder={page.title}
-        onValueChange={(v) => onChange(applySeo(page, { title: v }))}
+        placeholder={fallbackTitle}
+        onValueChange={(v) => onChange(patchSeo(seo, { title: v }))}
         description={
           <CountedHint
-            hint={t("seo.page.seoTitleHint")}
+            hint={kind === "archive" ? t("seo.archive.seoTitleHint") : t("seo.page.seoTitleHint")}
             count={title.trim().length}
             recommended={SEO_LIMITS.titleRecommended}
           />
@@ -428,7 +442,7 @@ export function PageSeoCard({
         label={t("seo.page.seoDescription")}
         value={description}
         placeholder={t("seo.page.seoDescriptionPlaceholder")}
-        onValueChange={(v) => onChange(applySeo(page, { description: v }))}
+        onValueChange={(v) => onChange(patchSeo(seo, { description: v }))}
         description={
           <CountedHint
             hint={t("seo.page.seoDescriptionHint")}
@@ -449,19 +463,25 @@ export function PageSeoCard({
         <Switch
           label={t("seo.page.noindex")}
           checked={seo.noindex === true}
-          onCheckedChange={(checked: boolean) => onChange(applySeo(page, { noindex: checked }))}
+          onCheckedChange={(checked: boolean) => onChange(patchSeo(seo, { noindex: checked }))}
           data-testid="seo-noindex"
         />
         <Text variant="secondary" size="sm">
-          {t("seo.page.noindexHint")}
+          {kind === "archive" ? t("seo.archive.noindexHint") : t("seo.page.noindexHint")}
         </Text>
       </div>
       {seo.noindex && (
         <Banner
           variant="alert"
           icon={<EyeSlash weight="fill" />}
-          title={t("seo.page.noindexWarningTitle")}
-          description={t("seo.page.noindexWarning")}
+          title={
+            kind === "archive"
+              ? t("seo.archive.noindexWarningTitle")
+              : t("seo.page.noindexWarningTitle")
+          }
+          description={
+            kind === "archive" ? t("seo.archive.noindexWarning") : t("seo.page.noindexWarning")
+          }
           data-testid="noindex-warning"
         />
       )}
@@ -478,7 +498,7 @@ export function PageSeoCard({
               label={t("seo.page.canonical")}
               value={canonical}
               placeholder={t("seo.page.canonicalPlaceholder")}
-              onValueChange={(v) => onChange(applySeo(page, { canonical: v }))}
+              onValueChange={(v) => onChange(patchSeo(seo, { canonical: v }))}
               onBlur={() => setCanonicalTouched(true)}
               description={
                 host ? t("seo.page.canonicalHintHost", { host }) : t("seo.page.canonicalHint")
@@ -501,7 +521,7 @@ export function PageSeoCard({
         <InsetPanel>
           <SearchResultPreview
             siteName={siteName}
-            breadcrumb={searchBreadcrumb(host, page.path, canonical)}
+            breadcrumb={searchBreadcrumb(host, path, canonical)}
             title={shownTitle}
             description={shownDescription}
             placeholder={!description.trim()}
@@ -515,6 +535,44 @@ export function PageSeoCard({
           />
         </InsetPanel>
       </div>
+    </>
+  );
+}
+
+/** Page › Search engines and sharing (DESIGN.md §2o): `SeoFields` for the page's `seo`. */
+export function PageSeoCard({
+  page,
+  siteName,
+  host,
+  errors,
+  showErrors,
+  onChange,
+}: {
+  page: Page;
+  siteName: string;
+  host: string | undefined;
+  errors: SeoErrors;
+  showErrors: boolean;
+  onChange: (page: Page) => void;
+}) {
+  const t = useT();
+  return (
+    <SectionCard
+      id="seo"
+      title={t("seo.page.title")}
+      icon={<MagnifyingGlass size={16} />}
+      description={t("seo.page.description")}
+    >
+      <SeoFields
+        seo={page.seo}
+        onChange={(seo) => onChange(setOptional(page, "seo", seo))}
+        fallbackTitle={page.title}
+        path={page.path}
+        siteName={siteName}
+        host={host}
+        errors={errors}
+        showErrors={showErrors}
+      />
     </SectionCard>
   );
 }
