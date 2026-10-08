@@ -1,7 +1,8 @@
 /**
  * Sprint 6: the Site Worker on real workerd (wrangler's test harness) against local D1 + R2.
  * Publishing and rollback are pointer flips seen by the next request; drafts stay invisible
- * except behind a signed preview link; the purge endpoint is authenticated.
+ * except behind a signed preview link; the purge endpoint is authenticated. RFC-0002: archives,
+ * term feeds and redirects answer with real status codes, and responses carry per-node cache tags.
  */
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
@@ -17,6 +18,7 @@ import { createTestHarness } from "wrangler";
 import { buildSiteWorker } from "../src/cloudflare/build.ts";
 import { siteConfigPath, siteWorkerConfig, writeWranglerConfig } from "../src/cloudflare/config.ts";
 import { init, readProjectConfig, snapshot } from "../src/index.ts";
+import { applyTaxonomyFixture } from "./taxonomy-fixture.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STARTER_NODE_MODULES = path.resolve(here, "../../../starters/blog/node_modules");
@@ -83,7 +85,11 @@ describe("Site Worker on workerd", () => {
     expect(res.status, html.slice(0, 500)).toBe(200);
     expect(html).toMatch(/<h1[^>]*>Edge Site<\/h1>/);
     expect(res.headers.get("x-cloudhal-mode")).toBe("published");
-    expect(res.headers.get("cache-tag")).toBe(`cloudhal-site-${siteId}`);
+    // the site tag first (what publish purges), then one per rendered node (RFC-0002 §7)
+    const tags = res.headers.get("cache-tag")?.split(",") ?? [];
+    expect(tags[0]).toBe(`cloudhal-site-${siteId}`);
+    const home = (await remote.listPages(siteId)).find((p) => p.path === "/");
+    expect(tags).toContain(`cloudhal-node-${home?.id}`);
     expect(res.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
     // agent-written content cannot bring scripts: CSP on every HTML response, no inline scripts
     expect(res.headers.get("content-security-policy")).toContain("script-src 'self'");
@@ -178,5 +184,105 @@ describe("Site Worker on workerd", () => {
     expect((await get("/__cloudhal/purge")).status).toBe(405);
     const ok = (await (await purge(PURGE_TOKEN)).json()) as { tag: string };
     expect(ok.tag).toBe(`cloudhal-site-${siteId}`);
+    // per-tag purge: only Cloudhal's own tags are accepted
+    const byTag = (tags: unknown) =>
+      get("/__cloudhal/purge", {
+        method: "POST",
+        headers: { authorization: `Bearer ${PURGE_TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ tags }),
+      });
+    expect((await byTag(["other-zone-tag"])).status).toBe(400);
+    const tagged = (await (await byTag(["cloudhal-term-term_abc123"])).json()) as {
+      tags: string[];
+    };
+    expect(tagged.tags).toEqual(["cloudhal-term-term_abc123"]);
+  });
+
+  it("serves archives, term feeds and the sitemap; answers 301/404/410 per RFC-0002", async () => {
+    const fx = await applyTaxonomyFixture(remote, siteId);
+    const snap = await remote.createSnapshot(siteId, {
+      actor: human,
+      reason: "publish",
+      label: "taxonomy",
+    });
+    await remote.publish(
+      (await remote.getSite(siteId)) as NonNullable<Awaited<ReturnType<typeof remote.getSite>>>,
+      snap.id,
+    );
+    await purge(PURGE_TOKEN);
+    const raw = (p: string) => get(p, { redirect: "manual" });
+
+    // an indexable archive with per-term and per-node cache tags
+    const news = await raw("/category/news");
+    const html = await news.text();
+    expect(news.status, html.slice(0, 300)).toBe(200);
+    expect(news.headers.get("x-cloudhal-snapshot")).toBe(snap.id);
+    expect(html).toContain("<h1>News</h1>");
+    expect(html).not.toContain('name="robots"');
+    expect(html).toContain('<a href="/category/news/page/2" rel="next">');
+    const tags = news.headers.get("cache-tag")?.split(",") ?? [];
+    expect(tags).toContain(`cloudhal-site-${siteId}`);
+    expect(tags).toContain(`cloudhal-term-${fx.news.id}`);
+    expect(tags).toContain(`cloudhal-node-${fx.renamedEntry.id}`);
+    expect((await raw("/category/news/page/2/")).status).toBe(200);
+    expect((await raw("/category/news/page/9")).status).toBe(404);
+    const first = await raw("/category/news/page/1");
+    expect(first.status).toBe(301);
+    expect(first.headers.get("location")).toBe("/category/news");
+
+    // a thin archive is served with noindex; proposed → 404; retired without redirect → 410
+    const thin = await raw("/tag/cloudhal");
+    expect(thin.status).toBe(200);
+    expect(await thin.text()).toContain('<meta name="robots" content="noindex,follow">');
+    const proposed = await raw("/tag/proposed-idea");
+    expect(proposed.status).toBe(404);
+    expect(proposed.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    const gone = await raw("/tag/old-topic");
+    expect(gone.status).toBe(410);
+    expect(gone.headers.get("cache-control")).toBe("no-store");
+
+    // slug change and term rename: real 301s, prefix matches carry pagination and the feed along,
+    // the query string is kept
+    const moved = await raw("/posts/issue-05?utm_source=x");
+    expect(moved.status).toBe(301);
+    expect(moved.headers.get("location")).toBe("/posts/issue-05-renamed?utm_source=x");
+    expect((await raw("/posts/issue-05-renamed")).status).toBe(200);
+    const renamed = await raw("/tag/weekly");
+    expect(renamed.status).toBe(301);
+    expect(renamed.headers.get("location")).toBe("/tag/weekly-digest");
+    const paged = await raw("/tag/weekly/page/2/");
+    expect(paged.status).toBe(301);
+    expect(paged.headers.get("location")).toBe("/tag/weekly-digest/page/2");
+    const oldFeed = await raw("/tag/weekly/rss.xml");
+    expect(oldFeed.status).toBe(301);
+    expect(oldFeed.headers.get("location")).toBe("/tag/weekly-digest/rss.xml");
+    expect((await raw("/tag/old-topic/rss.xml")).status).toBe(410);
+
+    // the per-term feed
+    const feed = await raw("/tag/weekly-digest/rss.xml");
+    expect(feed.status).toBe(200);
+    expect(feed.headers.get("content-type")).toContain("application/rss+xml");
+    expect(feed.headers.get("cache-tag")).toContain(`cloudhal-term-${fx.weekly.id}`);
+    const xml = await feed.text();
+    expect(xml).toContain("<title>Weekly · Edge Site</title>");
+    expect(xml).toContain("<title>Issue 21</title>");
+    expect((await raw("/tag/proposed-idea/rss.xml")).status).toBe(404);
+
+    // sitemap: indexable archives, not the thin one
+    const sitemap = await (await raw("/sitemap.xml")).text();
+    expect(sitemap).toContain("/category/news</loc>");
+    expect(sitemap).toContain("/tag/weekly-digest</loc>");
+    expect(sitemap).not.toContain("/tag/cloudhal</loc>");
+
+    // an entry page: its node tag and the tags of the terms it shows
+    const post = await raw("/posts/hello-world");
+    expect(post.status).toBe(200);
+    const postTags = post.headers.get("cache-tag")?.split(",") ?? [];
+    const hello = (await remote.listContentEntries(siteId)).find((e) => e.slug === "hello-world");
+    expect(postTags).toContain(`cloudhal-node-${hello?.id}`);
+    expect(postTags).toContain(`cloudhal-term-${fx.cloudhal.id}`);
+    expect(await post.text()).toContain(
+      '<a class="ch-chip" href="/category/news" rel="tag">News</a>',
+    );
   });
 });
