@@ -1,5 +1,6 @@
 //! GENERATED FILE — DO NOT EDIT. One module per root contract.
 
+pub mod asset;
 pub mod content_entry;
 pub mod page;
 pub mod project;

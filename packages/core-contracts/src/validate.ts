@@ -1,6 +1,7 @@
 import type { ErrorObject } from "ajv";
 import type { RootSchemaName } from "../scripts/schema-list.ts";
 import type {
+  Asset,
   ContentEntry,
   Page,
   Project,
@@ -26,6 +27,7 @@ export interface ContractTypes {
   taxonomy: Taxonomy;
   term: Term;
   redirect: Redirect;
+  asset: Asset;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -39,6 +41,7 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   taxonomy: v.validateTaxonomy,
   term: v.validateTerm,
   redirect: v.validateRedirect,
+  asset: v.validateAsset,
 };
 
 export class ContractValidationError extends Error {

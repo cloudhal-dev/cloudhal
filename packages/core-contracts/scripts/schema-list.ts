@@ -13,6 +13,7 @@ export const ROOT_SCHEMAS = [
   "taxonomy",
   "term",
   "redirect",
+  "asset",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];

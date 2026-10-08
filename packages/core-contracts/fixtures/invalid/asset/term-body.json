@@ -1,0 +1,20 @@
+{
+  "reason": "a term body is not an asset (node schemas are mutually exclusive)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "term_01HZX8K3Q9LL",
+    "siteId": "site_01HZX8K3Q9EF",
+    "taxonomyId": "tax_01HZX8K3Q9TG",
+    "slug": "llm",
+    "status": "active",
+    "visibility": "public",
+    "labels": {
+      "en": {
+        "name": "LLM"
+      }
+    },
+    "rev": 0,
+    "createdAt": "2026-10-08T10:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

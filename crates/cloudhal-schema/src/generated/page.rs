@@ -65,11 +65,17 @@ impl<'de> ::serde::Deserialize<'de> for Id {
             })
     }
 }
-#[doc = "Reference to a media asset. src may be a relative asset path or an absolute URL."]
+#[doc = "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ImageRef {
     pub alt: ImageRefAlt,
+    #[doc = "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."]
+    #[serde(
+        rename = "assetId",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub asset_id: ::std::option::Option<Id>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub height: ::std::option::Option<::std::num::NonZeroU64>,
     pub src: ImageRefSrc,

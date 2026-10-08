@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "asset_01HZX8K3Q9GF",
+  "siteId": "site_01HZX8K3Q9EF",
+  "kind": "image",
+  "mediaType": "image/gif",
+  "bytes": 5120,
+  "sha256": "77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa77aa",
+  "slug": "loading-dots",
+  "storage": {
+    "kind": "blob"
+  },
+  "image": {
+    "width": 64,
+    "height": 16,
+    "animated": true
+  },
+  "alt": {
+    "en": "Three dots pulsing"
+  },
+  "status": "active",
+  "uploadedBy": {
+    "kind": "human",
+    "id": "user_01HZX8K3Q9HU",
+    "name": "Halil"
+  },
+  "source": {
+    "kind": "upload"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-08T10:30:00Z",
+  "updatedAt": "2026-10-08T10:30:00Z"
+}

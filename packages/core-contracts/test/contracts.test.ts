@@ -67,7 +67,15 @@ for (const name of ROOT_SCHEMAS) {
  * untrusted body against the schema of the kind its row claims. That is only sound if no document
  * is valid under two node schemas, so every node fixture must fail every other node schema.
  */
-const NODE_SCHEMAS = ["site", "page", "content-entry", "taxonomy", "term", "redirect"] as const;
+const NODE_SCHEMAS = [
+  "site",
+  "page",
+  "content-entry",
+  "taxonomy",
+  "term",
+  "redirect",
+  "asset",
+] as const;
 
 describe("node schemas are mutually exclusive", () => {
   it.each(NODE_SCHEMAS)("valid %s fixtures fail every other node schema", async (own) => {

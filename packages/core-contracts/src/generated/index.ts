@@ -14,3 +14,4 @@ export type { SkillManifest } from "./skill-manifest.ts";
 export type { Path, Taxonomy, TaxonomyLabel, TaxonomyArchive } from "./taxonomy.ts";
 export type { Term, TermLabel } from "./term.ts";
 export type { Redirect, RedirectSource } from "./redirect.ts";
+export type { AssetStorage, AssetLicense, HttpsUrl, AssetSource, Sha256, Asset, BlobStorage, ExternalStorage, AssetImage, SpdxLicense, UrlLicense, UploadSource, FetchSource, ImportSource, LinkSource } from "./asset.ts";

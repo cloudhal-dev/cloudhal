@@ -121,3 +121,7 @@ fn term() {
 fn redirect() {
     check::<cloudhal_schema::Redirect>("redirect");
 }
+#[test]
+fn asset() {
+    check::<cloudhal_schema::Asset>("asset");
+}
