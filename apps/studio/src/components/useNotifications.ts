@@ -61,6 +61,16 @@ function useDescribe() {
         body: t("notifications.toast.endingBody", p),
       };
     }
+    if (item.kind === "member-joined")
+      return {
+        title: t("notifications.memberJoined.title", { name: item.name ?? t("members.someone") }),
+        body: t("notifications.memberJoined.toast", { role: t(`roles.names.${item.role}`) }),
+      };
+    if (item.kind === "role-changed")
+      return {
+        title: t("notifications.roleChanged.title", { role: t(`roles.names.${item.to}`) }),
+        body: t("notifications.roleChanged.body", { name: item.by.name ?? item.by.id }),
+      };
     return {
       title: t("notifications.request.title", requestParams(t, item, shortDuration)),
       body: item.reason
@@ -105,6 +115,15 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
       void qc.invalidateQueries({ queryKey: ["agent-keys"] });
     if (fresh.some((i) => i.kind === "elevation-request"))
       void qc.invalidateQueries({ queryKey: ["approvals"] });
+    // Someone joined, or the person's own role changed: what they may do changed with it.
+    if (fresh.some((i) => i.kind === "member-joined" || i.kind === "role-changed")) {
+      void qc.invalidateQueries({ queryKey: ["members"] });
+      void qc.invalidateQueries({ queryKey: ["invites"] });
+    }
+    if (fresh.some((i) => i.kind === "role-changed")) {
+      void qc.invalidateQueries({ queryKey: ["me"] });
+      void qc.invalidateQueries({ queryKey: ["agent-keys"] });
+    }
     const { toast, navigate, extend, describe, t } = latest.current;
     const go = (href: string) => navigate({ to: href as "/" });
     const system = shouldRaiseBrowserNotification({
@@ -127,8 +146,10 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
           });
         }
         actions.push({ label: t("notifications.openAgents"), onClick: () => void go(href) });
-      } else {
+      } else if (item.kind === "elevation-request") {
         actions.push({ label: t("notifications.request.review"), onClick: () => void go(href) });
+      } else {
+        actions.push({ label: t("notifications.openTeam"), onClick: () => void go(href) });
       }
       toast.notice({
         id: item.id,

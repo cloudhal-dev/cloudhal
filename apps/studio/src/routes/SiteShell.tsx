@@ -17,6 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
+import { usePublishMode, usePublishSite } from "../components/Publish.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
@@ -74,18 +75,16 @@ export function SiteShell() {
     },
   });
   const snapshot = useMutation({
-    mutationFn: (publish: boolean) =>
-      api.snapshots.create(siteId, {
-        label: publish ? t("snapshots.publishedFromStudio") : t("snapshots.fromStudio"),
-        publish,
-      }),
-    onSuccess: async (_r, publish) => {
+    mutationFn: () => api.snapshots.create(siteId, { label: t("snapshots.fromStudio") }),
+    onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
-      await qc.invalidateQueries({ queryKey: ["site", siteId] });
-      toast.success(publish ? t("snapshots.published") : t("snapshots.created"));
+      toast.success(t("snapshots.created"));
     },
     onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
   });
+  // Publishing follows the role: live, a request an Editor approves (202), or not at all (§2s).
+  const publish = usePublishSite(siteId);
+  const publishing = usePublishMode(siteId);
 
   const commands: PaletteCommand[] = [
     {
@@ -139,10 +138,22 @@ export function SiteShell() {
       label: t("commands.goSkills"),
       run: () => navigate({ to: "/agents/skills" }),
     },
+    { id: "team", label: t("commands.goTeam"), run: () => navigate({ to: "/team" }) },
     { id: "account", label: t("commands.goAccount"), run: () => navigate({ to: "/account" }) },
     { id: "new-article", label: t("commands.newArticle"), run: () => createArticle.mutate() },
-    { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate(false) },
-    { id: "publish", label: t("commands.publishSite"), run: () => snapshot.mutate(true) },
+    { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate() },
+    ...(publishing.mode === "none"
+      ? []
+      : [
+          {
+            id: "publish",
+            label:
+              publishing.mode === "request"
+                ? t("publishing.requestCommand")
+                : t("commands.publishSite"),
+            run: () => publish.mutate({ label: t("snapshots.publishedFromStudio") }),
+          },
+        ]),
     { id: "all-sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
   ];
 

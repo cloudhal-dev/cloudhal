@@ -39,6 +39,7 @@ import { ActorCell } from "../components/Audit.tsx";
 import { CreateTermDialog } from "../components/CreateTermDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { GovernanceDialog, type GovernanceTarget } from "../components/GovernanceDialog.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
@@ -54,6 +55,7 @@ import {
 } from "../components/Taxonomy.tsx";
 import { TaxonomyHealthCard } from "../components/TaxonomyHealthCard.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api, type TermListItem } from "../lib/api.ts";
 import {
@@ -164,13 +166,17 @@ export function TaxonomyPage() {
     return target ? data.name(target) : undefined;
   };
   const noTaxonomies = data.taxonomies.data !== undefined && taxonomies.length === 0;
+  // Governing the vocabulary is structure: Editors and above (RFC-0005 §2.2, DESIGN.md §2s).
+  const structure = useGate("structure.write");
+  const settings = useGate("settings.write");
 
   const newButton = (
     <Button
       variant="primary"
       icon={<Plus />}
       onClick={() => setCreateOpen(true)}
-      disabled={!tax}
+      disabled={!tax || structure.reason !== undefined}
+      title={structure.reason}
       data-testid="new-term"
     >
       {t("taxonomy.newTerm", { singular: singular.toLocaleLowerCase(locale) })}
@@ -193,22 +199,26 @@ export function TaxonomyPage() {
       aside={
         tax ? (
           <>
-            <TaxonomyHealthCard
-              tax={tax}
-              data={data}
-              entries={entries.data}
-              onMerge={(source, target) => {
-                const term = data.byId.get(source)?.term;
-                if (term) open(term.status === "proposed" ? "reviewMerge" : "merge", term, target);
-              }}
-              onReview={() => setSearch({ filter: "proposed" })}
-            />
+            <ReadOnly reason={structure.reason}>
+              <TaxonomyHealthCard
+                tax={tax}
+                data={data}
+                entries={entries.data}
+                onMerge={(source, target) => {
+                  const term = data.byId.get(source)?.term;
+                  if (term)
+                    open(term.status === "proposed" ? "reviewMerge" : "merge", term, target);
+                }}
+                onReview={() => setSearch({ filter: "proposed" })}
+              />
+            </ReadOnly>
             <TaxonomyRulesCard tax={tax} names={names} />
           </>
         ) : undefined
       }
     >
       <ErrorBanner error={data.taxonomies.error ?? data.terms.error} />
+      <ViewOnlyBanner reason={structure.reason} />
       {needsTagsMigration(data.taxonomies.data, entries.data) && !noTaxonomies && (
         <TagsMigrationBanner siteId={siteId} />
       )}
@@ -219,7 +229,12 @@ export function TaxonomyPage() {
           description={t("taxonomy.empty.noTaxonomiesDescription")}
           commandLine="cloudhal migrate tags-to-terms --dry-run"
           contents={
-            <Button variant="primary" onClick={() => setMigrationOpen(true)}>
+            <Button
+              variant="primary"
+              onClick={() => setMigrationOpen(true)}
+              disabled={settings.reason !== undefined}
+              title={settings.reason}
+            >
               {t("migration.banner.action")}
             </Button>
           }
@@ -290,175 +305,179 @@ export function TaxonomyPage() {
               contents={filter === "all" && !q ? newButton : undefined}
             />
           ) : (
-            <LayerCard className="overflow-x-auto p-0">
-              <Table>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.Head>{t("taxonomy.columns.name")}</Table.Head>
-                    <Table.Head>{t("taxonomy.columns.usage")}</Table.Head>
-                    <Table.Head>{t("taxonomy.columns.index")}</Table.Head>
-                    <Table.Head>{t("taxonomy.columns.visibility")}</Table.Head>
-                    <Table.Head sticky="right" className="w-0">
-                      <span className="sr-only">{t("site.rowMenu")}</span>
-                    </Table.Head>
-                  </Table.Row>
-                </Table.Header>
-                {!data.terms.isSuccess || !tax ? (
-                  <TableSkeleton columns={5} />
-                ) : (
-                  <Table.Body>
-                    {pageRows.map((row) => {
-                      const { term, usage } = row.item as TermListItem;
-                      const parent =
-                        row.depth === 0 && term.parentId
-                          ? data.byId.get(term.parentId)?.term
-                          : undefined;
-                      return (
-                        <Table.Row key={term.id} data-term-id={term.id} data-status={term.status}>
-                          <Table.Cell>
-                            <TermNameCell
-                              term={term}
-                              tax={tax}
-                              name={data.name(term)}
-                              depth={row.depth}
-                              href={editHref(term)}
-                              mergedInto={mergedName(term)}
-                              context={
-                                parent ? t("pickers.under", { path: data.name(parent) }) : undefined
-                              }
-                            />
-                            {term.status === "proposed" && term.proposedBy && (
-                              <div
-                                className="mt-2 flex flex-wrap items-center gap-2"
-                                data-testid="proposed-by"
-                              >
-                                <Text variant="secondary" size="sm" as="span">
-                                  {t("taxonomy.review.proposedBy")}
-                                </Text>
-                                <ActorCell actor={term.proposedBy} />
-                              </div>
-                            )}
-                            {term.status === "proposed" && (
-                              <div
-                                className="mt-2 flex flex-wrap items-center gap-1.5"
-                                data-testid="review-actions"
-                              >
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  icon={<Check />}
-                                  loading={approve.isPending && approve.variables?.id === term.id}
-                                  onClick={() => approve.mutate(term)}
-                                  data-testid="approve-term"
+            <ReadOnly reason={structure.reason} className="min-w-0">
+              <LayerCard className="overflow-x-auto p-0">
+                <Table>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.Head>{t("taxonomy.columns.name")}</Table.Head>
+                      <Table.Head>{t("taxonomy.columns.usage")}</Table.Head>
+                      <Table.Head>{t("taxonomy.columns.index")}</Table.Head>
+                      <Table.Head>{t("taxonomy.columns.visibility")}</Table.Head>
+                      <Table.Head sticky="right" className="w-0">
+                        <span className="sr-only">{t("site.rowMenu")}</span>
+                      </Table.Head>
+                    </Table.Row>
+                  </Table.Header>
+                  {!data.terms.isSuccess || !tax ? (
+                    <TableSkeleton columns={5} />
+                  ) : (
+                    <Table.Body>
+                      {pageRows.map((row) => {
+                        const { term, usage } = row.item as TermListItem;
+                        const parent =
+                          row.depth === 0 && term.parentId
+                            ? data.byId.get(term.parentId)?.term
+                            : undefined;
+                        return (
+                          <Table.Row key={term.id} data-term-id={term.id} data-status={term.status}>
+                            <Table.Cell>
+                              <TermNameCell
+                                term={term}
+                                tax={tax}
+                                name={data.name(term)}
+                                depth={row.depth}
+                                href={editHref(term)}
+                                mergedInto={mergedName(term)}
+                                context={
+                                  parent
+                                    ? t("pickers.under", { path: data.name(parent) })
+                                    : undefined
+                                }
+                              />
+                              {term.status === "proposed" && term.proposedBy && (
+                                <div
+                                  className="mt-2 flex flex-wrap items-center gap-2"
+                                  data-testid="proposed-by"
                                 >
-                                  {t("taxonomy.review.approve")}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  icon={<ArrowsMerge />}
-                                  onClick={() => open("reviewMerge", term)}
-                                  data-testid="merge-proposal"
+                                  <Text variant="secondary" size="sm" as="span">
+                                    {t("taxonomy.review.proposedBy")}
+                                  </Text>
+                                  <ActorCell actor={term.proposedBy} />
+                                </div>
+                              )}
+                              {term.status === "proposed" && (
+                                <div
+                                  className="mt-2 flex flex-wrap items-center gap-1.5"
+                                  data-testid="review-actions"
                                 >
-                                  {t("taxonomy.review.merge")}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  icon={<X />}
-                                  aria-label={t("taxonomy.review.rejectNamed", {
-                                    name: data.name(term),
-                                  })}
-                                  onClick={() => open("reject", term)}
-                                  data-testid="reject-term"
-                                >
-                                  {t("taxonomy.review.reject")}
-                                </Button>
-                              </div>
-                            )}
-                          </Table.Cell>
-                          <Table.Cell className="whitespace-nowrap">
-                            <span className="grid gap-0.5">
-                              {usage.total === 0 ? (
-                                <Text variant="secondary" as="span">
-                                  {t("taxonomy.usage.none")}
-                                </Text>
-                              ) : (
-                                <Tooltip
-                                  content={t("taxonomy.usage.hint", {
-                                    published: usage.published,
-                                    total: usage.total,
-                                  })}
-                                >
-                                  <span className="inline-flex" data-testid="usage">
-                                    {tax.key === "category" || tax.key === "tag" ? (
-                                      <Link
-                                        href={`/sites/${siteId}/articles?${tax.key}=${term.slug}`}
-                                        variant="plain"
-                                      >
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<Check />}
+                                    loading={approve.isPending && approve.variables?.id === term.id}
+                                    onClick={() => approve.mutate(term)}
+                                    data-testid="approve-term"
+                                  >
+                                    {t("taxonomy.review.approve")}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={<ArrowsMerge />}
+                                    onClick={() => open("reviewMerge", term)}
+                                    data-testid="merge-proposal"
+                                  >
+                                    {t("taxonomy.review.merge")}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={<X />}
+                                    aria-label={t("taxonomy.review.rejectNamed", {
+                                      name: data.name(term),
+                                    })}
+                                    onClick={() => open("reject", term)}
+                                    data-testid="reject-term"
+                                  >
+                                    {t("taxonomy.review.reject")}
+                                  </Button>
+                                </div>
+                              )}
+                            </Table.Cell>
+                            <Table.Cell className="whitespace-nowrap">
+                              <span className="grid gap-0.5">
+                                {usage.total === 0 ? (
+                                  <Text variant="secondary" as="span">
+                                    {t("taxonomy.usage.none")}
+                                  </Text>
+                                ) : (
+                                  <Tooltip
+                                    content={t("taxonomy.usage.hint", {
+                                      published: usage.published,
+                                      total: usage.total,
+                                    })}
+                                  >
+                                    <span className="inline-flex" data-testid="usage">
+                                      {tax.key === "category" || tax.key === "tag" ? (
+                                        <Link
+                                          href={`/sites/${siteId}/articles?${tax.key}=${term.slug}`}
+                                          variant="plain"
+                                        >
+                                          <Text as="span">
+                                            {t("taxonomy.usage.value", {
+                                              published: usage.published,
+                                              total: usage.total,
+                                            })}
+                                          </Text>
+                                        </Link>
+                                      ) : (
                                         <Text as="span">
                                           {t("taxonomy.usage.value", {
                                             published: usage.published,
                                             total: usage.total,
                                           })}
                                         </Text>
-                                      </Link>
-                                    ) : (
-                                      <Text as="span">
-                                        {t("taxonomy.usage.value", {
-                                          published: usage.published,
-                                          total: usage.total,
-                                        })}
-                                      </Text>
-                                    )}
+                                      )}
+                                    </span>
+                                  </Tooltip>
+                                )}
+                                {usage.lastUsedAt && (
+                                  <span className="flex items-center gap-1" data-testid="last-used">
+                                    <Text variant="secondary" size="xs" as="span">
+                                      {t("taxonomy.columns.lastUsed")}
+                                    </Text>
+                                    <RelativeTime iso={usage.lastUsedAt} size="xs" />
                                   </span>
-                                </Tooltip>
-                              )}
-                              {usage.lastUsedAt && (
-                                <span className="flex items-center gap-1" data-testid="last-used">
-                                  <Text variant="secondary" size="xs" as="span">
-                                    {t("taxonomy.columns.lastUsed")}
-                                  </Text>
-                                  <RelativeTime iso={usage.lastUsedAt} size="xs" />
-                                </span>
-                              )}
-                            </span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <IndexBadge
-                              status={indexStatus(
-                                term,
-                                tax,
-                                published.get(term.id) ?? 0,
-                                data.defaultLocale,
-                              )}
-                            />
-                          </Table.Cell>
-                          <Table.Cell className="whitespace-nowrap">
-                            <VisibilityBadge term={term} />
-                          </Table.Cell>
-                          <Table.Cell sticky="right" className="w-0 text-right">
-                            <span className="flex items-center justify-end gap-1.5">
-                              <TermRowMenu
-                                term={term}
-                                tax={tax}
-                                onEdit={() =>
-                                  navigate({
-                                    to: "/sites/$siteId/taxonomy/$termId",
-                                    params: { siteId, termId: term.id },
-                                  })
-                                }
-                                onOpen={(kind) => open(kind, term)}
+                                )}
+                              </span>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <IndexBadge
+                                status={indexStatus(
+                                  term,
+                                  tax,
+                                  published.get(term.id) ?? 0,
+                                  data.defaultLocale,
+                                )}
                               />
-                            </span>
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
-                  </Table.Body>
-                )}
-              </Table>
-            </LayerCard>
+                            </Table.Cell>
+                            <Table.Cell className="whitespace-nowrap">
+                              <VisibilityBadge term={term} />
+                            </Table.Cell>
+                            <Table.Cell sticky="right" className="w-0 text-right">
+                              <span className="flex items-center justify-end gap-1.5">
+                                <TermRowMenu
+                                  term={term}
+                                  tax={tax}
+                                  onEdit={() =>
+                                    navigate({
+                                      to: "/sites/$siteId/taxonomy/$termId",
+                                      params: { siteId, termId: term.id },
+                                    })
+                                  }
+                                  onOpen={(kind) => open(kind, term)}
+                                />
+                              </span>
+                            </Table.Cell>
+                          </Table.Row>
+                        );
+                      })}
+                    </Table.Body>
+                  )}
+                </Table>
+              </LayerCard>
+            </ReadOnly>
           )}
           {rows.length > PER_PAGE && (
             <Pagination page={page} perPage={PER_PAGE} totalCount={rows.length} setPage={setPage} />

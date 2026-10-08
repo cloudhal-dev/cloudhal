@@ -39,9 +39,11 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { type TaxonomyData, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { treeOptions } from "../components/TermPickers.tsx";
+import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { entryAccess } from "../lib/roles.ts";
 import { previewImageUrl } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { facetFilter, needsTagsMigration } from "../lib/taxonomy.ts";
@@ -98,6 +100,10 @@ export function ArticlesPage() {
     queryFn: () => api.entries.list(siteId, "posts"),
   });
   const [toDelete, setToDelete] = useState<ContentEntry | undefined>();
+  // Others' articles (and a Contributor's published ones) cannot be deleted (RFC-0005 I9).
+  const editAny = useCan("entries.editAny");
+  const editOwnPublished = useCan("entries.editOwnPublished");
+  const self = useSelf();
   const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const paging = usePaging(
     sorted,
@@ -390,6 +396,11 @@ export function ArticlesPage() {
                             })
                           }
                           onDelete={() => setToDelete(e)}
+                          deleteDisabledReason={
+                            entryAccess(e, { editAny, editOwnPublished }, self) === "edit"
+                              ? undefined
+                              : t("gating.entryDelete")
+                          }
                         />
                       </Table.Cell>
                     </Table.Row>

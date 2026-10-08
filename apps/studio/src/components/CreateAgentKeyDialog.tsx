@@ -23,8 +23,9 @@ import {
   type ScopeGroup,
   type SnippetKind,
   sameScopes,
+  scopeOptions,
 } from "../lib/agents.ts";
-import { api, type CreatedAgentKey, type KeyMode } from "../lib/api.ts";
+import { api, type CreatedAgentKey, errorCode, type KeyMode } from "../lib/api.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 
@@ -213,7 +214,13 @@ export function CreateAgentKeyDialog({
                   variant="error"
                   size="sm"
                   title={t("agents.create.failed")}
-                  description={create.error.message}
+                  description={
+                    errorCode(create.error) === "scope_above_role"
+                      ? t("agents.create.errors.scopeAboveRole")
+                      : errorCode(create.error) === "mode_above_role"
+                        ? t("agents.create.errors.modeAboveRole")
+                        : create.error.message
+                  }
                 />
               )}
               <InsetPanel layout="row" label={t("agents.create.mode")}>
@@ -283,41 +290,54 @@ export function CreateAgentKeyDialog({
                         </Button>
                       )}
                     </div>
-                    {(Object.entries(SCOPE_GROUPS) as Array<[ScopeGroup, GrantableScope[]]>).map(
-                      ([group, groupScopes]) => (
-                        <InsetPanel
-                          key={group}
-                          label={t(`agents.create.groups.${group}`)}
-                          className="gap-3"
-                        >
-                          <div className="grid gap-0.5">
-                            <Text size="sm" bold as="span">
-                              {t(`agents.create.groups.${group}`)}
-                            </Text>
-                            <Text variant="secondary" size="sm">
-                              {t(`agents.create.groupHints.${group}`)}
-                            </Text>
-                          </div>
-                          <div className="grid gap-2.5">
-                            {groupScopes.map((scope) => (
-                              <Checkbox
-                                key={scope}
-                                checked={scopes.includes(scope)}
-                                onCheckedChange={(on) => toggle(scope, on === true)}
-                                label={
-                                  <span className="flex flex-wrap items-baseline gap-x-2">
-                                    <span>{t(`agents.scopes.${scope}`)}</span>
-                                    <span className="font-mono text-[0.9em] text-kumo-subtle">
-                                      {scope}
+                    {(Object.keys(SCOPE_GROUPS) as ScopeGroup[]).map((group) => (
+                      <InsetPanel
+                        key={group}
+                        label={t(`agents.create.groups.${group}`)}
+                        className="gap-3"
+                      >
+                        <div className="grid gap-0.5">
+                          <Text size="sm" bold as="span">
+                            {t(`agents.create.groups.${group}`)}
+                          </Text>
+                          <Text variant="secondary" size="sm">
+                            {t(`agents.create.groupHints.${group}`)}
+                          </Text>
+                        </div>
+                        <div className="grid gap-2.5">
+                          {/* Narrowed to the person's role (RFC-0005 §5.1): an own variant in
+                                place of the full scope, or the scope disabled with the reason. */}
+                          {scopeOptions(group, rules.roleScopes).map(
+                            ({ scope, from, disabled }) => (
+                              <div key={from ?? scope} className="grid gap-0.5">
+                                <Checkbox
+                                  checked={!disabled && scopes.includes(scope)}
+                                  disabled={disabled}
+                                  onCheckedChange={(on) => toggle(scope, on === true)}
+                                  label={
+                                    <span className="flex flex-wrap items-baseline gap-x-2">
+                                      <span>{t(`agents.scopes.${scope}`)}</span>
+                                      <span className="font-mono text-[0.9em] text-kumo-subtle">
+                                        {scope}
+                                      </span>
                                     </span>
+                                  }
+                                />
+                                {(disabled || from) && (
+                                  <span className="pl-6">
+                                    <Text variant="secondary" size="sm">
+                                      {disabled
+                                        ? t("agents.create.scopeAboveRole")
+                                        : t("agents.create.scopeNarrowed", { scope: from ?? "" })}
+                                    </Text>
                                   </span>
-                                }
-                              />
-                            ))}
-                          </div>
-                        </InsetPanel>
-                      ),
-                    )}
+                                )}
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </InsetPanel>
+                    ))}
                     {missing.length > 0 && scopes.length > 0 && (
                       <Banner
                         variant="secondary"

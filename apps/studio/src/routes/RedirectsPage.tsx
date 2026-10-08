@@ -33,12 +33,14 @@ import { useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RedirectDialog } from "../components/RedirectDialog.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { taxonomyKeys, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -80,6 +82,8 @@ export function RedirectsPage() {
   const [reason, setReason] = useState<ReasonFilter>("all");
   const [dialog, setDialog] = useState<{ open: boolean; editing?: Redirect }>({ open: false });
   const [toDelete, setToDelete] = useState<Redirect | undefined>();
+  // Redirects are structure: Editors and above (RFC-0005 §2.2, DESIGN.md §2s).
+  const structure = useGate("structure.write");
   const host = primaryHostname(data.site.data?.domains ?? []);
   const list = [...(redirects.data ?? [])]
     .filter((r) => reason === "all" || r.reason === reason)
@@ -129,6 +133,8 @@ export function RedirectsPage() {
       variant="primary"
       icon={<Plus />}
       onClick={() => setDialog({ open: true })}
+      disabled={structure.reason !== undefined}
+      title={structure.reason}
       data-testid="new-redirect"
     >
       {t("redirects.new")}
@@ -150,6 +156,7 @@ export function RedirectsPage() {
       actions={newButton}
     >
       <ErrorBanner error={redirects.error ?? remove.error} />
+      <ViewOnlyBanner reason={structure.reason} />
       <ListToolbar
         search={paging.search}
         onSearch={paging.setSearch}
@@ -180,138 +187,144 @@ export function RedirectsPage() {
           contents={reason === "all" ? newButton : undefined}
         />
       ) : (
-        <LayerCard className="overflow-x-auto p-0">
-          <Table>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head>{t("redirects.columns.from")}</Table.Head>
-                <Table.Head>{t("redirects.columns.to")}</Table.Head>
-                <Table.Head>{t("redirects.columns.type")}</Table.Head>
-                <Table.Head>{t("redirects.columns.source")}</Table.Head>
-                <Table.Head>{t("redirects.columns.updated")}</Table.Head>
-                <Table.Head sticky="right" className="w-0">
-                  <span className="sr-only">{t("site.rowMenu")}</span>
-                </Table.Head>
-              </Table.Row>
-            </Table.Header>
-            {redirects.isPending ? (
-              <TableSkeleton columns={6} />
-            ) : (
-              <Table.Body>
-                {paging.pageItems.map((r) => {
-                  const style = REASON_STYLE[r.reason];
-                  const ext = externalHost(r.to);
-                  const source = sourceOf(r);
-                  return (
-                    <Table.Row key={r.id} data-redirect-id={r.id} data-reason={r.reason}>
-                      <Table.Cell>
-                        <span className="flex min-w-48 items-center gap-2">
-                          <Text variant="mono" as="span">
-                            {r.from}
-                            {r.match === "prefix" ? "/…" : ""}
-                          </Text>
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="flex min-w-48 flex-wrap items-center gap-x-2 gap-y-1">
-                          <ArrowRight size={14} className="shrink-0 text-kumo-subtle" aria-hidden />
-                          <Text variant="mono" as="span">
-                            {r.to}
-                          </Text>
-                          {ext && (
-                            <Tooltip content={t("redirects.externalHint", { host: ext })}>
+        <ReadOnly reason={structure.reason} className="min-w-0">
+          <LayerCard className="overflow-x-auto p-0">
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head>{t("redirects.columns.from")}</Table.Head>
+                  <Table.Head>{t("redirects.columns.to")}</Table.Head>
+                  <Table.Head>{t("redirects.columns.type")}</Table.Head>
+                  <Table.Head>{t("redirects.columns.source")}</Table.Head>
+                  <Table.Head>{t("redirects.columns.updated")}</Table.Head>
+                  <Table.Head sticky="right" className="w-0">
+                    <span className="sr-only">{t("site.rowMenu")}</span>
+                  </Table.Head>
+                </Table.Row>
+              </Table.Header>
+              {redirects.isPending ? (
+                <TableSkeleton columns={6} />
+              ) : (
+                <Table.Body>
+                  {paging.pageItems.map((r) => {
+                    const style = REASON_STYLE[r.reason];
+                    const ext = externalHost(r.to);
+                    const source = sourceOf(r);
+                    return (
+                      <Table.Row key={r.id} data-redirect-id={r.id} data-reason={r.reason}>
+                        <Table.Cell>
+                          <span className="flex min-w-48 items-center gap-2">
+                            <Text variant="mono" as="span">
+                              {r.from}
+                              {r.match === "prefix" ? "/…" : ""}
+                            </Text>
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <span className="flex min-w-48 flex-wrap items-center gap-x-2 gap-y-1">
+                            <ArrowRight
+                              size={14}
+                              className="shrink-0 text-kumo-subtle"
+                              aria-hidden
+                            />
+                            <Text variant="mono" as="span">
+                              {r.to}
+                            </Text>
+                            {ext && (
+                              <Tooltip content={t("redirects.externalHint", { host: ext })}>
+                                <span className="inline-flex">
+                                  <Badge variant="outline" icon={<ArrowSquareOut />}>
+                                    {t("redirects.external.badge")}
+                                  </Badge>
+                                </span>
+                              </Tooltip>
+                            )}
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell className="whitespace-nowrap">
+                          <span className="flex items-center gap-1.5">
+                            <Tooltip content={t(`redirects.status.${r.status}Hint`)}>
                               <span className="inline-flex">
-                                <Badge variant="outline" icon={<ArrowSquareOut />}>
-                                  {t("redirects.external.badge")}
+                                <Badge variant={r.status === 301 ? "secondary" : "warning"}>
+                                  {t(`redirects.status.short${r.status}`)}
                                 </Badge>
                               </span>
                             </Tooltip>
-                          )}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <span className="flex items-center gap-1.5">
-                          <Tooltip content={t(`redirects.status.${r.status}Hint`)}>
-                            <span className="inline-flex">
-                              <Badge variant={r.status === 301 ? "secondary" : "warning"}>
-                                {t(`redirects.status.short${r.status}`)}
+                            {r.match === "prefix" && (
+                              <Text variant="secondary" size="sm" as="span">
+                                {t("redirects.match.prefixShort")}
+                              </Text>
+                            )}
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <span className="grid min-w-36 gap-1">
+                            <span className="inline-flex" data-testid="redirect-source">
+                              <Badge variant={style.variant} icon={<style.icon />}>
+                                {t(`redirects.reasons.${r.reason}`)}
                               </Badge>
                             </span>
-                          </Tooltip>
-                          {r.match === "prefix" && (
-                            <Text variant="secondary" size="sm" as="span">
-                              {t("redirects.match.prefixShort")}
-                            </Text>
-                          )}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="grid min-w-36 gap-1">
-                          <span className="inline-flex" data-testid="redirect-source">
-                            <Badge variant={style.variant} icon={<style.icon />}>
-                              {t(`redirects.reasons.${r.reason}`)}
-                            </Badge>
-                          </span>
-                          {source && (
-                            <Link href={source.href} variant="plain">
-                              <Text size="sm" as="span" truncate>
-                                {source.label}
+                            {source && (
+                              <Link href={source.href} variant="plain">
+                                <Text size="sm" as="span" truncate>
+                                  {source.label}
+                                </Text>
+                              </Link>
+                            )}
+                            {r.note && (
+                              <Text variant="secondary" size="sm" as="span" truncate>
+                                {r.note}
                               </Text>
-                            </Link>
-                          )}
-                          {r.note && (
-                            <Text variant="secondary" size="sm" as="span" truncate>
-                              {r.note}
-                            </Text>
-                          )}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <RelativeTime iso={r.updatedAt} />
-                      </Table.Cell>
-                      <Table.Cell sticky="right" className="w-0 text-right">
-                        <DropdownMenu>
-                          <Tooltip
-                            content={t("site.rowMenu")}
-                            render={
-                              <DropdownMenu.Trigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    shape="square"
-                                    icon={<DotsThree weight="bold" />}
-                                    aria-label={t("redirects.menu", { from: r.from })}
-                                  />
-                                }
-                              />
-                            }
-                          />
-                          <DropdownMenu.Content align="end">
-                            <DropdownMenu.Item
-                              icon={PencilSimple}
-                              onClick={() => setDialog({ open: true, editing: r })}
-                            >
-                              {t("redirects.edit")}
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Separator />
-                            <DropdownMenu.Item
-                              icon={Trash}
-                              variant="danger"
-                              onClick={() => setToDelete(r)}
-                            >
-                              {t("common.delete")}
-                            </DropdownMenu.Item>
-                          </DropdownMenu.Content>
-                        </DropdownMenu>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            )}
-          </Table>
-        </LayerCard>
+                            )}
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell className="whitespace-nowrap">
+                          <RelativeTime iso={r.updatedAt} />
+                        </Table.Cell>
+                        <Table.Cell sticky="right" className="w-0 text-right">
+                          <DropdownMenu>
+                            <Tooltip
+                              content={t("site.rowMenu")}
+                              render={
+                                <DropdownMenu.Trigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      shape="square"
+                                      icon={<DotsThree weight="bold" />}
+                                      aria-label={t("redirects.menu", { from: r.from })}
+                                    />
+                                  }
+                                />
+                              }
+                            />
+                            <DropdownMenu.Content align="end">
+                              <DropdownMenu.Item
+                                icon={PencilSimple}
+                                onClick={() => setDialog({ open: true, editing: r })}
+                              >
+                                {t("redirects.edit")}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator />
+                              <DropdownMenu.Item
+                                icon={Trash}
+                                variant="danger"
+                                onClick={() => setToDelete(r)}
+                              >
+                                {t("common.delete")}
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu>
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                </Table.Body>
+              )}
+            </Table>
+          </LayerCard>
+        </ReadOnly>
       )}
       {paging.total > paging.perPage && (
         <Pagination

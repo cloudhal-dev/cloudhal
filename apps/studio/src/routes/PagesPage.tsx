@@ -22,6 +22,7 @@ import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
+import { useGate } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -35,6 +36,8 @@ export function PagesPage() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
   const [toDelete, setToDelete] = useState<Page | undefined>();
+  // Pages are structure: Editors and above (RFC-0005 §2.2).
+  const pagesGate = useGate("pages.write");
   const order = new Map((site.data?.pageIds ?? []).map((id, i) => [id, i]));
   const sorted = [...(pages.data ?? [])].sort(
     (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
@@ -74,6 +77,8 @@ export function PagesPage() {
       icon={<Plus />}
       onClick={() => create.mutate()}
       loading={create.isPending}
+      disabled={!pagesGate.allowed}
+      title={pagesGate.reason}
     >
       {t("overview.newPage")}
     </Button>
@@ -156,6 +161,7 @@ export function PagesPage() {
                           })
                         }
                         onDelete={() => setToDelete(p)}
+                        deleteDisabledReason={pagesGate.reason}
                       />
                     </Table.Cell>
                   </Table.Row>
