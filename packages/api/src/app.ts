@@ -7,6 +7,7 @@ import { activity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { entries } from "./routes/entries.ts";
+import { instanceRoutes } from "./routes/instance.ts";
 import { pages } from "./routes/pages.ts";
 import { previewLinks } from "./routes/preview-links.ts";
 import { sites } from "./routes/sites.ts";
@@ -95,6 +96,28 @@ export function createApi(deps: ApiDeps) {
     });
     app.route("/api/agent-keys", agentKeys(deps.agentKeys));
   }
+
+  for (const path of ["/api/instance", "/api/skills"])
+    app.use(path, async (c, next) => {
+      if (!c.get("actor")) throw unauthorized();
+      await next();
+    });
+  app.route(
+    "/api",
+    instanceRoutes(
+      () => ({
+        signUp: deps.signUp ?? "unknown",
+        features: {
+          agentKeys: Boolean(deps.agentKeys),
+          mcp: Boolean(deps.mcp),
+          activity: Boolean(deps.audit ?? deps.mcp?.audit),
+          previewLinks: Boolean(deps.preview),
+          deployTransfer: Boolean(deps.admin),
+        },
+      }),
+      deps.mcp?.skills ?? [],
+    ),
+  );
 
   app.route("/api/sites", sites);
   app.route("/api/sites/:siteId/pages", pages);

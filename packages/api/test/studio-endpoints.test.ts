@@ -153,3 +153,60 @@ describe("preview links", () => {
     ).toBe(401);
   });
 });
+
+describe("instance and skills", () => {
+  it("report sign-up mode, features and the skills agents see", async () => {
+    const { loadSkills } = await import("@cloudhal/agent-runtime");
+    const path = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const skillsDir = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../../skills/official",
+    );
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    await store.init();
+    const app = createApi({
+      store,
+      resolveActor: async (c) => (c.req.header("x-test-user") ? human : undefined),
+      signUp: "first-user",
+      mcp: {
+        stateKey: "instance-test-state-key-0123456789abcdef",
+        skills: await loadSkills(skillsDir),
+      },
+    });
+    expect((await app.request("/api/instance")).status).toBe(401);
+    const info = await (
+      await app.request("/api/instance", { headers: { "x-test-user": "1" } })
+    ).json();
+    expect(info).toEqual({
+      signUp: "first-user",
+      features: {
+        agentKeys: false,
+        mcp: true,
+        activity: false,
+        previewLinks: false,
+        deployTransfer: false,
+      },
+    });
+    const skills = (await (
+      await app.request("/api/skills", { headers: { "x-test-user": "1" } })
+    ).json()) as {
+      name: string;
+      approval: string[];
+      resource: string;
+      references: string[];
+    }[];
+    expect(skills.map((s) => s.name)).toEqual([
+      "publish-article",
+      "rollback",
+      "safe-edit",
+      "site-bootstrap",
+    ]);
+    expect(skills.find((s) => s.name === "rollback")?.approval).toContain("rollback");
+    expect(skills.find((s) => s.name === "publish-article")).toMatchObject({
+      resource: "skill://publish-article/SKILL.md",
+      references: ["editorial-checklist.md"],
+    });
+  });
+});

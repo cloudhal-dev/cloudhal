@@ -39,6 +39,8 @@ export interface CloudhalAuth {
   readonly resolveActor: ActorResolver;
   /** Actor + scopes: humans via session cookie get everything, API keys get their `cloudhal` permissions. */
   readonly resolvePrincipal: PrincipalResolver;
+  /** The effective sign-up policy (`AuthOptions.signUp`). */
+  readonly signUp: "first-user" | "closed" | "open";
   /** Agent credentials (API keys) owned by the signed-in human. */
   readonly agentKeys: AgentKeyService;
   /** The underlying Better Auth instance (server API: `auth.api.*`). */
@@ -242,6 +244,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
     resolveActor,
     resolvePrincipal,
     agentKeys,
+    signUp: signUpMode(options),
     instance: instance as unknown as Auth,
   };
 }

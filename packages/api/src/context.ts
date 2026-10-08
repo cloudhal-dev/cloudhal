@@ -38,6 +38,8 @@ export interface ApiDeps {
    * deployment token. Needs the raw storage the store was built on.
    */
   readonly admin?: { readonly deployToken: string; readonly storage: StoragePair };
+  /** Reported by `/api/instance` (who may create accounts). */
+  readonly signUp?: "first-user" | "closed" | "open";
   /** Mounts `/api/agent-keys` (create/list/delete API keys for agents). */
   readonly agentKeys?: AgentKeyService;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */

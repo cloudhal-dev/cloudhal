@@ -110,6 +110,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         resolvePrincipal: auth.resolvePrincipal,
         authHandler: auth.handler,
         agentKeys: auth.agentKeys,
+        signUp: auth.signUp,
         audit,
         mcp: {
           stateKey: required(env, "MCP_STATE_KEY"),
