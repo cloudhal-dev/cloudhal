@@ -28,6 +28,7 @@ describe("migrate", () => {
       "0008_policy_detail",
       "0009_audit_elevation",
       "0010_approval_result",
+      "0011_op_guards",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -41,6 +42,7 @@ describe("migrate", () => {
       "0008_policy_detail",
       "0009_audit_elevation",
       "0010_approval_result",
+      "0011_op_guards",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -54,6 +56,7 @@ describe("migrate", () => {
       "invitation",
       "member",
       "nodes",
+      "op_guards",
       "organization",
       "projects",
       "rateLimit",
@@ -79,6 +82,7 @@ describe("migrate", () => {
       "0008_policy_detail",
       "0009_audit_elevation",
       "0010_approval_result",
+      "0011_op_guards",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -91,14 +95,15 @@ describe("migrate", () => {
       "0008_policy_detail",
       "0009_audit_elevation",
       "0010_approval_result",
+      "0011_op_guards",
     ]);
     await h.dispose();
   });
 
   it("a failing migration leaves earlier ones applied and itself unapplied", async () => {
     const driver = await BetterSqlite3Driver.open(":memory:");
-    const bad = { name: "0011_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
-    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0011_bad/);
+    const bad = { name: "0099_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
+    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0099_bad/);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
       "0002_auth",
@@ -110,6 +115,7 @@ describe("migrate", () => {
       "0008_policy_detail",
       "0009_audit_elevation",
       "0010_approval_result",
+      "0011_op_guards",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

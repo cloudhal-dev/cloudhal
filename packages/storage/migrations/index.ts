@@ -9,6 +9,7 @@ import { migration0007AuditMode } from "./0007_audit_mode.ts";
 import { migration0008PolicyDetail } from "./0008_policy_detail.ts";
 import { migration0009AuditElevation } from "./0009_audit_elevation.ts";
 import { migration0010ApprovalResult } from "./0010_approval_result.ts";
+import { migration0011OpGuards } from "./0011_op_guards.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -22,4 +23,5 @@ export const migrations: readonly Migration[] = [
   migration0008PolicyDetail,
   migration0009AuditElevation,
   migration0010ApprovalResult,
+  migration0011OpGuards,
 ];
