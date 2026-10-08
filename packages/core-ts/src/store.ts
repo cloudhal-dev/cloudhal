@@ -2,6 +2,7 @@ import {
   type Actor,
   assertValid,
   type ContentEntry,
+  type Menu,
   type NodeRef,
   type Page,
   type Project,
@@ -26,6 +27,8 @@ import {
 } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
+import type { TargetRef } from "./menu.ts";
+import { MenuEngine } from "./menu-store.ts";
 import type { Resolution } from "./names.ts";
 import {
   type Cond,
@@ -117,6 +120,7 @@ export class SiteGraphStore {
   readonly #now: () => Date;
   readonly #newId: (prefix: string) => string;
   readonly #tax: TaxonomyEngine;
+  readonly #menus: MenuEngine;
 
   constructor(options: SiteGraphStoreOptions) {
     this.#sql = options.sql;
@@ -129,6 +133,12 @@ export class SiteGraphStore {
       sql: this.#sql,
       stamp: () => this.#stamp(),
       newId: (prefix) => this.#newId(prefix),
+    });
+    this.#menus = new MenuEngine({
+      sql: this.#sql,
+      stamp: () => this.#stamp(),
+      newId: (prefix) => this.#newId(prefix),
+      getSite: (id) => this.getSite(id),
     });
   }
 
@@ -604,6 +614,84 @@ export class SiteGraphStore {
   /** Exact `from` first, then the longest prefix redirect above `path` (rest appended to `to`). */
   redirectFor(siteId: string, path: string): Promise<RedirectMatch | undefined> {
     return this.#tax.redirectFor(siteId, path);
+  }
+
+  // ───────────────────────────── menus (RFC-0003) ─────────────────────────────
+
+  /**
+   * One guarded insert: the key is free (`key_taken`), the tree is valid (`validateMenuTree`) and
+   * every target is a node of the site, no retired term (`unknown_target`). `maxDepth` comes from
+   * the caller (`defaultMaxDepth(key)` for the well-known keys). The caller snapshots once.
+   */
+  createMenu(input: Creatable<Menu>): Promise<Menu> {
+    return this.#menus.createMenu(input);
+  }
+
+  getMenu(id: string): Promise<Menu | undefined> {
+    return this.#menus.getMenu(id);
+  }
+
+  getMenuByKey(siteId: string, key: string): Promise<Menu | undefined> {
+    return this.#menus.getMenuByKey(siteId, key);
+  }
+
+  /** Ordered by key. */
+  listMenus(siteId: string): Promise<Menu[]> {
+    return this.#menus.listMenus(siteId);
+  }
+
+  /** Whole tree, CAS on `rev`, key immutable; targets the write adds are guarded (invariant 9). */
+  updateMenu(menu: Menu): Promise<Menu> {
+    return this.#menus.updateMenu(menu);
+  }
+
+  /** CAS delete; the site falls back to its derived default for that key. */
+  deleteMenu(menu: Menu): Promise<void> {
+    return this.#menus.deleteMenu(menu);
+  }
+
+  /** Menus and item ids linking to a page, entry or term (delete prompts, "In menu" badges). */
+  menuReferences(siteId: string, target: TargetRef): Promise<{ menu: Menu; itemIds: string[] }[]> {
+    return this.#menus.menuReferences(siteId, target);
+  }
+
+  /**
+   * "Create menu from current pages" (RFC-0003 §8): page items without labels for the pages
+   * today's derived header shows, plus top-level categories with a served archive on request.
+   * `dryRun` returns the unsaved menu.
+   */
+  async createMenuFromPages(
+    site: Site,
+    key: string,
+    options: { categories?: boolean; maxDepth?: number; dryRun?: boolean } = {},
+  ): Promise<Menu> {
+    const [pages, entries, taxonomies, terms] = await Promise.all([
+      this.listPages(site.id),
+      options.categories ? this.listContentEntries(site.id) : Promise.resolve([]),
+      options.categories ? this.listTaxonomies(site.id) : Promise.resolve([]),
+      options.categories ? this.listTerms(site.id) : Promise.resolve([]),
+    ]);
+    const items = await this.#menus.itemsFromPages(
+      site,
+      { pages, entries, taxonomies, terms },
+      options,
+    );
+    const input = {
+      siteId: site.id,
+      key,
+      maxDepth: options.maxDepth ?? this.#menus.defaultDepth(key),
+      items,
+    };
+    if (!options.dryRun) return this.createMenu(input);
+    const ts = this.#stamp();
+    return {
+      ...input,
+      schemaVersion: 1,
+      id: this.#newId(ID_PREFIX.menu),
+      rev: 0,
+      createdAt: ts,
+      updatedAt: ts,
+    };
   }
 
   // ───────────────────────────── migration (RFC-0002 Compatibility) ─────────────────────────────

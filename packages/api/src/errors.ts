@@ -42,6 +42,12 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 422> = {
   not_allowed: 422,
   invalid_labels: 422,
   invalid_redirect: 422,
+  // RFC-0003 menus (the REST routes come later; the codes are mapped now).
+  key_taken: 409,
+  unknown_target: 422,
+  unknown_item: 422,
+  invalid_label: 422,
+  invalid_menu: 422,
 };
 
 /** In a query string `+` must be sent as `%2B`: form encoding turns it into a space (RFC-0002 §5). */
