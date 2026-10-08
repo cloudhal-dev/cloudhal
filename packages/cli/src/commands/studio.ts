@@ -61,6 +61,8 @@ export async function studio(
     const auth = await createAuthFor({
       dataDir: local.dataDir,
       baseURL: `http://localhost:${options.port ?? 8787}`,
+      // Better Auth checks Origin on browser POSTs itself; the Studio dev server must pass too.
+      trustedOrigins: deps.trustedOrigins ?? [],
     });
     deps = {
       ...deps,

@@ -3,24 +3,32 @@ import {
   Banner,
   Button,
   Collapsible,
-  Empty,
-  LayerCard,
+  PageLayout,
   RefreshButton,
+  SectionCard,
+  SectionEmpty,
   SkeletonLine,
   Table,
   Text,
   Tooltip,
 } from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
-import { CheckCircle, ClockCountdown, HandPalm, Info, X } from "@phosphor-icons/react";
+import {
+  CheckCircle,
+  ClockCountdown,
+  ClockCounterClockwise,
+  HandPalm,
+  Info,
+  X,
+} from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityViews } from "../components/ActivityViews.tsx";
 import { ModeBadge } from "../components/AgentModes.tsx";
 import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
 import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
   cannotTake,
   ElevationRequestCell,
@@ -50,17 +58,6 @@ import {
 
 type Decision = "approve" | "deny";
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-function SectionHeading({ title, count }: { title: string; count?: number | undefined }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Text variant="heading" as="h2">
-        {title}
-      </Text>
-      {count !== undefined && count > 0 && <Badge variant="warning">{count}</Badge>}
-    </div>
-  );
-}
 
 /**
  * The request's question as plain text. Manual-mode writes (ADR-0015) carry a terse policy reason
@@ -117,12 +114,8 @@ function PendingRequest({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-start gap-x-6 gap-y-2">
           {elevation ? <ElevationRequestCell /> : <ToolCell tool={request.tool} />}
-          <div className="grid gap-1">
-            <Text variant="secondary" size="xs" as="span">
-              {t("approvals.columns.agent")}
-            </Text>
-            <ActorCell actor={request.actor} />
-          </div>
+          {/* The actor's badge says it is an agent; aligned with the tool's label line. */}
+          <ActorCell actor={request.actor} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button
@@ -255,96 +248,94 @@ function HistoryTable({
   const t = useT();
   const promptText = usePromptText();
   return (
-    <LayerCard className="overflow-x-auto p-0">
-      <Table>
-        <Table.Header>
-          <Table.Row>
-            <Table.Head>{t("approvals.columns.request")}</Table.Head>
-            <Table.Head>{t("approvals.columns.status")}</Table.Head>
-            <Table.Head>{t("approvals.columns.agent")}</Table.Head>
-            <Table.Head>{t("approvals.columns.requested")}</Table.Head>
-            <Table.Head>{t("approvals.columns.decided")}</Table.Head>
-          </Table.Row>
-        </Table.Header>
-        {pending ? (
-          <TableSkeleton columns={5} rows={3} />
-        ) : rows.length === 0 ? (
-          <Table.Body>
+    <SectionCard
+      id="history"
+      title={t("approvals.history")}
+      icon={<ClockCounterClockwise size={16} />}
+      flush
+    >
+      {!pending && rows.length === 0 ? (
+        <SectionEmpty
+          size="sm"
+          icon={<HandPalm size={32} className="text-kumo-inactive" />}
+          title={t("approvals.noHistory")}
+          description={t("approvals.noHistoryDescription")}
+        />
+      ) : (
+        <Table>
+          <Table.Header>
             <Table.Row>
-              <Table.Cell colSpan={5}>
-                <Empty
-                  size="sm"
-                  icon={<HandPalm size={32} className="text-kumo-inactive" />}
-                  title={t("approvals.noHistory")}
-                  description={t("approvals.noHistoryDescription")}
-                />
-              </Table.Cell>
+              <Table.Head>{t("approvals.columns.request")}</Table.Head>
+              <Table.Head>{t("approvals.columns.status")}</Table.Head>
+              <Table.Head>{t("approvals.columns.agent")}</Table.Head>
+              <Table.Head>{t("approvals.columns.requested")}</Table.Head>
+              <Table.Head>{t("approvals.columns.decided")}</Table.Head>
             </Table.Row>
-          </Table.Body>
-        ) : (
-          <Table.Body>
-            {rows.map((r) => (
-              <Table.Row key={r.id} data-approval-id={r.id}>
-                <Table.Cell>
-                  <div className="grid w-72 gap-1">
-                    {elevationRequestOf(r) ? (
-                      <span className="flex items-center gap-1.5" data-elevation-history>
-                        <ClockCountdown size={16} className="shrink-0 text-kumo-subtle" />
-                        <Text bold as="span">
-                          {t("approvals.elevation.badge")}
+          </Table.Header>
+          {pending ? (
+            <TableSkeleton columns={5} rows={3} />
+          ) : (
+            <Table.Body>
+              {rows.map((r) => (
+                <Table.Row key={r.id} data-approval-id={r.id}>
+                  <Table.Cell>
+                    <div className="grid w-72 gap-1">
+                      {elevationRequestOf(r) ? (
+                        <span data-elevation-history>
+                          <ElevationRequestCell />
+                        </span>
+                      ) : (
+                        <ToolCell tool={r.tool} />
+                      )}
+                      <Tooltip content={promptText(r)} className="block min-w-0 text-left">
+                        <Text variant="secondary" size="sm" truncate>
+                          {promptText(r, true)}
                         </Text>
-                      </span>
-                    ) : (
-                      <ToolCell tool={r.tool} />
-                    )}
-                    <Tooltip content={promptText(r)} className="block min-w-0 text-left">
-                      <Text variant="secondary" size="sm" truncate>
-                        {promptText(r, true)}
-                      </Text>
-                    </Tooltip>
-                  </div>
-                </Table.Cell>
-                <Table.Cell className="whitespace-nowrap">
-                  <StatusBadgeFor
-                    status={r.status}
-                    elevation={elevationRequestOf(r) !== undefined}
-                  />
-                </Table.Cell>
-                <Table.Cell className="min-w-44 max-w-64">
-                  <ActorCell actor={r.actor} />
-                </Table.Cell>
-                <Table.Cell className="whitespace-nowrap">
-                  <RelativeTime iso={r.createdAt} />
-                </Table.Cell>
-                <Table.Cell className="whitespace-nowrap">
-                  {r.decidedAt ? (
-                    <div className="grid gap-0.5">
-                      <RelativeTime iso={r.decidedAt} />
-                      {r.decidedBy &&
-                        (r.decidedBy === meId ? (
-                          <Text variant="secondary" size="sm" as="span">
-                            {t("approvals.decidedByYou")}
-                          </Text>
-                        ) : (
-                          <Tooltip content={r.decidedBy} className="block max-w-40 text-left">
-                            <Text variant="mono-secondary" truncate as="span">
-                              {t("approvals.decidedBy", { actor: r.decidedBy })}
-                            </Text>
-                          </Tooltip>
-                        ))}
+                      </Tooltip>
                     </div>
-                  ) : (
-                    <Text variant="secondary" as="span">
-                      —
-                    </Text>
-                  )}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        )}
-      </Table>
-    </LayerCard>
+                  </Table.Cell>
+                  <Table.Cell className="whitespace-nowrap">
+                    <StatusBadgeFor
+                      status={r.status}
+                      elevation={elevationRequestOf(r) !== undefined}
+                    />
+                  </Table.Cell>
+                  <Table.Cell className="min-w-44 max-w-64">
+                    <ActorCell actor={r.actor} />
+                  </Table.Cell>
+                  <Table.Cell className="whitespace-nowrap">
+                    <RelativeTime iso={r.createdAt} />
+                  </Table.Cell>
+                  <Table.Cell className="whitespace-nowrap">
+                    {r.decidedAt ? (
+                      <div className="grid gap-0.5">
+                        <RelativeTime iso={r.decidedAt} />
+                        {r.decidedBy &&
+                          (r.decidedBy === meId ? (
+                            <Text variant="secondary" size="sm" as="span">
+                              {t("approvals.decidedByYou")}
+                            </Text>
+                          ) : (
+                            <Tooltip content={r.decidedBy} className="block max-w-40 text-left">
+                              <Text variant="mono-secondary" truncate as="span">
+                                {t("approvals.decidedBy", { actor: r.decidedBy })}
+                              </Text>
+                            </Tooltip>
+                          ))}
+                      </div>
+                    ) : (
+                      <Text variant="secondary" as="span">
+                        —
+                      </Text>
+                    )}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          )}
+        </Table>
+      )}
+    </SectionCard>
   );
 }
 
@@ -418,19 +409,21 @@ export function ApprovalsPage() {
   const { pending, history } = splitApprovals(all.data ?? []);
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <ActivityViews siteId={siteId} value="approvals" />
-        {!notEnabled && (
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.approvals.title") }]} />}
+      title={t("pageHeaders.approvals.title")}
+      description={t("pageHeaders.approvals.description")}
+      actions={
+        notEnabled ? undefined : (
           <RefreshButton
             variant="secondary"
-            size="sm"
-            aria-label={t("common.retry")}
+            aria-label={t("approvals.refresh")}
             loading={all.isRefetching}
             onClick={() => all.refetch()}
           />
-        )}
-      </div>
+        )
+      }
+    >
       {notEnabled ? (
         <Banner
           variant="secondary"
@@ -439,26 +432,30 @@ export function ApprovalsPage() {
           description={t("approvals.notEnabledDescription")}
         />
       ) : (
-        <>
+        <div className="flex min-w-0 flex-col gap-6">
           <ErrorBanner error={all.error} onRetry={() => all.refetch()} retrying={all.isFetching} />
-          <Text variant="secondary">{t("approvals.description")}</Text>
-          <div className="grid gap-3" data-testid="pending-approvals">
-            <SectionHeading title={t("approvals.pending")} count={pending.length} />
-            {all.isPending ? (
-              <LayerCard className="grid gap-3 px-5 py-4" role="status">
-                <span className="sr-only">{t("common.loading")}</span>
-                <SkeletonLine minWidth={30} maxWidth={45} />
-                <SkeletonLine minWidth={60} maxWidth={90} />
-                <SkeletonLine minWidth={40} maxWidth={55} />
-              </LayerCard>
-            ) : pending.length === 0 ? (
-              <Empty
-                icon={<CheckCircle size={48} className="text-kumo-inactive" />}
-                title={t("approvals.noPending")}
-                description={t("approvals.noPendingDescription")}
-              />
-            ) : (
-              <LayerCard className="p-0">
+          <div className="min-w-0" data-testid="pending-approvals">
+            <SectionCard
+              id="pending"
+              title={t("approvals.pending")}
+              icon={<HandPalm size={16} />}
+              description={pending.length > 0 ? t("approvals.pendingDescription") : undefined}
+              flush={!all.isPending}
+            >
+              {all.isPending ? (
+                <div className="grid gap-3" role="status">
+                  <span className="sr-only">{t("common.loading")}</span>
+                  <SkeletonLine minWidth={30} maxWidth={45} />
+                  <SkeletonLine minWidth={60} maxWidth={90} />
+                  <SkeletonLine minWidth={40} maxWidth={55} />
+                </div>
+              ) : pending.length === 0 ? (
+                <SectionEmpty
+                  icon={<CheckCircle size={32} className="text-kumo-inactive" />}
+                  title={t("approvals.noPending")}
+                  description={t("approvals.noPendingDescription")}
+                />
+              ) : (
                 <div className="divide-y divide-kumo-hairline">
                   {pending.map((r) => (
                     <PendingRequest
@@ -471,14 +468,11 @@ export function ApprovalsPage() {
                     />
                   ))}
                 </div>
-              </LayerCard>
-            )}
+              )}
+            </SectionCard>
           </div>
-          <div className="grid gap-3">
-            <SectionHeading title={t("approvals.history")} />
-            <HistoryTable rows={history} pending={all.isPending} meId={me.data?.actor.id} />
-          </div>
-        </>
+          <HistoryTable rows={history} pending={all.isPending} meId={me.data?.actor.id} />
+        </div>
       )}
       <ApproveRequestDialog
         siteId={siteId}
@@ -503,6 +497,6 @@ export function ApprovalsPage() {
         ownMode={ownModeOf(granting)}
         onOpenChange={(open) => !open && setGranting(undefined)}
       />
-    </div>
+    </PageLayout>
   );
 }

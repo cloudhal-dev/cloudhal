@@ -13,14 +13,16 @@ export function RowMenu({
   const t = useT();
   return (
     <DropdownMenu>
-      <DropdownMenu.Trigger
+      {/* Tooltip outside, trigger inside: Kumo's Tooltip forwards extra props to its own root, so
+          `Trigger render={<Tooltip …/>}` would swallow the trigger's props and never open. */}
+      <Tooltip
+        content={t("site.rowMenu")}
         render={
-          <Tooltip
-            content={t("site.rowMenu")}
+          <DropdownMenu.Trigger
             render={
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 shape="square"
                 icon={<DotsThree weight="bold" />}
                 aria-label={t("site.rowMenu")}

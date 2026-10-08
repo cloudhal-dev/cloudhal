@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ErrorBanner } from "../src/components/ErrorBanner.tsx";
+import { RowMenu } from "../src/components/RowMenu.tsx";
 import { StatusActions } from "../src/components/StatusActions.tsx";
 import { I18nProvider } from "../src/i18n/index.tsx";
 import { ApiRequestError } from "../src/lib/api.ts";
@@ -50,5 +51,20 @@ describe("StatusActions", () => {
     fireEvent.click(screen.getByTestId("publish"));
     expect(onPublish).toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalledWith("published");
+  });
+});
+
+describe("RowMenu", () => {
+  it("opens its menu and runs the chosen action (regression: a Tooltip around the trigger swallowed the click)", async () => {
+    const onOpen = vi.fn();
+    const onDelete = vi.fn();
+    const { container } = render(
+      <I18nProvider initialLocale="en">
+        <RowMenu onOpen={onOpen} onDelete={onDelete} />
+      </I18nProvider>,
+    );
+    fireEvent.click(within(container).getByRole("button", { name: "More actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Open/ }));
+    expect(onOpen).toHaveBeenCalledOnce();
   });
 });

@@ -1,20 +1,23 @@
 import {
   Badge,
   Button,
-  ClipboardText,
   Code,
-  Empty,
-  Grid,
-  LayerCard,
+  Columns,
+  InlineCopyText,
   Link,
+  LinkButton,
+  PageLayout,
+  SectionCard,
+  SectionEmpty,
   SkeletonLine,
   Table,
   Text,
 } from "@cloudhal/ui";
-import { Article, Camera, FileText, Plus } from "@phosphor-icons/react";
+import { Article, FileText, Plus, TerminalWindow } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
@@ -22,39 +25,6 @@ import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-
-function Card({
-  title,
-  aside,
-  href,
-  viewAll,
-  children,
-}: {
-  title: string;
-  aside?: ReactNode;
-  href?: string;
-  viewAll?: string;
-  children: ReactNode;
-}) {
-  return (
-    <LayerCard>
-      <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
-        <Text variant="heading" as="h2">
-          {title}
-        </Text>
-        {aside}
-        {href && viewAll && (
-          <Link href={href} variant="plain">
-            <Text variant="secondary" size="sm" as="span">
-              {viewAll}
-            </Text>
-          </Link>
-        )}
-      </LayerCard.Secondary>
-      {children}
-    </LayerCard>
-  );
-}
 
 export function SiteOverviewPage() {
   const t = useT();
@@ -94,131 +64,155 @@ export function SiteOverviewPage() {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 5);
 
+  const viewAll = (href: string) => (
+    <LinkButton href={href} variant="ghost" size="sm">
+      {t("overview.viewAll")}
+    </LinkButton>
+  );
+  const newPage = (
+    <Button
+      variant="secondary"
+      icon={<Plus />}
+      onClick={() => createPage.mutate()}
+      loading={createPage.isPending}
+    >
+      {t("overview.newPage")}
+    </Button>
+  );
+
   return (
-    <>
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} />}
+      title={site.data?.name}
+      loading={site.isPending}
+      description={
+        site.data
+          ? t("site.description", { slug: site.data.slug, locale: site.data.defaultLocale })
+          : undefined
+      }
+      actions={
+        <>
+          {newPage}
+          <Button
+            variant="secondary"
+            icon={<Article />}
+            onClick={() => navigate({ to: "/sites/$siteId/articles", params: { siteId } })}
+          >
+            {t("articles.newArticle")}
+          </Button>
+        </>
+      }
+    >
       <PendingApprovalsBanner siteId={siteId} />
-      <ErrorBanner error={pages.error ?? entries.error ?? createPage.error} />
-      <Grid variant="2-1" gap="base">
-        <div className="grid content-start gap-6">
-          <Card
+      <ErrorBanner error={site.error ?? pages.error ?? entries.error ?? createPage.error} />
+      <Columns variant="2-1">
+        <div className="grid min-w-0 content-start gap-6">
+          <SectionCard
             title={t("overview.pages")}
-            href={`/sites/${siteId}/pages`}
-            viewAll={t("overview.viewAll")}
+            icon={<FileText size={16} />}
+            actions={viewAll(`/sites/${siteId}/pages`)}
+            flush
           >
-            <LayerCard.Primary className="p-0">
-              <Table>
-                <Table.Header>
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head>{t("overview.columns.title")}</Table.Head>
+                  <Table.Head>{t("overview.columns.path")}</Table.Head>
+                  <Table.Head>{t("overview.columns.status")}</Table.Head>
+                </Table.Row>
+              </Table.Header>
+              {pages.isPending ? (
+                <TableSkeleton columns={3} rows={3} />
+              ) : topPages.length === 0 ? (
+                <Table.Body>
                   <Table.Row>
-                    <Table.Head>{t("overview.columns.title")}</Table.Head>
-                    <Table.Head>{t("overview.columns.path")}</Table.Head>
-                    <Table.Head>{t("overview.columns.status")}</Table.Head>
+                    <Table.Cell colSpan={3}>
+                      <SectionEmpty
+                        icon={<FileText size={32} className="text-kumo-inactive" />}
+                        title={t("overview.empty")}
+                        contents={newPage}
+                      />
+                    </Table.Cell>
                   </Table.Row>
-                </Table.Header>
-                {pages.isPending ? (
-                  <TableSkeleton columns={3} rows={3} />
-                ) : topPages.length === 0 ? (
-                  <Table.Body>
-                    <Table.Row>
-                      <Table.Cell colSpan={3}>
-                        <Empty
-                          size="sm"
-                          icon={<FileText size={32} className="text-kumo-inactive" />}
-                          title={t("overview.empty")}
-                          contents={
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon={<Plus />}
-                              onClick={() => createPage.mutate()}
-                            >
-                              {t("overview.newPage")}
-                            </Button>
-                          }
-                        />
-                      </Table.Cell>
-                    </Table.Row>
-                  </Table.Body>
-                ) : (
-                  <Table.Body>
-                    {topPages.map((p) => (
-                      <Table.Row key={p.id}>
-                        <Table.Cell>
-                          <Link href={`/sites/${siteId}/pages/${p.id}`} variant="plain">
-                            <Text bold as="span">
-                              {p.title}
-                            </Text>
-                          </Link>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text variant="mono-secondary" as="span">
-                            {p.path}
+                </Table.Body>
+              ) : (
+                <Table.Body>
+                  {topPages.map((p) => (
+                    <Table.Row key={p.id}>
+                      <Table.Cell>
+                        <Link href={`/sites/${siteId}/pages/${p.id}`} variant="plain">
+                          <Text bold as="span">
+                            {p.title}
                           </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Status status={p.status} />
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                )}
-              </Table>
-            </LayerCard.Primary>
-          </Card>
-          <Card
-            title={t("overview.recentArticles")}
-            href={`/sites/${siteId}/articles`}
-            viewAll={t("overview.viewAll")}
-          >
-            <LayerCard.Primary className="p-0">
-              <Table>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.Head>{t("articles.columns.title")}</Table.Head>
-                    <Table.Head>{t("articles.columns.author")}</Table.Head>
-                    <Table.Head>{t("articles.columns.status")}</Table.Head>
-                  </Table.Row>
-                </Table.Header>
-                {entries.isPending ? (
-                  <TableSkeleton columns={3} rows={3} />
-                ) : recent.length === 0 ? (
-                  <Table.Body>
-                    <Table.Row>
-                      <Table.Cell colSpan={3}>
-                        <Empty
-                          size="sm"
-                          icon={<Article size={32} className="text-kumo-inactive" />}
-                          title={t("articles.empty")}
-                        />
+                        </Link>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text variant="mono-secondary" as="span">
+                          {p.path}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Status status={p.status} />
                       </Table.Cell>
                     </Table.Row>
-                  </Table.Body>
-                ) : (
-                  <Table.Body>
-                    {recent.map((e) => (
-                      <Table.Row key={e.id}>
-                        <Table.Cell>
-                          <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
-                            <Text bold as="span">
-                              {e.title}
-                            </Text>
-                          </Link>
-                        </Table.Cell>
-                        <Table.Cell>{e.author.name ?? e.author.id}</Table.Cell>
-                        <Table.Cell>
-                          <Status status={e.status} />
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                )}
-              </Table>
-            </LayerCard.Primary>
-          </Card>
+                  ))}
+                </Table.Body>
+              )}
+            </Table>
+          </SectionCard>
+          <SectionCard
+            title={t("overview.recentArticles")}
+            icon={<Article size={16} />}
+            actions={viewAll(`/sites/${siteId}/articles`)}
+            flush
+          >
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head>{t("articles.columns.title")}</Table.Head>
+                  <Table.Head>{t("articles.columns.author")}</Table.Head>
+                  <Table.Head>{t("articles.columns.status")}</Table.Head>
+                </Table.Row>
+              </Table.Header>
+              {entries.isPending ? (
+                <TableSkeleton columns={3} rows={3} />
+              ) : recent.length === 0 ? (
+                <Table.Body>
+                  <Table.Row>
+                    <Table.Cell colSpan={3}>
+                      <SectionEmpty
+                        icon={<Article size={32} className="text-kumo-inactive" />}
+                        title={t("articles.empty")}
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              ) : (
+                <Table.Body>
+                  {recent.map((e) => (
+                    <Table.Row key={e.id}>
+                      <Table.Cell>
+                        <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
+                          <Text bold as="span">
+                            {e.title}
+                          </Text>
+                        </Link>
+                      </Table.Cell>
+                      <Table.Cell>{e.author.name ?? e.author.id}</Table.Cell>
+                      <Table.Cell>
+                        <Status status={e.status} />
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              )}
+            </Table>
+          </SectionCard>
         </div>
         <div className="grid min-w-0 content-start gap-6">
-          <Card
+          <SectionCard
             title={t("overview.status")}
-            aside={
+            actions={
               site.data?.publishedSnapshotId ? (
                 <Badge variant="success" appearance="dot">
                   {t("overview.live")}
@@ -230,68 +224,47 @@ export function SiteOverviewPage() {
               )
             }
           >
-            <LayerCard.Primary className="grid gap-3 px-5 py-4">
-              {site.isPending || pages.isPending ? (
-                <SkeletonLine />
-              ) : (
-                <Text variant="secondary" size="sm">
-                  {t("overview.counts", {
-                    pages: pages.data?.length ?? 0,
-                    articles: entries.data?.length ?? 0,
-                    snapshots: snapshots.data?.length ?? 0,
-                  })}
-                </Text>
-              )}
-              {site.data?.publishedSnapshotId && (
-                <ClipboardText size="sm" text={site.data.publishedSnapshotId} />
-              )}
-            </LayerCard.Primary>
-          </Card>
-          <Card
+            {site.isPending || pages.isPending ? (
+              <SkeletonLine />
+            ) : (
+              <dl className="grid divide-y divide-kumo-hairline">
+                <StatRow label={t("overview.pages")} value={pages.data?.length ?? 0} />
+                <StatRow label={t("nav.articles")} value={entries.data?.length ?? 0} />
+                <StatRow label={t("nav.snapshots")} value={snapshots.data?.length ?? 0} />
+                {site.data?.publishedSnapshotId && (
+                  <StatRow
+                    label={t("overview.liveSnapshotLabel")}
+                    value={<InlineCopyText>{site.data.publishedSnapshotId}</InlineCopyText>}
+                  />
+                )}
+              </dl>
+            )}
+          </SectionCard>
+          <SectionCard
             title={t("activity.recent")}
-            href={`/sites/${siteId}/activity`}
-            viewAll={t("overview.viewAll")}
+            actions={viewAll(`/sites/${siteId}/activity`)}
+            flush
           >
-            <LayerCard.Primary className="p-0">
-              <RecentActivity siteId={siteId} />
-            </LayerCard.Primary>
-          </Card>
-          <Card title={t("overview.quickActions")}>
-            <LayerCard.Primary className="grid gap-2 px-5 py-4">
-              <Button
-                variant="secondary"
-                icon={<Plus />}
-                onClick={() => createPage.mutate()}
-                loading={createPage.isPending}
-                className="justify-start"
-              >
-                {t("overview.newPage")}
-              </Button>
-              <Button
-                variant="secondary"
-                icon={<Article />}
-                onClick={() => navigate({ to: "/sites/$siteId/articles", params: { siteId } })}
-                className="justify-start"
-              >
-                {t("articles.newArticle")}
-              </Button>
-              <Button
-                variant="secondary"
-                icon={<Camera />}
-                onClick={() => navigate({ to: "/sites/$siteId/snapshots", params: { siteId } })}
-                className="justify-start"
-              >
-                {t("commands.createSnapshot")}
-              </Button>
-            </LayerCard.Primary>
-          </Card>
-          <Card title={t("overview.cli")}>
-            <LayerCard.Primary className="px-5 py-4">
-              <Code lang="bash" code={"cloudhal snapshot --publish\ncloudhal build"} />
-            </LayerCard.Primary>
-          </Card>
+            <RecentActivity siteId={siteId} />
+          </SectionCard>
+          <SectionCard title={t("overview.cli")} icon={<TerminalWindow size={16} />}>
+            <Code lang="bash" code={"cloudhal snapshot --publish\ncloudhal build"} />
+          </SectionCard>
         </div>
-      </Grid>
-    </>
+      </Columns>
+    </PageLayout>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+      <Text as="dt" variant="secondary">
+        {label}
+      </Text>
+      <Text as="dd" bold>
+        {value}
+      </Text>
+    </div>
   );
 }

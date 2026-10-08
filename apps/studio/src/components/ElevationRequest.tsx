@@ -1,4 +1,4 @@
-import { Badge, Banner, Link, Text, Tooltip } from "@cloudhal/ui";
+import { Badge, Banner, InsetPanel, Link, Text, Tooltip } from "@cloudhal/ui";
 import { ArrowRight, ClockCountdown, Info } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
@@ -93,25 +93,44 @@ export function ModeTransition({ from, to }: { from: KeyMode | undefined; to: Ke
 }
 
 /**
- * The left cell of an elevation request in Approvals: a timer tile and "Elevation request" with
- * the raw MCP name underneath, so it reads as a different kind of request from content approvals.
+ * The left cell of an elevation request in Approvals and History: a timer icon and "Elevation
+ * request" with the raw MCP name underneath — the same anatomy as `ToolCell`, so the rows align,
+ * while the icon marks it as a different kind of request from content approvals.
  */
 export function ElevationRequestCell() {
   const t = useT();
   return (
-    <div className="flex items-start gap-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-kumo-tint text-kumo-subtle ring ring-kumo-hairline">
-        <ClockCountdown size={20} />
-      </span>
-      <div className="grid gap-0.5">
+    <div className="grid justify-items-start gap-0.5" data-elevation-cell>
+      <span className="flex items-center gap-1.5">
+        <ClockCountdown size={16} className="shrink-0 text-kumo-subtle" aria-hidden />
         <Text bold as="span">
           {t("approvals.elevation.badge")}
         </Text>
-        <Text variant="mono-secondary" as="span">
-          {REQUEST_ELEVATION}
-        </Text>
-      </div>
+      </span>
+      <Text variant="mono-secondary" as="span">
+        {REQUEST_ELEVATION}
+      </Text>
     </div>
+  );
+}
+
+/**
+ * The agent's own words for its request, quoted in a recessed panel. Agent-written, so it is
+ * plain text only, never markup.
+ */
+export function AgentReason({ reason, testId }: { reason: string | undefined; testId?: string }) {
+  const t = useT();
+  return (
+    <InsetPanel variant="recessed" className="gap-1">
+      <Text variant="secondary" size="xs" as="span">
+        {t("approvals.elevation.reasonLabel")}
+      </Text>
+      {reason ? (
+        <Text data-testid={testId}>“{reason}”</Text>
+      ) : (
+        <Text variant="secondary">{t("approvals.elevation.noReason")}</Text>
+      )}
+    </InsetPanel>
   );
 }
 
@@ -136,17 +155,7 @@ export function ElevationRequestDetails({
         <ModeTransition from={ownMode} to={elevation.mode} />
         <Text data-testid="elevation-sentence">{text.sentence}</Text>
       </div>
-      <div className="grid gap-1 rounded-lg bg-kumo-recessed px-4 py-3 ring ring-kumo-hairline">
-        <Text variant="secondary" size="xs" as="span">
-          {t("approvals.elevation.reasonLabel")}
-        </Text>
-        {/* Agent-written: plain text only, never markup. */}
-        {elevation.reason ? (
-          <Text data-testid="elevation-reason">“{elevation.reason}”</Text>
-        ) : (
-          <Text variant="secondary">{t("approvals.elevation.noReason")}</Text>
-        )}
-      </div>
+      <AgentReason reason={elevation.reason} testId="elevation-reason" />
       {cannotTake(ownMode, elevation) ? (
         <CannotTakeNotice agent={text.agent} own={ownMode} />
       ) : (

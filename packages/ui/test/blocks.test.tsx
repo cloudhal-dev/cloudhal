@@ -1,5 +1,5 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ActorBadge,
@@ -72,9 +72,35 @@ describe("SnapshotTimeline", () => {
     expect(onRollback).toHaveBeenCalledWith(old);
   });
 
-  it("shows an empty state", () => {
-    render(<SnapshotTimeline snapshots={[]} labels={labels} />);
+  it("shows an empty state with its call to action", () => {
+    render(
+      <SnapshotTimeline
+        snapshots={[]}
+        labels={labels}
+        emptyContents={<button type="button">Create snapshot</button>}
+      />,
+    );
     expect(screen.getByText("No snapshots yet")).toBeInTheDocument();
+    expect(screen.getByText("Create snapshot")).toBeInTheDocument();
+  });
+
+  it("renders the time through renderTime and marks the live row", () => {
+    const live = snap("snap_live0000001", "2026-10-08T09:00:00Z");
+    const { container } = render(
+      <SnapshotTimeline
+        snapshots={[live]}
+        publishedSnapshotId={live.id}
+        onPublish={vi.fn()}
+        labels={labels}
+        renderTime={(iso) => <time dateTime={iso}>an hour ago</time>}
+      />,
+    );
+    const view = within(container);
+    expect(view.getByText("an hour ago")).toHaveAttribute("datetime", live.createdAt);
+    expect(view.getByText("Halil")).toBeInTheDocument();
+    const row = view.getByText("Live").closest("[data-snapshot-id]");
+    expect(row).toHaveAttribute("data-live", "true");
+    expect(view.queryByText("Publish")).not.toBeInTheDocument();
   });
 
   it("offers Compare only when there is something to compare with", () => {

@@ -113,7 +113,7 @@ describe("agent key list", () => {
     expect(scopesOf("key_auto")).toHaveAttribute("data-scopes", "custom");
     expect(scopesOf("key_auto")).toHaveTextContent("content:write");
 
-    const card = screen.getAllByTestId("how-modes")[0] as HTMLElement;
+    const card = container.querySelector("#how-modes") as HTMLElement;
     expect(card).toHaveTextContent("How modes work");
     const rule = (mode: string, column: number) =>
       card

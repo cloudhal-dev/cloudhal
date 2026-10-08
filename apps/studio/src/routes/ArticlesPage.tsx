@@ -5,26 +5,35 @@ import {
   Empty,
   LayerCard,
   Link,
+  PageLayout,
   Pagination,
   Table,
   Text,
 } from "@cloudhal/ui";
-import { Article, Plus } from "@phosphor-icons/react";
+import { Article, GearSix, type Icon, Plus, Robot, User } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { usePaging } from "../components/usePaging.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
+const AUTHOR_ICON: Record<ContentEntry["author"]["kind"], Icon> = {
+  human: User,
+  agent: Robot,
+  system: GearSix,
+};
+
+/** Site › Articles (DESIGN.md §2a): the "posts" collection, newest first. Built like PagesPage. */
 export function ArticlesPage() {
   const t = useT();
-  const { locale } = useI18n();
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -78,13 +87,17 @@ export function ArticlesPage() {
     </Button>
   );
   return (
-    <div className="grid gap-4">
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.articles.title") }]} />}
+      title={t("pageHeaders.articles.title")}
+      description={t("pageHeaders.articles.description")}
+      actions={newButton}
+    >
       <ErrorBanner error={entries.error ?? create.error ?? remove.error} />
       <ListToolbar
         search={paging.search}
         onSearch={paging.setSearch}
         placeholder={t("articles.search")}
-        actions={newButton}
       />
       {entries.data?.length === 0 ? (
         <Empty
@@ -94,58 +107,65 @@ export function ArticlesPage() {
           contents={newButton}
         />
       ) : (
-        <LayerCard className="p-0">
+        <LayerCard className="overflow-x-auto p-0">
           <Table>
             <Table.Header>
               <Table.Row>
                 <Table.Head>{t("articles.columns.title")}</Table.Head>
-                <Table.Head>{t("articles.columns.slug")}</Table.Head>
                 <Table.Head>{t("articles.columns.author")}</Table.Head>
                 <Table.Head>{t("articles.columns.status")}</Table.Head>
                 <Table.Head>{t("articles.columns.updated")}</Table.Head>
-                <Table.Head />
+                <Table.Head sticky="right" className="w-0">
+                  <span className="sr-only">{t("site.rowMenu")}</span>
+                </Table.Head>
               </Table.Row>
             </Table.Header>
             {entries.isPending ? (
-              <TableSkeleton columns={6} />
+              <TableSkeleton columns={5} />
             ) : (
               <Table.Body>
-                {paging.pageItems.map((e) => (
-                  <Table.Row key={e.id}>
-                    <Table.Cell>
-                      <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
-                        <Text bold as="span">
-                          {e.title}
-                        </Text>
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text variant="mono-secondary" as="span">
-                        /{e.collection}/{e.slug}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>{e.author.name ?? e.author.id}</Table.Cell>
-                    <Table.Cell>
-                      <Status status={e.status} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text variant="secondary" size="sm" as="span">
-                        {new Date(e.updatedAt).toLocaleString(locale)}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell className="text-right">
-                      <RowMenu
-                        onOpen={() =>
-                          navigate({
-                            to: "/sites/$siteId/articles/$entryId",
-                            params: { siteId, entryId: e.id },
-                          })
-                        }
-                        onDelete={() => setToDelete(e)}
-                      />
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
+                {paging.pageItems.map((e) => {
+                  const AuthorIcon = AUTHOR_ICON[e.author.kind];
+                  return (
+                    <Table.Row key={e.id} data-entry-id={e.id}>
+                      <Table.Cell>
+                        <div className="grid min-w-48 gap-1">
+                          <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
+                            <Text bold as="span">
+                              {e.title}
+                            </Text>
+                          </Link>
+                          <Text variant="mono-secondary" as="span" truncate>
+                            /{e.collection}/{e.slug}
+                          </Text>
+                        </div>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <AuthorIcon size={16} className="shrink-0 text-kumo-subtle" aria-hidden />
+                          <Text as="span">{e.author.name ?? e.author.id}</Text>
+                        </span>
+                      </Table.Cell>
+                      <Table.Cell className="whitespace-nowrap">
+                        <Status status={e.status} />
+                      </Table.Cell>
+                      <Table.Cell className="whitespace-nowrap">
+                        <RelativeTime iso={e.updatedAt} />
+                      </Table.Cell>
+                      <Table.Cell sticky="right" className="w-0 text-right">
+                        <RowMenu
+                          onOpen={() =>
+                            navigate({
+                              to: "/sites/$siteId/articles/$entryId",
+                              params: { siteId, entryId: e.id },
+                            })
+                          }
+                          onDelete={() => setToDelete(e)}
+                        />
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
               </Table.Body>
             )}
           </Table>
@@ -169,6 +189,6 @@ export function ArticlesPage() {
           if (toDelete) await remove.mutateAsync(toDelete);
         }}
       />
-    </div>
+    </PageLayout>
   );
 }

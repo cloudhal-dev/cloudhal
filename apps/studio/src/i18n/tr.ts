@@ -30,6 +30,10 @@ export const tr: Messages = {
     current: "Geçerli",
   },
   auth: {
+    signInTitle: "Tekrar hoş geldin",
+    signUpTitle: "Hesabını oluştur",
+    signUpDescription: "Yeni bir Studio'da açılan ilk hesap sahibi olur.",
+    footer: "Açık kaynak · Apache-2.0",
     signIn: "Giriş yap",
     createAccount: "Hesap oluştur",
     name: "Ad",
@@ -53,6 +57,50 @@ export const tr: Messages = {
     usageDescription:
       "Studio'daki her şey aynı zamanda bir CLI komutu; agent'lar ve betikler aynı işi yapabilir.",
     open: "Aç",
+  },
+  pageHeaders: {
+    pages: {
+      title: "Sayfalar",
+      description: "Bu sitenin rotaları. Her sayfa, temaların işlediği bölümlerden oluşur.",
+    },
+    articles: {
+      title: "Makaleler",
+      description:
+        "İnsanların ya da agent'ların yazdığı, siteyle birlikte yayınlanan yazılar ve içerikler.",
+    },
+    snapshots: {
+      title: "Snapshot'lar",
+      description:
+        "Sitenin dondurulmuş sürümleri. Yayınlamak canlı siteyi birine yönlendirir; geri almak daha eskisine.",
+    },
+    activity: {
+      title: "Etkinlik",
+      description:
+        "Bu sitede bir agent'ın ya da kişinin yaptığı her araç çağrısı ve politika kararı.",
+    },
+    approvals: {
+      title: "Onaylar",
+      description:
+        "Agent'ların yayınlama, geri alma ve silme istekleri, Manuel moddaki düzenlemeleri ve daha fazla bağımsızlık istekleri bir kişi karar verene kadar burada bekler.",
+    },
+    settings: {
+      title: "Ayarlar",
+      description: "Bu sitenin adı, dilleri, alan adları ve önizleme bağlantıları.",
+    },
+    agents: {
+      title: "Agent'lar",
+      description:
+        "Anahtarlar; agent'ların, CI işlerinin ve MCP istemcilerinin sitelerinde çalışmasını sağlar. Anahtarın modu, agent'ın neyi kendi başına yapacağını ve neyin seni bekleyeceğini belirler.",
+    },
+    skills: {
+      title: "Skill'ler",
+      description:
+        "Agent'ların MCP üzerinden okuduğu çalışma kılavuzları. Bir skill altındaki çağrı yalnızca skill'in bildirdiği yetkileri alır; listelediği araçlar her zaman bir kişinin onayını bekler.",
+    },
+    account: {
+      title: "Hesap",
+      description: "Profilin, nasıl giriş yaptığın ve bu Studio'ya başka kimlerin girebileceği.",
+    },
   },
   nav: {
     overview: "Genel bakış",
@@ -100,6 +148,7 @@ export const tr: Messages = {
     goApprovals: "Onaylara git",
   },
   overview: {
+    liveSnapshotLabel: "Canlı snapshot",
     liveSnapshot: "Canlı snapshot {id}",
     notPublished: "Henüz yayınlanmadı",
     newPage: "Yeni sayfa",
@@ -178,6 +227,37 @@ export const tr: Messages = {
     content: "İçerik",
     slugHint: "Küçük harf, tireli; URL olur.",
     metadata: "Ayrıntılar",
+    moreActions: "Diğer işlemler",
+    unpublish: "Yayından kaldır (taslağa döndür)",
+    duplicate: "Kopyasını oluştur",
+    duplicated: "Kopya oluşturuldu",
+    copyTitle: "{title} (kopya)",
+    dangerZone: "Tehlikeli bölge",
+    deletePageTitle: "Bu sayfayı sil",
+    deletePageHint:
+      "Sayfayı ve bölümlerini kaldırır. Yayınlanmış snapshot'lar kendi kopyalarını korur.",
+    deleteArticleTitle: "Bu makaleyi sil",
+    deleteArticleHint:
+      "Makaleyi siteden kaldırır. Yayınlanmış snapshot'lar kendi kopyalarını korur.",
+    removeSectionTitle: "Bu bölüm kaldırılsın mı?",
+    removeSectionDescription:
+      "{kind} bölümü taslaktan kaldırılır. Sayfa ancak kaydettiğinde değişir.",
+    sectionKinds: {
+      hero: "Hero",
+      richText: "Zengin metin",
+      image: "Görsel",
+      contentList: "İçerik listesi",
+    },
+    bodyTitle: "Gövde",
+    markdown: "Markdown",
+    wordsOne: "1 kelime",
+    wordsOther: "{count} kelime",
+    id: "Kimlik",
+    revision: "Revizyon",
+    locale: "Dil",
+    author: "Yazar",
+    updatedAt: "Güncellendi",
+    publishedAt: "Yayınlandı",
   },
   status: { draft: "Taslak", review: "İncelemede", published: "Yayında", archived: "Arşiv" },
   site: {
@@ -217,7 +297,28 @@ export const tr: Messages = {
     fromStudio: "Studio'dan snapshot",
     publishedFromStudio: "Studio'dan yayınlandı",
     compare: "Karşılaştır",
-    columns: { snapshot: "Snapshot", actor: "Kim", changes: "Değişiklik", when: "Ne zaman" },
+    create: "Snapshot oluştur",
+    createTitle: "Snapshot oluştur",
+    createIntro:
+      "Sitenin mevcut sayfalarını, makalelerini ve ayarlarını dondurur. Alınan snapshot bir daha değişmez.",
+    labelDescription: "İsteğe bağlı. Listede ve Etkinlik'te sebep yerine gösterilir.",
+    afterCreate: "Oluşturduktan sonra",
+    keepOption: "Canlı site olduğu gibi kalsın",
+    keepOptionDescription:
+      "Yalnızca snapshot'ı kaydet. Daha sonra bu listeden yayınlayabilir ya da karşılaştırabilirsin.",
+    publishOption: "Canlı siteye yayınla",
+    publishOptionDescription: "Snapshot canlı sürüm olur. Yayına girmeden önce onaylarsın.",
+    continueToPublish: "Yayınlamaya devam et",
+    search: "Snapshot'larda ara",
+    noMatches: "Eşleşen snapshot yok",
+    noMatchesDescription: "Başka bir etiket ya da snapshot kimliği dene.",
+    actions: "İşlemler",
+    columns: {
+      snapshot: "Snapshot",
+      actor: "Oluşturan",
+      changes: "Değişiklik",
+      when: "Oluşturulma",
+    },
     reasons: {
       manual: "Elle",
       agentMutation: "Agent değişikliği",
@@ -476,7 +577,9 @@ export const tr: Messages = {
   activity: {
     title: "Etkinlik",
     search: "Araç, aktör ya da skill ara",
+    refresh: "Etkinliği yenile",
     filters: {
+      label: "Filtreler",
       kind: "Aktör türü",
       decision: "Karar",
       allKinds: "Tüm aktörler",
@@ -554,6 +657,7 @@ export const tr: Messages = {
       password: "Şifre",
       sessions: "Etkin oturumlar",
       access: "Studio erişimi",
+      server: "Bu sunucu",
     },
     profile: {
       description: "Studio'da ve her sitenin etkinlik kaydında nasıl göründüğün.",
@@ -576,6 +680,7 @@ export const tr: Messages = {
       current: "Mevcut şifre",
       new: "Yeni şifre",
       newHint: "En az {min} karakter.",
+      confirmHint: "Yeni şifreyi tekrar yaz.",
       confirm: "Yeni şifreyi doğrula",
       show: "Şifreyi göster",
       hide: "Şifreyi gizle",
@@ -597,6 +702,8 @@ export const tr: Messages = {
       },
     },
     sessions: {
+      showAll: "Tümünü göster ({count})",
+      showFewer: "Daha az göster",
       description:
         "Hesabına giriş yapmış tarayıcılar ve istemciler. Tanımadığın her oturumu kapat. Agent anahtarları Agent'lar altında listelenir.",
       columns: {
@@ -831,9 +938,9 @@ export const tr: Messages = {
   },
   approvals: {
     title: "Onaylar",
-    views: { activity: "Etkinlik", approvals: "Onaylar" },
-    description:
-      "Agent'ların yayınlama, geri alma ve silme istekleri, daha fazla bağımsızlık istekleri ve Manuel moddaki agent'ların tüm değişiklikleri bir kişi karar verene kadar burada bekler. Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir ya da istediği yükseltmeyi verir.",
+    refresh: "Onayları yenile",
+    pendingDescription:
+      "Onay, agent'ın tam o çağrıyı bir kez yapmasına izin verir ya da istediği yükseltmeyi verir. Reddedersen agent'a bildirilir.",
     pending: "Seni bekleyenler",
     history: "Geçmiş",
     noPending: "Seni bekleyen bir şey yok",
@@ -992,6 +1099,7 @@ export const tr: Messages = {
     edit: "Düzenle",
     show: "Önizlemeyi göster",
     hide: "Önizlemeyi gizle",
+    toggleHint: "Son kaydedilen sürümü formun yanında göster",
   },
   diff: {
     title: "{name} içindeki değişiklikler",

@@ -1,15 +1,30 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
-import { ApprovalDialog, LayerCard, Pagination, SnapshotTimeline, Toolbar } from "@cloudhal/ui";
-import { Camera, RocketLaunch } from "@phosphor-icons/react";
+import {
+  ApprovalDialog,
+  Button,
+  Empty,
+  Input,
+  LayerCard,
+  LayerDialog,
+  PageLayout,
+  Pagination,
+  Radio,
+  SnapshotTimeline,
+  Table,
+} from "@cloudhal/ui";
+import { Camera, MagnifyingGlass } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ListToolbar } from "../components/ListToolbar.tsx";
+import { RelativeTime } from "../components/RelativeTime.tsx";
 import { SnapshotDiffDialog } from "../components/SnapshotDiffDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePaging } from "../components/usePaging.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
 type Pending =
@@ -17,9 +32,15 @@ type Pending =
   | { kind: "rollback"; snapshot: Snapshot }
   | { kind: "create"; publish: boolean };
 
+type AfterCreate = "keep" | "publish";
+
+/**
+ * Site › Snapshots (DESIGN.md §2a): every frozen version of the site, newest first. "Create
+ * snapshot" opens a small dialog (label + whether to publish); publishing, rolling back and
+ * snapshot-and-publish always pass `ApprovalDialog`. Compare opens the diff (§2i) at `?diff=<id>`.
+ */
 export function SnapshotsPage() {
   const t = useT();
-  const { locale } = useI18n();
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const toast = useToast();
@@ -30,9 +51,11 @@ export function SnapshotsPage() {
   });
   const paging = usePaging(
     snapshots.data,
-    (s, q) => (s.label ?? "").toLowerCase().includes(q) || s.id.includes(q),
+    (s, q) => (s.label ?? "").toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
   );
+  const [createOpen, setCreateOpen] = useState(false);
   const [label, setLabel] = useState("");
+  const [after, setAfter] = useState<AfterCreate>("keep");
   const [pending, setPending] = useState<Pending | undefined>();
   // The open diff lives in the URL (`?diff=<id>`) so Activity can link straight to it.
   const navigate = useNavigate();
@@ -54,8 +77,12 @@ export function SnapshotsPage() {
 
   const act = useMutation({
     mutationFn: async (p: Pending) => {
+      const trimmed = label.trim();
       if (p.kind === "create")
-        return api.snapshots.create(siteId, { ...(label ? { label } : {}), publish: p.publish });
+        return api.snapshots.create(siteId, {
+          ...(trimmed ? { label: trimmed } : {}),
+          publish: p.publish,
+        });
       if (p.kind === "publish") return api.snapshots.publish(siteId, p.snapshot.id);
       return api.snapshots.rollback(siteId, p.snapshot.id);
     },
@@ -63,7 +90,11 @@ export function SnapshotsPage() {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
       await qc.invalidateQueries({ queryKey: ["site", siteId] });
       setPending(undefined);
-      setLabel("");
+      setCreateOpen(false);
+      if (p.kind === "create") {
+        setLabel("");
+        setAfter("keep");
+      }
       toast.success(
         p.kind === "create"
           ? p.publish
@@ -77,70 +108,92 @@ export function SnapshotsPage() {
     onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
   });
 
+  /** The dialog's primary action: create now, or hand over to the publish confirmation. */
+  const submitCreate = () => {
+    if (after === "publish") {
+      setCreateOpen(false);
+      setPending({ kind: "create", publish: true });
+    } else {
+      act.mutate({ kind: "create", publish: false });
+    }
+  };
+
+  const createButton = (
+    <Button
+      variant="primary"
+      icon={<Camera />}
+      onClick={() => setCreateOpen(true)}
+      data-testid="create-snapshot"
+    >
+      {t("snapshots.create")}
+    </Button>
+  );
+  const searching = paging.search.trim() !== "";
+
   return (
-    <div className="grid gap-4">
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.snapshots.title") }]} />}
+      title={t("pageHeaders.snapshots.title")}
+      description={t("pageHeaders.snapshots.description")}
+      actions={createButton}
+    >
       <ErrorBanner error={snapshots.error ?? act.error ?? fetched.error} />
-      <Toolbar size="sm" className="w-full max-w-2xl" aria-label={t("snapshots.title")}>
-        <Toolbar.Input
-          aria-label={t("snapshots.label")}
-          placeholder={t("snapshots.labelPlaceholder")}
-          value={label}
-          onChange={(e) => setLabel((e.target as HTMLInputElement).value)}
-          className="flex-1"
+      <ListToolbar
+        search={paging.search}
+        onSearch={paging.setSearch}
+        placeholder={t("snapshots.search")}
+      />
+      {snapshots.data?.length === 0 ? (
+        <Empty
+          icon={<Camera size={48} className="text-kumo-inactive" />}
+          title={t("snapshots.empty")}
+          description={t("snapshots.emptyDescription")}
+          contents={createButton}
         />
-        <Toolbar.Button
-          icon={<Camera />}
-          onClick={() => act.mutate({ kind: "create", publish: false })}
-          disabled={act.isPending}
-        >
-          {t("snapshots.snapshot")}
-        </Toolbar.Button>
-        <Toolbar.Button
-          icon={<RocketLaunch />}
-          onClick={() => setPending({ kind: "create", publish: true })}
-          disabled={act.isPending}
-          data-testid="snapshot-publish"
-        >
-          {t("snapshots.snapshotAndPublish")}
-        </Toolbar.Button>
-      </Toolbar>
-      <LayerCard className="p-0">
-        {snapshots.isPending ? (
-          <TableSkeleton columns={5} rows={3} />
-        ) : (
-          <SnapshotTimeline
-            snapshots={paging.pageItems}
-            publishedSnapshotId={site.data?.publishedSnapshotId}
-            onPublish={(s) => setPending({ kind: "publish", snapshot: s })}
-            onRollback={(s) => setPending({ kind: "rollback", snapshot: s })}
-            onCompare={(s) => setDiff(s.id)}
-            emptyIcon={<Camera size={48} className="text-kumo-inactive" />}
-            formatDate={(iso) => new Date(iso).toLocaleString(locale)}
-            labels={{
-              empty: t("snapshots.empty"),
-              emptyDescription: t("snapshots.emptyDescription"),
-              live: t("common.live"),
-              publish: t("common.publish"),
-              rollBack: t("common.rollBack"),
-              compare: t("snapshots.compare"),
-              columns: {
-                snapshot: t("snapshots.columns.snapshot"),
-                actor: t("snapshots.columns.actor"),
-                changes: t("snapshots.columns.changes"),
-                when: t("snapshots.columns.when"),
-              },
-              reasons: {
-                manual: t("snapshots.reasons.manual"),
-                agentMutation: t("snapshots.reasons.agentMutation"),
-                publish: t("snapshots.reasons.publish"),
-                rollback: t("snapshots.reasons.rollback"),
-                scheduled: t("snapshots.reasons.scheduled"),
-                import: t("snapshots.reasons.import"),
-              },
-            }}
-          />
-        )}
-      </LayerCard>
+      ) : (
+        <LayerCard className="overflow-x-auto p-0">
+          {snapshots.isPending ? (
+            <Table>
+              <TableSkeleton columns={6} rows={4} />
+            </Table>
+          ) : (
+            <SnapshotTimeline
+              snapshots={paging.pageItems}
+              publishedSnapshotId={site.data?.publishedSnapshotId}
+              onPublish={(s) => setPending({ kind: "publish", snapshot: s })}
+              onRollback={(s) => setPending({ kind: "rollback", snapshot: s })}
+              onCompare={(s) => setDiff(s.id)}
+              emptyIcon={<MagnifyingGlass size={48} className="text-kumo-inactive" />}
+              renderTime={(iso) => <RelativeTime iso={iso} />}
+              labels={{
+                empty: searching ? t("snapshots.noMatches") : t("snapshots.empty"),
+                emptyDescription: searching
+                  ? t("snapshots.noMatchesDescription")
+                  : t("snapshots.emptyDescription"),
+                live: t("common.live"),
+                publish: t("common.publish"),
+                rollBack: t("common.rollBack"),
+                compare: t("snapshots.compare"),
+                actions: t("snapshots.actions"),
+                columns: {
+                  snapshot: t("snapshots.columns.snapshot"),
+                  actor: t("snapshots.columns.actor"),
+                  changes: t("snapshots.columns.changes"),
+                  when: t("snapshots.columns.when"),
+                },
+                reasons: {
+                  manual: t("snapshots.reasons.manual"),
+                  agentMutation: t("snapshots.reasons.agentMutation"),
+                  publish: t("snapshots.reasons.publish"),
+                  rollback: t("snapshots.reasons.rollback"),
+                  scheduled: t("snapshots.reasons.scheduled"),
+                  import: t("snapshots.reasons.import"),
+                },
+              }}
+            />
+          )}
+        </LayerCard>
+      )}
       {paging.total > paging.perPage && (
         <Pagination
           page={paging.page}
@@ -149,6 +202,62 @@ export function SnapshotsPage() {
           setPage={paging.setPage}
         />
       )}
+      <LayerDialog.Root
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        dismissDisabled={act.isPending}
+      >
+        <LayerDialog.Content size="base" closeLabel={t("common.close")}>
+          <LayerDialog.Title>{t("snapshots.createTitle")}</LayerDialog.Title>
+          <LayerDialog.Description>{t("snapshots.createIntro")}</LayerDialog.Description>
+          <LayerDialog.Body>
+            <div className="grid gap-6" data-testid="create-snapshot-dialog">
+              <Input
+                label={t("snapshots.label")}
+                placeholder={t("snapshots.labelPlaceholder")}
+                description={t("snapshots.labelDescription")}
+                value={label}
+                onValueChange={setLabel}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitCreate();
+                  }
+                }}
+                maxLength={200}
+                className="w-full"
+                autoFocus
+              />
+              <Radio.Group
+                appearance="card"
+                legend={t("snapshots.afterCreate")}
+                value={after}
+                onValueChange={(v) => setAfter(v as AfterCreate)}
+              >
+                <Radio.Item
+                  value="keep"
+                  label={t("snapshots.keepOption")}
+                  description={t("snapshots.keepOptionDescription")}
+                />
+                <Radio.Item
+                  value="publish"
+                  label={t("snapshots.publishOption")}
+                  description={t("snapshots.publishOptionDescription")}
+                />
+              </Radio.Group>
+            </div>
+          </LayerDialog.Body>
+          <LayerDialog.Actions dismissLabel={t("common.cancel")}>
+            <LayerDialog.Actions.Primary
+              onClick={submitCreate}
+              loading={act.isPending && pending === undefined}
+              data-testid="create-snapshot-submit"
+            >
+              {after === "publish" ? t("snapshots.continueToPublish") : t("snapshots.create")}
+            </LayerDialog.Actions.Primary>
+          </LayerDialog.Actions>
+        </LayerDialog.Content>
+      </LayerDialog.Root>
       <SnapshotDiffDialog
         siteId={siteId}
         snapshot={diffSnapshot}
@@ -174,6 +283,6 @@ export function SnapshotsPage() {
         busy={act.isPending}
         onConfirm={() => pending && act.mutate(pending)}
       />
-    </div>
+    </PageLayout>
   );
 }

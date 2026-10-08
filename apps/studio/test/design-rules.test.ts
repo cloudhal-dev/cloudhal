@@ -1,11 +1,13 @@
 /**
- * Design-system enforcement (docs/design/DESIGN.md). Fails the build when Studio code bypasses
- * Kumo or breaks the kumo-design rules. Keep this list in sync with DESIGN.md.
+ * Design-system enforcement (docs/design/DESIGN.md). Per-file rules live in
+ * `scripts/design-lint.ts` (shared with `pnpm design:lint` and the agent hook); this file runs
+ * them over every screen and adds the cross-file checks. Keep both in sync with DESIGN.md.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { allFiles, format, lintFile, ROUTE_TEMPLATES, STUDIO_SRC } from "../scripts/design-lint.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(here, "../src");
@@ -24,45 +26,6 @@ const uiFiles = files.filter(
   (f) => f.file.startsWith("routes/") || f.file.startsWith("components/"),
 );
 
-/** Raw elements that always have a Kumo equivalent. `<dl>/<dt>/<dd>`, `<div>`, `<span>`, `<form>`, `<main>` stay allowed as layout glue. */
-const FORBIDDEN_ELEMENTS = [
-  "table",
-  "thead",
-  "tbody",
-  "tr",
-  "td",
-  "th",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "button",
-  "input",
-  "select",
-  "textarea",
-  "label",
-  "a",
-  "nav",
-  "aside",
-  "ul",
-  "ol",
-  "li",
-  "p",
-  // Previews go through @cloudhal/ui's PreviewPanel (sandboxed, scaled, reloadable).
-  "iframe",
-];
-const FORBIDDEN_CLASSES: Array<[RegExp, string]> = [
-  [/\bfont-bold\b/, "use font-semibold or <Text bold>"],
-  [/\btracking-/, "never change tracking"],
-  [/\btransition-colors\b|\bduration-\d+/, "no colour transitions"],
-  [/\bdark:/, "Kumo handles dark mode via light-dark()"],
-  [
-    /\b(?:bg|text|border|ring)-(?:red|blue|green|zinc|gray|slate|neutral|orange|amber|yellow|emerald|indigo|violet|purple|pink|rose|white|black)(?:-\d+)?\b/,
-    "semantic kumo tokens only",
-  ],
-  [/\bshadow-(?:sm|md|lg|xl)\b/, "no drop shadows on bordered surfaces"],
-];
-
 /** Every screen must be composed from these; the matrix in DESIGN.md maps the rest. */
 const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/AppFrame.tsx": [
@@ -74,9 +37,17 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Sidebar.Rail",
   ],
   "routes/SiteShell.tsx": ["SidebarSwitcher", "Sidebar.MenuBadge", "Sidebar.Collapsible"],
-  "routes/SiteTabsLayout.tsx": ["PageHeader", "Breadcrumbs", "ButtonGroup", "ApprovalDialog"],
-  "routes/SitesPage.tsx": ["ResourceListPage", "Table", "Empty", "Surface", "Code", "Pagination"],
-  "routes/SiteOverviewPage.tsx": ["Grid", "LayerCard", "Table", "Empty", "ClipboardText"],
+  "components/SitePublish.tsx": ["ButtonGroup", "DropdownMenu", "ApprovalDialog"],
+  "routes/SiteShell.tsx#publish": ["SitePublish"],
+  "components/Crumbs.tsx": ["Breadcrumbs", "Breadcrumbs.Current", "Breadcrumbs.Clipboard"],
+  "routes/SitesPage.tsx": ["PageLayout", "Table", "Empty", "SectionCard", "Code", "Pagination"],
+  "routes/SiteOverviewPage.tsx": [
+    "Columns",
+    "SectionCard",
+    "Table",
+    "SectionEmpty",
+    "InlineCopyText",
+  ],
   "routes/PagesPage.tsx": [
     "ListToolbar",
     "Table",
@@ -86,16 +57,24 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "RowMenu",
   ],
   "routes/ArticlesPage.tsx": [
+    "PageLayout",
     "ListToolbar",
     "Table",
+    "TableSkeleton",
     "Empty",
     "Pagination",
     "DeleteResource",
     "RowMenu",
+    "RelativeTime",
   ],
   "routes/ArticleEditorPage.tsx": [
-    "PageHeader",
-    "LayerCard",
+    "PageLayout",
+    "SiteCrumbs",
+    "SectionCard",
+    "StatusActions",
+    "DetailsCard",
+    "DangerZoneCard",
+    "InputGroup",
     "Input",
     "InputArea",
     "TagInput",
@@ -104,8 +83,14 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "SkeletonLine",
   ],
   "routes/PageEditorPage.tsx": [
-    "PageHeader",
-    "LayerCard",
+    "PageLayout",
+    "SiteCrumbs",
+    "SectionCard",
+    "StatusActions",
+    "DetailsCard",
+    "DangerZoneCard",
+    "Tooltip",
+    "ConfirmDialog",
     "Empty",
     "DropdownMenu",
     "ApprovalDialog",
@@ -113,15 +98,22 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "SkeletonLine",
   ],
   "routes/SnapshotsPage.tsx": [
-    "Toolbar",
+    "PageLayout",
+    "ListToolbar",
     "SnapshotTimeline",
+    "Table",
+    "TableSkeleton",
+    "Empty",
     "Pagination",
+    "LayerDialog",
+    "Radio",
     "ApprovalDialog",
     "SnapshotDiffDialog",
+    "RelativeTime",
   ],
-  "routes/LoginPage.tsx": ["Surface", "Tabs", "Input", "Button"],
+  "routes/LoginPage.tsx": ["AuthLayout", "Tabs", "Input", "Button", "Banner"],
   "routes/AgentsPage.tsx": [
-    "ResourceListPage",
+    "PageLayout",
     "ListToolbar",
     "Table",
     "Empty",
@@ -132,6 +124,10 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "CreateAgentKeyDialog",
   ],
   "routes/ActivityPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "ListToolbar",
+    "LayerCard",
     "Toolbar",
     "Select",
     "Table",
@@ -164,9 +160,15 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Tooltip",
     "Banner",
     "Checkbox",
-    "LayerCard",
+    "SectionCard",
     "Table",
   ],
+  // Side panels are SectionCards; summaries inside dialogs are InsetPanels (DESIGN.md §1).
+  "routes/AgentsPage.tsx#layout": ["Crumbs", "SectionCard", "SectionEmpty"],
+  "routes/SkillsPage.tsx#layout": ["Crumbs", "SectionCard", "SectionEmpty"],
+  "components/CreateAgentKeyDialog.tsx#layout": ["InsetPanel"],
+  "components/ChangeAgentModeDialog.tsx#layout": ["InsetPanel"],
+  "components/ElevateAgentKeyDialog.tsx#layout": ["InsetPanel"],
   "components/ChangeAgentModeDialog.tsx": [
     "LayerDialog",
     "LayerDialog.Actions.Primary",
@@ -219,13 +221,21 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "elevationRequestOf",
     "requestOwnMode",
   ],
-  "components/ElevationRequest.tsx": ["ModeBadge", "Badge", "Tooltip", "Link", "Text"],
+  "components/ElevationRequest.tsx": [
+    "ModeBadge",
+    "Badge",
+    "Tooltip",
+    "Link",
+    "Text",
+    "InsetPanel",
+  ],
   "components/ApproveElevationDialog.tsx": [
     "LayerDialog",
     "LayerDialog.Actions.Primary",
     "AutoModeConfirm",
     "ModeBadge",
-    "Surface",
+    "InsetPanel",
+    "AgentReason",
     "Tabs",
     "Input",
     "Select",
@@ -238,14 +248,27 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/Audit.tsx#elevation-requests": ["ElevationGrant", "requestedByAgent"],
   "components/ActivityDetailDialog.tsx#elevation-requests": ["ElevationGrant"],
   "components/ActivityDetailDialog.tsx": ["LayerDialog", "Banner", "CodeHighlighted"],
-  "components/SnapshotDiffDialog.tsx": ["LayerDialog", "Tabs", "Badge", "Table", "Empty"],
-  "components/EditorLayout.tsx": ["Grid", "Tabs", "Tooltip"],
+  "components/SnapshotDiffDialog.tsx": [
+    "LayerDialog",
+    "Tabs",
+    "Badge",
+    "Table",
+    "SectionEmpty",
+    "InsetPanel",
+  ],
+  "components/EditorLayout.tsx": ["Columns", "Tabs", "Tooltip", "SectionCard"],
+  "components/StatusActions.tsx": ["DropdownMenu", "Tooltip", "TRANSITIONS"],
   "components/EditorPreview.tsx": ["PreviewPanel"],
-  // Settings template (§2c): sticky TableOfContents + one LayerCard per section.
-  "components/Settings.tsx": ["Grid", "TableOfContents", "useTableOfContentsActiveId", "LayerCard"],
+  // Settings template (§2c): Columns 1-2 with a sticky TableOfContents + one SectionCard per section.
+  "components/Settings.tsx": [
+    "Columns",
+    "TableOfContents",
+    "useTableOfContentsActiveId",
+    "SectionCard",
+  ],
   "routes/AccountPage.tsx": [
-    "PageHeader",
-    "Breadcrumbs",
+    "PageLayout",
+    "Crumbs",
     "SettingsLayout",
     "SettingsSection",
     "PasswordField",
@@ -259,20 +282,22 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/PasswordField.tsx": ["InputGroup", "InputGroup.Button"],
   "components/ConfirmDialog.tsx": ["LayerDialog.Alert", "LayerDialog.Actions.Primary"],
   "routes/SiteSettingsPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
     "SettingsLayout",
     "SettingsSection",
     "InputGroup",
     "Select",
     "Radio",
     "Table",
-    "Empty",
+    "SectionEmpty",
     "DropdownMenu",
     "ClipboardText",
     "ConfirmDialog",
-    "Surface",
+    "InsetPanel",
   ],
   "routes/SkillsPage.tsx": [
-    "ResourceListPage",
+    "PageLayout",
     "ListToolbar",
     "Table",
     "Empty",
@@ -283,12 +308,13 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "SkillDetailDialog",
   ],
   "components/SkillDetailDialog.tsx": ["LayerDialog", "ClipboardText", "CodeHighlighted", "Badge"],
-  // Approvals (§2m): pending requests as LayerCard rows, history Table, LayerDialog confirmation.
+  // Approvals (§2m): pending requests as divided rows in one SectionCard, history Table, LayerDialog confirmation.
   "routes/ApprovalsPage.tsx": [
-    "ActivityViews",
-    "LayerCard",
+    "PageLayout",
+    "SiteCrumbs",
+    "SectionCard",
     "Table",
-    "Empty",
+    "SectionEmpty",
     "Collapsible",
     "CodeHighlighted",
     "RefreshButton",
@@ -296,10 +322,8 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "ActorCell",
     "ToolCell",
   ],
-  "components/ApproveRequestDialog.tsx": ["LayerDialog", "Banner", "Badge", "Surface"],
-  "components/ActivityViews.tsx": ["Tabs", "Badge"],
+  "components/ApproveRequestDialog.tsx": ["LayerDialog", "Banner", "Badge", "InsetPanel"],
   "components/PendingApprovalsBanner.tsx": ["Banner", "Banner.Action"],
-  "routes/ActivityPage.tsx#approvals": ["ActivityViews"],
   "routes/SiteOverviewPage.tsx#approvals": ["PendingApprovalsBanner"],
   "routes/SiteShell.tsx#approvals": ["usePendingApprovals", "Sidebar.MenuBadge"],
   "routes/PageEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
@@ -311,8 +335,10 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
 const REQUIRED_SOMEWHERE = [
   "Sidebar",
   "Breadcrumbs",
-  "PageHeader",
-  "ResourceListPage",
+  "PageLayout",
+  "SectionCard",
+  "InsetPanel",
+  "AuthLayout",
   "Table",
   "LayerCard",
   "Empty",
@@ -357,20 +383,18 @@ const REQUIRED_SOMEWHERE = [
 ];
 
 describe("design rules (DESIGN.md)", () => {
-  it.each(uiFiles.map((f) => f.file))("%s uses Kumo instead of raw elements", (file) => {
-    const text = (uiFiles.find((f) => f.file === file) as { text: string }).text;
-    const offenders = FORBIDDEN_ELEMENTS.filter((el) => new RegExp(`<${el}(?=[\\s>/])`).test(text));
-    expect(offenders, `raw <${offenders.join(">, <")}> in ${file}; use the Kumo component`).toEqual(
-      [],
-    );
-  });
+  it.each(allFiles().map((f) => path.relative(path.resolve(STUDIO_SRC, "../../.."), f)))(
+    "%s passes the design lint",
+    (rel) => {
+      const abs = path.resolve(STUDIO_SRC, "../../..", rel);
+      const violations = lintFile(abs);
+      expect(violations, format(abs, violations)).toEqual([]);
+    },
+  );
 
-  it.each(uiFiles.map((f) => f.file))("%s follows kumo-design class rules", (file) => {
-    const text = (uiFiles.find((f) => f.file === file) as { text: string }).text;
-    const broken = FORBIDDEN_CLASSES.filter(([re]) => re.test(text)).map(
-      ([re, why]) => `${re} (${why})`,
-    );
-    expect(broken, file).toEqual([]);
+  it("every registered route template points at an existing file", () => {
+    const missing = Object.keys(ROUTE_TEMPLATES).filter((f) => !files.some((x) => x.file === f));
+    expect(missing).toEqual([]);
   });
 
   it.each(Object.entries(REQUIRED_IMPORTS))(
@@ -402,13 +426,6 @@ describe("design rules (DESIGN.md)", () => {
         .map(() => path.basename(f.file)),
     );
     expect(unsandboxed, 'use sandbox="" (no scripts, no same-origin)').toEqual([]);
-  });
-
-  it("LayerDialog.Content gets its parts directly (Kumo throws on fragments/conditionals)", () => {
-    const offenders = uiFiles
-      .filter((f) => /<LayerDialog\.Content[^>]*>\s*(?:\{|<>)/.test(f.text))
-      .map((f) => f.file);
-    expect(offenders).toEqual([]);
   });
 
   it("mode pickers are Kumo radio cards over the key modes only (bypass is local, ADR-0015)", () => {
@@ -471,22 +488,5 @@ describe("design rules (DESIGN.md)", () => {
     expect(pickers.length).toBeGreaterThan(0);
     const missing = pickers.filter((f) => !/<AutoModeConfirm\b/.test(f.text)).map((f) => f.file);
     expect(missing).toEqual([]);
-  });
-
-  it("never injects HTML (approval prompts and skill text can carry agent-written titles)", () => {
-    const offenders = files
-      .filter((f) => /dangerouslySetInnerHTML|\.innerHTML\s*=/.test(f.text))
-      .map((f) => f.file);
-    expect(offenders).toEqual([]);
-  });
-
-  it("every user-facing string goes through useT()", () => {
-    // Heuristic: JSX text nodes with letters outside of {...} expressions.
-    const offenders = uiFiles.flatMap((f) =>
-      [...f.text.matchAll(/>\s*([A-Za-z][A-Za-z ,.'!?-]{2,})\s*</g)]
-        .map((m) => `${f.file}: "${m[1]}"`)
-        .filter((s) => !/ID"$/.test(s)),
-    );
-    expect(offenders).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { Banner, Input, LayerDialog, Select, Tabs, Text } from "@cloudhal/ui";
+import { Banner, Input, InsetPanel, LayerDialog, Select, Tabs, Text } from "@cloudhal/ui";
 import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
@@ -266,11 +266,11 @@ export function ElevateAgentKeyDialog({
               />
             )}
             {/* What will happen, right above the action that makes it happen. */}
-            <div
-              className="grid gap-2 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-              data-testid="elevation-summary"
-            >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <InsetPanel>
+              <div
+                className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                data-testid="elevation-summary"
+              >
                 <span className="flex items-center gap-2">
                   <Text variant="secondary" size="sm" as="span">
                     {t("agents.elevate.now")}
@@ -303,7 +303,7 @@ export function ElevateAgentKeyDialog({
                   {t("agents.elevate.nextCall")}
                 </Text>
               </div>
-            </div>
+            </InsetPanel>
           </div>
         </LayerDialog.Body>
         <LayerDialog.Actions dismissLabel={t("common.cancel")}>

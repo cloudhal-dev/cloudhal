@@ -29,6 +29,10 @@ export const en = {
     current: "Current",
   },
   auth: {
+    signInTitle: "Welcome back",
+    signUpTitle: "Create your account",
+    signUpDescription: "The first account on a new Studio becomes its owner.",
+    footer: "Open source · Apache-2.0",
     signIn: "Sign in",
     createAccount: "Create account",
     name: "Name",
@@ -53,6 +57,50 @@ export const en = {
     usageDescription:
       "Everything in Studio is also a CLI command, so agents and scripts can do the same work.",
     open: "Open",
+  },
+  pageHeaders: {
+    pages: {
+      title: "Pages",
+      description: "The routes of this site. Each page is a stack of sections that themes render.",
+    },
+    articles: {
+      title: "Articles",
+      description:
+        "Posts and other entries, written by people or agents and published with the site.",
+    },
+    snapshots: {
+      title: "Snapshots",
+      description:
+        "Frozen versions of the site. Publishing points the live site at one; rolling back points it at an earlier one.",
+    },
+    activity: {
+      title: "Activity",
+      description:
+        "Every tool call an agent or person made on this site, with the policy decision.",
+    },
+    approvals: {
+      title: "Approvals",
+      description:
+        "Agents' publishes, rollbacks and deletes, their edits in Manual mode and their requests for more autonomy wait here until a person decides.",
+    },
+    settings: {
+      title: "Settings",
+      description: "Name, languages, domains and preview links for this site.",
+    },
+    agents: {
+      title: "Agents",
+      description:
+        "Keys let agents, CI jobs and MCP clients work on your sites. A key's mode decides what the agent does on its own and what waits for you.",
+    },
+    skills: {
+      title: "Skills",
+      description:
+        "Playbooks agents read over MCP. A call made under a skill only gets the scopes it declares, and the tools it lists always wait for a person.",
+    },
+    account: {
+      title: "Account",
+      description: "Your profile, how you sign in, and who else can get into this Studio.",
+    },
   },
   nav: {
     overview: "Overview",
@@ -100,6 +148,7 @@ export const en = {
     goApprovals: "Go to approvals",
   },
   overview: {
+    liveSnapshotLabel: "Live snapshot",
     liveSnapshot: "Live snapshot {id}",
     notPublished: "Not published yet",
     newPage: "New page",
@@ -179,6 +228,35 @@ export const en = {
     content: "Content",
     slugHint: "Lower-case, hyphenated; becomes the URL.",
     metadata: "Details",
+    moreActions: "More actions",
+    unpublish: "Unpublish (back to draft)",
+    duplicate: "Duplicate",
+    duplicated: "Copy created",
+    copyTitle: "{title} (copy)",
+    dangerZone: "Danger zone",
+    deletePageTitle: "Delete this page",
+    deletePageHint: "Removes the page and its sections. Published snapshots keep their copy.",
+    deleteArticleTitle: "Delete this article",
+    deleteArticleHint: "Removes the article from the site. Published snapshots keep their copy.",
+    removeSectionTitle: "Remove this section?",
+    removeSectionDescription:
+      "The {kind} section is removed from the draft. The page changes only when you save.",
+    sectionKinds: {
+      hero: "Hero",
+      richText: "Rich text",
+      image: "Image",
+      contentList: "Content list",
+    },
+    bodyTitle: "Body",
+    markdown: "Markdown",
+    wordsOne: "1 word",
+    wordsOther: "{count} words",
+    id: "ID",
+    revision: "Revision",
+    locale: "Language",
+    author: "Author",
+    updatedAt: "Updated",
+    publishedAt: "Published",
   },
   status: { draft: "Draft", review: "In review", published: "Published", archived: "Archived" },
   site: {
@@ -218,7 +296,23 @@ export const en = {
     fromStudio: "Snapshot from Studio",
     publishedFromStudio: "Published from Studio",
     compare: "Compare",
-    columns: { snapshot: "Snapshot", actor: "By", changes: "Changes", when: "When" },
+    create: "Create snapshot",
+    createTitle: "Create a snapshot",
+    createIntro:
+      "Freezes the site's current pages, articles and settings. Snapshots never change once taken.",
+    labelDescription: "Optional. Shown in the list and in Activity instead of the reason.",
+    afterCreate: "After creating it",
+    keepOption: "Keep the live site as it is",
+    keepOptionDescription: "Save the snapshot only. Publish it or compare it later from this list.",
+    publishOption: "Publish it to the live site",
+    publishOptionDescription:
+      "The snapshot becomes the live version. You confirm before anything goes live.",
+    continueToPublish: "Continue to publish",
+    search: "Search snapshots",
+    noMatches: "No snapshots match",
+    noMatchesDescription: "Try another label or snapshot id.",
+    actions: "Actions",
+    columns: { snapshot: "Snapshot", actor: "Author", changes: "Changes", when: "Created" },
     reasons: {
       manual: "Manual",
       agentMutation: "Agent change",
@@ -473,7 +567,9 @@ export const en = {
   activity: {
     title: "Activity",
     search: "Search tool, actor or skill",
+    refresh: "Refresh activity",
     filters: {
+      label: "Filters",
       kind: "Actor type",
       decision: "Decision",
       allKinds: "All actors",
@@ -552,6 +648,7 @@ export const en = {
       password: "Password",
       sessions: "Active sessions",
       access: "Studio access",
+      server: "This server",
     },
     profile: {
       description: "How you appear in Studio and in each site's activity log.",
@@ -574,6 +671,7 @@ export const en = {
       current: "Current password",
       new: "New password",
       newHint: "At least {min} characters.",
+      confirmHint: "Type the new password again.",
       confirm: "Confirm new password",
       show: "Show password",
       hide: "Hide password",
@@ -595,6 +693,8 @@ export const en = {
       },
     },
     sessions: {
+      showAll: "Show all {count}",
+      showFewer: "Show fewer",
       description:
         "Browsers and clients signed in to your account. Sign out any you don't recognise. Agent keys are listed under Agents.",
       columns: {
@@ -826,10 +926,10 @@ export const en = {
   },
   approvals: {
     title: "Approvals",
-    views: { activity: "Activity", approvals: "Approvals" },
-    description:
-      "Agents' publish, rollback and delete requests, their requests for more autonomy, and every change from agents in Manual mode wait here until a person decides. Approving lets the agent make that exact call once, or grants the elevation it asked for.",
+    refresh: "Refresh approvals",
     pending: "Waiting for you",
+    pendingDescription:
+      "Approving lets the agent make that exact call once, or grants the elevation it asked for. Denying tells the agent.",
     history: "History",
     noPending: "Nothing is waiting for you",
     noPendingDescription:
@@ -982,6 +1082,7 @@ export const en = {
     edit: "Edit",
     show: "Show preview",
     hide: "Hide preview",
+    toggleHint: "Show the last saved version next to the form",
   },
   diff: {
     title: "Changes in {name}",

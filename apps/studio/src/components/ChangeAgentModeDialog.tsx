@@ -1,4 +1,4 @@
-import { Banner, LayerDialog, Text } from "@cloudhal/ui";
+import { Banner, InsetPanel, LayerDialog, Text } from "@cloudhal/ui";
 import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -147,11 +147,11 @@ export function ChangeAgentModeDialog({
               />
             )}
             {/* The change as it will apply, right above the action that makes it. */}
-            <div
-              className="grid gap-2 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-              data-testid="mode-transition"
-            >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <InsetPanel>
+              <div
+                className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                data-testid="mode-transition"
+              >
                 <span className="flex items-center gap-2">
                   <Text variant="secondary" size="sm" as="span">
                     {t("agents.changeMode.from")}
@@ -177,7 +177,7 @@ export function ChangeAgentModeDialog({
                   {t("agents.changeMode.nextCall")}
                 </Text>
               </div>
-            </div>
+            </InsetPanel>
           </div>
         </LayerDialog.Body>
         <LayerDialog.Actions dismissLabel={t("common.cancel")}>

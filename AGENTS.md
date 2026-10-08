@@ -15,6 +15,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 pnpm gen                          # JSON Schema → TypeScript + Rust (requires cargo-typify 0.8.0)
 pnpm drift                        # gen + fail if generated files changed
 pnpm changeset                    # add a release note for a published package
+pnpm design:lint [files…]         # Kumo design rules for apps/studio + packages/ui blocks (also a Claude Code hook)
+pnpm design:shots -- <routes>     # headless screenshots at 1440/390 px; fails on sideways scroll / console errors
+pnpm kumo ls|doc <Name>|blocks|add <Block>|ai   # Kumo CLI: component list, API docs, blocks, usage guide
 ```
 
 ## Layout
@@ -41,7 +44,7 @@ pnpm changeset                    # add a release note for a published package
 4. **No interactive DB transactions** anywhere (D1 has none); only atomic `batch()`. Composite writes guard later statements on the earlier CAS (match on the new content `hash`, not `rev + 1`).
 5. **Worker-safe imports:** code reachable from a Worker never imports Node-only modules at top level (`better-sqlite3`, `node:fs` helpers, `@cloudhal/core-contracts/bundle`, `@cloudhal/api/auth/node`). Use the package subpaths.
 6. **Runtime validation** uses the precompiled validators (`assertValid`/`isValid`), never `new Ajv()` (Workers forbid eval).
-7. **Admin UIs** import UI primitives from `@cloudhal/ui` only; direct `@base-ui/react` imports are lint errors.
+7. **Admin UIs** import UI primitives from `@cloudhal/ui` only (`@cloudflare/kumo`/`@base-ui/react` in apps are lint errors) and are composed from Kumo components and blocks: every screen is a `PageLayout` with a registered template, sections are `SectionCard`s, no hand-made cards, headers, containers or raw HTML controls. Look APIs up with `pnpm kumo doc <Name>` before writing markup; if Kumo lacks something, add a block to `packages/ui/src/blocks`, never a one-off in a screen. `pnpm design:lint` must pass (it also runs after every agent edit via `.claude/settings.json`).
 8. **Skills** (`SKILL.md`) use only the six spec fields; Cloudhal data goes in `metadata` as `cloudhal.*` string keys.
 9. **Secrets** never in code, fixtures or docs. Test values live in `.env.example`.
 10. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts`; no hard-coded English in `apps/studio`.

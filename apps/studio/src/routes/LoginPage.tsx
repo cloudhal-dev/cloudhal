@@ -1,9 +1,10 @@
-import { Banner, Button, Input, Surface, Tabs, Text } from "@cloudhal/ui";
+import { AuthLayout, Banner, Button, Input, Tabs, Text } from "@cloudhal/ui";
 import { Key, SquaresFour } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { LanguageSwitch } from "../components/LanguageSwitch.tsx";
+import { PasswordField } from "../components/PasswordField.tsx";
 import { useT } from "../i18n/index.tsx";
 import { authClient } from "../lib/auth.ts";
 
@@ -69,78 +70,75 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-kumo-overlay px-4">
-      <div className="grid w-full max-w-sm gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <SquaresFour size={24} className="text-kumo-brand" />
-            <div className="grid gap-0.5">
-              <Text variant="heading" size="lg" as="h1">
-                {t("app.name")}
-              </Text>
-              <Text variant="secondary" size="sm">
-                {t("app.tagline")}
-              </Text>
-            </div>
-          </div>
-          <LanguageSwitch size="xs" />
-        </div>
-        <Surface className="rounded-xl bg-kumo-base px-6 py-5 ring ring-kumo-line">
-          <form onSubmit={submit} className="grid gap-4" data-testid="login-form">
-            {setupToken && mode === "signup" && (
-              <Banner
-                variant="default"
-                icon={<Key weight="fill" />}
-                title={t("auth.setupTitle")}
-                description={t("auth.setupDescription")}
-              />
-            )}
-            <Tabs
-              tabs={[
-                { value: "signin", label: t("auth.signIn") },
-                { value: "signup", label: t("auth.createAccount") },
-              ]}
-              value={mode}
-              onValueChange={(v) => setMode(v as "signin" | "signup")}
-              variant="segmented"
-              size="sm"
-            />
-            {mode === "signup" && (
-              <Input
-                label={t("auth.name")}
-                name="name"
-                value={name}
-                onValueChange={setName}
-                required
-                autoComplete="name"
-              />
-            )}
-            <Input
-              label={t("auth.email")}
-              name="email"
-              type="email"
-              value={email}
-              onValueChange={setEmail}
-              required
-              autoComplete="email"
-            />
-            <Input
-              label={t("auth.password")}
-              name="password"
-              type="password"
-              value={password}
-              onValueChange={setPassword}
-              required
-              description={t("auth.passwordHint")}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            />
-            <ErrorBanner error={error} />
-            <Button type="submit" variant="primary" loading={busy} className="w-full">
-              {mode === "signup" ? t("auth.createAccount") : t("auth.signIn")}
-            </Button>
-          </form>
-        </Surface>
-      </div>
-    </main>
+    <AuthLayout
+      brand={<SquaresFour size={20} weight="duotone" />}
+      product={t("app.name")}
+      title={mode === "signup" ? t("auth.signUpTitle") : t("auth.signInTitle")}
+      description={mode === "signup" ? t("auth.signUpDescription") : t("app.tagline")}
+      footer={
+        <>
+          <Text variant="secondary" size="sm" as="span">
+            {t("auth.footer")}
+          </Text>
+          <LanguageSwitch size="sm" />
+        </>
+      }
+    >
+      <form onSubmit={submit} className="grid gap-4" data-testid="login-form">
+        {setupToken && mode === "signup" && (
+          <Banner
+            variant="default"
+            icon={<Key weight="fill" />}
+            title={t("auth.setupTitle")}
+            description={t("auth.setupDescription")}
+          />
+        )}
+        <Tabs
+          tabs={[
+            { value: "signin", label: t("auth.signIn") },
+            { value: "signup", label: t("auth.createAccount") },
+          ]}
+          value={mode}
+          onValueChange={(v) => {
+            setMode(v as "signin" | "signup");
+            setError(undefined);
+          }}
+          variant="segmented"
+          className="w-full"
+        />
+        {mode === "signup" && (
+          <Input
+            label={t("auth.name")}
+            name="name"
+            value={name}
+            onValueChange={setName}
+            required
+            autoComplete="name"
+            className="w-full"
+          />
+        )}
+        <Input
+          label={t("auth.email")}
+          name="email"
+          type="email"
+          value={email}
+          onValueChange={setEmail}
+          required
+          autoComplete="email"
+          className="w-full"
+        />
+        <PasswordField
+          label={t("auth.password")}
+          value={password}
+          onValueChange={setPassword}
+          description={mode === "signup" ? t("auth.passwordHint") : undefined}
+          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+        />
+        <ErrorBanner error={error} />
+        <Button type="submit" variant="primary" loading={busy} className="w-full">
+          {mode === "signup" ? t("auth.createAccount") : t("auth.signIn")}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

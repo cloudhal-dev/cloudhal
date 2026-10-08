@@ -11,7 +11,6 @@ import { RouteError, RoutePending } from "./components/RouteStates.tsx";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
-import { SiteTabsLayout } from "./routes/SiteTabsLayout.tsx";
 
 /**
  * Screens load on demand (one chunk each); the shells above stay in the main bundle so the frame
@@ -110,28 +109,23 @@ const siteRoute = createRoute({
   beforeLoad: requireSession,
   component: SiteShell,
 });
-const siteTabsRoute = createRoute({
-  getParentRoute: () => siteRoute,
-  id: "site-tabs",
-  component: SiteTabsLayout,
-});
 const siteIndexRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/",
   component: SiteOverviewPage,
 });
 const pagesRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/pages",
   component: PagesPage,
 });
 const articlesRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/articles",
   component: ArticlesPage,
 });
 const snapshotsRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/snapshots",
   /** `?diff=<snapshotId>` opens that snapshot's changes (linked from Activity). */
   validateSearch: (search: Record<string, unknown>): { diff?: string } =>
@@ -139,18 +133,18 @@ const snapshotsRoute = createRoute({
   component: SnapshotsPage,
 });
 const activityRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/activity",
   component: ActivityPage,
 });
 /** Activity › Approvals: agents' gated calls waiting for a person (ADR-0014). */
 const approvalsRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/approvals",
   component: ApprovalsPage,
 });
 const siteSettingsRoute = createRoute({
-  getParentRoute: () => siteTabsRoute,
+  getParentRoute: () => siteRoute,
   path: "/settings",
   component: SiteSettingsPage,
 });
@@ -170,15 +164,13 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute]),
   siteRoute.addChildren([
-    siteTabsRoute.addChildren([
-      siteIndexRoute,
-      pagesRoute,
-      articlesRoute,
-      snapshotsRoute,
-      activityRoute,
-      approvalsRoute,
-      siteSettingsRoute,
-    ]),
+    siteIndexRoute,
+    pagesRoute,
+    articlesRoute,
+    snapshotsRoute,
+    activityRoute,
+    approvalsRoute,
+    siteSettingsRoute,
     pageEditorRoute,
     articleEditorRoute,
   ]),

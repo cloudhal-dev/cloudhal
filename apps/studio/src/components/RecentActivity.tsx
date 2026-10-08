@@ -1,4 +1,4 @@
-import { Empty, SkeletonLine, Table, Text } from "@cloudhal/ui";
+import { SectionEmpty, SkeletonLine, Table, Text } from "@cloudhal/ui";
 import { ClockCounterClockwise } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
@@ -27,8 +27,7 @@ export function RecentActivity({ siteId, limit = 5 }: { siteId: string; limit?: 
   const items = recent.data?.items ?? [];
   if (items.length === 0) {
     return (
-      <Empty
-        size="sm"
+      <SectionEmpty
         icon={<ClockCounterClockwise size={32} className="text-kumo-inactive" />}
         title={
           recent.error && !isNotEnabled(recent.error)

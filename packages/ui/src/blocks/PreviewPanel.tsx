@@ -44,8 +44,10 @@ export interface PreviewPanelProps {
   /** Extra header content, e.g. an "Unsaved changes" badge. */
   status?: ReactNode;
   defaultDevice?: PreviewDevice;
-  /** Height of the viewport area (CSS length). */
+  /** Height of the viewport area (CSS length). Ignored with `fill`. */
   height?: string;
+  /** Fill the parent's height (the parent sets it, e.g. a sticky editor column). */
+  fill?: boolean;
   className?: string;
 }
 
@@ -66,6 +68,7 @@ export function PreviewPanel({
   status,
   defaultDevice = "desktop",
   height = "min(78vh, 960px)",
+  fill = false,
   className,
 }: PreviewPanelProps) {
   const [device, setDevice] = useState<PreviewDevice>(defaultDevice);
@@ -75,7 +78,8 @@ export function PreviewPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const url = withVersion(src, version, nonce);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new URL means a new document is loading
+  // A new URL means a new document is loading.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the effect must re-run when the URL changes
   useEffect(() => setLoading(true), [url]);
 
   useLayoutEffect(() => {
@@ -96,7 +100,7 @@ export function PreviewPanel({
   const icon = { desktop: Monitor, tablet: DeviceTablet, mobile: DeviceMobile };
 
   return (
-    <LayerCard className={className}>
+    <LayerCard className={cn(fill && "h-full", className)}>
       <LayerCard.Secondary className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <Text variant="heading" as="h2">
@@ -142,11 +146,14 @@ export function PreviewPanel({
           />
         </div>
       </LayerCard.Secondary>
-      <LayerCard.Primary className="p-0">
+      <LayerCard.Primary className={cn("p-0", fill && "min-h-0 flex-1")}>
         <div
           ref={viewport}
-          className="relative overflow-hidden rounded-b-lg bg-kumo-recessed"
-          style={{ height }}
+          className={cn(
+            "relative overflow-hidden rounded-lg bg-kumo-recessed",
+            fill && "min-h-0 flex-1",
+          )}
+          style={fill ? undefined : { height }}
           aria-busy={loading}
           data-device={device}
         >

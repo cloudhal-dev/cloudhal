@@ -5,27 +5,22 @@ import {
   LayerCard,
   Link,
   LinkButton,
+  PageLayout,
   RefreshButton,
   Select,
   Table,
   Text,
   Toolbar,
 } from "@cloudhal/ui";
-import {
-  CaretRight,
-  ClockCounterClockwise,
-  Funnel,
-  Info,
-  Key,
-  MagnifyingGlass,
-} from "@phosphor-icons/react";
+import { CaretRight, ClockCounterClockwise, Funnel, Info, Key } from "@phosphor-icons/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog.tsx";
-import { ActivityViews } from "../components/ActivityViews.tsx";
 import { ActorCell, DecisionCell, Outcome, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT } from "../i18n/index.tsx";
@@ -56,99 +51,98 @@ export function useActivity(siteId: string, pageSize = PAGE_SIZE) {
 /** Site › Activity: every tool call and policy decision (DESIGN.md §2h). */
 export function ActivityPage() {
   const t = useT();
-  const label = useToolLabel();
   const { siteId } = useParams({ from: "/sites/$siteId" });
-  const activity = useActivity(siteId);
-  const [filter, setFilter] = useState<ActivityFilter>(NO_FILTER);
-  const [selected, setSelected] = useState<AuditRow | undefined>();
-  const loaded = useMemo(() => activity.data?.pages.flatMap((p) => p.items) ?? [], [activity.data]);
-  const rows = useMemo(() => filterActivity(loaded, filter, label), [loaded, filter, label]);
-  const notEnabled = isNotEnabled(activity.error);
-  const filtered = isFiltered(filter);
-
-  if (notEnabled) {
-    return (
-      <div className="grid gap-6">
-        <div>
-          <ActivityViews siteId={siteId} value="activity" />
-        </div>
+  // The list below shares this query (same key); a 404 means the server keeps no audit trail.
+  const notEnabled = isNotEnabled(useActivity(siteId).error);
+  return (
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.activity.title") }]} />}
+      title={t("pageHeaders.activity.title")}
+      description={t("pageHeaders.activity.description")}
+    >
+      {notEnabled ? (
         <Banner
           variant="secondary"
           icon={<Info weight="fill" />}
           title={t("activity.notEnabledTitle")}
           description={t("activity.notEnabledDescription")}
         />
-      </div>
-    );
-  }
+      ) : (
+        <ActivityList siteId={siteId} />
+      )}
+    </PageLayout>
+  );
+}
 
+/** Toolbar, table and paging of the audit trail (the server keeps one). */
+function ActivityList({ siteId }: { siteId: string }) {
+  const t = useT();
+  const label = useToolLabel();
+  const activity = useActivity(siteId);
+  const [filter, setFilter] = useState<ActivityFilter>(NO_FILTER);
+  const [selected, setSelected] = useState<AuditRow | undefined>();
+  const loaded = useMemo(() => activity.data?.pages.flatMap((p) => p.items) ?? [], [activity.data]);
+  const rows = useMemo(() => filterActivity(loaded, filter, label), [loaded, filter, label]);
+  const filtered = isFiltered(filter);
   const nothingYet = activity.isSuccess && loaded.length === 0;
 
   return (
-    <div className="grid gap-4">
-      <div>
-        <ActivityViews siteId={siteId} value="activity" />
-      </div>
+    <>
       <ErrorBanner
         error={activity.error}
         onRetry={() => activity.refetch()}
         retrying={activity.isRefetching}
       />
-      <div className="flex flex-wrap items-center gap-3">
-        <Toolbar size="sm" className="w-full max-w-sm" aria-label={t("activity.search")}>
-          <Toolbar.Button icon={<MagnifyingGlass />} aria-label={t("activity.search")} />
-          <Toolbar.Input
-            aria-label={t("activity.search")}
-            placeholder={t("activity.search")}
-            value={filter.search}
-            onChange={(e) =>
-              setFilter((f) => ({ ...f, search: (e.target as HTMLInputElement).value }))
-            }
-            className="flex-1"
-          />
-        </Toolbar>
-        <Toolbar size="sm" aria-label={t("activity.filters.kind")}>
-          <Toolbar.Button icon={<Funnel />} aria-label={t("activity.filters.kind")} />
-          <Select
-            aria-label={t("activity.filters.kind")}
-            value={filter.kind}
-            onValueChange={(v) => setFilter((f) => ({ ...f, kind: v as KindFilter }))}
-            items={{
-              all: t("activity.filters.allKinds"),
-              agent: t("activity.kinds.agent"),
-              human: t("activity.kinds.human"),
-              system: t("activity.kinds.system"),
-            }}
-            render={<Toolbar.Button />}
-          />
-          <Select
-            aria-label={t("activity.filters.decision")}
-            value={filter.decision}
-            onValueChange={(v) => setFilter((f) => ({ ...f, decision: v as DecisionFilter }))}
-            items={{
-              all: t("activity.filters.allDecisions"),
-              allow: t("activity.decisions.allow"),
-              "approval-required": t("activity.decisions.approval-required"),
-              deny: t("activity.decisions.deny"),
-            }}
-            render={<Toolbar.Button />}
-          />
-        </Toolbar>
-        <div className="ml-auto flex items-center gap-2">
-          {filtered && (
-            <Button variant="ghost" size="sm" onClick={() => setFilter(NO_FILTER)}>
-              {t("activity.clearFilters")}
-            </Button>
-          )}
-          <RefreshButton
-            variant="secondary"
-            size="sm"
-            aria-label={t("common.retry")}
-            loading={activity.isRefetching && !activity.isFetchingNextPage}
-            onClick={() => activity.refetch()}
-          />
-        </div>
-      </div>
+      {/* One row, one control height (Kumo default): search left; clear, filters and refresh right. */}
+      <ListToolbar
+        search={filter.search}
+        onSearch={(search) => setFilter((f) => ({ ...f, search }))}
+        placeholder={t("activity.search")}
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {filtered && (
+              <Button variant="ghost" onClick={() => setFilter(NO_FILTER)}>
+                {t("activity.clearFilters")}
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <Toolbar aria-label={t("activity.filters.label")}>
+                <Select
+                  aria-label={t("activity.filters.kind")}
+                  value={filter.kind}
+                  onValueChange={(v) => setFilter((f) => ({ ...f, kind: v as KindFilter }))}
+                  items={{
+                    all: t("activity.filters.allKinds"),
+                    agent: t("activity.kinds.agent"),
+                    human: t("activity.kinds.human"),
+                    system: t("activity.kinds.system"),
+                  }}
+                  render={<Toolbar.Button />}
+                />
+                <Select
+                  aria-label={t("activity.filters.decision")}
+                  value={filter.decision}
+                  onValueChange={(v) => setFilter((f) => ({ ...f, decision: v as DecisionFilter }))}
+                  items={{
+                    all: t("activity.filters.allDecisions"),
+                    allow: t("activity.decisions.allow"),
+                    "approval-required": t("activity.decisions.approval-required"),
+                    deny: t("activity.decisions.deny"),
+                  }}
+                  render={<Toolbar.Button />}
+                />
+              </Toolbar>
+              <RefreshButton
+                variant="secondary"
+                aria-label={t("activity.refresh")}
+                loading={activity.isRefetching && !activity.isFetchingNextPage}
+                onClick={() => activity.refetch()}
+              />
+            </div>
+          </div>
+        }
+      />
+      {/* Kumo Empty is framed itself: it takes the table's place, never inside the LayerCard. */}
       {nothingYet ? (
         <Empty
           icon={<ClockCounterClockwise size={48} className="text-kumo-inactive" />}
@@ -159,6 +153,18 @@ export function ActivityPage() {
             <LinkButton href="/agents" variant="secondary" icon={Key}>
               {t("commands.createAgentKey")}
             </LinkButton>
+          }
+        />
+      ) : activity.isSuccess && rows.length === 0 ? (
+        // Filtered to nothing: in the table's place, without a header to scroll past.
+        <Empty
+          icon={<Funnel size={48} className="text-kumo-inactive" />}
+          title={t("activity.noMatches")}
+          description={t("activity.noMatchesDescription")}
+          contents={
+            <Button variant="secondary" onClick={() => setFilter(NO_FILTER)}>
+              {t("activity.clearFilters")}
+            </Button>
           }
         />
       ) : (
@@ -178,24 +184,6 @@ export function ActivityPage() {
             </Table.Header>
             {activity.isPending ? (
               <TableSkeleton columns={COLUMNS} rows={6} />
-            ) : rows.length === 0 ? (
-              <Table.Body>
-                <Table.Row>
-                  <Table.Cell colSpan={COLUMNS}>
-                    <Empty
-                      size="sm"
-                      icon={<Funnel size={32} className="text-kumo-inactive" />}
-                      title={t("activity.noMatches")}
-                      description={t("activity.noMatchesDescription")}
-                      contents={
-                        <Button variant="secondary" size="sm" onClick={() => setFilter(NO_FILTER)}>
-                          {t("activity.clearFilters")}
-                        </Button>
-                      }
-                    />
-                  </Table.Cell>
-                </Table.Row>
-              </Table.Body>
             ) : (
               <Table.Body>
                 {rows.map((r) => (
@@ -297,6 +285,6 @@ export function ActivityPage() {
         row={selected}
         onOpenChange={(o) => !o && setSelected(undefined)}
       />
-    </div>
+    </>
   );
 }

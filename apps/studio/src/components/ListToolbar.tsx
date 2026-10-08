@@ -2,7 +2,11 @@ import { Toolbar } from "@cloudhal/ui";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
-/** Search row above every table: Toolbar on the left, the primary action on the right. */
+/**
+ * Search row above every table (DESIGN.md §2a): a Kumo `Toolbar` at the default size, so it lines
+ * up with `Select` filters and buttons on the same row. Filters/secondary controls go in
+ * `actions`; the page's primary "Create …" action belongs in `Page actions`, not here.
+ */
 export function ListToolbar({
   search,
   onSearch,
@@ -15,8 +19,8 @@ export function ListToolbar({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <Toolbar size="sm" className="w-full max-w-md" aria-label={placeholder}>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <Toolbar className="w-full max-w-md" aria-label={placeholder}>
         <Toolbar.Button icon={<MagnifyingGlass />} aria-label={placeholder} />
         <Toolbar.Input
           aria-label={placeholder}

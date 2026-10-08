@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
+import { SitePublish } from "../components/SitePublish.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
@@ -131,7 +132,7 @@ export function SiteShell() {
 
   return (
     <AppFrame
-      title={site.data?.name ?? "…"}
+      actions={<SitePublish siteId={siteId} />}
       loading={site.isPending}
       switcher={
         <SidebarSwitcher

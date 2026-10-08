@@ -52,6 +52,7 @@ export function PasswordField({
       />
       <InputGroup.Addon align="end">
         <InputGroup.Button
+          type="button"
           shape="square"
           variant="ghost"
           className="text-kumo-subtle"

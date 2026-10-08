@@ -1,9 +1,23 @@
-import { Button, CommandPalette, DropdownMenu, Sidebar, Text } from "@cloudhal/ui";
-import { MagnifyingGlass, SignOut, SquaresFour, UserCircle, UserGear } from "@phosphor-icons/react";
+import {
+  Button,
+  CommandPalette,
+  DropdownMenu,
+  PageCrumbsSlot,
+  PageFrameProvider,
+  Sidebar,
+} from "@cloudhal/ui";
+import {
+  MagnifyingGlass,
+  SignOut,
+  SquaresFour,
+  Translate,
+  UserCircle,
+  UserGear,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { LOCALES, type Locale, useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
@@ -18,24 +32,26 @@ export interface PaletteCommand {
  * The dashboard shell (DESIGN.md §1, §3), composed the way Kumo's own Sidebar demos do it:
  * switcher in `Sidebar.Header`, nav in `Sidebar.Content` (or `Sidebar.Loading` until data is
  * ready), user menu + `Sidebar.Trigger` in `Sidebar.Footer`, `Sidebar.Rail` for drag/peek, and
- * a slim sticky top bar with search (⌘K, `/`).
+ * a slim sticky top bar: the page's breadcrumbs (Kumo `Breadcrumbs` are `h-12`, like the bar),
+ * search (⌘K, `/`), the surface's actions (site: Publish) and the language.
  */
 export function AppFrame({
-  title,
+  actions,
   switcher,
   nav,
   loading = false,
   commands,
   children,
 }: {
-  title: string;
+  /** Surface-wide actions on the right of the top bar (the site surface's Publish). */
+  actions?: ReactNode;
   switcher: ReactNode;
   nav: ReactNode;
   loading?: boolean;
   commands: PaletteCommand[];
   children: ReactNode;
 }) {
-  const t = useT();
+  const { t, locale, setLocale } = useI18n();
   const navigate = useNavigate();
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
   const [open, setOpen] = useState(false);
@@ -68,109 +84,127 @@ export function AppFrame({
   return (
     // Kumo's aside element is `h-full`, so the provider needs a definite height; the content column
     // scrolls on its own and the sidebar stays viewport-tall with its footer pinned (DESIGN.md §3).
-    <Sidebar.Provider
-      defaultOpen
-      collapsible="icon"
-      peekable
-      mobileBreakpoint={768}
-      className="h-svh"
-    >
-      <Sidebar>
-        <Sidebar.Header>{switcher}</Sidebar.Header>
-        {loading ? <Sidebar.Loading /> : <Sidebar.Content>{nav}</Sidebar.Content>}
-        <Sidebar.Footer>
-          <Sidebar.Menu>
-            <Sidebar.MenuItem>
-              <DropdownMenu>
-                <DropdownMenu.Trigger
-                  render={
-                    <Sidebar.MenuButton
-                      icon={UserCircle}
-                      tooltip={me.data?.actor.name ?? t("nav.account")}
-                    />
-                  }
-                >
-                  <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
-                  <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
-                    {t("nav.account")}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
-                    {t("nav.allSites")}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item icon={SignOut} onClick={signOut}>
-                    {t("common.signOut")}
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu>
-            </Sidebar.MenuItem>
-          </Sidebar.Menu>
-          <Sidebar.Trigger />
-        </Sidebar.Footer>
-        <Sidebar.Rail />
-      </Sidebar>
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-overlay">
-        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
-          {/* The sidebar is a sheet below the mobile breakpoint; this is its only way in there. */}
-          <span className="-ml-1 md:hidden">
-            <Sidebar.Trigger />
-          </span>
-          <span className="hidden min-w-0 truncate sm:inline">
-            <Text variant="secondary" size="sm" as="span">
-              {title}
-            </Text>
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<MagnifyingGlass />}
-              onClick={() => setOpen(true)}
-              className="w-48 justify-start text-kumo-subtle sm:w-64"
-            >
-              <span className="min-w-0 flex-1 truncate text-left">{t("nav.search")}</span>
-              <kbd className="rounded bg-kumo-recessed px-1 font-mono text-kumo-subtle text-xs">
-                {t("nav.shortcutHint")}
-              </kbd>
-            </Button>
-            <LanguageSwitch size="xs" />
-          </div>
-        </header>
-        <main className="min-w-0 flex-1">{children}</main>
-      </div>
-      <CommandPalette.Root
-        open={open}
-        onOpenChange={setOpen}
-        items={filtered}
-        value={query}
-        onValueChange={setQuery}
-        itemToStringValue={(c: PaletteCommand) => c.label}
-        onSelect={(c: PaletteCommand) => {
-          setOpen(false);
-          setQuery("");
-          void c.run();
-        }}
+    <PageFrameProvider>
+      <Sidebar.Provider
+        defaultOpen
+        collapsible="icon"
+        peekable
+        mobileBreakpoint={768}
+        className="h-svh"
       >
-        <CommandPalette.Input placeholder={t("commands.placeholder")} />
-        <CommandPalette.List>
-          {filtered.map((c) => (
-            <CommandPalette.Item key={c.id} value={c}>
-              {c.label}
-            </CommandPalette.Item>
-          ))}
-          <CommandPalette.Empty>{t("commands.empty")}</CommandPalette.Empty>
-        </CommandPalette.List>
-      </CommandPalette.Root>
-    </Sidebar.Provider>
-  );
-}
-
-/** Container for page content (DESIGN.md §1). */
-export function Content({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6 md:p-8 lg:px-10 lg:py-9">
-      {children}
-    </div>
+        <Sidebar>
+          <Sidebar.Header>{switcher}</Sidebar.Header>
+          {loading ? <Sidebar.Loading /> : <Sidebar.Content>{nav}</Sidebar.Content>}
+          <Sidebar.Footer>
+            <Sidebar.Menu>
+              <Sidebar.MenuItem>
+                <DropdownMenu>
+                  <DropdownMenu.Trigger
+                    render={
+                      <Sidebar.MenuButton
+                        icon={UserCircle}
+                        tooltip={me.data?.actor.name ?? t("nav.account")}
+                      />
+                    }
+                  >
+                    <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
+                    <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
+                      {t("nav.account")}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      icon={SquaresFour}
+                      onClick={() => navigate({ to: "/sites" })}
+                    >
+                      {t("nav.allSites")}
+                    </DropdownMenu.Item>
+                    {/* The top bar's language select is hidden on phones; this is the way there. */}
+                    <DropdownMenu.Sub>
+                      <DropdownMenu.SubTrigger icon={Translate}>
+                        {t("common.language")}
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.SubContent>
+                        <DropdownMenu.RadioGroup
+                          value={locale}
+                          onValueChange={(v: Locale) => setLocale(v)}
+                        >
+                          {(Object.keys(LOCALES) as Locale[]).map((l) => (
+                            <DropdownMenu.RadioItem key={l} value={l}>
+                              {LOCALES[l]}
+                              <DropdownMenu.RadioItemIndicator />
+                            </DropdownMenu.RadioItem>
+                          ))}
+                        </DropdownMenu.RadioGroup>
+                      </DropdownMenu.SubContent>
+                    </DropdownMenu.Sub>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.Item icon={SignOut} onClick={signOut}>
+                      {t("common.signOut")}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu>
+              </Sidebar.MenuItem>
+            </Sidebar.Menu>
+            <Sidebar.Trigger />
+          </Sidebar.Footer>
+          <Sidebar.Rail />
+        </Sidebar>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-overlay">
+          <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-kumo-hairline border-b bg-kumo-canvas px-4">
+            {/* The sidebar is a sheet below the mobile breakpoint; this is its only way in there. */}
+            <span className="-ml-1 md:hidden">
+              <Sidebar.Trigger />
+            </span>
+            <PageCrumbsSlot className="hidden flex-1 sm:flex" />
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<MagnifyingGlass />}
+                onClick={() => setOpen(true)}
+                aria-label={t("nav.search")}
+                className="justify-start text-kumo-subtle sm:w-40 lg:w-64"
+              >
+                <span className="hidden min-w-0 flex-1 truncate text-left sm:inline">
+                  {t("nav.search")}
+                </span>
+                <kbd className="hidden rounded bg-kumo-recessed px-1 font-mono text-kumo-subtle text-xs sm:inline">
+                  {t("nav.shortcutHint")}
+                </kbd>
+              </Button>
+              {actions}
+              <span className="hidden sm:flex">
+                <LanguageSwitch size="sm" />
+              </span>
+            </div>
+          </header>
+          <main className="min-w-0 flex-1">{children}</main>
+        </div>
+        <CommandPalette.Root
+          open={open}
+          onOpenChange={setOpen}
+          items={filtered}
+          value={query}
+          onValueChange={setQuery}
+          itemToStringValue={(c: PaletteCommand) => c.label}
+          onSelect={(c: PaletteCommand) => {
+            setOpen(false);
+            setQuery("");
+            void c.run();
+          }}
+        >
+          <CommandPalette.Input placeholder={t("commands.placeholder")} />
+          <CommandPalette.List>
+            {filtered.map((c) => (
+              <CommandPalette.Item key={c.id} value={c}>
+                {c.label}
+              </CommandPalette.Item>
+            ))}
+            <CommandPalette.Empty>{t("commands.empty")}</CommandPalette.Empty>
+          </CommandPalette.List>
+        </CommandPalette.Root>
+      </Sidebar.Provider>
+    </PageFrameProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { Banner, Input, LayerDialog, Select, Surface, Tabs, Text } from "@cloudhal/ui";
+import { Banner, Input, InsetPanel, LayerDialog, Select, Tabs, Text } from "@cloudhal/ui";
 import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
@@ -17,7 +17,12 @@ import {
   parseCustomDuration,
 } from "../lib/elevation.ts";
 import { AutoModeConfirm, ModeBadge } from "./AgentModes.tsx";
-import { CannotTakeNotice, cannotTake, useShortDuration } from "./ElevationRequest.tsx";
+import {
+  AgentReason,
+  CannotTakeNotice,
+  cannotTake,
+  useShortDuration,
+} from "./ElevationRequest.tsx";
 import { useToast } from "./Toast.ts";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 import { useNow } from "./useNow.ts";
@@ -169,17 +174,8 @@ export function ApproveElevationDialog({
           {request && elevation && (
             <div className="grid gap-5" data-testid="approve-elevation">
               {cannotTake(ownMode, elevation) && <CannotTakeNotice agent={agent} own={ownMode} />}
-              <Surface className="grid gap-1 rounded-lg px-4 py-3 ring ring-kumo-hairline">
-                <Text variant="secondary" size="xs" as="span">
-                  {t("approvals.elevation.reasonLabel")}
-                </Text>
-                {/* Agent-written: plain text only, never markup. */}
-                {elevation.reason ? (
-                  <Text>“{elevation.reason}”</Text>
-                ) : (
-                  <Text variant="secondary">{t("approvals.elevation.noReason")}</Text>
-                )}
-              </Surface>
+              {/* Agent-written: quoted as plain text, never markup. */}
+              <AgentReason reason={elevation.reason} />
               <div className="grid gap-1.5" data-testid="elevation-mode">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <Text size="sm" bold as="span">
@@ -282,58 +278,57 @@ export function ApproveElevationDialog({
                 </div>
               )}
               {/* What will happen, right above the action that makes it happen. */}
-              <div
-                className="grid gap-2 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-                data-testid="grant-summary"
-              >
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  {ownMode && (
-                    <>
-                      <span className="flex items-center gap-2">
-                        <Text variant="secondary" size="sm" as="span">
-                          {t("agents.elevate.now")}
-                        </Text>
-                        <ModeBadge mode={ownMode} />
+              <div data-testid="grant-summary">
+                <InsetPanel>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    {ownMode && (
+                      <>
+                        <span className="flex items-center gap-2">
+                          <Text variant="secondary" size="sm" as="span">
+                            {t("agents.elevate.now")}
+                          </Text>
+                          <ModeBadge mode={ownMode} />
+                        </span>
+                        <ArrowRight size={16} className="text-kumo-subtle" aria-hidden />
+                      </>
+                    )}
+                    <span className="flex items-center gap-2">
+                      <Text variant="secondary" size="sm" as="span">
+                        {t("agents.elevate.elevated")}
+                      </Text>
+                      <ModeBadge mode={mode} />
+                    </span>
+                  </div>
+                  {until && !cannotTake(ownMode, elevation) && (
+                    <div className="flex items-start gap-2">
+                      <span className="flex h-lh items-center text-kumo-subtle">
+                        <ClockCountdown size={16} />
                       </span>
-                      <ArrowRight size={16} className="text-kumo-subtle" aria-hidden />
-                    </>
+                      <Text bold data-testid="grant-summary-text">
+                        {ownMode
+                          ? t("approvals.elevation.summary", {
+                              agent,
+                              mode: modeName,
+                              time: formatUntil(until, locale, { now }),
+                              from: t(`agents.modes.names.${ownMode}`),
+                            })
+                          : t("approvals.elevation.summaryNoOwn", {
+                              agent,
+                              mode: modeName,
+                              time: formatUntil(until, locale, { now }),
+                            })}
+                      </Text>
+                    </div>
                   )}
-                  <span className="flex items-center gap-2">
-                    <Text variant="secondary" size="sm" as="span">
-                      {t("agents.elevate.elevated")}
-                    </Text>
-                    <ModeBadge mode={mode} />
-                  </span>
-                </div>
-                {until && !cannotTake(ownMode, elevation) && (
                   <div className="flex items-start gap-2">
                     <span className="flex h-lh items-center text-kumo-subtle">
-                      <ClockCountdown size={16} />
+                      <Info size={16} />
                     </span>
-                    <Text bold data-testid="grant-summary-text">
-                      {ownMode
-                        ? t("approvals.elevation.summary", {
-                            agent,
-                            mode: modeName,
-                            time: formatUntil(until, locale, { now }),
-                            from: t(`agents.modes.names.${ownMode}`),
-                          })
-                        : t("approvals.elevation.summaryNoOwn", {
-                            agent,
-                            mode: modeName,
-                            time: formatUntil(until, locale, { now }),
-                          })}
+                    <Text variant="secondary" size="sm">
+                      {t("approvals.elevation.nextCall")}
                     </Text>
                   </div>
-                )}
-                <div className="flex items-start gap-2">
-                  <span className="flex h-lh items-center text-kumo-subtle">
-                    <Info size={16} />
-                  </span>
-                  <Text variant="secondary" size="sm">
-                    {t("approvals.elevation.nextCall")}
-                  </Text>
-                </div>
+                </InsetPanel>
               </div>
             </div>
           )}

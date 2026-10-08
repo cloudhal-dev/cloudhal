@@ -1,12 +1,11 @@
 import {
   Badge,
   Banner,
-  Breadcrumbs,
   Button,
   Checkbox,
   InlineCopyText,
   Input,
-  PageHeader,
+  PageLayout,
   SkeletonLine,
   Table,
   Text,
@@ -16,7 +15,6 @@ import {
   Desktop,
   DeviceMobile,
   DeviceTablet,
-  House,
   Info,
   Question,
   ShieldWarning,
@@ -28,8 +26,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Content } from "../components/AppFrame.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
+import { Crumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { PasswordField } from "../components/PasswordField.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
@@ -63,7 +61,10 @@ import {
   type UserSession,
 } from "../lib/auth.ts";
 
-const SECTIONS = ["profile", "password", "sessions", "access"] as const;
+/** Sessions shown before "Show all". */
+const SESSION_LIMIT = 5;
+
+const SECTIONS = ["profile", "password", "sessions", "access", "server"] as const;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -178,33 +179,39 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
               description={errorMessage(save.error)}
             />
           )}
-          <Input
-            className="w-full"
-            label={t("account.profile.name")}
-            description={t("account.profile.nameHint")}
-            value={name}
-            onValueChange={setName}
-            autoComplete="name"
-            maxLength={NAME_MAX + 50}
-            error={
-              nameError ? t(`account.profile.errors.${nameError}`, { max: NAME_MAX }) : undefined
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                submit();
-              }
-            }}
-          />
-          <Input
-            className="w-full text-kumo-subtle"
-            label={t("account.profile.email")}
-            description={t("account.profile.emailHint")}
-            value={me.user.email}
-            type="email"
-            readOnly
-          />
-          <dl className="-my-3 border-kumo-hairline border-t">
+          <div className="@container">
+            <div className="grid items-start gap-5 @lg:grid-cols-2">
+              <Input
+                className="w-full"
+                label={t("account.profile.name")}
+                description={t("account.profile.nameHint")}
+                value={name}
+                onValueChange={setName}
+                autoComplete="name"
+                maxLength={NAME_MAX + 50}
+                error={
+                  nameError
+                    ? t(`account.profile.errors.${nameError}`, { max: NAME_MAX })
+                    : undefined
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+              />
+              <Input
+                className="w-full text-kumo-subtle"
+                label={t("account.profile.email")}
+                description={t("account.profile.emailHint")}
+                value={me.user.email}
+                type="email"
+                readOnly
+              />
+            </div>
+          </div>
+          <dl className="-mb-3 border-kumo-hairline border-t">
             <SettingRow
               label={t("account.profile.actorId")}
               hint={t("account.profile.actorIdHint")}
@@ -309,32 +316,38 @@ function PasswordSection() {
           description={errorMessage(change.error)}
         />
       )}
-      <PasswordField
-        label={t("account.password.current")}
-        value={values.current}
-        onValueChange={set("current")}
-        error={messages.current}
-        autoComplete="current-password"
-        onEnter={submit}
-      />
-      <div className="grid gap-5 sm:grid-cols-2">
-        <PasswordField
-          label={t("account.password.new")}
-          description={t("account.password.newHint", { min: PASSWORD_MIN })}
-          value={values.next}
-          onValueChange={set("next")}
-          error={messages.next}
-          autoComplete="new-password"
-          onEnter={submit}
-        />
-        <PasswordField
-          label={t("account.password.confirm")}
-          value={values.confirm}
-          onValueChange={set("confirm")}
-          error={messages.confirm}
-          autoComplete="new-password"
-          onEnter={submit}
-        />
+      {/* One grid for all three fields, so every input has the same width and the pair aligns. */}
+      <div className="@container">
+        <div className="grid items-start gap-5 @lg:grid-cols-2">
+          <PasswordField
+            label={t("account.password.current")}
+            value={values.current}
+            onValueChange={set("current")}
+            error={messages.current}
+            autoComplete="current-password"
+            onEnter={submit}
+          />
+          <div className="@lg:col-start-1">
+            <PasswordField
+              label={t("account.password.new")}
+              description={t("account.password.newHint", { min: PASSWORD_MIN })}
+              value={values.next}
+              onValueChange={set("next")}
+              error={messages.next}
+              autoComplete="new-password"
+              onEnter={submit}
+            />
+          </div>
+          <PasswordField
+            label={t("account.password.confirm")}
+            description={t("account.password.confirmHint")}
+            value={values.confirm}
+            onValueChange={set("confirm")}
+            error={messages.confirm}
+            autoComplete="new-password"
+            onEnter={submit}
+          />
+        </div>
       </div>
       <div className="grid gap-1">
         <Checkbox
@@ -395,6 +408,9 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
     },
   });
   const rows = sortSessions(sessions.data ?? [], currentToken);
+  // Long lists (many browsers, scripts) show the newest few first (DESIGN.md §5 "More data").
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? rows : rows.slice(0, SESSION_LIMIT);
   const others = rows.filter((s) => s.token !== currentToken).length;
   const stale = isSessionNotFresh(sessions.error);
   const describe = (s: UserSession) => deviceLabel(t, describeUserAgent(s.userAgent));
@@ -406,15 +422,23 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
       description={t("account.sessions.description")}
       flush
       aside={
+        sessions.data && (
+          <Badge variant="secondary">
+            {t("account.sessions.count", { count: sessions.data.length })}
+          </Badge>
+        )
+      }
+      footer={
         <>
-          {sessions.data && (
-            <Badge variant="secondary">
-              {t("account.sessions.count", { count: sessions.data.length })}
-            </Badge>
+          {rows.length > SESSION_LIMIT && (
+            <Button variant="ghost" onClick={() => setShowAll((v) => !v)}>
+              {showAll
+                ? t("account.sessions.showFewer")
+                : t("account.sessions.showAll", { count: rows.length })}
+            </Button>
           )}
           <Button
             variant="secondary"
-            size="sm"
             icon={<SignOut />}
             disabled={others === 0}
             onClick={() => setOthersOpen(true)}
@@ -468,7 +492,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
             <TableSkeleton columns={5} rows={2} />
           ) : (
             <Table.Body>
-              {rows.map((s) => {
+              {visible.map((s) => {
                 const device = describeUserAgent(s.userAgent);
                 const Icon = DEVICE_ICONS[device.kind];
                 const isCurrent = s.token === currentToken;
@@ -483,17 +507,15 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
                   >
                     <Table.Cell className="whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
-                        <Icon size={20} className="shrink-0 text-kumo-subtle" />
-                        <div className="grid gap-0.5">
+                        <Icon size={16} className="shrink-0 text-kumo-subtle" />
+                        <div className="flex items-center gap-2">
                           <Tooltip content={s.userAgent ?? t("account.sessions.unknownDevice")}>
                             <Text bold as="span">
                               {label}
                             </Text>
                           </Tooltip>
                           {isCurrent && (
-                            <span>
-                              <Badge variant="info">{t("account.sessions.current")}</Badge>
-                            </span>
+                            <Badge variant="info">{t("account.sessions.current")}</Badge>
                           )}
                         </div>
                       </div>
@@ -593,6 +615,31 @@ const FEATURES: InstanceFeature[] = [
   "deployTransfer",
 ];
 
+function AccessSkeleton() {
+  const t = useT();
+  return (
+    <div className="grid gap-3" role="status">
+      <span className="sr-only">{t("common.loading")}</span>
+      <SkeletonLine minWidth={40} maxWidth={60} />
+      <SkeletonLine minWidth={70} maxWidth={90} />
+    </div>
+  );
+}
+
+/** A muted info line under a card's rows (icon aligned with the first line). */
+function InfoLine({ children }: { children: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="flex h-lh items-center text-kumo-subtle">
+        <Info size={16} />
+      </span>
+      <Text variant="secondary" size="sm">
+        {children}
+      </Text>
+    </div>
+  );
+}
+
 function AccessSection({
   instance,
   pending,
@@ -614,13 +661,8 @@ function AccessSection({
     >
       <ErrorBanner error={error} onRetry={onRetry} />
       {pending ? (
-        <div className="grid gap-3" role="status">
-          <span className="sr-only">{t("common.loading")}</span>
-          <SkeletonLine minWidth={40} maxWidth={60} />
-          <SkeletonLine minWidth={70} maxWidth={90} />
-        </div>
+        <AccessSkeleton />
       ) : (
-        instance &&
         policy && (
           <>
             <dl className="-my-3" data-sign-up={policy}>
@@ -641,39 +683,54 @@ function AccessSection({
                 description={t("account.access.openWarning")}
               />
             )}
-            <Text variant="secondary" size="sm">
-              {t("account.access.howToChange")}
-            </Text>
-            <div className="grid gap-1 border-kumo-hairline border-t pt-4">
-              <Text variant="heading" as="h3">
-                {t("account.access.server")}
-              </Text>
-              <Text variant="secondary" size="sm">
-                {t("account.access.serverDescription")}
-              </Text>
-              <dl className="divide-y divide-kumo-hairline">
-                {FEATURES.map((f) => (
-                  <SettingRow
-                    key={f}
-                    label={t(`account.access.features.${f}`)}
-                    hint={t(`account.access.featureHints.${f}`)}
-                  >
-                    <span data-feature={f} data-enabled={instance.features[f]}>
-                      {instance.features[f] ? (
-                        <Badge variant="success" appearance="dot">
-                          {t("common.on")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="neutral" appearance="dot">
-                          {t("common.off")}
-                        </Badge>
-                      )}
-                    </span>
-                  </SettingRow>
-                ))}
-              </dl>
-            </div>
+            <InfoLine>{t("account.access.howToChange")}</InfoLine>
           </>
+        )
+      )}
+    </SettingsSection>
+  );
+}
+
+/** What this deployment runs: one `SettingRow` per feature with an On/Off dot badge. */
+function ServerSection({
+  instance,
+  pending,
+}: {
+  instance: InstanceInfo | undefined;
+  pending: boolean;
+}) {
+  const t = useT();
+  return (
+    <SettingsSection
+      id="server"
+      title={t("account.sections.server")}
+      description={t("account.access.serverDescription")}
+    >
+      {pending ? (
+        <AccessSkeleton />
+      ) : (
+        instance && (
+          <dl className="-my-3 divide-y divide-kumo-hairline">
+            {FEATURES.map((f) => (
+              <SettingRow
+                key={f}
+                label={t(`account.access.features.${f}`)}
+                hint={t(`account.access.featureHints.${f}`)}
+              >
+                <span data-feature={f} data-enabled={instance.features[f]}>
+                  {instance.features[f] ? (
+                    <Badge variant="success" appearance="dot">
+                      {t("common.on")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="neutral" appearance="dot">
+                      {t("common.off")}
+                    </Badge>
+                  )}
+                </span>
+              </SettingRow>
+            ))}
+          </dl>
         )
       )}
     </SettingsSection>
@@ -686,20 +743,11 @@ export function AccountPage() {
   const me = useQuery({ queryKey: ["auth-session"], queryFn: account.current });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
   return (
-    <Content>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs>
-            <Breadcrumbs.Link href="/sites" icon={<House size={16} />}>
-              {t("sites.title")}
-            </Breadcrumbs.Link>
-            <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>{t("account.title")}</Breadcrumbs.Current>
-          </Breadcrumbs>
-        }
-        title={t("account.title")}
-        description={t("account.description")}
-      />
+    <PageLayout
+      crumbs={<Crumbs trail={[{ label: t("pageHeaders.account.title") }]} />}
+      title={t("pageHeaders.account.title")}
+      description={t("pageHeaders.account.description")}
+    >
       <ErrorBanner error={me.error} onRetry={() => me.refetch()} retrying={me.isFetching} />
       <SettingsLayout
         title={t("common.onThisPage")}
@@ -714,7 +762,8 @@ export function AccountPage() {
           error={instance.error}
           onRetry={() => instance.refetch()}
         />
+        <ServerSection instance={instance.data} pending={instance.isPending} />
       </SettingsLayout>
-    </Content>
+    </PageLayout>
   );
 }

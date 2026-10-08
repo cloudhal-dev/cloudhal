@@ -16,6 +16,13 @@ export {
   OutcomeBadge,
   type OutcomeBadgeProps,
 } from "./blocks/AuditBadges.tsx";
+export { AuthLayout, type AuthLayoutProps } from "./blocks/AuthLayout.tsx";
+export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
+export {
+  InsetPanel,
+  type InsetPanelProps,
+  type InsetPanelVariant,
+} from "./blocks/InsetPanel.tsx";
 export {
   DeleteResource,
   type DeleteResourceProps,
@@ -26,12 +33,21 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  PageCrumbsSlot,
+  PageFrameProvider,
+  PageLayout,
+  type PageLayoutProps,
+  type PageWidth,
+} from "./blocks/PageLayout.tsx";
+export {
   PREVIEW_DEVICE_WIDTH,
   type PreviewDevice,
   PreviewPanel,
   type PreviewPanelLabels,
   type PreviewPanelProps,
 } from "./blocks/PreviewPanel.tsx";
+export { SectionCard, type SectionCardProps } from "./blocks/SectionCard.tsx";
+export { SectionEmpty, type SectionEmptyProps } from "./blocks/SectionEmpty.tsx";
 export {
   SidebarSwitcher,
   type SidebarSwitcherProps,

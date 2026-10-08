@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ActivityViews } from "../src/components/ActivityViews.tsx";
 import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { PendingApprovalsBanner } from "../src/components/PendingApprovalsBanner.tsx";
 import { I18nProvider } from "../src/i18n/index.tsx";
@@ -199,18 +198,9 @@ describe("ApprovalsPage", () => {
 });
 
 describe("pending approval badges", () => {
-  it("shows the count on the Approvals switch and a banner on the overview", async () => {
+  it("shows the count in a banner on the overview", async () => {
     approvalsServer({ status: 200, body: {} });
-    render(
-      wrap(
-        <>
-          <ActivityViews siteId="site_1" value="activity" />
-          <PendingApprovalsBanner siteId="site_1" />
-        </>,
-      ),
-    );
-    const counts = await screen.findAllByTestId("approvals-tab-count");
-    expect(counts[0]).toHaveTextContent("2");
+    render(wrap(<PendingApprovalsBanner siteId="site_1" />));
     const banner = await screen.findByTestId("pending-approvals-banner");
     expect(banner).toHaveTextContent("2 agent requests are waiting for your approval");
     fireEvent.click(within(banner).getByRole("button", { name: /review requests/i }));

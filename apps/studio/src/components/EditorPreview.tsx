@@ -1,27 +1,28 @@
 import { Badge, PreviewPanel, Tooltip } from "@cloudhal/ui";
 import { useT } from "../i18n/index.tsx";
 
-/** Localised `PreviewPanel` for an editor; reloads whenever the saved `rev` changes. */
+/**
+ * Localised `PreviewPanel` for an editor; fills the editor's preview column and reloads whenever
+ * the saved `rev` changes.
+ */
 export function EditorPreview({
   src,
   rev,
   name,
   dirty,
-  height,
 }: {
   src: string;
   rev: number;
   name: string;
   /** The form has changes the preview can't show yet. */
   dirty: boolean;
-  height: string;
 }) {
   const t = useT();
   return (
     <PreviewPanel
       src={src}
       version={rev}
-      height={height}
+      fill
       labels={{
         title: t("preview.title"),
         frameTitle: t("preview.frameTitle", { name }),

@@ -20,3 +20,4 @@ packages/core-contracts/schemas/.bundled/
 
 # Package build output
 .build/
+.shots/

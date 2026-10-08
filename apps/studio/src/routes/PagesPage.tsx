@@ -5,6 +5,7 @@ import {
   Empty,
   LayerCard,
   Link,
+  PageLayout,
   Pagination,
   Table,
   Text,
@@ -13,6 +14,7 @@ import { FileText, Plus } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
@@ -75,13 +77,17 @@ export function PagesPage() {
     </Button>
   );
   return (
-    <div className="grid gap-4">
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.pages.title") }]} />}
+      title={t("pageHeaders.pages.title")}
+      description={t("pageHeaders.pages.description")}
+      actions={newButton}
+    >
       <ErrorBanner error={pages.error ?? create.error ?? remove.error} />
       <ListToolbar
         search={paging.search}
         onSearch={paging.setSearch}
         placeholder={t("overview.search")}
-        actions={newButton}
       />
       {pages.data?.length === 0 ? (
         <Empty
@@ -91,7 +97,7 @@ export function PagesPage() {
           contents={newButton}
         />
       ) : (
-        <LayerCard className="p-0">
+        <LayerCard className="overflow-x-auto p-0">
           <Table>
             <Table.Header>
               <Table.Row>
@@ -164,6 +170,6 @@ export function PagesPage() {
           if (toDelete) await remove.mutateAsync(toDelete);
         }}
       />
-    </div>
+    </PageLayout>
   );
 }

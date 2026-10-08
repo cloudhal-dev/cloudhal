@@ -1,4 +1,4 @@
-import { Badge, Banner, Checkbox, LayerCard, Radio, Table, Text, Tooltip } from "@cloudhal/ui";
+import { Badge, Banner, Checkbox, Radio, SectionCard, Table, Text, Tooltip } from "@cloudhal/ui";
 import {
   ClockCountdown,
   Eye,
@@ -298,79 +298,84 @@ function RuleBadge({ rule }: { rule: ModeRule }) {
 /**
  * "How modes work" (Agents page side column): the ADR-0015 table — what each key mode does with
  * content edits, publishes and rollback/deletes — plus the tools that always wait for a person.
+ * A flush `SectionCard`: the table runs edge to edge, the notes below it keep the card's padding.
  */
 export function HowModesWorkCard() {
   const t = useT();
   const { modes } = useAgentModeRules();
   return (
-    <LayerCard data-testid="how-modes">
-      <LayerCard.Secondary className="flex items-center gap-2 px-5 py-3">
-        <SlidersHorizontal size={16} className="text-kumo-subtle" />
-        <Text variant="heading" as="h2">
-          {t("agents.howModes.title")}
-        </Text>
-      </LayerCard.Secondary>
-      <LayerCard.Primary className="grid min-w-0 gap-0 p-0">
-        <div className="px-5 pt-4 pb-3">
-          <Text variant="secondary">{t("agents.howModes.description")}</Text>
-        </div>
-        <div className="min-w-0 overflow-x-auto border-y border-kumo-hairline">
-          {/* Tighter cells than Kumo's p-3 so four columns fit the 380 px side column; the first
-              column keeps the card's px-5 edge. */}
-          <Table className="[&_td]:px-2 [&_td:first-child]:pl-5 [&_th]:px-2 [&_th:first-child]:pl-5">
-            <Table.Header variant="compact">
-              <Table.Row>
-                <Table.Head>{t("agents.howModes.columns.mode")}</Table.Head>
-                <Table.Head>{t("agents.howModes.columns.edits")}</Table.Head>
-                <Table.Head>{t("agents.howModes.columns.publish")}</Table.Head>
-                <Table.Head>{t("agents.howModes.columns.rollback")}</Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {modes.map((mode) => (
-                <Table.Row key={mode} data-mode-row={mode}>
-                  <Table.Cell className="whitespace-nowrap">
-                    <Text as="span" bold>
-                      {t(`agents.modes.names.${mode}`)}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <RuleBadge rule={MODE_RULES[mode].edits} />
-                  </Table.Cell>
-                  <Table.Cell>
-                    <RuleBadge rule={MODE_RULES[mode].publish} />
-                  </Table.Cell>
-                  <Table.Cell>
-                    <RuleBadge rule={MODE_RULES[mode].rollback} />
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
-        </div>
-        <div className="grid gap-3 px-5 py-4">
-          <div className="grid gap-2">
-            <Text size="sm" bold as="span">
-              {t("agents.howModes.gated")}
-            </Text>
+    <SectionCard
+      id="how-modes"
+      title={t("agents.howModes.title")}
+      icon={<SlidersHorizontal size={16} />}
+      description={t("agents.howModes.description")}
+      flush
+    >
+      {/* Tighter cells than Kumo's p-3 so four columns fit the 380 px side column (and a phone) in
+          English and Turkish; the first column keeps the card's px-5 edge. */}
+      <Table className="[&_td]:px-1 [&_td:first-child]:pl-5 [&_td:last-child]:pr-5 [&_th]:px-1 [&_th]:align-bottom [&_th:first-child]:pl-5 [&_th:last-child]:pr-5">
+        <Table.Header variant="compact">
+          <Table.Row>
+            <Table.Head>{t("agents.howModes.columns.mode")}</Table.Head>
+            <Table.Head>{t("agents.howModes.columns.edits")}</Table.Head>
+            <Table.Head>{t("agents.howModes.columns.publish")}</Table.Head>
+            <Table.Head>{t("agents.howModes.columns.rollback")}</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {modes.map((mode) => (
+            <Table.Row key={mode} data-mode-row={mode}>
+              <Table.Cell className="whitespace-nowrap">
+                <Text as="span" bold>
+                  {t(`agents.modes.names.${mode}`)}
+                </Text>
+              </Table.Cell>
+              <Table.Cell>
+                <RuleBadge rule={MODE_RULES[mode].edits} />
+              </Table.Cell>
+              <Table.Cell>
+                <RuleBadge rule={MODE_RULES[mode].publish} />
+              </Table.Cell>
+              <Table.Cell>
+                <RuleBadge rule={MODE_RULES[mode].rollback} />
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table>
+      <div className="grid gap-4 border-kumo-hairline border-t px-5 pt-4 pb-5">
+        <div className="grid gap-2">
+          <Text size="sm" bold as="span">
+            {t("agents.howModes.gated")}
+          </Text>
+          <dl className="grid gap-1.5">
             {ALWAYS_GATED_TOOLS.map((tool) => (
               <div key={tool} className="flex items-center justify-between gap-3">
-                <Text as="span">{t(`tools.${tool}`)}</Text>
-                <Text variant="mono-secondary" as="span">
-                  {tool}
-                </Text>
+                <dt>
+                  <Text as="span">{t(`tools.${tool}`)}</Text>
+                </dt>
+                <dd>
+                  <Text variant="mono-secondary" as="span">
+                    {tool}
+                  </Text>
+                </dd>
               </div>
             ))}
-          </div>
-          {/* Prefer a time-boxed elevation over a permanent Auto key (ADR-0016). */}
-          <div className="flex items-start gap-2" data-testid="how-elevation">
-            <span className="flex h-lh items-center text-kumo-subtle">
-              <ClockCountdown size={16} />
-            </span>
-            <Text variant="secondary" size="sm">
-              {t("agents.elevation.howModes")}
-            </Text>
-          </div>
+          </dl>
+        </div>
+        {/* Prefer a time-boxed elevation over a permanent Auto key (ADR-0016). */}
+        <div className="flex items-start gap-2" data-testid="how-elevation">
+          <span className="flex h-lh items-center text-kumo-subtle">
+            <ClockCountdown size={16} />
+          </span>
+          <Text variant="secondary" size="sm">
+            {t("agents.elevation.howModes")}
+          </Text>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="flex h-lh items-center text-kumo-subtle">
+            <ModeIcon mode="bypass" />
+          </span>
           <Text variant="secondary" size="sm">
             {t("agents.howModes.bypass")}{" "}
             <span className="font-mono text-[0.9em] whitespace-nowrap text-kumo-default [font-variant-ligatures:none]">
@@ -378,7 +383,7 @@ export function HowModesWorkCard() {
             </span>
           </Text>
         </div>
-      </LayerCard.Primary>
-    </LayerCard>
+      </div>
+    </SectionCard>
   );
 }

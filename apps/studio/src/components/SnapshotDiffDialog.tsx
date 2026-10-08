@@ -1,11 +1,12 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
 import {
   Badge,
-  Empty,
   InlineCopyText,
+  InsetPanel,
   LayerCard,
   LayerDialog,
   Link,
+  SectionEmpty,
   SkeletonLine,
   Table,
   Tabs,
@@ -148,10 +149,17 @@ export function SnapshotDiffDialog({
                   <div className="flex flex-wrap items-center gap-1.5" data-testid="diff-counts">
                     {CHANGES.map((c) => {
                       const Icon = CHANGE_STYLE[c].icon;
+                      const count = groups[c].length;
+                      // Zero counts stay readable but quiet, so the colour points at what changed.
                       return (
-                        <Badge key={c} variant={CHANGE_STYLE[c].variant} icon={<Icon />}>
-                          {t(`diff.counts.${c}`, { count: groups[c].length })}
-                        </Badge>
+                        <span key={c} data-change-count={c} className="inline-flex">
+                          <Badge
+                            variant={count > 0 ? CHANGE_STYLE[c].variant : "secondary"}
+                            icon={<Icon />}
+                          >
+                            {t(`diff.counts.${c}`, { count })}
+                          </Badge>
+                        </span>
                       );
                     })}
                   </div>
@@ -159,8 +167,7 @@ export function SnapshotDiffDialog({
               </div>
             )}
             {available.length === 0 ? (
-              <Empty
-                size="sm"
+              <SectionEmpty
                 icon={<GitDiff size={32} className="text-kumo-inactive" />}
                 title={t("diff.nothingToCompare")}
                 description={t("diff.nothingToCompareDescription")}
@@ -168,14 +175,13 @@ export function SnapshotDiffDialog({
             ) : diff.error ? (
               <ErrorBanner error={diff.error} onRetry={() => diff.refetch()} />
             ) : !groups ? (
-              <LayerCard className="grid gap-3 px-5 py-4">
+              <InsetPanel className="gap-3">
                 <SkeletonLine />
                 <SkeletonLine />
                 <SkeletonLine />
-              </LayerCard>
+              </InsetPanel>
             ) : total === 0 ? (
-              <Empty
-                size="sm"
+              <SectionEmpty
                 icon={<Equals size={32} className="text-kumo-inactive" />}
                 title={t("diff.none")}
                 description={t("diff.noneDescription")}
@@ -187,7 +193,7 @@ export function SnapshotDiffDialog({
                     <Text bold as="h3">
                       {t(`diff.${c}`)}
                     </Text>
-                    <Badge variant="neutral">{groups[c].length}</Badge>
+                    <Badge variant="secondary">{groups[c].length}</Badge>
                   </div>
                   <LayerCard className="overflow-x-auto p-0">
                     <Table layout="fixed">

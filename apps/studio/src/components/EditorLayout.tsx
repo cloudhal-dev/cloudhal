@@ -1,24 +1,9 @@
-import { Button, Grid, Tabs, Tooltip } from "@cloudhal/ui";
-import { Eye, EyeSlash } from "@phosphor-icons/react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Button, Columns, cn, SectionCard, Tabs, Text, Tooltip } from "@cloudhal/ui";
+import { Eye, EyeSlash, Trash } from "@phosphor-icons/react";
+import { type ReactNode, useCallback, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 
-/** Tailwind's `xl`: from here the editor and its preview sit side by side (DESIGN.md §2f). */
-export const SPLIT_QUERY = "(min-width: 1280px)";
 const STORAGE_KEY = "cloudhal.studio.preview";
-
-export function useMediaQuery(query: string): boolean {
-  const get = () => typeof window !== "undefined" && window.matchMedia(query).matches;
-  const [matches, setMatches] = useState(get);
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = () => setMatches(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-}
 
 /** Whether the side-by-side preview is shown on wide screens (remembered per browser). */
 export function usePreviewVisible(): [boolean, (visible: boolean) => void] {
@@ -38,7 +23,10 @@ export function usePreviewVisible(): [boolean, (visible: boolean) => void] {
   return [visible, set];
 }
 
-/** Header action that shows/hides the preview column; only meaningful on wide screens. */
+/**
+ * Header action that shows/hides the preview column. Only rendered where the split exists
+ * (content ≥ 64rem, the same container query as `EditorLayout`); narrower editors use the tabs.
+ */
 export function PreviewToggle({
   visible,
   onChange,
@@ -49,27 +37,31 @@ export function PreviewToggle({
   const t = useT();
   const label = visible ? t("preview.hide") : t("preview.show");
   return (
-    <Tooltip
-      content={label}
-      render={
-        <Button
-          variant="ghost"
-          shape="square"
-          icon={visible ? <EyeSlash /> : <Eye />}
-          aria-label={label}
-          aria-pressed={visible}
-          onClick={() => onChange(!visible)}
-        />
-      }
-    />
+    <span className="hidden @5xl/page:inline-flex">
+      <Tooltip
+        content={t("preview.toggleHint")}
+        render={
+          <Button
+            variant="secondary"
+            icon={visible ? <EyeSlash /> : <Eye />}
+            aria-pressed={visible}
+            onClick={() => onChange(!visible)}
+          >
+            {label}
+          </Button>
+        }
+      />
+    </span>
   );
 }
 
 /**
- * Editor template with live preview (DESIGN.md §2f).
- * - ≥ xl, preview on: two columns — the form (main, then aside) left, a sticky preview right.
- * - ≥ xl, preview off: the classic `Grid 2-1` (main | aside).
- * - < xl: underline `Tabs` switch between the form (Grid 2-1, stacking on phones) and the preview.
+ * Editor template with live preview (DESIGN.md §2f). Widths are container queries on
+ * `PageLayout`'s `@container/page`, so the sidebar being open or collapsed is accounted for.
+ * - content ≥ 64rem, preview on: two equal columns — the form (main, then aside) left, the
+ *   preview right, sticky under the top bar and as tall as the viewport allows.
+ * - content ≥ 64rem, preview off: `Columns 2-1` (main | aside).
+ * - narrower: underline `Tabs` "Edit | Preview"; Edit is `Columns 2-1` (stacked on phones).
  */
 export function EditorLayout({
   main,
@@ -79,38 +71,17 @@ export function EditorLayout({
 }: {
   main: ReactNode;
   aside: ReactNode;
-  /** Render prop so the panel can size itself for the layout it lands in. */
-  preview: (height: string) => ReactNode;
+  /** The `EditorPreview`; it fills the column's height. */
+  preview: ReactNode;
   previewVisible: boolean;
 }) {
   const t = useT();
-  const wide = useMediaQuery(SPLIT_QUERY);
   const [view, setView] = useState<"edit" | "preview">("edit");
-  const form = (
-    <Grid variant="2-1" gap="base">
-      <div className="grid min-w-0 content-start gap-4">{main}</div>
-      <div className="grid min-w-0 content-start gap-4">{aside}</div>
-    </Grid>
-  );
-
-  if (wide) {
-    if (!previewVisible) return form;
-    return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-6">
-        <div className="grid min-w-0 content-start gap-4">
-          {main}
-          {aside}
-        </div>
-        <div className="sticky top-16 min-w-0" data-testid="preview-column">
-          {preview("calc(100svh - 9rem)")}
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 gap-6">
       <Tabs
         variant="underline"
+        className="@5xl/page:hidden"
         value={view}
         onValueChange={(v) => setView(v as "edit" | "preview")}
         tabs={[
@@ -118,7 +89,90 @@ export function EditorLayout({
           { value: "preview", label: t("preview.title") },
         ]}
       />
-      {view === "edit" ? form : preview("70svh")}
+      <div
+        className={cn(
+          "grid min-w-0 grid-cols-1 items-start gap-6",
+          previewVisible && "@5xl/page:grid-cols-2",
+        )}
+      >
+        <div className={cn("min-w-0", view === "preview" && "hidden @5xl/page:block")}>
+          <Columns variant="2-1" className={cn(previewVisible && "@5xl/page:grid-cols-1")}>
+            <div className="grid min-w-0 content-start gap-6">{main}</div>
+            <div className="grid min-w-0 content-start gap-6">{aside}</div>
+          </Columns>
+        </div>
+        <div
+          data-testid="preview-column"
+          className={cn(
+            "h-[70svh] min-w-0",
+            view === "edit" && "hidden",
+            previewVisible
+              ? "@5xl/page:sticky @5xl/page:top-16 @5xl/page:block @5xl/page:h-[calc(100svh-6rem)]"
+              : "@5xl/page:hidden",
+          )}
+        >
+          {preview}
+        </div>
+      </div>
     </div>
+  );
+}
+
+export interface DetailRow {
+  label: string;
+  value: ReactNode;
+}
+
+/** The editor's read-only facts (DESIGN.md §2b "details card"): label/value rows in a `dl`. */
+export function DetailsCard({ rows }: { rows: DetailRow[] }) {
+  const t = useT();
+  return (
+    <SectionCard title={t("editor.metadata")}>
+      <dl className="grid divide-y divide-kumo-hairline">
+        {rows.map((r) => (
+          <div
+            key={r.label}
+            className="flex min-w-0 items-center justify-between gap-4 py-2 first:pt-0 last:pb-0"
+          >
+            <Text as="dt" variant="secondary">
+              {r.label}
+            </Text>
+            <dd className="flex min-w-0 items-center justify-end">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </SectionCard>
+  );
+}
+
+/** The editor's danger zone (DESIGN.md §2b, §2d): one destructive action that opens `DeleteResource`. */
+export function DangerZoneCard({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  const t = useT();
+  return (
+    <SectionCard title={t("editor.dangerZone")}>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="grid min-w-0 flex-[1_1_14rem] gap-1.5">
+          <Text bold as="span">
+            {title}
+          </Text>
+          <Text variant="secondary" size="sm" as="span">
+            {description}
+          </Text>
+        </div>
+        <Button variant="secondary-destructive" icon={<Trash />} onClick={onAction}>
+          {actionLabel}
+        </Button>
+      </div>
+    </SectionCard>
   );
 }

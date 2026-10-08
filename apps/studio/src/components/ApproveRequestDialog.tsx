@@ -2,10 +2,10 @@ import {
   Badge,
   Banner,
   InlineCopyText,
+  InsetPanel,
   LayerDialog,
   LinkButton,
   SkeletonLine,
-  Surface,
   Text,
 } from "@cloudhal/ui";
 import {
@@ -155,9 +155,9 @@ export function ApproveRequestDialog({
           {request && (
             <div className="grid gap-5" data-testid="approve-dialog">
               {/* Server-built text that can quote agent-written titles: plain text only. */}
-              <Surface className="rounded-lg px-4 py-3 ring ring-kumo-hairline">
+              <InsetPanel>
                 <Text>{request.prompt}</Text>
-              </Surface>
+              </InsetPanel>
               {request.tool === "publish" && (
                 <PublishChanges siteId={siteId} active={current !== undefined} />
               )}

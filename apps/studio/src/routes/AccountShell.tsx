@@ -20,7 +20,6 @@ export function AccountShell() {
   const skills = useQuery({ queryKey: ["skills"], queryFn: api.skills.list });
   return (
     <AppFrame
-      title={t("app.name")}
       loading={sites.isPending}
       switcher={
         <SidebarSwitcher

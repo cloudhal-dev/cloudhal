@@ -2,7 +2,7 @@
   "name": "cloudhal-monorepo",
   "private": true,
   "version": "0.0.0",
-  "description": "Cloudhal \u2014 the open-source, agent-native site platform (monorepo root)",
+  "description": "Cloudhal — the open-source, agent-native site platform (monorepo root)",
   "license": "Apache-2.0",
   "packageManager": "pnpm@12.10.1",
   "engines": {
@@ -13,6 +13,9 @@
     "check": "biome check . && turbo run typecheck && turbo run test",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "design:lint": "node apps/studio/scripts/design-lint.ts",
+    "design:shots": "node apps/studio/scripts/screenshots.ts",
+    "kumo": "pnpm --filter @cloudhal/ui exec kumo",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "gen": "turbo run gen:ts gen:rs",

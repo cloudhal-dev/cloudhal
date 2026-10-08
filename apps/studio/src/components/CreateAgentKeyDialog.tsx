@@ -6,6 +6,7 @@ import {
   ClipboardText,
   Collapsible,
   Input,
+  InsetPanel,
   LayerDialog,
   Tabs,
   Text,
@@ -215,9 +216,9 @@ export function CreateAgentKeyDialog({
                   description={create.error.message}
                 />
               )}
-              <div className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline">
-                <div className="grid min-w-0 gap-1">
-                  <div className="flex items-center gap-2">
+              <InsetPanel layout="row" label={t("agents.create.mode")}>
+                <div className="grid min-w-0 flex-1 gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Text size="sm" bold as="span">
                       {t("agents.create.mode")}
                     </Text>
@@ -230,7 +231,7 @@ export function CreateAgentKeyDialog({
                 <Button variant="secondary" size="sm" onClick={() => setStep("mode")}>
                   {t("agents.create.changeMode")}
                 </Button>
-              </div>
+              </InsetPanel>
               <Input
                 label={t("agents.create.name")}
                 placeholder={t("agents.create.namePlaceholder")}
@@ -284,10 +285,10 @@ export function CreateAgentKeyDialog({
                     </div>
                     {(Object.entries(SCOPE_GROUPS) as Array<[ScopeGroup, GrantableScope[]]>).map(
                       ([group, groupScopes]) => (
-                        <div
+                        <InsetPanel
                           key={group}
-                          className="grid gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-                          data-scope-group={group}
+                          label={t(`agents.create.groups.${group}`)}
+                          className="gap-3"
                         >
                           <div className="grid gap-0.5">
                             <Text size="sm" bold as="span">
@@ -314,7 +315,7 @@ export function CreateAgentKeyDialog({
                               />
                             ))}
                           </div>
-                        </div>
+                        </InsetPanel>
                       ),
                     )}
                     {missing.length > 0 && scopes.length > 0 && (

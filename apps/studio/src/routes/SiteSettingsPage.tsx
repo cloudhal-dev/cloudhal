@@ -5,15 +5,16 @@ import {
   Button,
   ClipboardText,
   DropdownMenu,
-  Empty,
   InlineCopyText,
   Input,
   InputGroup,
+  InsetPanel,
   LinkButton,
+  PageLayout,
   Radio,
+  SectionEmpty,
   Select,
   SkeletonLine,
-  Surface,
   Table,
   Text,
   Tooltip,
@@ -35,6 +36,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
@@ -140,6 +143,20 @@ function SectionSkeleton() {
   );
 }
 
+/** A muted info line in a card (icon aligned with the first line of text). */
+function InfoLine({ children }: { children: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="flex h-lh items-center text-kumo-subtle">
+        <Info size={16} />
+      </span>
+      <Text variant="secondary" size="sm">
+        {children}
+      </Text>
+    </div>
+  );
+}
+
 function GeneralSection({
   site,
   onReload,
@@ -235,21 +252,23 @@ function GeneralSection({
               }
             }}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <InputGroup
-              label={t("siteSettings.general.slug")}
-              description={t("siteSettings.general.slugHint")}
-            >
-              <InputGroup.Addon>/</InputGroup.Addon>
-              <InputGroup.Input value={site.slug} readOnly className="text-kumo-subtle" />
-            </InputGroup>
-            <Select
-              label={t("siteSettings.general.defaultLocale")}
-              description={t("siteSettings.general.defaultLocaleHint")}
-              value={locale}
-              onValueChange={(v) => setLocale(String(v))}
-              items={Object.fromEntries(locales.map((l) => [l, l]))}
-            />
+          <div className="@container">
+            <div className="grid items-start gap-5 @lg:grid-cols-2">
+              <InputGroup
+                label={t("siteSettings.general.slug")}
+                description={t("siteSettings.general.slugHint")}
+              >
+                <InputGroup.Addon>/</InputGroup.Addon>
+                <InputGroup.Input value={site.slug} readOnly className="text-kumo-subtle" />
+              </InputGroup>
+              <Select
+                label={t("siteSettings.general.defaultLocale")}
+                description={t("siteSettings.general.defaultLocaleHint")}
+                value={locale}
+                onValueChange={(v) => setLocale(String(v))}
+                items={Object.fromEntries(locales.map((l) => [l, l]))}
+              />
+            </div>
           </div>
           <dl className="-mb-3 divide-y divide-kumo-hairline border-kumo-hairline border-t">
             <SettingRow
@@ -391,14 +410,11 @@ function DomainsSection({
             </div>
           )}
           {domains.length === 0 ? (
-            <div className="px-5 py-4">
-              <Empty
-                size="sm"
-                icon={<Globe size={32} className="text-kumo-inactive" />}
-                title={t("siteSettings.domains.empty")}
-                description={t("siteSettings.domains.emptyDescription")}
-              />
-            </div>
+            <SectionEmpty
+              icon={<Globe size={48} className="text-kumo-inactive" />}
+              title={t("siteSettings.domains.empty")}
+              description={t("siteSettings.domains.emptyDescription")}
+            />
           ) : (
             <Table>
               <Table.Header>
@@ -449,60 +465,50 @@ function DomainsSection({
               </Table.Body>
             </Table>
           )}
-          <div className="grid gap-3 border-kumo-hairline border-t px-5 py-4">
-            <div className="flex flex-wrap items-start gap-2">
-              <div className="min-w-0 flex-[1_1_16rem]">
-                <InputGroup
-                  label={t("siteSettings.domains.hostname")}
-                  error={
-                    error
-                      ? {
-                          message: t(`siteSettings.domains.errors.${error}`),
-                          match: true,
-                        }
-                      : undefined
+          <div className="grid grid-cols-1 gap-3 border-kumo-hairline border-t px-5 pt-4 pb-5">
+            {/* Kumo's hybrid InputGroup: the button is attached to the field, so it lines up
+                with the input whatever the label, description or error do. */}
+            <InputGroup
+              label={t("siteSettings.domains.hostname")}
+              error={
+                error
+                  ? {
+                      message: t(`siteSettings.domains.errors.${error}`),
+                      match: true,
+                    }
+                  : undefined
+              }
+            >
+              <InputGroup.Addon>https://</InputGroup.Addon>
+              <InputGroup.Input
+                value={input}
+                placeholder={t("siteSettings.domains.placeholder")}
+                // w-0 + grow: no intrinsic input width, so the row fits a 375px card.
+                className="w-0"
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={error ? true : undefined}
+                onChange={(e) => {
+                  setInput((e.target as HTMLInputElement).value);
+                  setAttempted(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    add();
                   }
-                >
-                  <InputGroup.Addon>https://</InputGroup.Addon>
-                  <InputGroup.Input
-                    value={input}
-                    placeholder={t("siteSettings.domains.placeholder")}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={error ? true : undefined}
-                    onChange={(e) => {
-                      setInput((e.target as HTMLInputElement).value);
-                      setAttempted(false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        add();
-                      }
-                    }}
-                  />
-                </InputGroup>
-              </div>
-              {/* Aligns with the input, below its label. */}
-              <div className="sm:pt-6">
-                <Button
-                  variant="secondary"
-                  icon={<Plus />}
-                  onClick={add}
-                  loading={save.isPending && !toRemove}
-                >
-                  {t("siteSettings.domains.add")}
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="flex h-lh items-center text-kumo-subtle">
-                <Info size={16} />
-              </span>
-              <Text variant="secondary" size="sm">
-                {t("siteSettings.domains.dnsHint")}
-              </Text>
-            </div>
+                }}
+              />
+              <InputGroup.Button
+                variant="secondary"
+                icon={<Plus />}
+                onClick={add}
+                loading={save.isPending && !toRemove}
+              >
+                {t("siteSettings.domains.add")}
+              </InputGroup.Button>
+            </InputGroup>
+            <InfoLine>{t("siteSettings.domains.dnsHint")}</InfoLine>
           </div>
         </>
       )}
@@ -551,74 +557,72 @@ function snapshotLabel(s: Snapshot, live: boolean, locale: string, liveLabel: st
   return `${name} · ${when}${live ? ` · ${liveLabel}` : ""}`;
 }
 
-/** The minted link in a neutral `Surface` panel: URL (or the bare token) to copy, target, expiry. */
+/** The minted link in an `InsetPanel`: URL (or the bare token) to copy, target, expiry. */
 function PreviewResult({ link }: { link: PreviewLink }) {
   const { t, locale } = useI18n();
   const kind = link.target === "live" ? "live" : "snapshot";
   return (
-    <Surface
-      className="grid min-w-0 gap-3 rounded-lg px-4 py-3 ring ring-kumo-hairline"
-      data-testid="preview-link"
-      aria-live="polite"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Text bold as="span">
-            {t("siteSettings.previews.result")}
-          </Text>
-          <Badge variant={kind === "live" ? "info" : "secondary"}>
-            {t(`siteSettings.previews.showing.${kind}`)}
-          </Badge>
-        </div>
-        {link.url && (
-          <LinkButton href={link.url} external variant="secondary" size="sm">
-            {t("siteSettings.previews.openLink")}
-          </LinkButton>
-        )}
-      </div>
-      {link.url ? (
-        <ClipboardText
-          size="base"
-          text={link.url}
-          tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
-        />
-      ) : (
-        <>
-          <Banner
-            variant="alert"
-            size="sm"
-            icon={<Warning weight="fill" />}
-            title={t("siteSettings.previews.noDomainTitle")}
-            description={t("siteSettings.previews.noDomainDescription")}
-          />
-          <div className="grid gap-1.5">
-            <Text size="sm" bold as="span">
-              {t("siteSettings.previews.token")}
+    <div data-testid="preview-link" aria-live="polite">
+      <InsetPanel className="gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Text bold as="span">
+              {t("siteSettings.previews.result")}
             </Text>
-            <ClipboardText
-              size="base"
-              text={link.token}
-              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
-            />
+            <Badge variant={kind === "live" ? "info" : "secondary"}>
+              {t(`siteSettings.previews.showing.${kind}`)}
+            </Badge>
           </div>
-        </>
-      )}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Tooltip content={absoluteTime(link.expiresAt, locale)}>
+          {link.url && (
+            <LinkButton href={link.url} external variant="secondary" size="sm">
+              {t("siteSettings.previews.openLink")}
+            </LinkButton>
+          )}
+        </div>
+        {link.url ? (
+          <ClipboardText
+            size="base"
+            text={link.url}
+            tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
+          />
+        ) : (
+          <>
+            <Banner
+              variant="alert"
+              size="sm"
+              icon={<Warning weight="fill" />}
+              title={t("siteSettings.previews.noDomainTitle")}
+              description={t("siteSettings.previews.noDomainDescription")}
+            />
+            <div className="grid gap-1.5">
+              <Text size="sm" bold as="span">
+                {t("siteSettings.previews.token")}
+              </Text>
+              <ClipboardText
+                size="base"
+                text={link.token}
+                tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
+              />
+            </div>
+          </>
+        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Tooltip content={absoluteTime(link.expiresAt, locale)}>
+            <Text variant="secondary" size="sm" as="span">
+              {t("siteSettings.previews.expires", {
+                when: new Date(link.expiresAt).toLocaleString(locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }),
+              })}
+            </Text>
+          </Tooltip>
           <Text variant="secondary" size="sm" as="span">
-            {t("siteSettings.previews.expires", {
-              when: new Date(link.expiresAt).toLocaleString(locale, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }),
-            })}
+            {t("siteSettings.previews.opens", { path: link.path })}
           </Text>
-        </Tooltip>
-        <Text variant="secondary" size="sm" as="span">
-          {t("siteSettings.previews.opens", { path: link.path })}
-        </Text>
-      </div>
-    </Surface>
+        </div>
+      </InsetPanel>
+    </div>
   );
 }
 
@@ -748,68 +752,69 @@ function PreviewLinksSection({
               error={snapshotError}
             />
           )}
-          <div className="grid gap-5 sm:grid-cols-[2fr_1fr]">
-            <InputGroup
-              label={t("siteSettings.previews.path")}
-              description={t("siteSettings.previews.pathHint")}
-              error={pathError ? { message: pathError, match: true } : undefined}
-            >
-              <InputGroup.Addon>{host ? `${host}/` : "/"}</InputGroup.Addon>
-              <InputGroup.Input
-                value={path}
-                placeholder={t("siteSettings.previews.pathPlaceholder")}
-                spellCheck={false}
-                autoComplete="off"
-                aria-invalid={pathError ? true : undefined}
-                onChange={(e) => setPath((e.target as HTMLInputElement).value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
+          <div className="@container">
+            <div className="grid items-start gap-5 @lg:grid-cols-[2fr_1fr]">
+              <InputGroup
+                label={t("siteSettings.previews.path")}
+                description={t("siteSettings.previews.pathHint")}
+                error={pathError ? { message: pathError, match: true } : undefined}
+              >
+                <InputGroup.Addon>{host ? `${host}/` : "/"}</InputGroup.Addon>
+                <InputGroup.Input
+                  value={path}
+                  placeholder={t("siteSettings.previews.pathPlaceholder")}
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-invalid={pathError ? true : undefined}
+                  onChange={(e) => setPath((e.target as HTMLInputElement).value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submit();
+                    }
+                  }}
+                />
+              </InputGroup>
+              <Select
+                label={t("siteSettings.previews.ttl")}
+                value={ttl}
+                onValueChange={(v) => setTtl(v as PreviewTtl)}
+                items={Object.fromEntries(
+                  PREVIEW_TTLS.map((o) => [o.id, t(`siteSettings.previews.ttls.${o.id}`)]),
+                )}
               />
-            </InputGroup>
-            <Select
-              label={t("siteSettings.previews.ttl")}
-              value={ttl}
-              onValueChange={(v) => setTtl(v as PreviewTtl)}
-              items={Object.fromEntries(
-                PREVIEW_TTLS.map((o) => [o.id, t(`siteSettings.previews.ttls.${o.id}`)]),
-              )}
-            />
+            </div>
           </div>
           {link && <PreviewResult link={link} />}
-          <div className="flex items-start gap-2">
-            <span className="flex h-lh items-center text-kumo-subtle">
-              <Info size={16} />
-            </span>
-            <Text variant="secondary" size="sm">
-              {t("siteSettings.previews.revokeHint")}
-            </Text>
-          </div>
+          <InfoLine>{t("siteSettings.previews.revokeHint")}</InfoLine>
         </>
       )}
     </SettingsSection>
   );
 }
 
-/** Site › Settings tab (DESIGN.md §2c settings template, §2k). */
+/** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
   const t = useT();
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
   const reload = () => void site.refetch();
-  // A failed site load is reported once, by the tab layout above (SiteTabsLayout).
   return (
-    <SettingsLayout
-      title={t("common.onThisPage")}
-      sections={SECTIONS.map((id) => ({ id, label: t(`siteSettings.sections.${id}`) }))}
+    <PageLayout
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.settings.title") }]} />}
+      title={t("pageHeaders.settings.title")}
+      description={t("pageHeaders.settings.description")}
     >
-      <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
-      <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
-      <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
-    </SettingsLayout>
+      <ErrorBanner error={site.error} onRetry={reload} retrying={site.isFetching} />
+      <SettingsLayout
+        title={t("common.onThisPage")}
+        sections={SECTIONS.map((id) => ({ id, label: t(`siteSettings.sections.${id}`) }))}
+      >
+        <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
+        <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
+        <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
+      </SettingsLayout>
+    </PageLayout>
   );
 }

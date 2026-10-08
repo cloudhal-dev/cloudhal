@@ -2,40 +2,64 @@ import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
 import {
   ApprovalDialog,
   Button,
-  ClipboardText,
   DeleteResource,
+  DropdownMenu,
   Field,
+  Grid,
+  InlineCopyText,
   Input,
   InputArea,
   InputGroup,
   LayerCard,
-  PageHeader,
+  PageLayout,
+  SectionCard,
   SkeletonLine,
   TagInput,
   Text,
 } from "@cloudhal/ui";
-import { FloppyDisk, Trash } from "@phosphor-icons/react";
+import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Content } from "../components/AppFrame.tsx";
-import { EditorCrumbs } from "../components/EditorCrumbs.tsx";
+import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
+  DangerZoneCard,
+  type DetailRow,
+  DetailsCard,
   EditorLayout,
   PreviewToggle,
-  SPLIT_QUERY,
-  useMediaQuery,
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { RelativeTime } from "../components/RelativeTime.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
-import { api } from "../lib/api.ts";
+import { api, type NewEntry } from "../lib/api.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
+
+/** A copy of the article as a new draft with a free slug. */
+function duplicateOf(entry: ContentEntry, title: string): NewEntry {
+  const suffix = `-copy-${Date.now().toString(36).slice(-4)}`;
+  return {
+    collection: entry.collection,
+    slug: `${entry.slug.slice(0, 128 - suffix.length)}${suffix}`,
+    locale: entry.locale,
+    status: "draft",
+    title,
+    body: entry.body,
+    fields: entry.fields,
+    tags: entry.tags,
+    ...(entry.summary !== undefined ? { summary: entry.summary } : {}),
+    ...(entry.coverImage ? { coverImage: entry.coverImage } : {}),
+    ...(entry.metadata ? { metadata: entry.metadata } : {}),
+  };
+}
+
+const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
 export function ArticleEditorPage() {
   const t = useT();
@@ -43,7 +67,6 @@ export function ArticleEditorPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
-  const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const query = useQuery({
     queryKey: ["entry", siteId, entryId],
     queryFn: () => api.entries.get(siteId, entryId),
@@ -52,7 +75,6 @@ export function ArticleEditorPage() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
-  const wide = useMediaQuery(SPLIT_QUERY);
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
@@ -67,6 +89,21 @@ export function ArticleEditorPage() {
       toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
     },
   });
+  const duplicate = useMutation({
+    mutationFn: (entry: ContentEntry) =>
+      api.entries.create(
+        siteId,
+        duplicateOf(entry, t("editor.copyTitle", { title: entry.title || t("articles.untitled") })),
+      ),
+    onSuccess: async (created) => {
+      await qc.invalidateQueries({ queryKey: ["entries", siteId] });
+      toast.success(t("editor.duplicated"), created.slug);
+      await navigate({
+        to: "/sites/$siteId/articles/$entryId",
+        params: { siteId, entryId: created.id },
+      });
+    },
+  });
   const remove = useMutation({
     mutationFn: (entry: ContentEntry) => api.entries.remove(entry),
     onSuccess: async () => {
@@ -74,76 +111,132 @@ export function ArticleEditorPage() {
       await navigate({ to: "/sites/$siteId/articles", params: { siteId } });
     },
   });
+  const articlesCrumb = {
+    label: t("pageHeaders.articles.title"),
+    href: `/sites/${siteId}/articles`,
+  };
 
   if (!draft) {
     return (
-      <Content>
+      <PageLayout
+        crumbs={<SiteCrumbs siteId={siteId} trail={[articlesCrumb, { label: undefined }]} />}
+        title={undefined}
+        loading={query.isPending}
+      >
         <ErrorBanner error={query.error} />
-        <LayerCard className="px-5 py-4">
-          <SkeletonLine />
+        <LayerCard className="grid gap-3 px-5 py-4">
+          <SkeletonLine minWidth={30} maxWidth={45} />
+          <SkeletonLine minWidth={70} maxWidth={90} />
+          <SkeletonLine minWidth={50} maxWidth={70} />
         </LayerCard>
-      </Content>
+      </PageLayout>
     );
   }
   const set = <K extends keyof ContentEntry>(key: K, value: ContentEntry[K]) =>
     setDraft({ ...draft, [key]: value });
   const changeStatus = (next: PublishStatus) => save.mutate({ ...draft, status: next });
+  const title = draft.title || t("articles.untitled");
+  const words = wordCount(draft.body.value);
+  const details: DetailRow[] = [
+    { label: t("editor.id"), value: <InlineCopyText>{draft.id}</InlineCopyText> },
+    {
+      label: t("editor.collection"),
+      value: (
+        <Text variant="mono-secondary" as="span">
+          {draft.collection}
+        </Text>
+      ),
+    },
+    {
+      label: t("editor.locale"),
+      value: <Text as="span">{draft.locale}</Text>,
+    },
+    {
+      label: t("editor.author"),
+      value: (
+        <Text as="span" truncate>
+          {draft.author.name ?? draft.author.id}
+        </Text>
+      ),
+    },
+    {
+      label: t("editor.revision"),
+      value: <Text as="span">{draft.rev}</Text>,
+    },
+    ...(draft.publishedAt
+      ? [
+          {
+            label: t("editor.publishedAt"),
+            value: <RelativeTime iso={draft.publishedAt} size="base" />,
+          },
+        ]
+      : []),
+    { label: t("editor.updatedAt"), value: <RelativeTime iso={draft.updatedAt} size="base" /> },
+  ];
 
   return (
-    <Content>
-      <PageHeader
-        breadcrumbs={
-          <EditorCrumbs
-            siteId={siteId}
-            siteName={site.data?.name}
-            section={{ label: t("articles.title"), href: `/sites/${siteId}/articles` }}
-            current={draft.title || t("articles.untitled")}
-            id={draft.id}
+    <PageLayout
+      crumbs={
+        <SiteCrumbs siteId={siteId} trail={[articlesCrumb, { label: title }]} copy={draft.id} />
+      }
+      title={title}
+      description={
+        <span className="flex flex-wrap items-center gap-2">
+          <Status status={draft.status} />
+          <Text variant="mono-secondary" as="span">
+            /{draft.collection}/{draft.slug}
+          </Text>
+        </span>
+      }
+      actions={
+        <>
+          <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />
+          <StatusActions
+            status={draft.status}
+            busy={save.isPending}
+            onChange={changeStatus}
+            onPublish={() => setPublishOpen(true)}
+            menu={
+              <>
+                <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
+                  {t("editor.duplicate")}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  icon={Trash}
+                  variant="danger"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  {t("editor.deleteArticle")}
+                </DropdownMenu.Item>
+              </>
+            }
           />
-        }
-        title={draft.title || t("articles.untitled")}
-        actions={
-          <>
-            <StatusActions
-              status={draft.status}
-              busy={save.isPending}
-              onChange={changeStatus}
-              onPublish={() => setPublishOpen(true)}
-            />
-            <Button
-              variant="secondary"
-              icon={<FloppyDisk />}
-              onClick={() => save.mutate(draft)}
-              loading={save.isPending}
-              data-testid="save"
-            >
-              {t("common.save")}
-            </Button>
-            {wide && <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />}
-          </>
-        }
-      />
-      <ErrorBanner error={save.error ?? remove.error} />
+          <Button
+            variant="primary"
+            onClick={() => save.mutate(draft)}
+            loading={save.isPending}
+            disabled={!dirty}
+            data-testid="save"
+          >
+            {t("common.save")}
+          </Button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
       <EditorLayout
         previewVisible={previewVisible}
-        preview={(height) => (
+        preview={
           <EditorPreview
             src={api.preview.entry(siteId, entryId)}
             rev={draft.rev}
-            name={draft.title || t("articles.untitled")}
+            name={title}
             dirty={dirty}
-            height={height}
           />
-        )}
+        }
         main={
-          <LayerCard>
-            <LayerCard.Secondary className="flex items-center justify-between px-5 py-3">
-              <Text variant="heading" as="h2">
-                {t("editor.content")}
-              </Text>
-              <Status status={draft.status} />
-            </LayerCard.Secondary>
-            <LayerCard.Primary className="grid gap-4 px-5 py-4">
+          <>
+            <SectionCard title={t("editor.article")}>
               <Input
                 label={t("editor.title")}
                 value={draft.title}
@@ -154,36 +247,11 @@ export function ArticleEditorPage() {
                     slug: draft.slug.startsWith("untitled") ? slugify(v) : draft.slug,
                   })
                 }
+                className="w-full"
               />
-              <Input
-                label={t("editor.summary")}
-                value={draft.summary ?? ""}
-                onValueChange={(v) => setDraft(setOptional(draft, "summary", v))}
-                required={false}
-              />
-              <InputArea
-                label={t("editor.body")}
-                value={draft.body.value}
-                onValueChange={(v) => set("body", { ...draft.body, value: v })}
-                autoResize
-                minRows={14}
-                maxRows={40}
-                className="font-mono"
-              />
-            </LayerCard.Primary>
-          </LayerCard>
-        }
-        aside={
-          <>
-            <LayerCard>
-              <LayerCard.Secondary className="px-5 py-3">
-                <Text variant="heading" as="h2">
-                  {t("editor.metadata")}
-                </Text>
-              </LayerCard.Secondary>
-              <LayerCard.Primary className="grid gap-4 px-5 py-4">
+              <Grid variant="2up" gap="none" className="items-start gap-x-4 gap-y-5">
                 <Field label={t("editor.slug")} description={t("editor.slugHint")}>
-                  <InputGroup>
+                  <InputGroup className="w-full">
                     <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
                     <InputGroup.Input
                       aria-label={t("editor.slug")}
@@ -201,23 +269,50 @@ export function ArticleEditorPage() {
                     ])
                   }
                   description={t("editor.tagsHint")}
+                  className="w-full"
                 />
-                <div className="grid gap-2">
-                  <ClipboardText size="sm" text={draft.id} />
-                  <Text variant="secondary" size="xs">
-                    {t("common.rev", { rev: draft.rev })} ·{" "}
-                    {t("common.updated", { when: new Date(draft.updatedAt).toLocaleString() })}
-                  </Text>
-                </div>
-              </LayerCard.Primary>
-            </LayerCard>
-            <Button
-              variant="secondary-destructive"
-              icon={<Trash />}
-              onClick={() => setDeleteOpen(true)}
+              </Grid>
+              <InputArea
+                label={t("editor.summary")}
+                value={draft.summary ?? ""}
+                onValueChange={(v) => setDraft(setOptional(draft, "summary", v))}
+                required={false}
+                autoResize
+                minRows={2}
+                maxRows={6}
+                className="w-full"
+              />
+            </SectionCard>
+            <SectionCard
+              title={t("editor.bodyTitle")}
+              actions={
+                <Text variant="secondary" size="sm" as="span">
+                  {t("editor.markdown")} ·{" "}
+                  {words === 1 ? t("editor.wordsOne") : t("editor.wordsOther", { count: words })}
+                </Text>
+              }
             >
-              {t("editor.deleteArticle")}
-            </Button>
+              <InputArea
+                aria-label={t("editor.body")}
+                value={draft.body.value}
+                onValueChange={(v) => set("body", { ...draft.body, value: v })}
+                autoResize
+                minRows={12}
+                maxRows={32}
+                className="w-full font-mono"
+              />
+            </SectionCard>
+          </>
+        }
+        aside={
+          <>
+            <DetailsCard rows={details} />
+            <DangerZoneCard
+              title={t("editor.deleteArticleTitle")}
+              description={t("editor.deleteArticleHint")}
+              actionLabel={t("editor.deleteArticle")}
+              onAction={() => setDeleteOpen(true)}
+            />
           </>
         }
       />
@@ -244,6 +339,6 @@ export function ArticleEditorPage() {
           await remove.mutateAsync(draft);
         }}
       />
-    </Content>
+    </PageLayout>
   );
 }

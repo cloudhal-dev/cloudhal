@@ -7,8 +7,10 @@ import {
   DropdownMenu,
   Empty,
   LayerCard,
+  PageLayout,
   Pagination,
-  ResourceListPage,
+  SectionCard,
+  SectionEmpty,
   Table,
   Tabs,
   Text,
@@ -33,6 +35,7 @@ import { useState } from "react";
 import { HowModesWorkCard } from "../components/AgentModes.tsx";
 import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
+import { Crumbs } from "../components/Crumbs.tsx";
 import { ElevateAgentKeyDialog } from "../components/ElevateAgentKeyDialog.tsx";
 import {
   ElevatedKeysBanner,
@@ -103,53 +106,66 @@ export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
   const t = useT();
   const [kind, setKind] = useState<SnippetKind>("json");
   return (
-    <LayerCard>
-      <LayerCard.Secondary className="flex items-center gap-2 px-5 py-3">
-        <PlugsConnected size={16} className="text-kumo-subtle" />
-        <Text variant="heading" as="h2">
-          {t("agents.connect.title")}
-        </Text>
-      </LayerCard.Secondary>
-      <LayerCard.Primary className="grid min-w-0 gap-4 px-5 py-4">
-        <Text variant="secondary">{t("agents.connect.description")}</Text>
+    <SectionCard
+      title={t("agents.connect.title")}
+      icon={<PlugsConnected size={16} />}
+      description={t("agents.connect.description")}
+    >
+      <dl className="grid gap-4">
         <div className="grid gap-1.5">
-          <Text size="sm" bold as="span">
-            {t("agents.connect.endpoint")}
-          </Text>
-          <ClipboardText size="base" text={endpoint} />
-        </div>
-        <div className="grid gap-1.5">
-          <Text size="sm" bold as="span">
-            {t("agents.connect.header")}
-          </Text>
-          <ClipboardText size="base" text="x-api-key" />
-        </div>
-        <div className="grid min-w-0 gap-3">
-          <Tabs
-            variant="segmented"
-            size="sm"
-            value={kind}
-            onValueChange={(v) => setKind(v as SnippetKind)}
-            tabs={(["json", "claude", "stdio"] as const).map((k) => ({
-              value: k,
-              label: t(`agents.connect.tabs.${k}`),
-            }))}
-          />
-          <div className="min-w-0 overflow-x-auto">
-            <CodeHighlighted
-              code={mcpSnippet(kind, endpoint)}
-              lang={kind === "json" ? "json" : "bash"}
-              showCopyButton
-            />
-          </div>
-          {kind === "stdio" && (
-            <Text variant="secondary" size="sm">
-              {t("agents.connect.stdioHint")}
+          <dt>
+            <Text size="sm" bold as="span">
+              {t("agents.connect.endpoint")}
             </Text>
-          )}
+          </dt>
+          <dd className="min-w-0">
+            <ClipboardText
+              size="base"
+              text={endpoint}
+              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
+            />
+          </dd>
         </div>
-      </LayerCard.Primary>
-    </LayerCard>
+        <div className="grid gap-1.5">
+          <dt>
+            <Text size="sm" bold as="span">
+              {t("agents.connect.header")}
+            </Text>
+          </dt>
+          <dd className="min-w-0">
+            <ClipboardText
+              size="base"
+              text="x-api-key"
+              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
+            />
+          </dd>
+        </div>
+      </dl>
+      <div className="grid min-w-0 gap-3">
+        <Tabs
+          variant="segmented"
+          size="sm"
+          value={kind}
+          onValueChange={(v) => setKind(v as SnippetKind)}
+          tabs={(["json", "claude", "stdio"] as const).map((k) => ({
+            value: k,
+            label: t(`agents.connect.tabs.${k}`),
+          }))}
+        />
+        <div className="min-w-0 overflow-x-auto">
+          <CodeHighlighted
+            code={mcpSnippet(kind, endpoint)}
+            lang={kind === "json" ? "json" : "bash"}
+            showCopyButton
+          />
+        </div>
+        {kind === "stdio" && (
+          <Text variant="secondary" size="sm">
+            {t("agents.connect.stdioHint")}
+          </Text>
+        )}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -274,153 +290,162 @@ export function AgentsPage() {
   );
 
   return (
-    <ResourceListPage
-      title={t("agents.title")}
-      description={t("agents.description")}
-      icon={<Robot size={32} className="text-kumo-subtle" />}
-      usage={<ConnectMcpCard endpoint={endpoint} />}
-      additionalContent={<HowModesWorkCard />}
+    <PageLayout
+      crumbs={
+        <Crumbs
+          trail={[
+            { label: t("pageHeaders.agents.title"), href: "/agents" },
+            { label: t("nav.agentKeys") },
+          ]}
+        />
+      }
+      icon={<Robot size={24} />}
+      title={t("pageHeaders.agents.title")}
+      description={t("pageHeaders.agents.description")}
+      actions={createButton}
+      aside={
+        <>
+          <ConnectMcpCard endpoint={endpoint} />
+          <HowModesWorkCard />
+        </>
+      }
     >
-      <div className="grid gap-4">
-        {notEnabled ? (
-          <Banner
-            variant="secondary"
-            icon={<Info weight="fill" />}
-            title={t("agents.notEnabledTitle")}
-            description={t("agents.notEnabledDescription")}
-          />
-        ) : (
-          <ErrorBanner
-            error={keys.error}
-            onRetry={() => keys.refetch()}
-            retrying={keys.isFetching}
-          />
-        )}
-        <ElevatedKeysBanner
-          keys={keys.data}
-          now={now}
-          onEnd={(elevated) => endElevation.mutate(elevated)}
-          ending={endElevation.isPending}
+      {notEnabled ? (
+        <Banner
+          variant="secondary"
+          icon={<Info weight="fill" />}
+          title={t("agents.notEnabledTitle")}
+          description={t("agents.notEnabledDescription")}
         />
-        <ListToolbar
-          search={paging.search}
-          onSearch={paging.setSearch}
-          placeholder={t("agents.search")}
-          actions={createButton}
+      ) : (
+        <ErrorBanner error={keys.error} onRetry={() => keys.refetch()} retrying={keys.isFetching} />
+      )}
+      <ListToolbar
+        search={paging.search}
+        onSearch={paging.setSearch}
+        placeholder={t("agents.search")}
+      />
+      {/* Elevations in force, right above the keys they belong to. */}
+      <ElevatedKeysBanner
+        keys={keys.data}
+        now={now}
+        onEnd={(elevated) => endElevation.mutate(elevated)}
+        ending={endElevation.isPending}
+      />
+      {notEnabled ? null : keys.data?.length === 0 ? (
+        <Empty
+          icon={<Key size={48} className="text-kumo-inactive" />}
+          title={t("agents.empty")}
+          description={t("agents.emptyDescription")}
+          commandLine="cloudhal mcp"
+          contents={
+            <Button variant="secondary" icon={<Plus />} onClick={() => setCreateOpen(true)}>
+              {t("agents.createKey")}
+            </Button>
+          }
         />
-        {notEnabled ? null : keys.data?.length === 0 ? (
-          <Empty
-            icon={<Key size={48} className="text-kumo-inactive" />}
-            title={t("agents.empty")}
-            description={t("agents.emptyDescription")}
-            commandLine="cloudhal mcp"
-            contents={createButton}
-          />
-        ) : (
-          <LayerCard className="overflow-x-auto p-0">
-            <Table>
-              <Table.Header>
+      ) : (
+        <LayerCard className="overflow-x-auto p-0">
+          <Table>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>{t("agents.columns.name")}</Table.Head>
+                <Table.Head>{t("agents.columns.mode")}</Table.Head>
+                <Table.Head>{t("agents.columns.scopes")}</Table.Head>
+                <Table.Head>{t("agents.columns.created")}</Table.Head>
+                <Table.Head>{t("agents.columns.status")}</Table.Head>
+                <Table.Head sticky="right" className="w-12">
+                  <span className="sr-only">{t("site.rowMenu")}</span>
+                </Table.Head>
+              </Table.Row>
+            </Table.Header>
+            {keys.isPending ? (
+              <TableSkeleton columns={6} rows={3} />
+            ) : paging.pageItems.length === 0 ? (
+              <Table.Body>
                 <Table.Row>
-                  <Table.Head>{t("agents.columns.name")}</Table.Head>
-                  <Table.Head>{t("agents.columns.mode")}</Table.Head>
-                  <Table.Head>{t("agents.columns.scopes")}</Table.Head>
-                  <Table.Head>{t("agents.columns.created")}</Table.Head>
-                  <Table.Head>{t("agents.columns.status")}</Table.Head>
-                  <Table.Head sticky="right" />
+                  <Table.Cell colSpan={6}>
+                    <SectionEmpty
+                      icon={<Key size={32} className="text-kumo-inactive" />}
+                      title={t("agents.noMatches", { query: paging.search })}
+                    />
+                  </Table.Cell>
                 </Table.Row>
-              </Table.Header>
-              {keys.isPending ? (
-                <TableSkeleton columns={6} rows={3} />
-              ) : paging.pageItems.length === 0 ? (
-                <Table.Body>
-                  <Table.Row>
-                    <Table.Cell colSpan={6}>
-                      <Empty
-                        size="sm"
-                        icon={<Key size={32} className="text-kumo-inactive" />}
-                        title={t("agents.noMatches", { query: paging.search })}
+              </Table.Body>
+            ) : (
+              <Table.Body>
+                {paging.pageItems.map((k) => (
+                  <Table.Row key={k.id} data-key-id={k.id}>
+                    <Table.Cell className="whitespace-nowrap">
+                      <div className="grid gap-0.5">
+                        <Text bold as="span">
+                          {k.name ?? t("agents.unnamed")}
+                        </Text>
+                        {k.start && (
+                          <Text variant="mono-secondary" as="span">
+                            {t("agents.keyPrefix", { start: k.start })}
+                          </Text>
+                        )}
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <KeyScopes agentKey={k} />
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      <div className="grid gap-0.5">
+                        <RelativeTime iso={k.createdAt} />
+                        <Text variant="secondary" size="sm" as="span">
+                          {k.expiresAt
+                            ? t("agents.expires", {
+                                when: new Date(k.expiresAt).toLocaleDateString(locale),
+                              })
+                            : t("agents.never")}
+                        </Text>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      {k.enabled ? (
+                        <Badge variant="success" appearance="dot">
+                          {t("agents.active")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral" appearance="dot">
+                          {t("agents.disabled")}
+                        </Badge>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell sticky="right" className="w-12 text-right">
+                      <KeyMenu
+                        agentKey={k}
+                        elevated={
+                          activeElevation({ mode: ownModeOf(k), elevation: k.elevation }, now) !==
+                          undefined
+                        }
+                        onChangeMode={() => setToChange(k)}
+                        onElevate={() => setToElevate(k)}
+                        onEndElevation={() => endElevation.mutate([k])}
+                        onRevoke={() => setToRevoke(k)}
                       />
                     </Table.Cell>
                   </Table.Row>
-                </Table.Body>
-              ) : (
-                <Table.Body>
-                  {paging.pageItems.map((k) => (
-                    <Table.Row key={k.id} data-key-id={k.id}>
-                      <Table.Cell className="whitespace-nowrap">
-                        <div className="grid gap-0.5">
-                          <Text bold as="span">
-                            {k.name ?? t("agents.unnamed")}
-                          </Text>
-                          {k.start && (
-                            <Text variant="mono-secondary" as="span">
-                              {t("agents.keyPrefix", { start: k.start })}
-                            </Text>
-                          )}
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <KeyScopes agentKey={k} />
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <div className="grid gap-0.5">
-                          <RelativeTime iso={k.createdAt} />
-                          {k.expiresAt ? (
-                            <Text variant="secondary" size="xs" as="span">
-                              {t("agents.expires", {
-                                when: new Date(k.expiresAt).toLocaleDateString(locale),
-                              })}
-                            </Text>
-                          ) : (
-                            <Text variant="secondary" size="xs" as="span">
-                              {t("agents.never")}
-                            </Text>
-                          )}
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        {k.enabled ? (
-                          <Badge variant="success" appearance="dot">
-                            {t("agents.active")}
-                          </Badge>
-                        ) : (
-                          <Badge variant="neutral" appearance="dot">
-                            {t("agents.disabled")}
-                          </Badge>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell sticky="right" className="text-right">
-                        <KeyMenu
-                          agentKey={k}
-                          elevated={
-                            activeElevation({ mode: ownModeOf(k), elevation: k.elevation }, now) !==
-                            undefined
-                          }
-                          onChangeMode={() => setToChange(k)}
-                          onElevate={() => setToElevate(k)}
-                          onEndElevation={() => endElevation.mutate([k])}
-                          onRevoke={() => setToRevoke(k)}
-                        />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              )}
-            </Table>
-          </LayerCard>
-        )}
-        {paging.total > paging.perPage && (
-          <Pagination
-            page={paging.page}
-            perPage={paging.perPage}
-            totalCount={paging.total}
-            setPage={paging.setPage}
-          />
-        )}
-      </div>
+                ))}
+              </Table.Body>
+            )}
+          </Table>
+        </LayerCard>
+      )}
+      {paging.total > paging.perPage && (
+        <Pagination
+          page={paging.page}
+          perPage={paging.perPage}
+          totalCount={paging.total}
+          setPage={paging.setPage}
+          controls="simple"
+        />
+      )}
       <CreateAgentKeyDialog open={createOpen} onOpenChange={setCreateOpen} endpoint={endpoint} />
       <ChangeAgentModeDialog
         agentKey={toChange}
@@ -447,6 +472,6 @@ export function AgentsPage() {
           if (toRevoke) await revoke.mutateAsync(toRevoke).catch(() => undefined);
         }}
       />
-    </ResourceListPage>
+    </PageLayout>
   );
 }

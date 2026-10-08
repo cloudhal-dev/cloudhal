@@ -32,7 +32,10 @@
           "options": {
             "paths": {
               "@base-ui/react": "Import UI primitives through @cloudhal/ui, never Base UI directly.",
-              "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui."
+              "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
+              "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
             }
           }
         }
@@ -65,6 +68,28 @@
           "correctness": {
             "noUnusedVariables": "off",
             "noUnusedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@base-ui/react": "Import UI primitives through @cloudhal/ui, never Base UI directly.",
+                  "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
+                  "@cloudflare/kumo": "Apps import Kumo through @cloudhal/ui (one entry point, our blocks included).",
+                  "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+                }
+              }
+            }
           }
         }
       }
