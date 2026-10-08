@@ -1281,7 +1281,8 @@ export const SnapshotSchema = {
             "contentEntry",
             "taxonomy",
             "term",
-            "redirect"
+            "redirect",
+            "menu"
           ]
         },
         "rev": {

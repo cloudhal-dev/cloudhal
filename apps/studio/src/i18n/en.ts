@@ -1344,6 +1344,7 @@ export const en = {
       taxonomy: "Taxonomy",
       term: "Term",
       redirect: "Redirect",
+      menu: "Menu",
     },
     gone: "No longer exists",
     revs: "rev {from} → {to}",

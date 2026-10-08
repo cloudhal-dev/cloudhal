@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "snap_01HZX8K3Q9MN",
+  "siteId": "site_01HZX8K3Q9EF",
+  "parentId": "snap_01HZX8K3Q9TX",
+  "siteRev": 12,
+  "reason": "agentMutation",
+  "label": "update_menu primary",
+  "actor": { "kind": "agent", "id": "agent_01HZX8K3Q9YZ" },
+  "nodes": [
+    {
+      "id": "menu_01HZX8K3Q9PR",
+      "kind": "menu",
+      "rev": 2,
+      "hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "id": "site_01HZX8K3Q9EF",
+      "kind": "site",
+      "rev": 12,
+      "hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  ],
+  "summary": { "added": 0, "changed": 1, "removed": 0 },
+  "createdAt": "2026-10-08T22:00:00Z"
+}

@@ -155,7 +155,15 @@ export function taxonomySuite(ctx: SuiteContext): void {
     it("invariant 15: node kinds are explicit — registry, prefixes, keys and snapshot refs", async () => {
       const w = await setup();
       const store = ctx.store();
-      expect(NODE_KINDS).toEqual(["site", "page", "contentEntry", "taxonomy", "term", "redirect"]);
+      expect(NODE_KINDS).toEqual([
+        "site",
+        "page",
+        "contentEntry",
+        "taxonomy",
+        "term",
+        "redirect",
+        "menu",
+      ]);
       expect(w.category.id).toMatch(/^tax_/);
       expect(w.news.id).toMatch(/^term_/);
       expect(uniquenessKey("taxonomy", w.category)).toBe("category");

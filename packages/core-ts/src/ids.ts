@@ -19,6 +19,9 @@ export const ID_PREFIX = {
   taxonomy: "tax",
   term: "term",
   redirect: "redir",
+  /** RFC-0003 menus and their items. */
+  menu: "menu",
+  menuItem: "item",
   snapshot: "snap",
   user: "user",
   agent: "agent",

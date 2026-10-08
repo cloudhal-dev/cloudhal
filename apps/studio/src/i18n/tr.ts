@@ -1365,6 +1365,7 @@ export const tr: Messages = {
       taxonomy: "Sınıflandırma",
       term: "Terim",
       redirect: "Yönlendirme",
+      menu: "Menü",
     },
     gone: "Artık mevcut değil",
     revs: "rev {from} → {to}",
