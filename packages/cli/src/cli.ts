@@ -5,6 +5,7 @@ import { deploy } from "./commands/deploy.ts";
 import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
+import { describeMigration, migrateTags } from "./commands/migrate.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 import { pullSite, pushSite } from "./commands/sync.ts";
@@ -24,6 +25,9 @@ Usage:
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--admin-url <url>]           local site → deployment
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
+  cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
+                                                          move entry tags into tag terms (RFC-0002);
+                                                          resumable; --revert <id> undoes a run
   cloudhal --help
 `;
 
@@ -49,6 +53,7 @@ export async function main(argv: string[]): Promise<number> {
       replace: { type: "boolean" },
       "admin-url": { type: "string" },
       studio: { type: "string" },
+      revert: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -184,6 +189,20 @@ export async function main(argv: string[]): Promise<number> {
       };
       if (command === "push") await pushSite(opts);
       else await pullSite(opts);
+      return 0;
+    }
+    case "migrate": {
+      const [what] = rest;
+      if (what !== "tags-to-terms")
+        throw new Error("usage: cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]");
+      if (values.revert !== undefined && values["dry-run"])
+        throw new Error("--dry-run and --revert cannot be combined");
+      const result = await migrateTags({
+        projectDir,
+        ...(values["dry-run"] ? { dryRun: true } : {}),
+        ...(values.revert !== undefined ? { revert: values.revert } : {}),
+      });
+      for (const line of describeMigration(result)) console.log(line);
       return 0;
     }
     case "mcp": {
