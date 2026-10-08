@@ -378,6 +378,17 @@ export function taxonomySuite(ctx: SuiteContext): void {
       expect((await store.getTerm(w.ai.id))?.slugHistory).toBeUndefined();
       expect(await store.redirectFor(w.site.id, "/tag/ai")).toBeUndefined();
       expect((await store.getTermBySlug(w.site.id, "tag", "ai"))?.id).toBe(fresh.id);
+      // renaming onto a reserved slug needs the same reclaim
+      await store.renameTerm(w.llm, "large-language-model");
+      expect(await code(store.renameTerm(fresh, "llm"))).toBe("slug_taken");
+      const moved = await store.renameTerm(fresh, "llm", { reclaim: true });
+      expect(moved.terms.map((t) => [t.id, t.slug]).reverse()).toEqual([
+        [w.llm.id, "large-language-model"],
+        [fresh.id, "llm"],
+      ]);
+      expect((await store.getTerm(w.llm.id))?.slugHistory).toBeUndefined();
+      expect(moved.redirects.map((r) => [r.from, r.to])).toEqual([["/tag/ai", "/tag/llm"]]);
+      expect((await store.redirectFor(w.site.id, "/tag/llm"))?.location).toBeUndefined();
     });
 
     it("invariant 9: parents only in hierarchical taxonomies, never retired, no cycles, at most 5 levels", async () => {

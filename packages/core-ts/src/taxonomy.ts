@@ -903,8 +903,9 @@ export class TaxonomyEngine {
     };
     assertValid("term", next);
     const batch = this.#batch(site.id, ts);
-    await batch.update("term", stored, next, this.#slugGuard(next, reclaim));
+    // Released first: the term's slug guard runs after the histories no longer hold the slug.
     const released = reclaim ? await this.#releaseSlug(batch, holders, slug, ts) : [];
+    await batch.update("term", stored, next, this.#slugGuard(next, reclaim));
     let redirects: Redirect[] = [];
     if (tax.archive.enabled && (reclaim || isPublic(stored))) {
       const plan = new RedirectPlan(site.id, await this.listRedirects(site.id), ts, this.#k.newId);
