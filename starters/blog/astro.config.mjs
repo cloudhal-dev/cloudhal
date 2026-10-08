@@ -4,7 +4,7 @@ import { cloudhal } from "@cloudhal/astro-renderer/integration";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
-/** @type {{ siteId: string; dataDir?: string }} */
+/** @type {{ siteId: string; dataDir?: string; media?: { transform?: "cdn-cgi" | "none" } }} */
 const project = JSON.parse(readFileSync(new URL("./cloudhal.json", import.meta.url), "utf8"));
 
 /**
@@ -24,7 +24,13 @@ export default defineConfig({
   session: false,
   ...(adapter ? { adapter } : {}),
   integrations: [
-    cloudhal({ siteId: project.siteId, dataDir: project.dataDir ?? ".cloudhal", target }),
+    cloudhal({
+      siteId: project.siteId,
+      dataDir: project.dataDir ?? ".cloudhal",
+      target,
+      // Responsive images through Cloudflare transformations: opt-in in cloudhal.json (RFC-0004).
+      ...(project.media ? { media: project.media } : {}),
+    }),
   ],
   vite: { plugins: [tailwindcss()] },
 });

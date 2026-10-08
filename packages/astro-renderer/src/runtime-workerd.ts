@@ -14,6 +14,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { siteCacheTag } from "./cache-tags.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
+import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
 import type { GraphSource } from "./source.ts";
 
@@ -34,11 +35,11 @@ export interface AstroLike {
 
 let resolver: SiteResolver | undefined;
 
-function getResolver(config: CloudhalRendererConfig): SiteResolver {
+function getResolver(siteId: string): SiteResolver {
   const e = env as unknown as SiteWorkerEnv;
   resolver ??= new SiteResolver({
     store: new SiteGraphStore({ sql: new D1Driver(e.DB), blobs: new R2BlobStore(e.BLOBS) }),
-    siteId: e.CLOUDHAL_SITE_ID ?? config.siteId,
+    siteId,
     previewSecret: e.CLOUDHAL_PREVIEW_SECRET,
     // The edge cache absorbs repeat traffic; a cache miss must see the pointer as it is now,
     // otherwise a just-purged page could be re-cached from a stale pointer.
@@ -66,10 +67,10 @@ export async function getSource(
   astro?: AstroLike,
 ): Promise<GraphSource | undefined> {
   if (!astro) throw new Error("on Cloudflare, pass the Astro global: getSource(config, Astro)");
-  const r = getResolver(config);
+  const siteId = (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? config.siteId;
+  const r = getResolver(siteId);
   const resolution = await r.resolve(astro.request);
   const h = astro.response.headers;
-  const siteId = (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? config.siteId;
   if (resolution.kind === "preview") {
     h.set("cache-control", "private, no-store");
     h.set("cloudflare-cdn-cache-control", "no-store");
@@ -98,4 +99,43 @@ export async function getSource(
     h.set("x-cloudhal-preview-error", resolution.previewError);
   }
   return resolution.source;
+}
+
+/**
+ * The media route (RFC-0004 §7.1), answered by the Site Worker entry before Astro: the asset comes
+ * from the published snapshot, or from the preview target behind a valid token (invariant 15).
+ * Returns `undefined` for paths that are not media URLs.
+ */
+export async function serveMedia(
+  request: Request,
+  options: { siteId?: string | undefined } = {},
+): Promise<Response | undefined> {
+  if (!matchMediaRoute(new URL(request.url).pathname)) return undefined;
+  const siteId = (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? options.siteId;
+  if (!siteId) return undefined;
+  const r = getResolver(siteId);
+  const resolution = await r.resolve(request);
+  if (resolution.kind === "unpublished")
+    return new Response("not found", {
+      status: 404,
+      headers: { "cache-control": "no-store", "cloudflare-cdn-cache-control": "no-store" },
+    });
+  const source = resolution.source;
+  const token = new URL(request.url).searchParams.get(PREVIEW_PARAM);
+  const preview = resolution.kind === "preview";
+  const store = r.store;
+  const response = await serveMediaRequest(request, {
+    siteId,
+    mode: preview ? "preview" : "published",
+    assetByPrefix: async (prefix) => source.assetByPrefix?.(prefix),
+    blobState: (sha256) => store.blobState(siteId, sha256),
+    blobs: store.blobs,
+    ...(preview && token ? { keepQuery: `${PREVIEW_PARAM}=${encodeURIComponent(token)}` } : {}),
+  });
+  if (response && resolution.kind === "published" && resolution.previewError) {
+    // An invalid preview link must not poison the edge cache entry for this URL.
+    response.headers.set("cloudflare-cdn-cache-control", "no-store");
+    response.headers.set("x-cloudhal-preview-error", resolution.previewError);
+  }
+  return response;
 }

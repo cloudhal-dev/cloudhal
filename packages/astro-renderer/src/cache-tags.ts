@@ -16,10 +16,14 @@
  * Node builds have no edge cache and stay untouched.
  */
 export {
+  ASSET_TAG_PREFIX,
+  assetCacheTag,
   CACHE_TAG_PREFIX,
   isCloudhalCacheTag,
   LIST_TAG_PREFIX,
   listCacheTag,
+  MEDIA_TAG_PREFIX,
+  mediaCacheTag,
   NODE_TAG_PREFIX,
   nodeCacheTag,
   siteCacheTag,

@@ -1,11 +1,14 @@
 ---
 import type { RichTextSection } from "@cloudhal/core-contracts";
 import { renderBody } from "../markdown.ts";
+import type { MediaContext } from "../media.ts";
 
 interface Props {
   section: RichTextSection;
+  /** Resolves `asset:<id>` in the markdown (RFC-0004 §7.6). */
+  media?: MediaContext;
 }
-const { section } = Astro.props;
-const html = renderBody({ format: section.format, value: section.body });
+const { section, media } = Astro.props;
+const html = renderBody({ format: section.format, value: section.body }, media);
 ---
 <section class="ch-richtext" data-section-id={section.id} data-kind="richText" set:html={html} />

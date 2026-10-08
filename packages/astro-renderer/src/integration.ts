@@ -16,6 +16,12 @@ export interface CloudhalRendererConfig {
    * rollback are pointer flips (needs the `@astrojs/cloudflare` adapter; see ADR-0012).
    */
   readonly target?: "node" | "cloudflare";
+  /**
+   * Media (RFC-0004 §7.5): `transform: "cdn-cgi"` emits responsive `srcset`s through Cloudflare
+   * image transformations on the site's own zone. Opt-in (answer 13): it needs Transformations
+   * enabled on a custom domain; the default `"none"` serves originals.
+   */
+  readonly media?: { readonly transform?: "cdn-cgi" | "none" };
 }
 
 const VIRTUAL_ID = "virtual:cloudhal/config";
@@ -26,13 +32,17 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   return {
     name: "@cloudhal/astro-renderer",
     hooks: {
-      "astro:config:setup": ({ updateConfig, config: astroConfig }) => {
+      "astro:config:setup": ({ updateConfig, addMiddleware, config: astroConfig }) => {
         const root = astroConfig.root.pathname;
         resolved = {
           ...config,
           dataDir: config.dataDir.startsWith("/") ? config.dataDir : `${root}${config.dataDir}`,
         };
         const cloudflare = config.target === "cloudflare";
+        // `cloudhal dev` answers the media route from the local blob store (RFC-0004 §7.8); the
+        // Cloudflare Site Worker answers it in its entry, before Astro.
+        if (!cloudflare)
+          addMiddleware({ entrypoint: "@cloudhal/astro-renderer/media-middleware", order: "pre" });
         updateConfig({
           vite: {
             plugins: [
@@ -58,6 +68,9 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         const { writeStaticRedirects } = await import("./static-redirects.ts");
         const count = await writeStaticRedirects(resolved, dir);
         if (count > 0) logger.info(`wrote _redirects (${count} redirects)`);
+        const { writeStaticMedia } = await import("./static-media.ts");
+        const media = await writeStaticMedia(resolved, dir);
+        if (media > 0) logger.info(`copied ${media} media file(s) to /media`);
       },
       /** On Cloudflare every project page is rendered per request (pointer-flip publishing). */
       "astro:route:setup": ({ route }) => {

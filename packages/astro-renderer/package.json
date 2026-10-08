@@ -29,7 +29,10 @@
     "./preview": "./src/preview.ts",
     "./resolver": "./src/resolver.ts",
     "./markdown": "./src/markdown.ts",
-    "./cloudflare-entry": "./src/cloudflare-entry.ts"
+    "./cloudflare-entry": "./src/cloudflare-entry.ts",
+    "./media": "./src/media.ts",
+    "./media-route": "./src/media-route.ts",
+    "./media-middleware": "./src/media-middleware.ts"
   },
   "files": [
     "dist",
@@ -141,6 +144,18 @@
       "./cloudflare-entry": {
         "types": "./dist/src/cloudflare-entry.d.ts",
         "default": "./dist/src/cloudflare-entry.js"
+      },
+      "./media": {
+        "types": "./dist/src/media.d.ts",
+        "default": "./dist/src/media.js"
+      },
+      "./media-route": {
+        "types": "./dist/src/media-route.d.ts",
+        "default": "./dist/src/media-route.js"
+      },
+      "./media-middleware": {
+        "types": "./dist/src/media-middleware.d.ts",
+        "default": "./dist/src/media-middleware.js"
       }
     }
   }

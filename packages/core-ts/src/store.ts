@@ -1125,6 +1125,7 @@ export class SiteGraphStore {
   async publish(site: Site, snapshotId: string): Promise<Site> {
     const snap = await this.getSnapshot(snapshotId);
     if (!snap || snap.siteId !== site.id) throw new NotFoundError("snapshot", snapshotId);
+    const previous = site.publishedSnapshotId;
     const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
     await this.#runOnPublished(updated, {
       ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),

@@ -3,9 +3,10 @@
  * robots, Open Graph / Twitter cards and JSON-LD. Pure functions over the graph, so every starter
  * gets the same, tested output and themes only decide where to render `<SeoHead>`.
  */
-import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, ImageRef, Page, Site } from "@cloudhal/core-contracts";
 import type { ArchiveView } from "./archive.ts";
 import { markdownText, safeSrc } from "./markdown.ts";
+import { assetAlt, imageObject, type MediaContext, socialImageUrl } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
 
@@ -70,9 +71,45 @@ function siteFeeds(site: Site, origin: string): HeadMeta["feeds"] {
   return [{ title: site.name, href: `${origin}${RSS_PATH}` }];
 }
 
+interface CardImage {
+  url: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  type?: string;
+  /** schema.org ImageObject when the image is an asset (RFC-0004 §7.7). */
+  object?: Record<string, unknown>;
+}
+
+/**
+ * A social image from an ImageRef: the asset's absolute media URL (with size, type and alt) when
+ * its `assetId` resolves, else the ref's own `src` (safe schemes only).
+ */
+export function cardImage(
+  ref: ImageRef | undefined,
+  origin: string,
+  locale: string,
+  media?: MediaContext,
+): CardImage | undefined {
+  if (!ref) return undefined;
+  const asset = ref.assetId ? media?.assets?.get(ref.assetId) : undefined;
+  if (asset && asset.kind === "image") {
+    const defaultLocale = media?.defaultLocale ?? locale;
+    return {
+      url: socialImageUrl(origin, asset, media?.preview ? "none" : (media?.transform ?? "none")),
+      alt: assetAlt(asset, ref.alt, locale, defaultLocale),
+      ...(asset.image ? { width: asset.image.width, height: asset.image.height } : {}),
+      type: asset.mediaType,
+      object: imageObject(origin, asset, locale, defaultLocale),
+    };
+  }
+  const url = absoluteUrl(origin, ref.src);
+  return url ? { url, alt: ref.alt ?? "" } : undefined;
+}
+
 function cards(
   kind: "website" | "article",
-  meta: { title: string; description?: string; url: string; image?: { url: string; alt: string } },
+  meta: { title: string; description?: string; url: string; image?: CardImage },
   site: Site,
   locale: string,
 ): Pick<HeadMeta, "openGraph" | "twitter"> {
@@ -84,18 +121,28 @@ function cards(
     ["og:locale", ogLocale(locale)],
   ];
   if (meta.description) og.push(["og:description", meta.description]);
-  if (meta.image) og.push(["og:image", meta.image.url], ["og:image:alt", meta.image.alt]);
+  if (meta.image) {
+    og.push(["og:image", meta.image.url]);
+    if (meta.image.width && meta.image.height)
+      og.push(
+        ["og:image:width", String(meta.image.width)],
+        ["og:image:height", String(meta.image.height)],
+      );
+    if (meta.image.type) og.push(["og:image:type", meta.image.type]);
+    og.push(["og:image:alt", meta.image.alt]);
+  }
   const twitter: Array<[string, string]> = [
     ["twitter:card", meta.image ? "summary_large_image" : "summary"],
     ["twitter:title", meta.title],
   ];
   if (meta.description) twitter.push(["twitter:description", meta.description]);
-  if (meta.image) twitter.push(["twitter:image", meta.image.url]);
+  if (meta.image)
+    twitter.push(["twitter:image", meta.image.url], ["twitter:image:alt", meta.image.alt]);
   return { openGraph: og, twitter };
 }
 
-/** `<head>` for a Page. */
-export function pageHead(site: Site, page: Page, origin: string): HeadMeta {
+/** `<head>` for a Page. `media` resolves its social image's asset (RFC-0004 §7.7). */
+export function pageHead(site: Site, page: Page, origin: string, media?: MediaContext): HeadMeta {
   const home = page.path === "/";
   const own = `${origin}${home ? "/" : page.path}`;
   const canonical = absoluteUrl(origin, page.seo?.canonical) ?? own;
@@ -126,7 +173,15 @@ export function pageHead(site: Site, page: Page, origin: string): HeadMeta {
     lang: page.locale,
     ...cards(
       "website",
-      { title, url: canonical, ...(description ? { description } : {}) },
+      {
+        title,
+        url: canonical,
+        ...(description ? { description } : {}),
+        ...(() => {
+          const image = cardImage(page.seo?.ogImage, origin, page.locale, media);
+          return image ? { image } : {};
+        })(),
+      },
       site,
       page.locale,
     ),
@@ -164,11 +219,11 @@ export function entryHead(
   entry: ContentEntry,
   origin: string,
   taxonomy: EntryTaxonomy = entryTaxonomy(undefined, entry),
+  media?: MediaContext,
 ): HeadMeta {
   const url = `${origin}${entryPath(entry)}`;
   const description = clip(entry.summary);
-  const imageUrl = absoluteUrl(origin, entry.coverImage?.src);
-  const image = imageUrl ? { url: imageUrl, alt: entry.coverImage?.alt ?? "" } : undefined;
+  const image = cardImage(entry.coverImage, origin, entry.locale, media);
   const title = `${entry.title} · ${site.name}`;
   const base = cards(
     "article",
@@ -210,7 +265,7 @@ export function entryHead(
         ...(description ? { description } : {}),
         url,
         mainEntityOfPage: url,
-        ...(image ? { image: [image.url] } : {}),
+        ...(image ? { image: image.object ? [image.object] : [image.url] } : {}),
         ...(entry.publishedAt ? { datePublished: entry.publishedAt } : {}),
         dateModified: entry.updatedAt,
         inLanguage: entry.locale,
@@ -247,7 +302,12 @@ export function pageLabel(locale: string, page: number): string {
  * the term as a `DefinedTerm`, its `ItemList`, and a `BreadcrumbList` through the ancestors), and
  * later pages get a "Page n" title and neither. Thin archives are `noindex,follow`.
  */
-export function archiveHead(site: Site, view: ArchiveView, origin: string): HeadMeta {
+export function archiveHead(
+  site: Site,
+  view: ArchiveView,
+  origin: string,
+  media?: MediaContext,
+): HeadMeta {
   const { locale, shown } = view;
   const label = view.term.labels[locale];
   const first = view.page === 1;
@@ -262,9 +322,7 @@ export function archiveHead(site: Site, view: ArchiveView, origin: string): Head
           (label?.description ? markdownText(label.description) : undefined),
       )
     : undefined;
-  const imageRef = label?.seo?.ogImage ?? view.term.image;
-  const imageUrl = absoluteUrl(origin, imageRef?.src);
-  const image = imageUrl ? { url: imageUrl, alt: imageRef?.alt ?? "" } : undefined;
+  const image = cardImage(label?.seo?.ogImage ?? view.term.image, origin, locale, media);
   const root = `${origin}${view.root}`;
   const jsonLd: object[] = first
     ? [

@@ -16,6 +16,7 @@ import {
 } from "@cloudhal/astro-renderer/cache-tags";
 import { Sections } from "@cloudhal/astro-renderer/components";
 import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
+import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
   type ActiveRoute,
   activeItem,
@@ -71,6 +72,16 @@ if (route.kind === "not-found" || route.kind === "feed") return new Response(nul
 
 const origin = siteOrigin(site, Astro.url);
 const locale = site.defaultLocale;
+// Media (RFC-0004): assets resolve `assetId` and `asset:<id>`; previews never use transformations.
+const media: MediaContext = {
+  assets: await loadAssetIndex(source),
+  locale,
+  defaultLocale: site.defaultLocale,
+  transform: config.media?.transform ?? "none",
+  preview: Astro.response.headers.get("x-cloudhal-mode") === "preview",
+  onMiss: (id) =>
+    console.warn(`cloudhal: ${path} refers to ${id}, which this version does not have`),
+};
 const t = strings(locale);
 const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);
 const primary = await source.navigation("primary", locale, { collectionIndex });
@@ -157,14 +168,14 @@ addCacheTags(Astro.response.headers, tags);
 
 const meta =
   route.kind === "page"
-    ? pageHead(site, route.page, origin)
+    ? pageHead(site, route.page, origin, media)
     : route.kind === "entry"
-      ? entryHead(site, route.entry, origin, terms)
-      : archiveHead(site, route.archive, origin);
+      ? entryHead(site, route.entry, origin, terms, media)
+      : archiveHead(site, route.archive, origin, media);
 ---
 <Base site={site} meta={meta} nav={nav} footer={footer}>
   {route.kind === "page" && (
-    <Sections sections={route.page.sections} entries={entries} components={components} />
+    <Sections sections={route.page.sections} entries={entries} components={components} media={media} />
   )}
   {route.kind === "entry" && (
     <Fragment>
@@ -176,10 +187,10 @@ const meta =
           { name: route.entry.title },
         ]}
       />
-      <Fragment set:html={renderEntryArticle(route.entry, locale)} />
+      <Fragment set:html={renderEntryArticle(route.entry, locale, media)} />
       <PostTerms taxonomy={terms} locale={locale} />
       <RelatedPosts title={t.related} entries={related} locale={locale} />
     </Fragment>
   )}
-  {route.kind === "archive" && <Archive archive={route.archive} t={t} />}
+  {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}
 </Base>

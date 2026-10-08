@@ -1,5 +1,6 @@
-import { openLocalStore } from "@cloudhal/core-ts/local";
+import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { CloudhalRendererConfig } from "./integration.ts";
+import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { type GraphSource, LiveSource, SnapshotSource } from "./source.ts";
 
 let cached: { key: string; source: Promise<GraphSource> } | undefined;
@@ -20,9 +21,17 @@ export function getSource(
   return cached.source;
 }
 
+let local: { dir: string; store: Promise<LocalStore> } | undefined;
+
+/** One local store per data directory and process. */
+function localStore(dataDir: string): Promise<LocalStore> {
+  if (local?.dir !== dataDir) local = { dir: dataDir, store: openLocalStore(dataDir) };
+  return local.store;
+}
+
 function open(config: CloudhalRendererConfig, selector: string): Promise<GraphSource> {
   return (async () => {
-    const { store } = await openLocalStore(config.dataDir);
+    const { store } = await localStore(config.dataDir);
     if (selector === "live") return new LiveSource(store, config.siteId);
     if (selector.startsWith("snapshot:"))
       return SnapshotSource.open(store, selector.slice("snapshot:".length));
@@ -33,6 +42,32 @@ function open(config: CloudhalRendererConfig, selector: string): Promise<GraphSo
 /** Test hook. */
 export function resetSource(): void {
   cached = undefined;
+}
+
+/**
+ * The media route for `cloudhal dev` (RFC-0004 §7.8): served from the local blob store with
+ * `no-store`, drafts included, matching the live preview. `undefined` for other paths.
+ */
+export async function serveMedia(
+  request: Request,
+  options: Partial<CloudhalRendererConfig>,
+): Promise<Response | undefined> {
+  if (!matchMediaRoute(new URL(request.url).pathname)) return undefined;
+  if (!options.dataDir || !options.siteId) return undefined;
+  const config: CloudhalRendererConfig = {
+    ...options,
+    dataDir: options.dataDir,
+    siteId: options.siteId,
+  };
+  const { store, blobs } = await localStore(config.dataDir);
+  const source = await getSource(config);
+  return serveMediaRequest(request, {
+    siteId: config.siteId,
+    mode: "dev",
+    assetByPrefix: async (prefix) => source.assetByPrefix?.(prefix),
+    blobState: (sha256) => store.blobState(config.siteId, sha256),
+    blobs,
+  });
 }
 
 /** Shared with the `workerd` runtime so code importing either build sees the same names. */

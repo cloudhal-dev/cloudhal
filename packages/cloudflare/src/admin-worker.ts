@@ -93,7 +93,20 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         migrated = true;
       }
 
-      const store = new SiteGraphStore({
+      // A takedown (RFC-0004 §4.6) purges the asset's media URLs at once, not at the next publish.
+      const purgeTags = async (tags: string[], what: string) => {
+        if (!env.SITE || !env.CLOUDHAL_PURGE_TOKEN) return;
+        const res = await env.SITE.fetch("https://site.internal/__cloudhal/purge", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${env.CLOUDHAL_PURGE_TOKEN}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ tags }),
+        });
+        log(`purge after ${what}: ${res.status} ${await res.text()}`);
+      };
+      const store: SiteGraphStore = new SiteGraphStore({
         sql,
         blobs,
         onPublished: async (site, change) => {
@@ -111,6 +124,11 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             `purge after publishing ${site.id} (${change.from ?? "nothing"} → ${change.to ?? "nothing"}): ${result.mode}, ${result.tags.length} tag(s), ${result.requests} request(s)`,
           );
         },
+        onMediaPurged: async (siteId, assetIds) =>
+          purgeTags(
+            assetIds.map((id) => `cloudhal-asset-${id}`),
+            `taking down media of ${siteId}`,
+          ),
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });
 
