@@ -179,6 +179,7 @@ export async function runEditorAgent(options: {
       summary?: string;
       body: { value: string };
       tags?: string[];
+      author: { kind: string; id: string };
     }[];
   }>("list_entries", { siteId, collection: "posts" });
   const posts = await loadPosts(options.postsDir);
@@ -251,8 +252,12 @@ export async function runEditorAgent(options: {
     );
   }
 
-  // Starter content that isn't part of the newsroom is archived, not deleted (deletion needs approval).
-  for (const e of entries.filter((x) => !wanted.has(x.slug) && x.status !== "archived")) {
+  // Only the starter's own sample content (written by the system seed) is archived — never what a
+  // person or another agent wrote. Archived, not deleted (deletion needs approval).
+  const isStarterSample = (x: (typeof entries)[number]) => x.author?.kind === "system";
+  for (const e of entries.filter(
+    (x) => !wanted.has(x.slug) && x.status !== "archived" && isStarterSample(x),
+  )) {
     await call("update_entry", { siteId, entryId: e.id, rev: e.rev, status: "archived" });
     archived.push(e.slug);
     log(`  archived ${e.slug}`);

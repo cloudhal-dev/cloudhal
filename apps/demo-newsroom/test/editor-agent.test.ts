@@ -118,6 +118,25 @@ describe("newsroom editor agent", () => {
     expect((await store.listSnapshots(site.id, 200)).length).toBe(snapshotsBefore);
   });
 
+  it("never archives content a person wrote", async () => {
+    const { store, site, client } = await setup("decline");
+    const mine = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "my-draft",
+      locale: "en",
+      status: "draft",
+      title: "My draft",
+      body: { format: "markdown", value: "" },
+      fields: {},
+      tags: [],
+      author: { kind: "human", id: "user_owner000001" },
+    });
+    const r = await run(client, false);
+    expect(r.archived).toEqual(["hello-world"]);
+    expect((await store.getContentEntry(mine.id))?.status).toBe("draft");
+  });
+
   it("does not publish when the person declines", async () => {
     const { store, site, client } = await setup("decline");
     const r = await run(client);
