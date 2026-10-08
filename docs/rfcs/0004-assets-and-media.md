@@ -1,5 +1,5 @@
 # RFC-0004: Assets and the media library
-- Status: Draft
+- Status: Accepted (2026-10-08, Halil — including the recommended answers to the open questions)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-08
 - Related: RFC-0001 (open question "media assets as first-class nodes"), RFC-0002, ADR-0001, ADR-0002, ADR-0004, ADR-0009, ADR-0011, ADR-0012, ADR-0014, ADR-0015, ADR-0017
 - Contracts on this branch: `asset.schema.json` and `ImageRef.assetId` (§2.1–2.2; generated and tested in both languages). §2.4 (`NodeRef.kind` gains `asset`) waits for the store change, as RFC-0002 §2.8 did.

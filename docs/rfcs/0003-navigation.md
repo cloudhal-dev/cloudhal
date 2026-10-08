@@ -1,5 +1,5 @@
 # RFC-0003: Navigation (menus)
-- Status: Draft
+- Status: Accepted (2026-10-08, Halil — including the recommended answers to the open questions)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-08
 - Related: RFC-0001 (open question "navigation menus … as first-class nodes"), RFC-0002 (node registry, `op_guards`, term archives, redirects), ADR-0001, ADR-0002, ADR-0004, ADR-0009, ADR-0011, ADR-0014, ADR-0015, ADR-0017
 - Contracts on this branch: `menu.schema.json` with fixtures, generated and tested in both languages (§2). The `NodeRef.kind` diff in §2.3 waits for the store code, as RFC-0002 §2.8 did.

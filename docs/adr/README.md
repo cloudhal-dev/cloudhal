@@ -35,3 +35,5 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0016](0016-time-boxed-elevation.md) | Time-boxed elevation: a more autonomous mode until a set time, computed per call, audited |
 | [0017](0017-taxonomy-and-redirects.md) | Taxonomy and redirects are graph nodes; terms referenced by id; governed rename/merge with automatic 301s (RFC-0002) |
 | [0018](0018-roles-and-invites.md) | Staff roles are scope sets; agent keys never exceed their creator; approvals follow roles; invites are one-time links (RFC-0005) |
+| [0019](0019-navigation-menus.md) | Menus are Menu nodes with a tree of id-referenced items; agent edits always approved (RFC-0003) |
+| [0020](0020-assets-and-media.md) | Assets are content-addressed nodes with SHA-256; SSRF-safe agent fetch; asset:upload / asset:manage (RFC-0004) |
