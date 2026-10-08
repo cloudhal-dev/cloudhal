@@ -58,10 +58,18 @@ export interface ImageRefErrors {
   alt?: "required" | "tooLong";
 }
 
-/** What is wrong with a cover image (an absent image is fine; a set one needs a source and alt text). */
+/**
+ * What is wrong with an image slot (an absent image is fine). An address needs a valid source and
+ * alt text. A media-library image (`assetId`, RFC-0004) has its source kept by the store, and its
+ * own alt text applies unless this use overrides it, so only the override's length is checked.
+ */
 export function validateImageRef(image: ImageRef | undefined): ImageRefErrors {
   if (!image) return {};
   const errors: ImageRefErrors = {};
+  if (image.assetId) {
+    if (image.alt.length > SEO_LIMITS.altMax) errors.alt = "tooLong";
+    return errors;
+  }
   const src = validateImageSrc(image.src);
   if (src) errors.src = src;
   if (!image.alt.trim()) errors.alt = "required";
@@ -72,19 +80,21 @@ export function validateImageRef(image: ImageRef | undefined): ImageRefErrors {
 export const hasErrors = (errors: object) => Object.keys(errors).length > 0;
 
 /**
- * Applies an edit of the cover image fields. Clearing both fields removes the image (the
- * contract has no empty `src`); a new source drops stale dimensions.
+ * Applies an edit of the image fields. Clearing both fields removes the image (the contract has no
+ * empty `src`); a new source drops stale dimensions and detaches a media-library image (editing
+ * the address means "use this address instead", RFC-0004 §8).
  */
 export function editImageRef(
   current: ImageRef | undefined,
   patch: Partial<Pick<ImageRef, "src" | "alt">>,
 ): ImageRef | undefined {
   const next: ImageRef = { ...(current ?? { src: "", alt: "" }), ...patch };
-  if (!next.src.trim() && !next.alt.trim()) return undefined;
   if (patch.src !== undefined && patch.src !== current?.src) {
     delete next.width;
     delete next.height;
+    delete next.assetId;
   }
+  if (!next.assetId && !next.src.trim() && !next.alt.trim()) return undefined;
   return next;
 }
 

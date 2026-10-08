@@ -15,6 +15,7 @@ import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { approvals } from "./routes/approvals.ts";
+import { assets, siteMedia } from "./routes/assets.ts";
 import { entries } from "./routes/entries.ts";
 import { agentModesInfo, instanceRoutes, invitesInfo, rolesInfo } from "./routes/instance.ts";
 import { inviteRoutes } from "./routes/invites.ts";
@@ -31,6 +32,7 @@ import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
 import { terms } from "./routes/terms.ts";
 import { routeGuard } from "./scopes.ts";
+import { randomUploadSecret, type UploadSecret } from "./uploads.ts";
 
 /**
  * Better Auth endpoints that are only used server-side: membership changes go through Cloudhal's
@@ -48,6 +50,14 @@ export function createApi(deps: ApiDeps) {
   app.onError(errorHandler);
   const clock = deps.now ?? (() => new Date());
   const ownership: OwnershipResolver = deps.staff?.ownership ?? PEOPLE_ONLY_OWNERSHIP;
+  // Upload tickets (RFC-0004 §5.5) are signed with a secret every instance shares when there is
+  // one; a server without one (local tools) signs with a key of its own process.
+  const uploadSecret: UploadSecret =
+    [deps.preview?.secret, deps.mcp?.stateKey].find(
+      (s): s is string | Uint8Array =>
+        s !== undefined &&
+        (typeof s === "string" ? new TextEncoder().encode(s) : s).byteLength >= 32,
+    ) ?? randomUploadSecret();
   let engine: PolicyEngine | undefined;
   const policy = () => {
     engine ??= new PolicyEngine(toolPolicies(defineTools()));
@@ -95,6 +105,7 @@ export function createApi(deps: ApiDeps) {
     c.set("policy", policy);
     c.set("mail", deps.mail);
     c.set("now", clock);
+    c.set("uploadSecret", uploadSecret);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -231,6 +242,9 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/migrations", migrations);
   // RFC-0003 §5: navigation menus (people; agents use the MCP menu tools).
   app.route("/api/sites/:siteId/menus", menus);
+  // RFC-0004 §6.1: the media library (people; agents use the MCP asset tools).
+  app.route("/api/sites/:siteId/assets", assets);
+  app.route("/api/sites/:siteId/media", siteMedia);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

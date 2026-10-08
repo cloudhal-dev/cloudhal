@@ -47,6 +47,7 @@ import {
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { ImageRefField } from "../components/MediaPicker.tsx";
 import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
@@ -56,7 +57,7 @@ import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewPage } from "../lib/api.ts";
-import { cleanSeo, hasErrors, validateSeo } from "../lib/seo.ts";
+import { cleanSeo, hasErrors, validateImageRef, validateSeo } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 
@@ -101,7 +102,22 @@ function duplicateOf(page: Page, title: string): NewPage {
 /** Field rows inside a section card: stacked on phones, side by side when there is room. */
 const FIELD_ROW = "items-start gap-x-4 gap-y-5";
 
-function SectionForm({ section, onChange }: { section: Section; onChange: (s: Section) => void }) {
+/** Where a section's image comes from: the site (media library, primary domain). */
+interface MediaContext {
+  siteId: string;
+  defaultLocale: string;
+  host: string | undefined;
+}
+
+function SectionForm({
+  section,
+  onChange,
+  media,
+}: {
+  section: Section;
+  onChange: (s: Section) => void;
+  media: MediaContext;
+}) {
   const t = useT();
   switch (section.kind) {
     case "hero":
@@ -120,6 +136,19 @@ function SectionForm({ section, onChange }: { section: Section; onChange: (s: Se
             required={false}
             className="w-full"
           />
+          {/* The hero's picture is optional (RFC-0004 §2.2 slot `HeroSection.image`). */}
+          <ImageRefField
+            siteId={media.siteId}
+            defaultLocale={media.defaultLocale}
+            image={section.image}
+            savedSrc={undefined}
+            host={media.host}
+            errors={validateImageRef(section.image)}
+            showErrors={false}
+            onChange={(image) => onChange(setOptional(section, "image", image))}
+            testId={`hero-${section.id}`}
+            labels={{ empty: t("editor.heroNoImage") }}
+          />
         </>
       );
     case "richText":
@@ -137,20 +166,18 @@ function SectionForm({ section, onChange }: { section: Section; onChange: (s: Se
     case "image":
       return (
         <>
-          <Grid variant="2up" gap="none" className={FIELD_ROW}>
-            <Input
-              label={t("editor.imageUrl")}
-              value={section.image.src}
-              onValueChange={(v) => onChange({ ...section, image: { ...section.image, src: v } })}
-              className="w-full"
-            />
-            <Input
-              label={t("editor.altText")}
-              value={section.image.alt}
-              onValueChange={(v) => onChange({ ...section, image: { ...section.image, alt: v } })}
-              className="w-full"
-            />
-          </Grid>
+          <ImageRefField
+            siteId={media.siteId}
+            defaultLocale={media.defaultLocale}
+            image={section.image}
+            savedSrc={undefined}
+            host={media.host}
+            errors={validateImageRef(section.image)}
+            showErrors={false}
+            // The section needs an image: clearing the fields keeps an empty address to fill in.
+            onChange={(image) => onChange({ ...section, image: image ?? { src: "", alt: "" } })}
+            testId={`image-${section.id}`}
+          />
           <Input
             label={t("editor.caption")}
             value={section.caption ?? ""}
@@ -492,7 +519,15 @@ export function PageEditorPage() {
                         </>
                       }
                     >
-                      <SectionForm section={s} onChange={(next) => updateSection(i, next)} />
+                      <SectionForm
+                        section={s}
+                        onChange={(next) => updateSection(i, next)}
+                        media={{
+                          siteId,
+                          defaultLocale: site.data?.defaultLocale ?? draft.locale,
+                          host,
+                        }}
+                      />
                     </SectionCard>
                   );
                 })

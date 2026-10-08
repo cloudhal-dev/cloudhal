@@ -6,6 +6,7 @@
 import { ApprovalStore, AuditLog, type Role } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
+import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -1512,6 +1513,100 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       );
       expect(live?.reason).toBe("publish");
       await client.close();
+    });
+
+    it("assets (RFC-0004, ADR-0018): Contributors and Authors upload and edit their own files, Editors manage all, takedown is the Owner's", async () => {
+      const t = await team();
+      const assets = `/api/sites/${siteId}/assets`;
+      const upload = async (p: Person, side: number) => {
+        const bytes = makePng({ width: side, height: side });
+        const tk = await call("POST", `${assets}/uploads`, {
+          cookie: p.cookie,
+          body: {
+            files: [
+              {
+                filename: `${p.role}.png`,
+                mediaType: "image/png",
+                bytes: bytes.byteLength,
+                alt: p.role,
+              },
+            ],
+          },
+        });
+        expect(tk.status, JSON.stringify(tk.body)).toBe(201);
+        const file = (tk.body.files as { url: string }[])[0] as { url: string };
+        const res = await app.request(`${ORIGIN}${file.url}`, {
+          method: "PUT",
+          headers: {
+            cookie: p.cookie,
+            "content-type": "image/png",
+            "content-length": String(bytes.byteLength),
+          },
+          body: bytes as Uint8Array<ArrayBuffer>,
+        });
+        const body = (await res.json()) as Json;
+        expect(res.status, JSON.stringify(body)).toBe(201);
+        return body.asset as { id: string; rev: number; uploadedBy: { id: string } };
+      };
+      const own = await upload(t.contributor, 5);
+      expect(own.uploadedBy.id).toBe(t.contributor.actorId);
+      const authors = await upload(t.author, 6);
+      const editors = await upload(t.editor, 7);
+      const edit = (p: Person, id: string, rev: number) =>
+        call("PUT", `${assets}/${id}`, { cookie: p.cookie, body: { rev, credit: `by ${p.role}` } });
+
+      // Own uploads: editable by the uploader; others' are refused with words.
+      expect((await edit(t.contributor, own.id, 0)).status).toBe(200);
+      const notOwn = await edit(t.contributor, editors.id, 0);
+      expect(notOwn.status).toBe(403);
+      expect(notOwn.body.error).toBe("not_own");
+      expect((await edit(t.author, own.id, 1)).status).toBe(403);
+      expect((await edit(t.author, authors.id, 0)).status).toBe(200);
+      const detail = (p: Person, id: string) =>
+        call("GET", `${assets}/${id}`, { cookie: p.cookie });
+      expect((await detail(t.contributor, own.id)).body.editable).toBe(true);
+      expect((await detail(t.contributor, editors.id)).body.editable).toBe(false);
+      expect((await detail(t.editor, own.id)).body.editable).toBe(true);
+
+      // Retire, restore and delete are asset:manage (Editor and above).
+      for (const p of [t.contributor, t.author]) {
+        const retire = await call("POST", `${assets}/${authors.id}/retire`, {
+          cookie: p.cookie,
+          body: { rev: 1 },
+        });
+        expect(retire.status).toBe(403);
+        expect(retire.body.error).toBe("missing_scope");
+        const del = await call("DELETE", `${assets}/${authors.id}?rev=1`, { cookie: p.cookie });
+        expect(del.status).toBe(403);
+      }
+      expect((await edit(t.editor, own.id, 1)).status).toBe(200);
+      const retired = await call("POST", `${assets}/${own.id}/retire`, {
+        cookie: t.editor.cookie,
+        body: { rev: 2 },
+      });
+      expect(retired.status).toBe(200);
+      expect(
+        (await call("DELETE", `${assets}/${authors.id}?rev=1`, { cookie: t.editor.cookie })).status,
+      ).toBe(204);
+
+      // Takedown: the Owner only (RFC-0004 §4.6), audited.
+      const purge = (p: Person) =>
+        call("POST", `${assets}/${editors.id}/purge`, {
+          cookie: p.cookie,
+          body: { reason: "Personal data in the photo" },
+        });
+      for (const p of [t.editor, t.administrator]) {
+        const r = await purge(p);
+        expect(r.status).toBe(403);
+        expect(r.body.error).toBe("owner_only");
+      }
+      expect((await purge(t.owner)).status).toBe(200);
+      const rows = await audit.list({ siteId, tool: "asset.purge" });
+      expect(rows.map((r) => r.actor.id)).toEqual([t.owner.actorId]);
+
+      // Studio's gating reads the same abilities.
+      const me = await call("GET", "/api/me", { cookie: t.contributor.cookie });
+      expect(me.body.can).toMatchObject({ "assets.upload": true, "assets.manage": false });
     });
   });
 }

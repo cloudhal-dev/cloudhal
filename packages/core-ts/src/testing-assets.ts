@@ -711,6 +711,67 @@ export function assetsSuite(ctx: SuiteContext): void {
       ).toBe("unsupported_type");
     });
 
+    it("upload tickets (§5.5): all or none under the open limit, single use, expiring; dedupe by the uploaded hash", async () => {
+      const w = await setup();
+      const store = ctx.store();
+      const t0 = new Date("2026-10-08T10:00:00.000Z");
+      const file = { bytes: 10, mediaType: "image/png", options: { filename: "a.png" } };
+      const two = await store.openUploadTickets(w.site.id, person, [file, file], {
+        ttlMs: 15 * 60_000,
+        maxOpen: 3,
+        now: t0,
+      });
+      expect(two?.map((t) => t.id.startsWith("upl_"))).toEqual([true, true]);
+      expect(await store.openUploadCount(person, t0)).toBe(2);
+      // Two more would make four: none is opened.
+      expect(
+        await store.openUploadTickets(w.site.id, person, [file, file], {
+          ttlMs: 60_000,
+          maxOpen: 3,
+          now: t0,
+        }),
+      ).toBeUndefined();
+      expect(await store.openUploadCount(person, t0)).toBe(2);
+      // Another actor has its own allowance.
+      expect(
+        await store.openUploadTickets(w.site.id, robot, [file], {
+          ttlMs: 60_000,
+          maxOpen: 1,
+          now: t0,
+        }),
+      ).toHaveLength(1);
+      const [first, second] = two ?? [];
+      const ticket = await store.getUploadTicket(first?.id ?? "");
+      expect(ticket).toMatchObject({
+        siteId: w.site.id,
+        actor: { kind: "human", id: person.id },
+        bytes: 10,
+        mediaType: "image/png",
+        options: { filename: "a.png" },
+        state: "open",
+        expiresAt: "2026-10-08T10:15:00.000Z",
+      });
+      expect(await store.claimUploadTicket(first?.id ?? "", t0)).toBe(true);
+      expect(await store.claimUploadTicket(first?.id ?? "", t0)).toBe(false);
+      expect((await store.getUploadTicket(first?.id ?? ""))?.state).toBe("used");
+      // Expired tickets cannot be claimed and no longer count as open.
+      const later = new Date("2026-10-08T10:16:00.000Z");
+      expect(await store.claimUploadTicket(second?.id ?? "", later)).toBe(false);
+      expect(await store.openUploadCount(person, later)).toBe(0);
+
+      // Dedupe: the stored hash, and the hash of the bytes as uploaded (before stripping).
+      const original = photo();
+      const { asset } = await upload(store, w.site.id, original);
+      expect(asset.originalSha256).toBe(await bytesHex(original));
+      expect((await store.assetForUploadedContent(w.site.id, asset.sha256))?.id).toBe(asset.id);
+      expect(
+        (await store.assetForUploadedContent(w.site.id, asset.originalSha256 as string))?.id,
+      ).toBe(asset.id);
+      expect(await store.assetForUploadedContent(w.site.id, "0".repeat(64))).toBeUndefined();
+      await store.purgeBlob(w.site.id, asset.sha256, person, { text: "notice", legal: false });
+      expect(await code(store.assetForUploadedContent(w.site.id, asset.sha256))).toBe("purged");
+    });
+
     it("the per-site quota is enforced", async () => {
       const w = await setup();
       const store = ctx.store();

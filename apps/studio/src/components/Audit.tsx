@@ -4,6 +4,8 @@ import { ArrowRight, Robot } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
 import {
+  ASSET_EVENTS,
+  isAssetEvent,
   isKeyEvent,
   isKnownTool,
   isMemberEvent,
@@ -37,7 +39,9 @@ export function useToolLabel() {
           ? t(`tools.${KEY_EVENTS[tool]}`)
           : isMemberEvent(tool)
             ? t(`tools.${MEMBER_EVENTS[tool]}`)
-            : tool,
+            : isAssetEvent(tool)
+              ? t(`tools.${ASSET_EVENTS[tool]}`)
+              : tool,
     [t],
   );
 }

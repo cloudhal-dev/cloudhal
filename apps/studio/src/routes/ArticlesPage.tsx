@@ -44,8 +44,8 @@ import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { imageRefPreviewUrl } from "../lib/media.ts";
 import { entryAccess } from "../lib/roles.ts";
-import { previewImageUrl } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { facetFilter, needsTagsMigration } from "../lib/taxonomy.ts";
 
@@ -301,7 +301,11 @@ export function ArticlesPage() {
                         <div className="flex min-w-56 items-center gap-3">
                           <ImagePreview
                             size="thumb"
-                            src={e.coverImage ? previewImageUrl(e.coverImage.src, host) : undefined}
+                            src={
+                              e.coverImage
+                                ? imageRefPreviewUrl(siteId, e.coverImage, host)
+                                : undefined
+                            }
                             alt=""
                             labels={{
                               empty: t("seo.noCover"),

@@ -119,6 +119,9 @@ describe("article editor: cover image", () => {
   it("validates the URL against the site's rule (https or a /path)", async () => {
     serve(articleRoutes(entry()));
     render(wrap(<ArticleEditorPage />));
+    // The library picker comes first; an address is under "Use an image address instead" (§2u).
+    expect(await screen.findByTestId("cover-choose")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("cover-address-toggle"));
     const src = await screen.findByTestId("cover-src");
     fireEvent.change(src, { target: { value: "http://cdn.example.com/a.jpg" } });
     fireEvent.blur(src);
@@ -137,6 +140,7 @@ describe("article editor: cover image", () => {
   it("requires alt text before saving and sends the image with the draft", async () => {
     const fetch = serve(articleRoutes(entry()));
     render(wrap(<ArticleEditorPage />));
+    fireEvent.click(await screen.findByTestId("cover-address-toggle"));
     fireEvent.change(await screen.findByTestId("cover-src"), {
       target: { value: " https://cdn.example.com/cover.jpg " },
     });

@@ -30,6 +30,8 @@ import {
   type IngestAssetInput,
   type IngestAssetResult,
   type StreamIngestInput,
+  type UploadTicket,
+  type UploadTicketRequest,
 } from "./assets.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
@@ -912,6 +914,35 @@ export class SiteGraphStore {
   /** Recomputes a stored blob's SHA-256 (`cloudhal media verify`). */
   verifyMediaBlob(siteId: string, sha256: string): Promise<"ok" | "missing" | "mismatch"> {
     return this.#assets.verifyBlob(siteId, sha256);
+  }
+
+  /** The asset holding this content (stored or as-uploaded SHA-256); refuses taken-down content. */
+  assetForUploadedContent(siteId: string, sha256: string): Promise<Asset | undefined> {
+    return this.#assets.assetForUploadedContent(siteId, sha256);
+  }
+
+  /** Single-use upload tickets (§5.5), all or none; undefined past `maxOpen` open tickets. */
+  openUploadTickets(
+    siteId: string,
+    actor: Pick<Actor, "kind" | "id">,
+    files: readonly UploadTicketRequest[],
+    options: { ttlMs: number; maxOpen: number; now?: Date | undefined },
+  ): Promise<UploadTicket[] | undefined> {
+    return this.#assets.openUploadTickets(siteId, actor, files, options);
+  }
+
+  /** Open, unexpired upload tickets an actor holds. */
+  openUploadCount(actor: Pick<Actor, "kind" | "id">, now?: Date): Promise<number> {
+    return this.#assets.openUploadCount(actor, now);
+  }
+
+  getUploadTicket(id: string): Promise<UploadTicket | undefined> {
+    return this.#assets.getUploadTicket(id);
+  }
+
+  /** `open` → `used` once; false for a used, expired or unknown ticket. */
+  claimUploadTicket(id: string, now?: Date): Promise<boolean> {
+    return this.#assets.claimUploadTicket(id, now);
   }
 
   /** The added assets an `auto`-mode publish may carry with their articles (§6.3). */

@@ -18,6 +18,13 @@ function walk(dir: string): string[] {
     return statSync(p).isDirectory() ? walk(p) : p.endsWith(".tsx") ? [p] : [];
   });
 }
+/** Every source file (`.ts` and `.tsx`), for checks that span helpers too. */
+function walkAll(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const p = path.join(dir, name);
+    return statSync(p).isDirectory() ? walkAll(p) : /\.tsx?$/.test(p) ? [p] : [];
+  });
+}
 const files = walk(SRC).map((f) => ({
   file: path.relative(SRC, f),
   text: readFileSync(f, "utf8"),
@@ -416,7 +423,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Badge",
     "SettingRow",
     "CharacterCount",
-    "previewImageUrl",
+    "imageRefPreviewUrl",
     "truncateForSearch",
     "searchBreadcrumb",
   ],
@@ -429,7 +436,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   ],
   "routes/PageEditorPage.tsx#seo": ["PageSeoCard", "validateSeo", "cleanSeo", "primaryHostname"],
   "routes/PagesPage.tsx#seo": ["Badge", "Tooltip", "EyeSlash"],
-  "routes/ArticlesPage.tsx#seo": ["ImagePreview", "previewImageUrl"],
+  "routes/ArticlesPage.tsx#seo": ["ImagePreview", "imageRefPreviewUrl"],
   // Categories, tags and redirects (§2p, RFC-0002 §8).
   "routes/TaxonomyPage.tsx": [
     "PageLayout",
@@ -660,6 +667,94 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "routes/RedirectsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
   "routes/SiteSettingsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
   "components/NotificationsBell.tsx#roles": ["MemberJoinedItem", "RoleChangedItem"],
+  // Media library (§2u, RFC-0004 §8): library, file page, upload queue, picker, takedown.
+  "routes/MediaPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "ListToolbar",
+    "Toolbar",
+    "Select",
+    "Tabs",
+    "MediaDropZone",
+    "MediaGrid",
+    "MediaTile",
+    "LayerCard",
+    "Table",
+    "TableSkeleton",
+    "Empty",
+    "RowMenu",
+    "RelativeTime",
+    "UploadDialog",
+    "useFileChooser",
+    "useGate",
+  ],
+  "routes/AssetPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "EditorLayout",
+    "SectionCard",
+    "SectionEmpty",
+    "Input",
+    "InputArea",
+    "InputGroup",
+    "Switch",
+    "Select",
+    "Tabs",
+    "Table",
+    "InlineCopyText",
+    "LinkButton",
+    "Banner",
+    "DetailsCard",
+    "DangerZoneCard",
+    "DeleteResource",
+    "TakedownDialog",
+    "ViewOnlyBanner",
+    "ReadOnly",
+    "useGate",
+    "validateAssetForm",
+  ],
+  "components/MediaUpload.tsx": [
+    "MediaDropZone",
+    "MediaKindFrame",
+    "ImagePreview",
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Meter",
+    "Checkbox",
+    "Banner",
+    "InsetPanel",
+    "Input",
+    "putUpload",
+  ],
+  "components/MediaPicker.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Tabs",
+    "MediaGrid",
+    "MediaTile",
+    "SectionEmpty",
+    "SkeletonLine",
+    "ImagePreview",
+    "InsetPanel",
+    "InputArea",
+    "Collapsible",
+    "UploadPanel",
+    "imageRefFor",
+    "useGate",
+  ],
+  "components/Media.tsx": ["ImagePreview", "MediaKindFrame", "Badge", "Tooltip"],
+  "components/TakedownDialog.tsx": [
+    "LayerDialog.Alert",
+    "LayerDialog.Actions.Primary",
+    "Banner",
+    "InsetPanel",
+    "InputArea",
+    "Checkbox",
+  ],
+  "components/Seo.tsx#media": ["ImageRefField"],
+  "routes/PageEditorPage.tsx#media": ["ImageRefField"],
+  "routes/SiteShell.tsx#media": ["Images", "nav.media", "goMedia"],
+  "components/SnapshotDiffDialog.tsx#media": ["assetTitle"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -721,6 +816,10 @@ const REQUIRED_SOMEWHERE = [
   "TermChip",
   "Avatar",
   "Meter",
+  "MediaDropZone",
+  "MediaGrid",
+  "MediaTile",
+  "MediaKindFrame",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -871,16 +970,94 @@ describe("design rules (DESIGN.md)", () => {
     const block = readFileSync(path.join(UI_BLOCKS, "SeoPreview.tsx"), "utf8");
     expect(block).toMatch(/<img\b[^>]*referrerPolicy="no-referrer"/);
     // Screens pass ImagePreview a URL that went through previewImageUrl (safe source, site
-    // paths resolved against the primary domain) — never a raw stored src.
+    // paths resolved against the primary domain), a media-library file's private content route
+    // (assetPreviewUrl, drafts included, §2u) or the person's own chosen file (an object URL) —
+    // never a raw stored src.
     const users = uiFiles.filter((f) => /<ImagePreview\b/.test(f.text));
     expect(users.map((f) => f.file).sort()).toEqual([
+      "components/Media.tsx",
+      "components/MediaPicker.tsx",
+      "components/MediaUpload.tsx",
       "components/Seo.tsx",
       "routes/ArticlesPage.tsx",
     ]);
     for (const f of users) {
-      expect(f.text, f.file).toMatch(/previewImageUrl\(/);
+      expect(f.text, f.file).toMatch(
+        /previewImageUrl\(|imageRefPreviewUrl\(|assetPreviewUrl\(|useObjectUrl\(/,
+      );
       expect(f.text, f.file).not.toMatch(/<ImagePreview[^>]*src=\{[^}]*\.src\}/);
     }
+    // The content route is the only asset source, and it is Studio's own (same origin).
+    const media = readFileSync(path.join(SRC, "lib/media.ts"), "utf8");
+    expect(media).toMatch(/return api\.assets\.contentUrl\(siteId, asset\.id\)/);
+  });
+
+  it("file bytes go up only through a single-use ticket (§2u, RFC-0004 §5.5)", () => {
+    const sources = walkAll(SRC).map((f) => ({
+      file: path.relative(SRC, f),
+      text: readFileSync(f, "utf8"),
+    }));
+    // One XMLHttpRequest in Studio (progress), in the upload helper; no multipart bodies.
+    const xhr = sources.filter((f) => /XMLHttpRequest/.test(f.text)).map((f) => f.file);
+    expect(xhr).toEqual(["lib/uploads.ts"]);
+    expect(sources.filter((f) => /new FormData\(/.test(f.text)).map((f) => f.file)).toEqual([]);
+    const uploads = sources.find((f) => f.file === "lib/uploads.ts") as { text: string };
+    // It only PUTs to the ticket's own URL (same origin, signed, `upl_` id).
+    expect(uploads.text).toMatch(/\^\\\/api\\\/sites\\\/\[\^\/\]\+\\\/assets\\\/uploads\\\/upl_/);
+    // Tickets are asked for in one place, and the bytes follow the ticket the server returned.
+    const asking = sources.filter((f) => /api\.assets\.requestUploads\(/.test(f.text));
+    expect(asking.map((f) => f.file)).toEqual(["components/MediaUpload.tsx"]);
+    const putting = sources.filter((f) => /\bputUpload\(/.test(f.text));
+    expect(putting.map((f) => f.file).sort()).toEqual([
+      "components/MediaUpload.tsx",
+      "lib/uploads.ts",
+    ]);
+    const queue = asking[0] as { text: string };
+    expect(queue.text).toMatch(
+      /api\.assets\.requestUploads\(siteId, requests\)[\s\S]*isOpenTicket\(ticket\)[\s\S]*putUpload\(ticket, item\.file/,
+    );
+    const api = sources.find((f) => f.file === "lib/api.ts") as { text: string };
+    expect(api.text).toMatch(/\/assets\/uploads`, \{\s*method: "POST"/);
+  });
+
+  it("images say what they show before they upload and before they save (§2u)", () => {
+    const queue = files.find((f) => f.file === "components/MediaUpload.tsx") as { text: string };
+    // An image needs alt text or "decorative"; Upload stays disabled until every image has one.
+    expect(queue.text).toMatch(
+      /described = \(item: UploadItem\) =>\s*!isImage\(item\) \|\| item\.decorative \|\| item\.alt\.trim\(\)\.length > 0/,
+    );
+    expect(queue.text).toMatch(/canStart = ready\.length > 0 && ready\.every\(described\)/);
+    expect(queue.text).toMatch(/disabled=\{pending \? !upload\.canStart/);
+    // The file page validates before every save; the rule is the server's (PUT /assets/:id).
+    const page = files.find((f) => f.file === "routes/AssetPage.tsx") as { text: string };
+    const saves = page.text.match(/save\.mutate\(/g) ?? [];
+    expect(saves.length).toBeGreaterThan(0);
+    expect(page.text.match(/if \(valid\(\)\) save\.mutate\(/g)?.length).toBe(saves.length);
+    const media = readFileSync(path.join(SRC, "lib/media.ts"), "utf8");
+    expect(media).toMatch(
+      /kind === "image" && !form\.decorative && !form\.alt\[defaultLocale\]\?\.trim\(\)\)\s*errors\.alt = "required"/,
+    );
+  });
+
+  it("media controls follow the asset abilities; takedown is the Owner's (§2u, §2s)", () => {
+    const library = files.find((f) => f.file === "routes/MediaPage.tsx") as { text: string };
+    expect(library.text).toMatch(/const upload = useGate\("assets\.upload"\)/);
+    expect(library.text).toMatch(/disabled=\{!upload\.allowed\}\s*title=\{upload\.reason\}/);
+    expect(library.text).toMatch(/disabledReason=\{upload\.reason\}/);
+    const page = files.find((f) => f.file === "routes/AssetPage.tsx") as { text: string };
+    expect(page.text).toMatch(/const manage = useGate\("assets\.manage"\)/);
+    // Retire, restore and delete carry the manage gate's reason; takedown the Owner's.
+    expect(page.text.match(/manage\.reason/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(page.text).toMatch(/useCan\("ownership\.transfer"\)/);
+    expect(page.text).toMatch(/media\.takedown\.ownerOnly/);
+    // Edits follow the server's own/manage answer, read-only otherwise.
+    expect(page.text).toMatch(/disabled=\{!dirty \|\| !data\.editable\}/);
+    const picker = files.find((f) => f.file === "components/MediaPicker.tsx") as { text: string };
+    expect(picker.text).toMatch(/useGate\("assets\.upload"\)/);
+    // A picked file is written as `assetId` + its URL; typing an address detaches it (lib/seo.ts).
+    expect(picker.text).toMatch(/onChange\(imageRefFor\(item, alt\)\)/);
+    const seo = readFileSync(path.join(SRC, "lib/seo.ts"), "utf8");
+    expect(seo).toMatch(/delete next\.assetId/);
   });
 
   it("every save path in the editors validates search and image fields first (§2o)", () => {
