@@ -52,7 +52,8 @@ export interface ScopeOption {
 
 /**
  * The scopes of a group as the person may grant them (RFC-0005 §5.1): each scope the role holds;
- * else its strongest own variant the role holds; else the scope, disabled — never hidden.
+ * else its strongest own variant the role holds (unless the group lists that variant itself); else
+ * the scope, disabled — never hidden.
  */
 export function scopeOptions(group: ScopeGroup, roleScopes?: readonly AnyScope[]): ScopeOption[] {
   return SCOPE_GROUPS[group].map((scope) => {
@@ -60,7 +61,10 @@ export function scopeOptions(group: ScopeGroup, roleScopes?: readonly AnyScope[]
     const weaker = weakerScopes(scope).find((w) => holds(roleScopes, w)) as
       | GrantableScope
       | undefined;
-    return weaker ? { scope: weaker, from: scope, disabled: false } : { scope, disabled: true };
+    // A weaker scope the group already offers on its own (`asset:manage` → `asset:upload`) is not
+    // repeated as a variant: the stronger one is shown disabled instead.
+    if (!weaker || SCOPE_GROUPS[group].includes(weaker)) return { scope, disabled: true };
+    return { scope: weaker, from: scope, disabled: false };
   });
 }
 

@@ -72,6 +72,7 @@ describe("role rules (RFC-0005 §2)", () => {
       "content:read",
       "preview:create",
       "content:draft:own",
+      "asset:upload",
     ]);
     const owner = modeRules(undefined, { cap: "auto", scopes: ["*"] });
     expect(owner.keyModes).toEqual(["plan", "manual", "edits", "auto"]);
@@ -82,6 +83,8 @@ describe("role rules (RFC-0005 §2)", () => {
     const author = scopeOptions("write", FALLBACK_ROLE_SCOPES.author);
     expect(author).toEqual([
       { scope: "content:write:own", from: "content:write", disabled: false },
+      { scope: "asset:upload", disabled: false },
+      { scope: "asset:manage", disabled: true },
       { scope: "site:write", disabled: true },
       { scope: "preview:create", disabled: false },
     ]);

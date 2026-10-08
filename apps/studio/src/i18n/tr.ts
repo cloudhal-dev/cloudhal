@@ -586,8 +586,6 @@ export const tr: Messages = {
       "content:write:own": "Makale oluşturur ve kendi makalelerini değiştirir",
       "content:draft:own": "Taslak yazar ve incelemeye gönderir",
       "site:publish:own": "Tüm değişiklikler kendisininse yayınlar",
-      "asset:upload": "Dosya yükler",
-      "asset:manage": "Herhangi bir dosyayı değiştirir ve siler",
     },
     modes: {
       legend: "Mod",

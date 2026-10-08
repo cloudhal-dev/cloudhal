@@ -577,8 +577,6 @@ export const en = {
       "content:write:own": "Create articles and change your own",
       "content:draft:own": "Write drafts and send them to review",
       "site:publish:own": "Publish when every change is your own",
-      "asset:upload": "Upload files",
-      "asset:manage": "Replace and delete any file",
     },
     modes: {
       legend: "Mode",
