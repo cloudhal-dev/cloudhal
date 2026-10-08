@@ -9,28 +9,30 @@
  * `mode: "replace"` is given. Snapshots are immutable and only ever added.
  */
 
-import { assertValid, type RootSchemaName } from "@cloudhal/core-contracts";
+import { assertValid } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
-import { kindOf, type SiteNode, siteIdOf, uniquenessKey } from "./store.ts";
-
-const SCHEMA_OF: Record<string, RootSchemaName> = {
-  site: "site",
-  page: "page",
-  contentEntry: "content-entry",
-};
+import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
 
 /**
  * A bundle is untrusted input (whoever holds the deployment token): every row must be a valid
- * contract document whose columns agree with its body, for this site only.
+ * contract document of the kind its `kind` column declares (RFC-0002 §4.1: the node schemas are
+ * mutually exclusive, so a body cannot pass as another kind), whose columns agree with its body,
+ * for this site only.
  */
 async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void> {
   for (const row of bundle.nodes) {
-    const schema = SCHEMA_OF[row.kind];
-    if (!schema) throw new Error(`node ${row.id}: unknown kind ${row.kind}`);
-    let body: SiteNode;
+    if (!isNodeKind(row.kind)) throw new Error(`node ${row.id}: unknown kind ${row.kind}`);
+    const kind: NodeKind = row.kind;
+    const spec = NODE_SPEC[kind] as {
+      schema: (typeof NODE_SPEC)[NodeKind]["schema"];
+      key(n: NodeTypes[NodeKind]): string;
+      siteId(n: NodeTypes[NodeKind]): string;
+    };
+    const schema = spec.schema;
+    let body: NodeTypes[NodeKind];
     try {
-      body = JSON.parse(row.body) as SiteNode;
+      body = JSON.parse(row.body) as NodeTypes[NodeKind];
     } catch {
       throw new Error(`node ${row.id}: body is not JSON`);
     }
@@ -44,10 +46,9 @@ async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void
     if (
       body.id !== row.id ||
       body.rev !== row.rev ||
-      kindOf(body) !== row.kind ||
-      siteIdOf(body) !== row.site_id ||
+      spec.siteId(body) !== row.site_id ||
       row.site_id !== siteId ||
-      uniquenessKey(body) !== row.key
+      spec.key(body) !== row.key
     )
       throw new Error(`node ${row.id}: columns do not match its body`);
     if ((await nodeHash(body)) !== row.hash)

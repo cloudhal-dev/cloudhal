@@ -116,6 +116,74 @@ describe("copySite", () => {
     await expect(importSite(await pair(), { ...bundle, format: "nope" })).rejects.toThrow(/format/);
   });
 
+  it("round-trips taxonomies, terms and redirects; rows are validated by their declared kind (RFC-0002 inv. 15)", async () => {
+    const src = await pair();
+    const site = await seedStarterSite(src.store, { name: "Kinds", slug: "kinds" });
+    await src.store.createRedirect({
+      siteId: site.id,
+      from: "/old-about",
+      to: "/about",
+      status: 301,
+      match: "exact",
+      reason: "manual",
+    });
+    await src.store.createSnapshot(site.id, { actor, reason: "manual" });
+    const bundle = JSON.parse(JSON.stringify(await exportSite(src, site.id)));
+    expect(new Set(bundle.nodes.map((n: { kind: string }) => n.kind))).toEqual(
+      new Set(["site", "page", "contentEntry", "taxonomy", "term", "redirect"]),
+    );
+    const dst = await pair();
+    await importSite(dst, bundle);
+    expect(await dst.store.listTaxonomies(site.id)).toEqual(
+      await src.store.listTaxonomies(site.id),
+    );
+    expect(await dst.store.listTerms(site.id)).toEqual(await src.store.listTerms(site.id));
+    expect((await dst.store.redirectFor(site.id, "/old-about"))?.location).toBe("/about");
+    const [post] = await dst.store.listContentEntries(site.id, {
+      filter: "category:news+tag:cloudhal",
+    });
+    expect(post?.slug).toBe("hello-world");
+    // and the copy is identical: a second import is a no-op
+    expect((await importSite(dst, bundle)).nodes.unchanged).toBe(true);
+
+    const term = bundle.nodes.find((n: { kind: string }) => n.kind === "term");
+    const variants: [string, (b: typeof bundle) => void, RegExp][] = [
+      [
+        "term claimed as page",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === term.id).kind = "page";
+        },
+        /not a valid page/,
+      ],
+      [
+        "term claimed as taxonomy",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === term.id).kind = "taxonomy";
+        },
+        /not a valid taxonomy/,
+      ],
+      [
+        "unknown kind",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === term.id).kind = "author";
+        },
+        /unknown kind author/,
+      ],
+      [
+        "wrong key",
+        (b) => {
+          b.nodes.find((x: { id: string }) => x.id === term.id).key = "tax_x:other";
+        },
+        /columns do not match/,
+      ],
+    ];
+    for (const [name, mutate, error] of variants) {
+      const b = JSON.parse(JSON.stringify(bundle));
+      mutate(b);
+      await expect(importSite(await pair(), b), name).rejects.toThrow(error);
+    }
+  });
+
   it("rejects rows whose columns or contents disagree with their bodies (security review L6)", async () => {
     const src = await pair();
     const site = await seedStarterSite(src.store, { name: "Rows", slug: "rows" });

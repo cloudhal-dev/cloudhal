@@ -1,4 +1,4 @@
-import type { Actor, Site } from "@cloudhal/core-contracts";
+import type { Actor, Site, Taxonomy } from "@cloudhal/core-contracts";
 import type { SiteGraphStore } from "./store.ts";
 
 export interface SeedOptions {
@@ -8,7 +8,11 @@ export interface SeedOptions {
   readonly owner?: Actor;
 }
 
-/** Creates a project, a site and a home page with a hero + content list. Returns the site (after the page append). */
+/**
+ * Creates a project, a site, a home page with a hero + content list, an about page, the default
+ * taxonomies (`category` required, `tag`; RFC-0002 §1) with a "News" category and a "Cloudhal" tag,
+ * and a first post filed under both. Returns the site (after the page append).
+ */
 export async function seedStarterSite(store: SiteGraphStore, options: SeedOptions): Promise<Site> {
   const locale = options.locale ?? "en";
   const owner = options.owner ?? { kind: "system" as const, id: "sys_cloudhalinit" };
@@ -67,6 +71,24 @@ export async function seedStarterSite(store: SiteGraphStore, options: SeedOption
       },
     ],
   }));
+  const [category, tag] = (await store.createDefaultTaxonomies(site)) as [Taxonomy, Taxonomy];
+  const news = await store.createTerm({
+    siteId: site.id,
+    taxonomyId: category.id,
+    slug: "news",
+    status: "active",
+    visibility: "public",
+    labels: { [locale]: { name: locale.split("-")[0] === "tr" ? "Haberler" : "News" } },
+    position: 0,
+  });
+  const cloudhal = await store.createTerm({
+    siteId: site.id,
+    taxonomyId: tag.id,
+    slug: "cloudhal",
+    status: "active",
+    visibility: "public",
+    labels: { [locale]: { name: "Cloudhal" } },
+  });
   await store.createContentEntry({
     siteId: site.id,
     collection: "posts",
@@ -81,7 +103,11 @@ export async function seedStarterSite(store: SiteGraphStore, options: SeedOption
         "# Hello, world\n\nThis post was seeded by `cloudhal init`. Ask the agent to write the next one.",
     },
     fields: {},
-    tags: ["cloudhal"],
+    tags: [],
+    terms: {
+      category: { ids: [news.id], primary: news.id },
+      tag: { ids: [cloudhal.id] },
+    },
     author: owner,
     publishedAt: new Date().toISOString(),
   });
