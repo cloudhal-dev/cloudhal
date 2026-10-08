@@ -4,8 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ActorBadge,
   DecisionBadge,
+  ImagePreview,
   OutcomeBadge,
   PreviewPanel,
+  SearchResultPreview,
   SnapshotTimeline,
   type SnapshotTimelineLabels,
   StatusBadge,
@@ -186,5 +188,81 @@ describe("PreviewPanel", () => {
     );
     expect(container.querySelector("[data-device]")).toHaveAttribute("data-device", "mobile");
     expect((container.querySelector("iframe") as HTMLIFrameElement).style.width).toBe("390px");
+  });
+});
+
+describe("ImagePreview", () => {
+  const imageLabels = { empty: "No image", loading: "Loading image", error: "Broken image" };
+  it("walks through empty, loading, loaded and broken, reporting each state", () => {
+    const onStatusChange = vi.fn();
+    const onLoad = vi.fn();
+    const { container, rerender } = render(
+      <ImagePreview
+        src={undefined}
+        alt="A cat"
+        labels={imageLabels}
+        onStatusChange={onStatusChange}
+      />,
+    );
+    const frame = () => container.querySelector("[data-image-status]") as HTMLElement;
+    expect(frame()).toHaveAttribute("data-image-status", "empty");
+    expect(screen.getByText("No image")).toBeInTheDocument();
+    rerender(
+      <ImagePreview
+        src="https://cdn.example/a.jpg"
+        alt="A cat"
+        labels={imageLabels}
+        onLoad={onLoad}
+        onStatusChange={onStatusChange}
+      />,
+    );
+    expect(frame()).toHaveAttribute("data-image-status", "loading");
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img).toHaveAttribute("alt", "A cat");
+    expect(img).toHaveAttribute("referrerpolicy", "no-referrer");
+    Object.defineProperty(img, "naturalWidth", { value: 1200 });
+    Object.defineProperty(img, "naturalHeight", { value: 630 });
+    fireEvent.load(img);
+    expect(frame()).toHaveAttribute("data-image-status", "loaded");
+    expect(onLoad).toHaveBeenCalledWith({ width: 1200, height: 630 });
+    rerender(
+      <ImagePreview
+        src="https://cdn.example/gone.jpg"
+        alt="A cat"
+        labels={imageLabels}
+        errorHint="Check the address."
+        onStatusChange={onStatusChange}
+      />,
+    );
+    fireEvent.error(container.querySelector("img") as HTMLImageElement);
+    expect(frame()).toHaveAttribute("data-image-status", "error");
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("Broken image")).toBeInTheDocument();
+    expect(screen.getByText("Check the address.")).toBeInTheDocument();
+    expect(onStatusChange.mock.calls.map(([s]) => s)).toEqual([
+      "empty",
+      "loading",
+      "loaded",
+      "loading",
+      "error",
+    ]);
+  });
+});
+
+describe("SearchResultPreview", () => {
+  it("renders the result as plain text, the placeholder muted", () => {
+    render(
+      <SearchResultPreview
+        siteName="Demo"
+        breadcrumb="example.com › about"
+        title="<b>About</b>"
+        description="Nothing set"
+        placeholder
+      />,
+    );
+    const result = screen.getByTestId("search-result-preview");
+    expect(result).toHaveTextContent("example.com › about");
+    expect(result.querySelector("b")).toBeNull();
+    expect(screen.getByText("Nothing set")).toHaveClass("italic");
   });
 });

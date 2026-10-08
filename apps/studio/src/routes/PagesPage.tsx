@@ -1,5 +1,6 @@
 import type { Page } from "@cloudhal/core-contracts";
 import {
+  Badge,
   Button,
   DeleteResource,
   Empty,
@@ -9,8 +10,9 @@ import {
   Pagination,
   Table,
   Text,
+  Tooltip,
 } from "@cloudhal/ui";
-import { FileText, Plus } from "@phosphor-icons/react";
+import { EyeSlash, FileText, Plus } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
@@ -115,11 +117,22 @@ export function PagesPage() {
                 {paging.pageItems.map((p) => (
                   <Table.Row key={p.id}>
                     <Table.Cell>
-                      <Link href={`/sites/${siteId}/pages/${p.id}`} variant="plain">
-                        <Text bold as="span">
-                          {p.title}
-                        </Text>
-                      </Link>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Link href={`/sites/${siteId}/pages/${p.id}`} variant="plain">
+                          <Text bold as="span">
+                            {p.title}
+                          </Text>
+                        </Link>
+                        {p.seo?.noindex && (
+                          <Tooltip content={t("seo.noindexBadgeHint")}>
+                            <span className="inline-flex" data-testid="noindex-badge">
+                              <Badge variant="outline" icon={<EyeSlash />}>
+                                {t("seo.noindexBadge")}
+                              </Badge>
+                            </span>
+                          </Tooltip>
+                        )}
+                      </span>
                     </Table.Cell>
                     <Table.Cell>
                       <Text variant="mono-secondary" as="span">
