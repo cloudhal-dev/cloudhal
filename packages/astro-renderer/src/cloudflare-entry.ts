@@ -4,7 +4,11 @@
  *
  * - `POST /__cloudhal/purge` (Bearer `CLOUDHAL_PURGE_TOKEN`) purges this site's edge cache. The
  *   admin Worker calls it after publish/rollback. Purges are scoped to the Worker that cached the
- *   responses, which is why this lives here and not in the admin Worker (ADR-0012).
+ *   responses, which is why this lives here and not in the admin Worker (ADR-0012). A JSON body
+ *   `{ "tags": [...] }` purges only those tags (`cloudhal-node-<id>`, `cloudhal-term-<id>`, see
+ *   `cache-tags.ts`); without one, everything is purged.
+ * - Redirects (RFC-0002) are answered by the routes themselves (real 301s, `no-store` here like
+ *   every non-200), so a publish that adds or removes one needs no purge of its own.
  * - Preview responses get every internal link rewritten to keep the signed token, so navigation
  *   stays in preview without a cookie (the edge cache does not vary on cookies).
  */
@@ -12,6 +16,7 @@
 import { cache } from "cloudflare:workers";
 import { handle } from "@astrojs/cloudflare/handler";
 import { CACHE_TAG_PREFIX, resetSource } from "@cloudhal/astro-renderer/runtime";
+import { isCloudhalCacheTag } from "./cache-tags.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 
 interface Env {
@@ -50,14 +55,38 @@ async function purge(
       ) => Promise<{ success: boolean; errors?: unknown[] }>;
     }
   )?.purge;
+  // Optional body `{ "tags": [...] }`: purge only those node/term/site tags (RFC-0002 §7). Without
+  // it — what the admin Worker sends after every publish and rollback — everything is purged.
+  let tags: string[] | undefined;
+  if ((request.headers.get("content-type") ?? "").includes("application/json")) {
+    const body = (await request.json().catch(() => undefined)) as { tags?: unknown } | undefined;
+    if (body?.tags !== undefined) {
+      if (
+        !Array.isArray(body.tags) ||
+        body.tags.length === 0 ||
+        body.tags.length > 100 ||
+        !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
+      )
+        return Response.json(
+          { error: "tags must be 1–100 cloudhal-site-/node-/term- cache tags" },
+          { status: 400 },
+        );
+      tags = body.tags as string[];
+    }
+  }
   if (!purger)
-    return Response.json({ purged: false, tag, reason: "no edge cache in this runtime" });
+    return Response.json({
+      purged: false,
+      tag,
+      ...(tags ? { tags } : {}),
+      reason: "no edge cache in this runtime",
+    });
   // This Worker serves one site, so everything it cached belongs to that site. Purging all of it
   // (not just the tag) also drops entries Cloudflare cached on its own, e.g. a 404 for a page that
   // was published since.
-  const result = await purger.call(cache, { purgeEverything: true });
+  const result = await purger.call(cache, tags ? { tags } : { purgeEverything: true });
   return Response.json(
-    { purged: result.success, tag, errors: result.errors ?? [] },
+    { purged: result.success, tag, ...(tags ? { tags } : {}), errors: result.errors ?? [] },
     { status: result.success ? 200 : 502 },
   );
 }

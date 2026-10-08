@@ -9,6 +9,7 @@ import { renderEntryArticle } from "../src/markdown.ts";
 import { navLinks, resolvePath, routablePaths } from "../src/routing.ts";
 import { absoluteUrl, clip, entryHead, jsonLdText, pageHead, siteOrigin } from "../src/seo.ts";
 import { LiveSource, SnapshotSource } from "../src/source.ts";
+import { entryTaxonomy, loadTaxonomyIndex } from "../src/taxonomy.ts";
 
 const human = { kind: "human" as const, id: "user_writer0001", name: "Ayşe Yazar" };
 const agent = { kind: "agent" as const, id: "agent_writer001", name: "desk-bot" };
@@ -47,7 +48,7 @@ async function entry(overrides: Partial<ContentEntry>): Promise<ContentEntry> {
     author: human,
     ...overrides,
   } as never);
-  // What the renderer sees: the deprecated tags became terms and the source shows their slugs.
+  // The store translated the deprecated tags into `tag` terms ("Launch", "News") and wrote [].
   return (
     (await new LiveSource(store, site.id).entryBySlug(created.collection, created.slug)) ?? created
   );
@@ -105,7 +106,8 @@ describe("seo", () => {
     const e = await entry({
       coverImage: { src: "/media/cover.jpg", alt: "The team", width: 1200, height: 630 },
     });
-    const m = entryHead(site, e, "https://news.example.com");
+    const index = await loadTaxonomyIndex(new LiveSource(store, site.id));
+    const m = entryHead(site, e, "https://news.example.com", entryTaxonomy(index, e));
     expect(m.canonical).toBe("https://news.example.com/posts/launch");
     expect(m.description).toBe("A short summary for search results.");
     expect(m.title).toBe("We launched <today> · Haber");
@@ -115,7 +117,8 @@ describe("seo", () => {
         ["og:image", "https://news.example.com/media/cover.jpg"],
         ["og:image:alt", "The team"],
         ["article:published_time", e.publishedAt as string],
-        ["article:tag", "launch"],
+        ["article:section", "News"],
+        ["article:tag", "Launch"],
       ]),
     );
     expect(m.twitter).toContainEqual(["twitter:card", "summary_large_image"]);
@@ -124,7 +127,11 @@ describe("seo", () => {
       headline: "We launched <today>",
       datePublished: e.publishedAt,
       author: { "@type": "Person", name: "Ayşe Yazar" },
-      keywords: "launch, news",
+      articleSection: "News",
+      keywords: [
+        { "@type": "DefinedTerm", name: "Launch" },
+        { "@type": "DefinedTerm", name: "News" },
+      ],
     });
     // an agent's article is credited to the site, not to the key's name
     const byAgent = entryHead(site, { ...e, author: agent }, "https://news.example.com");
@@ -156,12 +163,14 @@ describe("feeds and sitemap", () => {
       site,
       origin: "https://news.example.com",
       entries: await live.allEntries(),
+      taxonomy: await loadTaxonomyIndex(live),
     });
     expect(feed).toContain('<rss version="2.0"');
     expect(feed).toContain("<title>We launched &lt;today&gt;</title>");
     expect(feed).toContain("<link>https://news.example.com/posts/launch</link>");
     expect(feed).toContain("<link>https://news.example.com/notes/a-note</link>");
-    expect(feed).toContain("<category>launch</category>");
+    // the category, then the tags, by name (the "News" tag and category appear once)
+    expect(feed).toContain("<category>News</category><category>Launch</category><description>");
     expect(feed).toContain("<content:encoded><![CDATA[");
     expect(feed).toContain("<dc:creator><![CDATA[Ayşe Yazar]]></dc:creator>");
     expect(feed).not.toContain("Not yet");

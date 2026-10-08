@@ -15,6 +15,9 @@
     "./routing": "./src/routing.ts",
     "./seo": "./src/seo.ts",
     "./feeds": "./src/feeds.ts",
+    "./taxonomy": "./src/taxonomy.ts",
+    "./archive": "./src/archive.ts",
+    "./cache-tags": "./src/cache-tags.ts",
     "./integration": "./src/integration.ts",
     "./components": "./src/components/index.ts",
     "./components/*": "./src/components/*",
@@ -86,6 +89,18 @@
       "./feeds": {
         "types": "./dist/src/feeds.d.ts",
         "default": "./dist/src/feeds.js"
+      },
+      "./taxonomy": {
+        "types": "./dist/src/taxonomy.d.ts",
+        "default": "./dist/src/taxonomy.js"
+      },
+      "./archive": {
+        "types": "./dist/src/archive.d.ts",
+        "default": "./dist/src/archive.js"
+      },
+      "./cache-tags": {
+        "types": "./dist/src/cache-tags.d.ts",
+        "default": "./dist/src/cache-tags.js"
       },
       "./integration": {
         "types": "./dist/src/integration.d.ts",

@@ -48,6 +48,17 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
           },
         });
       },
+      /**
+       * Static builds also get `_redirects` (real 301s on hosts that read it; the meta-refresh pages
+       * stay as a fallback). The Cloudflare Site Worker answers redirects per request instead, so
+       * they follow publishes without a rebuild.
+       */
+      "astro:build:done": async ({ dir, logger }) => {
+        if (config.target === "cloudflare") return;
+        const { writeStaticRedirects } = await import("./static-redirects.ts");
+        const count = await writeStaticRedirects(resolved, dir);
+        if (count > 0) logger.info(`wrote _redirects (${count} redirects)`);
+      },
       /** On Cloudflare every project page is rendered per request (pointer-flip publishing). */
       "astro:route:setup": ({ route }) => {
         if (config.target === "cloudflare" && route.component.startsWith("src/pages/"))

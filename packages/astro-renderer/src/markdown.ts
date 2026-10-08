@@ -49,6 +49,26 @@ export function renderMarkdown(source: string): string {
   return md.parse(source) as string;
 }
 
+const ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+};
+
+/** Markdown as plain text (meta descriptions): rendered safely, then tags dropped and entities decoded. */
+export function markdownText(source: string): string {
+  return renderMarkdown(source)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:amp|lt|gt|quot|#39);/g, (m) => ENTITIES[m] ?? m)
+    .replace(/&#(\d{1,7});/g, (m, n: string) =>
+      Number(n) <= 0x10ffff ? String.fromCodePoint(Number(n)) : m,
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * `markdown` bodies are rendered safely; `html` bodies are trusted as-is — only humans can store
  * them (the MCP tools always write markdown).
