@@ -16,7 +16,7 @@ import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
-const TABS = ["overview", "pages", "articles", "snapshots", "activity"] as const;
+const TABS = ["overview", "pages", "articles", "snapshots", "activity", "settings"] as const;
 
 /** Site-level header with tabs (DESIGN.md §2b); the tab routes render in the outlet. */
 export function SiteTabsLayout() {

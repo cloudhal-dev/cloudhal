@@ -107,6 +107,56 @@ export function isNotEnabled(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 404;
 }
 
+/** What this Studio deployment offers (`GET /api/instance`, packages/api/src/routes/instance.ts). */
+export interface InstanceInfo {
+  /** Who may create an account: only the first person, nobody, anybody, or not reported. */
+  signUp: "first-user" | "closed" | "open" | "unknown";
+  features: {
+    agentKeys: boolean;
+    mcp: boolean;
+    activity: boolean;
+    previewLinks: boolean;
+    deployTransfer: boolean;
+  };
+}
+export type SignUpPolicy = InstanceInfo["signUp"];
+export type InstanceFeature = keyof InstanceInfo["features"];
+
+/** A skill agents can read over MCP (`GET /api/skills`). */
+export interface SkillSummary {
+  name: string;
+  description: string;
+  /** The most a call made under this skill may do (never more than the caller's own scopes). */
+  scopes: string[];
+  /** Tools that always stop for a person when called under this skill. */
+  approval: string[];
+  requiresCapabilities: string[];
+  /** File names under `references/`. */
+  references: string[];
+  /** MCP resource id, `skill://<name>/SKILL.md`. */
+  resource: string;
+}
+
+/** What a preview link renders: the current drafts or one snapshot. */
+export type PreviewTarget = "live" | { snapshot: string };
+
+export interface PreviewLinkInput {
+  target: PreviewTarget;
+  /** Absolute path on the site, e.g. `/blog/hello`. */
+  path?: string;
+  ttlSeconds?: number;
+}
+
+/** A signed, expiring link (`POST /api/sites/:id/preview-links`). */
+export interface PreviewLink {
+  token: string;
+  /** `https://<primary domain><path>?cloudhal-preview=<token>`; null when the site has no domain. */
+  url: string | null;
+  expiresAt: string;
+  target: PreviewTarget;
+  path: string;
+}
+
 export type NewPage = Omit<
   Page,
   "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion" | "siteId"
@@ -119,6 +169,18 @@ export type NewEntry = Omit<
 /** Thin typed client over the Cloudhal API; every mutation sends the full document (CAS on `rev`). */
 export const api = {
   me: () => request<{ actor: { kind: string; id: string; name?: string } }>("/api/me"),
+  instance: () => request<InstanceInfo>("/api/instance"),
+  skills: {
+    list: () => request<SkillSummary[]>("/api/skills"),
+  },
+  previewLinks: {
+    /** 404 when the server has no preview secret (see `isNotEnabled`). */
+    create: (siteId: string, input: PreviewLinkInput) =>
+      request<PreviewLink>(`/api/sites/${encodeURIComponent(siteId)}/preview-links`, {
+        method: "POST",
+        ...json(input),
+      }),
+  },
   sites: {
     list: () => request<Site[]>("/api/sites"),
     get: (id: string) => request<Site>(`/api/sites/${id}`),

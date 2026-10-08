@@ -1,5 +1,5 @@
 import { Button, CommandPalette, DropdownMenu, Sidebar, Text } from "@cloudhal/ui";
-import { MagnifyingGlass, SignOut, SquaresFour, UserCircle } from "@phosphor-icons/react";
+import { MagnifyingGlass, SignOut, SquaresFour, UserCircle, UserGear } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
@@ -93,6 +93,9 @@ export function AppFrame({
                   <span className="truncate">{me.data?.actor.name ?? t("nav.account")}</span>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content side="top" align="start" className="w-(--anchor-width)">
+                  <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
+                    {t("nav.account")}
+                  </DropdownMenu.Item>
                   <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
                     {t("nav.allSites")}
                   </DropdownMenu.Item>
