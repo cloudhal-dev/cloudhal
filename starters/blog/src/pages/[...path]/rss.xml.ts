@@ -1,5 +1,10 @@
 import config from "virtual:cloudhal/config";
-import { addCacheTags, nodeCacheTag, termCacheTag } from "@cloudhal/astro-renderer/cache-tags";
+import {
+  addCacheTags,
+  listCacheTag,
+  nodeCacheTag,
+  termCacheTag,
+} from "@cloudhal/astro-renderer/cache-tags";
 import { archiveFeedXml, FEED_LIMIT } from "@cloudhal/astro-renderer/feeds";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
@@ -35,6 +40,7 @@ export const GET: APIRoute = async ({ request, url, params }) => {
   const site = await source.site();
   headers.set("content-type", "application/rss+xml; charset=utf-8");
   addCacheTags(headers, [
+    listCacheTag(route.archive.term.id),
     termCacheTag(route.archive.term.id),
     ...route.archive.entries.slice(0, FEED_LIMIT).map((e) => nodeCacheTag(e.id)),
   ]);

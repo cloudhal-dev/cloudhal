@@ -29,7 +29,7 @@ Sprint 6 puts a Cloudhal site on Cloudflare. Publishing and rollback must be ins
 ## Consequences
 - Positive: agent → approval → live in one request; rollback is instant; previews are safe; the whole loop is tested on workerd in CI.
 - Negative: on-demand SSR on cache misses (bounded by the edge cache); two Workers to deploy; the generated admin entry needs `@cloudhal/cloudflare/workerd-prelude` first — esbuild does not initialise lazily-wrapped zod before `@modelcontextprotocol/core` evaluates (remove when fixed upstream).
-- Risks: Workers Cache purge rate limits are the Free-tier limits — purges are per publish, not per edit. Enabling D1 read replication later requires `withSession("first-primary")` for the pointer read. Real deployment was not exercised from CI (no account); the dry run bundles both Workers with the real wrangler.
+- Risks: Workers Cache purge rate limits are the Free-tier limits — purges are per publish, not per edit (and at most three tag requests per publish, see the addendum). Enabling D1 read replication later requires `withSession("first-primary")` for the pointer read. Real deployment was not exercised from CI (no account); the dry run bundles both Workers with the real wrangler.
 
 ## Addendum (2026-10-08): custom domains
 `cloudhal domain set <host> [--studio <host>]` stores hostnames in `cloudhal.json` (`domains.site`, `domains.studio`). `cloudhal deploy` then adds `routes: [{ pattern, custom_domain: true }]` to the site and admin Worker configs. Wrangler creates the DNS record and certificate; the zone must be in the same account.
@@ -40,3 +40,6 @@ Removing the domain from `cloudhal.json` restores workers.dev as primary on the 
 
 Studio needs nothing extra, because Better Auth's base URL is the request origin. Not exercised against a real zone in CI (no account): the deploy test checks the generated routes and the domain switch against an in-process admin API.
 
+
+## Addendum (2026-10-08): purging what changed
+Publish and rollback no longer purge the whole cache. `onPublished` receives the snapshot that was live and the new one; `SiteGraphStore.planCachePurge` turns their diff into Cloudhal cache tags (`cloudhal-node-`, `-term-`, `-list-`, or the site tag for structure — RFC-0002, follow-up notes), and the admin Worker sends them to the site Worker in requests of at most 100 tags, Cloudflare's limit per tag purge. Workers Cache always uses the Free-tier purge rate limit (5 requests per minute, bursts of 25), so one publish spends at most three requests and otherwise sends one "purge everything", which is also the fallback for a first publish, an unreadable or too large diff, and a failed tag purge. Sources: https://developers.cloudflare.com/workers/cache/purge/ · https://developers.cloudflare.com/cache/how-to/purge-cache/#hostname-tag-prefix-url-and-purge-everything-limits (checked 2026-10-08).

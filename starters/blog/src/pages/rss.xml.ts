@@ -1,4 +1,5 @@
 import config from "virtual:cloudhal/config";
+import { addCacheTags, listCacheTag } from "@cloudhal/astro-renderer/cache-tags";
 import { rssXml } from "@cloudhal/astro-renderer/feeds";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
@@ -13,6 +14,8 @@ export const GET: APIRoute = async ({ request, url }) => {
   const site = await source.site();
   const home = await source.pageByPath("/");
   headers.set("content-type", "application/rss+xml; charset=utf-8");
+  // Lists every collection's newest entries: any entry change purges it (`cloudhal-list-<site>`).
+  addCacheTags(headers, [listCacheTag(site.id)]);
   const body = rssXml({
     site,
     origin: siteOrigin(site, url),

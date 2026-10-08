@@ -117,7 +117,8 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
           const result = await importSite(storage, bundle, { mode });
           const after = await store.getSite(bundle.siteId);
           // A replaced site may point production elsewhere: purge the edge cache like a publish.
-          if (after && after.publishedSnapshotId !== before) await store.notifyPublished(after);
+          if (after && after.publishedSnapshotId !== before)
+            await store.notifyPublished(after, before);
           return c.json(result);
         } catch (e) {
           if (e instanceof SyncConflictError)

@@ -18,6 +18,7 @@ import {
   type SqlDriver,
   type SqlStatement,
 } from "@cloudhal/storage";
+import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
   isUniqueViolation,
@@ -75,10 +76,20 @@ export interface SiteGraphStoreOptions {
   readonly idGen?: (prefix: string) => string;
   /**
    * Called after the published pointer moved (publish and rollback). Deployments use it to purge
-   * edge caches. Failures are reported to `onHookError` and never undo the publish.
+   * edge caches — `planCachePurge(change)` says which tags. Failures are reported to `onHookError`
+   * and never undo the publish.
    */
-  readonly onPublished?: (site: Site) => Promise<void>;
+  readonly onPublished?: (site: Site, change: PublishChange) => Promise<void>;
   readonly onHookError?: (error: unknown) => void;
+}
+
+/**
+ * Where the published pointer moved from and to: `from` is absent on a first publish, `to` when the
+ * site is no longer published (an import that replaced it).
+ */
+export interface PublishChange {
+  readonly from?: string;
+  readonly to?: string;
 }
 
 export interface SnapshotInput {
@@ -775,15 +786,23 @@ export class SiteGraphStore {
 
   /**
    * Runs the `onPublished` hook (cache purge) for a pointer change that did not go through
-   * `publish` — e.g. a site imported with `cloudhal push --replace`.
+   * `publish` — e.g. a site imported with `cloudhal push --replace`. Pass the snapshot that was
+   * live before, so the purge can be limited to what changed; without it everything is purged.
    */
-  async notifyPublished(site: Site): Promise<void> {
-    if (!this.#onPublished) return;
-    try {
-      await this.#onPublished(site);
-    } catch (e) {
-      this.#onHookError(e);
-    }
+  async notifyPublished(site: Site, previousSnapshotId?: string): Promise<void> {
+    await this.#runOnPublished(site, {
+      ...(previousSnapshotId ? { from: previousSnapshotId } : {}),
+      ...(site.publishedSnapshotId ? { to: site.publishedSnapshotId } : {}),
+    });
+  }
+
+  /**
+   * Which edge-cache tags a pointer move from `change.from` to `change.to` must purge (RFC-0002
+   * §7): the tags of the nodes that differ between the two snapshots, or everything when that
+   * cannot be worked out. See `cache-purge.ts` for the rules.
+   */
+  planCachePurge(change: PublishChange, options?: CachePurgeOptions): Promise<CachePurgePlan> {
+    return planCachePurge(this, change.from, change.to, options);
   }
 
   /** Points production at a snapshot (CAS on the site). */
@@ -791,14 +810,20 @@ export class SiteGraphStore {
     const snap = await this.getSnapshot(snapshotId);
     if (!snap || snap.siteId !== site.id) throw new NotFoundError("snapshot", snapshotId);
     const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
-    if (this.#onPublished) {
-      try {
-        await this.#onPublished(updated);
-      } catch (e) {
-        this.#onHookError(e);
-      }
-    }
+    await this.#runOnPublished(updated, {
+      ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),
+      to: snapshotId,
+    });
     return updated;
+  }
+
+  async #runOnPublished(site: Site, change: PublishChange): Promise<void> {
+    if (!this.#onPublished) return;
+    try {
+      await this.#onPublished(site, change);
+    } catch (e) {
+      this.#onHookError(e);
+    }
   }
 
   /**

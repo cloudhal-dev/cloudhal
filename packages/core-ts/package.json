@@ -14,7 +14,8 @@
     "./local": "./src/local.ts",
     "./filter": "./src/filter.ts",
     "./names": "./src/names.ts",
-    "./taxonomy-report": "./src/taxonomy-report.ts"
+    "./taxonomy-report": "./src/taxonomy-report.ts",
+    "./cache-tags": "./src/cache-tags.ts"
   },
   "files": [
     "dist",
@@ -70,6 +71,10 @@
       "./taxonomy-report": {
         "types": "./dist/src/taxonomy-report.d.ts",
         "default": "./dist/src/taxonomy-report.js"
+      },
+      "./cache-tags": {
+        "types": "./dist/src/cache-tags.d.ts",
+        "default": "./dist/src/cache-tags.js"
       }
     }
   }

@@ -1,28 +1,39 @@
 /**
  * Edge-cache tags (ADR-0012, RFC-0002 §7). Every published response carries the site tag; pages
- * add a tag per node they render, so a purge can later target one term's archive and the entries
- * that show it instead of the whole site:
+ * add a tag per node and term they render and per list they show, so a publish purges only what
+ * changed (`planCachePurge` in core-ts, called by the admin Worker):
  *
  * - `cloudhal-site-<siteId>` — every published response (set by the runtime);
- * - `cloudhal-node-<id>` — the page or entry a response renders, and the entries an archive lists;
- * - `cloudhal-term-<id>` — the term an archive is about, its ancestors in the breadcrumb, and the
- *   terms an entry shows.
+ * - `cloudhal-node-<id>` — the page or entry a response renders, the entries an archive lists and
+ *   the related entries an article links to;
+ * - `cloudhal-term-<id>` — the term an archive is about, its ancestors in the breadcrumb, the terms
+ *   an entry shows and the header categories;
+ * - `cloudhal-list-<termId>` — a term's archive pages and feed; `cloudhal-list-<siteId>` — the site
+ *   feed, the sitemap and pages with a `ContentList` section.
  *
- * Tags are only added where the runtime already set `cache-tag` (published responses on
- * Cloudflare); previews and Node builds have no edge cache and stay untouched.
+ * The names live in `@cloudhal/core-ts/cache-tags`, shared with the purge planner. Tags are only
+ * added where the runtime already set `cache-tag` (published responses on Cloudflare); previews and
+ * Node builds have no edge cache and stay untouched.
  */
-export const CACHE_TAG_PREFIX = "cloudhal-site-";
-export const NODE_TAG_PREFIX = "cloudhal-node-";
-export const TERM_TAG_PREFIX = "cloudhal-term-";
+export {
+  CACHE_TAG_PREFIX,
+  isCloudhalCacheTag,
+  LIST_TAG_PREFIX,
+  listCacheTag,
+  NODE_TAG_PREFIX,
+  nodeCacheTag,
+  siteCacheTag,
+  TERM_TAG_PREFIX,
+  termCacheTag,
+} from "@cloudhal/core-ts/cache-tags";
 
 /** Cloudflare accepts up to 16 KB of tags per response; stay well below it. */
 const MAX_HEADER_LENGTH = 8 * 1024;
 
-export const siteCacheTag = (siteId: string) => `${CACHE_TAG_PREFIX}${siteId}`;
-export const nodeCacheTag = (id: string) => `${NODE_TAG_PREFIX}${id}`;
-export const termCacheTag = (id: string) => `${TERM_TAG_PREFIX}${id}`;
-
-/** Appends tags to an existing `cache-tag` header (deduplicated, bounded); no header, no change. */
+/**
+ * Appends tags to an existing `cache-tag` header (deduplicated, bounded); no header, no change.
+ * Put the tags a purge must be able to reach first: once the header is full the rest are dropped.
+ */
 export function addCacheTags(headers: Headers, tags: readonly string[]): void {
   const current = headers.get("cache-tag");
   if (!current) return;
@@ -37,9 +48,4 @@ export function addCacheTags(headers: Headers, tags: readonly string[]): void {
     length += tag.length + 1;
   }
   headers.set("cache-tag", all.join(","));
-}
-
-/** Whether a tag is one Cloudhal sets (the purge endpoint refuses anything else). */
-export function isCloudhalCacheTag(tag: string): boolean {
-  return /^cloudhal-(?:site|node|term)-[A-Za-z0-9_]{1,64}$/.test(tag);
 }

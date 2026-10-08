@@ -3,7 +3,9 @@
  * API, Better Auth and the MCP endpoint — all over the deployment's D1 database and R2 bucket.
  *
  * After every publish/rollback it purges the site Worker's edge cache through the `SITE` service
- * binding (cache purges are scoped to the Worker that cached the responses).
+ * binding (cache purges are scoped to the Worker that cached the responses): only the tags of what
+ * changed between the previously live snapshot and the new one (`purge.ts`), everything when that
+ * cannot be worked out.
  *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN (all ≥ 32 chars; `cloudhal deploy` generates them).
@@ -21,6 +23,7 @@ import { SiteGraphStore } from "@cloudhal/core-ts";
 import { migrate, migrations } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import { purgeSiteCache } from "./purge.ts";
 
 export interface AdminEnv {
   DB: D1Database;
@@ -93,13 +96,20 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       const store = new SiteGraphStore({
         sql,
         blobs,
-        onPublished: async (site) => {
-          if (!env.SITE || !env.CLOUDHAL_PURGE_TOKEN) return;
-          const res = await env.SITE.fetch("https://site.internal/__cloudhal/purge", {
-            method: "POST",
-            headers: { authorization: `Bearer ${env.CLOUDHAL_PURGE_TOKEN}` },
+        onPublished: async (site, change) => {
+          const binding = env.SITE;
+          if (!binding || !env.CLOUDHAL_PURGE_TOKEN) return;
+          // Only what changed between the snapshot that was live and the new one (RFC-0002 §7).
+          const result = await purgeSiteCache({
+            fetch: (url, init) => binding.fetch(url, init as never) as unknown as Promise<Response>,
+            token: env.CLOUDHAL_PURGE_TOKEN,
+            store,
+            change,
+            log: (line) => log(`${site.id}: ${line}`),
           });
-          log(`purge after publishing ${site.id}: ${res.status} ${await res.text()}`);
+          log(
+            `purge after publishing ${site.id} (${change.from ?? "nothing"} → ${change.to ?? "nothing"}): ${result.mode}, ${result.tags.length} tag(s), ${result.requests} request(s)`,
+          );
         },
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });

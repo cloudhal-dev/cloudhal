@@ -1,6 +1,8 @@
 /**
  * @cloudhal/core-ts — the Site Graph core in TypeScript (until the Rust port, ADR-0001).
  */
+export * from "./cache-purge.ts";
+export * from "./cache-tags.ts";
 export * from "./domains.ts";
 export * from "./errors.ts";
 export * from "./filter.ts";
