@@ -310,6 +310,52 @@ describe("media tools", () => {
     expect(page.page.sections[0]?.image?.src).toMatch(/^\/media\/[0-9a-f]{16}\/ferries\.jpg$/);
   });
 
+  it("preview_page renders library images: the cover with the file's alt, asset: images, sections", async () => {
+    const { asset } = await uploadPhoto({ caption: "Morning ferries", credit: "Photo: Ada" });
+    const created = await result<{ entry: ContentEntry }>(
+      call("create_entry", {
+        siteId: site.id,
+        slug: "ferries",
+        title: "Ferries at dawn",
+        body: `Intro\n\n![Ferries leaving Eminönü](asset:${asset.id})`,
+        coverImage: { assetId: asset.id },
+      }),
+    );
+    const url = `/media/${asset.sha256.slice(0, 16)}/ferries.jpg`;
+    const article = await result<{ html: string }>(
+      call("preview_page", { siteId: site.id, entryId: created.entry.id }),
+    );
+    // The cover's empty per-use alt falls back to the file's own alt text, as on the site.
+    expect(article.html).toContain(`<img src="${url}" alt="Ferries at dawn"`);
+    expect(article.html).toContain(`<img src="${url}" alt="Ferries leaving Eminönü"`);
+    expect(article.html).toContain("<figcaption>Morning ferries · Photo: Ada</figcaption>");
+    expect(article.html).not.toContain("<p>Ferries leaving Eminönü</p>");
+    const page = await result<{ page: { id: string } }>(
+      call("create_page", {
+        siteId: site.id,
+        path: "/gallery",
+        title: "Gallery",
+        sections: [
+          { id: "sec_gallery001", kind: "image", image: { assetId: asset.id, alt: "" } },
+          {
+            id: "sec_gallery002",
+            kind: "richText",
+            format: "markdown",
+            body: `![Ferry](asset:${asset.id})`,
+          },
+        ],
+      }),
+    );
+    const gallery = await result<{ html: string }>(
+      call("preview_page", { siteId: site.id, pageId: page.page.id }),
+    );
+    expect(gallery.html).toContain(
+      `<img src="${url}" alt="Ferries at dawn" width="1200" height="800"`,
+    );
+    expect(gallery.html).toContain("<figcaption>Morning ferries · Photo: Ada</figcaption>");
+    expect(gallery.html).toContain(`<img src="${url}" alt="Ferry"`);
+  });
+
   it("update_asset: own uploads with asset:upload, any with asset:manage; retire and restore need manage", async () => {
     const { asset } = await uploadPhoto();
     const edited = await result<{ asset: Asset }>(

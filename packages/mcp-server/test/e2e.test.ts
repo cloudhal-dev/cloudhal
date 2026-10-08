@@ -308,6 +308,10 @@ describe("MCP client ↔ Cloudhal server", () => {
     const id = text.match(/approvalId: (appr_\w+)/)?.[1] as string;
     expect(id).toBeDefined();
     expect((await store.getSite(siteId))?.publishedSnapshotId).toBeUndefined();
+    // asking again for the same call on the same site state returns the waiting request
+    const again = await client.callTool({ name: "publish", arguments: { siteId, label: "v1" } });
+    expect((again.content[0] as { text: string }).text).toContain(`approvalId: ${id}`);
+    expect(await approvals.list({ status: "pending" })).toHaveLength(1);
 
     const retry = () =>
       client.callTool({ name: "publish", arguments: { siteId, label: "v1", approvalId: id } });

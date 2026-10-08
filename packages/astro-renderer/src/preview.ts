@@ -1,4 +1,12 @@
-import type { ContentEntry, Page, Section, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
+import type {
+  ContentEntry,
+  ImageRef,
+  Page,
+  Section,
+  Site,
+  Taxonomy,
+  Term,
+} from "@cloudhal/core-contracts";
 import {
   type ArchiveState,
   type ArchiveView,
@@ -8,6 +16,7 @@ import {
   viewPagePath,
 } from "./archive.ts";
 import { renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
+import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { archiveHead, siteOrigin } from "./seo.ts";
 import {
@@ -26,6 +35,30 @@ function esc(s: string): string {
   );
 }
 
+function localeOf(media: MediaContext | undefined): { locale: string; defaultLocale: string } {
+  const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+  return { locale: media?.locale ?? defaultLocale, defaultLocale };
+}
+
+/** A section image: the asset from the media library when it resolves (RFC-0004 §7.5), else `src`. */
+function sectionImage(image: ImageRef, media: MediaContext | undefined): string {
+  const asset = image.assetId ? media?.assets?.get(image.assetId) : undefined;
+  if (asset) {
+    const { locale, defaultLocale } = localeOf(media);
+    return imgHtml(
+      imageAttributes(asset, image, {
+        locale,
+        defaultLocale,
+        transform: "none",
+        sizes: "(min-width: 48rem) 48rem, 100vw",
+        preview: true,
+      }),
+    );
+  }
+  const src = safeSrc(image.src);
+  return src ? `<img src="${esc(src)}" alt="${esc(image.alt)}">` : "";
+}
+
 /**
  * Framework-free HTML for a page's sections — the same structure the Astro components emit
  * (`.ch-*` classes, `data-section-id`), so agents can preview a change without a build and the
@@ -34,22 +67,34 @@ function esc(s: string): string {
 export function renderSectionHtml(
   section: Section,
   entries: Record<string, ContentEntry[]> = {},
+  media?: MediaContext,
 ): string {
   switch (section.kind) {
     case "hero":
       return `<section class="ch-hero" data-section-id="${esc(section.id)}" data-kind="hero"><h1>${esc(section.heading)}</h1>${
         section.subheading ? `<p class="ch-hero__sub">${esc(section.subheading)}</p>` : ""
-      }${section.image && safeSrc(section.image.src) ? `<img src="${esc(safeSrc(section.image.src) as string)}" alt="${esc(section.image.alt)}">` : ""}${
+      }${section.image ? sectionImage(section.image, media) : ""}${
         section.cta && safeHref(section.cta.href)
           ? `<a class="ch-hero__cta" href="${esc(safeHref(section.cta.href) as string)}">${esc(section.cta.label)}</a>`
           : ""
       }</section>`;
     case "richText":
-      return `<section class="ch-richtext" data-section-id="${esc(section.id)}" data-kind="richText">${section.format === "markdown" ? renderMarkdown(section.body) : section.body}</section>`;
-    case "image":
-      return `<figure class="ch-image" data-section-id="${esc(section.id)}" data-kind="image">${safeSrc(section.image.src) ? `<img src="${esc(safeSrc(section.image.src) as string)}" alt="${esc(section.image.alt)}">` : ""}${
-        section.caption ? `<figcaption>${esc(section.caption)}</figcaption>` : ""
+      return `<section class="ch-richtext" data-section-id="${esc(section.id)}" data-kind="richText">${section.format === "markdown" ? renderMarkdown(section.body, media) : section.body}</section>`;
+    case "image": {
+      // Like `Image.astro`: an asset's own caption and credit when the section has no caption.
+      const asset = section.image.assetId ? media?.assets?.get(section.image.assetId) : undefined;
+      const caption = asset
+        ? assetCaption(
+            asset,
+            localeOf(media).locale,
+            localeOf(media).defaultLocale,
+            section.caption,
+          )
+        : section.caption;
+      return `<figure class="ch-image" data-section-id="${esc(section.id)}" data-kind="image">${sectionImage(section.image, media)}${
+        caption ? `<figcaption>${esc(caption)}</figcaption>` : ""
       }</figure>`;
+    }
     case "contentList": {
       const list = [...(entries[section.collection] ?? [])]
         .sort((a, b) =>
@@ -86,15 +131,26 @@ export function renderPagePreview(
   site: Site,
   page: Page,
   entries: Record<string, ContentEntry[]> = {},
+  media?: MediaContext,
 ): PreviewDocument {
-  const body = page.sections.map((s) => renderSectionHtml(s, entries)).join("\n");
+  const ctx = previewMedia(site, media);
+  const body = page.sections.map((s) => renderSectionHtml(s, entries, ctx)).join("\n");
   const title = page.seo?.title ?? page.title;
   return { title, path: page.path, html: document(site, title, page.seo?.description, body) };
 }
 
-/** Full HTML document for an article preview. */
-export function renderEntryPreview(site: Site, entry: ContentEntry): PreviewDocument {
-  const body = renderEntryArticle(entry, site.defaultLocale);
+/** Previews resolve `asset:` references and asset-backed images, never through transformations. */
+function previewMedia(site: Site, media: MediaContext | undefined): MediaContext {
+  return { locale: site.defaultLocale, defaultLocale: site.defaultLocale, ...media, preview: true };
+}
+
+/** Full HTML document for an article preview (`media.assets`: the assets it refers to). */
+export function renderEntryPreview(
+  site: Site,
+  entry: ContentEntry,
+  media?: MediaContext,
+): PreviewDocument {
+  const body = renderEntryArticle(entry, site.defaultLocale, previewMedia(site, media));
   return {
     title: entry.title,
     path: `/${entry.collection}/${entry.slug}`,

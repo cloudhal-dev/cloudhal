@@ -23,7 +23,7 @@ import {
   ownOnlyChangeSet,
 } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
-import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
+import type { Asset, ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
   PageSchema,
@@ -33,6 +33,7 @@ import {
 } from "@cloudhal/core-contracts";
 import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
+import { assetRefsOf } from "@cloudhal/core-ts/media";
 import { assetTools, describeAsset } from "./asset-tools.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -99,6 +100,21 @@ const COVER_INPUT: JsonSchema = {
     "Cover image from the media library (list_assets, upload_asset). alt overrides the file's own alt text for this article.",
   properties: { assetId: id, alt: str("Alt text for this use", { maxLength: 500 }) },
 };
+
+/** The media-library assets a page or article refers to, by id, so previews render them (RFC-0004). */
+async function assetsOf(
+  ctx: ToolContext,
+  kind: "page" | "contentEntry",
+  node: Page | ContentEntry,
+): Promise<Map<string, Asset>> {
+  const ids = [...new Set(assetRefsOf(kind, node).map((r) => r.assetId))];
+  const found = await Promise.all(ids.map((id) => ctx.store.getAsset(id)));
+  return new Map(
+    found
+      .filter((a): a is Asset => a !== undefined && a.siteId === node.siteId)
+      .map((a) => [a.id, a]),
+  );
+}
 
 function coverImage(input: unknown): NonNullable<ContentEntry["coverImage"]> {
   const c = input as { assetId: string; alt?: string };
@@ -983,7 +999,9 @@ function rawTools(): ToolDefinition[] {
           const entry = await ctx.store.getContentEntry(a.entryId as string);
           if (!entry || entry.siteId !== site.id)
             throw new ToolError("not_found", `entry ${a.entryId} not found`);
-          doc = renderEntryPreview(site, entry);
+          doc = renderEntryPreview(site, entry, {
+            assets: await assetsOf(ctx, "contentEntry", entry),
+          });
         } else if (a.pageId) {
           const page = await ctx.store.getPage(a.pageId as string);
           if (!page || page.siteId !== site.id)
@@ -1000,7 +1018,9 @@ function rawTools(): ToolDefinition[] {
               collections.map(async (c) => [c, await ctx.store.listContentEntries(site.id, c)]),
             ),
           );
-          doc = renderPagePreview(site, page, entries);
+          doc = renderPagePreview(site, page, entries, {
+            assets: await assetsOf(ctx, "page", page),
+          });
         } else {
           throw new ToolError("invalid", "pass pageId or entryId");
         }

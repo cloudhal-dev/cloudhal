@@ -112,8 +112,18 @@ export class ApprovalStore {
     this.#now = options.now ?? (() => new Date());
   }
 
+  /**
+   * Files a request, or returns the one already waiting for the same actor, tool, arguments and
+   * site state: an agent that retries (or loses the first answer) does not fill Approvals with
+   * copies a person would have to deny one by one.
+   */
   async request(req: ApprovalRequest): Promise<Approval> {
     const now = this.#now();
+    const same = await this.#sql.get<{ id: string }>(
+      "SELECT id FROM approvals WHERE status = 'pending' AND expires_at > ? AND actor_id = ? AND tool = ? AND args_hash = ? AND state_hash = ? AND site_id IS ? ORDER BY created_at DESC LIMIT 1",
+      [now.toISOString(), req.actor.id, req.tool, req.argsHash, req.stateHash, req.siteId ?? null],
+    );
+    if (same) return (await this.get(same.id)) as Approval;
     const id = newApprovalId();
     const expires = new Date(now.getTime() + this.#ttlMs).toISOString();
     await this.#sql.run(
