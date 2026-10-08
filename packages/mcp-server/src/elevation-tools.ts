@@ -15,6 +15,7 @@ import {
   isAgentMode,
   isMoreAutonomous,
   minutesLeft,
+  modeCap,
   REMOTE_AGENT_MODES,
 } from "@cloudhal/agent-runtime";
 import { canonicalJson, sha256Hex } from "@cloudhal/core-ts";
@@ -80,6 +81,12 @@ function cannotRequest(ctx: ToolContext): string | undefined {
   return undefined;
 }
 
+/** Above the key creator's role cap (RFC-0005 §5.2: a Contributor's keys stop at `edits`). */
+function aboveCap(ctx: ToolContext, mode: AgentMode): boolean {
+  const role = ctx.principal.person?.role;
+  return role !== undefined && isMoreAutonomous(mode, modeCap(role));
+}
+
 async function latestRequest(ctx: ToolContext): Promise<Approval | undefined> {
   const [latest] =
     (await ctx.approvals?.list({
@@ -121,6 +128,19 @@ export function elevationTools(): ToolDefinition[] {
           canRequestElevation: { type: "boolean" },
           requestableModes: { type: "array", items: { type: "string" } },
           latestRequest: REQUEST,
+          person: {
+            type: "object",
+            additionalProperties: false,
+            description:
+              "Whose key this is (RFC-0005): you never do more than this person's role allows.",
+            properties: { role: { type: "string" }, name: { type: "string" } },
+            required: ["role"],
+          },
+          scopes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Your effective scopes right now (narrowed to the person's role).",
+          },
         },
         required: ["mode", "ownMode", "canRequestElevation", "requestableModes"],
       },
@@ -128,8 +148,15 @@ export function elevationTools(): ToolDefinition[] {
       scopes: [],
       handler: async (_a, ctx) => {
         const mode = effectiveMode(ctx.principal) ?? null;
+        const person = ctx.principal.person;
+        const who = {
+          ...(person
+            ? { person: { role: person.role, ...(person.name ? { name: person.name } : {}) } }
+            : {}),
+          scopes: [...ctx.principal.scopes],
+        };
         if (mode === null)
-          return { mode, ownMode: null, canRequestElevation: false, requestableModes: [] };
+          return { mode, ownMode: null, canRequestElevation: false, requestableModes: [], ...who };
         const own = ownMode(ctx);
         const at = ctx.now?.() ?? new Date();
         const latest = cannotRequest(ctx) ? undefined : await latestRequest(ctx);
@@ -147,9 +174,10 @@ export function elevationTools(): ToolDefinition[] {
             : {}),
           canRequestElevation: cannotRequest(ctx) === undefined,
           requestableModes: REMOTE_AGENT_MODES.filter(
-            (m) => isMoreAutonomous(m, own) && isMoreAutonomous(m, mode),
+            (m) => isMoreAutonomous(m, own) && isMoreAutonomous(m, mode) && !aboveCap(ctx, m),
           ),
           ...(latest ? { latestRequest: requestView(latest) } : {}),
+          ...who,
         };
       },
     },
@@ -207,6 +235,11 @@ export function elevationTools(): ToolDefinition[] {
         const own = ownMode(ctx);
         const problem = elevationProblem(own, mode, minutes);
         if (problem) throw new ToolError("invalid", problem);
+        if (aboveCap(ctx, mode))
+          throw new ToolError(
+            "denied",
+            `your key's person cannot hold ${mode.toUpperCase()} mode (their role caps keys at ${modeCap(ctx.principal.person?.role ?? "owner").toUpperCase()})`,
+          );
         const current = effectiveMode(ctx.principal) ?? own;
         if (!isMoreAutonomous(mode, current))
           throw new ToolError(

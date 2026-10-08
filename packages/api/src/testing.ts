@@ -42,7 +42,14 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
       expect((await call("/api/health")).body).toEqual({ ok: true });
       expect((await call("/api/sites")).status).toBe(401);
       expect((await call("/api/me")).status).toBe(401);
-      expect((await call("/api/me", auth)).body).toEqual({ actor: human });
+      // Without a membership source a person holds every scope (RFC-0005 I1).
+      expect((await call("/api/me", auth)).body).toMatchObject({
+        actor: human,
+        role: null,
+        member: true,
+        scopes: ["*"],
+        can: { "publish.any": true, "ownership.transfer": true },
+      });
       const sites = await call("/api/sites", auth);
       expect(sites.status).toBe(200);
       expect((sites.body as Site[]).map((s) => s.id)).toEqual([siteId]);

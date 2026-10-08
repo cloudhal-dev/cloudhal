@@ -699,11 +699,11 @@ export function taxonomyTools(): ToolDefinition[] {
         ["term", "existing"],
       ),
       annotations: { ...WRITE, idempotentHint: true },
-      scopes: ["content:write"],
+      scopes: ["content:draft:own"],
       precheck: async (a, ctx) => {
         const siteId = a.siteId as string;
         const tax = await requireTaxonomy(ctx, siteId, a.taxonomy as string);
-        const rule = termCreation(ctx.principal.actor, tax.allowNewTerms);
+        const rule = termCreation(ctx.principal, tax.allowNewTerms);
         if (rule.allowed) return;
         const inputs = [a.name as string, (a.slug as string | undefined) ?? ""];
         if (await existingMatch(ctx, siteId, tax.key, inputs)) return;
@@ -714,7 +714,7 @@ export function taxonomyTools(): ToolDefinition[] {
       },
       approvalPrompt: async (a, ctx) => {
         const tax = await requireTaxonomy(ctx, a.siteId as string, a.taxonomy as string);
-        const rule = termCreation(ctx.principal.actor, tax.allowNewTerms);
+        const rule = termCreation(ctx.principal, tax.allowNewTerms);
         const status = rule.allowed ? rule.status : "proposed";
         return `Add ${status} ${tax.key} "${quote(a.name as string, 50)}" (${(a.slug as string | undefined) ?? slugify(a.name as string)})? Reason: "${quote(a.reason as string, 120)}"`;
       },
@@ -734,7 +734,7 @@ export function taxonomyTools(): ToolDefinition[] {
             existing: true,
             via: match.via,
           };
-        const rule = termCreation(ctx.principal.actor, tax.allowNewTerms);
+        const rule = termCreation(ctx.principal, tax.allowNewTerms);
         if (!rule.allowed) throw new ToolError("denied", rule.reason);
         const slug = (a.slug as string | undefined) ?? slugify(name);
         if (!slug)

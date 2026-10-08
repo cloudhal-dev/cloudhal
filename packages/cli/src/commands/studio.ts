@@ -70,6 +70,7 @@ export async function studio(
       resolvePrincipal: auth.resolvePrincipal,
       authHandler: auth.handler,
       agentKeys: auth.agentKeys,
+      staff: auth.staff,
       signUp: auth.signUp,
     };
   }

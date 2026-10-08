@@ -1,24 +1,41 @@
-import { defaultScopes } from "@cloudhal/agent-runtime";
+import {
+  abilities,
+  defaultScopes,
+  invitableRoles,
+  type OwnershipResolver,
+  PEOPLE_ONLY_OWNERSHIP,
+  PolicyEngine,
+} from "@cloudhal/agent-runtime";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
+import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
-import { activity } from "./routes/activity.ts";
+import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { approvals } from "./routes/approvals.ts";
 import { entries } from "./routes/entries.ts";
-import { agentModesInfo, instanceRoutes } from "./routes/instance.ts";
+import { agentModesInfo, instanceRoutes, invitesInfo, rolesInfo } from "./routes/instance.ts";
+import { inviteRoutes } from "./routes/invites.ts";
+import { memberRoutes } from "./routes/members.ts";
 import { migrations } from "./routes/migrations.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
+import { passwordResetRoutes } from "./routes/password-reset.ts";
 import { previewLinks } from "./routes/preview-links.ts";
 import { redirects } from "./routes/redirects.ts";
 import { sites } from "./routes/sites.ts";
 import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
 import { terms } from "./routes/terms.ts";
+import { routeGuard } from "./scopes.ts";
+
+/**
+ * Better Auth endpoints that are only used server-side: membership changes go through Cloudhal's
+ * audited routes (RFC-0005 I3), and agent keys through `/api/agent-keys` (role caps, I5/I6).
+ */
+const FENCED_AUTH_PATHS = /^\/api\/auth\/(organization|admin|api-key)(\/|$)/;
 
 /**
  * Builds the Cloudhal API as a Hono app (a `fetch` handler). The same app runs on Node
@@ -28,6 +45,13 @@ export function createApi(deps: ApiDeps) {
   const requireAuth = deps.requireAuth ?? true;
   const app = new Hono<Env>();
   app.onError(errorHandler);
+  const clock = deps.now ?? (() => new Date());
+  const ownership: OwnershipResolver = deps.staff?.ownership ?? PEOPLE_ONLY_OWNERSHIP;
+  let engine: PolicyEngine | undefined;
+  const policy = () => {
+    engine ??= new PolicyEngine(toolPolicies(defineTools()));
+    return engine;
+  };
 
   // DNS rebinding: a server without auth (local scripts) only answers its own host names.
   if (deps.allowedHosts) {
@@ -65,6 +89,14 @@ export function createApi(deps: ApiDeps) {
     c.set("previewSecret", deps.preview?.secret);
     c.set("approvals", deps.mcp?.approvals);
     c.set("agentKeys", deps.agentKeys);
+    c.set("staff", deps.staff);
+    c.set("ownership", ownership);
+    c.set("policy", policy);
+    c.set("mail", deps.mail);
+    c.set("now", clock);
+    // The fenced Better Auth endpoints never reach credential resolution.
+    if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
+      return c.json({ error: "not_found", message: "not found" }, 404);
     if (deps.resolvePrincipal) {
       const principal = await deps.resolvePrincipal(c);
       c.set("principal", principal);
@@ -77,6 +109,9 @@ export function createApi(deps: ApiDeps) {
     await next();
   });
 
+  // Default-deny REST (RFC-0005 I15): every route declares its requirement in `ROUTE_SCOPES`.
+  app.use("/api/*", routeGuard({ requireAuth, membership: Boolean(deps.staff) }));
+
   app.get("/api/health", (c) => c.json({ ok: true }));
   if (deps.authHandler) {
     const handler = deps.authHandler;
@@ -88,38 +123,37 @@ export function createApi(deps: ApiDeps) {
     app.route("/api/admin", adminRoutes(deps.admin.deployToken, deps.admin.storage));
   }
 
+  /**
+   * Who is calling and what they may do (RFC-0005 §10.1): `role` (null without a membership),
+   * `scopes`, the `can` ability map for UI gating (cosmetic, I16) and the roles they may invite.
+   * Agents see their actor and their effective scopes.
+   */
   app.get("/api/me", (c) => {
-    const actor = c.get("actor");
-    if (!actor) throw unauthorized();
-    return c.json({ actor });
+    const principal = c.get("principal");
+    if (!principal) throw unauthorized();
+    const membership = Boolean(deps.staff);
+    const role = principal.person?.role ?? null;
+    const person = principal.actor.kind !== "agent";
+    return c.json({
+      actor: principal.actor,
+      role,
+      member: !membership || role !== null,
+      scopes: principal.scopes,
+      ...(person
+        ? {
+            can: abilities(membership ? (role ?? "contributor") : undefined, principal.scopes),
+            invitableRoles: membership
+              ? role
+                ? invitableRoles(role)
+                : []
+              : invitableRoles("owner"),
+            ...(principal.person ? { userId: principal.person.userId } : {}),
+          }
+        : principal.person
+          ? { person: { id: principal.person.id, role: principal.person.role } }
+          : {}),
+    });
   });
-
-  // Everything below requires an actor when auth is enabled. Agents (API keys) work through the
-  // MCP endpoint only, where the policy engine, approvals, snapshots and audit apply; the REST API
-  // is for people (Studio) and would otherwise give any key a person's powers.
-  const peopleOnly = createMiddleware<Env>(async (c, next) => {
-    const actor = c.get("actor");
-    if (requireAuth && !actor) throw unauthorized();
-    if (actor?.kind === "agent")
-      return c.json(
-        {
-          error: "forbidden",
-          message: "agent keys work through the MCP endpoint (/mcp), not the REST API",
-        },
-        403,
-      );
-    await next();
-  });
-  for (const path of [
-    "/api/sites",
-    "/api/sites/*",
-    "/api/instance",
-    "/api/skills",
-    "/api/agent-keys",
-    "/api/agent-keys/*",
-    "/api/notifications",
-  ])
-    app.use(path, peopleOnly);
 
   if (deps.mcp) {
     const mcp = createCloudhalMcpHandler({
@@ -127,6 +161,7 @@ export function createApi(deps: ApiDeps) {
       ...deps.mcp,
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
       now: deps.now,
+      ownership,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -138,27 +173,18 @@ export function createApi(deps: ApiDeps) {
         );
       const principal = c.get("principal");
       if (!principal) throw unauthorized();
+      // A signed-in person without a membership has no scopes; refuse rather than list tools.
+      if (deps.staff && principal.actor.kind === "human" && !principal.person)
+        return c.json(
+          { error: "not_a_member", message: "Your access was removed. Ask an administrator." },
+          403,
+        );
       return mcp.fetch(c.req.raw, principal);
     });
   }
 
-  if (deps.agentKeys) {
-    app.use("/api/agent-keys", async (c, next) => {
-      if (!c.get("actor")) throw unauthorized();
-      await next();
-    });
-    app.use("/api/agent-keys/*", async (c, next) => {
-      if (!c.get("actor")) throw unauthorized();
-      await next();
-    });
-    app.route("/api/agent-keys", agentKeys(deps.agentKeys));
-  }
+  if (deps.agentKeys) app.route("/api/agent-keys", agentKeys(deps.agentKeys));
 
-  for (const path of ["/api/instance", "/api/skills"])
-    app.use(path, async (c, next) => {
-      if (!c.get("actor")) throw unauthorized();
-      await next();
-    });
   app.route(
     "/api",
     instanceRoutes(
@@ -172,14 +198,24 @@ export function createApi(deps: ApiDeps) {
           deployTransfer: Boolean(deps.admin),
           approvals: Boolean(deps.mcp?.approvals),
           elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
+          members: Boolean(deps.staff),
         },
         agentModes: agentModesInfo(),
+        roles: rolesInfo(),
+        invites: invitesInfo(Boolean(deps.mail)),
       }),
       deps.mcp?.skills ?? [],
     ),
   );
 
-  app.route("/api/notifications", notificationRoutes(deps.now ?? (() => new Date())));
+  if (deps.staff) {
+    const links = { studioOrigin: deps.studioOrigin, trustedOrigins: trusted };
+    app.route("/api/members", memberRoutes(links));
+    app.route("/api/invites", inviteRoutes(links));
+    app.route("/api/password-reset", passwordResetRoutes);
+  }
+  app.route("/api/activity", deploymentActivity);
+  app.route("/api/notifications", notificationRoutes(clock));
   app.route("/api/sites", sites);
   app.route("/api/sites/:siteId/pages", pages);
   app.route("/api/sites/:siteId/entries", entries);

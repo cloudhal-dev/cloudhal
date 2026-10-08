@@ -2,13 +2,17 @@
  * `/api/agent-keys` — API keys that let agents (CI, bots, MCP clients) act with limited scopes in
  * a chosen mode (ADR-0015). People only.
  *
- * - `GET    /`            → AgentKeySummary[]
- * - `POST   /`            {name, mode?, scopes?} → summary + `key` (shown once)
- * - `PATCH  /:id`         {mode} → summary (audited)
+ * - `GET    /`            → AgentKeySummary[] (own keys); `?all=1` every key with its `owner`
+ *   (`agents:manage`, RFC-0005)
+ * - `POST   /`            {name, mode?, scopes?} → summary + `key` (shown once). Scopes must fit
+ *   the caller's role (400 `scope_above_role`), the mode its cap (400 `mode_above_role`)
+ * - `PATCH  /:id`         {mode} → summary (own keys; audited)
  * - `POST   /:id/elevation` {mode, minutes, reason?} → summary: a more autonomous mode until the
- *   time is up, then the key's own mode again (ADR-0016; audited)
- * - `DELETE /:id/elevation` → summary: ends it early (audited)
- * - `DELETE /:id`
+ *   time is up, then the key's own mode again (ADR-0016; only the key's creator; audited)
+ * - `DELETE /:id/elevation` → summary: ends it early (own keys, or any with `agents:manage`; audited)
+ * - `DELETE /:id` → 204 (own keys, or any with `agents:manage`; audited `agent-key.revoke`)
+ *
+ * Someone else's key answers 404 unless the caller holds `agents:manage`.
  */
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
 import { Hono } from "hono";
@@ -19,7 +23,14 @@ import { param } from "../params.ts";
 
 export function agentKeys(service: AgentKeyService): Hono<Env> {
   return new Hono<Env>()
-    .get("/", async (c) => c.json(await service.list({ headers: c.req.raw.headers })))
+    .get("/", async (c) =>
+      c.json(
+        await service.list({
+          headers: c.req.raw.headers,
+          ...(c.req.query("all") === "1" ? { all: true } : {}),
+        }),
+      ),
+    )
     .post("/", async (c) => {
       const body = ((await c.req.json().catch(() => ({}))) ?? {}) as {
         name?: unknown;
@@ -100,9 +111,14 @@ export function agentKeys(service: AgentKeyService): Hono<Env> {
     .delete("/:id/elevation", async (c) => {
       const actor = c.get("actor");
       if (!actor) throw unauthorized();
-      const before = (await service.list({ headers: c.req.raw.headers })).find(
-        (k) => k.id === param(c, "id"),
-      );
+      // Own keys first; Administrators may end others' elevations too (agents:manage).
+      const id = param(c, "id");
+      const before =
+        (await service.list({ headers: c.req.raw.headers })).find((k) => k.id === id) ??
+        (await service
+          .list({ headers: c.req.raw.headers, all: true })
+          .then((all) => all.find((k) => k.id === id))
+          .catch(() => undefined));
       const updated = await service.endElevation({
         headers: c.req.raw.headers,
         id: param(c, "id"),
@@ -121,7 +137,18 @@ export function agentKeys(service: AgentKeyService): Hono<Env> {
       return c.json(updated);
     })
     .delete("/:id", async (c) => {
-      await service.delete({ headers: c.req.raw.headers, id: param(c, "id") });
+      const actor = c.get("actor");
+      if (!actor) throw unauthorized();
+      const removed = await service.delete({ headers: c.req.raw.headers, id: param(c, "id") });
+      await c.get("audit")?.record({
+        at: new Date().toISOString(),
+        actor,
+        tool: "agent-key.revoke",
+        decision: "allow",
+        outcome: "ok",
+        reason: `${removed?.name ?? param(c, "id")} revoked`,
+        input: { keyId: param(c, "id"), agentId: removed?.agentId },
+      });
       return c.body(null, 204);
     });
 }

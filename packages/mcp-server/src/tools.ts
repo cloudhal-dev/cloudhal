@@ -11,10 +11,17 @@ import type {
   AuditLog,
   AutoCheck,
   Decision,
+  OwnOnlyResult,
   PolicyEngine,
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
-import { checkAutoPublish, describeAutoCheck, effectiveMode } from "@cloudhal/agent-runtime";
+import {
+  checkAutoPublish,
+  describeAutoCheck,
+  describeOwnOnly,
+  effectiveMode,
+  ownOnlyChangeSet,
+} from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
@@ -27,7 +34,10 @@ import {
 import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
 import {
+  ACTOR_OWNERSHIP,
   autoSnapshot,
+  callerPerson,
+  entryLimitCheck,
   id,
   type JsonSchema,
   mapError,
@@ -561,8 +571,13 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["content:write"],
+      own: "entry",
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
+        await entryLimitCheck(ctx, "create", undefined, {
+          author: ctx.principal.actor,
+          status: "draft",
+        });
         const { terms, tags } = await entryTerms(ctx, site, undefined, a);
         try {
           const entry = await ctx.store.createContentEntry({
@@ -615,6 +630,17 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["content:write"],
+      own: "entry",
+      // Own-limited callers (Authors, Contributors and their agents) only touch their own articles.
+      precheck: async (a, ctx) => {
+        if (!ctx.limit) return;
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        if (!entry || entry.siteId !== a.siteId) return;
+        await entryLimitCheck(ctx, "update", entry, {
+          author: entry.author,
+          status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
+        });
+      },
       approvalPrompt: async (a, ctx) => {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (!entry || entry.siteId !== a.siteId) return `Update article ${a.entryId}?`;
@@ -658,6 +684,10 @@ function rawTools(): ToolDefinition[] {
             `entry ${entry.id} is at rev ${entry.rev}, you sent ${a.rev}; reload and retry`,
           );
         const site = await requireSite(ctx, entry.siteId);
+        await entryLimitCheck(ctx, "update", entry, {
+          author: entry.author,
+          status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
+        });
         const { terms, tags } = await entryTerms(ctx, site, entry, a);
         const { terms: _old, ...rest } = entry;
         const next: ContentEntry = {
@@ -700,12 +730,19 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["content:write"],
+      own: "entry",
+      precheck: async (a, ctx) => {
+        if (!ctx.limit) return;
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        if (entry && entry.siteId === a.siteId) await entryLimitCheck(ctx, "delete", entry);
+      },
       approvalPrompt: async (a, ctx) =>
         `Delete article "${(await ctx.store.getContentEntry(a.entryId as string))?.title ?? a.entryId}"? Earlier snapshots keep a copy.`,
       handler: async (a, ctx) => {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (!entry || entry.siteId !== a.siteId)
           throw new ToolError("not_found", `entry ${a.entryId} not found`);
+        await entryLimitCheck(ctx, "delete", entry);
         try {
           await ctx.store.deleteContentEntry({ ...entry, rev: a.rev as number });
           return { snapshot: await autoSnapshot(ctx, entry.siteId, "delete_entry") };
@@ -729,7 +766,7 @@ function rawTools(): ToolDefinition[] {
         idempotentHint: false,
         openWorldHint: false,
       },
-      scopes: ["content:write"],
+      scopes: ["content:draft:own"],
       handler: async (a, ctx) => {
         await requireSite(ctx, a.siteId as string);
         return {
@@ -885,6 +922,7 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["site:publish"],
+      own: "changeset",
       requiresApproval: true,
       approvalPrompt: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
@@ -947,7 +985,30 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
     scopes: t.scopes,
     annotations: t.annotations,
     ...(t.requiresApproval ? { requiresApproval: true } : {}),
+    ...(t.own ? { own: t.own } : {}),
   }));
+}
+
+/**
+ * Is publishing the current state own-only for the caller (RFC-0005 §4, I10)? Every publicly
+ * visible pending change must be an entry the caller's person owns.
+ */
+export async function ownOnlyPublish(ctx: ToolContext, siteId: string): Promise<OwnOnlyResult> {
+  const store = ctx.store;
+  return ownOnlyChangeSet(
+    await store.pendingChanges(siteId),
+    callerPerson(ctx),
+    ctx.ownership ?? ACTOR_OWNERSHIP,
+    {
+      before: (ref) => store.readSnapshotNode(ref).catch(() => undefined),
+      after: async (ref) =>
+        ref.kind === "contentEntry"
+          ? store.getContentEntry(ref.id)
+          : ref.kind === "site"
+            ? store.getSite(ref.id)
+            : undefined,
+    },
+  );
 }
 
 export interface CallResult {
@@ -963,19 +1024,42 @@ export interface CallResult {
 
 /**
  * Policy → audit → handler. Transports call this; it is the only path a tool runs through.
- * `confirmed` is set by the transport once the human said yes (MRTR response or confirm token).
+ * `confirmed` is set by the transport once the human said yes (MRTR response or confirm token);
+ * `approved` once an out-of-band approval was redeemed — someone who could make the full call
+ * decided it (RFC-0005 §6), so an own limit on a publish no longer applies.
  */
 export async function runTool(
   def: ToolDefinition,
   args: Record<string, unknown>,
   ctx: ToolContext,
-  deps: { policy: PolicyEngine; audit?: AuditLog | undefined; confirmed?: boolean | undefined },
+  deps: {
+    policy: PolicyEngine;
+    audit?: AuditLog | undefined;
+    confirmed?: boolean | undefined;
+    approved?: boolean | undefined;
+  },
 ): Promise<CallResult> {
   const started = Date.now();
   let decision = deps.policy.evaluate(ctx.principal, def.name, {
     confirmed: deps.confirmed ?? false,
   });
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
+  const limit = decision.kind === "deny" ? undefined : decision.limit;
+  ctx = { ...ctx, limit };
+  // Own-only publish (I10): an Author's (or their agent's) publish that carries someone else's
+  // work, or structure, waits for someone whose role allows it (cause `role`).
+  if (limit?.target === "changeset" && !deps.approved && siteId && decision.kind !== "deny") {
+    const check = await ownOnlyPublish(ctx, siteId).catch(() => undefined);
+    if (!check?.ownOnly) {
+      const why = check ? describeOwnOnly(check) : "the site could not be read";
+      decision = {
+        kind: "approval-required",
+        reason: `your role publishes only your own work, but ${why}`,
+        cause: "role",
+        limit,
+      };
+    }
+  }
   const base = {
     at: new Date().toISOString(),
     actor: ctx.principal.actor,
