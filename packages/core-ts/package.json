@@ -15,7 +15,8 @@
     "./filter": "./src/filter.ts",
     "./names": "./src/names.ts",
     "./taxonomy-report": "./src/taxonomy-report.ts",
-    "./menu": "./src/menu.ts"
+    "./menu": "./src/menu.ts",
+    "./cache-tags": "./src/cache-tags.ts"
   },
   "files": [
     "dist",
@@ -75,6 +76,10 @@
       "./menu": {
         "types": "./dist/src/menu.d.ts",
         "default": "./dist/src/menu.js"
+      },
+      "./cache-tags": {
+        "types": "./dist/src/cache-tags.d.ts",
+        "default": "./dist/src/cache-tags.js"
       }
     }
   }

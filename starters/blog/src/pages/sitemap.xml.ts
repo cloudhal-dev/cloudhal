@@ -1,5 +1,6 @@
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
+import { addCacheTags, listCacheTag } from "@cloudhal/astro-renderer/cache-tags";
 import { sitemapUrls, sitemapXml } from "@cloudhal/astro-renderer/feeds";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
@@ -13,6 +14,8 @@ export const GET: APIRoute = async ({ request, url }) => {
   if (!source) return new Response("This site has not been published yet.", { status: 503 });
   const site = await source.site();
   headers.set("content-type", "application/xml; charset=utf-8");
+  // Lists every page, entry and indexable archive: any entry or term change purges it.
+  addCacheTags(headers, [listCacheTag(site.id)]);
   const entries = await source.allEntries();
   const archives = archiveSummaries(
     await loadTaxonomyIndex(source),

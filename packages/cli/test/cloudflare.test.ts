@@ -2,14 +2,18 @@
  * Sprint 6: the Site Worker on real workerd (wrangler's test harness) against local D1 + R2.
  * Publishing and rollback are pointer flips seen by the next request; drafts stay invisible
  * except behind a signed preview link; the purge endpoint is authenticated. RFC-0002: archives,
- * term feeds and redirects answer with real status codes, and responses carry per-node cache tags.
+ * term feeds and redirects answer with real status codes, responses carry per-node cache tags, and
+ * a publish purges only the tags of what changed (checked against a model of the edge cache, since
+ * local workerd has none).
  * RFC-0003: menus render per request, follow publishes, and hide items whose page is gone.
  */
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { copySite, mintPreviewToken, SiteGraphStore } from "@cloudhal/core-ts";
+import { purgeSiteCache } from "@cloudhal/cloudflare/purge";
+import type { Site } from "@cloudhal/core-contracts";
+import { copySite, mintPreviewToken, type PublishChange, SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { migrate, migrations } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -40,6 +44,7 @@ describe("Site Worker on workerd", () => {
   let siteId: string;
   let harness: ReturnType<typeof createTestHarness>;
   let remote: SiteGraphStore;
+  let target: { sql: D1Driver; blobs: R2BlobStore };
 
   beforeAll(async () => {
     tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-cf-"));
@@ -69,7 +74,7 @@ describe("Site Worker on workerd", () => {
     });
     await harness.listen();
     const env = (await harness.getWorker().getEnv()) as { DB: D1Database; BLOBS: R2Bucket };
-    const target = { sql: new D1Driver(env.DB), blobs: new R2BlobStore(env.BLOBS) };
+    target = { sql: new D1Driver(env.DB), blobs: new R2BlobStore(env.BLOBS) };
     await migrate(target.sql, migrations);
     // `cloudhal push`: the local project (graph + snapshots + blobs) lands in D1/R2.
     const cfg = await readProjectConfig(projectDir);
@@ -110,7 +115,8 @@ describe("Site Worker on workerd", () => {
     const rss = await get("/rss.xml");
     expect(rss.status).toBe(200);
     expect(rss.headers.get("content-type")).toContain("application/rss+xml");
-    expect(rss.headers.get("cache-tag")).toBe(`cloudhal-site-${siteId}`);
+    // the site feed lists every collection: the site's list tag next to the site tag
+    expect(rss.headers.get("cache-tag")).toBe(`cloudhal-site-${siteId},cloudhal-list-${siteId}`);
     expect(await rss.text()).toContain("/posts/hello-world</link>");
     const sitemap = await get("/sitemap.xml");
     expect(sitemap.status).toBe(200);
@@ -348,5 +354,110 @@ describe("Site Worker on workerd", () => {
       ]),
     );
     expect(footerOf(derived)).toBe(DEFAULT_FOOTER);
+  });
+
+  it("purges only what a publish changed: the edited article and its lists, not the site", async () => {
+    // A model of Cloudflare's edge cache in front of the Worker: 200s with a Cache-Tag are kept
+    // until a purge names one of their tags (case-insensitively) or purges everything.
+    const edge = new Map<string, { tags: string[]; html: string }>();
+    const fromEdge = async (p: string) => {
+      const hit = edge.get(p);
+      if (hit) return { ...hit, hit: true };
+      const res = await get(p, { redirect: "manual" });
+      const html = await res.text();
+      const tags = (res.headers.get("cache-tag") ?? "").split(",").filter(Boolean);
+      if (res.status === 200 && res.headers.get("cloudflare-cdn-cache-control") !== "no-store")
+        edge.set(p, { tags, html });
+      return { tags, html, hit: false };
+    };
+    const sent: { tags?: string[] }[] = [];
+    const results: Awaited<ReturnType<typeof purgeSiteCache>>[] = [];
+    const admin: SiteGraphStore = new SiteGraphStore({
+      ...target,
+      // what the admin Worker does after a publish (createAdminWorker → purgeSiteCache)
+      onPublished: async (_site, change: PublishChange) => {
+        const result = await purgeSiteCache({
+          fetch: async (url, init) => {
+            const res = await get(new URL(url).pathname, init as never);
+            const body = (await res.clone().json()) as { tags?: string[] };
+            sent.push(body);
+            // the site Worker echoes what it purged; apply it to the edge model
+            if (res.ok && body.tags) {
+              const purged = new Set(body.tags.map((t) => t.toLowerCase()));
+              for (const [p, v] of edge)
+                if (v.tags.some((t) => purged.has(t.toLowerCase()))) edge.delete(p);
+            } else if (res.ok) edge.clear();
+            return res as unknown as Response;
+          },
+          token: PURGE_TOKEN,
+          store: admin,
+          change,
+        });
+        results.push(result);
+      },
+    });
+    const publish = async (label: string) => {
+      const snap = await admin.createSnapshot(siteId, { actor: human, reason: "publish", label });
+      await admin.publish((await admin.getSite(siteId)) as Site, snap.id);
+      return snap;
+    };
+    // whatever earlier tests left unpublished goes live first, then the cache is warmed
+    await publish("baseline");
+    edge.clear();
+    const hello = (await admin.listContentEntries(siteId)).find(
+      (e) => e.slug === "hello-world",
+    ) as NonNullable<Awaited<ReturnType<typeof admin.getContentEntry>>>;
+    const news = (await admin.getTermBySlug(siteId, "category", "news"))?.id as string;
+    const affected = [
+      "/posts/hello-world",
+      "/category/news",
+      "/category/news/page/2",
+      "/category/news/rss.xml",
+      "/tag/cloudhal",
+      "/", // lists the newest posts
+      "/rss.xml",
+      "/sitemap.xml",
+    ];
+    const untouched = ["/about", "/posts/issue-03", "/posts/issue-04", "/tag/weekly-digest"];
+    for (const p of [...affected, ...untouched]) {
+      const first = await fromEdge(p);
+      expect(edge.has(p), `${p} should be cacheable`).toBe(true);
+      expect(first.hit).toBe(false);
+    }
+    expect((await fromEdge("/about")).hit).toBe(true);
+    // other articles do not link to this one (it is not among their related posts)
+    expect((await fromEdge("/posts/issue-03")).tags).not.toContain(`cloudhal-node-${hello.id}`);
+
+    // An editor changes one article's title and publishes.
+    await admin.updateContentEntry({ ...hello, title: "Hello, edge" });
+    await publish("edit hello");
+    const result = results.at(-1);
+    expect(result?.mode).toBe("tags");
+    expect(result?.tags).toEqual(
+      expect.arrayContaining([
+        `cloudhal-node-${hello.id}`,
+        `cloudhal-list-${news}`,
+        `cloudhal-list-${siteId}`,
+      ]),
+    );
+    expect(result?.tags).not.toContain(`cloudhal-site-${siteId}`);
+    expect(sent.at(-1)?.tags).toEqual(result?.tags);
+
+    // That article and the archives and lists it appears on are gone from the edge…
+    for (const p of affected) expect(edge.has(p), `${p} should have been purged`).toBe(false);
+    // …the rest of the site stays cached.
+    for (const p of untouched) expect(edge.has(p), `${p} should still be cached`).toBe(true);
+    const post = await fromEdge("/posts/hello-world");
+    expect(post.hit).toBe(false);
+    expect(post.html).toContain("Hello, edge");
+    expect((await fromEdge("/category/news")).html).toContain("Hello, edge");
+    expect((await fromEdge("/about")).hit).toBe(true);
+
+    // A structural change (a page) purges the site tag: every cached response goes.
+    const about = (await admin.listPages(siteId)).find((p) => p.path === "/about");
+    await admin.updatePage({ ...(about as NonNullable<typeof about>), title: "About the edge" });
+    await publish("edit about");
+    expect(results.at(-1)).toMatchObject({ mode: "tags", tags: [`cloudhal-site-${siteId}`] });
+    expect(edge.size).toBe(0);
   });
 });

@@ -30,16 +30,19 @@ export function usePreviewVisible(): [boolean, (visible: boolean) => void] {
 export function PreviewToggle({
   visible,
   onChange,
+  live = false,
 }: {
   visible: boolean;
   onChange: (visible: boolean) => void;
+  /** The preview shows the unsaved form (the term editor), not the last saved version. */
+  live?: boolean;
 }) {
   const t = useT();
   const label = visible ? t("preview.hide") : t("preview.show");
   return (
     <span className="hidden @5xl/page:inline-flex">
       <Tooltip
-        content={t("preview.toggleHint")}
+        content={live ? t("preview.toggleHintLive") : t("preview.toggleHint")}
         render={
           <Button
             variant="secondary"
@@ -71,7 +74,7 @@ export function EditorLayout({
 }: {
   main: ReactNode;
   aside: ReactNode;
-  /** The `EditorPreview`; it fills the column's height. Absent: a node without a page of its own to preview (a term). */
+  /** The `EditorPreview`; it fills the column's height. Absent: no preview column (`Columns 2-1`). */
   preview?: ReactNode;
   previewVisible?: boolean;
 }) {

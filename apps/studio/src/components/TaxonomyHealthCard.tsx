@@ -3,16 +3,17 @@ import { taxonomyReport } from "@cloudhal/core-ts/taxonomy-report";
 import { Badge, Button, SectionCard, SectionEmpty, Text } from "@cloudhal/ui";
 import { ArrowsMerge, Heartbeat, Sparkle } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { useT } from "../i18n/index.tsx";
-import { appliesTo } from "../lib/taxonomy.ts";
+import { useI18n } from "../i18n/index.tsx";
 import type { TaxonomyData } from "./Taxonomy.tsx";
 
 const SHOWN = 3;
 
 /**
- * Vocabulary health of one taxonomy (DESIGN.md §2p), from `taxonomyReport` — the same report
- * agents read through MCP `taxonomy_report`: near-duplicates with a one-click merge, single-use
- * terms, empty and oversized categories, the proposed backlog and articles without a category.
+ * Vocabulary health of one taxonomy (DESIGN.md §2p), from core-ts `taxonomyReport` — the function
+ * MCP `taxonomy_report` calls, with the same terms, usage and entries, so people and agents see the
+ * same findings: near-duplicates with a one-click merge, the proposed backlog, articles without a
+ * primary term or without any category, indexed archives without an intro, single-use and unused
+ * terms, empty and oversized categories.
  */
 export function TaxonomyHealthCard({
   tax,
@@ -23,22 +24,23 @@ export function TaxonomyHealthCard({
 }: {
   tax: Taxonomy;
   data: TaxonomyData;
-  /** The site's articles, for "articles without a category". */
+  /** All of the site's entries (every collection), as MCP reads them. */
   entries: readonly ContentEntry[] | undefined;
   onMerge: (sourceId: string, targetId: string) => void;
   onReview: () => void;
 }) {
-  const t = useT();
+  const { t, locale } = useI18n();
   const items = data.itemsOf(tax);
   const byId = new Map(items.map((i) => [i.term.id, i.term]));
-  const applicable = (entries ?? []).filter((e) => appliesTo(tax, e.collection));
   const report = taxonomyReport({
-    hierarchical: tax.hierarchical,
+    taxonomy: tax,
     terms: items.map((i) => i.term),
     usage: new Map(items.map((i) => [i.term.id, i.usage])),
-    entries: applicable.length,
+    ...(entries ? { entries } : {}),
     locale: data.defaultLocale,
   });
+  const Singular = data.label(tax, "singular");
+  const singular = Singular.toLocaleLowerCase(locale);
   const names = (ids: readonly string[]) =>
     ids
       .slice(0, 4)
@@ -47,15 +49,16 @@ export function TaxonomyHealthCard({
         return term ? data.name(term) : id;
       })
       .join(", ") + (ids.length > 4 ? t("taxonomy.health.andMore", { count: ids.length - 4 }) : "");
-  const uncategorised =
-    tax.key === "category" ? applicable.filter((e) => !e.terms?.[tax.key]?.ids.length) : [];
   const issues =
     report.nearDuplicates.length +
-    report.singleUse.length +
-    report.emptyCategories.length +
-    report.oversizedCategories.length +
     report.proposed.length +
-    uncategorised.length;
+    report.missingPrimary.length +
+    report.unfiled.length +
+    report.noIntro.length +
+    report.singleUse.length +
+    report.unused.length +
+    report.emptyCategories.length +
+    report.oversizedCategories.length;
   return (
     <SectionCard
       id="health"
@@ -140,11 +143,33 @@ export function TaxonomyHealthCard({
               }
             />
           )}
-          {uncategorised.length > 0 && (
+          {report.missingPrimary.length > 0 && (
             <HealthRow
-              id="uncategorised"
-              label={t("taxonomy.health.uncategorised", { count: uncategorised.length })}
-              hint={t("taxonomy.health.uncategorisedHint")}
+              id="missing-primary"
+              label={t("taxonomy.health.missingPrimary", {
+                count: report.missingPrimary.length,
+                singular,
+                Singular,
+              })}
+              hint={t("taxonomy.health.missingPrimaryHint")}
+            />
+          )}
+          {report.unfiled.length > 0 && (
+            <HealthRow
+              id="unfiled"
+              label={t("taxonomy.health.unfiled", {
+                count: report.unfiled.length,
+                singular,
+                Singular,
+              })}
+              hint={t("taxonomy.health.unfiledHint", { singular })}
+            />
+          )}
+          {report.noIntro.length > 0 && (
+            <HealthRow
+              id="no-intro"
+              label={t("taxonomy.health.noIntro", { count: report.noIntro.length })}
+              hint={`${names(report.noIntro)} · ${t("taxonomy.health.noIntroHint")}`}
             />
           )}
           {report.singleUse.length > 0 && (
@@ -152,6 +177,13 @@ export function TaxonomyHealthCard({
               id="single-use"
               label={t("taxonomy.health.singleUse", { count: report.singleUse.length })}
               hint={names(report.singleUse)}
+            />
+          )}
+          {report.unused.length > 0 && (
+            <HealthRow
+              id="unused"
+              label={t("taxonomy.health.unused", { count: report.unused.length })}
+              hint={`${names(report.unused)} · ${t("taxonomy.health.unusedHint")}`}
             />
           )}
           {report.emptyCategories.length > 0 && (

@@ -5,8 +5,9 @@
  * - `POST /__cloudhal/purge` (Bearer `CLOUDHAL_PURGE_TOKEN`) purges this site's edge cache. The
  *   admin Worker calls it after publish/rollback. Purges are scoped to the Worker that cached the
  *   responses, which is why this lives here and not in the admin Worker (ADR-0012). A JSON body
- *   `{ "tags": [...] }` purges only those tags (`cloudhal-node-<id>`, `cloudhal-term-<id>`, see
- *   `cache-tags.ts`); without one, everything is purged.
+ *   `{ "tags": [...] }` (at most 100, Cloudflare's limit per purge request) purges only those tags
+ *   (`cloudhal-site-`, `-node-`, `-term-`, `-list-`, see `cache-tags.ts`) — what the admin Worker
+ *   sends after working out what a publish changed; without one, everything is purged.
  * - Redirects (RFC-0002) are answered by the routes themselves (real 301s, `no-store` here like
  *   every non-200), so a publish that adds or removes one needs no purge of its own.
  * - Preview responses get every internal link rewritten to keep the signed token, so navigation
@@ -55,8 +56,11 @@ async function purge(
       ) => Promise<{ success: boolean; errors?: unknown[] }>;
     }
   )?.purge;
-  // Optional body `{ "tags": [...] }`: purge only those node/term/site tags (RFC-0002 §7). Without
-  // it — what the admin Worker sends after every publish and rollback — everything is purged.
+  // Optional body `{ "tags": [...] }`: purge only those Cloudhal tags (RFC-0002 §7). 100 per
+  // request is Cloudflare's limit for tag purges on the Free tier, which Workers Cache always uses
+  // (https://developers.cloudflare.com/cache/how-to/purge-cache/#hostname-tag-prefix-url-and-purge-everything-limits,
+  // https://developers.cloudflare.com/workers/cache/purge/); the admin Worker batches to it.
+  // Without a body everything is purged (first publish, or when the diff is unavailable).
   let tags: string[] | undefined;
   if ((request.headers.get("content-type") ?? "").includes("application/json")) {
     const body = (await request.json().catch(() => undefined)) as { tags?: unknown } | undefined;
@@ -68,7 +72,7 @@ async function purge(
         !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
       )
         return Response.json(
-          { error: "tags must be 1–100 cloudhal-site-/node-/term- cache tags" },
+          { error: "tags must be 1–100 cloudhal-site-/node-/term-/list- cache tags" },
           { status: 400 },
         );
       tags = body.tags as string[];

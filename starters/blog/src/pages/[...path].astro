@@ -8,7 +8,12 @@
  */
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
-import { addCacheTags, nodeCacheTag, termCacheTag } from "@cloudhal/astro-renderer/cache-tags";
+import {
+  addCacheTags,
+  listCacheTag,
+  nodeCacheTag,
+  termCacheTag,
+} from "@cloudhal/astro-renderer/cache-tags";
 import { Sections } from "@cloudhal/astro-renderer/components";
 import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import {
@@ -95,18 +100,18 @@ const nav = primary
 const footer = footerMenu
   ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
   : undefined;
-// Per-node edge-cache tags next to the site tag (published responses on Cloudflare only).
-const tags = [
-  ...categories.map((a) => termCacheTag(a.term.id)),
-  ...navigationCacheTags(primary),
-  ...navigationCacheTags(footerMenu),
-];
+// Edge-cache tags next to the site tag (published responses on Cloudflare only), so a publish
+// purges only the responses that show what changed (`cache-tags.ts`). The tags a purge must reach
+// come first; the header's categories (names shown on every page) last.
+const tags: string[] = [];
 
 let entries: Record<string, ContentEntry[]> = {};
 let terms = entryTaxonomy(undefined, { tags: [] });
 let related: ContentEntry[] = [];
 if (route.kind === "page") {
   tags.push(nodeCacheTag(route.page.id));
+  // Lists of the site's entries change with any entry: the site's list tag covers them.
+  if (route.page.sections.some((s) => s.kind === "contentList")) tags.push(listCacheTag(site.id));
   const collections = [
     ...new Set(
       route.page.sections.filter((s) => s.kind === "contentList").map((s) => s.collection),
@@ -129,16 +134,25 @@ if (route.kind === "page") {
   related = relatedEntries(route.entry, all, index, RELATED_POSTS);
   tags.push(
     nodeCacheTag(route.entry.id),
+    // the related posts it links to: a retitled or removed one purges this page too
+    ...related.map((e) => nodeCacheTag(e.id)),
     ...terms.groups.flatMap((g) => g.terms.map((s) => termCacheTag(s.id))),
     ...terms.trail.map((s) => termCacheTag(s.id)),
   );
 } else {
   tags.push(
+    // which entries the archive lists (and how many pages it has) changes with its membership
+    listCacheTag(route.archive.term.id),
     termCacheTag(route.archive.term.id),
     ...route.archive.trail.map((s) => termCacheTag(s.id)),
     ...route.archive.entries.map((e) => nodeCacheTag(e.id)),
   );
 }
+tags.push(
+  ...categories.map((a) => termCacheTag(a.term.id)),
+  ...navigationCacheTags(primary),
+  ...navigationCacheTags(footerMenu),
+);
 addCacheTags(Astro.response.headers, tags);
 
 const meta =

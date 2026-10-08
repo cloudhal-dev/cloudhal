@@ -42,6 +42,7 @@ import { Status } from "./Status.tsx";
 import { invalidateTaxonomy, type TaxonomyData } from "./Taxonomy.tsx";
 import { TermCombobox, treeOptions } from "./TermPickers.tsx";
 import { useToast } from "./Toast.ts";
+import { useSettled } from "./useSettled.ts";
 
 /**
  * The governance operations a person runs on a term (RFC-0002 §4.3, §8). Each is one batch and
@@ -70,16 +71,6 @@ const SLUG_ERROR: Record<SlugError, MessageKey> = {
   taken: "governance.rename.errors.taken",
   reserved: "governance.rename.errors.reserved",
 };
-
-/** Waits until a value stops changing (typing a slug) before it is previewed. */
-function useSettled<T>(value: T, ms = 300): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setSettled(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return settled;
-}
 
 /** "This would change 523 articles…" from a 409 `too_large` (or the preview's numbers). */
 function tooLargeOf(error: unknown): { entries: number; limit: number } | undefined {

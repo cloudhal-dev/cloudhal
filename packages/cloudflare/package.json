@@ -11,7 +11,8 @@
   "type": "module",
   "exports": {
     "./admin": "./src/admin-worker.ts",
-    "./workerd-prelude": "./src/workerd-prelude.ts"
+    "./workerd-prelude": "./src/workerd-prelude.ts",
+    "./purge": "./src/purge.ts"
   },
   "files": [
     "dist",
@@ -49,6 +50,10 @@
       "./workerd-prelude": {
         "types": "./dist/src/workerd-prelude.d.ts",
         "default": "./dist/src/workerd-prelude.js"
+      },
+      "./purge": {
+        "types": "./dist/src/purge.d.ts",
+        "default": "./dist/src/purge.js"
       }
     }
   }

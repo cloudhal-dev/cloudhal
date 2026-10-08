@@ -22,6 +22,8 @@ import {
   Eye,
   EyeSlash,
   FolderSimple,
+  FolderSimplePlus,
+  GearSix,
   HandPalm,
   Info,
   PencilSimple,
@@ -53,6 +55,7 @@ import {
   VisibilityBadge,
 } from "../components/Taxonomy.tsx";
 import { TaxonomyHealthCard } from "../components/TaxonomyHealthCard.tsx";
+import { TaxonomySettingsDialog } from "../components/TaxonomySettingsDialog.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api, type TermListItem } from "../lib/api.ts";
@@ -88,7 +91,8 @@ function matchesSearch(term: Term, q: string): boolean {
 /**
  * Site › Categories & tags (DESIGN.md §2p): one tab per taxonomy — a tree for categories, a flat
  * table for tags — with status filters, usage, indexing and visibility per term, the proposed
- * review, the governance row menu and the vocabulary health panel.
+ * review, the governance row menu and the vocabulary health panel. "New taxonomy" and each
+ * taxonomy's settings open `TaxonomySettingsDialog`.
  */
 export function TaxonomyPage() {
   const t = useT();
@@ -100,14 +104,20 @@ export function TaxonomyPage() {
   const toast = useToast();
   const data = useTaxonomyData(siteId);
   const entries = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
+    // Every collection, as MCP `taxonomy_report` reads them (a taxonomy may apply to any).
+    queryKey: ["entries", siteId, "all"],
+    queryFn: () => api.entries.list(siteId),
   });
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [migrationOpen, setMigrationOpen] = useState(false);
   const [governance, setGovernance] = useState<GovernanceTarget | undefined>();
+  // The mode outlives `open` so the dialog keeps its title while it closes.
+  const [settings, setSettings] = useState<{ open: boolean; mode: "new" | "edit" }>({
+    open: false,
+    mode: "new",
+  });
 
   const taxonomies = ordered(data.taxonomies.data ?? []);
   const tax = taxonomies.find((x) => x.key === search.taxonomy) ?? taxonomies[0];
@@ -165,6 +175,16 @@ export function TaxonomyPage() {
   };
   const noTaxonomies = data.taxonomies.data !== undefined && taxonomies.length === 0;
 
+  const newTaxonomyButton = (
+    <Button
+      variant="secondary"
+      icon={<FolderSimplePlus />}
+      onClick={() => setSettings({ open: true, mode: "new" })}
+      data-testid="new-taxonomy"
+    >
+      {t("taxonomySettings.newTaxonomy")}
+    </Button>
+  );
   const newButton = (
     <Button
       variant="primary"
@@ -182,7 +202,27 @@ export function TaxonomyPage() {
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.taxonomy.title") }]} />}
       title={t("pageHeaders.taxonomy.title")}
       description={t("pageHeaders.taxonomy.description")}
-      actions={tax ? newButton : undefined}
+      actions={
+        tax ? (
+          <>
+            <Tooltip
+              content={t("taxonomySettings.open", { Singular: singular })}
+              render={
+                <Button
+                  variant="secondary"
+                  shape="square"
+                  icon={<GearSix />}
+                  aria-label={t("taxonomySettings.open", { Singular: singular })}
+                  onClick={() => setSettings({ open: true, mode: "edit" })}
+                  data-testid="taxonomy-settings-open"
+                />
+              }
+            />
+            {newTaxonomyButton}
+            {newButton}
+          </>
+        ) : undefined
+      }
       {...(taxonomies.length > 0
         ? {
             tabs: taxonomies.map((x) => ({ value: x.key, label: data.label(x) })),
@@ -203,7 +243,11 @@ export function TaxonomyPage() {
               }}
               onReview={() => setSearch({ filter: "proposed" })}
             />
-            <TaxonomyRulesCard tax={tax} names={names} />
+            <TaxonomyRulesCard
+              tax={tax}
+              names={names}
+              onEdit={() => setSettings({ open: true, mode: "edit" })}
+            />
           </>
         ) : undefined
       }
@@ -219,9 +263,12 @@ export function TaxonomyPage() {
           description={t("taxonomy.empty.noTaxonomiesDescription")}
           commandLine="cloudhal migrate tags-to-terms --dry-run"
           contents={
-            <Button variant="primary" onClick={() => setMigrationOpen(true)}>
-              {t("migration.banner.action")}
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" onClick={() => setMigrationOpen(true)}>
+                {t("migration.banner.action")}
+              </Button>
+              {newTaxonomyButton}
+            </div>
           }
         />
       ) : (
@@ -473,6 +520,14 @@ export function TaxonomyPage() {
         onOpenChange={(o) => !o && setGovernance(undefined)}
       />
       <TagsMigrationDialog siteId={siteId} open={migrationOpen} onOpenChange={setMigrationOpen} />
+      <TaxonomySettingsDialog
+        open={settings.open}
+        onOpenChange={(open) => setSettings((s) => ({ ...s, open }))}
+        siteId={siteId}
+        taxonomy={settings.mode === "edit" ? tax : undefined}
+        data={data}
+        onCreated={(created) => setSearch({ taxonomy: created.key, filter: "all" })}
+      />
     </PageLayout>
   );
 }
@@ -559,7 +614,15 @@ function TermRowMenu({
 }
 
 /** How the taxonomy works: who adds terms, required, per-article limit, archives and indexing. */
-function TaxonomyRulesCard({ tax, names }: { tax: Taxonomy; names: Record<string, string> }) {
+function TaxonomyRulesCard({
+  tax,
+  names,
+  onEdit,
+}: {
+  tax: Taxonomy;
+  names: Record<string, string>;
+  onEdit: () => void;
+}) {
   const t = useT();
   return (
     <SectionCard
@@ -567,6 +630,17 @@ function TaxonomyRulesCard({ tax, names }: { tax: Taxonomy; names: Record<string
       title={t("taxonomy.rules.title", names)}
       icon={<Info size={16} />}
       description={t("taxonomy.rules.description")}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<GearSix />}
+          onClick={onEdit}
+          data-testid="rules-edit"
+        >
+          {t("taxonomySettings.edit")}
+        </Button>
+      }
     >
       <dl className="-my-3 grid divide-y divide-kumo-hairline">
         <SettingRow

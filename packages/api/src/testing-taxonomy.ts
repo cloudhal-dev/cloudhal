@@ -178,6 +178,71 @@ export function describeTaxonomyApi(label: string, factory: ApiStoreFactory): vo
       expect(hijack.body.error).toBe("invalid_labels");
     });
 
+    it("term archive preview: the saved page (sandboxed), the unsaved draft and its public state", async () => {
+      const news = await term("category", "news");
+      const saved = await app.request(`${base()}/terms/${news.id}/preview`, { headers });
+      expect(saved.status).toBe(200);
+      expect(saved.headers.get("content-security-policy")).toContain("sandbox");
+      expect(saved.headers.get("cache-control")).toBe("private, no-store");
+      const html = await saved.text();
+      expect(html).toContain("<h1>News</h1>");
+      expect(html).toContain('href="/posts/hello-world"');
+      // the policy travels inside the document too (an iframe srcdoc has no response headers)
+      expect(html).toContain('http-equiv="content-security-policy"');
+
+      // The editor's unsaved text: name, intro, SEO. Nothing is written.
+      const before = await snapshotCount();
+      const draft = await post(`${base()}/terms/${news.id}/preview`, {
+        labels: {
+          en: {
+            name: "Latest <news>",
+            description: "Our **newsroom**.",
+            seo: { title: "All the news", noindex: true },
+          },
+        },
+        // never taken from a draft: governance changes these
+        slug: "hijack",
+        status: "retired",
+      });
+      expect(draft.status).toBe(200);
+      const doc = draft.body as { html: string; archive: Record<string, unknown> };
+      expect(doc.html).toContain("<h1>Latest &lt;news&gt;</h1>");
+      expect(doc.html).toContain("<strong>newsroom</strong>");
+      expect(doc.html).toContain("<title>All the news</title>");
+      expect(doc.archive).toMatchObject({
+        status: 200,
+        indexable: false,
+        reason: "noindex",
+        total: 1,
+        minEntriesToIndex: 3,
+        path: "/category/news",
+      });
+      expect(await snapshotCount()).toBe(before);
+      expect((await term("category", "news")).labels.en?.name).toBe("News");
+
+      // One published article of three needed: a thin archive (noindex); an empty one is a 404;
+      // a proposed term has no public archive yet but still previews.
+      const thin = await post(`${base()}/terms/${news.id}/preview`, {});
+      expect(thin.body.archive).toMatchObject({ status: 200, reason: "thin", total: 1 });
+      const sports = await newTerm("category", "sports");
+      const empty = await post(`${base()}/terms/${sports.id}/preview`, {});
+      expect(empty.body.archive).toMatchObject({ status: 404, reason: "empty", total: 0 });
+      expect((empty.body as { html: string }).html).toContain("<h1>SPORTS</h1>");
+      const idea = await store.createTerm({
+        siteId,
+        taxonomyId: (await taxonomy("tag")).id,
+        slug: "idea",
+        status: "proposed",
+        visibility: "public",
+        labels: { en: { name: "Idea" } },
+        proposedBy: agent,
+      });
+      const proposed = await post(`${base()}/terms/${idea.id}/preview`, {});
+      expect(proposed.body.archive).toMatchObject({ status: 404, reason: "proposed" });
+      expect((await post(`${base()}/terms/${idea.id}/preview`, { labels: "x" })).status).toBe(400);
+      expect((await post(`${base()}/terms/term_missing0001/preview`, {})).status).toBe(404);
+    });
+
     it("rename: dry-run preview, then one snapshot with the archive redirect; stale rev 409", async () => {
       const cloudhal = await term("tag", "cloudhal");
       const preview = await post(`${base()}/terms/${cloudhal.id}/rename`, {

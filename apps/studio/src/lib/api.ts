@@ -216,6 +216,41 @@ export interface TermDetail {
   redirects: Redirect[];
 }
 
+/**
+ * Why a term's archive answers the way it does (RFC-0002 §7, the renderer's `archiveState`):
+ * `indexed`; `thin` and `noindex` are a 200 with `noindex,follow`; `empty`, `proposed`, `internal`
+ * and `archiveOff` a 404; `retired` a 410.
+ */
+export type ArchiveReason =
+  | "indexed"
+  | "thin"
+  | "noindex"
+  | "empty"
+  | "proposed"
+  | "internal"
+  | "retired"
+  | "archiveOff";
+
+/** `POST …/terms/:id/preview`: the archive page with the unsaved text, and its public state. */
+export interface TermPreview {
+  html: string;
+  archive: {
+    status: 200 | 404 | 410;
+    indexable: boolean;
+    reason: ArchiveReason;
+    /** Published articles the archive lists (sub-categories included). */
+    total: number;
+    minEntriesToIndex: number;
+    path: string;
+  };
+}
+
+/** A new taxonomy as Studio sends it (the server adds ids, revision and timestamps). */
+export type NewTaxonomy = Omit<
+  Taxonomy,
+  "id" | "siteId" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
+>;
+
 /** An entry as a governance preview lists it. */
 export interface EntrySummary {
   id: string;
@@ -598,6 +633,12 @@ export const api = {
   },
   taxonomies: {
     list: (siteId: string) => request<Taxonomy[]>(`/api/sites/${siteId}/taxonomies`),
+    /** One snapshot; 400 `reserved_key`, 409 `path_conflict` or a taken key, 422 `invalid_labels`. */
+    create: (siteId: string, taxonomy: NewTaxonomy) =>
+      request<{ taxonomy: Taxonomy; snapshot: Snapshot }>(`/api/sites/${siteId}/taxonomies`, {
+        method: "POST",
+        ...json(taxonomy),
+      }),
     update: (taxonomy: Taxonomy) =>
       request<{ taxonomy: Taxonomy; snapshot: Snapshot }>(
         `/api/sites/${taxonomy.siteId}/taxonomies/${taxonomy.id}`,
@@ -623,6 +664,15 @@ export const api = {
       request<{ term: Term; snapshot: Snapshot }>(
         `/api/sites/${term.siteId}/terms/${encodeURIComponent(term.id)}`,
         { method: "PUT", ...json(term) },
+      ),
+    /**
+     * The archive page with the editor's unsaved names, intro, SEO and image, and what the public
+     * route answers with them. Nothing is written.
+     */
+    previewDraft: (term: Pick<Term, "id" | "siteId" | "labels" | "image">) =>
+      request<TermPreview>(
+        `/api/sites/${term.siteId}/terms/${encodeURIComponent(term.id)}/preview`,
+        { method: "POST", ...json({ labels: term.labels, image: term.image ?? null }) },
       ),
     /** Previews a governance operation without writing anything. */
     preview: (term: Term, op: GovernanceOp) =>
@@ -715,5 +765,8 @@ export const api = {
   preview: {
     page: (siteId: string, pageId: string) => `/api/sites/${siteId}/pages/${pageId}/preview`,
     entry: (siteId: string, entryId: string) => `/api/sites/${siteId}/entries/${entryId}/preview`,
+    /** A term's archive page as saved (the editor shows the unsaved draft via `terms.previewDraft`). */
+    term: (siteId: string, termId: string) =>
+      `/api/sites/${siteId}/terms/${encodeURIComponent(termId)}/preview`,
   },
 };

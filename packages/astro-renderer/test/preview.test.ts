@@ -33,6 +33,48 @@ describe("preview HTML", () => {
   });
 });
 
+describe("term archive preview", async () => {
+  const { renderArchivePreview } = await import("../src/preview.ts");
+  it("renders the archive as the starter does and says what the public route answers", async () => {
+    const store = new SiteGraphStore({
+      sql: await BetterSqlite3Driver.open(":memory:"),
+      blobs: new MemoryBlobStore(),
+    });
+    await store.init();
+    const site = await seedStarterSite(store, { name: "Archive", slug: "archive", locale: "tr" });
+    const taxonomies = await store.listTaxonomies(site.id);
+    const terms = await store.listTerms(site.id);
+    const entries = await store.listContentEntries(site.id, {});
+    const news = terms.find((t) => t.slug === "news") as (typeof terms)[0];
+    const render = (patch: Partial<typeof news>, tax = taxonomies) =>
+      renderArchivePreview(site, {
+        taxonomies: tax,
+        terms: terms.map((t) => (t.id === news.id ? { ...t, ...patch } : t)),
+        termId: news.id,
+        entries,
+      });
+    const doc = render({});
+    expect(doc.reason).toBe("thin");
+    expect(doc.state).toEqual({ status: 200, indexable: false });
+    expect(doc.html).toContain("<h1>Haberler</h1>");
+    expect(doc.html).toContain("1 yazı");
+    expect(doc.html).toContain('<meta name="robots" content="noindex,follow">');
+    expect(doc.html).toContain('<a href="/category/news/rss.xml">RSS beslemesi</a>');
+    expect(render({ visibility: "internal" }).reason).toBe("internal");
+    expect(render({ status: "retired" }).state).toEqual({ status: 410 });
+    const off = taxonomies.map((t) =>
+      t.id === news.taxonomyId ? { ...t, archive: { ...t.archive, enabled: false } } : t,
+    );
+    expect(render({}, off).reason).toBe("archiveOff");
+    const lower = taxonomies.map((t) =>
+      t.id === news.taxonomyId ? { ...t, minEntriesToIndex: 1 } : t,
+    );
+    const indexed = render({}, lower);
+    expect(indexed.reason).toBe("indexed");
+    expect(indexed.html).not.toContain('name="robots"');
+  });
+});
+
 describe("markdown safety (agent-written content)", async () => {
   const { renderMarkdown, renderEntryArticle, safeHref } = await import("../src/markdown.ts");
 
