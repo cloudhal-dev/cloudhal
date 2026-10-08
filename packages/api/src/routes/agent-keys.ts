@@ -5,6 +5,9 @@
  * - `GET    /`            → AgentKeySummary[]
  * - `POST   /`            {name, mode?, scopes?} → summary + `key` (shown once)
  * - `PATCH  /:id`         {mode} → summary (audited)
+ * - `POST   /:id/elevation` {mode, minutes, reason?} → summary: a more autonomous mode until the
+ *   time is up, then the key's own mode again (ADR-0016; audited)
+ * - `DELETE /:id/elevation` → summary: ends it early (audited)
  * - `DELETE /:id`
  */
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
@@ -60,6 +63,60 @@ export function agentKeys(service: AgentKeyService): Hono<Env> {
         reason: `${updated.name ?? updated.id}: ${before?.mode ?? "?"} → ${updated.mode}`,
         mode: updated.mode,
       });
+      return c.json(updated);
+    })
+    .post("/:id/elevation", async (c) => {
+      const actor = c.get("actor");
+      if (!actor) throw unauthorized();
+      const body = ((await c.req.json().catch(() => ({}))) ?? {}) as {
+        mode?: unknown;
+        minutes?: unknown;
+        reason?: unknown;
+      };
+      if (!isAgentMode(body.mode)) throw badRequest("mode is required (manual, edits, auto)");
+      if (typeof body.minutes !== "number") throw badRequest("minutes is required");
+      if (body.reason !== undefined && typeof body.reason !== "string")
+        throw badRequest("reason must be a string");
+      const updated = await service.elevate({
+        headers: c.req.raw.headers,
+        id: param(c, "id"),
+        mode: body.mode,
+        minutes: body.minutes,
+        reason: body.reason,
+      });
+      const until = updated.elevation?.until ?? "";
+      await c.get("audit")?.record({
+        at: new Date().toISOString(),
+        actor,
+        tool: "agent-key.elevate",
+        decision: "allow",
+        outcome: "ok",
+        reason: `${updated.name ?? updated.id}: ${updated.mode} → ${updated.effectiveMode} until ${until} (${body.minutes} min)${updated.elevation?.reason ? `: ${updated.elevation.reason}` : ""}`,
+        mode: updated.effectiveMode,
+        elevation: { from: updated.mode, until },
+      });
+      return c.json(updated);
+    })
+    .delete("/:id/elevation", async (c) => {
+      const actor = c.get("actor");
+      if (!actor) throw unauthorized();
+      const before = (await service.list({ headers: c.req.raw.headers })).find(
+        (k) => k.id === param(c, "id"),
+      );
+      const updated = await service.endElevation({
+        headers: c.req.raw.headers,
+        id: param(c, "id"),
+      });
+      if (before?.elevation)
+        await c.get("audit")?.record({
+          at: new Date().toISOString(),
+          actor,
+          tool: "agent-key.elevation-end",
+          decision: "allow",
+          outcome: "ok",
+          reason: `${updated.name ?? updated.id}: ${before.elevation.mode} → ${updated.mode} (ended early)`,
+          mode: updated.mode,
+        });
       return c.json(updated);
     })
     .delete("/:id", async (c) => {

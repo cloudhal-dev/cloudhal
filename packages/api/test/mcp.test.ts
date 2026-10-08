@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { createApi } from "../src/app.ts";
 import { createAuth } from "../src/auth.ts";
 
-async function setup() {
+async function setup(now?: () => Date) {
   const db = new Database(":memory:");
   const sql = new BetterSqlite3Driver(db);
   const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
@@ -19,6 +19,7 @@ async function setup() {
     database: db,
     baseURL: "http://localhost",
     secret: "test-secret-test-secret-test-secret",
+    ...(now ? { now } : {}),
   });
   const audit = new AuditLog(sql);
   const app = createApi({
@@ -230,5 +231,115 @@ describe("agent modes on API keys (ADR-0015)", () => {
     // keys created before modes existed read as `edits`
     const legacy = await post({ name: "old-style", scopes: ["site:read", "content:read"] });
     expect(((await legacy.json()) as { mode: string }).mode).toBe("edits");
+  });
+});
+
+describe("time-boxed elevation (ADR-0016)", () => {
+  it("elevates a key for a while, tells the agent, audits it, and falls back on its own", async () => {
+    let clock = Date.parse("2026-10-08T10:00:00Z");
+    const { app, siteId, cookie, connect, audit } = await setup(() => new Date(clock));
+    const json = (method: string, path: string, body?: unknown) =>
+      app.request(path, {
+        method,
+        headers: { "content-type": "application/json", cookie },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const created = (await (await json("POST", "/api/agent-keys", { name: "desk" })).json()) as {
+      id: string;
+      key: string;
+      mode: string;
+    };
+    expect(created.mode).toBe("edits");
+    const elevate = (body: unknown) =>
+      json("POST", `/api/agent-keys/${created.id}/elevation`, body);
+
+    // refused: not more autonomous, bypass, out-of-range or missing minutes, unknown key
+    expect((await elevate({ mode: "plan", minutes: 60 })).status).toBe(400);
+    expect((await elevate({ mode: "bypass", minutes: 60 })).status).toBe(400);
+    expect((await elevate({ mode: "auto", minutes: 2 })).status).toBe(400);
+    expect((await elevate({ mode: "auto" })).status).toBe(400);
+    expect(
+      (await json("POST", "/api/agent-keys/nope/elevation", { mode: "auto", minutes: 60 })).status,
+    ).toBe(400);
+    // agents cannot elevate themselves (people-only routes)
+    expect(
+      (
+        await app.request(`/api/agent-keys/${created.id}/elevation`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": created.key },
+          body: JSON.stringify({ mode: "auto", minutes: 60 }),
+        })
+      ).status,
+    ).toBe(403);
+
+    const res = await elevate({ mode: "auto", minutes: 60, reason: "launch day" });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const elevated = (await res.json()) as {
+      mode: string;
+      effectiveMode: string;
+      elevation: { mode: string; until: string; reason: string; grantedBy: string };
+    };
+    expect(elevated).toMatchObject({
+      mode: "edits",
+      effectiveMode: "auto",
+      elevation: { mode: "auto", until: "2026-10-08T11:00:00.000Z", reason: "launch day" },
+    });
+    expect(elevated.elevation.grantedBy).toMatch(/^user_/);
+
+    const during = await connect({ "x-api-key": created.key });
+    expect(during.getInstructions()).toContain("AUTO mode");
+    expect(during.getInstructions()).toContain(
+      "temporary: a person granted it until 2026-10-08T11:00:00.000Z",
+    );
+    expect(during.getInstructions()).toContain("EDITS mode again");
+    await during.callTool({ name: "list_pages", arguments: { siteId } });
+    const rows = await audit.list({ limit: 50 });
+    expect(rows.find((r) => r.tool === "list_pages")).toMatchObject({
+      mode: "auto",
+      elevation: { from: "edits", until: "2026-10-08T11:00:00.000Z" },
+    });
+    expect(rows.find((r) => r.tool === "agent-key.elevate")).toMatchObject({
+      reason: "desk: edits → auto until 2026-10-08T11:00:00.000Z (60 min): launch day",
+      elevation: { from: "edits", until: "2026-10-08T11:00:00.000Z" },
+    });
+
+    // changing the key's own mode keeps the elevation while it is still higher
+    const patched = (await (
+      await json("PATCH", `/api/agent-keys/${created.id}`, { mode: "manual" })
+    ).json()) as { mode: string; effectiveMode: string };
+    expect(patched).toMatchObject({ mode: "manual", effectiveMode: "auto" });
+
+    // time is up: back to the key's own mode without anyone doing anything
+    clock = Date.parse("2026-10-08T11:00:01Z");
+    const listed = (await (await json("GET", "/api/agent-keys")).json()) as {
+      id: string;
+      effectiveMode: string;
+      elevation?: unknown;
+    }[];
+    expect(listed.find((k) => k.id === created.id)).toMatchObject({ effectiveMode: "manual" });
+    expect(listed.find((k) => k.id === created.id)?.elevation).toBeUndefined();
+    const after = await connect({ "x-api-key": created.key });
+    expect(after.getInstructions()).toContain("MANUAL mode");
+    expect(after.getInstructions()).not.toContain("temporary");
+
+    // ending early
+    await elevate({ mode: "edits", minutes: 30 });
+    expect(
+      ((await (await elevate({ mode: "auto", minutes: 30 })).json()) as { effectiveMode: string })
+        .effectiveMode,
+    ).toBe("auto"); // a new elevation replaces the one in force
+    const ended = (await (
+      await json("DELETE", `/api/agent-keys/${created.id}/elevation`)
+    ).json()) as { effectiveMode: string; elevation?: unknown };
+    expect(ended).toMatchObject({ effectiveMode: "manual" });
+    expect(ended.elevation).toBeUndefined();
+    expect(
+      (await audit.list({ limit: 50 })).find((r) => r.tool === "agent-key.elevation-end"),
+    ).toMatchObject({ reason: "desk: auto → manual (ended early)" });
+    // ending when nothing is in force is harmless and not audited again
+    expect((await json("DELETE", `/api/agent-keys/${created.id}/elevation`)).status).toBe(200);
+    expect(
+      (await audit.list({ limit: 50 })).filter((r) => r.tool === "agent-key.elevation-end"),
+    ).toHaveLength(1);
   });
 });

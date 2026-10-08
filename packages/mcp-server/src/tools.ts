@@ -867,6 +867,9 @@ export async function runTool(
     skill: ctx.principal.skill?.name,
     input: args,
     mode: effectiveMode(ctx.principal),
+    ...(ctx.principal.actor.kind === "agent" && ctx.principal.elevation
+      ? { elevation: ctx.principal.elevation }
+      : {}),
   };
   if (decision.kind === "deny") {
     await deps.audit?.record({

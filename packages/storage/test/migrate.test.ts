@@ -26,6 +26,7 @@ describe("migrate", () => {
       "0006_approvals",
       "0007_audit_mode",
       "0008_policy_detail",
+      "0009_audit_elevation",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -37,6 +38,7 @@ describe("migrate", () => {
       "0006_approvals",
       "0007_audit_mode",
       "0008_policy_detail",
+      "0009_audit_elevation",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -73,6 +75,7 @@ describe("migrate", () => {
       "0006_approvals",
       "0007_audit_mode",
       "0008_policy_detail",
+      "0009_audit_elevation",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -83,14 +86,15 @@ describe("migrate", () => {
       "0006_approvals",
       "0007_audit_mode",
       "0008_policy_detail",
+      "0009_audit_elevation",
     ]);
     await h.dispose();
   });
 
   it("a failing migration leaves earlier ones applied and itself unapplied", async () => {
     const driver = await BetterSqlite3Driver.open(":memory:");
-    const bad = { name: "0009_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
-    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0009_bad/);
+    const bad = { name: "0010_bad", sql: "CREATE TABLE ok (x);\nCREATE TABLE ok (x);" };
+    await expect(migrate(driver, [...migrations, bad])).rejects.toThrow(/0010_bad/);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
       "0002_auth",
@@ -100,6 +104,7 @@ describe("migrate", () => {
       "0006_approvals",
       "0007_audit_mode",
       "0008_policy_detail",
+      "0009_audit_elevation",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

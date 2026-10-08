@@ -48,6 +48,8 @@ export interface Principal {
   mode?: AgentMode | undefined;
   /** True for the local stdio server (the developer's own machine); enables `bypass`. */
   local?: boolean | undefined;
+  /** Set while `mode` comes from a time-boxed elevation (ADR-0016): the key's own mode and the end. */
+  elevation?: { from: AgentMode; until: string } | undefined;
 }
 
 /** The mode that actually applies: `bypass` only counts locally, remote keys fall back to `edits`. */

@@ -220,6 +220,7 @@ describe("instance and skills", () => {
           ],
         },
         autoPublishLimit: 20,
+        elevation: { minMinutes: 5, maxMinutes: 1440 },
       },
     });
     const skills = (await (

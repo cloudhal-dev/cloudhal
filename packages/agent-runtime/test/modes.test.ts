@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeElevation,
   checkAutoPublish,
   describeAutoCheck,
   effectiveMode,
+  elevationProblem,
   PolicyEngine,
   type Principal,
   scopesForMode,
@@ -146,3 +148,33 @@ describe("agent modes", () => {
     expect(check({ added: [], changed: [], removed: [] }).code).toBe("nothing");
   });
 });
+
+describe("time-boxed elevation (ADR-0016)", () => {
+  it("only accepts a more autonomous remote mode for a bounded time", () => {
+    expect(elevationProblem("edits", "auto", 60)).toBeUndefined();
+    expect(elevationProblem("plan", "manual", 5)).toBeUndefined();
+    expect(elevationProblem("edits", "edits", 60)).toMatch(/more autonomous/);
+    expect(elevationProblem("auto", "edits", 60)).toMatch(/more autonomous/);
+    expect(elevationProblem("edits", "bypass", 60)).toMatch(/bypass is local only/);
+    expect(elevationProblem("edits", "auto", 4)).toMatch(/between 5 and 1440/);
+    expect(elevationProblem("edits", "auto", 1441)).toMatch(/between 5 and 1440/);
+    expect(elevationProblem("edits", "auto", 1.5)).toMatch(/whole number/);
+  });
+
+  it("applies until it ends, and never below the key's own mode", () => {
+    const e = {
+      mode: "auto" as const,
+      until: "2026-10-08T12:00:00.000Z",
+      grantedBy: "user_owner1",
+      grantedAt: "2026-10-08T11:00:00.000Z",
+    };
+    expect(activeElevation("edits", e, new Date("2026-10-08T11:59:59Z"))).toBe(e);
+    expect(activeElevation("edits", e, new Date("2026-10-08T12:00:00Z"))).toBeUndefined();
+    expect(activeElevation("auto", e, new Date("2026-10-08T11:30:00Z"))).toBeUndefined();
+    expect(
+      activeElevation("edits", { ...e, mode: "bypass" }, new Date("2026-10-08T11:30:00Z")),
+    ).toBeUndefined();
+    expect(activeElevation("edits", undefined, new Date())).toBeUndefined();
+  });
+});
+

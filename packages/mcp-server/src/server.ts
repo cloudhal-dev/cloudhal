@@ -126,7 +126,11 @@ const MODE_TEXT: Record<AgentMode, string> = {
 
 function modeInstructions(principal: Principal): string {
   const mode = effectiveMode(principal);
-  return mode ? MODE_TEXT[mode] : "You are acting for a signed-in person.";
+  if (!mode) return "You are acting for a signed-in person.";
+  const elevation = principal.elevation;
+  if (!elevation) return MODE_TEXT[mode];
+  // Time-boxed elevation (ADR-0016): say when it ends and what the agent falls back to.
+  return `${MODE_TEXT[mode]}\nThis mode is temporary: a person granted it until ${elevation.until} (UTC). After that you work in ${elevation.from.toUpperCase()} mode again, so finish or hand over anything that depends on it before then.`;
 }
 
 function errorResult(text: string): CallToolResult {

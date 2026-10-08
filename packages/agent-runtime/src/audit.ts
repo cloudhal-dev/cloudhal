@@ -24,6 +24,8 @@ export interface AuditEntry {
    * a person; on an `approval-required` row it says why it waited.
    */
   autoCheck?: AutoCheck | undefined;
+  /** The call ran under a time-boxed elevation (ADR-0016): the key's own mode and the end. */
+  elevation?: { from: string; until: string } | undefined;
 }
 
 export interface AuditRow extends AuditEntry {
@@ -54,9 +56,9 @@ function parseAuditInput(raw: string | null): unknown {
   }
 }
 
-function parseAutoCheck(raw: string): AutoCheck | undefined {
+function parseJson<T>(raw: string): T | undefined {
   try {
-    return JSON.parse(raw) as AutoCheck;
+    return JSON.parse(raw) as T;
   } catch {
     return undefined;
   }
@@ -71,7 +73,7 @@ export class AuditLog {
 
   async record(entry: AuditEntry): Promise<number> {
     const r = await this.#sql.run(
-      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check, elevation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         entry.at,
         entry.actor.kind,
@@ -89,6 +91,7 @@ export class AuditLog {
         entry.mode ?? null,
         entry.cause ?? null,
         entry.autoCheck ? JSON.stringify(entry.autoCheck) : null,
+        entry.elevation ? JSON.stringify(entry.elevation) : null,
       ],
     );
     return r.lastRowId ?? 0;
@@ -141,7 +144,10 @@ export class AuditLog {
       durationMs: (r.duration_ms as number | null) ?? undefined,
       mode: (r.mode as string | null) ?? undefined,
       ...(r.cause ? { cause: r.cause as ApprovalCause } : {}),
-      ...(r.auto_check ? { autoCheck: parseAutoCheck(r.auto_check as string) } : {}),
+      ...(r.auto_check ? { autoCheck: parseJson<AutoCheck>(r.auto_check as string) } : {}),
+      ...(r.elevation
+        ? { elevation: parseJson<{ from: string; until: string }>(r.elevation as string) }
+        : {}),
     }));
   }
 }

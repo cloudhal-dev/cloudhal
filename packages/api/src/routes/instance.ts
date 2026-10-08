@@ -6,6 +6,8 @@ import {
   type AgentMode,
   AUTO_PUBLISH_LIMIT,
   DEFAULT_AGENT_MODE,
+  ELEVATION_MAX_MINUTES,
+  ELEVATION_MIN_MINUTES,
   type LoadedSkill,
   REMOTE_AGENT_MODES,
   type Scope,
@@ -36,6 +38,8 @@ export interface AgentModesInfo {
   scopes: Partial<Record<AgentMode, Scope[]>>;
   /** Largest publish `auto` mode lets through without a person. */
   autoPublishLimit: number;
+  /** Bounds of a time-boxed elevation (ADR-0016). */
+  elevation: { minMinutes: number; maxMinutes: number };
 }
 
 /** The server's mode rules, so clients do not copy them. */
@@ -45,6 +49,7 @@ export function agentModesInfo(): AgentModesInfo {
     default: DEFAULT_AGENT_MODE,
     scopes: Object.fromEntries(REMOTE_AGENT_MODES.map((m) => [m, scopesForMode(m)])),
     autoPublishLimit: AUTO_PUBLISH_LIMIT,
+    elevation: { minMinutes: ELEVATION_MIN_MINUTES, maxMinutes: ELEVATION_MAX_MINUTES },
   };
 }
 

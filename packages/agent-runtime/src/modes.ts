@@ -89,3 +89,62 @@ export function checkAutoPublish(diff: {
             : "low-risk";
   return { ...base, code, lowRisk: code === "low-risk" };
 }
+
+/**
+ * Time-boxed elevation (ADR-0016): the owner lets a key work in a more autonomous mode until
+ * `until`; afterwards it is back in its own mode without anyone doing anything (the effective mode
+ * is computed on every call).
+ */
+export interface ModeElevation {
+  mode: AgentMode;
+  /** ISO time the elevation ends. */
+  until: string;
+  /** Actor id of the person who granted it. */
+  grantedBy: string;
+  grantedAt: string;
+  /** Why, in the owner's words (shown in Studio and the audit). */
+  reason?: string | undefined;
+}
+
+/** Shortest and longest elevation an owner can grant. */
+export const ELEVATION_MIN_MINUTES = 5;
+export const ELEVATION_MAX_MINUTES = 24 * 60;
+
+/** `a` lets the agent do more on its own than `b` (AGENT_MODES order). */
+export function isMoreAutonomous(a: AgentMode, b: AgentMode): boolean {
+  return AGENT_MODES.indexOf(a) > AGENT_MODES.indexOf(b);
+}
+
+/**
+ * Why an elevation request is refused, or undefined when it is acceptable: a remote mode more
+ * autonomous than the key's own, for between `ELEVATION_MIN_MINUTES` and `ELEVATION_MAX_MINUTES`.
+ */
+export function elevationProblem(
+  base: AgentMode,
+  mode: AgentMode,
+  minutes: number,
+): string | undefined {
+  if (!REMOTE_AGENT_MODES.includes(mode))
+    return `mode "${mode}" is not available for API keys (bypass is local only)`;
+  if (!isMoreAutonomous(mode, base))
+    return `an elevation must be more autonomous than the key's own mode (${base})`;
+  if (
+    !Number.isInteger(minutes) ||
+    minutes < ELEVATION_MIN_MINUTES ||
+    minutes > ELEVATION_MAX_MINUTES
+  )
+    return `minutes must be a whole number between ${ELEVATION_MIN_MINUTES} and ${ELEVATION_MAX_MINUTES}`;
+  return undefined;
+}
+
+/** The elevation that applies right now, if any (expired or no-longer-higher ones do not). */
+export function activeElevation(
+  base: AgentMode,
+  elevation: ModeElevation | undefined,
+  now: Date,
+): ModeElevation | undefined {
+  if (!elevation || !REMOTE_AGENT_MODES.includes(elevation.mode)) return undefined;
+  if (!isMoreAutonomous(elevation.mode, base)) return undefined;
+  const until = Date.parse(elevation.until);
+  return Number.isFinite(until) && until > now.getTime() ? elevation : undefined;
+}
