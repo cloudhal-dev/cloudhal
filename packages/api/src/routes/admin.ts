@@ -6,7 +6,7 @@
  * - `GET  /api/admin/sites/:siteId/bundle` → SiteBundle (export)
  * - `PUT  /api/admin/sites/:siteId/bundle?mode=bootstrap|replace` ← SiteBundle (import)
  * - `PUT  /api/admin/sites/:siteId/domains` ← {primary} — the custom domain `cloudhal deploy` just
- *   routed becomes the site's primary hostname (preview links, canonical URLs); others stay secondary
+ *   routed becomes the site's primary hostname (used for preview links); others stay secondary
  */
 import {
   exportSite,
