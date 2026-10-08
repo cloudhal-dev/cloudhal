@@ -1,0 +1,53 @@
+name: Contributor setup (30-minute promise)
+
+# A newcomer's first run, on a clean runner: no dependency, turbo or cargo caches, no Cloudflare
+# account or secrets. It runs exactly the "## Setup" block of CONTRIBUTING.md (extracted by
+# scripts/contributor-setup.ts), after the prerequisites the document lists, within 30 minutes.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 1"
+  pull_request:
+    paths:
+      - "CONTRIBUTING.md"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".node-version"
+      - "rust-toolchain.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "turbo.json"
+      - "scripts/contributor-setup.ts"
+      - ".github/workflows/contributor.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-clone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      # Prerequisites as CONTRIBUTING.md lists them (no caches on purpose).
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
+          pnpm --version
+      - name: Rust toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain
+      - name: Setup block from CONTRIBUTING.md
+        env:
+          # A newcomer has no Cloudflare credentials; nothing may need them.
+          CLOUDFLARE_API_TOKEN: ""
+          CLOUDFLARE_ACCOUNT_ID: ""
+        run: |
+          node scripts/contributor-setup.ts | tee setup-commands.sh
+          start=$(date +%s)
+          bash -euo pipefail setup-commands.sh
+          echo "Setup took $(( ($(date +%s) - start) / 60 )) min $(( ($(date +%s) - start) % 60 )) s" | tee -a "$GITHUB_STEP_SUMMARY"
