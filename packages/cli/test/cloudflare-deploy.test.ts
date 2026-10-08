@@ -99,6 +99,8 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
   it("serves the Studio shell and answers 503 before anything is published", async () => {
     const studio = await adminFetch("/sites/whatever");
     expect(await studio.text()).toContain("<title>Studio</title>");
+    // a missing build file is a real 404 (never the SPA shell under a script URL)
+    expect((await adminFetch("/assets/Old-abc123.js")).status).toBe(404);
     expect((await adminFetch("/api/health")).status).toBe(200);
     expect((await siteFetch("/")).status).toBe(500); // site row not pushed yet
   });

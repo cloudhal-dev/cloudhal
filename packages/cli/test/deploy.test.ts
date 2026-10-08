@@ -69,7 +69,7 @@ describe("cloudhal deploy", () => {
       compatibility_flags: ["nodejs_compat"],
       services: [{ binding: "SITE", service: "deploy-me-site" }],
       assets: {
-        not_found_handling: "single-page-application",
+        not_found_handling: "none",
         run_worker_first: ["/api/*", "/mcp", "/mcp/*", "/.well-known/*"],
       },
     });

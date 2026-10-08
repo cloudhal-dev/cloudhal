@@ -73,8 +73,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           headers: { "content-type": "text/plain", "cache-control": "no-store" },
         });
       if (!WORKER_PATHS.test(url.pathname)) {
-        // Studio SPA (normally served by the assets layer before the Worker runs).
-        return env.ASSETS ? env.ASSETS.fetch(request) : new Response("not found", { status: 404 });
+        // A client-side route (/sites/…, /login, …): answer with the Studio shell.
+        if (!env.ASSETS) return new Response("not found", { status: 404 });
+        return env.ASSETS.fetch(new Request(new URL("/", url), { headers: request.headers }));
       }
 
       const sql = new D1Driver(env.DB);

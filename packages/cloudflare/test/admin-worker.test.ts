@@ -26,7 +26,8 @@ describe("admin Worker routing", () => {
       const res = await worker.fetch(new Request(`https://admin.example${p}`), env, ctx);
       expect(await res.text()).toBe("studio");
     }
-    expect(seen).toEqual(["/", "/sites/site_x", "/login", "/apix", "/mcpx"]);
+    // every client route is answered with the shell at "/"
+    expect(seen).toEqual(["/", "/", "/", "/", "/"]);
     // a missing build file is a 404, never the SPA shell (which could be cached under its URL)
     const missing = await worker.fetch(
       new Request("https://admin.example/assets/Old-abc123.js"),

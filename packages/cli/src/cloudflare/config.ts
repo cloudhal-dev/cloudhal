@@ -75,8 +75,9 @@ export function adminWorkerConfig(n: DeploymentNames & { studioDir: string; main
     assets: {
       directory: n.studioDir,
       binding: "ASSETS",
-      not_found_handling: "single-page-application",
-      // Browser navigations to these must reach the Worker, not the SPA fallback.
+      // The Worker serves the SPA shell for client routes and a 404 for missing build files; the
+      // assets layer's own SPA fallback would answer index.html for a missing /assets/*.js too.
+      not_found_handling: "none",
       run_worker_first: ["/api/*", "/mcp", "/mcp/*", "/.well-known/*"],
     },
     observability: { enabled: true },
