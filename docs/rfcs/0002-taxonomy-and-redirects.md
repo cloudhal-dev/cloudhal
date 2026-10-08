@@ -717,3 +717,18 @@ Starters own the routes (ADR-0009). The blog starter's catch-all resolves, in or
 11. Should the migration snapshot use reason `manual` + label (this draft), or a new `migration` reason?
 12. Sibling order of categories for menus: should terms get a `position` now, or wait for the navigation editor?
 13. Should terms get SKOS `hiddenLabel` (searchable misspellings that are never shown) next to `altNames`?
+
+## Recommended answers (Claude, 2026-10-08 — pending Halil's acceptance)
+1. **Per-locale description and SEO: yes.** An archive's intro text and meta description are prose; a Turkish archive needs Turkish prose. Keep them in `labels[locale]` as drafted.
+2. **Localized slugs: no, not in v1.** One slug per term until locale routing exists; then add `labels[locale].slug` with redirects.
+3. **> 400 entries: refuse in v1** with a clear message ("split it, or ask for the staged job"). Add a resumable staged job only when a real site hits the cap.
+4. **Published slug-change redirect is "structure": yes.** URL changes wait for a person, even in `auto`.
+5. **Page path changes create redirects too: yes**, same rule as entries (`RedirectSource.kind = page`).
+6. **No-intro archives `noindex`: no by default.** The entry threshold alone decides; an intro text is encouraged by `taxonomy_report`, not enforced.
+7. **Dedicated scope: no.** Keep `site:write`; it is already not granted by default and every structural call waits for a person. Revisit if roles need finer splits.
+8. **Retired terms without a redirect: 410 Gone.** It tells crawlers the archive was removed on purpose; merged terms keep 301.
+9. **Category archives include sub-categories: yes** (`category:x>*`), as drafted.
+10. **Existing sites: `category.required = false`** and no "Uncategorized"/"Genel" term (an empty catch-all becomes a thin archive). Studio nudges "N articles have no category".
+11. **Migration snapshot reason: `manual` + label**, as drafted; no new enum value for a one-off.
+12. **`position` on terms: yes, optional integer now** (cheap, additive), so category menus and sidebars have a stable order before the navigation editor lands.
+13. **SKOS `hiddenLabel`: later.** `altNames` covers synonyms; add hidden labels when site search exists.
