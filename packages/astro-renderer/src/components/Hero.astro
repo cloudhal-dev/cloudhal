@@ -1,14 +1,18 @@
 ---
 import type { HeroSection } from "@cloudhal/core-contracts";
+import { safeHref, safeSrc } from "../markdown.ts";
 
 interface Props {
   section: HeroSection;
 }
 const { section } = Astro.props;
+// Section fields can be written by agents: only safe URL schemes reach the page.
+const imageSrc = section.image ? safeSrc(section.image.src) : undefined;
+const ctaHref = section.cta ? safeHref(section.cta.href) : undefined;
 ---
 <section class="ch-hero" data-section-id={section.id} data-kind="hero">
   <h1>{section.heading}</h1>
   {section.subheading && <p class="ch-hero__sub">{section.subheading}</p>}
-  {section.image && <img src={section.image.src} alt={section.image.alt} width={section.image.width} height={section.image.height} />}
-  {section.cta && <a class="ch-hero__cta" href={section.cta.href} rel={section.cta.external ? "noopener" : undefined}>{section.cta.label}</a>}
+  {section.image && imageSrc && <img src={imageSrc} alt={section.image.alt} width={section.image.width} height={section.image.height} />}
+  {section.cta && ctaHref && <a class="ch-hero__cta" href={ctaHref} rel={section.cta.external ? "noopener noreferrer" : undefined}>{section.cta.label}</a>}
 </section>

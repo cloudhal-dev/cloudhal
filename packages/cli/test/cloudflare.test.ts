@@ -85,6 +85,10 @@ describe("Site Worker on workerd", () => {
     expect(res.headers.get("x-cloudhal-mode")).toBe("published");
     expect(res.headers.get("cache-tag")).toBe(`cloudhal-site-${siteId}`);
     expect(res.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    // agent-written content cannot bring scripts: CSP on every HTML response, no inline scripts
+    expect(res.headers.get("content-security-policy")).toContain("script-src 'self'");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
     expect((await get("/posts/hello-world")).status).toBe(200);
     expect((await get("/nope")).status).toBe(404);
   });

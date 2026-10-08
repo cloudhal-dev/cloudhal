@@ -1,5 +1,5 @@
 import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
-import { renderEntryArticle, renderMarkdown } from "./markdown.ts";
+import { renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 
 function esc(s: string): string {
   return s.replace(
@@ -21,15 +21,15 @@ export function renderSectionHtml(
     case "hero":
       return `<section class="ch-hero" data-section-id="${esc(section.id)}" data-kind="hero"><h1>${esc(section.heading)}</h1>${
         section.subheading ? `<p class="ch-hero__sub">${esc(section.subheading)}</p>` : ""
-      }${section.image ? `<img src="${esc(section.image.src)}" alt="${esc(section.image.alt)}">` : ""}${
-        section.cta
-          ? `<a class="ch-hero__cta" href="${esc(section.cta.href)}">${esc(section.cta.label)}</a>`
+      }${section.image && safeSrc(section.image.src) ? `<img src="${esc(safeSrc(section.image.src) as string)}" alt="${esc(section.image.alt)}">` : ""}${
+        section.cta && safeHref(section.cta.href)
+          ? `<a class="ch-hero__cta" href="${esc(safeHref(section.cta.href) as string)}">${esc(section.cta.label)}</a>`
           : ""
       }</section>`;
     case "richText":
       return `<section class="ch-richtext" data-section-id="${esc(section.id)}" data-kind="richText">${section.format === "markdown" ? renderMarkdown(section.body) : section.body}</section>`;
     case "image":
-      return `<figure class="ch-image" data-section-id="${esc(section.id)}" data-kind="image"><img src="${esc(section.image.src)}" alt="${esc(section.image.alt)}">${
+      return `<figure class="ch-image" data-section-id="${esc(section.id)}" data-kind="image">${safeSrc(section.image.src) ? `<img src="${esc(safeSrc(section.image.src) as string)}" alt="${esc(section.image.alt)}">` : ""}${
         section.caption ? `<figcaption>${esc(section.caption)}</figcaption>` : ""
       }</figure>`;
     case "contentList": {

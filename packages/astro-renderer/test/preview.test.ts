@@ -83,3 +83,29 @@ describe("markdown safety (agent-written content)", async () => {
     expect(other.match(/<h1>/g)).toHaveLength(2);
   });
 });
+
+describe("section URLs (H3)", async () => {
+  const { renderSectionHtml } = await import("../src/preview.ts");
+  const { safeSrc } = await import("../src/markdown.ts");
+  it("drops javascript: links and non-image data: sources", () => {
+    const hero = renderSectionHtml({
+      id: "sec_hero00000001",
+      kind: "hero",
+      heading: "Hi",
+      cta: { label: "Go", href: "javascript:alert(1)" },
+      image: { src: "javascript:alert(2)", alt: "x" },
+    } as never);
+    expect(hero).not.toContain("javascript:");
+    expect(hero).not.toContain("<a ");
+    expect(hero).not.toContain("<img");
+    const image = renderSectionHtml({
+      id: "sec_img000000001",
+      kind: "image",
+      image: { src: "data:text/html,<script>1</script>", alt: "x" },
+    } as never);
+    expect(image).not.toContain("<img");
+    expect(safeSrc("data:image/png;base64,iVBORw0KGgo=")).toBeDefined();
+    expect(safeSrc("https://cdn.example/a.png")).toBe("https://cdn.example/a.png");
+    expect(safeSrc("mailto:a@b.c")).toBeUndefined();
+  });
+});

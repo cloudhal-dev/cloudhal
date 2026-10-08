@@ -25,7 +25,7 @@ import {
   SiteSchema,
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import type { SiteGraphStore, SnapshotDiff } from "@cloudhal/core-ts";
 import {
   ConflictError,
   mintPreviewToken,
@@ -89,6 +89,49 @@ const ENTRY = strip(ContentEntrySchema);
 const SNAPSHOT = strip(SnapshotSchema);
 const SECTION = strip(SectionSchema);
 type Seo = NonNullable<Page["seo"]>;
+
+/** Agents write markdown only; raw HTML sections are for people in Studio (security review H3). */
+function assertNoHtmlSections(sections: unknown): void {
+  if (!Array.isArray(sections)) return;
+  for (const s of sections as { kind?: string; format?: string; id?: string }[])
+    if (s?.kind === "richText" && s.format !== "markdown")
+      throw new ToolError(
+        "invalid",
+        `section ${s.id ?? ""} uses format "${s.format}"; agents may only write markdown sections`,
+      );
+}
+
+/** Agent-controlled text in approval prompts is shortened and quoted so it cannot pose as UI. */
+function quote(text: string, max = 60): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+async function describeChanges(ctx: ToolContext, diff: SnapshotDiff): Promise<string[]> {
+  const title = async (ref: { id: string; kind: string }) => {
+    if (ref.kind === "page") return (await ctx.store.getPage(ref.id))?.title;
+    if (ref.kind === "contentEntry") return (await ctx.store.getContentEntry(ref.id))?.title;
+    if (ref.kind === "site") return "site settings";
+    return undefined;
+  };
+  const label = (kind: string) => (kind === "contentEntry" ? "article" : kind);
+  const out: string[] = [];
+  const groups: [string, { id: string; kind: string }[]][] = [
+    ["+", diff.added],
+    ["~", diff.changed.map((c) => c.after)],
+    ["−", diff.removed],
+  ];
+  for (const [sign, refs] of groups)
+    for (const ref of refs) {
+      if (out.length >= 8) {
+        out.push(`… and ${diff.added.length + diff.changed.length + diff.removed.length - 8} more`);
+        return out;
+      }
+      const t = sign === "−" ? undefined : await title(ref);
+      out.push(`${sign} ${label(ref.kind)} ${t ? `"${quote(t)}"` : ref.id}`);
+    }
+  return out;
+}
 
 async function requireSite(ctx: ToolContext, siteId: string): Promise<Site> {
   const site = await ctx.store.getSite(siteId);
@@ -258,6 +301,7 @@ function rawTools(): ToolDefinition[] {
       },
       scopes: ["content:write"],
       handler: async (a, ctx) => {
+        assertNoHtmlSections(a.sections);
         const site = await requireSite(ctx, a.siteId as string);
         try {
           const result = await ctx.store.createPage(site, {
@@ -302,6 +346,7 @@ function rawTools(): ToolDefinition[] {
       },
       scopes: ["content:write"],
       handler: async (a, ctx) => {
+        assertNoHtmlSections(a.sections);
         const page = await ctx.store.getPage(a.pageId as string);
         if (!page || page.siteId !== a.siteId)
           throw new ToolError("not_found", `page ${a.pageId} not found`);
@@ -488,6 +533,11 @@ function rawTools(): ToolDefinition[] {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (!entry || entry.siteId !== a.siteId)
           throw new ToolError("not_found", `entry ${a.entryId} not found`);
+        if (a.body !== undefined && entry.body.format !== "markdown")
+          throw new ToolError(
+            "invalid",
+            `entry ${entry.id} has an HTML body, which only a person can change in Studio; agents write markdown`,
+          );
         if (entry.rev !== a.rev)
           throw new ToolError(
             "conflict",
@@ -719,12 +769,11 @@ function rawTools(): ToolDefinition[] {
       requiresApproval: true,
       approvalPrompt: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
-        const latest = await ctx.store.latestSnapshot(site.id);
-        const diff =
-          latest && site.publishedSnapshotId
-            ? await ctx.store.diffSnapshots(site.publishedSnapshotId, latest.id)
-            : undefined;
-        return `Publish "${site.name}" to production${diff ? ` (+${diff.added.length} added, ~${diff.changed.length} changed, −${diff.removed.length} removed since the live snapshot)` : ""}?`;
+        // What the person approves is what goes live: the current state against the live snapshot.
+        const diff = await ctx.store.pendingChanges(site.id);
+        const lines = await describeChanges(ctx, diff);
+        const counts = `+${diff.added.length} added, ~${diff.changed.length} changed, −${diff.removed.length} removed`;
+        return `Publish "${quote(site.name)}" to production (${counts} since the live version)?${lines.length ? `\n${lines.join("\n")}` : ""}`;
       },
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);

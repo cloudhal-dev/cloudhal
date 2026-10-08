@@ -12,6 +12,14 @@ export function safeHref(href: string): string | undefined {
   return value; // relative path, fragment or query
 }
 
+/** Image sources: what `safeHref` allows (no mailto/tel) plus raster data: URLs. */
+export function safeSrc(src: string): string | undefined {
+  const value = src.trim();
+  if (/^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i.test(value)) return value;
+  const safe = safeHref(value);
+  return safe && !/^(mailto|tel):/i.test(safe) ? safe : undefined;
+}
+
 /**
  * Markdown is written by agents as well as people, so it is rendered as data, not markup: raw
  * HTML is escaped (no script/iframe/event handlers can reach the published site) and links and
@@ -30,8 +38,8 @@ md.use({
       return `<a href="${escapeHtml(safe)}"${title ? ` title="${escapeHtml(title)}"` : ""}>${label}</a>`;
     },
     image({ href, title, text }) {
-      const safe = safeHref(href);
-      if (!safe || /^(mailto|tel):/i.test(safe)) return escapeHtml(text);
+      const safe = safeSrc(href);
+      if (!safe) return escapeHtml(text);
       return `<img src="${escapeHtml(safe)}" alt="${escapeHtml(text)}"${title ? ` title="${escapeHtml(title)}"` : ""} loading="lazy">`;
     },
   },

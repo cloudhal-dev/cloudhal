@@ -73,12 +73,35 @@ function keepPreviewInLinks(response: Response, token: string): Response {
     .transform(response);
 }
 
+/**
+ * Defence in depth for content written by agents: no inline or third-party scripts, no plugins,
+ * no foreign framing. Sites ship no client scripts of their own (Astro islands load from 'self').
+ */
+// Not exported: every named export of a Worker entry module must be a handler or entrypoint.
+const SITE_CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
+
+function withSecurityHeaders(response: Response): Response {
+  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
+  const headers = new Headers(response.headers);
+  if (!headers.has("content-security-policy")) headers.set("content-security-policy", SITE_CSP);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export function createSiteWorker(options: { siteId?: string } = {}) {
   return {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
-      const response = (await handle(request, env as never, ctx)) as unknown as Response;
+      const response = withSecurityHeaders(
+        (await handle(request, env as never, ctx)) as unknown as Response,
+      );
       const token = response.headers.get("x-cloudhal-preview-token");
       if (response.headers.get("x-cloudhal-mode") !== "preview" || !token) return response;
       const headers = new Headers(response.headers);

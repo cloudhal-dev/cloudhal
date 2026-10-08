@@ -1,12 +1,14 @@
 ---
 import type { ImageSection } from "@cloudhal/core-contracts";
+import { safeSrc } from "../markdown.ts";
 
 interface Props {
   section: ImageSection;
 }
 const { section } = Astro.props;
+const src = safeSrc(section.image.src);
 ---
 <figure class="ch-image" data-section-id={section.id} data-kind="image">
-  <img src={section.image.src} alt={section.image.alt} width={section.image.width} height={section.image.height} />
+  {src && <img src={src} alt={section.image.alt} width={section.image.width} height={section.image.height} />}
   {section.caption && <figcaption>{section.caption}</figcaption>}
 </figure>

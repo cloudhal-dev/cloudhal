@@ -195,3 +195,65 @@ describe("preview_page on a deployed site", () => {
     expect((await verifyPreviewToken(secret, token, seeded.id)).target).toBe("live");
   });
 });
+
+describe("agent-written content stays safe (H3)", () => {
+  it("refuses HTML sections and edits to HTML bodies; the publish prompt lists what changes", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const site = await seedStarterSite(store, { name: "Safe", slug: "safe" });
+    const ctx: ToolContext = { store, principal: { actor: agent, scopes: ["*"] } };
+    const policy = new PolicyEngine(toolPolicies(tools));
+    const run = (name: string, args: Record<string, unknown>, confirmed = false) =>
+      runTool(byName[name] as (typeof tools)[number], args, ctx, { policy, confirmed });
+    const html = {
+      id: "sec_evil00000001",
+      kind: "richText",
+      format: "html",
+      body: "<img src=x onerror=alert(1)>",
+    };
+    await expect(
+      run("create_page", { siteId: site.id, path: "/x", title: "X", sections: [html] }),
+    ).rejects.toThrow(/only write markdown/);
+    const page = (await store.listPages(site.id))[0] as NonNullable<
+      Awaited<ReturnType<typeof store.listPages>>[number]
+    >;
+    await expect(
+      run("update_page", { siteId: site.id, pageId: page.id, rev: page.rev, sections: [html] }),
+    ).rejects.toThrow(/only write markdown/);
+
+    // a person stored an HTML article; an agent may change its title but not its body
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "by-hand",
+      locale: "en",
+      status: "draft",
+      title: "By hand",
+      body: { format: "html", value: "<p>hand-written</p>" },
+      fields: {},
+      tags: [],
+      author: { kind: "human", id: "user_owner000001" },
+    });
+    await expect(
+      run("update_entry", {
+        siteId: site.id,
+        entryId: entry.id,
+        rev: entry.rev,
+        body: "<script>x</script>",
+      }),
+    ).rejects.toThrow(/HTML body/);
+    const renamed = await run("update_entry", {
+      siteId: site.id,
+      entryId: entry.id,
+      rev: entry.rev,
+      title: "Renamed",
+    });
+    expect((renamed.result as { entry: { title: string } }).entry.title).toBe("Renamed");
+
+    const prompt = (await run("publish", { siteId: site.id })).approvalPrompt as string;
+    expect(prompt).toMatch(/^Publish "Safe" to production \(\+\d+ added/);
+    expect(prompt).toContain('+ article "Renamed"');
+    expect(prompt).toContain('+ page "About"');
+  });
+});
