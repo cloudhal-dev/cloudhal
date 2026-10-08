@@ -208,10 +208,61 @@ export interface AgentModesInfo {
   /** Scopes a key gets in each mode when the owner does not choose them. */
   scopes: Partial<Record<AgentMode, AgentScope[]>>;
   autoPublishLimit: number;
-  /** Bounds of a time-boxed elevation, in minutes (ADR-0016). Older servers omit it. */
-  elevation?: { minMinutes: number; maxMinutes: number };
+  /**
+   * Bounds of a time-boxed elevation, in minutes (ADR-0016), and how long before its end the owner
+   * is told (`noticeMinutes`, newer servers). Older servers omit it.
+   */
+  elevation?: { minMinutes: number; maxMinutes: number; noticeMinutes?: number };
 }
 export type SignUpPolicy = InstanceInfo["signUp"];
+
+/**
+ * One thing that needs the signed-in owner's attention (`GET /api/notifications`, ADR-0016 addendum
+ * "told before it ends"). Derived from current state on every request; `id` is stable, so a client
+ * can show each one once. Named `StudioNotification` so it never shadows the DOM `Notification`.
+ */
+export type StudioNotification = ElevationEndingNotification | ElevationRequestNotification;
+
+/** One of the owner's elevations ends within `noticeMinutes`: extend it or let it end. */
+export interface ElevationEndingNotification {
+  /** `elevation-ending:<keyId>:<until>` — a new elevation (an extension) gets a new id. */
+  id: string;
+  kind: "elevation-ending";
+  keyId: string;
+  keyName: string | null;
+  /** The elevated mode. */
+  mode: AgentMode;
+  /** The key's own mode, which applies again afterwards. */
+  from: AgentMode;
+  /** ISO time the elevation ends. */
+  until: string;
+  /** Whole minutes left when the server answered (Studio recomputes it from `until`). */
+  minutesLeft: number;
+}
+
+/** An agent asks for an elevation of one of the owner's keys and waits in a site's Approvals. */
+export interface ElevationRequestNotification {
+  /** `elevation-request:<approvalId>`. */
+  id: string;
+  kind: "elevation-request";
+  approvalId: string;
+  siteId: string;
+  agent: Actor;
+  keyId?: string;
+  mode: AgentMode;
+  minutes: number;
+  /** The agent's own words: agent-controlled, so plain text only. May be empty. */
+  reason: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface NotificationsPage {
+  /** Elevations ending soonest first, then the newest requests. */
+  items: StudioNotification[];
+  /** Minutes before its end that an elevation shows up here. */
+  noticeMinutes: number;
+}
 export type InstanceFeature = keyof InstanceInfo["features"];
 
 /** A skill agents can read over MCP (`GET /api/skills`). */
@@ -290,6 +341,10 @@ export type NewEntry = Omit<
 export const api = {
   me: () => request<{ actor: { kind: string; id: string; name?: string } }>("/api/me"),
   instance: () => request<InstanceInfo>("/api/instance"),
+  notifications: {
+    /** What needs the signed-in person's attention; 404 on servers without it (see `isNotEnabled`). */
+    list: () => request<NotificationsPage>("/api/notifications"),
+  },
   skills: {
     list: () => request<SkillSummary[]>("/api/skills"),
   },

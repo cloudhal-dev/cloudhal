@@ -519,6 +519,8 @@ export const tr: Messages = {
       bannerItem: "{name}: {from} → {to}, bitiş {time}",
       endNow: "Şimdi bitir",
       endAll: "Hepsini şimdi bitir",
+      endsIn: "{time} sonra bitiyor",
+      extendAll: "Hepsini {duration} uzat",
       howModes:
         "Bir süreliğine daha fazla bağımsızlık mı gerekiyor? Anahtarı Otomatik modda bırakmak yerine geçici olarak yükselt: süre dolunca kendi moduna kendiliğinden döner.",
     },
@@ -656,8 +658,32 @@ export const tr: Messages = {
       profile: "Profil",
       password: "Şifre",
       sessions: "Etkin oturumlar",
+      notifications: "Bildirimler",
       access: "Studio erişimi",
       server: "Bu sunucu",
+    },
+    notifications: {
+      description:
+        "Üst çubuktaki zil, bitmek üzere olan yükseltmeleri ve yükseltme isteyen agent'ları listeler. Studio arka plandaki bir sekmedeyken de sana haber verebilir.",
+      switch:
+        "Bir yükseltme bitmek üzereyken ya da bir agent yükseltme istediğinde bu tarayıcıda bana bildir",
+      switchHint: "Yalnızca Studio bir sekmede açıkken. Her bildirim bir kez gösterilir.",
+      permission: "Tarayıcı izni",
+      permissions: { granted: "İzin verildi", default: "Henüz sorulmadı", denied: "Engellendi" },
+      permissionHints: {
+        granted: "Bu tarayıcı Studio'nun bildirim göstermesine izin veriyor.",
+        default: "Bildirimleri açtığında tarayıcın izin ister.",
+        denied: "Bunu Studio değil, tarayıcın değiştirir.",
+      },
+      deniedTitle: "Studio'nun bildirimleri engellenmiş",
+      denied:
+        "Açmak için tarayıcının site ayarlarında (adres çubuğundaki simge) bu siteye bildirim izni ver, sonra Studio'yu yeniden yükle.",
+      unsupported: "Bu tarayıcı bildirim gösteremiyor. Üst çubuktaki zil yine her şeyi listeler.",
+      enabled: "Tarayıcı bildirimleri açık",
+      test: "Deneme bildirimi gönder",
+      testTitle: "Bildirimler açık",
+      testBody:
+        "Bir yükseltme bitmek üzereyken ya da bir agent yükseltme istediğinde Studio sana böyle haber verir.",
     },
     profile: {
       description: "Studio'da ve her sitenin etkinlik kaydında nasıl göründüğün.",
@@ -934,6 +960,43 @@ export const tr: Messages = {
       title: "Kendi skill'ini ekle",
       description:
         "Studio skill'leri projendeki skills/ klasöründen yükler. Klasör yoksa resmi seti sunar.",
+    },
+  },
+  notifications: {
+    title: "Bildirimler",
+    bellCount: "Bildirimler ({count})",
+    empty: "Bekleyen bir şey yok",
+    emptyDescription:
+      "Bir yükseltme bitmek üzereyken ya da bir agent yükseltme istediğinde burada görünür.",
+    settings: "Bildirim ayarları",
+    openAgents: "Agent'ları aç",
+    ending: {
+      title: "Yükseltme bitmek üzere",
+      sentence:
+        "{name}: {mode} modu {left} sonra bitiyor ({time}). Ardından yeniden {from} moduna döner.",
+    },
+    request: {
+      title: "{agent}, {mode} modu istiyor · {duration}",
+      reason: "“{reason}”",
+      review: "İncele",
+    },
+    toast: {
+      endingTitle: "{name}: {mode} modu {left} sonra bitiyor",
+      endingBody:
+        "{time} itibarıyla yeniden {from} moduna döner. Agent'ın hâlâ ihtiyacı varsa uzat.",
+    },
+    extend: {
+      button: "{duration} uzat",
+      group: "Yükseltmeyi uzat",
+      more: "Diğer süreler",
+      fromNow: "Şu andan itibaren",
+      presets: { "30": "30 dk", "60": "1 saat", "240": "4 saat" },
+      presetUntil: "{duration} · bitiş {time}",
+      done: "Yükseltme uzatıldı",
+      failed: "Yükseltme uzatılamadı",
+      gone: "Bu yükseltme zaten bitti",
+      goneDescription:
+        "Hiçbir şey uzatılmadı. Anahtarı yeniden yükseltmek için Agent'lar sayfasında Geçici olarak yükselt'i kullan.",
     },
   },
   approvals: {

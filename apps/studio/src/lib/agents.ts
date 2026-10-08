@@ -130,6 +130,8 @@ export function autoCheckHeldBack(request: {
 /** Shortest and longest time-boxed elevation (ADR-0016), for servers that do not report them. */
 export const ELEVATION_MIN_MINUTES = 5;
 export const ELEVATION_MAX_MINUTES = 24 * 60;
+/** How long before its end an elevation counts as "ending soon" (ADR-0016), for older servers. */
+export const ELEVATION_NOTICE_MINUTES = 10;
 
 /** The mode rules Studio applies: the server's (`/api/instance`) when reported, else Studio's copy. */
 export interface ModeRules {
@@ -140,6 +142,8 @@ export interface ModeRules {
   autoPublishLimit: number;
   /** Bounds of a time-boxed elevation, in whole minutes. */
   elevation: { minMinutes: number; maxMinutes: number };
+  /** Minutes before its end that an elevation is "ending soon" (notifications, Agents banner). */
+  noticeMinutes: number;
 }
 
 export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
@@ -155,7 +159,12 @@ export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
       minMinutes: ELEVATION_MIN_MINUTES,
       maxMinutes: ELEVATION_MAX_MINUTES,
     },
+    noticeMinutes: validNotice(info?.elevation?.noticeMinutes) ?? ELEVATION_NOTICE_MINUTES,
   };
+}
+
+function validNotice(minutes: number | undefined): number | undefined {
+  return Number.isInteger(minutes) && (minutes as number) > 0 ? minutes : undefined;
 }
 
 function validBounds(

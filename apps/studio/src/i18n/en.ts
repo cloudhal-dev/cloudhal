@@ -510,6 +510,8 @@ export const en = {
       bannerItem: "{name}: {from} → {to} until {time}",
       endNow: "End now",
       endAll: "End all now",
+      endsIn: "Ends in {time}",
+      extendAll: "Extend all {duration}",
       howModes:
         "Need more autonomy for a while? Elevate a key temporarily instead of leaving it in Auto: it returns to its own mode by itself.",
     },
@@ -647,8 +649,33 @@ export const en = {
       profile: "Profile",
       password: "Password",
       sessions: "Active sessions",
+      notifications: "Notifications",
       access: "Studio access",
       server: "This server",
+    },
+    notifications: {
+      description:
+        "The bell in the top bar lists elevations that are about to end and agents that ask for one. Studio can also tell you while it's in a background tab.",
+      switch:
+        "Notify me in this browser when an elevation is about to end or an agent asks for one",
+      switchHint: "Only while Studio is open in a tab. Each notice appears once.",
+      permission: "Browser permission",
+      permissions: { granted: "Allowed", default: "Not asked yet", denied: "Blocked" },
+      permissionHints: {
+        granted: "This browser lets Studio show notifications.",
+        default: "Your browser asks when you turn notifications on.",
+        denied: "Changed in your browser, not in Studio.",
+      },
+      deniedTitle: "Notifications are blocked for Studio",
+      denied:
+        "To turn them on, allow notifications for this site in your browser's site settings (the icon next to the address), then reload Studio.",
+      unsupported:
+        "This browser can't show notifications. The bell in the top bar still lists everything.",
+      enabled: "Browser notifications are on",
+      test: "Send a test notification",
+      testTitle: "Notifications are on",
+      testBody:
+        "This is how Studio tells you when an elevation is about to end or an agent asks for one.",
     },
     profile: {
       description: "How you appear in Studio and in each site's activity log.",
@@ -922,6 +949,41 @@ export const en = {
       title: "Add your own",
       description:
         "Studio loads skills from the skills/ folder of your project. Without one, it serves the official set.",
+    },
+  },
+  notifications: {
+    title: "Notifications",
+    bellCount: "Notifications ({count})",
+    empty: "You're all caught up",
+    emptyDescription:
+      "When an elevation is about to end or an agent asks for one, it shows up here.",
+    settings: "Notification settings",
+    openAgents: "Open Agents",
+    ending: {
+      title: "Elevation ending soon",
+      sentence: "{name}'s {mode} mode ends in {left} ({time}), then back to {from}.",
+    },
+    request: {
+      title: "{agent} asks for {mode} · {duration}",
+      reason: "“{reason}”",
+      review: "Review",
+    },
+    toast: {
+      endingTitle: "{name}'s {mode} mode ends in {left}",
+      endingBody: "At {time} it goes back to {from}. Extend it if the agent still needs it.",
+    },
+    extend: {
+      button: "Extend {duration}",
+      group: "Extend the elevation",
+      more: "Other durations",
+      fromNow: "Counts from now",
+      presets: { "30": "30 min", "60": "1 hour", "240": "4 hours" },
+      presetUntil: "{duration} · until {time}",
+      done: "Elevation extended",
+      failed: "Couldn't extend the elevation",
+      gone: "This elevation has already ended",
+      goneDescription:
+        "Nothing was extended. To elevate the key again, use Elevate temporarily on the Agents page.",
     },
   },
   approvals: {
