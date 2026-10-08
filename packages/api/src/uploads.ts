@@ -23,10 +23,13 @@ function fromB64url(text: string): Uint8Array<ArrayBuffer> | undefined {
 /** A signing secret of at least 32 bytes (the preview secret, the MCP state key, or random). */
 export type UploadSecret = string | Uint8Array;
 
-const keys = new WeakMap<object, Promise<CryptoKey>>();
-const stringKeys = new Map<string, Promise<CryptoKey>>();
+/** WebCrypto's key type, named without the DOM lib (Node-only typechecks have no global `CryptoKey`). */
+type HmacKey = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
 
-function key(secret: UploadSecret): Promise<CryptoKey> {
+const keys = new WeakMap<object, Promise<HmacKey>>();
+const stringKeys = new Map<string, Promise<HmacKey>>();
+
+function key(secret: UploadSecret): Promise<HmacKey> {
   const raw = typeof secret === "string" ? enc.encode(secret) : secret;
   if (raw.byteLength < 32) throw new RangeError("upload signing secret must be at least 32 bytes");
   const make = () =>
