@@ -68,6 +68,17 @@ export interface SnapshotDiff {
   readonly changed: Array<{ before: NodeRef; after: NodeRef }>;
 }
 
+/**
+ * The first time an entry is marked published it gets its publication date, whichever path made
+ * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept.
+ */
+function firstPublication(
+  entry: Pick<ContentEntry, "status" | "publishedAt">,
+  ts: string,
+): { publishedAt?: string } {
+  return entry.status === "published" && !entry.publishedAt ? { publishedAt: ts } : {};
+}
+
 export function uniquenessKey(node: SiteNode): string {
   if ("pageIds" in node) return "site";
   if ("path" in node) return `${node.locale}:${node.path}`;
@@ -353,6 +364,7 @@ export class SiteGraphStore {
       rev: 0,
       createdAt: ts,
       updatedAt: ts,
+      ...firstPublication(input, ts),
     };
     assertValid("content-entry", entry);
     await this.#runInsert(
@@ -377,7 +389,13 @@ export class SiteGraphStore {
   }
 
   async updateContentEntry(entry: ContentEntry): Promise<ContentEntry> {
-    const next: ContentEntry = { ...entry, rev: entry.rev + 1, updatedAt: this.#stamp() };
+    const ts = this.#stamp();
+    const next: ContentEntry = {
+      ...entry,
+      rev: entry.rev + 1,
+      updatedAt: ts,
+      ...firstPublication(entry, ts),
+    };
     assertValid("content-entry", next);
     const r = await this.#runUnique(
       await this.#casUpdateStatement(next, entry.rev),

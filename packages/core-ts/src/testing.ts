@@ -167,12 +167,27 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
           title: "Dup",
         } as never),
       ).rejects.toThrow(UniqueConstraintError);
+      expect(entry.publishedAt).toBeUndefined();
       const e2 = await store.updateContentEntry({ ...entry, status: "published" });
       expect(e2.rev).toBe(1);
+      // the first publication dates the entry, whichever path published it; later edits keep it
+      expect(e2.publishedAt).toBe(e2.updatedAt);
+      const e3 = await store.updateContentEntry({ ...e2, title: "Hello again" });
+      expect(e3.publishedAt).toBe(e2.publishedAt);
+      // an explicit date (e.g. imported) is kept
+      const imported = await store.createContentEntry({
+        ...entry,
+        id: undefined as unknown as string,
+        slug: "imported",
+        status: "published",
+        publishedAt: "2020-01-02T03:04:05.000Z",
+      } as never);
+      expect(imported.publishedAt).toBe("2020-01-02T03:04:05.000Z");
+      await store.deleteContentEntry(imported);
       expect((await store.listContentEntries(site.id, "posts")).map((e) => e.status)).toEqual([
         "published",
       ]);
-      await store.deleteContentEntry(e2);
+      await store.deleteContentEntry(e3);
       expect(await store.listContentEntries(site.id)).toEqual([]);
     });
 
