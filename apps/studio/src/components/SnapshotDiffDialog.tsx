@@ -34,8 +34,10 @@ import {
   diffBases,
   diffRows,
 } from "../lib/diff.ts";
+import type { MenuDiffSummary } from "../lib/menus.ts";
 import { archivePath } from "../lib/taxonomy.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
+import { useMenuTitle } from "./Menus.tsx";
 import { type TaxonomyData, taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx";
 
 /**
@@ -77,6 +79,26 @@ function AssignmentDeltas({ deltas, data }: { deltas: AssignmentDelta[]; data: T
             ]
           : []),
       ])}
+    </span>
+  );
+}
+
+/** A menu's delta under its row (RFC-0003 §6.3 counts): "+2 −1 ↕1 ~1" and "3 → 4 items". */
+function MenuDeltaBadges({ summary }: { summary: MenuDiffSummary }) {
+  const t = useT();
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-1" data-testid="menu-delta-summary">
+      <Badge variant="outline">
+        {t("menus.diff.summary", {
+          added: summary.added,
+          removed: summary.removed,
+          moved: summary.moved,
+          changed: summary.changed,
+        })}
+      </Badge>
+      <Badge variant="outline">
+        {t("menus.diff.items", { before: summary.before, after: summary.after })}
+      </Badge>
     </span>
   );
 }
@@ -199,11 +221,26 @@ export function SnapshotDiffDialog({
     queryFn: () =>
       api.snapshots.diff(siteId, baseId as string, (snapshot as Snapshot).id, {
         assignments: true,
+        menus: true,
       }),
     enabled: open && !!baseId && !!snapshot,
     staleTime: Number.POSITIVE_INFINITY, // snapshots are immutable
   });
-  const name = useNodeNames(siteId, open);
+  const nodeName = useNodeNames(siteId, open);
+  const menuTitle = useMenuTitle();
+  const menuOf = (id: string) => diff.data?.menus?.find((m) => m.menuId === id);
+  // Menus are named from the diff itself (key and delta), so a deleted menu keeps its name.
+  const name = (row: DiffRow): { title?: string; href?: string; detail?: string } => {
+    if (row.kind !== "menu") return nodeName(row);
+    const m = menuOf(row.id);
+    if (!m) return {};
+    return {
+      title: menuTitle(m.key),
+      ...(m.change !== "removed"
+        ? { href: `/sites/${siteId}/navigation?menu=${encodeURIComponent(m.key)}` }
+        : {}),
+    };
+  };
   const taxonomy = useTaxonomyData(siteId, open);
   const deltasOf = (entryId: string) =>
     (diff.data?.assignments ?? []).filter((d) => d.entryId === entryId);
@@ -340,6 +377,9 @@ export function SnapshotDiffDialog({
                                     )}
                                     <InlineCopyText>{row.id}</InlineCopyText>
                                   </div>
+                                  {row.kind === "menu" && menuOf(row.id) && (
+                                    <MenuDeltaBadges summary={menuOf(row.id) as MenuDiffSummary} />
+                                  )}
                                   {row.kind === "contentEntry" && deltasOf(row.id).length > 0 && (
                                     <AssignmentDeltas deltas={deltasOf(row.id)} data={taxonomy} />
                                   )}

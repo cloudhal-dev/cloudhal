@@ -123,6 +123,47 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "CodeHighlighted",
     "CreateAgentKeyDialog",
   ],
+  // Navigation menus (§2t, RFC-0003 §8): the MenuTree editor with its preview, picker and delta.
+  "routes/NavigationPage.tsx": [
+    "PageLayout",
+    "SiteCrumbs",
+    "EditorLayout",
+    "PreviewToggle",
+    "SectionCard",
+    "SectionEmpty",
+    "MenuTree",
+    "NavigationPreview",
+    "MenuItemDialog",
+    "MenuSaveDialog",
+    "CreateMenuDialog",
+    "FromPagesDialog",
+    "ConfirmDialog",
+    "DangerZoneCard",
+    "DetailsCard",
+    "DropdownMenu.Item",
+    "Tooltip",
+    "Banner",
+    "Tabs",
+    "useGate",
+  ],
+  "components/MenuItemDialog.tsx": [
+    "LayerDialog",
+    "LayerDialog.Actions.Primary",
+    "Combobox",
+    "Combobox.Group",
+    "Combobox.GroupLabel",
+    "Input",
+    "Checkbox",
+    "InsetPanel",
+    "Select",
+  ],
+  "components/MenuSaveDialog.tsx": ["LayerDialog", "LayerDialog.Actions.Primary", "InsetPanel"],
+  "components/MenuDialogs.tsx": ["LayerDialog", "Radio", "Checkbox", "InsetPanel", "SkeletonLine"],
+  "routes/PageEditorPage.tsx#menus": ["UsedInMenusCard", "MenuDeleteNotice"],
+  "routes/ArticleEditorPage.tsx#menus": ["UsedInMenusCard", "MenuDeleteNotice"],
+  "routes/TermEditorPage.tsx#menus": ["UsedInMenusCard"],
+  "routes/PagesPage.tsx#menus": ["MenuDeleteNotice"],
+  "routes/ArticlesPage.tsx#menus": ["MenuDeleteNotice"],
   "routes/ActivityPage.tsx": [
     "PageLayout",
     "SiteCrumbs",
@@ -984,6 +1025,47 @@ describe("design rules (DESIGN.md)", () => {
       router.indexOf("const indexRoute"),
     );
     expect(invite).not.toMatch(/requireSession/);
+  });
+
+  it("menus are saved only after the delta confirmation, one PUT with rev (§2t, RFC-0003 §8)", () => {
+    const saving = uiFiles.filter((f) => /api\.menus\.save\(/.test(f.text));
+    expect(saving.map((f) => f.file)).toEqual(["routes/NavigationPage.tsx"]);
+    const page = saving[0] as { text: string };
+    // Save opens the confirmation (after the local checks); only its confirm runs the mutation.
+    expect(page.text).toMatch(
+      /const startSave = \(\) => \{[\s\S]*?draftProblem\([\s\S]*?setSaveOpen\(true\)/,
+    );
+    expect(page.text).toMatch(/<MenuSaveDialog[\s\S]*?onConfirm=\{\(\) => save\.mutate\(\)\}/);
+    expect(page.text).toMatch(/saveBody\(base, draft\)/);
+    const dialog = files.find((f) => f.file === "components/MenuSaveDialog.tsx") as {
+      text: string;
+    };
+    expect(dialog.text).toMatch(/t\("governance\.oneSnapshot"\)/);
+    // Writes are gated on structure.write (cosmetic; the API refuses anyway).
+    expect(page.text).toMatch(/readOnly=\{!can\}/);
+  });
+
+  it("external menu links show their host and new tabs are opt-in (§2t, RFC-0003 security)", () => {
+    const dialog = files.find((f) => f.file === "components/MenuItemDialog.tsx") as {
+      text: string;
+    };
+    expect(dialog.text).toMatch(/hostOf\(form\.href\.trim\(\)\)/);
+    expect(dialog.text).toMatch(/menus\.item\.leavesFor/);
+    expect(dialog.text).toMatch(/label=\{t\("menus\.item\.newTab"\)\}/);
+    const chips = files.find((f) => f.file === "components/Menus.tsx") as { text: string };
+    expect(chips.text).toMatch(/menus\.chips\.newTab/);
+  });
+
+  it("deleting a page or article names the menu items it hides (§2t, RFC-0003 invariant 10)", () => {
+    for (const file of [
+      "routes/PageEditorPage.tsx",
+      "routes/ArticleEditorPage.tsx",
+      "routes/PagesPage.tsx",
+      "routes/ArticlesPage.tsx",
+    ]) {
+      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      expect(text, file).toMatch(/<DeleteResource[\s\S]*?notice=\{<MenuDeleteNotice/);
+    }
   });
 
   it("every screen that can pick Auto asks for consent first", () => {

@@ -47,6 +47,7 @@ import {
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { GovernanceDialog, type GovernanceTarget } from "../components/GovernanceDialog.tsx";
+import { UsedInMenusCard } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { CountedHint, CoverImageCard, SeoFields } from "../components/Seo.tsx";
 import {
@@ -613,6 +614,7 @@ export function TermEditorPage() {
                   </div>
                 )}
               </SectionCard>
+              <UsedInMenusCard siteId={siteId} kind="term" id={saved.id} />
               <DetailsCard rows={details} />
               {!retired && saved.status === "active" && (
                 <DangerZoneCard

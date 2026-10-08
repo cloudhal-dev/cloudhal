@@ -19,6 +19,12 @@ import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import {
+  InMenuBadge,
+  MenuDeleteNotice,
+  useMenuReferences,
+  usePageMenus,
+} from "../components/Menus.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -35,9 +41,14 @@ export function PagesPage() {
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
+  const pageMenus = usePageMenus(siteId);
   const [toDelete, setToDelete] = useState<Page | undefined>();
   // Pages are structure: Editors and above (RFC-0005 §2.2).
   const pagesGate = useGate("pages.write");
+  const deleteRefs = useMenuReferences(
+    siteId,
+    toDelete ? { kind: "page", id: toDelete.id } : undefined,
+  );
   const order = new Map((site.data?.pageIds ?? []).map((id, i) => [id, i]));
   const sorted = [...(pages.data ?? [])].sort(
     (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
@@ -128,6 +139,7 @@ export function PagesPage() {
                             {p.title}
                           </Text>
                         </Link>
+                        <InMenuBadge keys={pageMenus.get(p.id)} />
                         {p.seo?.noindex && (
                           <Tooltip content={t("seo.noindexBadgeHint")}>
                             <span className="inline-flex" data-testid="noindex-badge">
@@ -184,6 +196,7 @@ export function PagesPage() {
         onOpenChange={(o) => !o && setToDelete(undefined)}
         resourceType={t("editor.page")}
         resourceName={toDelete?.path ?? ""}
+        notice={<MenuDeleteNotice refs={deleteRefs.data} kind="page" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           if (toDelete) await remove.mutateAsync(toDelete);

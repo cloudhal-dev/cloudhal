@@ -47,6 +47,7 @@ import {
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -211,6 +212,8 @@ export function PageEditorPage() {
   const [showErrors, setShowErrors] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Menus linking here (RFC-0003): named in the delete dialog, listed in the "In menus" card.
+  const menuRefs = useMenuReferences(siteId, { kind: "page", id: pageId });
   const [removeIndex, setRemoveIndex] = useState<number | undefined>();
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
   useEffect(() => {
@@ -499,6 +502,7 @@ export function PageEditorPage() {
         }
         aside={
           <>
+            <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
             <DetailsCard
               rows={[
                 {
@@ -562,6 +566,7 @@ export function PageEditorPage() {
         onOpenChange={setDeleteOpen}
         resourceType={t("editor.page")}
         resourceName={draft.path}
+        notice={<MenuDeleteNotice refs={menuRefs.data} kind="page" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           await remove.mutateAsync(draft);

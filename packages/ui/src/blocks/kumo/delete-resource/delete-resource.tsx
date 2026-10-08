@@ -9,7 +9,7 @@ import {
   Input,
 } from "@cloudflare/kumo";
 import { Check, Copy, WarningCircle, X } from "@phosphor-icons/react";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 export const KUMO_DELETE_RESOURCE_VARIANTS = {
   size: {
@@ -55,6 +55,8 @@ export interface DeleteResourceProps extends KumoDeleteResourceVariantsProps {
   className?: string;
   /** Error message to display if the delete action fails */
   errorMessage?: string;
+  /** Cloudhal: a consequence to read before confirming (e.g. the menu items that will be hidden). */
+  notice?: ReactNode;
 }
 
 export function DeleteResource({
@@ -68,6 +70,7 @@ export function DeleteResource({
   deleteButtonText,
   size = KUMO_DELETE_RESOURCE_DEFAULT_VARIANTS.size,
   errorMessage,
+  notice,
   className,
 }: DeleteResourceProps) {
   const [confirmationInput, setConfirmationInput] = useState("");
@@ -132,6 +135,7 @@ export function DeleteResource({
               <span className="font-medium text-kumo-default">{resourceName}</span>{" "}
               {resourceType.toLowerCase()}.
             </p>
+            {notice}
           </div>
 
           <div className="flex flex-col gap-2">

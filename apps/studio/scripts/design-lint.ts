@@ -59,6 +59,7 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/TaxonomyPage.tsx": "list",
   "routes/TermEditorPage.tsx": "editor",
   "routes/RedirectsPage.tsx": "list",
+  "routes/NavigationPage.tsx": "editor",
   "routes/LoginPage.tsx": "auth",
   "routes/MembersPage.tsx": "list",
   "routes/InvitePage.tsx": "token",
