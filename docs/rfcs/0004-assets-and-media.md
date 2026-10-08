@@ -700,14 +700,14 @@ Errors are `InvariantError` codes, mapped centrally as in RFC-0002: `unsupported
 |---|---|---|---|---|
 | `list_assets` | content:read | yes | – | Filters as in REST; returns url, kind, size, sha256, alt per locale, status and usage counts. |
 | `get_asset` | content:read | yes | – | Adds the usage list (`node`, `field`). |
-| `upload_asset` | content:write | no | – (publish gates) | §5.6. Idempotent by content (`existing: true`). |
-| `fetch_asset_url` | content:write | no | – (publish gates) | §5.6, §5.7. |
-| `update_asset` | content:write | no | – | Title, alt, caption, credit, license, slug, decorative. A slug change keeps old URLs working (§7.1). |
-| `retire_asset` / `restore_asset` | content:write | no | – | Retiring never breaks a page (invariant 6). |
-| `delete_asset` | content:write | no (destructive) | **yes** | Refused while in use; the error lists the uses. |
+| `upload_asset` | asset:upload | no | – (publish gates) | §5.6. Idempotent by content (`existing: true`). |
+| `fetch_asset_url` | asset:upload | no | – (publish gates) | §5.6, §5.7. |
+| `update_asset` | asset:upload (own uploads) / asset:manage (any) | no | – | Title, alt, caption, credit, license, slug, decorative. A slug change keeps old URLs working (§7.1). |
+| `retire_asset` / `restore_asset` | asset:manage | no | – | Retiring never breaks a page (invariant 6). |
+| `delete_asset` | asset:manage | no (destructive) | **yes** | Refused while in use; the error lists the uses. |
 
 - `create_entry`, `update_entry`, `create_page`, `update_page` and the term tools accept `{assetId, alt?}` in every ImageRef slot. They report `unknown_asset` and `retired_asset` with suggestions taken from `list_assets` by alt text and title.
-- No new scope is introduced (open question 12). Purge, lifting a purge, GC and external links are not exposed over MCP.
+- Scopes follow accepted RFC-0005: `asset:upload` (upload, and edit one's own uploads; Contributor and above; part of the default agent-key scopes outside `plan`) and `asset:manage` (edit, retire, restore and delete any asset; Editor and above), which implies `asset:upload`. Purge, lifting a purge, GC and external links are not exposed over MCP.
 - `describeChanges` and approval prompts name assets with their kind, size and title, quoted and truncated by the existing `quote()` rule, and list "+ image "Bosphorus at dawn" (JPEG, 3000×2000, 482 KB), used by "Ferries at dawn"". This happens at rollout step 3, with §2.4.
 
 #### 6.3 Policy: when do agent uploads become public?
@@ -935,7 +935,7 @@ The implementation follows `kumo-design`, `studio-ui` and a new DESIGN.md sectio
   - Streams count bytes, and each `Content-Length` is checked against the ticket.
   - GC reclaims abandoned uploads.
 - **Injection through metadata.** Alt text, captions, titles and credits are agent-controllable text. They are escaped in HTML, serialised in JSON-LD, and quoted and truncated in approval prompts. Placeholders are raster `data:` URLs only (schema).
-- **Approvals and scopes.** No new scope. Uploads are `content:write` and become public only through publish, under the `auto` rule of §6.3. Deletes are approval-gated. External files, SVG, purge and GC are for people only.
+- **Approvals and scopes.** Scopes per RFC-0005: `asset:upload` and `asset:manage`. Uploads become public only through publish, under the `auto` rule of §6.3. Deletes are approval-gated. External files, SVG, purge and GC are for people only.
 - **Malware: out of scope.** Cloudhal does not scan uploads. The type allowlist excludes executables, archives and macro formats, and data is served as an attachment, which narrows the risk without removing it. Operators who need scanning can attach a scanner to R2 event notifications. An `onAssetStored(site, asset)` hook is the planned extension point, not part of this RFC.
 - **Open redirects.** The `302` for external assets goes only to the asset's stored https URL, which only people can set in v1, and only for assets in the published or previewed snapshot.
 
@@ -963,7 +963,7 @@ The implementation follows `kumo-design`, `studio-ui` and a new DESIGN.md sectio
 11. **`downloads` and `figure` section kinds** now?
     **Recommendation:** no. They belong to the scholarly starter RFC (figure numbering, captions, Table Schema previews). Markdown `asset:` links cover downloads with checksums meanwhile.
 12. **A dedicated `media:write` scope?**
-    **Recommendation:** no. `content:write` matches the risk, because publishing gates exposure. Revisit with RFC-0005 (roles) if roles need to split media from text.
+    **Resolved by RFC-0005 (accepted):** yes — `asset:upload` (Contributor and above, own uploads) and `asset:manage` (Editor and above). Publishing still gates exposure.
 13. **Image transformations by default** on custom domains?
     **Recommendation:** opt-in (`media.transform: "cdn-cgi"`) until the zone check and billing are verified on a real account. Starters render correctly either way.
 14. **AVIF metadata.** Refuse AVIF with Exif or XMP (this draft), or strip it?
