@@ -83,7 +83,11 @@ describe("taxonomy lib", () => {
       {
         ...JS,
         labels: {
-          en: { name: " JavaScript ", altNames: [" JS ", ""] as [string, ...string[]], seo: { title: " " } },
+          en: {
+            name: " JavaScript ",
+            altNames: [" JS ", ""] as [string, ...string[]],
+            seo: { title: " " },
+          },
           tr: { name: "" },
         },
       },
