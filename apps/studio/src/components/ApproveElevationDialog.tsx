@@ -96,6 +96,7 @@ export function ApproveElevationDialog({
         qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
         qc.invalidateQueries({ queryKey: ["agent-keys"] }),
         qc.invalidateQueries({ queryKey: ["activity", siteId] }),
+        qc.invalidateQueries({ queryKey: ["notifications"] }),
       ]);
     },
     onError: async (error) => {
@@ -103,7 +104,10 @@ export function ApproveElevationDialog({
       if (isNoLongerPending(error)) {
         onOpenChange(false);
         toast.error(t("approvals.noLongerPending"), t("approvals.noLongerPendingDescription"));
-        await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
+          qc.invalidateQueries({ queryKey: ["notifications"] }),
+        ]);
         return;
       }
       // Still pending, but the key cannot take it now: say why and keep the dialog open.

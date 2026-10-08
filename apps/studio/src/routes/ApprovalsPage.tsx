@@ -375,13 +375,20 @@ export function ApprovalsPage() {
       if (decision === "approve")
         toast.success(t("approvals.approved"), t("approvals.approvedDescription", { agent }));
       else toast.success(t("approvals.denied"), t("approvals.deniedDescription", { agent }));
-      await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+      // The bell lists pending elevation requests too (§2n).
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
+        qc.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
     },
     onError: async (error) => {
       if (isNoLongerPending(error)) {
         setConfirming(undefined);
         toast.error(t("approvals.noLongerPending"), t("approvals.noLongerPendingDescription"));
-        await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
+          qc.invalidateQueries({ queryKey: ["notifications"] }),
+        ]);
       } else if (!confirming) {
         toast.error(t("approvals.failed"), errorMessage(error));
       }

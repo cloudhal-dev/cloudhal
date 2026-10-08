@@ -42,6 +42,7 @@ import {
   KeyModeCell,
   useElevationExpiry,
   useEndElevation,
+  useExtendElevation,
 } from "../components/Elevation.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
@@ -263,6 +264,9 @@ export function AgentsPage() {
   const now = useNow();
   useElevationExpiry(keys.data);
   const endElevation = useEndElevation();
+  // Elevations about to end can be extended right from the banner, as from the bell (§2n).
+  const extendElevation = useExtendElevation();
+  const rules = useAgentModeRules();
   // Agents that asked for more autonomy and wait for a person (ADR-0016 addendum).
   const asks = usePendingElevations();
 
@@ -329,8 +333,11 @@ export function AgentsPage() {
       <ElevatedKeysBanner
         keys={keys.data}
         now={now}
+        noticeMinutes={rules.noticeMinutes}
         onEnd={(elevated) => endElevation.mutate(elevated)}
         ending={endElevation.isPending}
+        onExtend={(targets) => extendElevation.mutate({ targets })}
+        extending={extendElevation.isPending}
       />
       {notEnabled ? null : keys.data?.length === 0 ? (
         <Empty

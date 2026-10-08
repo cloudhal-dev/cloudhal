@@ -329,6 +329,36 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "routes/PageEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
   "routes/ArticleEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
   "routes/SiteOverviewPage.tsx#activity": ["RecentActivity"],
+  // Notifications (§2n, ADR-0016 addendum "told before it ends"): bell, panel, toasts, opt-in.
+  "components/AppFrame.tsx#notifications": ["NotificationsBell"],
+  "components/NotificationsBell.tsx": [
+    "NotificationBell",
+    "NotificationItem",
+    "SectionEmpty",
+    "Badge",
+    "ButtonGroup",
+    "DropdownMenu",
+    "LinkButton",
+    "ModeBadge",
+    "AgentReason",
+    "RelativeTime",
+    "useExtendElevation",
+    "useEndElevation",
+    "useNotifications",
+    "useNotificationAlerts",
+    "liveNotifications",
+  ],
+  "components/NotificationSettings.tsx": [
+    "SettingsSection",
+    "SettingRow",
+    "Switch",
+    "Badge",
+    "Banner",
+    "requestPermission",
+  ],
+  "routes/AccountPage.tsx#notifications": ["NotificationSettings"],
+  "components/Elevation.tsx#notifications": ["useExtendElevation", "endsWithin"],
+  "routes/AgentsPage.tsx#notifications": ["useExtendElevation", "noticeMinutes"],
 };
 
 /** DESIGN.md §6: components that must be in use somewhere in Studio today (the rest are reserved for later surfaces). */
@@ -380,6 +410,8 @@ const REQUIRED_SOMEWHERE = [
   "InputGroup",
   "Radio",
   "Collapsible",
+  "Switch",
+  "NotificationBell",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -455,11 +487,50 @@ describe("design rules (DESIGN.md)", () => {
 
   it("every screen that can elevate a key asks for consent before Auto", () => {
     const elevating = uiFiles.filter((f) => /api\.agentKeys\.elevate\b/.test(f.text));
-    expect(elevating.map((f) => f.file)).toEqual(["components/ElevateAgentKeyDialog.tsx"]);
-    for (const f of elevating) {
-      expect(f.text, f.file).toMatch(/<AutoModeConfirm\b/);
-      expect(f.text, f.file).toMatch(/needsConsent && !autoConfirmed\) return/);
+    // The dialog grants; Elevation.tsx only extends an elevation in force (next test).
+    expect(elevating.map((f) => f.file)).toEqual([
+      "components/ElevateAgentKeyDialog.tsx",
+      "components/Elevation.tsx",
+    ]);
+    const dialog = elevating[0] as { file: string; text: string };
+    expect(dialog.text).toMatch(/<AutoModeConfirm\b/);
+    expect(dialog.text).toMatch(/needsConsent && !autoConfirmed\) return/);
+  });
+
+  it("extending re-posts the mode in force, never a new grant (ADR-0016 addendum)", () => {
+    const elevation = files.find((f) => f.file === "components/Elevation.tsx") as { text: string };
+    const extend = elevation.text.slice(
+      elevation.text.indexOf("export function useExtendElevation"),
+    );
+    // One call, inside useExtendElevation, after re-reading the keys: refused when the elevation
+    // ended or changed mode; the body is `extensionInput(target, …)` = the target's own mode.
+    expect(elevation.text.match(/api\.agentKeys\.elevate\(/g)).toHaveLength(1);
+    expect(extend).toMatch(
+      /api\.agentKeys\.list\(\)[\s\S]*!canExtend\(target, now\) \|\| inForce\?\.mode !== target\.mode[\s\S]*throw new ElevationGoneError[\s\S]*api\.agentKeys\.elevate\(target\.keyId, extensionInput\(target,/,
+    );
+    expect(elevation.text).not.toMatch(/bypass/);
+  });
+
+  it("every notification action routes through the shared extend/end helpers", () => {
+    const alerts = readFileSync(path.join(SRC, "components/useNotifications.ts"), "utf8");
+    const notificationFiles = [
+      ...["components/NotificationsBell.tsx", "routes/AgentsPage.tsx"].map(
+        (file) => files.find((f) => f.file === file) as { file: string; text: string },
+      ),
+      { file: "components/useNotifications.ts", text: alerts },
+    ];
+    for (const f of notificationFiles) {
+      // No direct key mutations: only `useExtendElevation` / `useEndElevation` change elevations.
+      expect(f.text, f.file).not.toMatch(/api\.agentKeys\.(elevate|endElevation)\b/);
+      expect(f.text, f.file).toMatch(/\buseExtendElevation\(\)/);
     }
+    const bell = notificationFiles[0] as { text: string };
+    expect(bell.text).toMatch(/\buseEndElevation\(\)/);
+    // Ending early has one implementation too.
+    const ending = uiFiles.filter((f) => /api\.agentKeys\.endElevation\b/.test(f.text));
+    expect(ending.map((f) => f.file)).toEqual(["components/Elevation.tsx"]);
+    // The toast's "Extend" is the same helper with the same default.
+    expect(alerts).toMatch(/extend\(\{ targets: \[target\], minutes: DEFAULT_EXTEND_MINUTES \}\)/);
   });
 
   it("every screen that grants an agent's elevation request asks for consent before Auto", () => {
