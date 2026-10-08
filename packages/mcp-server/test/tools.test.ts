@@ -92,10 +92,24 @@ describe("Cloudhal tools (SDK-independent)", () => {
     expect(doc.html).toContain("<h1>Hello</h1>");
     expect(doc.url).toBe("http://localhost:4321/posts/agent-post");
 
+    // The deprecated `tags` became a proposed tag term (RFC-0002 §4.4). A review entry needs a
+    // primary category; until the MCP tools take `terms`, a person files it through the store.
+    const stored = await ctx.store.getContentEntry(entry.id);
+    const proposed = await ctx.store.getTerm(stored?.terms?.tag?.ids[0] as string);
+    expect(proposed).toMatchObject({ slug: "agents", status: "proposed", proposedBy: agent });
+    const news = await ctx.store.getTermBySlug(siteId, "category", "news");
+    const filed = await ctx.store.updateContentEntry({
+      ...(stored as NonNullable<typeof stored>),
+      terms: {
+        ...stored?.terms,
+        category: { ids: [news?.id as string], primary: news?.id as string },
+      },
+    });
+
     const updated = await call("update_entry", {
       siteId,
       entryId: entry.id,
-      rev: entry.rev,
+      rev: filed.rev,
       status: "review",
     });
     expect((updated.result as { entry: { status: string; rev: number } }).entry.status).toBe(
@@ -139,6 +153,19 @@ describe("Cloudhal tools (SDK-independent)", () => {
     };
     expect(site.publishedSnapshotId).toBe(snapshot.id);
     expect(snapshot.reason).toBe("publish");
+
+    // Approval prompts name taxonomy, term and redirect changes (RFC-0002 §6.4).
+    const tag = await ctx.store.getTermBySlug(siteId, "tag", "cloudhal");
+    await ctx.store.renameTerm(tag as NonNullable<typeof tag>, "cloudhal-dev");
+    const category = await ctx.store.getTaxonomyByKey(siteId, "category");
+    await ctx.store.updateTaxonomy({
+      ...(category as NonNullable<typeof category>),
+      required: false,
+    });
+    const prompt = (await call("publish", { siteId, label: "Renamed" })).approvalPrompt ?? "";
+    expect(prompt).toContain('~ taxonomy "Categories"');
+    expect(prompt).toContain('~ term "Cloudhal"');
+    expect(prompt).toContain('+ redirect "/tag/cloudhal → /tag/cloudhal-dev"');
 
     const second = await call("publish", { siteId, label: "Second" }, true);
     const rb = await call("rollback", { siteId, snapshotId: snapshot.id });

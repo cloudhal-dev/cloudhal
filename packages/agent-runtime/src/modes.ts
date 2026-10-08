@@ -53,7 +53,7 @@ const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
   "low-risk": (c) => `${c.changes} article change(s) only`,
   "removes-content": () => "it removes content",
   nothing: () => "nothing to publish",
-  structure: () => "it changes pages or site settings",
+  structure: () => "it changes pages, site settings, taxonomies or redirects",
   "too-many": (c) => `it changes more than ${c.limit} articles`,
 };
 
@@ -63,8 +63,9 @@ export function describeAutoCheck(check: AutoCheck): string {
 }
 
 /**
- * Low risk = only articles added or edited, nothing removed, no pages or site settings touched,
- * and at most `AUTO_PUBLISH_LIMIT` changes. Anything else waits for a person even in `auto`.
+ * Low risk = only articles added or edited, nothing removed, no pages, site settings, taxonomies,
+ * terms or redirects touched (RFC-0002 §6.4), and at most `AUTO_PUBLISH_LIMIT` changes. Anything
+ * else waits for a person even in `auto`.
  */
 export function checkAutoPublish(diff: {
   added: PendingChange[];

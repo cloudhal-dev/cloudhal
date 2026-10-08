@@ -516,7 +516,7 @@ export const tr: Messages = {
         "Hiçbir şeyin onay beklemediği Bypass modu anahtarlar için sunulmaz. Yalnızca kendi bilgisayarındaki yerel sunucuda vardır:",
       autoTitle: "Küçük yayınlar sana sormadan canlıya çıkar",
       autoDescription:
-        "Otomatik modda yalnızca makale ekleyen ya da düzenleyen bir yayın hemen canlıya çıkar: hiçbir şey silinmez, sayfalar ve site ayarları değişmez, en fazla {limit} değişiklik olur. Etkinlik kaydında otomatik onaylandı olarak görünür ve tek tıkla geri alabilirsin. Daha büyük yayınlar, geri alma ve silme yine senin onayını bekler.",
+        "Otomatik modda yalnızca makale ekleyen ya da düzenleyen bir yayın hemen canlıya çıkar: hiçbir şey silinmez, sayfalar, site ayarları, sınıflandırmalar ve yönlendirmeler değişmez, en fazla {limit} değişiklik olur. Etkinlik kaydında otomatik onaylandı olarak görünür ve tek tıkla geri alabilirsin. Daha büyük yayınlar, geri alma ve silme yine senin onayını bekler.",
       autoConfirm: "Bu agent'ın benim onayım olmadan yayın yapabileceğini anlıyorum",
       autoConfirmRequired: "Otomatik modun ne yaptığını anladığını onayla",
     },
@@ -1161,7 +1161,7 @@ export const tr: Messages = {
     autoCheck: {
       "removes-content": "içerik siliyor",
       nothing: "yayınlanacak yeni bir şey yok",
-      structure: "sayfaları ya da site ayarlarını değiştiriyor",
+      structure: "sayfaları, site ayarlarını, sınıflandırmaları ya da yönlendirmeleri değiştiriyor",
       "too-many": "{changes} değişiklik içeriyor ve otomatik modun sınırı {limit}",
     },
     noHistory: "Henüz karar yok",
