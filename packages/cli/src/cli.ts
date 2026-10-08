@@ -6,6 +6,7 @@ import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
 import { describeMigration, migrateTags } from "./commands/migrate.ts";
+import { transferOwner } from "./commands/owner.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 import { pullSite, pushSite } from "./commands/sync.ts";
@@ -25,6 +26,9 @@ Usage:
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--admin-url <url>]           local site → deployment
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
+  cloudhal owner transfer --to <email> [--admin-url <url>]
+                                                          make a member the deployment's Owner
+                                                          (lockout recovery; uses the deployment token)
   cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
                                                           move entry tags into tag terms (RFC-0002);
                                                           resumable; --revert <id> undoes a run
@@ -54,6 +58,7 @@ export async function main(argv: string[]): Promise<number> {
       "admin-url": { type: "string" },
       studio: { type: "string" },
       revert: { type: "string" },
+      to: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -189,6 +194,18 @@ export async function main(argv: string[]): Promise<number> {
       };
       if (command === "push") await pushSite(opts);
       else await pullSite(opts);
+      return 0;
+    }
+    case "owner": {
+      const [action] = rest;
+      if (action !== "transfer" || !values.to)
+        throw new Error("usage: cloudhal owner transfer --to <email> [--admin-url <url>]");
+      await transferOwner({
+        projectDir,
+        to: values.to,
+        ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+        log: (l) => console.log(l),
+      });
       return 0;
     }
     case "migrate": {

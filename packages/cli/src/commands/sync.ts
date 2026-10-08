@@ -20,7 +20,7 @@ export interface SyncOptions {
 }
 
 /** Error bodies may be HTML pages (e.g. a not-yet-live workers.dev host); keep messages short. */
-function brief(body: string): string {
+export function brief(body: string): string {
   const text = body
     .replace(/<style[\s\S]*?<\/style>|<svg[\s\S]*?<\/svg>|<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
@@ -28,7 +28,8 @@ function brief(body: string): string {
   return text.length > 300 ? `${text.slice(0, 300)}…` : text;
 }
 
-async function target(options: SyncOptions) {
+/** The deployment's admin Worker and its operator token (from `cloudhal deploy`'s state). */
+export async function deployment(options: SyncOptions) {
   const cfg = await readProjectConfig(options.projectDir);
   const dir = path.join(options.projectDir, cfg.dataDir, "deploy");
   let adminUrl = options.adminUrl;
@@ -48,8 +49,13 @@ async function target(options: SyncOptions) {
   };
   if (!secrets.CLOUDHAL_DEPLOY_TOKEN)
     throw new Error("deployment token missing in .cloudhal/deploy/secrets.json");
+  return { cfg, adminUrl, token: secrets.CLOUDHAL_DEPLOY_TOKEN, fetch: options.fetch ?? fetch };
+}
+
+async function target(options: SyncOptions) {
+  const { cfg, adminUrl, token, fetch: f } = await deployment(options);
   const url = new URL(`/api/admin/sites/${cfg.siteId}/bundle`, adminUrl);
-  return { cfg, url, token: secrets.CLOUDHAL_DEPLOY_TOKEN, fetch: options.fetch ?? fetch };
+  return { cfg, url, token, fetch: f };
 }
 
 export async function pushSite(
