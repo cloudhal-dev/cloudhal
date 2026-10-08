@@ -131,7 +131,13 @@ describe("cloudhal deploy", () => {
       return ok();
     };
 
-    const first = await deploy({ projectDir, studioDir, wrangler, fetch: fakeFetch });
+    const first = await deploy({
+      projectDir,
+      studioDir,
+      wrangler,
+      fetch: fakeFetch,
+      healthTimeoutMs: 5000,
+    });
     expect(calls).toEqual([
       "d1 info deploy-me-db --json",
       "d1 create deploy-me-db",
@@ -161,7 +167,13 @@ describe("cloudhal deploy", () => {
       title: "Edited in production",
     });
     calls.length = 0;
-    const second = await deploy({ projectDir, studioDir, wrangler, fetch: fakeFetch });
+    const second = await deploy({
+      projectDir,
+      studioDir,
+      wrangler,
+      fetch: fakeFetch,
+      healthTimeoutMs: 5000,
+    });
     expect(second.pushed).toBe(false);
     expect(calls[0]).toBe("d1 info deploy-me-db --json");
     expect(calls).not.toContain("d1 create deploy-me-db");

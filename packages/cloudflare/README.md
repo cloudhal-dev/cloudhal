@@ -18,6 +18,6 @@ export default createAdminWorker({ skills });
 | `BETTER_AUTH_SECRET`, `MCP_STATE_KEY` | sessions; signed approval state |
 | `CLOUDHAL_PREVIEW_SECRET`, `CLOUDHAL_PURGE_TOKEN` | shared with the site Worker |
 | `CLOUDHAL_DEPLOY_TOKEN` | `cloudhal push` / `pull` |
-| `CLOUDHAL_DISABLE_SIGNUP=true` | close sign-up once the owner exists |
+| `CLOUDHAL_SIGNUP` | `first-user` (default — only the first account, the owner, can sign up), `closed` or `open` |
 
 The site Worker itself is the project's Astro build (`@cloudhal/astro-renderer/cloudflare-entry`). Both are deployed, configured and tested by `@cloudhal/cli` (`cloudhal deploy`, `test/cloudflare*.test.ts` on workerd).

@@ -31,8 +31,8 @@ export interface AdminEnv {
   CLOUDHAL_PREVIEW_SECRET?: string;
   CLOUDHAL_PURGE_TOKEN?: string;
   CLOUDHAL_DEPLOY_TOKEN?: string;
-  /** Set to "true" to close public sign-up once the owner account exists. */
-  CLOUDHAL_DISABLE_SIGNUP?: string;
+  /** `first-user` (default: only the owner can sign up), `closed` or `open`. */
+  CLOUDHAL_SIGNUP?: string;
 }
 
 export interface AdminWorkerOptions {
@@ -95,7 +95,10 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           database: env.DB,
           baseURL: url.origin,
           secret: required(env, "BETTER_AUTH_SECRET"),
-          disableSignUp: env.CLOUDHAL_DISABLE_SIGNUP === "true",
+          signUp:
+            env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
+              ? env.CLOUDHAL_SIGNUP
+              : "first-user",
           workers: { waitUntil: (p) => ctx.waitUntil(p) },
         });
         auths.set(url.origin, auth);

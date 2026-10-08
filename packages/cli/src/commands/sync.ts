@@ -19,6 +19,15 @@ export interface SyncOptions {
   readonly fetch?: typeof fetch;
 }
 
+/** Error bodies may be HTML pages (e.g. a not-yet-live workers.dev host); keep messages short. */
+function brief(body: string): string {
+  const text = body
+    .replace(/<style[\s\S]*?<\/style>|<svg[\s\S]*?<\/svg>|<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 300 ? `${text.slice(0, 300)}…` : text;
+}
+
 async function target(options: SyncOptions) {
   const cfg = await readProjectConfig(options.projectDir);
   const dir = path.join(options.projectDir, cfg.dataDir, "deploy");
@@ -70,9 +79,9 @@ export async function pushSite(
   const body = await res.text();
   if (res.status === 409)
     throw new Error(
-      `the deployment has diverged from your local copy: ${body}\nRun \`cloudhal pull\` first, or \`cloudhal push --replace\` to overwrite.`,
+      `the deployment has diverged from your local copy: ${brief(body)}\nRun \`cloudhal pull\` first, or \`cloudhal push --replace\` to overwrite.`,
     );
-  if (!res.ok) throw new Error(`push failed (${res.status}): ${body}`);
+  if (!res.ok) throw new Error(`push failed (${res.status}): ${brief(body)}`);
   log(`pushed: ${body}`);
   return { pushed: true, message: body };
 }
@@ -81,7 +90,7 @@ export async function pullSite(options: SyncOptions): Promise<{ message: string 
   const log = options.log ?? (() => {});
   const { cfg, url, token, fetch: f } = await target(options);
   const res = await f(url, { headers: { authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`pull failed (${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`pull failed (${res.status}): ${brief(await res.text())}`);
   const bundle = (await res.json()) as SiteBundle;
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   try {

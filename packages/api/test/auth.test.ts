@@ -110,3 +110,42 @@ for (const backend of backends) {
     });
   });
 }
+
+describe("sign-up policy", () => {
+  const signUp = (app: ReturnType<typeof createApi>, email: string) =>
+    app.request("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: email, email, password: "correct horse battery" }),
+    });
+  const make = async (signUpMode?: "first-user" | "closed" | "open") => {
+    const db = new Database(":memory:");
+    const store = new SiteGraphStore({
+      sql: new BetterSqlite3Driver(db),
+      blobs: new MemoryBlobStore(),
+    });
+    await store.init();
+    const auth = createAuth({
+      database: db,
+      baseURL: "http://localhost",
+      secret: "test-secret-test-secret-test-secret",
+      ...(signUpMode ? { signUp: signUpMode } : {}),
+    });
+    return createApi({ store, resolveActor: auth.resolveActor, authHandler: auth.handler });
+  };
+
+  it("by default only the first account (the owner) can sign up", async () => {
+    const app = await make();
+    expect((await signUp(app, "owner@example.com")).status).toBe(200);
+    const second = await signUp(app, "stranger@example.com");
+    expect(second.status).toBe(403);
+    expect(await second.text()).toMatch(/already has an owner/);
+  });
+
+  it("can be closed or opened explicitly", async () => {
+    expect((await signUp(await make("closed"), "a@example.com")).status).not.toBe(200);
+    const open = await make("open");
+    expect((await signUp(open, "a@example.com")).status).toBe(200);
+    expect((await signUp(open, "b@example.com")).status).toBe(200);
+  });
+});

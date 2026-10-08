@@ -2,6 +2,7 @@ import { apiKey } from "@better-auth/api-key";
 import { ALL_SCOPES, defaultScopes, type Principal, type Scope } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
 import { type Auth, betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import type { Context } from "hono";
 import type { ActorResolver, PrincipalResolver } from "./context.ts";
@@ -13,7 +14,16 @@ export interface AuthOptions {
   readonly baseURL: string;
   readonly secret: string;
   readonly trustedOrigins?: readonly string[];
-  /** Close public sign-up (invite-only). Default: open. */
+  /**
+   * Who may create an account with email + password:
+   * - `first-user` (default): only while no user exists — the first account is the owner, then
+   *   sign-up closes. Every human gets full scopes, so an open sign-up on a public deployment would
+   *   hand the site to anyone who finds it.
+   * - `closed`: nobody (accounts are created by the owner / admin plugin).
+   * - `open`: anybody (local development, demos).
+   */
+  readonly signUp?: "first-user" | "closed" | "open";
+  /** @deprecated use `signUp: "closed"`. */
   readonly disableSignUp?: boolean;
   /**
    * Cloudflare Workers settings: the client IP header (`cf-connecting-ip`), `waitUntil` for
@@ -57,6 +67,13 @@ export interface AgentKeyService {
   delete(input: { headers: Headers; id: string }): Promise<void>;
 }
 
+export function signUpMode(
+  options: Pick<AuthOptions, "signUp" | "disableSignUp">,
+): "first-user" | "closed" | "open" {
+  if (options.signUp) return options.signUp;
+  return options.disableSignUp ? "closed" : "first-user";
+}
+
 function createInstance(options: AuthOptions) {
   return betterAuth({
     // biome-ignore lint/suspicious/noExplicitAny: Better Auth accepts several concrete DB handles
@@ -66,10 +83,22 @@ function createInstance(options: AuthOptions) {
     trustedOrigins: [...(options.trustedOrigins ?? [])],
     emailAndPassword: {
       enabled: true,
-      disableSignUp: options.disableSignUp ?? false,
+      disableSignUp: signUpMode(options) === "closed",
       autoSignIn: true,
     },
     telemetry: { enabled: false },
+    // Checked before the endpoint runs (outside Better Auth's write transaction, which would
+    // deadlock a second query on single-connection SQLite).
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (!ctx.path.startsWith("/sign-up") || signUpMode(options) !== "first-user") return;
+        const existing = await ctx.context.adapter.count({ model: "user" });
+        if (existing > 0)
+          throw new APIError("FORBIDDEN", {
+            message: "Sign-up is closed: this Studio already has an owner. Ask them for access.",
+          });
+      }),
+    },
     ...(options.workers
       ? {
           rateLimit: { enabled: true, storage: "database" as const },

@@ -56,6 +56,8 @@ export interface DeployOptions {
   /** Injected in tests. */
   readonly wrangler?: WranglerRunner;
   readonly fetch?: typeof fetch;
+  /** How long to wait for a freshly deployed admin Worker to answer. Default 2 minutes. */
+  readonly healthTimeoutMs?: number;
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -151,6 +153,34 @@ async function ensureResources(
   if (bucket.code !== 0 && !/already exists|already own/i.test(bucket.stderr + bucket.stdout))
     throw new Error(`could not create R2 bucket ${names.bucket}:\n${bucket.stderr.slice(-2000)}`);
   return databaseId;
+}
+
+async function waitForHealth(
+  adminUrl: string,
+  f: typeof fetch,
+  log: (line: string) => void,
+  timeoutMs: number,
+): Promise<void> {
+  const url = new URL("/api/health", adminUrl);
+  const deadline = Date.now() + timeoutMs;
+  let announced = false;
+  for (;;) {
+    try {
+      const res = await f(url);
+      if (res.ok) return;
+    } catch {
+      // DNS/TLS not ready yet
+    }
+    if (Date.now() > deadline)
+      throw new Error(
+        `${adminUrl} did not answer within ${Math.round(timeoutMs / 1000)}s; run \`cloudhal push\` once it is up`,
+      );
+    if (!announced) {
+      log(`waiting for ${new URL(adminUrl).hostname} to come online…`);
+      announced = true;
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
 }
 
 export interface DeployResult {
@@ -261,6 +291,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   // 5. first deploy: push the local site
   let pushed = false;
   if (adminUrl) {
+    // A brand-new workers.dev hostname can take a while to answer; wait instead of failing.
+    await waitForHealth(adminUrl, options.fetch ?? fetch, log, options.healthTimeoutMs ?? 120_000);
     if (siteUrl && !(site.domains ?? []).length) {
       // Preview links need the public hostname of the site.
       const l = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
