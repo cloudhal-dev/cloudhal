@@ -83,6 +83,70 @@ describe("api.snapshots / preview", () => {
   });
 });
 
+describe("api.instance / skills", () => {
+  it("reads what the deployment offers and the skills agents see", async () => {
+    const fetch = mockFetch({ signUp: "first-user", features: { mcp: true } });
+    expect((await api.instance()).signUp).toBe("first-user");
+    mockFetch([{ name: "safe-edit", resource: "skill://safe-edit/SKILL.md" }]);
+    expect((await api.skills.list())[0]?.resource).toBe("skill://safe-edit/SKILL.md");
+    expect(fetch.mock.calls[0]?.[0]).toBe("/api/instance");
+  });
+});
+
+describe("api.previewLinks", () => {
+  it("posts the target, path and lifetime", async () => {
+    const fetch = mockFetch(
+      { token: "t", url: null, expiresAt: "x", target: "live", path: "/" },
+      201,
+    );
+    await api.previewLinks.create("site_1", {
+      target: { snapshot: "snap_1" },
+      path: "/blog",
+      ttlSeconds: 3600,
+    });
+    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/sites/site_1/preview-links");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      target: { snapshot: "snap_1" },
+      path: "/blog",
+      ttlSeconds: 3600,
+    });
+  });
+
+  it("reports a server without a preview secret as 'not enabled'", async () => {
+    mockFetch({ error: "not_found", message: "preview links are not enabled on this server" }, 404);
+    const error = await api.previewLinks.create("site_1", { target: "live" }).catch((e) => e);
+    expect(isNotEnabled(error)).toBe(true);
+  });
+});
+
+describe("api.approvals", () => {
+  it("lists by status and unwraps items", async () => {
+    const fetch = mockFetch({ items: [{ id: "appr_1" }] });
+    expect(await api.approvals.list("site_1", "pending")).toEqual([{ id: "appr_1" }]);
+    await api.approvals.list("site_1");
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([
+      "/api/sites/site_1/approvals?status=pending",
+      "/api/sites/site_1/approvals",
+    ]);
+  });
+
+  it("approves and denies with POST, and surfaces 409 when no longer pending", async () => {
+    const fetch = mockFetch({ id: "appr_1", status: "approved" });
+    await api.approvals.decide("site_1", "appr_1", "approve");
+    await api.approvals.decide("site_1", "appr_1", "deny");
+    expect(fetch.mock.calls.map((c) => [c[0], (c[1] as RequestInit).method])).toEqual([
+      ["/api/sites/site_1/approvals/appr_1/approve", "POST"],
+      ["/api/sites/site_1/approvals/appr_1/deny", "POST"],
+    ]);
+    mockFetch({ error: "conflict", message: "this request is denied" }, 409);
+    const error = await api.approvals.decide("site_1", "appr_1", "approve").catch((e) => e);
+    expect(error).toBeInstanceOf(ApiRequestError);
+    expect((error as ApiRequestError).status).toBe(409);
+  });
+});
+
 describe("splitHref (Kumo href → TanStack Router)", () => {
   it("separates the search string so links can carry ?diff=", () => {
     expect(splitHref("/sites/s1/snapshots?diff=snap_1")).toEqual({

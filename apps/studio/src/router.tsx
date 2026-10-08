@@ -17,8 +17,13 @@ import { SiteTabsLayout } from "./routes/SiteTabsLayout.tsx";
  * Screens load on demand (one chunk each); the shells above stay in the main bundle so the frame
  * renders immediately. `defaultPreload: "intent"` fetches a screen's chunk on hover/focus.
  */
+const AccountPage = lazyRouteComponent(() => import("./routes/AccountPage.tsx"), "AccountPage");
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
 const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
+const ApprovalsPage = lazyRouteComponent(
+  () => import("./routes/ApprovalsPage.tsx"),
+  "ApprovalsPage",
+);
 const ArticleEditorPage = lazyRouteComponent(
   () => import("./routes/ArticleEditorPage.tsx"),
   "ArticleEditorPage",
@@ -34,7 +39,12 @@ const SiteOverviewPage = lazyRouteComponent(
   () => import("./routes/SiteOverviewPage.tsx"),
   "SiteOverviewPage",
 );
+const SiteSettingsPage = lazyRouteComponent(
+  () => import("./routes/SiteSettingsPage.tsx"),
+  "SiteSettingsPage",
+);
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
+const SkillsPage = lazyRouteComponent(() => import("./routes/SkillsPage.tsx"), "SkillsPage");
 const SnapshotsPage = lazyRouteComponent(
   () => import("./routes/SnapshotsPage.tsx"),
   "SnapshotsPage",
@@ -82,6 +92,16 @@ const agentsRoute = createRoute({
   path: "/agents",
   component: AgentsPage,
 });
+const skillsRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/agents/skills",
+  component: SkillsPage,
+});
+const accountSettingsRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/account",
+  component: AccountPage,
+});
 
 // Site surface
 const siteRoute = createRoute({
@@ -123,6 +143,17 @@ const activityRoute = createRoute({
   path: "/activity",
   component: ActivityPage,
 });
+/** Activity › Approvals: agents' gated calls waiting for a person (ADR-0014). */
+const approvalsRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/approvals",
+  component: ApprovalsPage,
+});
+const siteSettingsRoute = createRoute({
+  getParentRoute: () => siteTabsRoute,
+  path: "/settings",
+  component: SiteSettingsPage,
+});
 const pageEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/pages/$pageId",
@@ -137,7 +168,7 @@ const articleEditorRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   indexRoute,
-  accountRoute.addChildren([sitesRoute, agentsRoute]),
+  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute]),
   siteRoute.addChildren([
     siteTabsRoute.addChildren([
       siteIndexRoute,
@@ -145,6 +176,8 @@ const routeTree = rootRoute.addChildren([
       articlesRoute,
       snapshotsRoute,
       activityRoute,
+      approvalsRoute,
+      siteSettingsRoute,
     ]),
     pageEditorRoute,
     articleEditorRoute,

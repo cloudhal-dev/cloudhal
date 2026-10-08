@@ -1,5 +1,5 @@
 import { Sidebar, SidebarSwitcher } from "@cloudhal/ui";
-import { Gear, Robot, SquaresFour } from "@phosphor-icons/react";
+import { Robot, SquaresFour, UserGear } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { AppFrame } from "../components/AppFrame.tsx";
@@ -17,6 +17,7 @@ export function AccountShell() {
     queryFn: api.agentKeys.list,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
+  const skills = useQuery({ queryKey: ["skills"], queryFn: api.skills.list });
   return (
     <AppFrame
       title={t("app.name")}
@@ -53,23 +54,49 @@ export function AccountShell() {
           <Sidebar.Group>
             <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
-              <Sidebar.MenuButton
-                icon={Robot}
-                href="/agents"
-                active={pathname === "/agents"}
-                tooltip={t("nav.agents")}
-              >
-                {t("nav.agents")}
-                {keys.data && <Sidebar.MenuBadge>{keys.data.length}</Sidebar.MenuBadge>}
-              </Sidebar.MenuButton>
+              <Sidebar.MenuItem>
+                <Sidebar.Collapsible defaultOpen>
+                  <Sidebar.CollapsibleTrigger
+                    render={
+                      <Sidebar.MenuButton
+                        icon={Robot}
+                        tooltip={t("nav.agents")}
+                        active={pathname.startsWith("/agents")}
+                      >
+                        {t("nav.agents")}
+                        <Sidebar.MenuChevron />
+                      </Sidebar.MenuButton>
+                    }
+                  />
+                  <Sidebar.CollapsibleContent>
+                    <Sidebar.MenuSub>
+                      <Sidebar.MenuSubButton href="/agents" active={pathname === "/agents"}>
+                        {t("nav.agentKeys")}
+                        {keys.data && <Sidebar.MenuBadge>{keys.data.length}</Sidebar.MenuBadge>}
+                      </Sidebar.MenuSubButton>
+                      <Sidebar.MenuSubButton
+                        href="/agents/skills"
+                        active={pathname === "/agents/skills"}
+                      >
+                        {t("nav.agentSkills")}
+                        {skills.data && <Sidebar.MenuBadge>{skills.data.length}</Sidebar.MenuBadge>}
+                      </Sidebar.MenuSubButton>
+                    </Sidebar.MenuSub>
+                  </Sidebar.CollapsibleContent>
+                </Sidebar.Collapsible>
+              </Sidebar.MenuItem>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
-            <Sidebar.GroupLabel>{t("nav.account")}</Sidebar.GroupLabel>
+            <Sidebar.GroupLabel>{t("nav.settings")}</Sidebar.GroupLabel>
             <Sidebar.Menu>
-              <Sidebar.MenuButton icon={Gear} tooltip={t("nav.soon")} disabled>
+              <Sidebar.MenuButton
+                icon={UserGear}
+                href="/account"
+                active={pathname === "/account"}
+                tooltip={t("nav.account")}
+              >
                 {t("nav.account")}
-                <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
@@ -78,6 +105,16 @@ export function AccountShell() {
       commands={[
         { id: "sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
         { id: "agents", label: t("commands.goAgents"), run: () => navigate({ to: "/agents" }) },
+        {
+          id: "skills",
+          label: t("commands.goSkills"),
+          run: () => navigate({ to: "/agents/skills" }),
+        },
+        {
+          id: "account",
+          label: t("commands.goAccount"),
+          run: () => navigate({ to: "/account" }),
+        },
       ]}
     >
       <Outlet />

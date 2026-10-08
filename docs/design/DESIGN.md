@@ -48,6 +48,8 @@ Empty → `Empty icon={<Icon size={48} />} title description commandLine content
 
 ### 2c. Settings / form
 Same header; `Grid variant="1-2"` with `TableOfContents` on the left; one `LayerCard` per section, `Switch` for instant settings, `SensitiveInput` for secrets, `ClipboardText` for ids; sticky footer `border-t border-kumo-line` with `Button variant="primary" type="submit" loading`.
+Studio implements it as `SettingsLayout` + `SettingsSection` (`components/Settings.tsx`): the `TableOfContents` is sticky from `md` (hidden on phones, which scroll one column) and driven by Kumo's `useTableOfContentsActiveId`; items scroll the content column themselves (no router hash navigation), and a `#section` deep link lands on its card. Each section is a `LayerCard`: `Secondary` header (title, optional badge/actions right), `Primary` body with a muted description, controls carrying their own `label`/`description`/`error`, label/value rows as `dl` (`SettingRow`), and a footer row `border-t border-kumo-hairline` with the section's own actions (ghost "Discard" only while dirty, primary "Save changes" disabled until dirty). Sections save independently. A section holding a `Table` uses `flush` (no body padding). Text inputs in cards get `className="w-full"` so they never overflow the card at 375 px.
+Saves that `PUT` a whole document send the latest cached copy plus the section's fields; a 409 shows `Banner variant="alert"` "This site changed somewhere else" with `Banner.Action` "Load latest" (the form keeps unsaved edits unless the server's values for those fields changed).
 
 ### 2d. Destructive flow
 `Button variant="secondary-destructive"` → `DeleteResource open onOpenChange resourceType resourceName onDelete isDeleting errorMessage`. Non-typed destructive confirmations: `LayerDialog.Alert`. Never `{open && <Dialog/>}`.
@@ -75,6 +77,23 @@ Toolbar row: search `Toolbar` (tool, label, actor, skill) + filter `Toolbar` wit
 ### 2i. Snapshot diff
 Opened from the snapshot row's ghost "Compare" button or `?diff=<snapshotId>` (Activity links there), so it is linkable and closes back to the plain URL. `LayerDialog size="xl"`: segmented `Tabs` choosing the base (previous snapshot / live version; plain text when only one exists), counts as `Badge`s (`n added` success, `n changed` warning, `n removed` error, with icons), then one section per non-empty change type: heading + count, `LayerCard p-0` + `Table` with the item (title linked to its editor, kind as an outline `Badge`, path and copyable id below; "No longer exists" for deleted nodes) and the revision (`rev a → b`). Empty states: "No differences", "Nothing to compare with".
 
+### 2j. Account (account surface › Settings › Account; also in the user menu)
+Settings template (§2c). **Profile**: initials avatar (`rounded-full bg-kumo-tint ring`), name `Input` (validated, Enter saves), email read-only `Input` with an explanation, actor ID (`user_…`, what activity and snapshots record) as `InlineCopyText`. **Password**: `PasswordField` — Kumo's `InputGroup` password pattern (`InputGroup.Input` + `InputGroup.Button` eye toggle with tooltip) — for current / new / confirm; errors appear after the first submit attempt and Better Auth codes map onto fields (`INVALID_PASSWORD` → current password); "Sign out of all other sessions" `Checkbox`, checked by default; no `<form>` (Kumo `Checkbox` is a button), Enter submits. **Active sessions**: flush `Table` (device icon + "Chrome on macOS" with the raw user agent in a `Tooltip`, "This device" `Badge info`, IP in mono, last active / signed in as `RelativeTime`, ghost "Sign out" on other rows) and a header action "Sign out other sessions"; both confirm through `ConfirmDialog` (`LayerDialog.Alert`). Better Auth lists sessions only for a sign-in younger than a day (`SESSION_NOT_FRESH`): that is `Banner variant="secondary"` with "Sign in again", not an error. **Studio access**: the sign-up policy from `/api/instance` as a `SettingRow` with a dot `Badge` and a plain explanation of the mode (owner only / closed / open / not reported; `open` adds `Banner variant="alert"`), how to change it, and "This server" features with On/Off dot badges.
+
+### 2k. Site settings (site › Settings tab and the sidebar group "Settings")
+Settings template inside the site tab layout. **General**: name `Input`, slug read-only in an `InputGroup` with a `/` addon, default language `Select` over `site.locales`, languages as outline `Badge`s, site ID `InlineCopyText`. **Domains**: flush `Table` (hostname in mono, role `Badge info` with a star for primary / outline "Alias", row `DropdownMenu`: Visit, Make primary, Remove domain) or `Empty`; an add row `InputGroup` with an `https://` addon and a secondary "Add domain" button. Input is normalised (scheme, path, case) and validated with the contract's hostname pattern; the first domain becomes primary, removing the primary promotes the next (the `ConfirmDialog` says which). Every change is a full-document `PUT` (CAS). A muted info line says DNS is configured separately. **Preview links**: `Radio appearance="card"` (current drafts / a snapshot), snapshot `Select` (label · time · live), page `InputGroup` with the primary host as addon, lifetime `Select` (1 h / 1 d / 7 d); the result is a `Surface` panel with the URL in `ClipboardText`, "Open link" `LinkButton external`, target `Badge` and expiry; without a domain the token is shown under `Banner variant="alert"`. A server without a preview secret (`features.previewLinks === false`, or 404) gets `Banner variant="secondary"` and no form.
+
+### 2l. Skills (account surface › Agents › Skills)
+`ResourceListPage` (`usage`: "How agents use skills" `LayerCard` — four numbered steps and a `Collapsible` `tools/call` example whose `_meta["cloudhal.skill"]` narrows the call; `additionalContent`: "Add your own"). Table: skill (name, two-line description, `skill://…/SKILL.md` as `InlineCopyText`), scopes (the agent-keys `ScopeBadge`; unknown scopes as mono outline badges), tools that need approval (warning `Badge` with a hand icon, localised tool name), reference count (file names in a `Tooltip`), chevron → `SkillDetailDialog` (`LayerDialog lg`: scopes with the "never more than the key" note, approvals, requirements, reference files, `ClipboardText` resource, `CodeHighlighted` call). Empty: `Empty` with a `commandLine`; a server without MCP: `Banner variant="secondary"`.
+
+### 2m. Approvals (site › Activity › Approvals; sidebar History › Approvals with a count)
+Agents with keys cannot approve their own publish / rollback / delete (ADR-0014): the request waits here for a person. Activity and Approvals share the Activity tab through a segmented `Tabs` switch (`ActivityViews`, count `Badge warning`); the sidebar item and the overview show the same count from one query, polled every 15 s (`refetchInterval`) only while the site shell is mounted; a 404 (approvals off) stops polling and shows `Banner variant="secondary"`.
+- **Waiting for you**: one `LayerCard p-0` with `divide-y` rows (no nested cards): `ToolCell` (localised label + raw name), `ActorCell` (`ActorBadge` + name), Deny (secondary) / Approve (primary) with `loading`, the server's prompt as **plain text** (it can quote agent-written titles; never HTML — CI checks there is no `dangerouslySetInnerHTML`), requested / expires as `RelativeTime` with a warning `Badge` under an hour, and `Collapsible` arguments in `CodeHighlighted`. Ordered by expiry. Empty: `Empty` "Nothing is waiting for you".
+- **Approve** on `publish`, `rollback`, `delete_page`, `delete_entry` opens `ApproveRequestDialog` (`LayerDialog`): the prompt in a `Surface`; for publish the approximate changes (live snapshot → newest snapshot: count badges + "View changes", labelled as an approximation because edits after the newest snapshot are not counted); for rollback the target snapshot with "View changes"; for deletes the target id; and an info `Banner` "Single use, for the site as it is now" (void if anything changes before the agent calls again). Other tools and Deny act immediately with a toast.
+- **409** (decided, used or expired meanwhile): error toast "This request is no longer pending", the dialog closes, the list refetches.
+- **History**: `Table` with request (tool + truncated prompt in a `Tooltip`), status dot `Badge` (approved success, denied error, used neutral, expired warning), agent, requested, decided (time + "by you" or the deciding actor id).
+- **Overview**: while requests wait, `Banner variant="alert"` with a hand icon and `Banner.Action` "Review requests" above the cards.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
@@ -85,8 +104,9 @@ Opened from the snapshot row's ghost "Compare" button or `?diff=<snapshotId>` (A
         <Sidebar.MenuButton icon={House} href active tooltip>Overview</Sidebar.MenuButton>
       </Sidebar.Menu></Sidebar.Group>
       <Sidebar.Group><Sidebar.GroupLabel>Content</Sidebar.GroupLabel><Sidebar.Menu>…Pages, Articles…</Sidebar.Menu></Sidebar.Group>
-      <Sidebar.Group><Sidebar.GroupLabel>History</Sidebar.GroupLabel><Sidebar.Menu>…Snapshots, Activity…</Sidebar.Menu></Sidebar.Group>
-      <Sidebar.Group><Sidebar.GroupLabel>Automation</Sidebar.GroupLabel><Sidebar.Menu>…Agents (collapsible: Keys and MCP → /agents, Skills "Soon"), Schedules "Soon"…</Sidebar.Menu></Sidebar.Group>
+      <Sidebar.Group><Sidebar.GroupLabel>History</Sidebar.GroupLabel><Sidebar.Menu>…Snapshots, Activity, Approvals (pending count)…</Sidebar.Menu></Sidebar.Group>
+      <Sidebar.Group><Sidebar.GroupLabel>Automation</Sidebar.GroupLabel><Sidebar.Menu>…Agents (collapsible: Keys and MCP → /agents, Skills → /agents/skills), Schedules "Soon"…</Sidebar.Menu></Sidebar.Group>
+      <Sidebar.Group><Sidebar.GroupLabel>Settings</Sidebar.GroupLabel><Sidebar.Menu>…Settings → site settings (account surface: Account → /account)…</Sidebar.Menu></Sidebar.Group>
     </Sidebar.Content>
     <Sidebar.Footer>{/* user menu + Sidebar.Trigger */}</Sidebar.Footer>
     <Sidebar.Rail />
@@ -122,6 +142,8 @@ Rules from `sidebar.tsx`: `MenuButton` auto-wraps in `<li>`; `MenuItem` only aro
 | Busy | `Button loading`, dismiss disabled while pending. |
 | Not available | A feature the server does not run (404 from `/activity`, `/agent-keys`) is not an error: `Banner variant="secondary"` with an info icon explaining what to start or enable; create actions are disabled. |
 | More data | Cursor APIs (`nextBefore`): footer with "Showing n of m loaded" and a secondary "Load more" (`loading`); client-side `Pagination` stays for fully loaded lists. |
+| Polling | Counts that must stay current (pending approvals) use `refetchInterval` (15 s) on a query owned by the surface shell, so polling stops when the surface unmounts; a 404 stops it for good. |
+| Re-authenticate | Actions the auth server allows only after a recent sign-in (the session list) show `Banner variant="secondary"` with a "Sign in again" action, never an error. |
 | Time | Relative in lists ("5 minutes ago", `Intl.RelativeTimeFormat` in the active locale, re-rendered every 30 s) with the absolute timestamp in a `Tooltip`; absolute in detail views. |
 
 ## 6. Component usage matrix (all 54)
@@ -141,7 +163,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | CloudflareLogo | not used (Cloudflare brand) |
 | Code | one-line CLI parity in usage panels |
 | CodeHighlighted (`@cloudhal/ui/code`) | client config snippets, tool input JSON (`showCopyButton`) |
-| Collapsible | advanced settings, run step details |
+| Collapsible | approval arguments, the skills `tools/call` example; advanced settings, run step details (later) |
 | Combobox | site/page pickers |
 | CommandPalette | global ⌘K / `/` |
 | DatePicker / DateRangePicker | scheduled publish, history filters |
@@ -151,7 +173,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | Field | wraps controls that lack a `label` prop |
 | Grid | detail/settings layouts |
 | InlineCopyText | ids in dense cells |
-| Input / InputArea / InputGroup | forms; `InputGroup.Addon` for slug/URL prefixes and async validation state |
+| Input / InputArea / InputGroup | forms; `InputGroup.Addon` for slug/URL/host prefixes (`/`, `https://`, the preview host) and async validation state; `InputGroup.Button` for the password show/hide toggle (`PasswordField`) |
 | Label | standalone labels only |
 | LayerCard | section cards (never nested) |
 | LayerDialog | create/edit forms (create agent key), detail sheets (activity event), snapshot diff, destructive alerts |
@@ -161,7 +183,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | Meter | quota/usage in `additionalContent` |
 | Pagination | every table |
 | Popover | filters, help |
-| Radio | exclusive settings |
+| Radio | exclusive settings; `appearance="card"` for the preview-link target |
 | Select | filters, enums (never for status mutation) |
 | SensitiveInput | API keys, secrets |
 | Sidebar | app navigation (§3) |
@@ -170,7 +192,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | Surface | usage panels, login card |
 | Switch | instant settings |
 | Table | all lists |
-| TableOfContents | settings sections |
+| TableOfContents | settings sections (`SettingsLayout`, driven by `useTableOfContentsActiveId`) |
 | Tabs | page-header tabs (controlled from the route), segmented switches (device width, snippet format, diff base), underline Edit/Preview on narrow editors |
 | TagInput | article tags |
 | Text | all text |
@@ -181,7 +203,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | PreviewPanel (Cloudhal block) | every editor (§2f); the only place an `<iframe>` may appear |
 
 ## 7. Anti-patterns (CI-enforced where mechanical)
-Raw `<table>/<h1>/<button>/<input>/<select>/<a>/<ul>/<p>` in screens; hand-rolled sidebars, headers, cards; raw Tailwind colours; `dark:`; `font-bold`, `tracking-*`, uppercase headings; hover colour transitions; `border` + `shadow`; nested `LayerCard`; conditionally rendered dialogs; status mutation through `Select`; `DANGEROUS_className` to restyle Kumo; hard-coded English (every string through `useT()`; Kumo's own labels through `KumoLocaleProvider`); spinner-only pages; uniform `p-5` card padding; a raw `<iframe>` in a screen or any iframe without `sandbox=""`; fragments or conditionals directly inside `LayerDialog.Content`; a `<form>` around Kumo `Checkbox`/`Switch` (they are buttons and submit it); past-tense labels for audit events ("Deleted page" for a call that was denied) — use the tool's imperative name; a top bar that can shrink (`shrink-0` on sticky bars inside flex columns).
+Raw `<table>/<h1>/<button>/<input>/<select>/<a>/<ul>/<p>` in screens; hand-rolled sidebars, headers, cards; raw Tailwind colours; `dark:`; `font-bold`, `tracking-*`, uppercase headings; hover colour transitions; `border` + `shadow`; nested `LayerCard`; conditionally rendered dialogs; status mutation through `Select`; `DANGEROUS_className` to restyle Kumo; hard-coded English (every string through `useT()`; Kumo's own labels through `KumoLocaleProvider`); spinner-only pages; uniform `p-5` card padding; a raw `<iframe>` in a screen or any iframe without `sandbox=""`; fragments or conditionals directly inside `LayerDialog.Content`; a `<form>` around Kumo `Checkbox`/`Switch` (they are buttons and submit it); past-tense labels for audit events ("Deleted page" for a call that was denied) — use the tool's imperative name; a top bar that can shrink (`shrink-0` on sticky bars inside flex columns); rendering agent- or server-supplied text (approval prompts, skill descriptions) as HTML — always plain `Text`, never `dangerouslySetInnerHTML`; letting a self-approved action skip the person (approvals are decided only in Studio, ADR-0014).
 
 ## 8. Review checklist
 Before merging UI: screenshot against this document; run `pnpm --filter @cloudhal/studio test` (design rules); confirm every new string exists in `en.ts` and `tr.ts`; confirm the kumo-design rules (14px, sentence case, tokens) by reading the diff.

@@ -16,7 +16,7 @@ import { useToast } from "../components/Toast.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
-const TABS = ["overview", "pages", "articles", "snapshots", "activity"] as const;
+const TABS = ["overview", "pages", "articles", "snapshots", "activity", "settings"] as const;
 
 /** Site-level header with tabs (DESIGN.md §2b); the tab routes render in the outlet. */
 export function SiteTabsLayout() {
@@ -29,8 +29,11 @@ export function SiteTabsLayout() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const [publishOpen, setPublishOpen] = useState(false);
   const base = `/sites/${siteId}`;
-  const current =
-    TABS.find((tab) => tab !== "overview" && pathname.startsWith(`${base}/${tab}`)) ?? "overview";
+  // Approvals live under the Activity tab (segmented "Activity | Approvals" inside it).
+  const current = pathname.startsWith(`${base}/approvals`)
+    ? "activity"
+    : (TABS.find((tab) => tab !== "overview" && pathname.startsWith(`${base}/${tab}`)) ??
+      "overview");
 
   const snapshot = useMutation({
     mutationFn: (publish: boolean) =>

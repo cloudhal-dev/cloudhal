@@ -5,7 +5,9 @@ import {
   Camera,
   ClockCounterClockwise,
   FileText,
+  GearSix,
   Globe,
+  HandPalm,
   House,
   Robot,
   SquaresFour,
@@ -14,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
 import { useToast } from "../components/Toast.ts";
+import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
@@ -36,6 +39,9 @@ export function SiteShell() {
     queryKey: ["snapshots", siteId],
     queryFn: () => api.snapshots.list(siteId),
   });
+  // Polls while the site surface is open; drives the sidebar badge (and the overview banner).
+  const approvals = usePendingApprovals(siteId);
+  const pendingApprovals = approvals.data?.length ?? 0;
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -100,7 +106,23 @@ export function SiteShell() {
       label: t("commands.goActivity"),
       run: () => navigate({ to: "/sites/$siteId/activity", params: { siteId } }),
     },
+    {
+      id: "approvals",
+      label: t("commands.goApprovals"),
+      run: () => navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
+    },
+    {
+      id: "settings",
+      label: t("commands.goSiteSettings"),
+      run: () => navigate({ to: "/sites/$siteId/settings", params: { siteId } }),
+    },
     { id: "agents", label: t("commands.goAgents"), run: () => navigate({ to: "/agents" }) },
+    {
+      id: "skills",
+      label: t("commands.goSkills"),
+      run: () => navigate({ to: "/agents/skills" }),
+    },
+    { id: "account", label: t("commands.goAccount"), run: () => navigate({ to: "/account" }) },
     { id: "new-article", label: t("commands.newArticle"), run: () => createArticle.mutate() },
     { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate(false) },
     { id: "publish", label: t("commands.publishSite"), run: () => snapshot.mutate(true) },
@@ -182,6 +204,15 @@ export function SiteShell() {
               >
                 {t("nav.activity")}
               </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={HandPalm}
+                href={`${base}/approvals`}
+                active={is(`${base}/approvals`)}
+                tooltip={t("nav.approvals")}
+              >
+                {t("nav.approvals")}
+                {pendingApprovals > 0 && <Sidebar.MenuBadge>{pendingApprovals}</Sidebar.MenuBadge>}
+              </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
@@ -202,9 +233,8 @@ export function SiteShell() {
                       <Sidebar.MenuSubButton href="/agents">
                         {t("nav.agentKeys")}
                       </Sidebar.MenuSubButton>
-                      <Sidebar.MenuSubButton disabled>
+                      <Sidebar.MenuSubButton href="/agents/skills">
                         {t("nav.agentSkills")}
-                        <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
                       </Sidebar.MenuSubButton>
                     </Sidebar.MenuSub>
                   </Sidebar.CollapsibleContent>
@@ -213,6 +243,19 @@ export function SiteShell() {
               <Sidebar.MenuButton icon={CalendarDots} tooltip={t("nav.schedules")} disabled>
                 {t("nav.schedules")}
                 <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
+              </Sidebar.MenuButton>
+            </Sidebar.Menu>
+          </Sidebar.Group>
+          <Sidebar.Group>
+            <Sidebar.GroupLabel>{t("nav.settings")}</Sidebar.GroupLabel>
+            <Sidebar.Menu>
+              <Sidebar.MenuButton
+                icon={GearSix}
+                href={`${base}/settings`}
+                active={is(`${base}/settings`)}
+                tooltip={t("nav.siteSettings")}
+              >
+                {t("nav.siteSettings")}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

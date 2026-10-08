@@ -12,7 +12,6 @@ import {
   Table,
   Tabs,
   Text,
-  Tooltip,
 } from "@cloudhal/ui";
 import { CodeHighlighted } from "@cloudhal/ui/code";
 import {
@@ -32,42 +31,18 @@ import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
+import { ScopeBadge } from "../components/ScopeBadge.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
-import {
-  APPROVAL_GATED_TOOLS,
-  mcpSnippet,
-  type SnippetKind,
-  scopeVariant,
-  sortScopes,
-} from "../lib/agents.ts";
-import {
-  type AgentKeySummary,
-  type AgentScope,
-  api,
-  isNotEnabled,
-  mcpEndpoint,
-} from "../lib/api.ts";
+import { APPROVAL_GATED_TOOLS, mcpSnippet, type SnippetKind, sortScopes } from "../lib/agents.ts";
+import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
 
 const matches = (k: AgentKeySummary, q: string) =>
   (k.name ?? "").toLowerCase().includes(q) ||
   (k.start ?? "").toLowerCase().includes(q) ||
   k.scopes.some((s) => s.includes(q));
-
-/** Scope pill with what it allows in a tooltip; `*` reads as "Full access". */
-export function ScopeBadge({ scope }: { scope: AgentScope }) {
-  const t = useT();
-  if (scope === "*") return <Badge variant="warning">{t("agents.fullAccess")}</Badge>;
-  return (
-    <Tooltip content={t(`agents.scopes.${scope}`)}>
-      <Badge variant={scopeVariant(scope)}>
-        <span className="font-mono text-[0.9em]">{scope}</span>
-      </Badge>
-    </Tooltip>
-  );
-}
 
 /** The "Connect an MCP client" card: endpoint, header and ready-to-paste client config. */
 export function ConnectMcpCard({ endpoint }: { endpoint: string }) {

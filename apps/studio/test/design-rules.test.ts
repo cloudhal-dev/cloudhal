@@ -153,6 +153,67 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/SnapshotDiffDialog.tsx": ["LayerDialog", "Tabs", "Badge", "Table", "Empty"],
   "components/EditorLayout.tsx": ["Grid", "Tabs", "Tooltip"],
   "components/EditorPreview.tsx": ["PreviewPanel"],
+  // Settings template (§2c): sticky TableOfContents + one LayerCard per section.
+  "components/Settings.tsx": ["Grid", "TableOfContents", "useTableOfContentsActiveId", "LayerCard"],
+  "routes/AccountPage.tsx": [
+    "PageHeader",
+    "Breadcrumbs",
+    "SettingsLayout",
+    "SettingsSection",
+    "PasswordField",
+    "Checkbox",
+    "Table",
+    "TableSkeleton",
+    "ConfirmDialog",
+    "Banner",
+    "SkeletonLine",
+  ],
+  "components/PasswordField.tsx": ["InputGroup", "InputGroup.Button"],
+  "components/ConfirmDialog.tsx": ["LayerDialog.Alert", "LayerDialog.Actions.Primary"],
+  "routes/SiteSettingsPage.tsx": [
+    "SettingsLayout",
+    "SettingsSection",
+    "InputGroup",
+    "Select",
+    "Radio",
+    "Table",
+    "Empty",
+    "DropdownMenu",
+    "ClipboardText",
+    "ConfirmDialog",
+    "Surface",
+  ],
+  "routes/SkillsPage.tsx": [
+    "ResourceListPage",
+    "ListToolbar",
+    "Table",
+    "Empty",
+    "Pagination",
+    "InlineCopyText",
+    "Collapsible",
+    "CodeHighlighted",
+    "SkillDetailDialog",
+  ],
+  "components/SkillDetailDialog.tsx": ["LayerDialog", "ClipboardText", "CodeHighlighted", "Badge"],
+  // Approvals (§2m): pending requests as LayerCard rows, history Table, LayerDialog confirmation.
+  "routes/ApprovalsPage.tsx": [
+    "ActivityViews",
+    "LayerCard",
+    "Table",
+    "Empty",
+    "Collapsible",
+    "CodeHighlighted",
+    "RefreshButton",
+    "ApproveRequestDialog",
+    "ActorCell",
+    "ToolCell",
+  ],
+  "components/ApproveRequestDialog.tsx": ["LayerDialog", "Banner", "Badge", "Surface"],
+  "components/ActivityViews.tsx": ["Tabs", "Badge"],
+  "components/PendingApprovalsBanner.tsx": ["Banner", "Banner.Action"],
+  "routes/ActivityPage.tsx#approvals": ["ActivityViews"],
+  "routes/SiteOverviewPage.tsx#approvals": ["PendingApprovalsBanner"],
+  "routes/SiteShell.tsx#approvals": ["usePendingApprovals", "Sidebar.MenuBadge"],
   "routes/PageEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
   "routes/ArticleEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
   "routes/SiteOverviewPage.tsx#activity": ["RecentActivity"],
@@ -201,6 +262,10 @@ const REQUIRED_SOMEWHERE = [
   "DecisionBadge",
   "ActorBadge",
   "OutcomeBadge",
+  "TableOfContents",
+  "InputGroup",
+  "Radio",
+  "Collapsible",
 ];
 
 describe("design rules (DESIGN.md)", () => {
@@ -254,6 +319,13 @@ describe("design rules (DESIGN.md)", () => {
   it("LayerDialog.Content gets its parts directly (Kumo throws on fragments/conditionals)", () => {
     const offenders = uiFiles
       .filter((f) => /<LayerDialog\.Content[^>]*>\s*(?:\{|<>)/.test(f.text))
+      .map((f) => f.file);
+    expect(offenders).toEqual([]);
+  });
+
+  it("never injects HTML (approval prompts and skill text can carry agent-written titles)", () => {
+    const offenders = files
+      .filter((f) => /dangerouslySetInnerHTML|\.innerHTML\s*=/.test(f.text))
       .map((f) => f.file);
     expect(offenders).toEqual([]);
   });
