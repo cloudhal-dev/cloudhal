@@ -46,6 +46,23 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "create_entry",
       "update_entry",
       "delete_entry",
+      "list_taxonomies",
+      "list_terms",
+      "resolve_terms",
+      "propose_term",
+      "update_term",
+      "rename_term",
+      "merge_terms",
+      "retire_term",
+      "set_term_parent",
+      "set_term_visibility",
+      "review_term",
+      "taxonomy_report",
+      "create_taxonomy",
+      "update_taxonomy",
+      "list_redirects",
+      "create_redirect",
+      "delete_redirect",
       "create_snapshot",
       "list_snapshots",
       "diff_snapshots",
@@ -70,6 +87,16 @@ describe("Cloudhal tools (SDK-independent)", () => {
   });
 
   it("an agent creates an article, previews it, and every mutation snapshots", async () => {
+    // A new tag is proposed first (never created implicitly); `tags` is an alias for terms.tag.add.
+    const proposed = await call("propose_term", {
+      siteId,
+      taxonomy: "tag",
+      name: "Agents",
+      reason: "Articles about AI agents",
+    });
+    const tag = (proposed.result as { term: { id: string; status: string; proposedBy?: unknown } })
+      .term;
+    expect(tag).toMatchObject({ status: "proposed", proposedBy: agent });
     const created = await call("create_entry", {
       siteId,
       slug: "agent-post",
@@ -80,10 +107,12 @@ describe("Cloudhal tools (SDK-independent)", () => {
     });
     expect(created.decision.kind).toBe("allow");
     const { entry, snapshot } = created.result as {
-      entry: { id: string; rev: number; author: { id: string } };
+      entry: { id: string; rev: number; author: { id: string }; terms?: unknown; tags: unknown };
       snapshot: { reason: string; label?: string };
     };
     expect(entry.author.id).toBe(agent.id);
+    expect(entry.terms).toEqual({ tag: { ids: [tag.id] } });
+    expect(entry.tags).toEqual([]);
     expect(snapshot.reason).toBe("agentMutation");
     expect(snapshot.label).toContain("create_entry");
 
@@ -92,25 +121,25 @@ describe("Cloudhal tools (SDK-independent)", () => {
     expect(doc.html).toContain("<h1>Hello</h1>");
     expect(doc.url).toBe("http://localhost:4321/posts/agent-post");
 
-    // The deprecated `tags` became a proposed tag term (RFC-0002 §4.4). A review entry needs a
-    // primary category; until the MCP tools take `terms`, a person files it through the store.
-    const stored = await ctx.store.getContentEntry(entry.id);
-    const proposed = await ctx.store.getTerm(stored?.terms?.tag?.ids[0] as string);
-    expect(proposed).toMatchObject({ slug: "agents", status: "proposed", proposedBy: agent });
-    const news = await ctx.store.getTermBySlug(siteId, "category", "news");
-    const filed = await ctx.store.updateContentEntry({
-      ...(stored as NonNullable<typeof stored>),
-      terms: {
-        ...stored?.terms,
-        category: { ids: [news?.id as string], primary: news?.id as string },
-      },
+    // Review needs a primary category (required on the starter): filed by name.
+    const missing = call("update_entry", {
+      siteId,
+      entryId: entry.id,
+      rev: entry.rev,
+      status: "review",
     });
-
+    await expect(missing).rejects.toMatchObject({
+      code: "required_term",
+      message: expect.stringContaining(
+        'call list_terms(taxonomy: "category") and set terms.category.primary',
+      ),
+    });
     const updated = await call("update_entry", {
       siteId,
       entryId: entry.id,
-      rev: filed.rev,
+      rev: entry.rev,
       status: "review",
+      terms: { category: { primary: "News" } },
     });
     expect((updated.result as { entry: { status: string; rev: number } }).entry.status).toBe(
       "review",
@@ -120,16 +149,25 @@ describe("Cloudhal tools (SDK-independent)", () => {
     ).rejects.toThrow(ToolError);
 
     const list = await call("list_snapshots", { siteId });
-    expect((list.result as { snapshots: unknown[] }).snapshots.length).toBe(2);
+    expect((list.result as { snapshots: unknown[] }).snapshots.length).toBe(3);
     const rows = await audit.list({ siteId });
     expect(rows.map((r) => r.tool)).toEqual([
       "list_snapshots",
       "update_entry",
       "update_entry",
+      "update_entry",
       "preview_page",
       "create_entry",
+      "propose_term",
     ]);
     expect(rows.find((r) => r.tool === "create_entry")?.snapshotId).toBeDefined();
+    // assignment deltas land in the audit input (RFC-0002 §6.4)
+    expect(rows.find((r) => r.tool === "create_entry")?.input).toMatchObject({
+      effect: { terms: { tag: { added: ["agents"] } } },
+    });
+    expect(rows.find((r) => r.tool === "update_entry" && r.outcome === "ok")?.input).toMatchObject({
+      effect: { terms: { category: { added: ["news"], primary: { from: null, to: "news" } } } },
+    });
   });
 
   it("publishing is denied for a plain agent and approval-gated for a human", async () => {

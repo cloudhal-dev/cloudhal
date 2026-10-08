@@ -8,19 +8,15 @@
  */
 
 import type {
-  ApprovalStore,
   AuditLog,
   AutoCheck,
   Decision,
   PolicyEngine,
-  Principal,
-  Scope,
-  ToolAnnotations,
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
 import { checkAutoPublish, describeAutoCheck, effectiveMode } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
-import type { ContentEntry, Page, Section, Site, Snapshot } from "@cloudhal/core-contracts";
+import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
   PageSchema,
@@ -28,70 +24,46 @@ import {
   SiteSchema,
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
-import type { SiteGraphStore, SnapshotDiff } from "@cloudhal/core-ts";
+import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
+import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
 import {
-  ConflictError,
-  mintPreviewToken,
-  NotFoundError,
-  previewUrl,
-  primaryOrigin,
-  termName,
-} from "@cloudhal/core-ts";
+  autoSnapshot,
+  id,
+  type JsonSchema,
+  mapError,
+  obj,
+  quote,
+  requireSite,
+  SLUG_PATTERN,
+  str,
+  strip,
+  type ToolContext,
+  type ToolDefinition,
+  ToolError,
+  toToolError,
+} from "./common.ts";
 import { elevationTools } from "./elevation-tools.ts";
+import { taxonomyTools } from "./taxonomy-tools.ts";
+import {
+  applyTermsInput,
+  assignmentDeltas,
+  auditDeltas,
+  describeDeltas,
+  TAGS_INPUT,
+  TERMS_INPUT,
+  type TermsInput,
+  termLookup,
+} from "./terms.ts";
 
-export type JsonSchema = Record<string, unknown>;
+export {
+  type JsonSchema,
+  type ToolContext,
+  type ToolDefinition,
+  ToolError,
+  type ToolErrorCode,
+  toToolError,
+} from "./common.ts";
 
-export interface ToolDefinition {
-  name: string;
-  title: string;
-  description: string;
-  inputSchema: JsonSchema;
-  outputSchema: JsonSchema;
-  annotations: ToolAnnotations;
-  scopes: Scope[];
-  requiresApproval?: boolean;
-  /** Human-readable question shown in the approval gate. */
-  approvalPrompt?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
-  handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
-}
-
-export interface ToolContext {
-  store: SiteGraphStore;
-  principal: Principal;
-  /** Out-of-band approvals (HTTP): where `request_elevation` files its request. */
-  approvals?: ApprovalStore | undefined;
-  /** Clock (tests); defaults to the system time. */
-  now?: (() => Date) | undefined;
-  /** Base URL of a running `cloudhal dev` server, when known (preview links). */
-  previewBaseUrl?: string | undefined;
-  /** Shared preview secret: signed links to the deployed site (preferred over `previewBaseUrl`). */
-  previewSecret?: string | undefined;
-}
-
-export class ToolError extends Error {
-  override readonly name = "ToolError";
-  readonly code: "not_found" | "conflict" | "invalid" | "denied" | "approval_required";
-  constructor(code: ToolError["code"], message: string) {
-    super(message);
-    this.code = code;
-  }
-}
-
-const id = { type: "string", pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$" };
-const str = (desc: string, extra: JsonSchema = {}) => ({
-  type: "string",
-  description: desc,
-  ...extra,
-});
-const obj = (
-  properties: JsonSchema,
-  required: string[] = [],
-  extra: JsonSchema = {},
-): JsonSchema => ({ type: "object", additionalProperties: false, properties, required, ...extra });
-const strip = (schema: unknown): JsonSchema => {
-  const { $schema: _s, $id: _i, ...rest } = schema as JsonSchema;
-  return rest;
-};
 const SITE = strip(SiteSchema);
 const PAGE = strip(PageSchema);
 const ENTRY = strip(ContentEntrySchema);
@@ -110,12 +82,6 @@ function assertNoHtmlSections(sections: unknown): void {
       );
 }
 
-/** Agent-controlled text in approval prompts is shortened and quoted so it cannot pose as UI. */
-function quote(text: string, max = 60): string {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
-}
-
 const KIND_LABEL: Record<string, string> = {
   site: "site",
   page: "page",
@@ -125,12 +91,17 @@ const KIND_LABEL: Record<string, string> = {
   redirect: "redirect",
 };
 
+/**
+ * One line per changed node for approval prompts, at most 8. Articles also show their assignment
+ * deltas (RFC-0002 §6.4): `~ article "…" (+tag ai, −tag llms, primary category → News)`.
+ */
 async function describeChanges(
   ctx: ToolContext,
   diff: SnapshotDiff,
   site?: Site,
 ): Promise<string[]> {
   const locale = site?.defaultLocale;
+  const lookup = termLookup(ctx);
   const title = async (ref: { id: string; kind: string }) => {
     switch (ref.kind) {
       case "page":
@@ -155,43 +126,78 @@ async function describeChanges(
         return undefined;
     }
   };
+  const deltas = async (
+    ref: { id: string; kind: string },
+    before?: SnapshotDiff["added"][number],
+  ) => {
+    if (ref.kind !== "contentEntry") return "";
+    const now = await ctx.store.getContentEntry(ref.id);
+    if (!now) return "";
+    const was = before ? await ctx.store.readSnapshotNode<ContentEntry>(before) : undefined;
+    const text = await describeDeltas(assignmentDeltas(was?.terms, now.terms), lookup, locale);
+    return text ? ` (${text})` : "";
+  };
   const label = (kind: string) => KIND_LABEL[kind] ?? kind;
   const out: string[] = [];
-  const groups: [string, { id: string; kind: string }[]][] = [
-    ["+", diff.added],
-    ["~", diff.changed.map((c) => c.after)],
-    ["−", diff.removed],
+  const groups: [
+    string,
+    { ref: SnapshotDiff["added"][number]; before?: SnapshotDiff["added"][number] }[],
+  ][] = [
+    ["+", diff.added.map((ref) => ({ ref }))],
+    ["~", diff.changed.map((c) => ({ ref: c.after, before: c.before }))],
+    ["−", diff.removed.map((ref) => ({ ref }))],
   ];
   for (const [sign, refs] of groups)
-    for (const ref of refs) {
+    for (const { ref, before } of refs) {
       if (out.length >= 8) {
         out.push(`… and ${diff.added.length + diff.changed.length + diff.removed.length - 8} more`);
         return out;
       }
       const t = sign === "−" ? undefined : await title(ref);
-      out.push(`${sign} ${label(ref.kind)} ${t ? `"${quote(t)}"` : ref.id}`);
+      const d = sign === "−" ? "" : await deltas(ref, before);
+      out.push(`${sign} ${label(ref.kind)} ${t ? `"${quote(t)}"` : ref.id}${d}`);
     }
   return out;
 }
 
-async function requireSite(ctx: ToolContext, siteId: string): Promise<Site> {
-  const site = await ctx.store.getSite(siteId);
-  if (!site) throw new ToolError("not_found", `site ${siteId} not found`);
-  return site;
+/**
+ * The `terms` (and deprecated `tags`) input of create_entry / update_entry → the entry's new
+ * assignments and `tags`. `tags` is an alias for `terms.tag.add` on sites with a `tag` taxonomy; a
+ * site that has not been migrated (no `tag` taxonomy) keeps plain tags.
+ */
+async function entryTerms(
+  ctx: ToolContext,
+  site: Site,
+  entry: ContentEntry | undefined,
+  a: Record<string, unknown>,
+): Promise<{ terms: ContentEntry["terms"]; tags: string[] }> {
+  const input: TermsInput = { ...((a.terms as TermsInput | undefined) ?? {}) };
+  const aliased = a.tags as string[] | undefined;
+  let tags = entry?.tags ?? [];
+  if (aliased !== undefined) {
+    if (await ctx.store.getTaxonomyByKey(site.id, "tag")) {
+      if (aliased.length > 0) {
+        const ops = input.tag ?? {};
+        input.tag = { ...ops, add: [...(ops.add ?? []), ...aliased] };
+      }
+    } else tags = aliased;
+  }
+  const terms =
+    Object.keys(input).length > 0
+      ? await applyTermsInput(ctx, site, entry?.terms, input)
+      : entry?.terms;
+  return { terms, tags };
 }
 
-async function autoSnapshot(ctx: ToolContext, siteId: string, tool: string): Promise<Snapshot> {
-  return ctx.store.createSnapshot(siteId, {
-    actor: ctx.principal.actor,
-    reason: "agentMutation",
-    label: `${tool} by ${ctx.principal.actor.name ?? ctx.principal.actor.id}`,
-  });
-}
-
-function mapError(e: unknown): never {
-  if (e instanceof ConflictError) throw new ToolError("conflict", e.message);
-  if (e instanceof NotFoundError) throw new ToolError("not_found", e.message);
-  throw e;
+/** Assignment deltas of an entry write into the audit row (`input.effect.terms`). */
+async function reportDeltas(
+  ctx: ToolContext,
+  before: ContentEntry | undefined,
+  after: ContentEntry,
+): Promise<void> {
+  const deltas = assignmentDeltas(before?.terms, after.terms);
+  if (deltas.length > 0 && ctx.report)
+    ctx.report({ terms: await auditDeltas(deltas, termLookup(ctx)) });
 }
 
 /**
@@ -224,11 +230,16 @@ export function hoistDefs(schema: JsonSchema): JsonSchema {
 
 /** All tools, in the deterministic order `tools/list` exposes them. */
 export function defineTools(): ToolDefinition[] {
-  return [...rawTools(), ...elevationTools()].map((t) => ({
-    ...t,
-    inputSchema: hoistDefs(t.inputSchema),
-    outputSchema: hoistDefs(t.outputSchema),
-  }));
+  const raw = rawTools();
+  // Taxonomy, term and redirect tools (RFC-0002 §6.2) follow the article tools.
+  const at = raw.findIndex((t) => t.name === "delete_entry") + 1;
+  return [...raw.slice(0, at), ...taxonomyTools(), ...raw.slice(at), ...elevationTools()].map(
+    (t) => ({
+      ...t,
+      inputSchema: hoistDefs(t.inputSchema),
+      outputSchema: hoistDefs(t.outputSchema),
+    }),
+  );
 }
 
 function rawTools(): ToolDefinition[] {
@@ -451,10 +462,27 @@ function rawTools(): ToolDefinition[] {
     {
       name: "list_entries",
       title: "List articles",
-      description: "Content entries of a collection (default: posts), newest first.",
-      inputSchema: obj({ siteId: id, collection: str("Collection slug", { default: "posts" }) }, [
-        "siteId",
-      ]),
+      description:
+        'Content entries, newest first. `collection` defaults to posts (unless the filter names one). `filter` selects by terms (RFC-0002 grammar): clauses joined by "+" (AND), "[a,b]" = either, "-" = none of, "primary:category:x" = primary term, "category:x>*" = x or a sub-category, "collection:posts"; values are term slugs (old slugs work) or ids. Example: "category:news+tag:[ai,llm]+-tag:sponsored".',
+      inputSchema: obj(
+        {
+          siteId: id,
+          collection: str("Collection slug", { default: "posts", pattern: SLUG_PATTERN }),
+          filter: str("Filter over term assignments, e.g. category:news+tag:ai", {
+            minLength: 1,
+            maxLength: 512,
+          }),
+          locale: str("Only entries in this BCP 47 locale"),
+          status: {
+            type: "array",
+            description: "Only entries in these statuses",
+            items: { type: "string", enum: ["draft", "review", "published", "archived"] },
+            minItems: 1,
+            uniqueItems: true,
+          },
+        },
+        ["siteId"],
+      ),
       outputSchema: obj({ entries: { type: "array", items: ENTRY } }, ["entries"]),
       annotations: {
         readOnlyHint: true,
@@ -465,13 +493,24 @@ function rawTools(): ToolDefinition[] {
       scopes: ["content:read"],
       handler: async (a, ctx) => {
         await requireSite(ctx, a.siteId as string);
-        const entries = (
-          await ctx.store.listContentEntries(
-            a.siteId as string,
-            (a.collection as string | undefined) ?? "posts",
-          )
-        ).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt));
-        return { entries };
+        const filter = a.filter as string | undefined;
+        const collection =
+          (a.collection as string | undefined) ??
+          (filter && /(^|\+)-?collection:/.test(filter) ? undefined : "posts");
+        const query: EntryQuery = {
+          ...(collection !== undefined ? { collection } : {}),
+          ...(filter !== undefined ? { filter } : {}),
+          ...(a.locale !== undefined ? { locale: a.locale as string } : {}),
+          ...(a.status !== undefined ? { status: a.status as ContentEntry["status"][] } : {}),
+        };
+        try {
+          const entries = (await ctx.store.listContentEntries(a.siteId as string, query)).sort(
+            (x, y) => y.updatedAt.localeCompare(x.updatedAt),
+          );
+          return { entries };
+        } catch (e) {
+          mapError(e);
+        }
       },
     },
     {
@@ -497,17 +536,19 @@ function rawTools(): ToolDefinition[] {
     {
       name: "create_entry",
       title: "Create article",
-      description: "Create a draft content entry (markdown body). Snapshots afterwards.",
+      description:
+        "Create a draft content entry (markdown body), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Snapshots afterwards.",
       inputSchema: obj(
         {
           siteId: id,
-          collection: str("Collection slug", { default: "posts" }),
-          slug: str("Lower-case hyphenated slug", { pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" }),
+          collection: str("Collection slug", { default: "posts", pattern: SLUG_PATTERN }),
+          slug: str("Lower-case hyphenated slug", { pattern: SLUG_PATTERN, maxLength: 128 }),
           locale: str("BCP 47 locale; defaults to the site's default locale"),
           title: str("Title"),
           summary: str("One or two sentences"),
           body: str("Markdown body"),
-          tags: { type: "array", items: { type: "string" } },
+          terms: TERMS_INPUT,
+          tags: TAGS_INPUT,
           fields: { type: "object", description: "Collection-specific fields" },
         },
         ["siteId", "slug", "title", "body"],
@@ -522,6 +563,7 @@ function rawTools(): ToolDefinition[] {
       scopes: ["content:write"],
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
+        const { terms, tags } = await entryTerms(ctx, site, undefined, a);
         try {
           const entry = await ctx.store.createContentEntry({
             siteId: site.id,
@@ -533,9 +575,11 @@ function rawTools(): ToolDefinition[] {
             ...(a.summary ? { summary: a.summary as string } : {}),
             body: { format: "markdown", value: a.body as string },
             fields: (a.fields as Record<string, unknown> | undefined) ?? {},
-            tags: (a.tags as string[] | undefined) ?? [],
+            tags,
+            ...(terms ? { terms } : {}),
             author: ctx.principal.actor,
           });
+          await reportDeltas(ctx, undefined, entry);
           const snapshot = await autoSnapshot(ctx, site.id, "create_entry");
           return { entry, snapshot };
         } catch (e) {
@@ -547,7 +591,7 @@ function rawTools(): ToolDefinition[] {
       name: "update_entry",
       title: "Update article",
       description:
-        "Update title, summary, body, tags, slug or status (draft → review → published) of an entry. Requires the current `rev`. Snapshots afterwards.",
+        "Update title, summary, body, slug, status (draft → review → published) or terms (`terms`: add, remove or set categories and tags by id, slug or name) of an entry. Review and published articles need a primary term in every required taxonomy. Requires the current `rev`. Changing a published article's slug leaves a redirect. Snapshots afterwards.",
       inputSchema: obj(
         {
           siteId: id,
@@ -556,8 +600,9 @@ function rawTools(): ToolDefinition[] {
           title: str("Title"),
           summary: str("Summary"),
           body: str("Markdown body"),
-          slug: str("Slug"),
-          tags: { type: "array", items: { type: "string" } },
+          slug: str("Slug", { pattern: SLUG_PATTERN, maxLength: 128 }),
+          terms: TERMS_INPUT,
+          tags: TAGS_INPUT,
           status: { type: "string", enum: ["draft", "review", "published", "archived"] },
         },
         ["siteId", "entryId", "rev"],
@@ -570,6 +615,34 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["content:write"],
+      approvalPrompt: async (a, ctx) => {
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        if (!entry || entry.siteId !== a.siteId) return `Update article ${a.entryId}?`;
+        const site = await ctx.store.getSite(entry.siteId);
+        const changes = [
+          a.title ? `title → "${quote(a.title as string)}"` : "",
+          a.summary !== undefined ? "summary" : "",
+          a.body !== undefined ? "body" : "",
+          a.slug && a.slug !== entry.slug
+            ? `slug ${entry.slug} → ${a.slug as string}${entry.status === "published" || entry.publishedAt ? " (leaves a redirect)" : ""}`
+            : "",
+          a.status && a.status !== entry.status ? `status → ${a.status as string}` : "",
+        ].filter(Boolean);
+        if (a.terms || a.tags) {
+          try {
+            const { terms } = await entryTerms(ctx, site as Site, entry, a);
+            const d = await describeDeltas(
+              assignmentDeltas(entry.terms, terms),
+              termLookup(ctx),
+              site?.defaultLocale,
+            );
+            if (d) changes.push(d);
+          } catch {
+            changes.push("terms");
+          }
+        }
+        return `Update article "${quote(entry.title)}"${changes.length ? ` (${changes.join(", ")})` : ""}?`;
+      },
       handler: async (a, ctx) => {
         const entry = await ctx.store.getContentEntry(a.entryId as string);
         if (!entry || entry.siteId !== a.siteId)
@@ -584,13 +657,17 @@ function rawTools(): ToolDefinition[] {
             "conflict",
             `entry ${entry.id} is at rev ${entry.rev}, you sent ${a.rev}; reload and retry`,
           );
+        const site = await requireSite(ctx, entry.siteId);
+        const { terms, tags } = await entryTerms(ctx, site, entry, a);
+        const { terms: _old, ...rest } = entry;
         const next: ContentEntry = {
-          ...entry,
+          ...rest,
           ...(a.title ? { title: a.title as string } : {}),
           ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
           ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
           ...(a.slug ? { slug: a.slug as string } : {}),
-          ...(a.tags ? { tags: a.tags as string[] } : {}),
+          tags,
+          ...(terms ? { terms } : {}),
           ...(a.status ? { status: a.status as ContentEntry["status"] } : {}),
           ...(a.status === "published" && !entry.publishedAt
             ? { publishedAt: new Date().toISOString() }
@@ -598,6 +675,7 @@ function rawTools(): ToolDefinition[] {
         };
         try {
           const saved = await ctx.store.updateContentEntry(next);
+          await reportDeltas(ctx, entry, saved);
           const snapshot = await autoSnapshot(ctx, entry.siteId, "update_entry");
           return { entry: saved, snapshot };
         } catch (e) {
@@ -919,6 +997,20 @@ export async function runTool(
     });
     return { decision };
   }
+  if (def.precheck) {
+    try {
+      await def.precheck(args, ctx);
+    } catch (raw) {
+      const e = toToolError(raw);
+      await deps.audit?.record({
+        ...base,
+        decision: "deny",
+        reason: e instanceof Error ? e.message : String(e),
+        outcome: "error",
+      });
+      throw e;
+    }
+  }
   // `auto` mode: a publish that only adds or edits a few articles goes live without a person.
   let autoCheck: AutoCheck | undefined;
   let autoNote: string | undefined;
@@ -951,11 +1043,21 @@ export async function runTool(
     });
     return { decision, approvalPrompt, ...checked };
   }
+  // What the call did beyond its arguments (assignment deltas, a governance operation) goes into
+  // the audit row's `input.effect` (RFC-0002 §6.4).
+  let effect: Record<string, unknown> | undefined;
+  const callCtx: ToolContext = {
+    ...ctx,
+    report: (e) => {
+      effect = { ...effect, ...e };
+    },
+  };
   try {
-    const result = await def.handler(args, ctx);
+    const result = await def.handler(args, callCtx);
     const snapshotId = (result as { snapshot?: { id?: string } } | undefined)?.snapshot?.id;
     await deps.audit?.record({
       ...base,
+      ...(effect ? { input: { ...args, effect } } : {}),
       decision: "allow",
       outcome: "ok",
       snapshotId,
@@ -969,7 +1071,8 @@ export async function runTool(
       ...(autoNote ? { autoApproved: autoNote } : {}),
       ...checked,
     };
-  } catch (e) {
+  } catch (raw) {
+    const e = toToolError(raw);
     await deps.audit?.record({
       ...base,
       decision: "allow",

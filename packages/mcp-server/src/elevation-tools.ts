@@ -18,7 +18,7 @@ import {
   REMOTE_AGENT_MODES,
 } from "@cloudhal/agent-runtime";
 import { canonicalJson, sha256Hex } from "@cloudhal/core-ts";
-import { type JsonSchema, type ToolContext, type ToolDefinition, ToolError } from "./tools.ts";
+import { type JsonSchema, type ToolContext, type ToolDefinition, ToolError } from "./common.ts";
 
 export const REQUEST_ELEVATION = "request_elevation";
 
