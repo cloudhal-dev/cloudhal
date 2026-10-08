@@ -76,3 +76,4 @@ export {
   type SnapshotTimelineProps,
 } from "./blocks/SnapshotTimeline.tsx";
 export { StatusBadge, type StatusBadgeProps } from "./blocks/StatusBadge.tsx";
+export { TermChip, TermChipList, type TermChipProps } from "./blocks/TermChips.tsx";
