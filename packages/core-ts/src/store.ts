@@ -307,14 +307,14 @@ export class SiteGraphStore {
    */
   async createPage(site: Site, input: Creatable<Page>): Promise<{ page: Page; site: Site }> {
     const ts = this.#stamp();
-    const draft: Page = {
+    const draft: Page = structuredClone({
       ...input,
       schemaVersion: 1,
       id: input.id ?? this.#newId(ID_PREFIX.page),
       rev: 0,
       createdAt: ts,
       updatedAt: ts,
-    };
+    });
     fillMissingSrc("page", draft);
     assertValid("page", draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
@@ -371,7 +371,7 @@ export class SiteGraphStore {
    */
   async updatePage(page: Page): Promise<Page> {
     const ts = this.#stamp();
-    const draft: Page = { ...page, rev: page.rev + 1, updatedAt: ts };
+    const draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
     fillMissingSrc("page", draft);
     assertValid("page", draft);
     checkReservedPath(draft.path);
