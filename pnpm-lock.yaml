@@ -752,6 +752,9 @@ importers:
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage
+      marked:
+        specifier: 'catalog:'
+        version: 18.1.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'

@@ -16,7 +16,10 @@
     "./names": "./src/names.ts",
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
-    "./cache-tags": "./src/cache-tags.ts"
+    "./cache-tags": "./src/cache-tags.ts",
+    "./media": "./src/media/index.ts",
+    "./media-node": "./src/media-node.ts",
+    "./media/fixtures": "./src/media/fixtures.ts"
   },
   "files": [
     "dist",
@@ -29,7 +32,8 @@
   },
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
-    "@cloudhal/storage": "workspace:*"
+    "@cloudhal/storage": "workspace:*",
+    "marked": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
@@ -80,6 +84,18 @@
       "./cache-tags": {
         "types": "./dist/src/cache-tags.d.ts",
         "default": "./dist/src/cache-tags.js"
+      },
+      "./media": {
+        "types": "./dist/src/media/index.d.ts",
+        "default": "./dist/src/media/index.js"
+      },
+      "./media-node": {
+        "types": "./dist/src/media-node.d.ts",
+        "default": "./dist/src/media-node.js"
+      },
+      "./media/fixtures": {
+        "types": "./dist/src/media/fixtures.d.ts",
+        "default": "./dist/src/media/fixtures.js"
       }
     }
   }
