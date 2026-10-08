@@ -63,6 +63,15 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   return {
     async fetch(request: Request, env: AdminEnv, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(request.url);
+      // The assets layer answers existing files before the Worker runs, so a request for a file
+      // under /assets/ that reaches us is missing (e.g. a chunk from an older Studio build). Answer
+      // 404, never the SPA shell: an HTML 200 for a script URL can be cached and shadow the real
+      // file once it exists.
+      if (url.pathname.startsWith("/assets/"))
+        return new Response("not found", {
+          status: 404,
+          headers: { "content-type": "text/plain", "cache-control": "no-store" },
+        });
       if (!WORKER_PATHS.test(url.pathname)) {
         // Studio SPA (normally served by the assets layer before the Worker runs).
         return env.ASSETS ? env.ASSETS.fetch(request) : new Response("not found", { status: 404 });

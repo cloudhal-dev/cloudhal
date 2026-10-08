@@ -27,6 +27,15 @@ describe("admin Worker routing", () => {
       expect(await res.text()).toBe("studio");
     }
     expect(seen).toEqual(["/", "/sites/site_x", "/login", "/apix", "/mcpx"]);
+    // a missing build file is a 404, never the SPA shell (which could be cached under its URL)
+    const missing = await worker.fetch(
+      new Request("https://admin.example/assets/Old-abc123.js"),
+      env,
+      ctx,
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("cache-control")).toBe("no-store");
+    expect(seen).not.toContain("/assets/Old-abc123.js");
     const noAssets = await worker.fetch(new Request("https://admin.example/"), {} as never, ctx);
     expect(noAssets.status).toBe(404);
   });
