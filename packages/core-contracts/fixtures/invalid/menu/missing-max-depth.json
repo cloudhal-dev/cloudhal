@@ -1,0 +1,22 @@
+{
+  "reason": "maxDepth is required",
+  "data": {
+    "schemaVersion": 1,
+    "id": "menu_01HZX8K3Q9BD",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "footer",
+    "items": [
+      {
+        "id": "item_01HZX8K3Q9X1",
+        "kind": "url",
+        "href": "https://example.com/",
+        "labels": {
+          "en": "Example"
+        }
+      }
+    ],
+    "rev": 0,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T09:00:00Z"
+  }
+}
