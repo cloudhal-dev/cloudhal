@@ -186,7 +186,7 @@ describe("agent key list", () => {
         container.querySelector('[data-key-id="key_docs"] [data-mode]')?.getAttribute("data-mode"),
       ).toBe("auto"),
     );
-  }, 15_000); // several dialogs and menus; slow when the whole monorepo tests in parallel
+  });
 
   it("keeps the dialog open and shows the server's reason when the change is refused (400)", async () => {
     const fetch = serve((url, init) =>
