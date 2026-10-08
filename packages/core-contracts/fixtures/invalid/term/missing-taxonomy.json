@@ -1,0 +1,25 @@
+{
+  "reason": "every term belongs to a taxonomy",
+  "data": {
+    "schemaVersion": 1,
+    "id": "term_01HZX8K3Q9LL",
+    "siteId": "site_01HZX8K3Q9EF",
+    "slug": "llm",
+    "status": "proposed",
+    "visibility": "public",
+    "labels": {
+      "en": {
+        "name": "LLM",
+        "altNames": ["LLMs", "large language models"]
+      }
+    },
+    "proposedBy": {
+      "kind": "agent",
+      "id": "agent_01HZX8K3Q9YZ",
+      "name": "Newsroom Agent"
+    },
+    "rev": 0,
+    "createdAt": "2026-10-08T10:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

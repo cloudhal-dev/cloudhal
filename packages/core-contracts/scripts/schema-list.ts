@@ -10,6 +10,9 @@ export const ROOT_SCHEMAS = [
   "content-entry",
   "snapshot",
   "skill-manifest",
+  "taxonomy",
+  "term",
+  "redirect",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];

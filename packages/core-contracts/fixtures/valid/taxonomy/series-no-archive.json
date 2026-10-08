@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "tax_01HZX8K3Q9SR",
+  "siteId": "site_01HZX8K3Q9EF",
+  "key": "series",
+  "labels": {
+    "en": {
+      "singular": "Series",
+      "plural": "Series"
+    }
+  },
+  "hierarchical": false,
+  "allowNewTerms": "none",
+  "required": false,
+  "archive": {
+    "enabled": false,
+    "basePath": "/series"
+  },
+  "feed": false,
+  "minEntriesToIndex": 0,
+  "rev": 0,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:00:00Z",
+  "metadata": {
+    "cloudhal.source": "studio"
+  }
+}

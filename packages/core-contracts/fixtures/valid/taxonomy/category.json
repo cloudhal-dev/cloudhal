@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "tax_01HZX8K3Q9CA",
+  "siteId": "site_01HZX8K3Q9EF",
+  "key": "category",
+  "labels": {
+    "en": {
+      "singular": "Category",
+      "plural": "Categories"
+    },
+    "tr": {
+      "singular": "Kategori",
+      "plural": "Kategoriler"
+    }
+  },
+  "hierarchical": true,
+  "allowNewTerms": "none",
+  "required": true,
+  "maxPerEntry": 3,
+  "collections": ["posts"],
+  "archive": {
+    "enabled": true,
+    "basePath": "/category"
+  },
+  "feed": true,
+  "minEntriesToIndex": 3,
+  "rev": 0,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:00:00Z"
+}

@@ -683,6 +683,9 @@ pub enum Section {
     #[serde(rename = "contentList")]
     ContentList {
         collection: Slug,
+        #[doc = "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        filter: ::std::option::Option<SectionFilter>,
         id: Id,
         limit: ::std::num::NonZeroU64,
         sort: SectionSort,
@@ -777,6 +780,59 @@ impl ::std::convert::TryFrom<::std::string::String> for SectionCaption {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for SectionCaption {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct SectionFilter(::std::string::String);
+impl ::std::ops::Deref for SectionFilter {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<SectionFilter> for ::std::string::String {
+    fn from(value: SectionFilter) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for SectionFilter {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 512usize {
+            return Err("longer than 512 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for SectionFilter {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for SectionFilter {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SectionFilter {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -997,7 +1053,7 @@ impl<'de> ::serde::Deserialize<'de> for SectionSubheading {
             })
     }
 }
-#[doc = "`Seo`"]
+#[doc = "Search and social metadata of a routable node (page, term archive)."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Seo {
@@ -1007,6 +1063,11 @@ pub struct Seo {
     pub description: ::std::option::Option<SeoDescription>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub noindex: ::std::option::Option<bool>,
+    #[serde(
+        rename = "ogImage",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub og_image: ::std::option::Option<ImageRef>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub title: ::std::option::Option<SeoTitle>,
 }

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "page_01HZX8K3Q9AB",
+  "siteId": "site_01HZX8K3Q9EF",
+  "path": "/about",
+  "title": "About",
+  "locale": "en",
+  "status": "published",
+  "sections": [],
+  "seo": {
+    "title": "About the newsroom",
+    "description": "Who runs this site.",
+    "canonical": "https://news.example.com/about",
+    "ogImage": {
+      "src": "/assets/about-og.jpg",
+      "alt": "The team"
+    }
+  },
+  "rev": 1,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T10:00:00Z"
+}

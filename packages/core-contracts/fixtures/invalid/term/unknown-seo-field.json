@@ -1,0 +1,39 @@
+{
+  "reason": "Seo has no 'robots' property",
+  "data": {
+    "schemaVersion": 1,
+    "id": "term_01HZX8K3Q9NW",
+    "siteId": "site_01HZX8K3Q9EF",
+    "taxonomyId": "tax_01HZX8K3Q9CA",
+    "slug": "news",
+    "status": "active",
+    "visibility": "public",
+    "labels": {
+      "en": {
+        "name": "News",
+        "description": "Daily coverage of **agent-operated** publishing.",
+        "seo": {
+          "title": "News about agent-operated publishing",
+          "description": "Every news story, newest first.",
+          "ogImage": {
+            "src": "/assets/news-og.jpg",
+            "alt": "News",
+            "width": 1200,
+            "height": 630
+          },
+          "robots": "noindex"
+        }
+      },
+      "tr": {
+        "name": "Haberler"
+      }
+    },
+    "image": {
+      "src": "/assets/news.jpg",
+      "alt": "Newsroom"
+    },
+    "rev": 4,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

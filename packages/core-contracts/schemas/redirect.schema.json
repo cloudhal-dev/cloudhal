@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/redirect.schema.json",
+  "title": "Redirect",
+  "description": "An HTTP redirect from a path the site no longer serves. Created automatically when a published entry or a term changes slug, when terms are merged or retired, and by people. Snapshotted and published like every other node (RFC-0002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "from",
+    "to",
+    "status",
+    "match",
+    "reason",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "from": {
+      "type": "string",
+      "description": "Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.",
+      "pattern": "^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$",
+      "maxLength": 1024
+    },
+    "to": {
+      "type": "string",
+      "description": "Target: a site path (may carry a query or fragment) or an absolute https URL. Protocol-relative ('//host') and backslash forms are rejected.",
+      "pattern": "^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$",
+      "maxLength": 2048
+    },
+    "status": {
+      "type": "integer",
+      "description": "301 (permanent) for slug changes, merges and retirements; 302 (temporary) only for manual redirects.",
+      "enum": [301, 302]
+    },
+    "match": {
+      "type": "string",
+      "description": "exact: only `from` itself. prefix: `from` and every path below it; the rest of the path is appended to `to` (archives: /tag/old/page/2 → /tag/new/page/2).",
+      "enum": ["exact", "prefix"]
+    },
+    "reason": {
+      "type": "string",
+      "enum": ["slug-change", "merge", "retire", "manual"]
+    },
+    "source": { "$ref": "#/$defs/RedirectSource" },
+    "note": { "type": "string", "maxLength": 500 },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "RedirectSource": {
+      "type": "object",
+      "description": "The node whose earlier URL this redirect preserves (automatic redirects). Used to collapse chains on later renames and to list a node's old URLs.",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["page", "contentEntry", "term"] },
+        "id": { "$ref": "common.schema.json#/$defs/Id" }
+      }
+    }
+  }
+}

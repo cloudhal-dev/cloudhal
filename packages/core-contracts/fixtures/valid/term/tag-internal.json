@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "term_01HZX8K3Q9IN",
+  "siteId": "site_01HZX8K3Q9EF",
+  "taxonomyId": "tax_01HZX8K3Q9TG",
+  "slug": "homepage-feature",
+  "status": "active",
+  "visibility": "internal",
+  "labels": {
+    "en": {
+      "name": "Homepage feature"
+    }
+  },
+  "rev": 1,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:00:00Z",
+  "metadata": {
+    "cloudhal.purpose": "theme"
+  }
+}

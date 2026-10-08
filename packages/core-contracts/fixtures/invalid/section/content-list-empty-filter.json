@@ -1,0 +1,11 @@
+{
+  "reason": "an empty filter is omitted",
+  "data": {
+    "id": "sec_01HZX8K3Q9FL",
+    "kind": "contentList",
+    "collection": "posts",
+    "limit": 6,
+    "sort": "newest",
+    "filter": ""
+  }
+}

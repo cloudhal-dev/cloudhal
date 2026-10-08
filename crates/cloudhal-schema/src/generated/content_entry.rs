@@ -261,7 +261,14 @@ pub struct ContentEntry {
     pub status: PublishStatus,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub summary: ::std::option::Option<ContentEntrySummary>,
+    #[doc = "Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2."]
     pub tags: ::std::vec::Vec<Slug>,
+    #[doc = "Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object."]
+    #[serde(
+        default,
+        skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
+    )]
+    pub terms: ::std::collections::HashMap<Slug, TermAssignment>,
     pub title: ContentEntryTitle,
     #[serde(rename = "updatedAt")]
     pub updated_at: Timestamp,
@@ -818,6 +825,15 @@ impl<'de> ::serde::Deserialize<'de> for Slug {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
     }
+}
+#[doc = "Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TermAssignment {
+    pub ids: ::std::vec::Vec<Id>,
+    #[doc = "The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub primary: ::std::option::Option<Id>,
 }
 #[doc = "RFC 3339 / ISO 8601 instant in UTC."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]

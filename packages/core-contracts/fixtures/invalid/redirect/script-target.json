@@ -1,0 +1,17 @@
+{
+  "reason": "only site paths and https URLs are targets",
+  "data": {
+    "schemaVersion": 1,
+    "id": "redir_01HZX8K3Q9R4",
+    "siteId": "site_01HZX8K3Q9EF",
+    "from": "/2019/05/Old-Post.html",
+    "to": "javascript:alert(1)",
+    "status": 302,
+    "match": "exact",
+    "reason": "manual",
+    "note": "Imported WordPress URL; content lives on the archive site.",
+    "rev": 1,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}
