@@ -25,6 +25,7 @@ export {
   type TagsMigrationResult,
   type TagsRevertResult,
 } from "./tags-migration.ts";
+export * from "./taxonomy-report.ts";
 export {
   type DefaultTaxonomyOptions,
   type EntryQuery,

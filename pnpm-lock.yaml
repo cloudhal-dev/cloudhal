@@ -341,6 +341,9 @@ importers:
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../../packages/core-contracts
+      '@cloudhal/core-ts':
+        specifier: workspace:*
+        version: link:../../packages/core-ts
       '@cloudhal/ui':
         specifier: workspace:*
         version: link:../../packages/ui
