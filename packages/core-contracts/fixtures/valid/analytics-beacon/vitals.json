@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "vitals",
+  "path": "/posts/ferry-timetables",
+  "lcp": 2140.4,
+  "inp": 96.5,
+  "cls": 0.042,
+  "ttfb": 180.25,
+  "fcp": 910.75,
+  "sampleOneIn": 5
+}

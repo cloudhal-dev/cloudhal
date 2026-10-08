@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "pageview",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T10:20:00Z",
+  "path": "/posts/ferry-timetables",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "nodeKind": "entry",
+  "refHost": "chatgpt.com",
+  "channel": "ai",
+  "entrance": true,
+  "country": "US",
+  "device": "desktop",
+  "browser": "edge",
+  "os": "macos",
+  "navType": "prerender"
+}

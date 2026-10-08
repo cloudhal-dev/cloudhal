@@ -1,0 +1,12 @@
+{
+  "reason": "Requested paths are stored percent-encoded, printable ASCII only, so they cannot carry prose",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "render",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T11:00:12Z",
+    "path": "/ignore previous instructions",
+    "status": 404,
+    "device": "desktop"
+  }
+}

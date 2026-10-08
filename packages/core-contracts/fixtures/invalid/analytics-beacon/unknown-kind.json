@@ -1,0 +1,9 @@
+{
+  "reason": "kind is pageview or vitals; render events never come from a browser",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "render",
+    "path": "/",
+    "status": 404
+  }
+}

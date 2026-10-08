@@ -1,0 +1,21 @@
+{
+  "reason": "Query strings are never stored: only utm_source, utm_medium and utm_campaign survive, as their own normalised fields",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T08:14:03Z",
+    "path": "/posts/ferry-timetables?ref=abc&email=reader",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "nodeKind": "entry",
+    "refHost": "news.ycombinator.com",
+    "channel": "social",
+    "entrance": true,
+    "country": "TR",
+    "device": "mobile",
+    "browser": "safari",
+    "os": "ios",
+    "navType": "navigate",
+    "locale": "en"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "reason": "A redirect target is a site path or an https URL",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "render",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T11:05:00Z",
+    "path": "/old",
+    "status": 301,
+    "redirectTo": "javascript:alert(1)",
+    "device": "desktop"
+  }
+}

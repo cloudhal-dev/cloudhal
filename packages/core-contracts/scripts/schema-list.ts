@@ -15,6 +15,8 @@ export const ROOT_SCHEMAS = [
   "redirect",
   "asset",
   "menu",
+  "analytics-event",
+  "analytics-beacon",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];
