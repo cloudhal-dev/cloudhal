@@ -90,7 +90,11 @@ describe("Site Worker on workerd", () => {
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
     expect((await get("/posts/hello-world")).status).toBe(200);
-    expect((await get("/nope")).status).toBe(404);
+    const missing = await get("/nope");
+    expect(missing.status).toBe(404);
+    // a page that does not exist yet must not stay cached past the publish that creates it
+    expect(missing.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    expect(missing.headers.get("cache-control")).toBe("no-store");
   });
 
   const purge = (token?: string) =>

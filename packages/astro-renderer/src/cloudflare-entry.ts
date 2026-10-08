@@ -45,12 +45,17 @@ async function purge(
   // `cache.purge` exists on Cloudflare; local workerd has no edge cache to purge.
   const purger = (
     cache as unknown as {
-      purge?: (o: { tags: string[] }) => Promise<{ success: boolean; errors?: unknown[] }>;
+      purge?: (
+        o: { tags: string[] } | { purgeEverything: true },
+      ) => Promise<{ success: boolean; errors?: unknown[] }>;
     }
   )?.purge;
   if (!purger)
     return Response.json({ purged: false, tag, reason: "no edge cache in this runtime" });
-  const result = await purger.call(cache, { tags: [tag] });
+  // This Worker serves one site, so everything it cached belongs to that site. Purging all of it
+  // (not just the tag) also drops entries Cloudflare cached on its own, e.g. a 404 for a page that
+  // was published since.
+  const result = await purger.call(cache, { purgeEverything: true });
   return Response.json(
     { purged: result.success, tag, errors: result.errors ?? [] },
     { status: result.success ? 200 : 502 },
@@ -81,6 +86,23 @@ function keepPreviewInLinks(response: Response, token: string): Response {
 const SITE_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
 
+/**
+ * Only a 200 page may sit in the edge cache (tagged, until the next publish). Anything else — a
+ * 404 for a page that does not exist *yet*, a 503 before the first publish — must not be cached,
+ * or it would outlive the publish that fixes it.
+ */
+function cacheOnlySuccess(response: Response): Response {
+  if (response.status === 200 || response.status === 304) return response;
+  const headers = new Headers(response.headers);
+  headers.set("cloudflare-cdn-cache-control", "no-store");
+  headers.set("cache-control", "no-store");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function withSecurityHeaders(response: Response): Response {
   if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
   const headers = new Headers(response.headers);
@@ -100,7 +122,7 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
       const response = withSecurityHeaders(
-        (await handle(request, env as never, ctx)) as unknown as Response,
+        cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
       );
       const token = response.headers.get("x-cloudhal-preview-token");
       if (response.headers.get("x-cloudhal-mode") !== "preview" || !token) return response;
