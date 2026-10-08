@@ -2,6 +2,7 @@
 
 pub mod asset;
 pub mod content_entry;
+pub mod menu;
 pub mod page;
 pub mod project;
 pub mod redirect;

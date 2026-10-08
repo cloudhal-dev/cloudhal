@@ -3,6 +3,7 @@ import type { RootSchemaName } from "../scripts/schema-list.ts";
 import type {
   Asset,
   ContentEntry,
+  Menu,
   Page,
   Project,
   Redirect,
@@ -28,6 +29,7 @@ export interface ContractTypes {
   term: Term;
   redirect: Redirect;
   asset: Asset;
+  menu: Menu;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -42,6 +44,7 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   term: v.validateTerm,
   redirect: v.validateRedirect,
   asset: v.validateAsset,
+  menu: v.validateMenu,
 };
 
 export class ContractValidationError extends Error {

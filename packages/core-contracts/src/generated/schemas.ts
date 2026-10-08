@@ -2473,6 +2473,353 @@ export const AssetSchema = {
   }
 } as const;
 
+export const MenuSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/menu.schema.json",
+  "title": "Menu",
+  "description": "A named navigation menu of a site (e.g. 'primary', 'footer', 'sidebar'): an ordered tree of items. Items point at pages, entries and terms by id, so renames and slug changes never break them; an item whose target is gone, retired or unpublished is hidden by the renderer, never rendered as a dead link (RFC-0003).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "key",
+    "maxDepth",
+    "items",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/Id"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "key": {
+      "$ref": "#/$defs/Slug",
+      "description": "Where themes place the menu ('primary', 'footer', 'sidebar', …). Unique per site and immutable once created."
+    },
+    "maxDepth": {
+      "type": "integer",
+      "description": "Deepest level an item may sit at; top-level items are level 1. The store refuses deeper trees.",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "items": {
+      "type": "array",
+      "description": "Top-level items in display order. Empty means the site deliberately shows no items here (a missing menu means the theme's derived default).",
+      "items": {
+        "$ref": "#/$defs/MenuItem"
+      },
+      "maxItems": 100
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "MenuItem": {
+      "description": "One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "PageMenuItem",
+          "description": "Links to a page by id; the label falls back to the page title.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "pageId"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "page"
+              ]
+            },
+            "pageId": {
+              "$ref": "#/$defs/Id"
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "EntryMenuItem",
+          "description": "Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "entryId"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "contentEntry"
+              ]
+            },
+            "entryId": {
+              "$ref": "#/$defs/Id"
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "TermMenuItem",
+          "description": "Links to a term's archive by term id; the label falls back to the term name in the locale.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "termId"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "term"
+              ]
+            },
+            "termId": {
+              "$ref": "#/$defs/Id"
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "CollectionMenuItem",
+          "description": "Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "collection",
+            "labels"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "collection"
+              ]
+            },
+            "collection": {
+              "$ref": "#/$defs/Slug"
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "UrlMenuItem",
+          "description": "Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "href",
+            "labels"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "url"
+              ]
+            },
+            "href": {
+              "type": "string",
+              "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$",
+              "maxLength": 2048
+            },
+            "newTab": {
+              "type": "boolean",
+              "description": "Open in a new tab (rendered with rel=\"noopener noreferrer\")."
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "GroupMenuItem",
+          "description": "A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "labels",
+            "children"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "group"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/MenuLabels"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MenuItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        }
+      ]
+    },
+    "MenuLabels": {
+      "type": "object",
+      "description": "Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.",
+      "propertyNames": {
+        "$ref": "#/$defs/Locale"
+      },
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Slug": {
+      "type": "string",
+      "description": "Lower-case URL segment.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -2485,4 +2832,5 @@ export const schemas = {
   "term": TermSchema,
   "redirect": RedirectSchema,
   "asset": AssetSchema,
+  "menu": MenuSchema,
 } as const;

@@ -75,6 +75,7 @@ const NODE_SCHEMAS = [
   "term",
   "redirect",
   "asset",
+  "menu",
 ] as const;
 
 describe("node schemas are mutually exclusive", () => {

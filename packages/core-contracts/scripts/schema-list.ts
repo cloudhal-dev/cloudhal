@@ -14,6 +14,7 @@ export const ROOT_SCHEMAS = [
   "term",
   "redirect",
   "asset",
+  "menu",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];

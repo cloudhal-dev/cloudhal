@@ -125,3 +125,7 @@ fn redirect() {
 fn asset() {
     check::<cloudhal_schema::Asset>("asset");
 }
+#[test]
+fn menu() {
+    check::<cloudhal_schema::Menu>("menu");
+}
