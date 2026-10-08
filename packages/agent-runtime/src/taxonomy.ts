@@ -4,6 +4,7 @@
  * approve proposals — is decided here, the same for every transport.
  */
 import type { Actor } from "@cloudhal/core-contracts";
+import { holds, type Principal } from "./policy.ts";
 
 /** `Taxonomy.allowNewTerms`. */
 export type AllowNewTerms = "none" | "propose" | "free";
@@ -16,9 +17,17 @@ export type TermCreation =
 /**
  * Invariant 11 for an actor: people (and the system) create active terms; agents create proposed
  * terms under `propose`, active ones under `free`, and none under `none` ("ask a person").
+ *
+ * Given a principal, a person whose role lacks `site:write` (Contributor, Author; RFC-0005 §2.2) is
+ * treated like an agent: they propose tags and never add categories.
  */
-export function termCreation(actor: Actor, allowNewTerms: AllowNewTerms): TermCreation {
-  if (actor.kind !== "agent") return { allowed: true, status: "active" };
+export function termCreation(
+  who: Actor | Pick<Principal, "actor" | "scopes">,
+  allowNewTerms: AllowNewTerms,
+): TermCreation {
+  const actor = "actor" in who ? who.actor : who;
+  const governs = "actor" in who ? holds(who.scopes, "site:write") : true;
+  if (actor.kind !== "agent" && governs) return { allowed: true, status: "active" };
   switch (allowNewTerms) {
     case "free":
       return { allowed: true, status: "active" };
