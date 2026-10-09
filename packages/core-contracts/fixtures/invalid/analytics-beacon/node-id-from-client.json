@@ -1,0 +1,9 @@
+{
+  "reason": "The server resolves the node from the path; a browser cannot attribute views to a node",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "path": "/",
+    "nodeId": "entry_01HZX8K3Q9FT"
+  }
+}

@@ -2822,6 +2822,547 @@ export const MenuSchema = {
   }
 } as const;
 
+export const AnalyticsEventSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/analytics-event.schema.json",
+  "title": "AnalyticsEvent",
+  "description": "One site analytics event as stored (RFC-0006): a page view or a Core Web Vitals sample reported by the site's first-party script, or a response the site Worker rendered itself (cache miss, redirect, 404, 410, 5xx). Written by the site Worker after it validated and enriched a beacon. The named fields are the columns of the local/self-host SQLite store; each one documents its fixed slot in a Workers Analytics Engine data point (index1 = siteId, blob1 = kind, blob2 = schemaVersion). Slots never move and new fields are only appended. Never carries an IP address, a user agent, a full referrer URL, a query string or a cookie.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "AnalyticsPageviewEvent",
+      "description": "A published page, article or archive was shown to a visitor (the site's script ran).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "nodeId",
+        "nodeKind",
+        "channel",
+        "entrance",
+        "device",
+        "browser",
+        "os",
+        "navType"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pageview"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob3. The published route the view resolved to; never a query string."
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4. The page, entry or term the server resolved the path to, so stats survive slug changes."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "refHost": {
+          "$ref": "#/$defs/AnalyticsHostname"
+        },
+        "channel": {
+          "$ref": "#/$defs/AnalyticsChannel"
+        },
+        "utmSource": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob8."
+        },
+        "utmMedium": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob9."
+        },
+        "utmCampaign": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob10."
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "browser": {
+          "$ref": "#/$defs/AnalyticsBrowser"
+        },
+        "os": {
+          "$ref": "#/$defs/AnalyticsOs"
+        },
+        "visitor": {
+          "$ref": "#/$defs/AnalyticsVisitorHash"
+        },
+        "navType": {
+          "$ref": "#/$defs/AnalyticsNavType"
+        },
+        "locale": {
+          "$ref": "#/$defs/Locale",
+          "description": "WAE blob17. Locale of the resolved node, not the visitor's Accept-Language."
+        },
+        "entrance": {
+          "type": "boolean",
+          "description": "WAE double1 (1 or 0). The view starts a visit: the referrer is empty or another site, and the navigation is not a reload, back/forward or restore."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsVitalsEvent",
+      "description": "Core Web Vitals of one sampled page view, measured by the site's own script and sent when the page is hidden. Code checks that at least one metric is present (the schema subset has no cross-property rules).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "nodeId",
+        "nodeKind",
+        "device",
+        "sampleOneIn"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "vitals"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob3."
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "browser": {
+          "$ref": "#/$defs/AnalyticsBrowser"
+        },
+        "lcp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double3. Largest Contentful Paint."
+        },
+        "inp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double4. Interaction to Next Paint."
+        },
+        "cls": {
+          "type": "number",
+          "description": "WAE double5, stored multiplied by 1000. Cumulative Layout Shift (unitless).",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ttfb": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double6. Time to First Byte."
+        },
+        "fcp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double7. First Contentful Paint."
+        },
+        "sampleOneIn": {
+          "$ref": "#/$defs/AnalyticsSampleOneIn"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsRenderEvent",
+      "description": "The site Worker answered a request itself (a cache miss, redirect, 404, 410 or error). Cache hits never run the Worker, so these are not page views. The requested path is visitor-controlled text and is always shown as such.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "status",
+        "device"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "render"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/AnalyticsRequestPath"
+        },
+        "status": {
+          "type": "integer",
+          "description": "WAE double2. HTTP status the Worker answered with.",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4. The node rendered or redirected from, when the path resolved to one."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "redirectTo": {
+          "type": "string",
+          "description": "WAE blob19. Target of a 301, 302 or 308: a site path or an https URL, without query string.",
+          "pattern": "^(?:/|https://)[!-~]*$",
+          "maxLength": 512
+        },
+        "refHost": {
+          "$ref": "#/$defs/AnalyticsHostname"
+        },
+        "refPath": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob20. Same-site referrers only: the page that linked here, which finds broken internal links."
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "crawler": {
+          "$ref": "#/$defs/AnalyticsCrawlerName"
+        },
+        "renderMs": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double8. Time the Worker spent answering."
+        },
+        "sampleOneIn": {
+          "$ref": "#/$defs/AnalyticsSampleOneIn"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "AnalyticsBrowser": {
+      "type": "string",
+      "description": "WAE blob13. Browser family, without version.",
+      "enum": [
+        "chrome",
+        "edge",
+        "firefox",
+        "safari",
+        "samsung",
+        "opera",
+        "other"
+      ]
+    },
+    "AnalyticsChannel": {
+      "type": "string",
+      "description": "WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.",
+      "enum": [
+        "direct",
+        "internal",
+        "search",
+        "social",
+        "ai",
+        "email",
+        "paid",
+        "referral"
+      ]
+    },
+    "AnalyticsCountry": {
+      "type": "string",
+      "description": "WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.",
+      "pattern": "^[A-Z][A-Z0-9]$"
+    },
+    "AnalyticsCrawlerName": {
+      "type": "string",
+      "description": "WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+    },
+    "AnalyticsDevice": {
+      "type": "string",
+      "description": "WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.",
+      "enum": [
+        "desktop",
+        "mobile",
+        "tablet",
+        "bot",
+        "unknown"
+      ]
+    },
+    "AnalyticsHostname": {
+      "type": "string",
+      "description": "WAE blob6. Host of an external referrer: lower case, without www., port, path or query.",
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+      "maxLength": 253
+    },
+    "AnalyticsMillis": {
+      "type": "integer",
+      "description": "Whole milliseconds (the server rounds), capped at ten minutes.",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "AnalyticsNavType": {
+      "type": "string",
+      "description": "WAE blob16. How the page was reached; restore = back/forward cache.",
+      "enum": [
+        "navigate",
+        "reload",
+        "back_forward",
+        "prerender",
+        "restore"
+      ]
+    },
+    "AnalyticsNodeKind": {
+      "type": "string",
+      "description": "WAE blob5. The kind of node the path resolved to.",
+      "enum": [
+        "page",
+        "entry",
+        "archive"
+      ]
+    },
+    "AnalyticsOs": {
+      "type": "string",
+      "description": "WAE blob14. Operating system family, without version.",
+      "enum": [
+        "windows",
+        "macos",
+        "ios",
+        "android",
+        "linux",
+        "chromeos",
+        "other"
+      ]
+    },
+    "AnalyticsRequestPath": {
+      "type": "string",
+      "description": "WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.",
+      "pattern": "^/[!-~]*$",
+      "maxLength": 256
+    },
+    "AnalyticsSampleOneIn": {
+      "type": "integer",
+      "description": "WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "AnalyticsUtmValue": {
+      "type": "string",
+      "description": "A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.",
+      "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$"
+    },
+    "AnalyticsVisitorHash": {
+      "type": "string",
+      "description": "WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "Path": {
+      "type": "string",
+      "description": "Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
+export const AnalyticsBeaconSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json",
+  "title": "AnalyticsBeacon",
+  "description": "What a site's first-party analytics script sends to POST /__cloudhal/e (RFC-0006): JSON as text/plain, at most 2 KB. Everything in it is untrusted. The server keeps a beacon only after the same-origin, bot and rate checks, normalises the path and resolves it to a published route, reduces the referrer to a host, normalises UTM values, and derives everything else (node, country, device, visitor) itself. The script never sends an identifier, a cookie or a full URL.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "AnalyticsPageviewBeacon",
+      "description": "Sent once per page view, when the page is first visible (after prerendering, and again on a back/forward cache restore).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "path"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pageview"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/BeaconPath"
+        },
+        "referrer": {
+          "type": "string",
+          "description": "The host of document.referrer only (the script drops scheme, path and query); empty or absent for direct visits.",
+          "maxLength": 253
+        },
+        "utmSource": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "utmMedium": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "utmCampaign": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "navType": {
+          "type": "string",
+          "enum": [
+            "navigate",
+            "reload",
+            "back_forward",
+            "prerender",
+            "restore"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsVitalsBeacon",
+      "description": "Sent once, when a sampled page view is hidden, with the Core Web Vitals measured so far.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "path",
+        "sampleOneIn"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "vitals"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/BeaconPath"
+        },
+        "lcp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "inp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "cls": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ttfb": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "fcp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "sampleOneIn": {
+          "type": "integer",
+          "description": "The vitals sampling the script was served with (one page view in N); the server checks it against the site's setting.",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "BeaconMillis": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "BeaconPath": {
+      "type": "string",
+      "description": "location.pathname as the browser reports it (no query string, no fragment).",
+      "pattern": "^/[^?#\\s]*$",
+      "maxLength": 1024
+    },
+    "BeaconUtm": {
+      "type": "string",
+      "description": "A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -2835,4 +3376,6 @@ export const schemas = {
   "redirect": RedirectSchema,
   "asset": AssetSchema,
   "menu": MenuSchema,
+  "analytics-event": AnalyticsEventSchema,
+  "analytics-beacon": AnalyticsBeaconSchema,
 } as const;

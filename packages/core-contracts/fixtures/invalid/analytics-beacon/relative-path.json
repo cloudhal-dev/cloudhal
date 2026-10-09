@@ -1,0 +1,8 @@
+{
+  "reason": "path is location.pathname and starts with /",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "path": "posts/x"
+  }
+}
