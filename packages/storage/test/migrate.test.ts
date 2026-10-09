@@ -31,6 +31,7 @@ describe("migrate", () => {
       "0011_op_guards",
       "0012_roles",
       "0013_media",
+      "0014_analytics",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -47,6 +48,7 @@ describe("migrate", () => {
       "0011_op_guards",
       "0012_roles",
       "0013_media",
+      "0014_analytics",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -55,6 +57,12 @@ describe("migrate", () => {
       "_migrations",
       "account",
       "agent_owner",
+      "analytics_daily",
+      "analytics_events",
+      "analytics_query_budget",
+      "analytics_rollup_runs",
+      "analytics_salts",
+      "analytics_settings",
       "apikey",
       "approvals",
       "asset_refs",
@@ -95,6 +103,7 @@ describe("migrate", () => {
       "0011_op_guards",
       "0012_roles",
       "0013_media",
+      "0014_analytics",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -110,6 +119,7 @@ describe("migrate", () => {
       "0011_op_guards",
       "0012_roles",
       "0013_media",
+      "0014_analytics",
     ]);
     await h.dispose();
   });
@@ -132,6 +142,7 @@ describe("migrate", () => {
       "0011_op_guards",
       "0012_roles",
       "0013_media",
+      "0014_analytics",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();
