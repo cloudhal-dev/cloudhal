@@ -12,6 +12,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./sql": "./src/sql/index.ts",
+    "./rollup": "./src/rollup.ts",
+    "./reader": "./src/reader.ts",
     "./testing": "./src/testing.ts"
   },
   "files": [
@@ -49,6 +51,14 @@
       "./sql": {
         "types": "./dist/src/sql/index.d.ts",
         "default": "./dist/src/sql/index.js"
+      },
+      "./rollup": {
+        "types": "./dist/src/rollup.d.ts",
+        "default": "./dist/src/rollup.js"
+      },
+      "./reader": {
+        "types": "./dist/src/reader.d.ts",
+        "default": "./dist/src/reader.js"
       },
       "./testing": {
         "types": "./dist/src/testing.d.ts",

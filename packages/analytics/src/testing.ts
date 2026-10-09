@@ -5,6 +5,9 @@
  * - `describeAnalyticsConformance` — every query of the model over `FIXTURE_EVENTS` must return the
  *   hand-computed answer, identical to the in-memory reference (invariant A10). Runs on SqlAnalytics
  *   (SQLite and Miniflare D1) and on the WAE compiler through a fake Analytics SQL API.
+ * - `describeAnalyticsStateSuite`, `describeRollupSuite` (`./testing-rollups.ts`) — settings CAS,
+ *   salts, the query budget, and `runRollups` (idempotence, partial failure, `(other)` rows,
+ *   retention) with `RollupReader` agreeing with the raw store (SQLite and D1).
  */
 import type { AnalyticsEvent } from "@cloudhal/core-contracts";
 import { isValid } from "@cloudhal/core-contracts";
@@ -20,6 +23,7 @@ import { answerQuery } from "./memory.ts";
 import { type AnalyticsQuery, type AnalyticsReader, assertAnalyticsQuery } from "./model.ts";
 
 export * from "./fixtures.ts";
+export * from "./testing-rollups.ts";
 
 export interface ConformanceFactory {
   /** A fresh, empty store. */

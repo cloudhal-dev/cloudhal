@@ -3,7 +3,11 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll } from "vitest";
 import { SqlAnalytics } from "../src/sql/index.ts";
-import { describeAnalyticsConformance } from "../src/testing.ts";
+import {
+  describeAnalyticsConformance,
+  describeAnalyticsStateSuite,
+  describeRollupSuite,
+} from "../src/testing.ts";
 
 // One Miniflare instance for the whole file; every suite starts from empty tables.
 let d1: Awaited<ReturnType<typeof createMiniflareD1>> | undefined;
@@ -24,3 +28,7 @@ describeAnalyticsConformance("SqlAnalytics on Cloudflare D1 (Miniflare)", {
     return { reader: store, load: (events) => store.insertMany(events) };
   },
 });
+
+describeAnalyticsStateSuite("Cloudflare D1 (Miniflare)", { create: driver });
+
+describeRollupSuite("Cloudflare D1 (Miniflare)", { create: driver });

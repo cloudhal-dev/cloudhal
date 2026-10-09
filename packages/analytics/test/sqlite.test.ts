@@ -1,7 +1,11 @@
 import { migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { SqlAnalytics } from "../src/sql/index.ts";
-import { describeAnalyticsConformance } from "../src/testing.ts";
+import {
+  describeAnalyticsConformance,
+  describeAnalyticsStateSuite,
+  describeRollupSuite,
+} from "../src/testing.ts";
 
 describeAnalyticsConformance("SqlAnalytics on better-sqlite3", {
   async create() {
@@ -14,4 +18,12 @@ describeAnalyticsConformance("SqlAnalytics on better-sqlite3", {
       close: () => sql.close(),
     };
   },
+});
+
+describeAnalyticsStateSuite("better-sqlite3", {
+  create: () => BetterSqlite3Driver.open(":memory:"),
+});
+
+describeRollupSuite("better-sqlite3", {
+  create: () => BetterSqlite3Driver.open(":memory:"),
 });
