@@ -1,0 +1,59 @@
+{
+  "name": "@cloudhal/analytics",
+  "version": "0.0.1",
+  "description": "Cloudhal site analytics (RFC-0006): query model, classifiers, beacon handler, SQLite/D1 store, daily rollups and Workers Analytics Engine adapters. Worker-safe.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/analytics"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sql": "./src/sql/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "miniflare": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./sql": {
+        "types": "./dist/src/sql/index.d.ts",
+        "default": "./dist/src/sql/index.js"
+      },
+      "./testing": {
+        "types": "./dist/src/testing.d.ts",
+        "default": "./dist/src/testing.js"
+      }
+    }
+  }
+}
