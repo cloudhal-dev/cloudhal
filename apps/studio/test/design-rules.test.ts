@@ -7,7 +7,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { allFiles, format, lintFile, ROUTE_TEMPLATES, STUDIO_SRC } from "../scripts/design-lint.ts";
+import {
+  allFiles,
+  format,
+  lintFile,
+  lintSource,
+  ROUTE_TEMPLATES,
+  STUDIO_SRC,
+} from "../scripts/design-lint.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(here, "../src");
@@ -866,6 +873,23 @@ describe("design rules (DESIGN.md)", () => {
         .map(() => path.basename(f.file)),
     );
     expect(unsandboxed, 'use sandbox="" (no scripts, no same-origin)').toEqual([]);
+  });
+
+  it("chart and map tooltips are never HTML formatters (RFC-0006 §10.1)", () => {
+    const UI_SRC = path.resolve(here, "../../../packages/ui/src");
+    const KUMO_COPIES = path.join(UI_SRC, "blocks", "kumo");
+    const sources = [...walkAll(SRC), ...walkAll(UI_SRC).filter((f) => !f.startsWith(KUMO_COPIES))];
+    const offenders = sources.filter((f) =>
+      /\b(?:tooltipFormatter|dangerousHtmlFormatter)\s*[=:]/.test(readFileSync(f, "utf8")),
+    );
+    expect(offenders.map((f) => path.basename(f))).toEqual([]);
+    // The lint rule that backs it (screens and blocks, also on every agent edit).
+    const flagged = lintSource(
+      "components/X.tsx",
+      "<ChoroplethMap tooltipFormatter={(r) => r.name} />",
+      "screen",
+    ).map((v) => v.rule);
+    expect(flagged).toContain("no-html-tooltip");
   });
 
   it("mode pickers are Kumo radio cards over the key modes only (bypass is local, ADR-0015)", () => {

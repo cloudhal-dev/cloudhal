@@ -1,9 +1,24 @@
 /**
  * @cloudhal/ui — the only UI entry point for Cloudhal admin surfaces (ADR-0003).
  * Kumo components are re-exported as-is; Kumo *blocks* (copied via `kumo add`, owned here) and
- * Cloudhal blocks live in ./blocks.
+ * Cloudhal blocks live in ./blocks. Blocks that draw with ECharts (analytics charts and the
+ * country map) live in the separate `@cloudhal/ui/charts` entry so only lazy routes load ECharts.
  */
 export * from "@cloudflare/kumo";
+export {
+  type AnalyticsPlanHint,
+  AnalyticsQuotaBanner,
+  type AnalyticsQuotaBannerLabels,
+  type AnalyticsQuotaBannerProps,
+  FREE_PLAN_WARNING_AT,
+  shouldWarnFreePlan,
+  WORKERS_FREE_DAILY_REQUESTS,
+} from "./blocks/AnalyticsQuotaBanner.tsx";
+export {
+  AnalyticsRangePicker,
+  type AnalyticsRangePickerLabels,
+  type AnalyticsRangePickerProps,
+} from "./blocks/AnalyticsRangePicker.tsx";
 export { ApprovalDialog, type ApprovalDialogProps } from "./blocks/ApprovalDialog.tsx";
 export {
   ActorBadge,
@@ -18,6 +33,38 @@ export {
 } from "./blocks/AuditBadges.tsx";
 export { AuthLayout, type AuthLayoutProps } from "./blocks/AuthLayout.tsx";
 export { Avatar, type AvatarProps, type AvatarSize } from "./blocks/Avatar.tsx";
+export {
+  ANALYTICS_RANGE_PRESETS,
+  type AnalyticsFormatter,
+  type AnalyticsGranularity,
+  type AnalyticsRange,
+  type AnalyticsRangePreset,
+  addDays,
+  type CountryNameLabels,
+  compareValues,
+  createAnalyticsFormatter,
+  currentBucketStart,
+  type DeltaTone,
+  FLAT_WITHIN,
+  isAnalyticsRangePreset,
+  isoDay,
+  isValidCustomRange,
+  MAX_RANGE_DAYS,
+  pickedDay,
+  previousAnalyticsRange,
+  type ResolvedAnalyticsRange,
+  resolveAnalyticsRange,
+  type StatDelta,
+} from "./blocks/analytics-format.ts";
+export {
+  type BreakdownLabels,
+  BreakdownMeters,
+  type BreakdownMetersProps,
+  type BreakdownRow,
+  BreakdownTable,
+  type BreakdownTableProps,
+  foldBreakdown,
+} from "./blocks/Breakdown.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
 export {
   InsetPanel,
@@ -102,5 +149,21 @@ export {
   type SnapshotTimelineLabels,
   type SnapshotTimelineProps,
 } from "./blocks/SnapshotTimeline.tsx";
+export {
+  DeltaBadge,
+  Sparkline,
+  StatTile,
+  StatTileGroup,
+  type StatTileGroupProps,
+  type StatTileProps,
+} from "./blocks/StatTile.tsx";
 export { StatusBadge, type StatusBadgeProps } from "./blocks/StatusBadge.tsx";
 export { TermChip, TermChipList, type TermChipProps } from "./blocks/TermChips.tsx";
+export {
+  type ChartColors,
+  mixHex,
+  resolveChartColors,
+  useChartPalette,
+  useColorMode,
+  useReducedMotion,
+} from "./blocks/useChartPalette.ts";

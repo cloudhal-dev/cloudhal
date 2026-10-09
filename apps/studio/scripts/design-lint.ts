@@ -245,6 +245,15 @@ export function lintSource(rel: string, text: string, scope: Scope): Violation[]
     );
   if (/dangerouslySetInnerHTML|\.innerHTML\s*=/.test(text))
     add("no-html-injection", "never inject HTML — agent/server text is always plain <Text>");
+  // Kumo's chart and map tooltip hooks insert their return value as raw HTML (RFC-0006 §10.1):
+  // country names and paths come from data, so the escaping default tooltip is the only one.
+  const htmlTooltip = /\b(?:tooltipFormatter|dangerousHtmlFormatter)\s*[=:]/.exec(text);
+  if (htmlTooltip)
+    add(
+      "no-html-tooltip",
+      "chart/map tooltip formatters are injected as HTML — keep Kumo's default (escaped) tooltip; name regions through the data (CountryMap does) and put details in the table",
+      htmlTooltip.index,
+    );
   for (const m of text.matchAll(
     /from\s+["'](lucide-react|@heroicons\/[^"']+|react-icons[^"']*|@tabler\/icons-react|@radix-ui\/react-icons)["']/g,
   ))
