@@ -31,6 +31,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { ActorResolver, PrincipalResolver } from "./context.ts";
 import { type MemberRow, StaffStore } from "./staff.ts";
 
@@ -71,7 +72,12 @@ export interface AuthOptions {
   };
   /** Clock for time-boxed elevations and invites (tests). */
   readonly now?: () => Date;
+  /** Requests one API key may make per window (default 600 per minute); see `resolvePrincipal`. */
+  readonly agentKeyRateLimit?: { readonly windowMs: number; readonly max: number };
 }
+
+/** The default per-key request budget: generous for an agent session, a brake on a runaway loop. */
+export const AGENT_KEY_RATE_LIMIT = { windowMs: 60_000, max: 600 } as const;
 
 export interface CloudhalAuth {
   readonly handler: (request: Request) => Promise<Response>;
@@ -309,8 +315,10 @@ function createInstance(options: AuthOptions, staff: StaffStore) {
       apiKey({
         apiKeyHeaders: API_KEY_HEADER,
         enableMetadata: true,
-        // The plugin's default (10 requests per key per day) would stall any real agent session.
-        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
+        // Cloudhal limits keys itself (`resolvePrincipal`): the plugin's window only resets after a
+        // pause as long as the window, so an agent polling steadily was locked out for good once it
+        // had made `maxRequests` calls in total — and the refusal surfaced as "unauthorized".
+        rateLimit: { enabled: false },
       }),
     ],
   });
@@ -482,6 +490,7 @@ function personRef(member: MemberRow): PersonRef {
 export function createAuth(options: AuthOptions): CloudhalAuth {
   const now = options.now ?? (() => new Date());
   const staffStore = new StaffStore(options.sql, now);
+  const keyLimit = options.agentKeyRateLimit ?? AGENT_KEY_RATE_LIMIT;
   const instance = createInstance(options, staffStore);
   const api = instance.api as unknown as {
     verifyApiKey(input: { body: { key: string } }): Promise<VerifiedApiKey>;
@@ -805,6 +814,22 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
     if (key) {
       const verified = await api.verifyApiKey({ body: { key } });
       if (!verified.valid || !verified.key) return undefined;
+      // A fixed window per key (`rateLimit` table): it resets every window however busy the key is.
+      if (
+        !(await staffStore.hit(`cloudhal:key:${verified.key.id}`, keyLimit.windowMs, keyLimit.max))
+      )
+        throw new HTTPException(429, {
+          res: Response.json(
+            {
+              error: "rate_limited",
+              message: `this API key made more than ${keyLimit.max} requests in ${Math.round(keyLimit.windowMs / 1000)} s; wait and try again`,
+            },
+            {
+              status: 429,
+              headers: { "retry-after": String(Math.ceil(keyLimit.windowMs / 1000)) },
+            },
+          ),
+        });
       // An agent never exceeds its creator (I5): no creator membership, no key.
       const creator = verified.key.referenceId
         ? await staffStore.member(verified.key.referenceId)
