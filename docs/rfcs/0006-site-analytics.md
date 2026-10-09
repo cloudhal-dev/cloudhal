@@ -1,5 +1,5 @@
 # RFC-0006: Site analytics
-- Status: Draft
+- Status: Accepted (2026-10-09, PR #12 merged by Halil; ADR-0021)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-09
 - Related: ADR-0002 (storage, batch-only), ADR-0004 / ADR-0011 (MCP, policy engine), ADR-0006 (Node self-host), ADR-0008 (precompiled validators), ADR-0012 (Cloudflare deployment, Workers Cache, "no Cloudflare API token handling"), ADR-0015 (agent modes), ADR-0018 / RFC-0005 (roles and scopes), RFC-0002 (redirects on slug change), RFC-0004 (Free-plan limits, media), `docs/design/DESIGN.md`, `docs/security/threat-model.md`
 - Owner decisions: Halil, 2026-10-09 (§0). This RFC adopts them; it does not reopen them.
