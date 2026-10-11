@@ -6,6 +6,7 @@ import {
   PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
 } from "@cloudhal/agent-runtime";
+import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
@@ -106,6 +107,7 @@ export function createApi(deps: ApiDeps) {
     c.set("mail", deps.mail);
     c.set("now", clock);
     c.set("uploadSecret", uploadSecret);
+    c.set("analytics", deps.analytics);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -211,6 +213,8 @@ export function createApi(deps: ApiDeps) {
           approvals: Boolean(deps.mcp?.approvals),
           elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
           members: Boolean(deps.staff),
+          // RFC-0006 §8: where events go, whether Studio can read them, the budget.
+          analytics: deps.analytics?.feature() ?? ANALYTICS_OFF,
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),

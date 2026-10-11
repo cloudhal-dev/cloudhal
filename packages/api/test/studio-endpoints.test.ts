@@ -190,6 +190,21 @@ describe("instance and skills", () => {
         approvals: false,
         elevationRequests: false,
         members: false,
+        // RFC-0006 §8: a server without analytics says so
+        analytics: {
+          enabled: false,
+          store: "none",
+          reader: "none",
+          liveDays: 92,
+          budget: null,
+          rollups: "scheduled",
+          defaults: {
+            enabled: false,
+            uniqueVisitors: false,
+            vitalsOneIn: 5,
+            rollupRetentionDays: null,
+          },
+        },
       },
       agentModes: {
         modes: ["plan", "manual", "edits", "auto"],

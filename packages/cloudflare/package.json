@@ -24,6 +24,7 @@
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
+    "@cloudhal/analytics": "workspace:*",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/api": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",

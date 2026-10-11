@@ -577,6 +577,9 @@ importers:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cloudhal/astro-renderer':
         specifier: workspace:*
         version: link:../astro-renderer
@@ -672,6 +675,9 @@ importers:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cloudhal/api':
         specifier: workspace:*
         version: link:../api
@@ -724,6 +730,9 @@ importers:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cloudhal/api':
         specifier: workspace:*
         version: link:../api
@@ -827,6 +836,9 @@ importers:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cloudhal/astro-renderer':
         specifier: workspace:*
         version: link:../astro-renderer

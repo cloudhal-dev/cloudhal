@@ -7,6 +7,11 @@
  * changed between the previously live snapshot and the new one (`purge.ts`), everything when that
  * cannot be worked out.
  *
+ * Site analytics (RFC-0006 §7.5, §8): with `CLOUDHAL_ANALYTICS_DATASET` set the deployment records to
+ * Workers Analytics Engine; Studio and MCP read it through the `ANALYTICS_SQL` binding (no API
+ * token), and the hourly `scheduled` handler rolls finished days into D1 and deletes old salts. A
+ * missing binding means the "can't read yet" state (`reader: "none"`), never a crash.
+ *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
@@ -17,10 +22,14 @@ import {
   type SkillSource,
   skillFromSource,
 } from "@cloudhal/agent-runtime";
+import { parseAnalyticsDefaults } from "@cloudhal/analytics";
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { SqlQueryBudget } from "@cloudhal/analytics/sql";
+import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
 import { createApi } from "@cloudhal/api";
 import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { SiteGraphStore } from "@cloudhal/core-ts";
-import { migrate, migrations } from "@cloudhal/storage";
+import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { purgeSiteCache } from "./purge.ts";
@@ -39,6 +48,76 @@ export interface AdminEnv {
   CLOUDHAL_SETUP_TOKEN?: string;
   /** `first-user` (default: only the owner can sign up), `closed` or `open`. */
   CLOUDHAL_SIGNUP?: string;
+  /** Reads Workers Analytics Engine (RFC-0006 §7.3); absent: analytics recorded but not readable. */
+  ANALYTICS_SQL?: AnalyticsSQLBinding;
+  /** `<deployment>_events`; set by `cloudhal deploy` when `analytics.enabled` (absent: no analytics). */
+  CLOUDHAL_ANALYTICS_DATASET?: string;
+  /** Uncached live analytics queries per UTC day (default 8000, §7.7). */
+  CLOUDHAL_ANALYTICS_BUDGET?: string;
+  /** Deployment defaults for sites without a settings row (compact JSON from cloudhal.json). */
+  CLOUDHAL_ANALYTICS_DEFAULTS?: string;
+  /** `off` when the deploy had to go without the hourly cron trigger: daily totals roll up on read. */
+  CLOUDHAL_ANALYTICS_CRON?: string;
+}
+
+/** Default daily budget of uncached live queries: 80 % of WAE Free's 10,000 (§7.7, A2). */
+export const DEFAULT_ANALYTICS_BUDGET = 8000;
+
+const PURGE_URL = "https://site.internal/__cloudhal/purge";
+
+/**
+ * The deployment's analytics (RFC-0006 §8) from its bindings and vars. Plain construction, no I/O,
+ * so it is built per request or scheduled run (ADR-0012: nothing but plain values is cached).
+ */
+export function adminAnalytics(
+  env: AdminEnv,
+  sql: SqlDriver,
+  options: { now?: () => Date; log?: (line: string) => void } = {},
+): AnalyticsService {
+  const dataset = env.CLOUDHAL_ANALYTICS_DATASET;
+  const on = typeof dataset === "string" && DATASET_RE.test(dataset);
+  const budgetVar = Number(env.CLOUDHAL_ANALYTICS_BUDGET);
+  const budget =
+    Number.isInteger(budgetVar) && budgetVar >= 0 ? budgetVar : DEFAULT_ANALYTICS_BUDGET;
+  const binding = on ? env.ANALYTICS_SQL : undefined;
+  const log = options.log ?? ((line: string) => console.log(line));
+  const onError = (message: string, error?: unknown) =>
+    log(`${message}: ${error instanceof Error ? error.message : String(error ?? "")}`);
+  const site = env.SITE;
+  const token = env.CLOUDHAL_PURGE_TOKEN;
+  return new AnalyticsService({
+    sql,
+    store: on ? "wae" : "none",
+    ...(binding && on
+      ? {
+          live: new WaeReader(binding, {
+            dataset,
+            budget: new SqlQueryBudget(sql, { limit: budget }),
+            onError,
+          }),
+          // The rollup job's own reads are exempt from the budget (§7.7).
+          source: new WaeReader(binding, { dataset, onError }),
+        }
+      : {}),
+    defaults: parseAnalyticsDefaults(env.CLOUDHAL_ANALYTICS_DEFAULTS),
+    budget: on ? budget : null,
+    rollups: env.CLOUDHAL_ANALYTICS_CRON === "off" ? "on-read" : "scheduled",
+    ...(options.now ? { now: options.now } : {}),
+    // The script tag lives in cached HTML: a settings change purges the site's whole cache (§5.1).
+    ...(site && token
+      ? {
+          purgeSite: async (siteId: string) => {
+            const res = await site.fetch(PURGE_URL, {
+              method: "POST",
+              headers: { authorization: `Bearer ${token}` },
+            });
+            log(`purge everything after analytics settings of ${siteId}: ${res.status}`);
+            if (!res.ok) throw new Error(`purge failed: ${res.status}`);
+          },
+        }
+      : {}),
+    onError,
+  });
 }
 
 export interface AdminWorkerOptions {
@@ -62,6 +141,16 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   // Only plain values survive between requests. Workers do not let one request await I/O started
   // by another (it hangs), so no promise, auth instance or binding wrapper is cached here.
   let migrated = false;
+  const ensureMigrated = async (sql: SqlDriver) => {
+    if (migrated) return;
+    try {
+      await migrate(sql, migrations);
+    } catch {
+      // A concurrent request or isolate applied them first; a second pass sees them as done.
+      await migrate(sql, migrations);
+    }
+    migrated = true;
+  };
 
   return {
     async fetch(request: Request, env: AdminEnv, ctx: ExecutionContext): Promise<Response> {
@@ -83,15 +172,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
 
       const sql = new D1Driver(env.DB);
       const blobs = new R2BlobStore(env.BLOBS);
-      if (!migrated) {
-        try {
-          await migrate(sql, migrations);
-        } catch {
-          // A concurrent request or isolate applied them first; a second pass sees them as done.
-          await migrate(sql, migrations);
-        }
-        migrated = true;
-      }
+      await ensureMigrated(sql);
 
       // A takedown (RFC-0004 §4.6) purges the asset's media URLs at once, not at the next publish.
       const purgeTags = async (tags: string[], what: string) => {
@@ -175,8 +256,32 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         ...(env.CLOUDHAL_DEPLOY_TOKEN
           ? { admin: { deployToken: env.CLOUDHAL_DEPLOY_TOKEN, storage: { sql, blobs } } }
           : {}),
+        analytics: adminAnalytics(env, sql, { log }),
       });
       return app.fetch(request, env, ctx);
+    },
+
+    /**
+     * The hourly job (RFC-0006 §7.5, cron `17 * * * *`): migrations as on the fetch path, salts
+     * before today deleted, at most one finished site-day rolled up from WAE into D1, retention.
+     * Bounded work per invocation; a missed run is caught up by the next ones.
+     */
+    async scheduled(
+      controller: ScheduledController,
+      env: AdminEnv,
+      _ctx: ExecutionContext,
+    ): Promise<void> {
+      const sql = new D1Driver(env.DB);
+      await ensureMigrated(sql);
+      const now = new Date(controller.scheduledTime || Date.now());
+      const analytics = adminAnalytics(env, sql, { now: () => now, log });
+      const store = new SiteGraphStore({ sql, blobs: new R2BlobStore(env.BLOBS) });
+      const siteIds = (await store.listSites()).map((s) => s.id);
+      const report = await analytics.rollup({ siteIds });
+      const failed = report.failed.map((f) => `${f.siteId} ${f.day}: ${f.error}`);
+      log(
+        `analytics rollup (${analytics.feature().reader}): ${report.done.length} site-day(s) done, ${report.pending} pending, ${report.saltsDeleted} salt(s) deleted, ${report.retained} row(s) past retention${failed.length ? `; failed: ${failed.join("; ")}` : ""}`,
+      );
     },
   };
 }
