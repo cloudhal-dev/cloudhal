@@ -1,6 +1,9 @@
+import type { Site } from "@cloudhal/core-contracts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
+import type { SqlDriver } from "@cloudhal/storage";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
+import { SiteResolver } from "./resolver.ts";
 import { type GraphSource, LiveSource, SnapshotSource } from "./source.ts";
 
 let cached: { key: string; source: Promise<GraphSource> } | undefined;
@@ -68,6 +71,47 @@ export async function serveMedia(
     blobState: (sha256) => store.blobState(config.siteId, sha256),
     blobs,
   });
+}
+
+let analyticsResolver: { key: string; resolver: Promise<SiteResolver> } | undefined;
+
+/**
+ * What site analytics read on Node (`cloudhal dev`, self-host; RFC-0006 §11): the local SQLite
+ * store for settings, the salt and raw events, the site row, and published snapshots (cached per
+ * process). Same name and shape as the `workerd` build, which reads the D1/R2 bindings instead.
+ * `open()` must have resolved before `sql()` is called.
+ */
+export function analyticsBackend(
+  siteId: string,
+  config?: Partial<CloudhalRendererConfig>,
+): {
+  sql: () => SqlDriver;
+  site: () => Promise<Site | undefined>;
+  snapshot: (id: string) => Promise<GraphSource>;
+  open: () => Promise<SqlDriver>;
+} {
+  const dataDir = config?.dataDir;
+  if (!dataDir) throw new Error("analyticsBackend on Node needs the renderer config's dataDir");
+  const key = `${dataDir}|${siteId}`;
+  if (analyticsResolver?.key !== key)
+    analyticsResolver = {
+      key,
+      resolver: localStore(dataDir).then((l) => new SiteResolver({ store: l.store, siteId })),
+    };
+  const pending = analyticsResolver.resolver;
+  let sql: SqlDriver | undefined;
+  return {
+    sql: () => {
+      if (!sql) throw new Error("analyticsBackend: await open() first");
+      return sql;
+    },
+    open: async () => {
+      sql ??= (await localStore(dataDir)).sql;
+      return sql;
+    },
+    site: async () => (await pending).store.getSite(siteId),
+    snapshot: async (id) => (await pending).snapshot(id),
+  };
 }
 
 /** Shared with the `workerd` runtime so code importing either build sees the same names. */

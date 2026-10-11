@@ -16,18 +16,124 @@
  * - `/media/<sha16>/<slug>.<ext>` (RFC-0004 §7.1) is answered here, before Astro: published media
  *   are immutable and tagged `cloudhal-media-<siteId>` / `cloudhal-asset-<id>` (not the site tag),
  *   so purging pages after a publish leaves them cached.
+ * - Site analytics (RFC-0006 §5): `POST /__cloudhal/e` takes page-view and vitals beacons (always
+ *   `204`, never cached) and writes them to Workers Analytics Engine (`ANALYTICS`); published HTML
+ *   pages get the `/_cloudhal/p.<hash>.js` tag while the site's setting is on (it sits in the cached
+ *   HTML, so a settings change purges); responses the Worker renders become `render` events. All of
+ *   it is off without `CLOUDHAL_ANALYTICS=on` and the binding (`analytics.ts`).
  */
 
 import { cache } from "cloudflare:workers";
+import config from "virtual:cloudhal/config";
 import { handle } from "@astrojs/cloudflare/handler";
-import { CACHE_TAG_PREFIX, resetSource, serveMedia } from "@cloudhal/astro-renderer/runtime";
+import { type WaeDataset, WaeWriter } from "@cloudhal/analytics/wae";
+import {
+  analyticsBackend,
+  CACHE_TAG_PREFIX,
+  resetSource,
+  serveMedia,
+} from "@cloudhal/astro-renderer/runtime";
+import {
+  ANALYTICS_BEACON_PATH,
+  deploymentDefaults,
+  parseHosts,
+  SiteAnalytics,
+} from "./analytics.ts";
 import { isCloudhalCacheTag } from "./cache-tags.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 
 interface Env {
   CLOUDHAL_SITE_ID?: string;
   CLOUDHAL_PURGE_TOKEN?: string;
+  /**
+   * Site analytics (RFC-0006 §11): the Workers Analytics Engine dataset (`<deployment>_events`).
+   * Without it nothing is collected and no script tag is injected.
+   */
+  ANALYTICS?: AnalyticsEngineDataset;
+  /** `"on"` turns analytics on for the deployment; anything else (or absent) is off. */
+  CLOUDHAL_ANALYTICS?: string;
+  /** `cloudhal.json`'s `analytics` block as compact JSON: defaults for sites without a settings row. */
+  CLOUDHAL_ANALYTICS_DEFAULTS?: string;
+  /**
+   * Hostnames the site answers on besides `Site.domains` (comma-separated), e.g. its workers.dev
+   * host. Requests that arrive on a `*.workers.dev` host are always accepted as the site's own.
+   */
+  CLOUDHAL_SITE_HOSTS?: string;
   [binding: string]: unknown;
+}
+
+/**
+ * Writes made through an RPC-style binding (a test double, or a future binding that returns a
+ * promise) are kept alive with `waitUntil`; Workers Analytics Engine's `writeDataPoint` returns
+ * nothing, so this costs nothing in production.
+ */
+class PendingWrites {
+  readonly #pending = new Set<Promise<unknown>>();
+  dataset(binding: AnalyticsEngineDataset): WaeDataset {
+    return {
+      writeDataPoint: (point) => {
+        const result = (binding.writeDataPoint as (p: unknown) => unknown)(point);
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          const p = (result as Promise<unknown>).catch(() => {});
+          this.#pending.add(p);
+          p.finally(() => this.#pending.delete(p));
+        }
+      },
+    };
+  }
+  /** Settles when the writes made so far have. */
+  settled(): Promise<unknown> {
+    return Promise.allSettled([...this.#pending]);
+  }
+  /** Keeps the invocation alive until the writes made so far have settled. */
+  flush(ctx: ExecutionContext): void {
+    if (this.#pending.size > 0) ctx.waitUntil(this.settled());
+  }
+}
+
+const pendingWrites = new PendingWrites();
+let analytics: SiteAnalytics | undefined;
+
+/** One per isolate: settings, pointer, rate limits and the render sampler live as long as it does. */
+function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
+  if (analytics) return analytics;
+  const { sql, site, snapshot } = analyticsBackend(siteId);
+  analytics = new SiteAnalytics({
+    siteId,
+    defaults: deploymentDefaults(env.CLOUDHAL_ANALYTICS, env.CLOUDHAL_ANALYTICS_DEFAULTS),
+    writer: env.ANALYTICS
+      ? new WaeWriter(pendingWrites.dataset(env.ANALYTICS), {
+          onError: (m, e) => console.error(m, e),
+        })
+      : undefined,
+    sql,
+    site,
+    snapshot,
+    script: config.analyticsScript,
+    hosts: parseHosts(env.CLOUDHAL_SITE_HOSTS),
+    acceptRequestHost: (host) => host.endsWith(".workers.dev"),
+    onError: (m, e) => console.error(m, e),
+  });
+  return analytics;
+}
+
+/** Appends the analytics tag to `<head>` of a published HTML page (§5.1). */
+async function withAnalyticsTag(response: Response, a: SiteAnalytics): Promise<Response> {
+  if (
+    response.status !== 200 ||
+    response.headers.get("x-cloudhal-mode") !== "published" ||
+    !(response.headers.get("content-type") ?? "").includes("text/html")
+  )
+    return response;
+  const tag = await a.tag();
+  if (!tag) return response;
+  return new HTMLRewriter()
+    .on("head", {
+      element(el) {
+        el.append(tag, { html: true });
+      },
+    })
+    .transform(response);
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -50,6 +156,8 @@ async function purge(
   if (!expected || !timingSafeEqual(given, expected))
     return Response.json({ error: "unauthorized" }, { status: 401 });
   resetSource();
+  // A settings change purges the cache (RFC-0006 §9.2): re-read settings on the next request.
+  analytics?.reset();
   const siteId = env.CLOUDHAL_SITE_ID ?? siteIdFromBuild;
   const tag = `${CACHE_TAG_PREFIX}${siteId}`;
   // `cache.purge` exists on Cloudflare; local workerd has no edge cache to purge.
@@ -146,7 +254,9 @@ function keepPreviewInLinks(response: Response, token: string): Response {
 
 /**
  * Defence in depth for content written by agents: no inline or third-party scripts, no plugins,
- * no foreign framing. Sites ship no client scripts of their own (Astro islands load from 'self').
+ * no foreign framing. The only client script a site ships of its own is Cloudhal's first-party
+ * analytics script (hashed, served from `/_cloudhal/`, switchable off; RFC-0006 §0), which loads
+ * from 'self' and posts to 'self', as Astro islands do.
  */
 // Not exported: every named export of a Worker entry module must be a handler or entrypoint.
 const SITE_CSP =
@@ -188,11 +298,33 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
       const siteId = env.CLOUDHAL_SITE_ID ?? options.siteId;
+      const a = siteId ? siteAnalytics(env, siteId) : undefined;
+      // Analytics beacons (RFC-0006 §5.2): 204 for every outcome, never cached (POST).
+      if (url.pathname === ANALYTICS_BEACON_PATH) {
+        if (!a)
+          return new Response(null, {
+            status: request.method === "POST" ? 204 : 405,
+            headers: { "cache-control": "no-store" },
+          });
+        const answer = await a.beacon(request);
+        pendingWrites.flush(ctx);
+        return answer;
+      }
+      const started = Date.now();
       const media = siteId ? await serveMedia(request, { siteId }) : undefined;
+      const rendered =
+        media ??
+        withSecurityHeaders(
+          cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
+        );
+      // Server-side render events (§5.4), off the response path: published HTML 200s (cache
+      // misses), redirects, 404, 410, 451 and 5xx; never previews or HEAD.
+      if (a?.available) {
+        const renderMs = Date.now() - started;
+        ctx.waitUntil(a.render(request, rendered, renderMs).then(() => pendingWrites.settled()));
+      }
       if (media) return media;
-      const response = withSecurityHeaders(
-        cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
-      );
+      const response = a?.available ? await withAnalyticsTag(rendered, a) : rendered;
       const token = response.headers.get("x-cloudhal-preview-token");
       if (response.headers.get("x-cloudhal-mode") !== "preview" || !token) return response;
       const headers = new Headers(response.headers);

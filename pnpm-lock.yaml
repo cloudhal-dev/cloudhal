@@ -284,6 +284,9 @@ catalogs:
     vitest:
       specifier: 5.0.3
       version: 5.0.3
+    web-vitals:
+      specifier: 6.2.2
+      version: 6.2.2
     wrangler:
       specifier: 4.148.0
       version: 4.148.0
@@ -546,6 +549,9 @@ importers:
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage
+      web-vitals:
+        specifier: 'catalog:'
+        version: 6.2.2
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -629,6 +635,9 @@ importers:
 
   packages/astro-renderer:
     dependencies:
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -641,6 +650,9 @@ importers:
       marked:
         specifier: 'catalog:'
         version: 18.1.0
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
     devDependencies:
       '@astrojs/cloudflare':
         specifier: 'catalog:'
@@ -700,6 +712,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20261007.1
+      '@cloudhal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.3.1
@@ -4260,6 +4275,9 @@ packages:
       jsdom:
         optional: true
 
+  web-vitals@6.2.2:
+    resolution: {integrity: sha512-oto5x6dLEgrRqfcWed+pZEUb2q6ikbFmqF54CRDhI/QGbn+qxC49b4C4OkbH+kb9C3a8shpFD3SgR9kRcs80ZQ==}
+
   whatwg-mimetype@3.0.0:
     resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
     engines: {node: '>=12'}
@@ -7134,6 +7152,8 @@ snapshots:
       happy-dom: 20.14.5
     transitivePeerDependencies:
       - msw
+
+  web-vitals@6.2.2: {}
 
   whatwg-mimetype@3.0.0: {}
 
