@@ -16,7 +16,6 @@ import {
 interface MiddlewareContext {
   request: Request;
   clientAddress?: string;
-  isPrerendered?: boolean;
 }
 
 const { defaults, record } = nodeAnalyticsSettings(config);
@@ -33,7 +32,7 @@ export async function onRequest(
   context: MiddlewareContext,
   next: () => Promise<Response>,
 ): Promise<Response> {
-  if (context.isPrerendered) return next();
+  // Added in `cloudhal dev` only, where every route renders per request (static routes too).
   let ip: string | undefined;
   try {
     ip = context.clientAddress;
