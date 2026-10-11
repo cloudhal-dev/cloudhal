@@ -192,7 +192,7 @@ describe("CreateAgentKeyDialog", () => {
     expect(sentBody(fetch)).toEqual({
       name: "Reader",
       mode: "plan",
-      scopes: ["site:read", "content:read"],
+      scopes: ["site:read", "content:read", "analytics:read"],
     });
   });
 

@@ -15,6 +15,7 @@ import { errorHandler, unauthorized } from "./errors.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
 import { entries } from "./routes/entries.ts";
@@ -249,6 +250,8 @@ export function createApi(deps: ApiDeps) {
   // RFC-0004 §6.1: the media library (people; agents use the MCP asset tools).
   app.route("/api/sites/:siteId/assets", assets);
   app.route("/api/sites/:siteId/media", siteMedia);
+  // RFC-0006 §9.2: site analytics (people; agents use the MCP analytics tools).
+  if (deps.analytics) app.route("/api/sites/:siteId/analytics", analytics);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

@@ -26,6 +26,7 @@ const S = "/api/sites/:siteId";
 const T = `${S}/terms/:termId`;
 const M = `${S}/menus`;
 const A = `${S}/assets`;
+const AN = `${S}/analytics`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -43,6 +44,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["POST", "/api/admin/owner", "deploy-token"],
+  // RFC-0006 §7.5: analytics backfill and the operator's status and export
+  ["POST", "/api/admin/sites/:siteId/analytics/rollup", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/analytics/status", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/analytics/export", "deploy-token"],
 
   // deployment
   ["GET", "/api/instance", "member"],
@@ -145,6 +150,18 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", `${A}/:assetId`, "asset:manage"],
   ["POST", `${A}/:assetId/purge`, "owner"],
   ["POST", `${S}/media/:sha256/lift-purge`, "owner"],
+  // site analytics (RFC-0006 §9.2): aggregates without personal data for Authors and above;
+  // settings (privacy decisions, outside the graph) for Administrators, audited
+  ["GET", `${AN}/status`, "analytics:read"],
+  ["GET", `${AN}/summary`, "analytics:read"],
+  ["GET", `${AN}/series`, "analytics:read"],
+  ["GET", `${AN}/top/:dimension`, "analytics:read"],
+  ["GET", `${AN}/vitals`, "analytics:read"],
+  ["GET", `${AN}/renders/:report`, "analytics:read"],
+  ["GET", `${AN}/nodes/:nodeId`, "analytics:read"],
+  ["GET", `${AN}/export`, "analytics:read"],
+  ["GET", `${AN}/settings`, "analytics:read"],
+  ["PUT", `${AN}/settings`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

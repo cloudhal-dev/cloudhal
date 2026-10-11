@@ -12,7 +12,15 @@
  * - `GET|HEAD /api/admin/sites/:siteId/media/:sha256` → the content's bytes (RFC-0004 §4.7)
  * - `PUT  /api/admin/sites/:siteId/media/:sha256` ← raw bytes, verified against the SHA-256 before
  *   anything is stored; bundles refuse to import until the media they list are here
+ * - `POST /api/admin/sites/:siteId/analytics/rollup` ← {days?, maxSiteDays?} → the rollup report:
+ *   `cloudhal analytics rollup --remote` backfills missing days from WAE (RFC-0006 §7.5), a few
+ *   site-days per call; the CLI repeats while `pending > 0`
+ * - `GET  /api/admin/sites/:siteId/analytics/status` and `…/export?from&to` (CSV of the rollups):
+ *   `cloudhal analytics status|export --remote`
  */
+
+import { AnalyticsQueryError } from "@cloudhal/analytics";
+import { rangeFromParams } from "@cloudhal/analytics/service";
 import {
   exportSite,
   importSite,
@@ -38,6 +46,9 @@ export function timingSafeEqual(a: string, b: string): boolean {
   for (let i = 0; i < ea.length; i++) diff |= (ea[i] as number) ^ (eb[i] as number);
   return diff === 0;
 }
+
+/** Site-days one backfill call rolls up: about 18 WAE queries each, bounded per Worker request. */
+export const ROLLUP_MAX_SITE_DAYS_PER_CALL = 3;
 
 /** One media PUT: the Workers request-body limit on Free and Pro (RFC-0004 answer 6). */
 const MAX_MEDIA_PUT = 100 * 1024 * 1024;
@@ -89,6 +100,61 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
           reason: `operator made ${member.name} the Owner`,
         });
         return c.json({ from: moved.from, to: user.id, name: member.name, email: user.email });
+      })
+      // RFC-0006 §7.5 backfill and the operator's view of analytics (deployment token).
+      .post("/sites/:siteId/analytics/rollup", async (c) => {
+        const analytics = c.get("analytics");
+        if (!analytics)
+          return c.json({ error: "not_found", message: "analytics are not enabled" }, 404);
+        const siteId = param(c, "siteId");
+        if (!(await c.get("store").getSite(siteId)))
+          return c.json({ error: "not_found", message: "site not found" }, 404);
+        const body = ((await c.req.json().catch(() => ({}))) ?? {}) as {
+          days?: unknown;
+          maxSiteDays?: unknown;
+        };
+        const days = body.days ?? 7;
+        if (!Number.isInteger(days) || (days as number) < 1 || (days as number) > 92)
+          throw new AnalyticsQueryError("days must be an integer from 1 to 92");
+        const max = body.maxSiteDays ?? 1;
+        if (
+          !Number.isInteger(max) ||
+          (max as number) < 1 ||
+          (max as number) > ROLLUP_MAX_SITE_DAYS_PER_CALL
+        )
+          throw new AnalyticsQueryError(
+            `maxSiteDays must be an integer from 1 to ${ROLLUP_MAX_SITE_DAYS_PER_CALL}`,
+          );
+        const report = await analytics.rollup({
+          siteIds: [siteId],
+          lookbackDays: days as number,
+          maxSiteDays: max as number,
+        });
+        return c.json({ ...report, reader: analytics.feature().reader });
+      })
+      .get("/sites/:siteId/analytics/status", async (c) => {
+        const analytics = c.get("analytics");
+        if (!analytics)
+          return c.json({ error: "not_found", message: "analytics are not enabled" }, 404);
+        const siteId = param(c, "siteId");
+        if (!(await c.get("store").getSite(siteId)))
+          return c.json({ error: "not_found", message: "site not found" }, 404);
+        return c.json(await analytics.status(siteId));
+      })
+      .get("/sites/:siteId/analytics/export", async (c) => {
+        const analytics = c.get("analytics");
+        if (!analytics)
+          return c.json({ error: "not_found", message: "analytics are not enabled" }, 404);
+        const siteId = param(c, "siteId");
+        if (!(await c.get("store").getSite(siteId)))
+          return c.json({ error: "not_found", message: "site not found" }, 404);
+        const range = rangeFromParams(
+          { range: c.req.query("range"), from: c.req.query("from"), to: c.req.query("to") },
+          analytics.now(),
+        );
+        return new Response(await analytics.exportCsv(siteId, range), {
+          headers: { "content-type": "text/csv; charset=utf-8", "cache-control": "no-store" },
+        });
       })
       .get("/sites/:siteId/bundle", async (c) => {
         const siteId = param(c, "siteId");

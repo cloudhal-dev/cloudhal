@@ -594,6 +594,7 @@ export const tr: Messages = {
       "content:write": "Sayfa ve makale oluşturur, düzenler, siler",
       "asset:upload": "Medya yükler ve kendi yüklediklerini düzenler",
       "asset:manage": "Tüm medyayı düzenler, emekliye ayırır ve siler",
+      "analytics:read": "Site istatistiklerini okur (kişisel veri yok)",
       "site:write": "Site ayarlarını değiştirir",
       "preview:create": "Taslak önizlemesi oluşturur",
       "site:publish": "Bir snapshot'ı canlı siteye yayınlar",
@@ -2232,6 +2233,10 @@ export const tr: Messages = {
         manage: "Tüm dosyaları yönetmek için en az {role} rolü gerekir.",
       },
       activity: { all: "Tüm ekibin etkinliğini görmek için en az {role} rolü gerekir." },
+      analytics: {
+        read: "İstatistikleri görmek için en az {role} rolü gerekir.",
+        settings: "İstatistik ayarlarını değiştirmek için en az {role} rolü gerekir.",
+      },
       settings: {
         write: "Site ayarlarını ve alan adlarını değiştirmek için en az {role} rolü gerekir.",
       },

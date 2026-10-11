@@ -1,4 +1,5 @@
 import { OwnLimitError } from "@cloudhal/agent-runtime";
+import { AnalyticsError } from "@cloudhal/analytics";
 import { ContractValidationError } from "@cloudhal/core-contracts";
 import {
   ConflictError,
@@ -128,8 +129,40 @@ export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof NotFoundError) {
     return c.json<ApiErrorBody>({ error: "not_found", message: err.message }, 404);
   }
+  if (err instanceof AnalyticsError) return analyticsError(err, c);
   console.error(err);
   return c.json<ApiErrorBody>({ error: "internal", message: "internal error" }, 500);
+}
+
+/**
+ * Analytics errors (RFC-0006 §7.3, §9.2): `invalid_query` and `invalid_settings` 400, `conflict`
+ * 409 (stale settings `rev`), `analytics_unavailable` 503 with `retryable` and `Retry-After: 30`,
+ * `analytics_query_failed` 502 (the message never names the dataset).
+ */
+function analyticsError(err: AnalyticsError, c: Context): Response {
+  switch (err.code) {
+    case "invalid_query":
+    case "invalid_settings":
+    case "unsupported_query":
+      return c.json<ApiErrorBody>({ error: err.code, message: err.message }, 400);
+    case "conflict":
+      return c.json<ApiErrorBody>(
+        { error: "conflict", message: err.message, details: { kind: "analyticsSettings" } },
+        409,
+      );
+    case "analytics_query_failed":
+      return c.json<ApiErrorBody>({ error: err.code, message: err.message }, 502);
+    default:
+      c.header("retry-after", "30");
+      return c.json<ApiErrorBody>(
+        {
+          error: "analytics_unavailable",
+          message: err.message,
+          details: { retryable: err.retryable || err.code === "analytics_budget_exceeded" },
+        },
+        503,
+      );
+  }
 }
 
 export function notFound(message: string): HTTPException {
