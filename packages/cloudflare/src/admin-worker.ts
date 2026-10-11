@@ -22,7 +22,7 @@ import {
   type SkillSource,
   skillFromSource,
 } from "@cloudhal/agent-runtime";
-import { parseAnalyticsDefaults } from "@cloudhal/analytics";
+import { type AnalyticsDefaults, parseAnalyticsDefaults } from "@cloudhal/analytics";
 import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlQueryBudget } from "@cloudhal/analytics/sql";
 import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
@@ -66,6 +66,21 @@ export const DEFAULT_ANALYTICS_BUDGET = 8000;
 const PURGE_URL = "https://site.internal/__cloudhal/purge";
 
 /**
+ * `CLOUDHAL_ANALYTICS_DEFAULTS` as the Site Worker reads it (`deploymentDefaults` in the renderer):
+ * cloudhal.json's `analytics` block, in which `enabled` defaults to `true`.
+ */
+export function analyticsDefaults(json: string | undefined): AnalyticsDefaults {
+  let parsed: unknown;
+  try {
+    parsed = json ? JSON.parse(json) : {};
+  } catch {
+    parsed = {};
+  }
+  const o = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  return parseAnalyticsDefaults({ enabled: true, ...o });
+}
+
+/**
  * The deployment's analytics (RFC-0006 §8) from its bindings and vars. Plain construction, no I/O,
  * so it is built per request or scheduled run (ADR-0012: nothing but plain values is cached).
  */
@@ -99,7 +114,7 @@ export function adminAnalytics(
           source: new WaeReader(binding, { dataset, onError }),
         }
       : {}),
-    defaults: parseAnalyticsDefaults(env.CLOUDHAL_ANALYTICS_DEFAULTS),
+    defaults: analyticsDefaults(env.CLOUDHAL_ANALYTICS_DEFAULTS),
     budget: on ? budget : null,
     rollups: env.CLOUDHAL_ANALYTICS_CRON === "off" ? "on-read" : "scheduled",
     ...(options.now ? { now: options.now } : {}),

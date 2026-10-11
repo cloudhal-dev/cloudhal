@@ -67,6 +67,8 @@ describe("admin Worker analytics", () => {
       sql,
     ).feature();
     expect(blind).toMatchObject({ enabled: true, store: "wae", reader: "none", budget: 8000 });
+    // like the Site Worker, `enabled` defaults to true once the deployment records analytics
+    expect(blind.defaults.enabled).toBe(true);
 
     const full = adminAnalytics(
       baseEnv({
