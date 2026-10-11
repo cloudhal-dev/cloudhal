@@ -83,6 +83,11 @@ export interface BreakdownTableProps {
   limit?: number;
   /** The period's total of `value`; shares are of this, and the gap becomes "(other)". */
   total?: number;
+  /**
+   * `false` lists only the given rows (shares still of `total`), without "(other)" — one page of a
+   * longer list, such as "Show all" with `Pagination`.
+   */
+  showOther?: boolean;
   loading?: boolean;
   /** Skeleton rows while loading. Default 5. */
   loadingRows?: number;
@@ -139,6 +144,7 @@ export function BreakdownTable({
   locale,
   limit,
   total: totalProp,
+  showOther = true,
   loading = false,
   loadingRows = 5,
   empty,
@@ -153,8 +159,9 @@ export function BreakdownTable({
         ...(limit !== undefined ? { limit } : {}),
         ...(totalProp !== undefined ? { total: totalProp } : {}),
         otherLabel: labels.other,
+        showOther,
       }),
-    [input, limit, totalProp, labels.other],
+    [input, limit, totalProp, labels.other, showOther],
   );
   const secondary = !compact && labels.secondary !== undefined;
   if (!loading && rows.length === 0) return <>{empty}</>;

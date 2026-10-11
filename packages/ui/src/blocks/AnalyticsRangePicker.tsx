@@ -133,6 +133,9 @@ export function AnalyticsRangePicker({
               key={round}
               size="sm"
               variant="subtle"
+              // Two months side by side need ~380 px: below `sm` they stack, so the popover fits a
+              // phone without scrolling sideways (the scroller above stays as a last resort).
+              className="max-sm:[&>div:first-child]:flex-col"
               timezone={labels.timezone}
               onStartDateChange={setStart}
               onEndDateChange={setEnd}
