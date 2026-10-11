@@ -45,7 +45,8 @@
     "vitest": "catalog:",
     "@modelcontextprotocol/client": "catalog:",
     "wrangler": "catalog:",
-    "@cloudflare/workers-types": "catalog:"
+    "@cloudflare/workers-types": "catalog:",
+    "@cloudhal/analytics": "workspace:*"
   },
   "engines": {
     "node": ">=24"
