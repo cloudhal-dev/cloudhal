@@ -177,6 +177,7 @@ export function createApi(deps: ApiDeps) {
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
       now: deps.now,
       ownership,
+      analytics: deps.analytics,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.

@@ -34,6 +34,7 @@ import {
 import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
+import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -335,6 +336,8 @@ export function defineTools(): ToolDefinition[] {
     ...menuTools(),
     ...assetTools(),
     ...raw.slice(at),
+    // RFC-0006 §9.3: read-only analytics (`analytics:read`).
+    ...analyticsTools(),
     ...elevationTools(),
   ].map((t) => ({
     ...t,
