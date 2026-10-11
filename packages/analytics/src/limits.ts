@@ -4,6 +4,9 @@
  * dropped every minute.
  */
 
+/** The HMAC key type, spelled so it resolves with Node's and with Workers' type libraries alike. */
+type HmacKey = Parameters<typeof crypto.subtle.sign>[1];
+
 const MINUTE_MS = 60_000;
 const MAX_KEYS = 20_000;
 
@@ -17,7 +20,7 @@ export interface BeaconRateLimiterOptions {
 export class BeaconRateLimiter {
   readonly #perMinute: number;
   readonly #now: () => number;
-  #key: Promise<CryptoKey> | undefined;
+  #key: Promise<HmacKey> | undefined;
   #window = -1;
   #counts = new Map<string, number>();
 
@@ -26,10 +29,10 @@ export class BeaconRateLimiter {
     this.#now = options.now ?? Date.now;
   }
 
-  #hmacKey(): Promise<CryptoKey> {
+  #hmacKey(): Promise<HmacKey> {
     this.#key ??= crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256" }, false, [
       "sign",
-    ]) as Promise<CryptoKey>;
+    ]) as Promise<HmacKey>;
     return this.#key;
   }
 

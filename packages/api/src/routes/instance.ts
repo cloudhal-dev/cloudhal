@@ -23,6 +23,7 @@ import {
   type Scope,
   scopesForMode,
 } from "@cloudhal/agent-runtime";
+import type { AnalyticsFeature } from "@cloudhal/analytics/service";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 
@@ -39,6 +40,12 @@ export interface InstanceInfo {
     elevationRequests: boolean;
     /** Staff roles, members and invites (RFC-0005). */
     members: boolean;
+    /**
+     * Site analytics (RFC-0006 §8): `store` where events are recorded, `reader` whether they can be
+     * read (`none`: recorded but not readable yet, e.g. no Analytics SQL binding), the live window,
+     * the daily live-query budget and how daily totals are made.
+     */
+    analytics: AnalyticsFeature;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;

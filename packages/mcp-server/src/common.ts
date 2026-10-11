@@ -12,6 +12,7 @@ import {
   type Scope,
   type ToolAnnotations,
 } from "@cloudhal/agent-runtime";
+import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { InvariantCode, SiteGraphStore } from "@cloudhal/core-ts";
 import {
@@ -94,6 +95,8 @@ export interface ToolContext {
   limit?: OwnLimit | undefined;
   /** Media settings (fetch transport, host lists, daily limits). */
   media?: MediaToolOptions | undefined;
+  /** Site analytics (RFC-0006): the analytics tools answer `analytics_disabled` without it. */
+  analytics?: AnalyticsService | undefined;
 }
 
 /**
@@ -144,7 +147,9 @@ export type ToolErrorCode =
   | "unknown_taxonomy"
   | "unknown_term"
   | "ambiguous_term"
-  | "invalid_filter";
+  | "invalid_filter"
+  | "analytics_disabled"
+  | "analytics_unavailable";
 
 export class ToolError extends Error {
   override readonly name = "ToolError";

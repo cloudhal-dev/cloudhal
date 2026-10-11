@@ -82,6 +82,10 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "preview_page",
       "publish",
       "rollback",
+      "get_analytics",
+      "top_content",
+      "content_stats",
+      "broken_links",
       "get_mode",
       "request_elevation",
     ]);

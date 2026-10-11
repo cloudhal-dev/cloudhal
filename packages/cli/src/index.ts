@@ -1,3 +1,16 @@
+export {
+  type AnalyticsCliOptions,
+  analyticsExport,
+  analyticsRollup,
+  analyticsSeed,
+  analyticsStatus,
+  describeStatus,
+  type ExportCliOptions,
+  localAnalytics,
+  type RollupCliOptions,
+  runLocalRollups,
+  type SeedCliOptions,
+} from "./commands/analytics.ts";
 export { type BuildOptions, build, type DevOptions, dev } from "./commands/astro.ts";
 export {
   type DeployOptions,
@@ -25,6 +38,7 @@ export { resolveBuildSnapshot, type SnapshotOptions, snapshot } from "./commands
 export { type StudioOptions, studio } from "./commands/studio.ts";
 export { pullSite, pushSite, type SyncOptions } from "./commands/sync.ts";
 export {
+  type AnalyticsConfig,
   CONFIG_FILE,
   type ProjectConfig,
   readProjectConfig,

@@ -7,6 +7,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
+import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
 export interface StudioOptions {
@@ -40,8 +41,15 @@ export async function studio(
   const serveStudio = await exists(path.join(studioDist, "index.html"));
 
   const skillsDir = await resolveSkillsDir(options.projectDir);
+  // Site analytics on the project's SQLite (RFC-0006 L3): read through SqlAnalytics, daily totals
+  // rolled up hourly (and raw events pruned) while Studio runs.
+  const analytics = localAnalytics(local.sql, cfg);
+  const stopRollups = analytics.feature().enabled
+    ? startLocalRollups(analytics, local, cfg.analytics)
+    : () => {};
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
+    analytics,
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [
@@ -89,6 +97,7 @@ export async function studio(
   return {
     url: `http://localhost:${port}/`,
     stop: async () => {
+      stopRollups();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await local.close();
     },

@@ -1,5 +1,13 @@
+import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
+import {
+  analyticsExport,
+  analyticsRollup,
+  analyticsSeed,
+  analyticsStatus,
+  describeStatus,
+} from "./commands/analytics.ts";
 import { build, dev } from "./commands/astro.ts";
 import { deploy } from "./commands/deploy.ts";
 import { type DomainTarget, domain } from "./commands/domain.ts";
@@ -38,6 +46,13 @@ Usage:
                                                           (RFC-0004); revertible
   cloudhal media verify [<assetId>]                       recompute media checksums
   cloudhal media gc [--dry-run]                           delete unreferenced media bytes (> 24 h old)
+  cloudhal analytics status [--remote]                    site analytics: settings, daily totals, budget
+  cloudhal analytics rollup [--days <n>] [--remote] [--redo]
+                                                          compute daily totals (--remote backfills the
+                                                          deployment from WAE, up to 92 days)
+  cloudhal analytics seed [--days <n>] [--views <n>]      demo traffic in the local SQLite only
+  cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
+                                                          daily totals as CSV (default: 30 days)
   cloudhal --help
 `;
 
@@ -67,6 +82,12 @@ export async function main(argv: string[]): Promise<number> {
       to: { type: "string" },
       "include-markdown": { type: "boolean" },
       "allow-host": { type: "string", multiple: true },
+      remote: { type: "boolean" },
+      redo: { type: "boolean" },
+      days: { type: "string" },
+      views: { type: "string" },
+      from: { type: "string" },
+      out: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -139,6 +160,8 @@ export async function main(argv: string[]): Promise<number> {
         ...(values.name ? { name: values.name } : {}),
         ...(values["dry-run"] ? { dryRun: true } : {}),
         log: (l) => console.log(l),
+        // The analytics question for projects without the key needs a person at a terminal.
+        ...(process.stdin.isTTY && process.stdout.isTTY ? { prompt: askYesNo } : {}),
       });
       if (r.dryRun) {
         console.log(
@@ -260,6 +283,59 @@ export async function main(argv: string[]): Promise<number> {
       }
       throw new Error("usage: cloudhal media import-urls|verify|gc");
     }
+    case "analytics": {
+      const [what] = rest;
+      const number = (v: string | undefined) => (v === undefined ? undefined : Number(v));
+      const remote = values.remote ? { remote: true } : {};
+      const adminUrl = values["admin-url"] ? { adminUrl: values["admin-url"] } : {};
+      if (what === "status") {
+        const s = await analyticsStatus({ projectDir, ...remote, ...adminUrl });
+        for (const line of describeStatus(s)) console.log(line);
+        return 0;
+      }
+      if (what === "rollup") {
+        const days = number(values.days);
+        const r = await analyticsRollup({
+          projectDir,
+          ...remote,
+          ...adminUrl,
+          ...(days !== undefined ? { days } : {}),
+          ...(values.redo ? { redo: true } : {}),
+          log: (l) => console.log(l),
+        });
+        console.log(
+          `${r.done} day(s) rolled up, ${r.pending} pending${r.failed.length ? `, ${r.failed.length} failed` : ""}${r.pruned ? `; ${r.pruned} old raw event(s) pruned` : ""}`,
+        );
+        for (const f of r.failed) console.log(`  ${f.day}: ${f.error}`);
+        return r.failed.length ? 1 : 0;
+      }
+      if (what === "seed") {
+        if (values.remote) throw new Error("seed writes demo data to the local SQLite only");
+        const days = number(values.days);
+        const views = number(values.views);
+        await analyticsSeed({
+          projectDir,
+          ...(days !== undefined ? { days } : {}),
+          ...(views !== undefined ? { views } : {}),
+          log: (l) => console.log(l),
+        });
+        return 0;
+      }
+      if (what === "export") {
+        const csv = await analyticsExport({
+          projectDir,
+          ...remote,
+          ...adminUrl,
+          ...(values.from ? { from: values.from } : {}),
+          ...(values.to ? { to: values.to } : {}),
+          ...(values.out ? { out: values.out } : {}),
+        });
+        if (values.out) console.log(`wrote ${values.out}`);
+        else process.stdout.write(csv);
+        return 0;
+      }
+      throw new Error("usage: cloudhal analytics status|rollup|seed|export");
+    }
     case "mcp": {
       const server = await mcp({
         projectDir,
@@ -285,5 +361,16 @@ export async function main(argv: string[]): Promise<number> {
     default:
       process.stderr.write(`unknown command "${command}"\n\n${HELP}`);
       return 1;
+  }
+}
+
+/** A yes/no question at the terminal; Enter means yes. */
+async function askYesNo(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(question)).trim().toLowerCase();
+    return answer === "" || answer === "y" || answer === "yes";
+  } finally {
+    rl.close();
   }
 }

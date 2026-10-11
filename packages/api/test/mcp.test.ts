@@ -1,5 +1,8 @@
 /** `/mcp` over HTTP: session cookie → human (approval-gated), API key → agent (scope-limited). */
+
 import { ApprovalStore, AuditLog } from "@cloudhal/agent-runtime";
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -38,6 +41,12 @@ async function setup(
     ...(now ? { now } : {}),
     agentKeys: auth.agentKeys,
     staff: auth.staff,
+    analytics: new AnalyticsService({
+      sql,
+      store: "sql",
+      live: new SqlAnalytics(sql),
+      defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 5 },
+    }),
   });
 
   const signUp = await app.request("/api/auth/sign-up/email", {
@@ -237,6 +246,10 @@ describe("agent modes on API keys (ADR-0015)", () => {
     expect((denied.content[0] as { text: string }).text).toMatch(
       /missing scope content:write|plan mode/,
     );
+    // RFC-0006: a new key reads analytics in every mode, plan included, over /mcp.
+    const stats = await client.callTool({ name: "get_analytics", arguments: { siteId } });
+    expect(stats.isError, JSON.stringify(stats.content)).toBeFalsy();
+    expect(stats.structuredContent).toMatchObject({ siteId, summary: { pageviews: 0 } });
 
     // owner switches it to edits — but the key's scopes stay what they were (a mode never grants)
     const patch = await app.request(`/api/agent-keys/${key.id}`, {

@@ -27,6 +27,41 @@ export function resolveWranglerBin(projectDir: string): string {
   return path.join(path.dirname(require.resolve("wrangler/package.json")), "bin/wrangler.js");
 }
 
+/** The version of the project's installed wrangler (`package.json`), or undefined. */
+export async function installedWranglerVersion(projectDir: string): Promise<string | undefined> {
+  try {
+    const require = createRequire(path.join(projectDir, "package.json"));
+    const pkg = JSON.parse(await readFile(require.resolve("wrangler/package.json"), "utf8")) as {
+      version?: unknown;
+    };
+    return typeof pkg.version === "string" ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** `a >= b` for `major.minor.patch` versions (pre-release suffixes ignored). */
+export function versionAtLeast(a: string, b: string): boolean {
+  const parse = (v: string) =>
+    v
+      .split(/[.+-]/)
+      .slice(0, 3)
+      .map((x) => Number.parseInt(x, 10) || 0);
+  const [x, y] = [parse(a), parse(b)];
+  for (let i = 0; i < 3; i++) {
+    if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  }
+  return true;
+}
+
+/** Wrangler accepts the `analytics` (Analytics SQL) config key from this version (RFC-0006 §11). */
+export const WRANGLER_FOR_ANALYTICS = "4.145.0";
+
+/** Whether a failed deploy was refused for the account's cron-trigger limit (Free: 5). */
+export function isCronLimitError(output: string): boolean {
+  return /cron/i.test(output) && /(limit|exceed|maximum|too many|quota)/i.test(output);
+}
+
 export function wranglerRunner(
   projectDir: string,
   log: (line: string) => void = () => {},

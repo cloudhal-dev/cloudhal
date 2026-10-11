@@ -76,6 +76,7 @@ export const KEY_SCOPES: readonly Exclude<AgentScope, "*">[] = [
   "site:rollback",
   "asset:upload",
   "asset:manage",
+  "analytics:read",
 ];
 
 /**
@@ -124,12 +125,13 @@ const EDITOR: AnyScope[] = [
   "asset:manage",
   "audit:read",
   "members:invite",
+  "analytics:read",
 ];
 
 /** Role → scopes (`ROLE_SCOPES`, RFC-0005 §2.1), for servers that do not report them. */
 export const FALLBACK_ROLE_SCOPES: Record<Role, AnyScope[]> = {
   contributor: [...READ, "content:draft:own", "asset:upload"],
-  author: [...READ, "content:write:own", "site:publish:own", "asset:upload"],
+  author: [...READ, "content:write:own", "site:publish:own", "asset:upload", "analytics:read"],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
   owner: ["*"],
@@ -152,6 +154,8 @@ export const FALLBACK_ABILITIES: Record<Ability, AnyScope | "owner"> = {
   "members.invite": "members:invite",
   "members.manage": "members:manage",
   "agents.manage": "agents:manage",
+  "analytics.read": "analytics:read",
+  "analytics.settings": "site:settings",
   "ownership.transfer": "owner",
 };
 

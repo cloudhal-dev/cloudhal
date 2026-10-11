@@ -2,6 +2,8 @@
  * RFC-0005 I15: REST is default-deny. Every route the app mounts declares its requirement in
  * `ROUTE_SCOPES`; this test fails for any route without one (and for declarations without a route).
  */
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -33,6 +35,7 @@ async function fullApp() {
     mcp: { stateKey: "route-scopes-state-key-0123456789abcdefg" },
     preview: { secret: "route-scopes-preview-secret-0123456789ab" },
     admin: { deployToken: "route-scopes-deploy-token-0123456789abc", storage: { sql, blobs } },
+    analytics: new AnalyticsService({ sql, store: "sql", live: new SqlAnalytics(sql) }),
   });
 }
 
@@ -99,5 +102,27 @@ describe("ROUTE_SCOPES (I15)", () => {
     expect(requirementFor("POST", `/api/sites/site_x/media/${"a".repeat(64)}/lift-purge`)).toBe(
       "owner",
     );
+    // RFC-0006 §9.2: analytics reads for Authors and above; settings for Administrators; the
+    // backfill, status and export for the operator.
+    const an = "/api/sites/site_x/analytics";
+    for (const read of [
+      "status",
+      "summary",
+      "series",
+      "top/node",
+      "vitals",
+      "renders/errors",
+      "nodes/entry_y00001",
+      "export",
+      "settings",
+    ])
+      expect(requirementFor("GET", `${an}/${read}`), read).toBe("analytics:read");
+    expect(requirementFor("PUT", `${an}/settings`)).toBe("site:settings");
+    expect(requirementFor("POST", `${an}/settings`)).toBeUndefined();
+    expect(requirementFor("DELETE", `${an}/settings`)).toBeUndefined();
+    expect(requirementFor("GET", `${an}/raw`)).toBeUndefined();
+    expect(requirementFor("POST", "/api/admin/sites/site_x/analytics/rollup")).toBe("deploy-token");
+    expect(requirementFor("GET", "/api/admin/sites/site_x/analytics/status")).toBe("deploy-token");
+    expect(requirementFor("GET", "/api/admin/sites/site_x/analytics/export")).toBe("deploy-token");
   });
 });

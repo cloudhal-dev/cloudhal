@@ -6,6 +6,7 @@ import {
   PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
 } from "@cloudhal/agent-runtime";
+import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
@@ -14,6 +15,7 @@ import { errorHandler, unauthorized } from "./errors.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
 import { entries } from "./routes/entries.ts";
@@ -106,6 +108,7 @@ export function createApi(deps: ApiDeps) {
     c.set("mail", deps.mail);
     c.set("now", clock);
     c.set("uploadSecret", uploadSecret);
+    c.set("analytics", deps.analytics);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -174,6 +177,7 @@ export function createApi(deps: ApiDeps) {
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
       now: deps.now,
       ownership,
+      analytics: deps.analytics,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -211,6 +215,8 @@ export function createApi(deps: ApiDeps) {
           approvals: Boolean(deps.mcp?.approvals),
           elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
           members: Boolean(deps.staff),
+          // RFC-0006 §8: where events go, whether Studio can read them, the budget.
+          analytics: deps.analytics?.feature() ?? ANALYTICS_OFF,
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
@@ -245,6 +251,8 @@ export function createApi(deps: ApiDeps) {
   // RFC-0004 §6.1: the media library (people; agents use the MCP asset tools).
   app.route("/api/sites/:siteId/assets", assets);
   app.route("/api/sites/:siteId/media", siteMedia);
+  // RFC-0006 §9.2: site analytics (people; agents use the MCP analytics tools).
+  if (deps.analytics) app.route("/api/sites/:siteId/analytics", analytics);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

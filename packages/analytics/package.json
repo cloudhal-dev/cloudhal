@@ -14,6 +14,7 @@
     "./sql": "./src/sql/index.ts",
     "./rollup": "./src/rollup.ts",
     "./reader": "./src/reader.ts",
+    "./service": "./src/service.ts",
     "./wae": "./src/wae/index.ts",
     "./testing": "./src/testing.ts",
     "./client": "./src/client/index.ts"
@@ -62,6 +63,10 @@
       "./reader": {
         "types": "./dist/src/reader.d.ts",
         "default": "./dist/src/reader.js"
+      },
+      "./service": {
+        "types": "./dist/src/service.d.ts",
+        "default": "./dist/src/service.js"
       },
       "./wae": {
         "types": "./dist/src/wae/index.d.ts",

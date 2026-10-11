@@ -585,6 +585,7 @@ export const en = {
       "content:write": "Create, edit and delete pages and articles",
       "asset:upload": "Upload media and edit its own uploads",
       "asset:manage": "Edit, retire and delete any media",
+      "analytics:read": "Read site analytics (no personal data)",
       "site:write": "Change site settings",
       "preview:create": "Render draft previews",
       "site:publish": "Publish a snapshot to the live site",
@@ -2192,6 +2193,10 @@ export const en = {
         manage: "Only {roles} and above can manage every file.",
       },
       activity: { all: "Only {roles} and above see the whole team's activity." },
+      analytics: {
+        read: "Only {roles} and above see analytics.",
+        settings: "Only {roles} and above can change analytics settings.",
+      },
       settings: { write: "Only {roles} and above can change site settings and domains." },
       members: {
         invite: "Only {roles} and above can invite people.",

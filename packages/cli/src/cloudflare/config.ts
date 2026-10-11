@@ -7,11 +7,32 @@
  *   binding to purge its cache after publish/rollback.
  *
  * Resource ids are omitted on first deploy: wrangler provisions D1/R2 and writes the ids back.
+ *
+ * Site analytics (RFC-0006 §11), when `cloudhal.json` turns them on: the site Worker writes to a
+ * Workers Analytics Engine dataset (`ANALYTICS`), the admin Worker reads it through the Analytics
+ * SQL binding (`ANALYTICS_SQL`, no API token) and rolls finished days up on an hourly cron trigger.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const COMPATIBILITY_DATE = "2026-10-01";
+
+/** The admin Worker's hourly analytics job (RFC-0006 §7.5). */
+export const ANALYTICS_CRON = "17 * * * *";
+
+/** What the generated configs need for site analytics (RFC-0006 §8, §11). */
+export interface AnalyticsDeployment {
+  /** `<deployment>_events` (`datasetName`). */
+  readonly dataset: string;
+  /** `CLOUDHAL_ANALYTICS_DEFAULTS`: cloudhal.json's per-site defaults. */
+  readonly defaults: Readonly<Record<string, unknown>>;
+  /** Uncached live queries per UTC day (admin Worker). */
+  readonly budget: number;
+  /** The hourly cron trigger; `false` when the account has no free cron slot (§11). */
+  readonly cron: boolean;
+  /** Extra hostnames the site answers on (custom domains), `CLOUDHAL_SITE_HOSTS`. */
+  readonly siteHosts?: readonly string[];
+}
 
 export interface DeploymentNames {
   /** Base name, e.g. `newsroom` → Workers `newsroom-site` / `newsroom-admin`. */
@@ -50,7 +71,10 @@ function customDomain(hostname: string | undefined) {
 }
 
 /** The site Worker's config, written to the project root (`wrangler.jsonc`) before `astro build`. */
-export function siteWorkerConfig(n: DeploymentNames & { siteId: string; domain?: string }) {
+export function siteWorkerConfig(
+  n: DeploymentNames & { siteId: string; domain?: string; analytics?: AnalyticsDeployment },
+) {
+  const a = n.analytics;
   return {
     $schema: "node_modules/wrangler/config-schema.json",
     name: workerNames(n).site,
@@ -58,7 +82,18 @@ export function siteWorkerConfig(n: DeploymentNames & { siteId: string; domain?:
     compatibility_date: COMPATIBILITY_DATE,
     compatibility_flags: ["nodejs_compat"],
     ...storageBindings(n),
-    vars: { CLOUDHAL_SITE_ID: n.siteId },
+    // Analytics (RFC-0006 §4): one write binding; the dataset is created on its first write.
+    ...(a ? { analytics_engine_datasets: [{ binding: "ANALYTICS", dataset: a.dataset }] } : {}),
+    vars: {
+      CLOUDHAL_SITE_ID: n.siteId,
+      ...(a
+        ? {
+            CLOUDHAL_ANALYTICS: "on",
+            CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify(a.defaults),
+            ...(a.siteHosts?.length ? { CLOUDHAL_SITE_HOSTS: a.siteHosts.join(",") } : {}),
+          }
+        : {}),
+    },
     ...customDomain(n.domain),
     // Workers Cache: published pages are cached until a publish purges `cloudhal-site-<id>`.
     cache: { enabled: true },
@@ -68,9 +103,15 @@ export function siteWorkerConfig(n: DeploymentNames & { siteId: string; domain?:
 
 /** The admin Worker's config (API + auth + MCP + Studio assets). */
 export function adminWorkerConfig(
-  n: DeploymentNames & { studioDir: string; main: string; domain?: string },
+  n: DeploymentNames & {
+    studioDir: string;
+    main: string;
+    domain?: string;
+    analytics?: AnalyticsDeployment;
+  },
 ) {
   const names = workerNames(n);
+  const a = n.analytics;
   return {
     $schema: "node_modules/wrangler/config-schema.json",
     name: names.admin,
@@ -80,6 +121,21 @@ export function adminWorkerConfig(
     compatibility_flags: ["nodejs_compat"],
     ...storageBindings(n),
     services: [{ binding: "SITE", service: names.site }],
+    // Analytics (RFC-0006 §7.3): reads WAE through the binding, no API token; vars for the
+    // dataset, the query budget and the defaults; the hourly rollup job. Without analytics the
+    // cron list is empty, so turning analytics off also removes the trigger.
+    ...(a
+      ? {
+          analytics: { binding: "ANALYTICS_SQL" },
+          vars: {
+            CLOUDHAL_ANALYTICS_DATASET: a.dataset,
+            CLOUDHAL_ANALYTICS_BUDGET: String(a.budget),
+            CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify(a.defaults),
+            ...(a.cron ? {} : { CLOUDHAL_ANALYTICS_CRON: "off" }),
+          },
+        }
+      : {}),
+    triggers: { crons: a?.cron ? [ANALYTICS_CRON] : [] },
     ...customDomain(n.domain),
     assets: {
       directory: n.studioDir,

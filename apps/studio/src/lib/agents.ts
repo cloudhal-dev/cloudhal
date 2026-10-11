@@ -15,7 +15,7 @@ export type ScopeGroup = "read" | "write" | "release";
 
 /** How the create-key dialog groups scopes: what an agent may see, change, and make live. */
 export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
-  read: ["site:read", "content:read"],
+  read: ["site:read", "content:read", "analytics:read"],
   write: ["content:write", "asset:upload", "asset:manage", "site:write", "preview:create"],
   release: ["site:publish", "site:rollback"],
 };
@@ -27,6 +27,7 @@ export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
 const SCOPE_ORDER: GrantableScope[] = [
   "site:read",
   "content:read",
+  "analytics:read",
   "content:write",
   "content:write:own",
   "content:draft:own",
@@ -97,7 +98,7 @@ export function ownModeOf(key: { mode?: unknown } | undefined): KeyMode {
  * (`modeRules`); this copy of `scopesForMode` is the fallback for servers that do not report them.
  */
 export function scopesForMode(mode: AgentMode): GrantableScope[] {
-  const read: GrantableScope[] = ["site:read", "content:read", "preview:create"];
+  const read: GrantableScope[] = ["site:read", "content:read", "preview:create", "analytics:read"];
   if (mode === "plan") return read;
   return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];
 }

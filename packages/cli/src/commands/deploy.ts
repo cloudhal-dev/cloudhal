@@ -7,17 +7,24 @@
  *   4. admin Worker: generated entry + bundled skills + built Studio, `wrangler deploy`
  *   5. push: the local site (graph, snapshots, blobs) through the admin API — first deploy only;
  *      afterwards the deployment is the source of truth (use `cloudhal pull`).
+ *   6. analytics (RFC-0006 §11): with `analytics` on in cloudhal.json both configs get their
+ *      bindings, vars and the hourly cron (wrangler ≥ 4.145 is required); a project without the
+ *      key is asked once in a terminal (non-interactive: off). When analytics switch on or off the
+ *      site's cache is purged once, so pages gain or lose the script tag. An account without a free
+ *      cron slot gets the admin Worker without the trigger (daily totals then roll up on read).
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
  */
 import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { datasetName } from "@cloudhal/analytics/wae";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { assetDir } from "../assets.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
+  type AnalyticsDeployment,
   type DeploymentNames,
   readExistingIds,
   siteConfigPath,
@@ -25,8 +32,24 @@ import {
   workerNames,
   writeWranglerConfig,
 } from "../cloudflare/config.ts";
-import { deployedUrls, must, type WranglerRunner, wranglerRunner } from "../cloudflare/wrangler.ts";
-import { readProjectConfig } from "../config.ts";
+import {
+  deployedUrls,
+  installedWranglerVersion,
+  isCronLimitError,
+  must,
+  versionAtLeast,
+  WRANGLER_FOR_ANALYTICS,
+  WranglerError,
+  type WranglerRunner,
+  wranglerRunner,
+} from "../cloudflare/wrangler.ts";
+import {
+  analyticsDefaultsOf,
+  analyticsEnabled,
+  type ProjectConfig,
+  readProjectConfig,
+  writeProjectConfig,
+} from "../config.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { pushSite, setPrimaryDomain } from "./sync.ts";
 
@@ -47,7 +70,12 @@ export interface DeployState {
   deployedAt?: string;
   /** The custom site domain this deploy routed, so removing it later restores workers.dev. */
   siteDomain?: string;
+  /** Whether the last deploy had analytics on (a change purges the site's cache once). */
+  analytics?: "on" | "off";
 }
+
+/** Default daily budget of uncached live analytics queries (RFC-0006 §7.7, open question 6). */
+export const DEFAULT_QUERY_BUDGET = 8000;
 
 export interface DeployOptions {
   readonly projectDir: string;
@@ -61,6 +89,13 @@ export interface DeployOptions {
   readonly fetch?: typeof fetch;
   /** How long to wait for a freshly deployed admin Worker to answer. Default 2 minutes. */
   readonly healthTimeoutMs?: number;
+  /**
+   * Asks a yes/no question in a terminal (the analytics upgrade prompt). Absent: non-interactive,
+   * so a project without an `analytics` key keeps analytics off.
+   */
+  readonly prompt?: (question: string) => Promise<boolean>;
+  /** The project's wrangler version (tests); read from its `package.json` otherwise. */
+  readonly wranglerVersion?: string;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -202,11 +237,64 @@ export interface DeployResult {
   /** Custom domains from cloudhal.json, routed by this deploy. */
   customSiteUrl?: string;
   customStudioUrl?: string;
+  /** Site analytics as deployed (RFC-0006 §11). */
+  analytics: {
+    enabled: boolean;
+    dataset?: string;
+    /** The hourly rollup trigger is in place (false: the account had no free cron slot). */
+    cron?: boolean;
+    /** The site's cache was purged because analytics switched on or off. */
+    purged?: boolean;
+  };
+}
+
+/**
+ * Whether this deploy records analytics: `cloudhal.json` decides; a project without the key is
+ * asked once in a terminal and the answer is written back (RFC-0006 §11, open question 1).
+ */
+async function decideAnalytics(
+  options: DeployOptions,
+  cfg: ProjectConfig,
+  siteName: string,
+  log: (line: string) => void,
+): Promise<ProjectConfig> {
+  if (cfg.analytics !== undefined) return cfg;
+  if (!options.prompt) {
+    log(
+      'analytics: off. Turn on cookie-less analytics with "analytics": { "enabled": true } in cloudhal.json, then deploy again.',
+    );
+    return cfg;
+  }
+  const yes = await options.prompt(`Turn on cookie-less analytics for ${siteName}? (Y/n) `);
+  const next: ProjectConfig = { ...cfg, analytics: { enabled: yes } };
+  await writeProjectConfig(options.projectDir, next);
+  log(`analytics: ${yes ? "on" : "off"} (saved in cloudhal.json)`);
+  return next;
+}
+
+/** Purges the site Worker's whole cache once (the script tag lives in cached HTML). */
+async function purgeSite(
+  siteUrl: string,
+  token: string,
+  f: typeof fetch,
+  log: (line: string) => void,
+): Promise<boolean> {
+  try {
+    const res = await f(new URL("/__cloudhal/purge", siteUrl), {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (res.ok) return true;
+    log(`could not purge the site cache (${res.status}); pages pick up the change as they expire`);
+  } catch (e) {
+    log(`could not purge the site cache: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return false;
 }
 
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const log = options.log ?? (() => {});
-  const cfg = await readProjectConfig(options.projectDir);
+  let cfg = await readProjectConfig(options.projectDir);
   const dir = deployDir(options.projectDir, cfg.dataDir);
   await mkdir(dir, { recursive: true });
   const run = options.wrangler ?? wranglerRunner(options.projectDir, log);
@@ -218,6 +306,24 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const previous = await readDeployState(options.projectDir, cfg.dataDir);
   const base: DeploymentNames = { name: options.name ?? previous?.name ?? site.slug };
   const names = workerNames(base);
+
+  // 0. analytics: decided before anything is generated; the wrangler version gates the configs
+  cfg = await decideAnalytics(options, cfg, site.name, log);
+  let analytics: AnalyticsDeployment | undefined;
+  if (analyticsEnabled(cfg)) {
+    const version = options.wranglerVersion ?? (await installedWranglerVersion(options.projectDir));
+    if (version && !versionAtLeast(version, WRANGLER_FOR_ANALYTICS))
+      throw new Error(
+        `Analytics needs wrangler 4.145 or newer (found ${version}). Run \`pnpm add -D wrangler@^4.148\`, or set \`analytics.enabled: false\` in cloudhal.json.`,
+      );
+    analytics = {
+      dataset: datasetName(base.name),
+      defaults: analyticsDefaultsOf(cfg),
+      budget: cfg.analytics?.queryBudget ?? DEFAULT_QUERY_BUDGET,
+      cron: true,
+      ...(cfg.domains?.site ? { siteHosts: [cfg.domains.site] } : {}),
+    };
+  }
 
   const studioDir = options.studioDir ?? (await assetDir("studio")) ?? "(no built Studio)";
   if (!(await exists(path.join(studioDir, "index.html"))))
@@ -240,6 +346,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       ...withIds,
       siteId: cfg.siteId,
       ...(cfg.domains?.site ? { domain: cfg.domains.site } : {}),
+      ...(analytics ? { analytics } : {}),
     }),
     `Cloudhal site Worker for ${site.name}`,
   );
@@ -247,14 +354,18 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const siteConfig = await buildSiteWorker(options.projectDir, (l) => log(`  ${l}`));
 
   // 4. admin Worker
-  const admin = await prepareAdminWorker({
-    projectDir: options.projectDir,
-    dataDir: cfg.dataDir,
-    names: withIds,
-    studioDir,
-    skillsDir: await resolveSkillsDir(options.projectDir),
-    domain: cfg.domains?.studio,
-  });
+  const skillsDir = await resolveSkillsDir(options.projectDir);
+  const prepareAdmin = (a: AnalyticsDeployment | undefined) =>
+    prepareAdminWorker({
+      projectDir: options.projectDir,
+      dataDir: cfg.dataDir,
+      names: withIds,
+      studioDir,
+      skillsDir,
+      domain: cfg.domains?.studio,
+      analytics: a,
+    });
+  const admin = await prepareAdmin(analytics);
 
   if (options.dryRun) {
     await must(
@@ -268,7 +379,15 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       admin.dir,
     );
     log("dry run complete: bundles in .cloudhal/deploy/out");
-    return { dryRun: true, names, siteConfig, adminConfig: admin.configPath };
+    return {
+      dryRun: true,
+      names,
+      siteConfig,
+      adminConfig: admin.configPath,
+      analytics: analytics
+        ? { enabled: true, dataset: analytics.dataset, cron: analytics.cron }
+        : { enabled: false },
+    };
   }
 
   // Secrets go to wrangler through files that exist only while it runs (0600, then removed).
@@ -289,11 +408,25 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     log(`deploying ${names.site}`);
     siteDeploy = await must(run, ["deploy", "--secrets-file", siteSecretsFile], options.projectDir);
     log(`deploying ${names.admin}`);
-    adminDeploy = await must(
-      run,
-      ["deploy", "-c", admin.configPath, "--secrets-file", adminSecretsFile],
-      admin.dir,
-    );
+    const adminArgs = ["deploy", "-c", admin.configPath, "--secrets-file", adminSecretsFile];
+    adminDeploy = await run(adminArgs, { cwd: admin.dir });
+    if (
+      adminDeploy.code !== 0 &&
+      analytics?.cron &&
+      isCronLimitError(adminDeploy.stderr + adminDeploy.stdout)
+    ) {
+      // Workers Free allows 5 cron triggers per account (RFC-0006 §11): go without ours.
+      log(
+        "Cloudflare refused the hourly analytics trigger: this account already uses all its cron triggers (Workers Free allows 5). Deploying without it; daily totals are then computed when someone opens Analytics in Studio.",
+      );
+      analytics = { ...analytics, cron: false };
+      await prepareAdmin(analytics);
+      adminDeploy = await run(adminArgs, { cwd: admin.dir });
+    }
+    if (adminDeploy.code !== 0)
+      throw new WranglerError(
+        `wrangler ${adminArgs.join(" ")} failed:\n${(adminDeploy.stderr || adminDeploy.stdout).slice(-3000)}`,
+      );
   } finally {
     await rm(siteSecretsFile, { force: true });
     await rm(adminSecretsFile, { force: true });
@@ -306,6 +439,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ...(siteUrl ? { siteUrl } : {}),
     deployedAt: new Date().toISOString(),
     ...(cfg.domains?.site ? { siteDomain: cfg.domains.site } : {}),
+    analytics: analytics ? "on" : "off",
   });
 
   // 5. first deploy: push the local site
@@ -353,6 +487,18 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       );
     }
   }
+  // Analytics switched on (or off): purge the site's cache once, so cached pages gain (or lose)
+  // the script tag. The admin Worker ran migration 0014 on the health check above; until it has,
+  // the Site Worker counts analytics as off (fail closed).
+  let purged = false;
+  const was = previous?.analytics ?? "off";
+  if (siteUrl && was !== (analytics ? "on" : "off")) {
+    purged = await purgeSite(siteUrl, secrets.CLOUDHAL_PURGE_TOKEN, options.fetch ?? fetch, log);
+    if (purged) log(`analytics ${analytics ? "on" : "off"}: purged the site cache`);
+  }
+  if (analytics && !analytics.cron)
+    log("analytics: no cron trigger; daily totals are computed when someone opens Analytics");
+
   // First deploy: the owner account can only be created through this one-time link.
   const setupUrl =
     pushed && adminUrl
@@ -369,5 +515,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ...(setupUrl ? { setupUrl } : {}),
     ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
     ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
+    analytics: analytics
+      ? { enabled: true, dataset: analytics.dataset, cron: analytics.cron, purged }
+      : { enabled: false, ...(purged ? { purged } : {}) },
   };
 }

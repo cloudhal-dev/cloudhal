@@ -6,6 +6,7 @@ import type {
   PolicyEngine,
   Principal,
 } from "@cloudhal/agent-runtime";
+import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
@@ -79,6 +80,11 @@ export interface ApiDeps {
   readonly mail?: MailSender;
   /** Origin of the Studio that serves `/invite` and `/reset-password` (default: the request's). */
   readonly studioOrigin?: string;
+  /**
+   * Site analytics (RFC-0006): mounts `/api/sites/:id/analytics/*`, the deploy-token rollup routes
+   * and the MCP analytics tools, and fills `/api/instance` → `features.analytics`.
+   */
+  readonly analytics?: AnalyticsService;
 }
 
 export type Env = {
@@ -102,5 +108,7 @@ export type Env = {
     now: () => Date;
     /** Signs upload tickets (RFC-0004 §5.5): the preview secret, the MCP state key, or random. */
     uploadSecret: UploadSecret;
+    /** Site analytics (RFC-0006); undefined on servers without it. */
+    analytics: AnalyticsService | undefined;
   };
 };
