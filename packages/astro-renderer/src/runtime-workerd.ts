@@ -9,7 +9,9 @@
  * are never cached.
  */
 import { env } from "cloudflare:workers";
+import type { Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { siteCacheTag } from "./cache-tags.ts";
@@ -54,6 +56,34 @@ function getResolver(siteId: string): SiteResolver {
 /** Test/purge hook: forget cached state in this isolate. */
 export function resetSource(): void {
   resolver?.invalidate();
+}
+
+/**
+ * What site analytics read on the Site Worker (`SiteAnalytics`, RFC-0006 §5.2): D1 for settings and
+ * the daily salt, the site row (published pointer, domains) and the isolate's snapshot cache.
+ */
+export function analyticsBackend(
+  siteId: string,
+  /** Ignored here (bindings decide); the Node build reads the local store from `dataDir`. */
+  _config?: Partial<CloudhalRendererConfig>,
+): {
+  sql: () => SqlDriver;
+  site: () => Promise<Site | undefined>;
+  snapshot: (id: string) => Promise<GraphSource>;
+  open: () => Promise<SqlDriver>;
+} {
+  const r = getResolver(siteId);
+  let sql: D1Driver | undefined;
+  const driver = () => {
+    sql ??= new D1Driver((env as unknown as SiteWorkerEnv).DB);
+    return sql;
+  };
+  return {
+    sql: driver,
+    open: async () => driver(),
+    site: () => r.store.getSite(siteId),
+    snapshot: (id) => r.snapshot(id),
+  };
 }
 
 export { CACHE_TAG_PREFIX } from "./cache-tags.ts";

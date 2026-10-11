@@ -1,4 +1,5 @@
 import type { AstroIntegration } from "astro";
+import type { AnalyticsClient } from "./analytics-client.ts";
 
 /** Options for the `cloudhal()` integration; made available to pages via `virtual:cloudhal/config`. */
 export interface CloudhalRendererConfig {
@@ -22,17 +23,41 @@ export interface CloudhalRendererConfig {
    * enabled on a custom domain; the default `"none"` serves originals.
    */
   readonly media?: { readonly transform?: "cdn-cgi" | "none" };
+  /**
+   * Site analytics (RFC-0006) on **Node** targets: `cloudhal.json`'s `analytics` block. Without it,
+   * `CLOUDHAL_ANALYTICS` / `CLOUDHAL_ANALYTICS_DEFAULTS` in the environment decide, as on the
+   * Cloudflare Site Worker (where the Worker vars always decide and this is ignored). `dev: true`
+   * records `cloudhal dev` traffic into the local SQLite store; by default `cloudhal dev` answers the
+   * beacon endpoint and records nothing. Static builds never carry analytics (no endpoint).
+   */
+  readonly analytics?: {
+    readonly enabled?: boolean;
+    readonly uniqueVisitors?: boolean;
+    readonly vitalsOneIn?: number;
+    readonly dev?: boolean;
+  };
+  /** Set by the integration: URL of the built page-view script (`/_cloudhal/p.<hash>.js`). */
+  readonly analyticsScript?: string;
 }
 
 const VIRTUAL_ID = "virtual:cloudhal/config";
 const RESOLVED_ID = `\0${VIRTUAL_ID}`;
+/** Dev only: the built analytics scripts, served from memory by the analytics middleware. */
+const CLIENT_ID = "virtual:cloudhal/analytics-client";
+const RESOLVED_CLIENT_ID = `\0${CLIENT_ID}`;
 
 export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   let resolved: CloudhalRendererConfig = config;
+  let client: AnalyticsClient | undefined;
   return {
     name: "@cloudhal/astro-renderer",
     hooks: {
-      "astro:config:setup": ({ updateConfig, addMiddleware, config: astroConfig }) => {
+      "astro:config:setup": async ({
+        updateConfig,
+        addMiddleware,
+        config: astroConfig,
+        command,
+      }) => {
         const root = astroConfig.root.pathname;
         resolved = {
           ...config,
@@ -43,14 +68,36 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         // Cloudflare Site Worker answers it in its entry, before Astro.
         if (!cloudflare)
           addMiddleware({ entrypoint: "@cloudhal/astro-renderer/media-middleware", order: "pre" });
+        // Analytics (RFC-0006 §5.1, §11): the Site Worker build ships the two hashed scripts as
+        // static assets and its entry injects the tag; `cloudhal dev` serves them and answers the
+        // beacon from a middleware. Static builds have no endpoint, so no script at all.
+        if ((cloudflare && command === "build") || (!cloudflare && command === "dev")) {
+          const { buildAnalyticsClient } = await import("./analytics-client.ts");
+          client = await buildAnalyticsClient();
+          resolved = { ...resolved, analyticsScript: client.script.path };
+        }
+        if (!cloudflare && command === "dev")
+          addMiddleware({
+            entrypoint: "@cloudhal/astro-renderer/analytics-middleware",
+            order: "pre",
+          });
         updateConfig({
           vite: {
             plugins: [
               {
                 name: "cloudhal-config",
-                resolveId: (id: string) => (id === VIRTUAL_ID ? RESOLVED_ID : undefined),
+                resolveId: (id: string) =>
+                  id === VIRTUAL_ID
+                    ? RESOLVED_ID
+                    : id === CLIENT_ID
+                      ? RESOLVED_CLIENT_ID
+                      : undefined,
                 load: (id: string) =>
-                  id === RESOLVED_ID ? `export default ${JSON.stringify(resolved)};` : undefined,
+                  id === RESOLVED_ID
+                    ? `export default ${JSON.stringify(resolved)};`
+                    : id === RESOLVED_CLIENT_ID
+                      ? `export default ${JSON.stringify(cloudflare ? null : (client ?? null))};`
+                      : undefined,
               },
             ],
             // Native module must stay external in Node SSR; workerd never loads it.
@@ -64,7 +111,15 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
        * they follow publishes without a rebuild.
        */
       "astro:build:done": async ({ dir, logger }) => {
-        if (config.target === "cloudflare") return;
+        if (config.target === "cloudflare") {
+          // the client directory: Workers static assets, served before the Worker runs (A6)
+          if (client) {
+            const { writeAnalyticsClient } = await import("./analytics-client.ts");
+            await writeAnalyticsClient(client, dir);
+            logger.info(`wrote ${client.script.path} and ${client.vitals.path}`);
+          }
+          return;
+        }
         const { writeStaticRedirects } = await import("./static-redirects.ts");
         const count = await writeStaticRedirects(resolved, dir);
         if (count > 0) logger.info(`wrote _redirects (${count} redirects)`);

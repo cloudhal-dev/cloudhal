@@ -32,7 +32,9 @@
     "./cloudflare-entry": "./src/cloudflare-entry.ts",
     "./media": "./src/media.ts",
     "./media-route": "./src/media-route.ts",
-    "./media-middleware": "./src/media-middleware.ts"
+    "./media-middleware": "./src/media-middleware.ts",
+    "./analytics": "./src/analytics.ts",
+    "./analytics-middleware": "./src/analytics-middleware.ts"
   },
   "files": [
     "dist",
@@ -47,7 +49,9 @@
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
-    "marked": "catalog:"
+    "marked": "catalog:",
+    "@cloudhal/analytics": "workspace:*",
+    "vite": "catalog:"
   },
   "peerDependencies": {
     "astro": "^7.3.0",
@@ -156,6 +160,14 @@
       "./media-middleware": {
         "types": "./dist/src/media-middleware.d.ts",
         "default": "./dist/src/media-middleware.js"
+      },
+      "./analytics": {
+        "types": "./dist/src/analytics.d.ts",
+        "default": "./dist/src/analytics.js"
+      },
+      "./analytics-middleware": {
+        "types": "./dist/src/analytics-middleware.d.ts",
+        "default": "./dist/src/analytics-middleware.js"
       }
     }
   }
