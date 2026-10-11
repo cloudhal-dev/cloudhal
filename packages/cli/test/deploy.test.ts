@@ -62,8 +62,19 @@ describe("cloudhal deploy", () => {
       name: "deploy-me-site",
       main: "@cloudhal/astro-renderer/cloudflare-entry",
       cache: { enabled: true },
-      vars: { CLOUDHAL_SITE_ID: cfg.siteId },
+      // RFC-0006 §11: `cloudhal init` turns analytics on, so the Site Worker writes to WAE
+      analytics_engine_datasets: [{ binding: "ANALYTICS", dataset: "deploy_me_events" }],
+      vars: {
+        CLOUDHAL_SITE_ID: cfg.siteId,
+        CLOUDHAL_ANALYTICS: "on",
+        CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify({
+          enabled: true,
+          uniqueVisitors: false,
+          vitalsOneIn: 5,
+        }),
+      },
     });
+    expect(r.analytics).toEqual({ enabled: true, dataset: "deploy_me_events", cron: true });
     const admin = await jsonc(r.adminConfig);
     expect(admin).toMatchObject({
       name: "deploy-me-admin",
@@ -73,6 +84,18 @@ describe("cloudhal deploy", () => {
         not_found_handling: "none",
         run_worker_first: ["/api/*", "/mcp", "/mcp/*", "/.well-known/*"],
       },
+      // …and the admin Worker reads it through the Analytics SQL binding, with the hourly job
+      analytics: { binding: "ANALYTICS_SQL" },
+      vars: {
+        CLOUDHAL_ANALYTICS_DATASET: "deploy_me_events",
+        CLOUDHAL_ANALYTICS_BUDGET: "8000",
+        CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify({
+          enabled: true,
+          uniqueVisitors: false,
+          vitalsOneIn: 5,
+        }),
+      },
+      triggers: { crons: ["17 * * * *"] },
     });
     const secretsFile = path.join(deployDir, "secrets.json");
     expect((await stat(secretsFile)).mode & 0o777).toBe(0o600);
@@ -105,8 +128,16 @@ describe("cloudhal deploy", () => {
       store: remote,
       admin: { deployToken: secrets.CLOUDHAL_DEPLOY_TOKEN as string, storage: { sql, blobs } },
     });
-    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
-      app.fetch(new Request(input, init))) as typeof fetch;
+    const purges: string[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      // the Site Worker's purge endpoint (analytics switched on: the script tag must appear)
+      if (new URL(req.url).pathname === "/__cloudhal/purge") {
+        purges.push(`${new URL(req.url).host} ${req.headers.get("authorization")}`);
+        return new Response("ok");
+      }
+      return app.fetch(req);
+    }) as typeof fetch;
 
     const calls: string[] = [];
     let databaseCreated = false;
@@ -153,6 +184,16 @@ describe("cloudhal deploy", () => {
       adminUrl: "https://deploy-me-admin.acme.workers.dev",
       pushed: true,
     });
+    // analytics went on with this deploy: one purge of the site's cache, with the purge token
+    expect(first.analytics).toEqual({
+      enabled: true,
+      dataset: "deploy_me_events",
+      cron: true,
+      purged: true,
+    });
+    expect(purges).toEqual([
+      `deploy-me-site.acme.workers.dev Bearer ${secrets.CLOUDHAL_PURGE_TOKEN}`,
+    ]);
     // the owner account can only be created through the one-time setup link
     expect(first.setupUrl).toBe(
       `https://deploy-me-admin.acme.workers.dev/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`,
@@ -187,6 +228,9 @@ describe("cloudhal deploy", () => {
     });
     expect(second.pushed).toBe(false);
     expect(second.setupUrl).toBeUndefined();
+    // analytics stayed on: no second purge
+    expect(second.analytics.purged).toBe(false);
+    expect(purges).toHaveLength(1);
     expect(calls[0]).toBe("d1 info deploy-me-db --json");
     expect(calls).not.toContain("d1 create deploy-me-db");
     expect((await remote.getPage(about?.id as string))?.title).toBe("Edited in production");
@@ -301,5 +345,124 @@ describe("cloudhal deploy", () => {
       hostname: "deploy-me-site.acme.workers.dev",
       primary: true,
     });
+  });
+
+  it("analytics: existing projects are asked (non-interactive: off), wrangler is checked, the cron limit is survived", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const blobs = new MemoryBlobStore();
+    const remote = new SiteGraphStore({ sql, blobs });
+    await remote.init();
+    const cfg = await readProjectConfig(projectDir);
+    const secrets = JSON.parse(
+      await readFile(path.join(projectDir, cfg.dataDir, "deploy/secrets.json"), "utf8"),
+    ) as Record<string, string>;
+    const app = createApi({
+      store: remote,
+      admin: { deployToken: secrets.CLOUDHAL_DEPLOY_TOKEN as string, storage: { sql, blobs } },
+    });
+    const purges: string[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (new URL(req.url).pathname === "/__cloudhal/purge") {
+        purges.push(req.url);
+        return new Response("ok");
+      }
+      return app.fetch(req);
+    }) as typeof fetch;
+    let cronRefusals = 0;
+    const adminDeploys: string[] = [];
+    const wrangler: WranglerRunner = async (args) => {
+      const ok = (stdout = "", records: Record<string, unknown>[] = []) => ({
+        code: 0,
+        stdout,
+        stderr: "",
+        records,
+      });
+      if (args[0] === "d1" && args[1] === "info")
+        return ok(JSON.stringify({ uuid: "11111111-2222-3333-4444-555555555555" }));
+      if (args[0] === "deploy" && args.includes("-c")) {
+        const config = await jsonc(args[args.indexOf("-c") + 1] as string);
+        adminDeploys.push(JSON.stringify((config.triggers as { crons: string[] }).crons));
+        if (cronRefusals-- > 0 && (config.triggers as { crons: string[] }).crons.length > 0)
+          return {
+            code: 1,
+            stdout: "",
+            stderr:
+              "✘ [ERROR] A request to the Cloudflare API failed: You have exceeded the limit of 5 cron triggers. [code: 10057]",
+            records: [],
+          };
+        return ok("", [{ type: "deploy", targets: ["deploy-me-admin.acme.workers.dev"] }]);
+      }
+      if (args[0] === "deploy")
+        return ok("", [{ type: "deploy", targets: ["https://deploy-me-site.acme.workers.dev"] }]);
+      return ok();
+    };
+    const lines: string[] = [];
+    const run = (extra: Partial<Parameters<typeof deploy>[0]> = {}) =>
+      deploy({
+        projectDir,
+        studioDir,
+        wrangler,
+        fetch: fakeFetch,
+        healthTimeoutMs: 5000,
+        log: (l) => lines.push(l),
+        ...extra,
+      });
+
+    // A project from before RFC-0006 has no `analytics` key; `media` (the starter's) survives.
+    const file = path.join(projectDir, "cloudhal.json");
+    const raw = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    const { analytics: _a, ...old } = raw;
+    await writeFile(file, JSON.stringify({ ...old, media: { transform: "none" } }));
+
+    // Non-interactive: analytics stay off and the deploy says how to turn them on. The bindings,
+    // vars and cron are gone, and the site cache is purged once so the script tag disappears.
+    const off = await run();
+    expect(off.analytics).toEqual({ enabled: false, purged: true });
+    expect(lines.join("\n")).toMatch(/analytics: off\. Turn on cookie-less analytics/);
+    const siteOff = await jsonc(path.join(projectDir, "wrangler.jsonc"));
+    expect(siteOff.analytics_engine_datasets).toBeUndefined();
+    expect(siteOff.vars).toEqual({ CLOUDHAL_SITE_ID: cfg.siteId });
+    const adminOff = await jsonc(off.adminConfig);
+    expect(adminOff.analytics).toBeUndefined();
+    expect(adminOff.triggers).toEqual({ crons: [] });
+    expect(JSON.parse(await readFile(file, "utf8")).analytics).toBeUndefined();
+    expect(purges).toHaveLength(1);
+
+    // Interactive: the question is asked once and the answer saved. An old wrangler stops the
+    // deploy before anything is generated, with what to do.
+    const asked: string[] = [];
+    await expect(
+      run({
+        prompt: async (q) => {
+          asked.push(q);
+          return true;
+        },
+        wranglerVersion: "4.120.0",
+      }),
+    ).rejects.toThrow(
+      "Analytics needs wrangler 4.145 or newer (found 4.120.0). Run `pnpm add -D wrangler@^4.148`, or set `analytics.enabled: false` in cloudhal.json.",
+    );
+    expect(asked).toEqual(["Turn on cookie-less analytics for Deploy Me? (Y/n) "]);
+    const saved = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    expect(saved.analytics).toEqual({ enabled: true });
+    expect(saved.media).toEqual({ transform: "none" });
+
+    // The account has no free cron slot: the admin Worker goes without the trigger and says so.
+    cronRefusals = 1;
+    adminDeploys.length = 0;
+    const on = await run({ prompt: async () => false, wranglerVersion: "4.148.0" });
+    expect(adminDeploys).toEqual(['["17 * * * *"]', "[]"]);
+    expect(on.analytics).toEqual({
+      enabled: true,
+      dataset: "deploy_me_events",
+      cron: false,
+      purged: true,
+    });
+    expect(lines.join("\n")).toMatch(/Cloudflare refused the hourly analytics trigger/);
+    const adminOn = await jsonc(on.adminConfig);
+    expect(adminOn.triggers).toEqual({ crons: [] });
+    expect(adminOn.vars).toMatchObject({ CLOUDHAL_ANALYTICS_CRON: "off" });
+    expect(purges).toHaveLength(2);
   });
 });

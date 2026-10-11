@@ -14,7 +14,19 @@ cloudhal push [--replace] [--admin-url <url>]           local site → deploymen
 cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
 cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
                                                         entry tags → tag terms (RFC-0002)
+cloudhal analytics status [--remote]                    site analytics (RFC-0006): settings, totals, budget
+cloudhal analytics rollup [--days <n>] [--remote] [--redo]
+                                                        daily totals (--remote backfills from WAE)
+cloudhal analytics seed [--days <n>] [--views <n>]      demo traffic, local SQLite only
+cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
+                                                        daily totals as CSV
 ```
+
+### Site analytics (RFC-0006)
+
+`cloudhal.json` → `analytics` sets the deployment defaults: `enabled` (on when the block is there; `cloudhal init` writes `{ "enabled": true }`), `uniqueVisitors`, `vitalsOneIn` (0, 1, 2, 5, 10, 20), `queryBudget` (uncached WAE queries per UTC day, default 8000), `rawRetentionDays` (SQLite, default 90) and `dev` (record `cloudhal dev` traffic). With analytics on, `cloudhal deploy` gives the site Worker a Workers Analytics Engine dataset (`<deployment>_events`, binding `ANALYTICS`) and the `CLOUDHAL_ANALYTICS*` vars, and the admin Worker the Analytics SQL binding (`ANALYTICS_SQL`, no API token), its vars and an hourly cron trigger (`17 * * * *`) for the daily rollups. It needs wrangler 4.145 or newer. When analytics switch on or off, the deploy purges the site's cache once so pages gain or lose the script tag. A project without the key (from before analytics) is asked once in a terminal; a non-interactive deploy keeps analytics off and says how to turn them on. When the account has no free cron trigger (Workers Free allows 5), the admin Worker is deployed without one and daily totals are computed when someone opens Analytics.
+
+Locally, `cloudhal studio` and `cloudhal mcp` read the project's SQLite (`analytics_events`) and roll up finished days hourly. `cloudhal analytics seed --days 30` fills demo traffic for Studio work; `rollup --remote --days 90` backfills a deployment from WAE (3 months are kept there); `export` writes the daily totals as CSV — there is nothing per visitor to export.
 
 ### Migrating tags to terms (RFC-0002)
 

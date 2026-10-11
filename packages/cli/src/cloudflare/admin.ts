@@ -6,6 +6,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readSkillSources } from "@cloudhal/agent-runtime";
 import {
+  type AnalyticsDeployment,
   adminWorkerConfig,
   type DeploymentNames,
   readExistingIds,
@@ -26,6 +27,8 @@ export async function prepareAdminWorker(options: {
   skillsDir?: string | undefined;
   /** Custom domain for Studio (Cloudflare Custom Domain). */
   domain?: string | undefined;
+  /** Site analytics: the Analytics SQL binding, vars and the cron trigger (RFC-0006 §11). */
+  analytics?: AnalyticsDeployment | undefined;
 }): Promise<PreparedAdmin> {
   const dir = path.join(options.projectDir, options.dataDir, "deploy", "admin");
   await mkdir(dir, { recursive: true });
@@ -48,6 +51,7 @@ export async function prepareAdminWorker(options: {
       main: "./worker.ts",
       studioDir: path.relative(dir, options.studioDir) || ".",
       ...(options.domain ? { domain: options.domain } : {}),
+      ...(options.analytics ? { analytics: options.analytics } : {}),
     }),
     "Cloudhal admin Worker (API, auth, MCP, Studio)",
   );
