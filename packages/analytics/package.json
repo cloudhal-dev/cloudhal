@@ -16,7 +16,8 @@
     "./reader": "./src/reader.ts",
     "./service": "./src/service.ts",
     "./wae": "./src/wae/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./client": "./src/client/index.ts"
   },
   "files": [
     "dist",
@@ -29,7 +30,8 @@
   },
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
-    "@cloudhal/storage": "workspace:*"
+    "@cloudhal/storage": "workspace:*",
+    "web-vitals": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
@@ -73,6 +75,10 @@
       "./testing": {
         "types": "./dist/src/testing.d.ts",
         "default": "./dist/src/testing.js"
+      },
+      "./client": {
+        "types": "./dist/src/client/index.d.ts",
+        "default": "./dist/src/client/index.js"
       }
     }
   }
