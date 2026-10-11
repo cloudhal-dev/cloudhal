@@ -718,9 +718,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20261007.1
-      '@cloudhal/analytics':
-        specifier: workspace:*
-        version: link:../analytics
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.3.1
