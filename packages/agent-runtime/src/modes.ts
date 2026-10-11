@@ -22,7 +22,8 @@ export function isAgentMode(value: unknown): value is AgentMode {
 
 /** The scopes a key needs to be useful in a mode (offered by default when creating one). */
 export function scopesForMode(mode: AgentMode): Scope[] {
-  const read: Scope[] = ["site:read", "content:read", "preview:create"];
+  // `analytics:read` is read-only and carries no personal data: every mode, plan included (RFC-0006).
+  const read: Scope[] = ["site:read", "content:read", "preview:create", "analytics:read"];
   if (mode === "plan") return read;
   // `asset:upload` is part of the default agent-key scopes outside plan (RFC-0004, ADR-0018).
   return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];

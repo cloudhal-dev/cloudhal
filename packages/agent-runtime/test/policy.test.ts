@@ -69,6 +69,24 @@ describe("PolicyEngine", () => {
     expect(media.evaluate(manager, "retire_asset")).toEqual({ kind: "allow" });
   });
 
+  it("analytics:read: read-only tools allowed in every mode, plan included (RFC-0006 §9.3)", () => {
+    const analytics = new PolicyEngine([
+      {
+        name: "get_analytics",
+        scopes: ["analytics:read"],
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      },
+    ]);
+    expect(defaultScopes(agent)).toContain("analytics:read");
+    for (const mode of ["plan", "manual", "edits", "auto"] as const)
+      expect(
+        analytics.evaluate({ actor: agent, scopes: ["analytics:read"], mode }, "get_analytics"),
+      ).toEqual({ kind: "allow" });
+    expect(
+      analytics.evaluate({ actor: agent, scopes: ["site:read", "content:read"] }, "get_analytics"),
+    ).toMatchObject({ kind: "deny", reason: "missing scope analytics:read" });
+  });
+
   it("unknown tools are denied", () => {
     expect(engine.evaluate({ actor: human, scopes: ["*"] }, "nope")).toMatchObject({
       kind: "deny",

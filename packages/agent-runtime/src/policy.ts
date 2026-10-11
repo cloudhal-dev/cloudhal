@@ -20,6 +20,7 @@ export type Scope =
   | "site:rollback"
   | "asset:upload"
   | "asset:manage"
+  | "analytics:read"
   | "audit:read"
   | "site:settings"
   | "members:invite"
@@ -44,6 +45,9 @@ export const KEY_SCOPES: readonly Scope[] = [
   "site:rollback",
   "asset:upload",
   "asset:manage",
+  // RFC-0006 §9.1: read-only site analytics (aggregates, no personal data). Implies nothing and
+  // nothing implies it except `*`.
+  "analytics:read",
 ];
 
 /** Scopes only a person holds (through their role): never stored on a key, never satisfy a tool. */
@@ -314,6 +318,13 @@ export function defaultScopes(actor: Actor): Scope[] {
     case "system":
       return ["*"];
     case "agent":
-      return ["site:read", "content:read", "content:write", "preview:create", "asset:upload"];
+      return [
+        "site:read",
+        "content:read",
+        "content:write",
+        "preview:create",
+        "asset:upload",
+        "analytics:read",
+      ];
   }
 }

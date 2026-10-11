@@ -30,6 +30,7 @@ const EDITOR: Scope[] = [
   "asset:manage",
   "audit:read",
   "members:invite",
+  "analytics:read",
 ];
 
 /**
@@ -38,7 +39,8 @@ const EDITOR: Scope[] = [
  */
 export const ROLE_SCOPES: Readonly<Record<Role, readonly Scope[]>> = {
   contributor: [...READ, "content:draft:own", "asset:upload"],
-  author: [...READ, "content:write:own", "site:publish:own", "asset:upload"],
+  // RFC-0006 §9.1: Authors and above read analytics; Contributors do not in v1.
+  author: [...READ, "content:write:own", "site:publish:own", "asset:upload", "analytics:read"],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
   owner: ["*"],
@@ -187,6 +189,9 @@ export const ABILITIES = {
   "members.invite": "members:invite",
   "members.manage": "members:manage",
   "agents.manage": "agents:manage",
+  // RFC-0006 §9.1: reading analytics; changing the site's analytics settings (Administrator).
+  "analytics.read": "analytics:read",
+  "analytics.settings": "site:settings",
   "ownership.transfer": "owner",
 } as const satisfies Record<string, Scope | "owner">;
 

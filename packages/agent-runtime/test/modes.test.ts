@@ -119,8 +119,16 @@ describe("agent modes", () => {
   });
 
   it("suggests scopes per mode and defines low-risk publishes", () => {
-    expect(scopesForMode("plan")).toEqual(["site:read", "content:read", "preview:create"]);
+    expect(scopesForMode("plan")).toEqual([
+      "site:read",
+      "content:read",
+      "preview:create",
+      "analytics:read",
+    ]);
     expect(scopesForMode("auto")).toContain("site:publish");
+    // RFC-0006 §9.1: new keys read analytics in every mode
+    for (const m of ["plan", "manual", "edits", "auto"] as const)
+      expect(scopesForMode(m)).toContain("analytics:read");
     const entry = (id: string) => ({ id, kind: "contentEntry" });
     const check = (diff: Parameters<typeof checkAutoPublish>[0]) => {
       const c = checkAutoPublish(diff);

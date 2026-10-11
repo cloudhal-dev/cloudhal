@@ -226,7 +226,7 @@ describe("agent modes on API keys (ADR-0015)", () => {
     expect(res.status).toBe(201);
     const key = (await res.json()) as { id: string; key: string; mode: string; scopes: string[] };
     expect(key.mode).toBe("plan");
-    expect(key.scopes).toEqual(["site:read", "content:read", "preview:create"]);
+    expect(key.scopes).toEqual(["site:read", "content:read", "preview:create", "analytics:read"]);
 
     const client = await connect({ "x-api-key": key.key });
     expect(client.getInstructions()).toContain("PLAN mode");
