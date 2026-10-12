@@ -52,6 +52,7 @@ export function RedirectDialog({
   open,
   onOpenChange,
   editing,
+  initialFrom,
   redirects,
   served,
   host,
@@ -61,6 +62,8 @@ export function RedirectDialog({
   onOpenChange: (open: boolean) => void;
   /** The redirect to edit; absent to create one. */
   editing: Redirect | undefined;
+  /** A new redirect prefilled with this old path (a broken link from Analytics). */
+  initialFrom?: string | undefined;
   redirects: readonly Redirect[];
   served: ReadonlySet<string>;
   host: string | undefined;
@@ -78,7 +81,7 @@ export function RedirectDialog({
   const [touched, setTouched] = useState({ from: false, to: false });
   useEffect(() => {
     if (!open) return;
-    setFrom(editing?.from ?? "");
+    setFrom(editing?.from ?? initialFrom ?? "");
     setTo(editing?.to ?? "");
     setMatch(editing?.match ?? "exact");
     setStatus(editing?.status ?? 301);
@@ -86,7 +89,7 @@ export function RedirectDialog({
     setStep("form");
     setSubmitted(false);
     setTouched({ from: false, to: false });
-  }, [open, editing]);
+  }, [open, editing, initialFrom]);
   const manual = !editing || editing.reason === "manual";
   const normalised = editing ? editing.from : normaliseFrom(from);
   const errors = validateRedirect(

@@ -8,6 +8,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { RouteError, RoutePending } from "./components/RouteStates.tsx";
+import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics.ts";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
@@ -17,6 +18,10 @@ import { SiteShell } from "./routes/SiteShell.tsx";
  * renders immediately. `defaultPreload: "intent"` fetches a screen's chunk on hover/focus.
  */
 const AccountPage = lazyRouteComponent(() => import("./routes/AccountPage.tsx"), "AccountPage");
+const AnalyticsPage = lazyRouteComponent(
+  () => import("./routes/AnalyticsPage.tsx"),
+  "AnalyticsPage",
+);
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
 const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
 const ApprovalsPage = lazyRouteComponent(
@@ -161,6 +166,14 @@ const siteIndexRoute = createRoute({
   path: "/",
   component: SiteOverviewPage,
 });
+/** Site › Overview › Analytics (RFC-0006 §10.1): `?range=7d` or `?from=&to=`, `&compare=0`, `&filter=`. */
+const analyticsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/analytics",
+  validateSearch: (search: Record<string, unknown>): AnalyticsSearch =>
+    validateAnalyticsSearch(search),
+  component: AnalyticsPage,
+});
 const pagesRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/pages",
@@ -275,6 +288,7 @@ const routeTree = rootRoute.addChildren([
   accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute, teamRoute]),
   siteRoute.addChildren([
     siteIndexRoute,
+    analyticsRoute,
     pagesRoute,
     articlesRoute,
     snapshotsRoute,
