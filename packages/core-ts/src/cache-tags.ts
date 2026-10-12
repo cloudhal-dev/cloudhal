@@ -17,6 +17,9 @@
  *   carry the site tag, so purging pages leaves media cached; a publish purges the asset tags of
  *   media that left the live snapshot or changed slug or status, a takedown purges its asset at
  *   once, and `cloudhal-media-<siteId>` is the operator's "purge all media" lever.
+ * - `cloudhal-comments-<nodeId>` — the approved comments rendered into an entry's page and its
+ *   comment pages (RFC-0007 §8.1). Separate from the node tag, so moderation purges only that
+ *   article, never archives, feeds or lists. `@cloudhal/comments` plans these purges.
  *
  * Tags are plain ASCII and far below Cloudflare's 1024-character limit per tag.
  */
@@ -26,6 +29,7 @@ export const TERM_TAG_PREFIX = "cloudhal-term-";
 export const LIST_TAG_PREFIX = "cloudhal-list-";
 export const MEDIA_TAG_PREFIX = "cloudhal-media-";
 export const ASSET_TAG_PREFIX = "cloudhal-asset-";
+export const COMMENTS_TAG_PREFIX = "cloudhal-comments-";
 
 export const siteCacheTag = (siteId: string) => `${CACHE_TAG_PREFIX}${siteId}`;
 export const nodeCacheTag = (id: string) => `${NODE_TAG_PREFIX}${id}`;
@@ -34,6 +38,8 @@ export const termCacheTag = (id: string) => `${TERM_TAG_PREFIX}${id}`;
 export const listCacheTag = (termOrSiteId: string) => `${LIST_TAG_PREFIX}${termOrSiteId}`;
 export const mediaCacheTag = (siteId: string) => `${MEDIA_TAG_PREFIX}${siteId}`;
 export const assetCacheTag = (assetId: string) => `${ASSET_TAG_PREFIX}${assetId}`;
+/** The comments tag of an entry (RFC-0007 §8.1). */
+export const commentsCacheTag = (nodeId: string) => `${COMMENTS_TAG_PREFIX}${nodeId}`;
 
 /** Whether a tag is one Cloudhal sets (the purge endpoint refuses anything else). */
 export function isCloudhalCacheTag(tag: string): boolean {
