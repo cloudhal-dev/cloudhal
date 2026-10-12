@@ -1932,6 +1932,32 @@ export class SqlScheduleStore implements SchedulerStore {
     return (results[0]?.changes ?? 0) === 1;
   }
 
+  /** Renames a release (CAS on `rev`); the title is not in `rl1:`, so approvals stand. */
+  async retitleRelease(
+    siteId: string,
+    id: string,
+    input: { expectedRev: number; title: string | null },
+  ): Promise<Release> {
+    const rec = await this.getReleaseRecord(siteId, id);
+    if (!rec) throw new ScheduleError("not_found", `release ${id} not found`);
+    if (rec.release.rev !== input.expectedRev) throw new ScheduleConflictError("release", id);
+    const now = this.#stamp();
+    const { title: _t, ...rest } = rec.release;
+    const next: Release = {
+      ...rest,
+      ...(input.title ? { title: plainLine(input.title, 200) } : {}),
+      rev: rec.release.rev + 1,
+      updatedAt: now,
+    };
+    assertValid("release", next);
+    const res = await this.#sql.run(
+      "UPDATE releases SET title = ?, rev = rev + 1, updated_at = ? WHERE id = ? AND site_id = ? AND rev = ?",
+      [next.title ?? null, now, id, siteId, input.expectedRev],
+    );
+    if (res.changes !== 1) throw new ScheduleConflictError("release", id);
+    return next;
+  }
+
   /** Lateness (seconds) of release runs that ended since `since`, ascending (`/api/scheduler` p50/p95). */
   async releaseLateness(since: string, limit = 2_000): Promise<number[]> {
     const rows = await this.#sql.all<{ lateness_s: number }>(
