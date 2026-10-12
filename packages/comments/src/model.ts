@@ -59,6 +59,12 @@ export const COMMENT_DISPLAY_DEPTH = 2;
 export const RENDER_PAGE_SIZE = 50;
 /** Ids per moderation or label call (§4.4, §11.1). */
 export const MAX_BULK = 50;
+/**
+ * "Ban and hide past comments": comments hidden per batch, and batches per request (one read and
+ * three statements each), so one Worker request stays inside D1 Free's 50 queries (§15).
+ */
+export const HIDE_PAST_BATCH = 200;
+export const HIDE_PAST_BATCHES = 5;
 export const MAX_LABELS = 32;
 /** Plain-text limits after normalising (§6.4). */
 export const TEXT_MIN = 2;

@@ -23,8 +23,9 @@ import {
   sealEmail,
 } from "@cloudhal/comments";
 import { exportPage, SqlCommentStore } from "@cloudhal/comments/sql";
+import { countingDriver } from "@cloudhal/comments/testing";
 import type { Actor, Comment, ContentEntry } from "@cloudhal/core-contracts";
-import { canonicalJson, type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
+import { canonicalJson, SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import { defineTools } from "@cloudhal/mcp-server/tools";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
@@ -589,6 +590,99 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       expect(ex.text).not.toContain("spam@example.com");
       const personal = await call(`${CM()}/export?personal=1`, "editor");
       expect(personal.text).toContain("spam@example.com");
+    });
+
+    it("large sites: every request stays inside D1 Free's 50 queries per invocation", async () => {
+      // every query of the request counted: graph, comments, audit and approvals
+      const counting = countingDriver(sql);
+      store = new SiteGraphStore({ sql: counting, blobs: new MemoryBlobStore() });
+      comments = new SqlCommentStore(counting, { now: () => NOW });
+      audit = new AuditLog(counting);
+      approvals = new ApprovalStore(counting, { now: () => NOW });
+      build();
+      const LIMIT = 50;
+      const measured = async (path: string, init: { method?: string; body?: unknown } = {}) => {
+        counting.reset();
+        const res = await app.request(path, {
+          method: init.method ?? "GET",
+          headers: { "content-type": "application/json", "x-test-user": "editor" },
+          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+        });
+        const text = await res.text();
+        const queries = counting.reads + counting.writes.length;
+        expect(res.status, `${path}: ${text.slice(0, 200)}`).toBeLessThan(300);
+        expect(queries, `${init.method ?? "GET"} ${path}`).toBeLessThan(LIMIT);
+        return { res, text, queries };
+      };
+      // A prolific commenter (1,100 approved comments), 2,000 guests and 120 more commenters,
+      // cloned in SQL from real rows.
+      const loud = await approved("Template", { email: "loud@example.com" });
+      const guest = await seed("Guest template");
+      const loudId = (await comments.findCommenter(siteId, { commentId: loud.id })) as string;
+      const clone = (n: number, prefix: string, from: string, emailId: string | null) =>
+        sql.run(
+          `INSERT INTO comments (id, site_id, node_id, parent_id, in_reply_to_id, source, origin, author, body, status, labels, moderation, email_id, ip_hmac, challenge_id, proof, op, hash, created_at, edited_at, rev)
+           WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < ?)
+           SELECT ? || printf('%06d', k.i), t.site_id, t.node_id, NULL, NULL, t.source, NULL, t.author, t.body, t.status, t.labels, t.moderation, ?, NULL, NULL, t.proof, NULL, t.hash,
+                  strftime('%Y-%m-%dT%H:%M:%fZ', t.created_at, '-' || k.i || ' seconds'), NULL, t.rev
+           FROM k, comments t WHERE t.id = ?`,
+          [n, prefix, emailId, from],
+        );
+      await clone(1_099, "cmt_loud", loud.id, loudId);
+      await clone(2_000, "cmt_guest", guest.id, null);
+      await sql.run(
+        `INSERT INTO commenter_emails (id, site_id, email_hmac, email_ciphertext, email_iv, created_at)
+         WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < 120)
+         SELECT 'cmr_bulk' || printf('%06d', k.i), t.site_id, 'bulk' || k.i, t.email_ciphertext, t.email_iv, t.created_at
+         FROM k, commenter_emails t WHERE t.id = ?`,
+        [loudId],
+      );
+      const total = 3_101;
+
+      // Studio's export, page by page, then with personal data
+      for (const personal of [false, true]) {
+        const lines: Json[] = [];
+        let cursor: string | null = null;
+        let pages = 0;
+        do {
+          const q = new URLSearchParams({
+            ...(personal ? { personal: "1" } : {}),
+            ...(cursor ? { cursor } : {}),
+          });
+          const { res, text } = await measured(`${CM()}/export?${q}`);
+          for (const l of text.trim().split("\n")) lines.push(JSON.parse(l) as Json);
+          cursor = res.headers.get("cloudhal-next-cursor");
+          pages++;
+        } while (cursor && pages < 100);
+        expect(cursor).toBeNull();
+        expect(lines[0]).toMatchObject({ cloudhal: "comments", siteId });
+        expect(lines.filter((l) => l.cloudhal !== undefined)).toHaveLength(1);
+        const ids = lines.filter((l) => typeof l.id === "string").map((l) => l.id);
+        expect(ids).toHaveLength(total);
+        expect(new Set(ids).size).toBe(total);
+        const people = lines.filter((l) => l.commenter !== undefined);
+        expect(people).toHaveLength(personal ? 121 : 0);
+        if (personal) expect(people[0]?.commenter).toMatchObject({ email: "loud@example.com" });
+      }
+
+      // a commenter's own export: every comment, one request
+      const mine = await measured(`${S()}/commenters/${loudId}/export`, { method: "POST" });
+      expect((JSON.parse(mine.text) as { comments: unknown[] }).comments).toHaveLength(1_100);
+
+      // ban and hide past comments: bounded per request; repeating the request finishes it
+      const ban = { commentId: loud.id, subjects: ["email"], reasonCode: "spam", hidePast: true };
+      const first = await measured(`${S()}/comment-bans`, { method: "POST", body: ban });
+      expect(JSON.parse(first.text)).toMatchObject({ hidden: 1_000, more: true });
+      const second = await measured(`${S()}/comment-bans`, { method: "POST", body: ban });
+      expect(JSON.parse(second.text)).toMatchObject({ hidden: 100 });
+      expect(JSON.parse(second.text).more).toBeUndefined();
+      const left = await sql.get<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM comments WHERE email_id = ? AND status = 'approved'",
+        [loudId],
+      );
+      expect(Number(left?.n)).toBe(0);
+      expect(await comments.listBans(siteId)).toHaveLength(1);
+      expect(queued).toContain("takedown");
     });
 
     it("operator (deployment token): status, paged export with personal data, idempotent import", async () => {

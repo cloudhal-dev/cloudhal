@@ -34,6 +34,7 @@ import {
   settingsPurgeTags,
   utcDayStart,
 } from "@cloudhal/comments";
+import { CommentImportError, exportPage } from "@cloudhal/comments/sql";
 import type { Actor } from "@cloudhal/core-contracts";
 import {
   type CommentEntry,
@@ -423,53 +424,35 @@ export const comments: Hono<Env> = new Hono<Env>()
       throw apiError(403, "missing_scope", "exporting personal data needs commenters:data", {
         scope: "commenters:data",
       });
-    const lines: string[] = [
-      JSON.stringify({
-        cloudhal: "comments",
-        version: 1,
-        siteId: site.id,
-        exportedAt: c.get("now")().toISOString(),
-        ...(personal ? { personalData: true } : {}),
-      }),
-    ];
-    let cursor: string | undefined;
-    let count = 0;
-    for (let i = 0; i < 400; i++) {
-      const page = await d.store.list(site.id, {
-        order: "oldest",
-        limit: 50,
-        ...(cursor ? { cursor } : {}),
+    const keys = personal ? keysOf(d) : undefined;
+    // One page per request (500 comments, or 100 commenters), so a large site never runs past
+    // D1 Free's 50 queries per invocation; `cloudhal-next-cursor` asks for the next page. The
+    // header line is on the first page only, so the pages concatenate into one file.
+    const cursor = c.req.query("cursor");
+    let page: Awaited<ReturnType<typeof exportPage>>;
+    try {
+      page = await exportPage(d.store, site.id, {
+        cursor,
+        personal,
+        keys,
+        now: c.get("now")(),
       });
-      for (const x of page.comments) lines.push(JSON.stringify(x));
-      count += page.comments.length;
-      cursor = page.nextCursor;
-      if (!cursor) break;
+    } catch (e) {
+      if (e instanceof CommentImportError) throw badRequest(e.message);
+      throw e;
     }
-    let commenters = 0;
-    if (personal) {
-      const keys = keysOf(d);
-      for (const id of await d.store.commenterIds(site.id)) {
-        const who = await d.store.commenter(site.id, id, keys);
-        if (!who) continue;
-        commenters++;
-        lines.push(
-          JSON.stringify({
-            commenter: {
-              commenterId: who.id,
-              email: who.email,
-              firstSeen: who.firstSeen,
-              commentIds: who.commentIds,
-            },
-          }),
-        );
-      }
-    }
-    await record(c, site.id, "comments.export", { personal, comments: count, commenters });
-    return new Response(`${lines.join("\n")}\n`, {
+    await record(c, site.id, "comments.export", {
+      personal,
+      comments: page.comments,
+      commenters: page.commenters,
+      ...(cursor ? { continued: true } : {}),
+    });
+    return new Response(page.lines.length ? `${page.lines.join("\n")}\n` : "", {
       headers: {
         "content-type": "application/x-ndjson; charset=utf-8",
         "content-disposition": `attachment; filename="comments-${site.id}.jsonl"`,
         "cache-control": "no-store",
+        ...(page.next ? { "cloudhal-next-cursor": page.next } : {}),
       },
     });
   })
@@ -786,9 +769,8 @@ export const comments: Hono<Env> = new Hono<Env>()
     const site = await requireSite(c);
     const who = await d.store.commenter(site.id, param(c, "commenterId"), keysOf(d));
     if (!who) throw notFound("commenter not found");
-    const all: Comment[] = [];
-    for (let i = 0; i < who.commentIds.length; i += 50)
-      all.push(...(await d.store.getMany(site.id, who.commentIds.slice(i, i + 50))));
+    // one read, however many comments they wrote (D1 Free: 50 queries per invocation)
+    const all = await d.store.commenterComments(site.id, who.id);
     await record(c, site.id, "comments.commenter-export", {
       commenterId: who.id,
       comments: all.length,
@@ -845,25 +827,25 @@ export const comments: Hono<Env> = new Hono<Env>()
       by: actor,
     });
     let hidden = 0;
+    let more = false;
     if (b.hidePast === true) {
-      // Also hide their approved comments: every comment of the commenter (by email), or this one.
-      const commenterId = await d.store.findCommenter(site.id, { commentId: b.commentId });
-      const ids = commenterId
-        ? ((await d.store.commenter(site.id, commenterId, keysOf(d)))?.commentIds ?? [])
-        : [b.commentId];
-      for (let i = 0; i < ids.length; i += 50) {
-        const approved = (await d.store.getMany(site.id, ids.slice(i, i + 50))).filter(
-          (x) => x.status === "approved",
-        );
-        if (approved.length === 0) continue;
-        const r = await moderate(c, site.id, {
-          ids: approved.map((x) => x.id),
+      // Also hide their approved comments: every comment of the commenter (by email), or this
+      // one. Set-based and bounded (≤ 1,000 a request, about 20 queries), so a prolific
+      // commenter never runs a request past D1 Free's 50 queries; `more` asks the client to
+      // send the same request again (the ban is an upsert, so repeating it changes nothing else).
+      const r = await d.store.hideApprovedOf(site.id, b.commentId, {
+        actor,
+        reasonCode: code,
+        audit: audit(c, site.id, "comments.moderate", {
           action: "hide",
           reasonCode: code,
-          expectedRevs: Object.fromEntries(approved.map((x) => [x.id, x.rev])),
-        });
-        hidden += r.results.filter((x) => x.ok).length;
-      }
+          via: "ban",
+          commentId: b.commentId,
+        }),
+      });
+      hidden = r.hidden;
+      more = r.more;
+      queued(d, site.id, r.hidden > 0 ? "takedown" : null);
     }
     await record(c, site.id, "comments.ban", {
       commentId: b.commentId,
@@ -871,8 +853,9 @@ export const comments: Hono<Env> = new Hono<Env>()
       until: typeof b.until === "string" ? b.until : null,
       reasonCode: code,
       hidden,
+      ...(more ? { more } : {}),
     });
-    return c.json({ bans, hidden }, 201);
+    return c.json({ bans, hidden, ...(more ? { more } : {}) }, 201);
   })
   .delete("/comment-bans/:banId", async (c) => {
     const d = deps(c);

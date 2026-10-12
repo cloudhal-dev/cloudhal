@@ -52,6 +52,8 @@ import {
   type CountQuery,
   type EraseResult,
   type EraseTarget,
+  HIDE_PAST_BATCH,
+  HIDE_PAST_BATCHES,
   isPerson,
   LABELS,
   type LabelName,
@@ -1400,30 +1402,147 @@ export class SqlCommentStore implements SubmissionStore {
     commenterId: string,
     keys: CommentKeys,
   ): Promise<Commenter | null> {
-    const r = await this.sql.get<Record<string, string>>(
-      "SELECT id, email_ciphertext, email_iv, created_at FROM commenter_emails WHERE id = ? AND site_id = ?",
-      [commenterId, siteId],
+    return (await this.commenters(siteId, [commenterId], keys))[0] ?? null;
+  }
+
+  /**
+   * Several commenters with their decrypted addresses in three reads, whatever their number (a
+   * personal-data export page stays inside D1 Free's 50 queries per invocation). Unknown ids are
+   * left out; the order is the order of `ids`.
+   */
+  async commenters(
+    siteId: string,
+    ids: readonly string[],
+    keys: CommentKeys,
+  ): Promise<Commenter[]> {
+    const wanted = [...new Set(ids)];
+    if (wanted.length === 0) return [];
+    const rows = await this.sql.all<Record<string, string>>(
+      "SELECT id, email_ciphertext, email_iv, created_at FROM commenter_emails WHERE site_id = ? AND id IN (SELECT value FROM json_each(?))",
+      [siteId, json(wanted)],
     );
-    if (!r) return null;
-    const email = await openEmail(keys, siteId, {
-      ciphertext: String(r.email_ciphertext),
-      iv: String(r.email_iv),
-    });
-    const comments = await this.sql.all<{ id: string }>(
-      "SELECT id FROM comments WHERE email_id = ? AND site_id = ? ORDER BY created_at, id",
-      [commenterId, siteId],
-    );
-    const reports = await this.sql.all<{ id: string }>(
-      "SELECT id FROM comment_reports WHERE email_id = ? AND site_id = ? ORDER BY created_at, id",
-      [commenterId, siteId],
-    );
-    return {
-      id: String(r.id),
-      email,
-      firstSeen: String(r.created_at),
-      commentIds: comments.map((c) => c.id),
-      reportIds: reports.map((c) => c.id),
+    if (rows.length === 0) return [];
+    const found = rows.map((r) => String(r.id));
+    const linked = async (table: "comments" | "comment_reports") => {
+      const out = new Map<string, string[]>();
+      const refs = await this.sql.all<{ id: string; email_id: string }>(
+        `SELECT id, email_id FROM ${table} WHERE site_id = ? AND email_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, id`,
+        [siteId, json(found)],
+      );
+      for (const r of refs) out.set(r.email_id, [...(out.get(r.email_id) ?? []), r.id]);
+      return out;
     };
+    const [comments, reports] = [await linked("comments"), await linked("comment_reports")];
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const out: Commenter[] = [];
+    for (const id of wanted) {
+      const r = byId.get(id);
+      if (!r) continue;
+      out.push({
+        id,
+        email: await openEmail(keys, siteId, {
+          ciphertext: String(r.email_ciphertext),
+          iv: String(r.email_iv),
+        }),
+        firstSeen: String(r.created_at),
+        commentIds: comments.get(id) ?? [],
+        reportIds: reports.get(id) ?? [],
+      });
+    }
+    return out;
+  }
+
+  /** Every comment linked to a commenter, oldest first, in one read (a commenter's export). */
+  async commenterComments(siteId: string, commenterId: string): Promise<Comment[]> {
+    const rows = await this.sql.all<CommentRow>(
+      "SELECT * FROM comments WHERE site_id = ? AND email_id = ? ORDER BY created_at, id",
+      [siteId, commenterId],
+    );
+    return rows.map(toComment);
+  }
+
+  /**
+   * "Ban and hide past comments" (§14): hides the approved comments of a comment's author — every
+   * approved comment linked to the same email, or the comment itself when it has none. Runs at
+   * most `batches` set-based batches of `batch` comments (each one read and one batch of three
+   * statements, with the audit rows in the first), so one request stays inside D1 Free's 50
+   * queries per invocation; `more` says approved comments remain (send the request again).
+   */
+  async hideApprovedOf(
+    siteId: string,
+    commentId: string,
+    input: {
+      readonly actor: Actor;
+      readonly reasonCode: ReasonCode;
+      readonly note?: string;
+      readonly audit?: readonly AuditStatement[];
+    },
+    o: { readonly batch?: number; readonly batches?: number } = {},
+  ): Promise<{ hidden: number; nodeIds: string[]; more: boolean }> {
+    if (!isPerson(input.actor)) throw new CommentForbiddenError("only a person can do this");
+    if (!(REASON_CODES as readonly string[]).includes(input.reasonCode))
+      throw new CommentInputError("unknown reasonCode");
+    assertNote(input.note);
+    if (!COMMENT_ID.test(commentId)) throw new CommentNotFoundError();
+    const size = o.batch ?? HIDE_PAST_BATCH;
+    const batches = o.batches ?? HIDE_PAST_BATCHES;
+    const now = this.#now().toISOString();
+    const moderation: CommentModeration = {
+      action: "hide",
+      actor: input.actor,
+      at: now,
+      reasonCode: input.reasonCode,
+      ...(input.note ? { note: input.note } : {}),
+      automated: false,
+    };
+    const nodeIds = new Set<string>();
+    let hidden = 0;
+    let audit = input.audit ?? [];
+    for (let i = 0; i < batches; i++) {
+      const rows = await this.sql.all<CommentRow>(
+        `SELECT * FROM comments WHERE site_id = ? AND status = 'approved'
+           AND (id = ? OR email_id = (SELECT email_id FROM comments WHERE id = ? AND site_id = ?))
+         ORDER BY id LIMIT ?`,
+        [siteId, commentId, commentId, siteId, size + 1],
+      );
+      const page = rows.slice(0, size);
+      if (page.length === 0) return { hidden, nodeIds: [...nodeIds].sort(), more: false };
+      const opId = newCommentsId(ID_PREFIX.op);
+      const changes: [string, number, string][] = [];
+      for (const r of page) {
+        const before = toComment(r);
+        const after: Comment = { ...before, status: "hidden", moderation, rev: before.rev + 1 };
+        changes.push([r.id, before.rev, await commentRecordHash(after)]);
+        nodeIds.add(r.node_id);
+      }
+      const ids = changes.map((c) => c[0]);
+      const results = await this.sql.batch([
+        {
+          sql: `UPDATE comments SET status = 'hidden', moderation = ?, rev = rev + 1, op = ?,
+                  hash = (SELECT json_extract(j.value, '$[2]') FROM json_each(?) j WHERE json_extract(j.value, '$[0]') = comments.id)
+                WHERE site_id = ? AND status = 'approved' AND (id, rev) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`,
+          params: [json(moderation), opId, json(changes), siteId, json(changes)],
+        },
+        this.#eventsFromOp(
+          siteId,
+          opId,
+          ids,
+          "hide",
+          input.actor,
+          input.reasonCode,
+          input.note ?? null,
+          false,
+          null,
+          now,
+        ),
+        this.#purgeFromOp(siteId, opId, ids, "takedown", now),
+        ...auditStatements(audit),
+      ]);
+      audit = [];
+      hidden += results[0]?.changes ?? 0;
+      if (rows.length <= size) return { hidden, nodeIds: [...nodeIds].sort(), more: false };
+    }
+    return { hidden, nodeIds: [...nodeIds].sort(), more: true };
   }
 
   /**

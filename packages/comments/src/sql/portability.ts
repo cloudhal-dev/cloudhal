@@ -7,8 +7,10 @@
  * `commenters:data`, or the operator) `{"commenter":{commenterId,email,firstSeen,commentIds}}`
  * lines follow the comments. Nothing else ever leaves: no IP hash, challenge or proof (C1).
  *
- * **Export** is paged so one Worker request stays far inside D1 Free's 50 queries: `cursor`
- * continues where the last page stopped (`c:` comments, then `p:` commenters).
+ * **Export** is paged so one Worker request stays far inside D1 Free's 50 queries (at most 10
+ * reads of comments, or 4 for a page of commenters): `cursor` continues where the last page
+ * stopped (`c:` comments, then `p:` commenters). Studio's REST export and the deployment-token
+ * export use the same pages.
  *
  * **Import** is idempotent: a record whose `id` exists is skipped, and so is one whose `origin`
  * (importers' `{system, id}`) is already stored for the site. Each record must be a valid
@@ -62,8 +64,8 @@ export const exportHeader = (
 
 /** Comments per export page: 10 indexed reads of 50. */
 export const EXPORT_PAGE_COMMENTS = 500;
-/** Commenters per export page: 3 reads each. */
-export const EXPORT_PAGE_COMMENTERS = 10;
+/** Commenters per export page: four reads for the whole page (`SqlCommentStore.commenters`). */
+export const EXPORT_PAGE_COMMENTERS = 100;
 /** Lines one import call accepts (the CLI sends batches of this size or less). */
 export const IMPORT_MAX_LINES = 200;
 /** Records written per statement, and the size of their JSON parameter. */
@@ -134,9 +136,12 @@ export async function exportPage(
      ORDER BY created_at, id LIMIT ?`,
     [siteId, ...(after ? [at ?? "", at ?? "", id ?? ""] : []), max + 1],
   );
-  for (const r of rows.slice(0, max)) {
-    const who = await store.commenter(siteId, r.id, o.keys);
-    if (!who) continue;
+  // three reads for the whole page, whatever its size
+  for (const who of await store.commenters(
+    siteId,
+    rows.slice(0, max).map((r) => r.id),
+    o.keys,
+  )) {
     commenters++;
     const line: CommenterExportLine = {
       commenter: {

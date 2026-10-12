@@ -267,6 +267,7 @@ cloudhal comments import --in <file> [--remote]
   - Statuses are kept: approved comments stay approved. This is the one way, besides a person, that a comment becomes approved.
   - Emails are encrypted again under the target deployment's key.
 - **`--remote`** talks to your deployment with the deployment token (`.cloudhal/deploy/secrets.json`), through `/api/admin/sites/:siteId/comments/status|export|import`. Each call is audited as the operator.
+- **Large sites on Workers Free.** D1 Free answers at most 50 queries per Worker request, so every export (the CLI's and Studio's "Export comments", `GET /api/sites/:siteId/comments/export`) comes in pages of 500 comments or 100 commenters, with a `cloudhal-next-cursor` header while more remain; Studio and the CLI fetch the pages for you. A commenter's own export is one query, and "Ban… › Also hide their approved comments" hides up to 1,000 comments a request (Studio repeats it until none are left).
 - Disqus and WordPress importers are planned (v1.1).
 
 ## Costs

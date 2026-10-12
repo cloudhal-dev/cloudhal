@@ -875,6 +875,79 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       expect(gone.body).toBeUndefined();
     });
 
+    it("commenters in three reads; a commenter's comments in one; hiding past comments in bounded batches", async () => {
+      const mine: Comment[] = [];
+      for (let i = 0; i < 5; i++)
+        mine.push(await approve(ctx, await stored(ctx, { email: "loud@example.com" })));
+      const pendingOne = await stored(ctx, { email: "loud@example.com" });
+      const other = await approve(ctx, await stored(ctx, { email: "calm@example.com" }));
+      const guest = await approve(ctx, await stored(ctx));
+      const ids = await Promise.all(
+        ["loud@example.com", "calm@example.com"].map(async (e) =>
+          ctx.store.findCommenter(SITE, { emailHmac: await emailHmac(ctx.keys, e) }),
+        ),
+      );
+      const [loud, calm] = ids as string[];
+      ctx.sql.reset();
+      const many = await ctx.store.commenters(
+        SITE,
+        [calm as string, "cmr_unknown000", loud as string],
+        ctx.keys,
+      );
+      expect(ctx.sql.reads).toBe(3);
+      expect(many.map((w) => [w.id, w.email, w.commentIds.length])).toEqual([
+        [calm, "calm@example.com", 1],
+        [loud, "loud@example.com", 6],
+      ]);
+      expect(await ctx.store.commenters(OTHER_SITE, [loud as string], ctx.keys)).toEqual([]);
+      ctx.sql.reset();
+      const all = await ctx.store.commenterComments(SITE, loud as string);
+      expect(ctx.sql.reads).toBe(1);
+      expect(all.map((c) => c.id).sort()).toEqual([...mine, pendingOne].map((c) => c.id).sort());
+      for (const c of all) expectContractComment(c);
+
+      await expect(
+        ctx.store.hideApprovedOf(SITE, mine[0]?.id as string, { actor: AGENT, reasonCode: "spam" }),
+      ).rejects.toBeInstanceOf(CommentForbiddenError);
+      // batches of 2, at most 2 a call: 4 of the 5 approved, then the last one
+      ctx.sql.reset();
+      const first = await ctx.store.hideApprovedOf(
+        SITE,
+        mine[2]?.id as string,
+        { actor: EDITOR, reasonCode: "spam" },
+        { batch: 2, batches: 2 },
+      );
+      expect(first).toEqual({ hidden: 4, nodeIds: [ENTRY], more: true });
+      expect(ctx.sql.reads).toBe(2);
+      expect(ctx.sql.batches.map((b) => b.length)).toEqual([3, 3]);
+      const second = await ctx.store.hideApprovedOf(
+        SITE,
+        mine[2]?.id as string,
+        { actor: EDITOR, reasonCode: "spam" },
+        { batch: 2, batches: 2 },
+      );
+      expect(second).toEqual({ hidden: 1, nodeIds: [ENTRY], more: false });
+      for (const c of mine) {
+        const now = (await ctx.store.get(SITE, c.id)) as Comment;
+        expectContractComment(now);
+        expect(now).toMatchObject({
+          status: "hidden",
+          rev: c.rev + 1,
+          moderation: { action: "hide", reasonCode: "spam", automated: false },
+        });
+      }
+      // only approved comments of that commenter: pending, other people and guests untouched
+      expect((await ctx.store.get(SITE, pendingOne.id))?.status).toBe("pending");
+      expect((await ctx.store.get(SITE, other.id))?.status).toBe("approved");
+      expect(await count(ctx.sql, "comment_events", "action = 'hide'")).toBe(5);
+      expect(await ctx.store.purgeQueue.queued(SITE)).toMatchObject([{ priority: "takedown" }]);
+      // a guest without an email: just that comment
+      expect(
+        await ctx.store.hideApprovedOf(SITE, guest.id, { actor: EDITOR, reasonCode: "abuse" }),
+      ).toEqual({ hidden: 1, nodeIds: [ENTRY], more: false });
+      expect((await ctx.store.get(SITE, other.id))?.status).toBe("approved");
+    });
+
     it("purge queue: sent rows leave unless re-enqueued, failures back off, the log is shared", async () => {
       await ctx.store.purgeQueue.enqueue(
         SITE,
