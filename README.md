@@ -33,6 +33,8 @@ npx cloudhal domain set news.example.com    # your own domain (zone in the same 
 npx cloudhal deploy
 ```
 
+New projects count visits from the first deploy: cookie-less, first-party, read by Studio through Cloudflare bindings without an API token. Switch it off per site in Studio or for the deployment with `"analytics": { "enabled": false }` in `cloudhal.json`; existing deployments are asked once on their next deploy. Requirements (wrangler ≥ 4.145, an hourly cron trigger), Workers Free and Paid limits and the `cloudhal analytics` commands are in the [CLI README](packages/cli/README.md#site-analytics-rfc-0006); what is collected is in the [privacy guide](docs/guides/analytics-privacy.md).
+
 The first deploy prints a one-time link for the owner account. In Studio you create keys for remote agents and choose each key's **mode**. Approvals wait in Studio, and every agent call is in the activity log.
 
 | Mode | What the agent does on its own |
@@ -65,7 +67,8 @@ packages/core-contracts   JSON Schema source of truth, generated TypeScript + pr
 packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs, R2 adapters; migrations
 packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 packages/astro-renderer   Astro 7 integration, live/snapshot data sources, section components
-packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull
+packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
+packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull / analytics
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
 packages/mcp-server       MCP server: 20 semantic tools, approval gate, agent modes, skills as resources; stdio + HTTP
@@ -77,7 +80,9 @@ skills/official           site-bootstrap, safe-edit, publish-article, rollback (
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
 docs/design               DESIGN.md — the binding admin design system (Kumo)
+docs/guides               guides for site owners (analytics and privacy)
 docs/rfcs                 design proposals (RFC-0001: Site Graph)
+docs/security             threat model
 .agents/skills            skills for coding agents working on this repo
 apps/demo-newsroom        Cloudhal's own newsroom, published by an agent through Cloudhal (dogfooding)
 packages/create-cloudhal  npm create cloudhal
