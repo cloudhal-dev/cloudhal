@@ -67,6 +67,24 @@ describe("checkBundleBudget", () => {
     expect(problems.join("\n")).toContain("chunks/date-picker-abc.js");
   });
 
+  it("reports comment blocks in the initial load, but not the generic bulk action bar", () => {
+    const bundle = Object.fromEntries([
+      chunk("index.js", {
+        isEntry: true,
+        moduleIds: [
+          "/repo/packages/ui/src/blocks/CommentRow.tsx",
+          "/repo/packages/ui/src/blocks/CommenterSummary.tsx",
+          "/repo/packages/ui/src/blocks/ArticleCommentsSummary.tsx",
+          "/repo/packages/ui/src/blocks/comment-model.ts",
+          "/repo/packages/ui/src/blocks/BulkActionBar.tsx",
+        ],
+      }),
+    ]);
+    const { problems } = checkBundleBudget(bundle, budget);
+    expect(problems).toHaveLength(4);
+    expect(problems.join("\n")).not.toContain("BulkActionBar");
+  });
+
   it("reports an entry or initial load over budget", () => {
     const bundle = Object.fromEntries([
       chunk("index.js", { isEntry: true, code: Math.random().toString(36).repeat(200) }),

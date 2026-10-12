@@ -20,12 +20,14 @@ export const BUNDLE_BUDGET = {
   initialGzipBytes: 470_000,
 };
 
-/** Modules that must never be in the initial load (analytics-only, loaded by lazy routes). */
+/** Modules that must never be in the initial load (analytics and comments, loaded by lazy routes). */
 export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]node_modules[\\/].*[\\/](echarts|zrender)[\\/]/,
   /[\\/]@cloudflare[\\/]kumo[\\/]dist[\\/]chunks[\\/](chart|date-range-picker|date-picker)-/,
   /[\\/]packages[\\/]ui[\\/]src[\\/]charts\.ts$/,
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|AnalyticsBotBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|calendar-locale|charts|useChartFrame|useChartPalette)\.tsx?$/,
+  // Reader comments (RFC-0007 §14): the blocks load with the comment screens and the editor card.
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](Comment[A-Za-z]*|ArticleCommentsSummary|comment-model)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
   // Lazy message namespaces: their words load with the screens that show them.
