@@ -923,3 +923,23 @@ The script itself is never a Worker request.
 
 ### Verification on the live account (2026-10-12)
 All 37 golden statements were run against the deployed dataset through the Analytics SQL binding. Before the fix, 18 failed: the Analytics SQL API refuses an aliased grouped column that is also used in ORDER BY ("column `key` not found"), and `quantileWeighted(0.75, x, if(x >= 0, double9, 0))` is a type error (Float64 weight beside an integer literal). The compiler now selects dimension columns without aliases and casts weights with `toUInt32`; the reader maps rows by column name. After the fix all 37 statements succeed live. Also observed: `approx_percentile_cont` is not supported; plain `quantileWeighted` and `sumIf` are. The fake in `test/helpers/fake-wae.ts` now enforces both refusals so the conformance suite catches regressions.
+
+## Implementation notes (docs and security; rollout step 11)
+`docs/security/threat-model.md` (promise 4 rewritten, promise 11, a "Site analytics" table of threats with what is mitigated and what remains, new accepted risks, the review of 2026-10-12), `docs/guides/analytics-privacy.md` (the site-owner guide with the Studio privacy paragraph in English and Turkish and the GDPR/KVKK notes), `README.md`, `packages/cli/README.md` (configuration, Cloudflare requirements, limits and costs, upgrading, commands) and `starters/blog/README.md`. ADR-0021 was written at acceptance; each code step shipped its own changeset, and this step changes no published package.
+
+- **Checked against the code, not this RFC.** The threat model describes what the code does today. Where this RFC promised more, the gap is listed there as residual or open: the Rate Limiting binding (`analytics.rateLimit` is parsed but not wired), the "possible bot traffic" banner, the GPC/DNT share next to unique visitors, and the estimated cache-hit ratio are not built.
+- **Open items found in the review** (code fixes, not docs): (1) without the cron trigger (`CLOUDHAL_ANALYTICS_CRON=off`), salts before today are deleted only by an on-read rollup, so a salt can outlive its day when nobody opens Analytics; (2) `SiteAnalytics` memoises the day's salt per isolate and neither `reset()` nor the settings route clears it, so a salt deleted by "unique visitors off" keeps being used when the mode is switched back on the same day; (3) `processBeacon` prefers a client-sent `CF-Connecting-IP` over `clientIp`, which off Cloudflare (`cloudhal dev` with `analytics.dev`, a future Node host) lets a client pick the IP used for rate limiting and hashing; (4) `deleteSiteAnalytics` exists but nothing calls it (there is no site deletion yet), so §7.6's "deleting a site deletes its settings, rollups and runs" is not true of any path today.
+
+### Status of rollout (2026-10-12)
+0. **Spike on a Workers Free account — open.** The spike and the live verification ran on the maintainer's Workers Paid account. A1 (the Analytics SQL binding on Free), A2 (whether binding queries count against Free's 10,000 reads a day), A3 (Rate Limiting binding on Free), A4 (behaviour past 100,000 writes a day), A5 (`params` through the binding) and A6 (static-asset requests free) still need a Free account; S4 was re-verified only on Paid. The fallback ("can't read yet") is built.
+1. **Contracts — done** (`analytics-event`, `analytics-beacon`).
+2. **`@cloudhal/analytics` core — done.**
+3. **Storage — done** (`0014_analytics`, with `good`/`poor` columns beyond §7.4).
+4. **WAE adapters — done.** Dialect pinned on the live account on 2026-10-12: all 37 golden statements succeed after the alias and weight fix.
+5. **Site Worker and renderer — done.** The vitals module is ≈ 3.6 KB gzipped, more than §5.1's estimate; the page-view script is within its 1 KB budget.
+6. **Admin Worker — done** (`scheduled`, `features.analytics`, on-read rollups without a cron).
+7. **Policy and API — done.**
+8. **MCP — done.** `get_analytics` has no cache-hit ratio.
+9. **CLI — done.** The Rate Limiting binding is not wired.
+10. **Studio — done** in three parts (screen; settings section and "Allow analytics" on older keys; Readers card, overview card and Kumo locale). Left: the Articles list's "Views · 30 days" column (§10.2), the bot-traffic banner and cache-hit ratio (§10.1), the GPC/DNT share; Kumo 2.14's locale gaps (the map legend, the calendar, "Timezone" and "Reset Dates" stay English); the bundle growth of the eagerly loaded chunks (about 115 kB and 120 kB minified, step 10 notes).
+11. **Docs and security — done** (this section). Open: the four review items above.
