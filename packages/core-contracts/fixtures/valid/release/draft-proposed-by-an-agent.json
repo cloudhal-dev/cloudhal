@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "rel_01HZXA7Q2K4N",
+  "siteId": "site_01HZX8K3Q9EF",
+  "items": [
+    {
+      "kind": "set",
+      "nodeId": "entry_01HZX8K3Q9WX",
+      "nodeKind": "contentEntry",
+      "target": {
+        "rev": 7,
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "kind": "set",
+      "nodeId": "entry_01HZX8K3Q9WY",
+      "nodeKind": "contentEntry",
+      "target": {
+        "rev": 3,
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "base": {
+        "rev": 2,
+        "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "when": {
+    "kind": "at",
+    "at": "2026-11-02T06:07:00Z",
+    "timeZone": "Europe/Istanbul"
+  },
+  "state": "draft",
+  "hash": "rl1:1111111111111111111111111111111111111111111111111111111111111111",
+  "createdBy": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9DK",
+    "name": "Desk"
+  },
+  "createdAt": "2026-10-30T14:10:00Z",
+  "updatedAt": "2026-10-30T14:10:00Z",
+  "rev": 0,
+  "title": "Monday newsletter set"
+}

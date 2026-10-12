@@ -57,6 +57,7 @@
     "author": { "$ref": "common.schema.json#/$defs/Actor" },
     "coverImage": { "$ref": "common.schema.json#/$defs/ImageRef" },
     "publishedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "availability": { "$ref": "common.schema.json#/$defs/Availability" },
     "rev": { "$ref": "common.schema.json#/$defs/Revision" },
     "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
     "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },

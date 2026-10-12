@@ -47,6 +47,13 @@ export type Revision = number;
  * via the `definition` "Timestamp".
  */
 export type Timestamp = string;
+/**
+ * IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "TimeZone".
+ */
+export type TimeZone = string;
 
 /**
  * Root node of a Site Graph: one deployable website with its locales, domains, theme and page index. Pages and content entries are separate nodes referenced by id so they can be versioned and locked independently.
@@ -69,6 +76,10 @@ export interface Site {
   pageIds: Id[];
   homePageId?: Id;
   theme: ThemeRef;
+  /**
+   * The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC.
+   */
+  timeZone?: string;
   /**
    * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
    */

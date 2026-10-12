@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "aut_01HZXD4F6H8P",
+  "siteId": "site_01HZX8K3Q9EF",
+  "name": "One-off calendar proposal",
+  "job": {
+    "kind": "agent-task",
+    "keyId": "key_7Tq3VbN1",
+    "instructions": "Draft a calendar proposal for next week's posts.",
+    "modeCap": "plan",
+    "readsUntrustedText": false,
+    "windowMinutes": 15,
+    "budget": {
+      "maxToolCalls": 100,
+      "maxWrites": 50,
+      "maxApprovalRequests": 0,
+      "maxMinutes": 15
+    }
+  },
+  "recurrence": {
+    "start": "2026-10-16T08:00",
+    "timeZone": "Europe/Istanbul",
+    "preset": "once"
+  },
+  "state": "active",
+  "consecutiveFailures": 0,
+  "owner": {
+    "id": "user_01HZX8K3Q9AY",
+    "name": "Ayşe Demir"
+  },
+  "nextRunAt": "2026-10-19T06:07:00Z",
+  "createdAt": "2026-10-12T10:00:00Z",
+  "updatedAt": "2026-10-12T10:00:00Z",
+  "rev": 0
+}

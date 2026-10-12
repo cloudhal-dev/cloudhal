@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "run_01HZXE1G3J5P",
+  "siteId": "site_01HZX8K3Q9EF",
+  "subject": {
+    "kind": "automation",
+    "automationId": "aut_01HZXD4F6H8M",
+    "job": "builtin"
+  },
+  "occurrenceAt": "2027-03-28T01:07:00Z",
+  "state": "succeeded",
+  "outcome": "proposed",
+  "trigger": "cron",
+  "attempt": 1,
+  "startedAt": "2027-03-28T01:07:03Z",
+  "endedAt": "2027-03-28T01:07:09Z",
+  "latenessSeconds": 3,
+  "createdAt": "2027-03-28T01:07:03Z",
+  "updatedAt": "2027-03-28T01:07:09Z",
+  "rev": 2,
+  "adjusted": "dst-gap",
+  "counts": {
+    "broken-links": 4,
+    "proposals": 4
+  },
+  "approvalIds": ["appr_01HZXB2M4N6P8Q"]
+}

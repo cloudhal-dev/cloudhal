@@ -174,6 +174,10 @@ export const SiteSchema = {
     "theme": {
       "$ref": "#/$defs/ThemeRef"
     },
+    "timeZone": {
+      "$ref": "#/$defs/TimeZone",
+      "description": "The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."
+    },
     "publishedSnapshotId": {
       "$ref": "#/$defs/Id",
       "description": "Snapshot currently serving production. Rollback = pointing this at an older snapshot."
@@ -273,6 +277,12 @@ export const SiteSchema = {
       "type": "string",
       "description": "RFC 3339 / ISO 8601 instant in UTC.",
       "format": "date-time"
+    },
+    "TimeZone": {
+      "type": "string",
+      "description": "IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.",
+      "pattern": "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$",
+      "maxLength": 64
     }
   }
 } as const;
@@ -333,6 +343,9 @@ export const PageSchema = {
     "seo": {
       "$ref": "#/$defs/Seo"
     },
+    "availability": {
+      "$ref": "#/$defs/Availability"
+    },
     "rev": {
       "$ref": "#/$defs/Revision"
     },
@@ -347,6 +360,20 @@ export const PageSchema = {
     }
   },
   "$defs": {
+    "Availability": {
+      "type": "object",
+      "description": "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "until": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
     "Id": {
       "type": "string",
       "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
@@ -949,6 +976,9 @@ export const ContentEntrySchema = {
     "publishedAt": {
       "$ref": "#/$defs/Timestamp"
     },
+    "availability": {
+      "$ref": "#/$defs/Availability"
+    },
     "rev": {
       "$ref": "#/$defs/Revision"
     },
@@ -991,6 +1021,20 @@ export const ContentEntrySchema = {
         "agent",
         "system"
       ]
+    },
+    "Availability": {
+      "type": "object",
+      "description": "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "until": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
     },
     "Body": {
       "type": "object",
@@ -3966,6 +4010,1292 @@ export const CommentSubmissionSchema = {
   }
 } as const;
 
+export const ReleaseSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release.schema.json",
+  "title": "Release",
+  "description": "A scheduled content change set (RFC-0008): node versions pinned by id, rev and content hash, applied on top of whatever is live at the release's time. A single scheduled publish is a one-item release. Each item records the version that was live when the release was pinned (`base`); if a pinned node or its live base changed before the release runs, the release is held as a conflict instead of overwriting anything. A person's approval is bound to `hash` (`rl1:`), which digests the items only, so a person may move an approved release without re-approving it while an agent's move or any content change voids the approval. Releases live in D1 next to the graph; they are not graph nodes, never enter a snapshot and are not part of site bundles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "items",
+    "state",
+    "hash",
+    "createdBy",
+    "createdAt",
+    "updatedAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/ReleaseId"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "title": {
+      "type": "string",
+      "description": "Optional name shown in Studio (\"Election night\"). A one-item release without a title is shown under its entry's or page's title.",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"
+    },
+    "items": {
+      "type": "array",
+      "description": "The pinned changes, at most one per node. A release never contains the site node: site settings, domains and structure are published the ordinary way.",
+      "items": {
+        "$ref": "#/$defs/ReleaseItem"
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "when": {
+      "$ref": "#/$defs/ReleaseWhen"
+    },
+    "state": {
+      "$ref": "#/$defs/ReleaseState"
+    },
+    "hash": {
+      "$ref": "#/$defs/ReleaseHash"
+    },
+    "approval": {
+      "$ref": "#/$defs/ReleaseApproval"
+    },
+    "outcome": {
+      "$ref": "#/$defs/ReleaseOutcome"
+    },
+    "createdBy": {
+      "$ref": "#/$defs/Actor"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "LocalDateTime": {
+      "type": "string",
+      "description": "A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ReleaseApproval": {
+      "description": "Why the release may run, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleasePersonApproval",
+          "description": "A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "by",
+            "at"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "person"
+              ]
+            },
+            "by": {
+              "$ref": "#/$defs/ReleasePerson"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "executeAt": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "approvalId": {
+              "$ref": "#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseAutoApproval",
+          "description": "An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "by",
+            "keyId",
+            "at",
+            "windowEnds"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "auto"
+              ]
+            },
+            "by": {
+              "$ref": "#/$defs/Actor"
+            },
+            "keyId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{6,64}$"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "windowEnds": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        }
+      ]
+    },
+    "ReleaseConflict": {
+      "type": "object",
+      "description": "A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.",
+      "additionalProperties": false,
+      "required": [
+        "nodeId"
+      ],
+      "properties": {
+        "nodeId": {
+          "$ref": "#/$defs/Id"
+        },
+        "expected": {
+          "$ref": "#/$defs/ReleaseNodeVersion"
+        },
+        "found": {
+          "$ref": "#/$defs/ReleaseNodeVersion"
+        }
+      }
+    },
+    "ReleaseHash": {
+      "type": "string",
+      "description": "`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.",
+      "pattern": "^rl1:[0-9a-f]{64}$"
+    },
+    "ReleaseId": {
+      "type": "string",
+      "description": "A release id: `rel_` and 6 to 32 letters or digits.",
+      "pattern": "^rel_[A-Za-z0-9]{6,32}$"
+    },
+    "ReleaseItem": {
+      "description": "One pinned change, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseSetItem",
+          "description": "Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "nodeId",
+            "nodeKind",
+            "target"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "set"
+              ]
+            },
+            "nodeId": {
+              "$ref": "#/$defs/Id"
+            },
+            "nodeKind": {
+              "$ref": "#/$defs/ReleaseNodeKind"
+            },
+            "target": {
+              "$ref": "#/$defs/ReleaseNodeVersion"
+            },
+            "base": {
+              "$ref": "#/$defs/ReleaseNodeVersion"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseRemoveItem",
+          "description": "Take the node out of the live snapshot. `base` is the live version that is removed.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "nodeId",
+            "nodeKind",
+            "base"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "remove"
+              ]
+            },
+            "nodeId": {
+              "$ref": "#/$defs/Id"
+            },
+            "nodeKind": {
+              "$ref": "#/$defs/ReleaseNodeKind"
+            },
+            "base": {
+              "$ref": "#/$defs/ReleaseNodeVersion"
+            }
+          }
+        }
+      ]
+    },
+    "ReleaseNodeKind": {
+      "type": "string",
+      "description": "Kinds of graph node a release may carry. The site node is never one of them.",
+      "enum": [
+        "page",
+        "contentEntry",
+        "taxonomy",
+        "term",
+        "redirect",
+        "menu",
+        "asset"
+      ]
+    },
+    "ReleaseNodeVersion": {
+      "type": "object",
+      "description": "One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.",
+      "additionalProperties": false,
+      "required": [
+        "rev",
+        "hash"
+      ],
+      "properties": {
+        "rev": {
+          "$ref": "#/$defs/Revision"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ReleaseOutcome": {
+      "description": "What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleasePublishedOutcome",
+          "description": "Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "runId",
+            "at",
+            "snapshotId",
+            "baseSnapshotId",
+            "latenessSeconds",
+            "purge"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "published"
+              ]
+            },
+            "runId": {
+              "$ref": "#/$defs/Id"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "snapshotId": {
+              "$ref": "#/$defs/Id"
+            },
+            "baseSnapshotId": {
+              "$ref": "#/$defs/Id"
+            },
+            "latenessSeconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "purge": {
+              "type": "string",
+              "enum": [
+                "tags",
+                "everything",
+                "deferred",
+                "failed",
+                "none"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseConflictOutcome",
+          "description": "Held: these nodes changed since the release was pinned. Nothing was published.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "conflicts"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "conflict"
+              ]
+            },
+            "runId": {
+              "$ref": "#/$defs/Id"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ReleaseConflict"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseFailedOutcome",
+          "description": "Refused at run time; nothing was published.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "code"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "failed"
+              ]
+            },
+            "runId": {
+              "$ref": "#/$defs/Id"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "code": {
+              "type": "string",
+              "enum": [
+                "dependency_missing",
+                "invalid_snapshot",
+                "site_missing",
+                "node_body_missing",
+                "store_error"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 500,
+              "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseMissedOutcome",
+          "description": "The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "latenessSeconds"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "missed"
+              ]
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "latenessSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseExpiredOutcome",
+          "description": "No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "expired"
+              ]
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "unapproved",
+                "approval_lost",
+                "auto_window_ended",
+                "creator_removed"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseCanceledOutcome",
+          "description": "Withdrawn by a person or an agent; its nodes are unlocked.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "by"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "canceled"
+              ]
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "by": {
+              "$ref": "#/$defs/Actor"
+            }
+          }
+        }
+      ]
+    },
+    "ReleasePerson": {
+      "type": "object",
+      "description": "A staff person (`user_…`). Agents never appear here.",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^user_[A-Za-z0-9]{6,32}$"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ReleaseState": {
+      "type": "string",
+      "description": "Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.",
+      "enum": [
+        "draft",
+        "awaiting_approval",
+        "scheduled",
+        "running",
+        "published",
+        "conflict",
+        "missed",
+        "expired",
+        "failed",
+        "canceled"
+      ]
+    },
+    "ReleaseWhen": {
+      "description": "When the release runs, discriminated by `kind`. Absent while a draft has no time yet.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseAt",
+          "description": "At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "at",
+            "timeZone"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "at"
+              ]
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            },
+            "timeZone": {
+              "$ref": "#/$defs/TimeZone"
+            },
+            "localTime": {
+              "$ref": "#/$defs/LocalDateTime"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseOnApproval",
+          "description": "As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "on-approval"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    },
+    "TimeZone": {
+      "type": "string",
+      "description": "IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.",
+      "pattern": "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$",
+      "maxLength": 64
+    }
+  }
+} as const;
+
+export const AutomationSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/automation.schema.json",
+  "title": "Automation",
+  "description": "A recurring job on a site (RFC-0008), created by a person in Studio: either a built-in deterministic job that Cloudhal runs itself (reports, findings and notifications; it never publishes), or a scheduled agent task that an external agent picks up over MCP with the automation's own key, inside a run window, under a mode cap and budgets. No language model runs inside Cloudhal. Scheduling never grants rights: every call of a task runs with the key's scopes narrowed to its owner's current role. Automations live in D1 next to the graph; they are not graph nodes and are not part of site bundles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "name",
+    "job",
+    "recurrence",
+    "state",
+    "consecutiveFailures",
+    "owner",
+    "createdAt",
+    "updatedAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/AutomationId"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"
+    },
+    "job": {
+      "$ref": "#/$defs/AutomationJob"
+    },
+    "recurrence": {
+      "$ref": "#/$defs/AutomationRecurrence"
+    },
+    "state": {
+      "$ref": "#/$defs/AutomationState"
+    },
+    "pausedReason": {
+      "type": "string",
+      "description": "Why the automation is not `active`: a person paused it; its agent paused it; three consecutive failures; a run exceeded its budget; the site's kill switch; its key was revoked; its owner left or no longer holds the scopes it needs.",
+      "enum": [
+        "person",
+        "agent",
+        "failures",
+        "budget",
+        "kill-switch",
+        "key-revoked",
+        "owner-removed",
+        "role-changed"
+      ]
+    },
+    "consecutiveFailures": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "owner": {
+      "$ref": "#/$defs/AutomationOwner"
+    },
+    "nextRunAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "$defs": {
+    "AutomationBudget": {
+      "type": "object",
+      "description": "Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.",
+      "additionalProperties": false,
+      "required": [
+        "maxToolCalls",
+        "maxWrites",
+        "maxApprovalRequests",
+        "maxMinutes"
+      ],
+      "properties": {
+        "maxToolCalls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "maxWrites": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "maxApprovalRequests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "maxMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 240
+        }
+      }
+    },
+    "AutomationId": {
+      "type": "string",
+      "description": "An automation id: `aut_` and 6 to 32 letters or digits.",
+      "pattern": "^aut_[A-Za-z0-9]{6,32}$"
+    },
+    "AutomationJob": {
+      "description": "What runs, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "BuiltinAutomationJob",
+          "description": "A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "builtin"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "builtin"
+              ]
+            },
+            "builtin": {
+              "type": "string",
+              "enum": [
+                "broken-links",
+                "stale-content",
+                "feed-check",
+                "weekly-digest",
+                "cleanup"
+              ]
+            },
+            "staleAfterDays": {
+              "type": "integer",
+              "description": "`stale-content` only: entries not updated for this many days are listed for review.",
+              "minimum": 30,
+              "maximum": 1095
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "AgentTaskAutomationJob",
+          "description": "A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "keyId",
+            "instructions",
+            "modeCap",
+            "readsUntrustedText",
+            "windowMinutes",
+            "budget"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "agent-task"
+              ]
+            },
+            "keyId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{6,64}$"
+            },
+            "instructions": {
+              "type": "string",
+              "description": "What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"
+            },
+            "skill": {
+              "type": "string",
+              "description": "A skill the run declares (its scopes and approval list narrow the run further).",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "maxLength": 64
+            },
+            "modeCap": {
+              "type": "string",
+              "description": "The most autonomous mode a run may use; never `bypass`.",
+              "enum": [
+                "plan",
+                "manual",
+                "edits",
+                "auto"
+              ]
+            },
+            "readsUntrustedText": {
+              "type": "boolean"
+            },
+            "windowMinutes": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 240
+            },
+            "budget": {
+              "$ref": "#/$defs/AutomationBudget"
+            }
+          }
+        }
+      ]
+    },
+    "AutomationOwner": {
+      "type": "object",
+      "description": "The person who created the automation and owns its key (`user_…`). Agents never own automations.",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^user_[A-Za-z0-9]{6,32}$"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "AutomationRecurrence": {
+      "type": "object",
+      "description": "When the automation runs: the first occurrence as a wall-clock time in `timeZone`, repeated by `rule` (absent: once). Occurrences are computed in the zone, so \"Mondays 09:07\" stays 09:07 across daylight-saving changes; a time that does not exist on a given day (a spring-forward gap) runs at the next valid minute, and a time that occurs twice runs once, at the first (a documented deviation from RFC 5545 §3.3.10, which drops such occurrences). `preset` records which Studio choice produced the rule.",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "timeZone",
+        "preset"
+      ],
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/LocalDateTime"
+        },
+        "timeZone": {
+          "$ref": "#/$defs/TimeZone"
+        },
+        "rule": {
+          "$ref": "#/$defs/AutomationRule"
+        },
+        "preset": {
+          "type": "string",
+          "enum": [
+            "once",
+            "hourly",
+            "daily",
+            "weekdays",
+            "weekly",
+            "monthly",
+            "custom"
+          ]
+        }
+      }
+    },
+    "AutomationRule": {
+      "type": "string",
+      "description": "The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.",
+      "maxLength": 300,
+      "pattern": "^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"
+    },
+    "AutomationState": {
+      "type": "string",
+      "description": "`active` runs on its recurrence; `paused` and `auto-paused` (by failures or a budget) wait for a person to resume; `broken` needs a person to repair it (key revoked, owner gone); `ended` reached its COUNT or UNTIL.",
+      "enum": [
+        "active",
+        "paused",
+        "auto-paused",
+        "broken",
+        "ended"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "LocalDateTime": {
+      "type": "string",
+      "description": "A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    },
+    "TimeZone": {
+      "type": "string",
+      "description": "IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.",
+      "pattern": "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$",
+      "maxLength": 64
+    }
+  }
+} as const;
+
+export const ScheduleRunSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/schedule-run.schema.json",
+  "title": "ScheduleRun",
+  "description": "One occurrence of something scheduled (RFC-0008): a release's execution or an automation's run. Its id is derived from the subject and `occurrenceAt`, so a second scheduler tick that reaches the same occurrence finds the same row and the effect happens at most once. `state` says whether the run itself completed; `outcome` says whether it did any work, because a run that ended cleanly may still have done nothing. Runs live in D1 and are kept 90 days; the audit log keeps what each call did.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "subject",
+    "occurrenceAt",
+    "state",
+    "attempt",
+    "createdAt",
+    "updatedAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/ScheduleRunId"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "subject": {
+      "$ref": "#/$defs/ScheduleRunSubject"
+    },
+    "occurrenceAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "state": {
+      "$ref": "#/$defs/ScheduleRunState"
+    },
+    "outcome": {
+      "type": "string",
+      "description": "What the run achieved, separately from whether it completed: `did-work` changed something or produced findings; `nothing-to-do`; `proposed` left drafts or proposals for people; `waiting-approval` filed requests a person must decide.",
+      "enum": [
+        "did-work",
+        "nothing-to-do",
+        "proposed",
+        "waiting-approval"
+      ]
+    },
+    "trigger": {
+      "type": "string",
+      "description": "What woke the scheduler: the every-minute cron trigger, the Durable Object clock's alarm, an admin request (backstop), the Node timer, or a person (\"Run now\", \"Publish now\").",
+      "enum": [
+        "cron",
+        "alarm",
+        "request",
+        "node",
+        "manual"
+      ]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "startedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "endedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "latenessSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "adjusted": {
+      "type": "string",
+      "description": "The occurrence was moved: `dst-gap` (the wall-clock time did not exist that day, so it ran at the next valid minute) or `tzdata` (the zone's rules changed after it was planned).",
+      "enum": [
+        "dst-gap",
+        "tzdata"
+      ]
+    },
+    "window": {
+      "$ref": "#/$defs/ScheduleRunWindow"
+    },
+    "usage": {
+      "$ref": "#/$defs/ScheduleRunUsage"
+    },
+    "taint": {
+      "$ref": "#/$defs/ScheduleRunTaint"
+    },
+    "summary": {
+      "type": "string",
+      "description": "The agent's own account of the run (`end_run`) or the built-in job's report line. Plain text written by an agent: Studio renders it as text and never as an instruction.",
+      "maxLength": 2000,
+      "pattern": "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+    },
+    "counts": {
+      "type": "object",
+      "description": "Findings by name (e.g. `broken-links`, `stale-entries`, `proposals`).",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,40}$"
+      },
+      "maxProperties": 20,
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "approvalIds": {
+      "type": "array",
+      "description": "Approval requests the run filed.",
+      "items": {
+        "$ref": "#/$defs/Id"
+      },
+      "uniqueItems": true,
+      "maxItems": 50
+    },
+    "error": {
+      "$ref": "#/$defs/ScheduleRunError"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    }
+  },
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "ScheduleRunError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+        }
+      }
+    },
+    "ScheduleRunId": {
+      "type": "string",
+      "description": "A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).",
+      "pattern": "^run_[A-Za-z0-9]{6,32}$"
+    },
+    "ScheduleRunState": {
+      "type": "string",
+      "description": "`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.",
+      "enum": [
+        "due",
+        "ready",
+        "running",
+        "succeeded",
+        "failed",
+        "missed",
+        "skipped",
+        "budget-exceeded",
+        "killed"
+      ]
+    },
+    "ScheduleRunSubject": {
+      "description": "What ran, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseRunSubject",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "releaseId"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "release"
+              ]
+            },
+            "releaseId": {
+              "type": "string",
+              "pattern": "^rel_[A-Za-z0-9]{6,32}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "AutomationRunSubject",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "automationId",
+            "job"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "automation"
+              ]
+            },
+            "automationId": {
+              "type": "string",
+              "pattern": "^aut_[A-Za-z0-9]{6,32}$"
+            },
+            "job": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "agent-task"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ScheduleRunTaint": {
+      "type": "object",
+      "description": "The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.",
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "tool"
+      ],
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      }
+    },
+    "ScheduleRunUsage": {
+      "type": "object",
+      "description": "What the run used against its budget, counted by the server.",
+      "additionalProperties": false,
+      "required": [
+        "toolCalls",
+        "writes",
+        "approvalRequests"
+      ],
+      "properties": {
+        "toolCalls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "writes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "approvalRequests": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ScheduleRunWindow": {
+      "type": "object",
+      "description": "An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.",
+      "additionalProperties": false,
+      "required": [
+        "opensAt",
+        "closesAt"
+      ],
+      "properties": {
+        "opensAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "closesAt": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -3983,4 +5313,7 @@ export const schemas = {
   "analytics-beacon": AnalyticsBeaconSchema,
   "comment": CommentSchema,
   "comment-submission": CommentSubmissionSchema,
+  "release": ReleaseSchema,
+  "automation": AutomationSchema,
+  "schedule-run": ScheduleRunSchema,
 } as const;

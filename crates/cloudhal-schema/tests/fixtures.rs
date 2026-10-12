@@ -145,3 +145,15 @@ fn comment() {
 fn comment_submission() {
     check::<cloudhal_schema::CommentSubmission>("comment-submission");
 }
+#[test]
+fn release() {
+    check::<cloudhal_schema::Release>("release");
+}
+#[test]
+fn automation() {
+    check::<cloudhal_schema::Automation>("automation");
+}
+#[test]
+fn schedule_run() {
+    check::<cloudhal_schema::ScheduleRun>("schedule-run");
+}

@@ -36,6 +36,7 @@
       "items": { "$ref": "section.schema.json" }
     },
     "seo": { "$ref": "common.schema.json#/$defs/Seo" },
+    "availability": { "$ref": "common.schema.json#/$defs/Availability" },
     "rev": { "$ref": "common.schema.json#/$defs/Revision" },
     "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
     "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },

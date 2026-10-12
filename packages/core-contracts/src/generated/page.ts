@@ -48,19 +48,19 @@ export type Section = HeroSection | RichTextSection | ImageSection | ContentList
  */
 export type Slug = string;
 /**
- * Monotonic per-node revision used for optimistic locking (compare-and-swap on write).
- *
- * This interface was referenced by `Page`'s JSON-Schema
- * via the `definition` "Revision".
- */
-export type Revision = number;
-/**
  * RFC 3339 / ISO 8601 instant in UTC.
  *
  * This interface was referenced by `Page`'s JSON-Schema
  * via the `definition` "Timestamp".
  */
 export type Timestamp = string;
+/**
+ * Monotonic per-node revision used for optimistic locking (compare-and-swap on write).
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Revision".
+ */
+export type Revision = number;
 
 /**
  * A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.
@@ -78,6 +78,7 @@ export interface Page {
   status: PublishStatus;
   sections: Section[];
   seo?: Seo;
+  availability?: Availability;
   rev: Revision;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -154,6 +155,16 @@ export interface Seo {
   noindex?: boolean;
   canonical?: string;
   ogImage?: ImageRef;
+}
+/**
+ * Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Availability".
+ */
+export interface Availability {
+  from?: Timestamp;
+  until?: Timestamp;
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

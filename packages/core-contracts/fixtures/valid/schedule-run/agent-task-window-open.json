@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "run_01HZXE1G3J5L",
+  "siteId": "site_01HZX8K3Q9EF",
+  "subject": {
+    "kind": "automation",
+    "automationId": "aut_01HZXD4F6H8K",
+    "job": "agent-task"
+  },
+  "occurrenceAt": "2026-10-12T11:23:00Z",
+  "state": "ready",
+  "trigger": "alarm",
+  "attempt": 1,
+  "latenessSeconds": 2,
+  "createdAt": "2026-10-12T11:23:02Z",
+  "updatedAt": "2026-10-12T11:23:02Z",
+  "rev": 0,
+  "window": {
+    "opensAt": "2026-10-12T11:23:00Z",
+    "closesAt": "2026-10-12T11:38:00Z"
+  }
+}

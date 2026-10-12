@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "aut_01HZXD4F6H8Q",
+  "siteId": "site_01HZX8K3Q9EF",
+  "name": "Weekday feed check",
+  "job": {
+    "kind": "builtin",
+    "builtin": "feed-check"
+  },
+  "recurrence": {
+    "start": "2026-10-13T07:43",
+    "timeZone": "America/New_York",
+    "rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=7;BYMINUTE=43;UNTIL=20271231T235900Z",
+    "preset": "weekdays"
+  },
+  "state": "active",
+  "consecutiveFailures": 0,
+  "owner": {
+    "id": "user_01HZX8K3Q9AY",
+    "name": "Ayşe Demir"
+  },
+  "nextRunAt": "2026-10-19T06:07:00Z",
+  "createdAt": "2026-10-12T10:00:00Z",
+  "updatedAt": "2026-10-12T10:00:00Z",
+  "rev": 0
+}

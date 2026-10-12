@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "run_01HZXE1G3J5M",
+  "siteId": "site_01HZX8K3Q9EF",
+  "subject": {
+    "kind": "automation",
+    "automationId": "aut_01HZXD4F6H8K",
+    "job": "agent-task"
+  },
+  "occurrenceAt": "2026-10-12T12:23:00Z",
+  "state": "budget-exceeded",
+  "outcome": "did-work",
+  "trigger": "cron",
+  "attempt": 1,
+  "startedAt": "2026-10-12T12:24:10Z",
+  "endedAt": "2026-10-12T12:31:00Z",
+  "latenessSeconds": 4,
+  "createdAt": "2026-10-12T12:23:04Z",
+  "updatedAt": "2026-10-12T12:31:00Z",
+  "rev": 5,
+  "window": {
+    "opensAt": "2026-10-12T12:23:00Z",
+    "closesAt": "2026-10-12T12:38:00Z"
+  },
+  "usage": {
+    "toolCalls": 100,
+    "writes": 12,
+    "approvalRequests": 0
+  },
+  "taint": {
+    "at": "2026-10-12T12:24:15Z",
+    "tool": "list_comments"
+  },
+  "summary": "Labelled 31 comments, hid 12 as spam; stopped at the tool-call budget.",
+  "counts": {
+    "labelled": 31,
+    "hidden": 12
+  },
+  "error": {
+    "code": "budget_exceeded",
+    "message": "maxToolCalls (100) reached"
+  }
+}

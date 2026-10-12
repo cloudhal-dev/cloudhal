@@ -106,6 +106,27 @@
       "type": "string",
       "description": "Editorial lifecycle of a page or content entry.",
       "enum": ["draft", "review", "published", "archived"]
+    },
+    "TimeZone": {
+      "type": "string",
+      "description": "IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.",
+      "pattern": "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$",
+      "maxLength": 64
+    },
+    "LocalDateTime": {
+      "type": "string",
+      "description": "A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "Availability": {
+      "type": "object",
+      "description": "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "from": { "$ref": "#/$defs/Timestamp" },
+        "until": { "$ref": "#/$defs/Timestamp" }
+      }
     }
   }
 }

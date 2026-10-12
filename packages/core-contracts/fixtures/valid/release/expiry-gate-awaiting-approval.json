@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "rel_01HZXA7Q2K4P",
+  "siteId": "site_01HZX8K3Q9EF",
+  "items": [
+    {
+      "kind": "set",
+      "nodeId": "page_01HZX8K3Q9EV",
+      "nodeKind": "page",
+      "target": {
+        "rev": 12,
+        "hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "base": {
+        "rev": 11,
+        "hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    }
+  ],
+  "when": {
+    "kind": "on-approval"
+  },
+  "state": "awaiting_approval",
+  "hash": "rl1:1111111111111111111111111111111111111111111111111111111111111111",
+  "createdBy": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9DK",
+    "name": "Desk"
+  },
+  "createdAt": "2026-10-30T14:10:00Z",
+  "updatedAt": "2026-10-30T14:12:00Z",
+  "rev": 1,
+  "metadata": {
+    "cloudhal.purpose": "expiry"
+  }
+}
