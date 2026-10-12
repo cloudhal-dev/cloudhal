@@ -161,7 +161,7 @@ On Cloudflare the hourly job is the admin Worker's cron trigger. If your account
 
 ### Requests from commenters (access, erasure)
 
-People with `commenters:data` find a commenter by email or from any of their comments (Commenter view; REST `GET /api/sites/:siteId/commenters?email=…` or `?commentId=…`).
+People with `commenters:data` find a commenter by email or from any of their comments (Commenter view; REST `POST /api/sites/:siteId/commenters/lookup` with `{"email": …}` or `{"commentId": …}` as JSON, so an address never appears in a URL or a request log).
 - **Export their data** (GDPR Art. 15 and 20): their email and their comments as JSON (`POST …/commenters/:commenterId/export`).
 - **Erase** (GDPR Art. 17), with a required reason:
   - *Anonymise* (the default): every comment by that person shows "Anonymous", their email row is deleted, and their hashed addresses and proof-of-work ids are cleared. The text stays.

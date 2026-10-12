@@ -208,9 +208,9 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       for (const role of ["author", "editor", "administrator", "owner"])
         expect((await call(CM(), role)).status, role).toBe(200);
       // commenter data is for Editors and above
-      expect((await call(`${S()}/commenters?commentId=cmt_abcdef123456`, "author")).status).toBe(
-        403,
-      );
+      const lookup = { method: "POST", body: { commentId: "cmt_abcdef123456" } };
+      expect((await call(`${S()}/commenters/lookup`, "author", lookup)).status).toBe(403);
+      expect((await call(`${S()}/commenters/lookup`, "agent", lookup)).status).toBe(403);
       expect((await call(`${CM()}/export`, "author")).status).toBe(403);
     });
 
@@ -476,12 +476,21 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
 
     it("commenters: emails only with commenters:data; erasure anonymises, is audited and purged", async () => {
       const a = await approved("Mine", { email: "Reader@Example.com", name: "Ayla" });
-      const found = await call(`${S()}/commenters?email=reader@example.com`);
+      // the lookup is a POST: an email address never goes in a URL (request logs keep URLs)
+      const lookup = (body: Json, who = "editor") =>
+        call(`${S()}/commenters/lookup`, who, { method: "POST", body });
+      const found = await lookup({ email: "reader@example.com" });
       const who = found.body.commenter as Json;
       expect(who).toMatchObject({ email: "reader@example.com", commentIds: [a.id] });
-      expect((await call(`${S()}/commenters?commentId=${a.id}`)).body.commenter).toMatchObject({
-        id: who.id,
-      });
+      expect((await lookup({ commentId: a.id })).body.commenter).toMatchObject({ id: who.id });
+      expect((await lookup({ email: "nobody@example.com" })).body).toEqual({ commenter: null });
+      for (const bad of [{}, { email: 1 }, { email: "a@b.c", commentId: a.id }, { q: "x" }])
+        expect((await lookup(bad)).status, JSON.stringify(bad)).toBe(400);
+      // the old query-string variant is gone (default-deny: no declared route)
+      const old = await call(`${S()}/commenters?email=reader@example.com`);
+      expect(old.status).not.toBe(200);
+      expect(old.text).not.toContain("reader@example.com");
+      expect((await lookup({ email: "reader@example.com" }, "author")).status).toBe(403);
       const detail = await call(`${S()}/commenters/${who.id}`);
       expect((detail.body.comments as Json[]).map((x) => x.id)).toEqual([a.id]);
       const exported = await call(`${S()}/commenters/${who.id}/export`, "editor", {

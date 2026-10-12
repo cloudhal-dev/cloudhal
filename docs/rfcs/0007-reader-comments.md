@@ -706,7 +706,7 @@ const CM = `${S}/comments`;
 ["DELETE", `${CM}/settings/secrets/:name`, "site:settings"],
 ["GET", `${S}/comment-threads/:nodeId`, "comments:read"],
 ["PUT", `${S}/comment-threads/:nodeId`, "comments:moderate:own"],   // rev (CAS); audited comments.thread
-["GET", `${S}/commenters`, "commenters:data"],                 // ?email= | ?commentId=
+["POST", `${S}/commenters/lookup`, "commenters:data"],         // {email} | {commentId} in the body (review 2026-10-12, item 8)
 ["GET", `${S}/commenters/:commenterId`, "commenters:data"],
 ["POST", `${S}/commenters/:commenterId/export`, "commenters:data"],
 ["POST", `${S}/commenters/:commenterId/erase`, "commenters:data"],  // {mode: anonymise | delete-text, reason}
@@ -966,7 +966,6 @@ The **daily cap is what keeps Free safe**: at the default 1,000 stored submissio
 - **Security review.** The claims of the Security section and invariants C1–C14 were checked against the code; the threat model's review of 2026-10-12 lists the findings. Fixed here: a declined local approval audited the raw arguments (draft text, notes), and retention never ran without a cron or on Node. Still open:
   - posts without JavaScript bypass Turnstile;
   - Studio's REST export and some bulk routes exceed D1 Free's per-invocation queries;
-  - the email in `GET …/commenters?email=`;
   - minor key and limiter details;
   - §11.2's "CSV and JSON exports" should read "CSV exports".
 - **Also open.** `ADDABLE_KEY_SCOPES` (`packages/api/src/auth.ts`) does not include `comments:read` yet, so Studio's one-click "Allow comments" (D2) has no route. The guide tells owners to create a new key meanwhile.
@@ -977,6 +976,7 @@ The open items of the threat model's review of 2026-10-12 (reader comments), one
 - **IP-hash retention is capped at 30 days** (review item 4). `retention.clientDataDays` accepts 1–30 (`MAX_CLIENT_DATA_DAYS`; `applySettingsInput`, so the settings route answers 400 above it). The retention plan clamps the value (`clientDataDays()`), and so does reading a stored row, so a value saved before the cap never keeps hashes longer and Studio shows what applies. §9.1's "30 days" and the notice's "up to 30 days" (§9.6) are now always true. Tests: `core.test.ts` (validation, clamped plan), the store conformance suite (refused, clamped when read) and the API suite (400).
 - **Structured content quotes reader text too** (review item 6). `agentComment` now returns every reader name, comment text and report detail as its `<reader-name>`/`<reader-text>`/`<reader-report>` block with `&`, `<` and `>` escaped (`readerBlock`), and `renderAgentComments` prints those same strings, so the two channels cannot drift apart. `list_comments`, `get_comment_thread` and `draft_comment_reply` add `untrustedNotice` (the preamble plus how the blocks are escaped) to their structured result. Reader text is charged to the 20,000-character budget once, before escaping; both channels carry it. Clients that read `text` as plain text must unescape the block's content. Tests: hostile names, texts and report details (fake tool calls, closing and pre-escaped tags, chat-template tokens) round-trip exactly and never appear raw in either channel.
 - **Approval bindings fail closed** (review item 3). A binding that throws is no longer the placeholder `"unbound"`, which two failures shared. The MCP server treats it as missing (`isBoundState` in `@cloudhal/mcp-server/comments`): it files no approval request, mints no confirmation token and matches no answer against it, and answers `state_unavailable`. `POST …/approvals/:id/approve` denies a comment request with 409 `state_changed` when its stored binding is not a computed one or when the binding cannot be recomputed as the approver, and never runs it. Tests: the MCP comment tests (a failing store at request time and at confirmation) and the API suite on SQLite and D1 (placeholder bindings, a failing store at decision time).
+- **No email in a URL** (review item 8). `GET …/commenters?email=|commentId=` is replaced by `POST /api/sites/:siteId/commenters/lookup` with `{email}` or `{commentId}` as JSON (exactly one; unknown fields are refused), declared in `ROUTE_SCOPES` as `commenters:data` (people only). The GET variant is removed, so it has no declared route. Studio's typed client keeps `api.comments.findCommenter(siteId, by)` and now posts. Tests: the route-scope table and the API suite on SQLite and D1.
 
 ### Status of rollout
 | Step | What | Status |

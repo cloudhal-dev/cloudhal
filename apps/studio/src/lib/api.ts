@@ -2000,10 +2000,12 @@ export const api = {
         `${commentsPath(siteId)}/comment-threads/${encodeURIComponent(nodeId)}`,
         { method: "PUT", ...json({ rev, ...change }) },
       ),
+    /** A POST with a JSON body, so an email address never goes in a URL (or request logs). */
     findCommenter: (siteId: string, by: { email: string } | { commentId: string }) =>
-      request<{ commenter: Commenter | null }>(
-        `${commentsPath(siteId)}/commenters${query({ ...by })}`,
-      ),
+      request<{ commenter: Commenter | null }>(`${commentsPath(siteId)}/commenters/lookup`, {
+        method: "POST",
+        ...json(by),
+      }),
     commenter: (siteId: string, commenterId: string) =>
       request<{ commenter: Commenter; comments: CommentView[] }>(
         `${commentsPath(siteId)}/commenters/${encodeURIComponent(commenterId)}`,

@@ -746,11 +746,22 @@ export const comments: Hono<Env> = new Hono<Env>()
     return c.json({ thread: await threadView(d, site.id, nodeId, entry, c.get("now")()) });
   })
   // ───────────── commenters (people with commenters:data) ─────────────
-  .get("/commenters", async (c) => {
+  // A lookup is a POST with a JSON body so an email address never sits in a URL, where request
+  // logs keep it (threat-model review of 2026-10-12, item 8). There is no GET variant.
+  .post("/commenters/lookup", async (c) => {
     const d = deps(c);
     const site = await requireSite(c);
-    const email = c.req.query("email");
-    const commentId = c.req.query("commentId");
+    person(c);
+    const b = await body(c);
+    for (const k of Object.keys(b))
+      if (k !== "email" && k !== "commentId") throw badRequest(`unknown field "${k}"`);
+    const email = b.email;
+    const commentId = b.commentId;
+    if (email !== undefined && typeof email !== "string") throw badRequest("email is a string");
+    if (commentId !== undefined && typeof commentId !== "string")
+      throw badRequest("commentId is a string");
+    if (email !== undefined && commentId !== undefined)
+      throw badRequest("give email or commentId, not both");
     let id: string | null = null;
     if (email) {
       const keys = keysOf(d);
