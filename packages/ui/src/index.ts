@@ -30,6 +30,11 @@ export {
 } from "./blocks/AnalyticsRangePicker.tsx";
 export { ApprovalDialog, type ApprovalDialogProps } from "./blocks/ApprovalDialog.tsx";
 export {
+  ArticleCommentsSummary,
+  type ArticleCommentsSummaryLabels,
+  type ArticleCommentsSummaryProps,
+} from "./blocks/ArticleCommentsSummary.tsx";
+export {
   ActorBadge,
   type ActorBadgeProps,
   type AuditActorKind,
@@ -77,12 +82,108 @@ export {
   type BreakdownTableProps,
   foldBreakdown,
 } from "./blocks/Breakdown.tsx";
+export {
+  type BulkAction,
+  BulkActionBar,
+  type BulkActionBarLabels,
+  type BulkActionBarProps,
+} from "./blocks/BulkActionBar.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
+export {
+  type CommentBanSubject,
+  type CommenterBan,
+  CommenterSummary,
+  type CommenterSummaryLabels,
+  type CommenterSummaryProps,
+} from "./blocks/CommenterSummary.tsx";
+export {
+  COMMENT_DATE_FILTERS,
+  type CommentActorFilter,
+  type CommentDateFilter,
+  type CommentFilterFacet,
+  CommentFilters,
+  type CommentFiltersLabels,
+  type CommentFiltersProps,
+  type CommentFilterValue,
+  type CommentLabelFilter,
+  type CommentStatusFilter,
+  commentFilterSince,
+  DEFAULT_COMMENT_FILTERS,
+  isCommentFilterActive,
+} from "./blocks/CommentFilters.tsx";
+export {
+  type CommentEvent,
+  CommentHistory,
+  type CommentHistoryLabels,
+  type CommentHistoryProps,
+  type CommentModerationLabels,
+  StatementOfReasons,
+  type StatementOfReasonsLabels,
+  type StatementOfReasonsProps,
+} from "./blocks/CommentModeration.tsx";
+export {
+  CommentAuthor,
+  type CommentAuthorProps,
+  CommentLabelBadge,
+  type CommentLabelBadgeProps,
+  CommentLabelList,
+  type CommentLabelListProps,
+  CommentStatusBadge,
+  type CommentStatusBadgeProps,
+  CommentTime,
+  type CommentTimeProps,
+  type CommentWords,
+  UntrustedTextPanel,
+  type UntrustedTextPanelProps,
+} from "./blocks/CommentParts.tsx";
+export {
+  type CommentReport,
+  CommentReports,
+  type CommentReportsLabels,
+  type CommentReportsProps,
+} from "./blocks/CommentReports.tsx";
+export { CommentRow, type CommentRowData, type CommentRowProps } from "./blocks/CommentRow.tsx";
+export { CommentText, type CommentTextProps } from "./blocks/CommentText.tsx";
+export {
+  CommentThread,
+  type CommentThreadLabels,
+  type CommentThreadProps,
+} from "./blocks/CommentThread.tsx";
 export {
   type CalendarLabels,
   calendarLocaleProps,
   firstDayOfWeek,
 } from "./blocks/calendar-locale.ts";
+export {
+  buildCommentThread,
+  COMMENT_DISPLAY_DEPTH,
+  COMMENT_LABELS,
+  COMMENT_REASON_CODES,
+  COMMENT_REPORT_REASONS,
+  COMMENT_STATUSES,
+  COMMENT_THREAD_MODES,
+  type CommentLabelName,
+  type CommentLabelSource,
+  type CommentModerationAction,
+  type CommentReasonCode,
+  type CommentReportReason,
+  type CommentTextLine,
+  type CommentTextParagraph,
+  type CommentTextSegment,
+  type CommentThreadMode,
+  type CommentThreadNode,
+  type CommentThreadState,
+  commentAnchorId,
+  commentAuthorName,
+  commentExcerpt,
+  formatCommentDate,
+  formatCommentTime,
+  isInstructionLike,
+  linkifyCommentLine,
+  parseCommentText,
+  safeCommentHref,
+  type ThreadComment,
+} from "./blocks/comment-model.ts";
 export {
   InsetPanel,
   type InsetPanelProps,
