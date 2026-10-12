@@ -335,6 +335,9 @@ importers:
       '@cloudhal/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
+      '@cloudhal/schedules':
+        specifier: workspace:*
+        version: link:../../packages/schedules
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../../packages/storage

@@ -34,7 +34,7 @@ Studio, agents (MCP tools) and the CSV export only ever see totals. Nobody sees 
   - This is processing of personal data, even though no IP is stored. Studio says so before the switch turns on, and you should mention it in your privacy policy (the paragraph below does).
   - Switching it off deletes today's random value at once. The value is shared by every site of the deployment, so other sites in this mode may count a returning visitor twice that day.
   - Switching it on counts unique visitors from that moment; earlier days stay without them.
-  - The random value is deleted by the admin Worker's hourly job. A deployment without that job (see "Turning analytics off" and the [CLI notes](../../packages/cli/README.md#site-analytics-rfc-0006)) deletes it only when someone opens Analytics. Known gap, being fixed.
+  - The random value is deleted by the admin Worker's hourly job, which runs on the scheduler's tick: the cron trigger, or a Durable Object alarm when the account has no free cron trigger ([Schedules](schedules.md#the-scheduler)). The first salt of a new day also deletes every earlier one.
 
 ## Global Privacy Control and Do Not Track
 When a browser sends Global Privacy Control (`Sec-GPC: 1`) or Do Not Track (`DNT: 1`), the page view and the visit are still counted, because they contain nothing personal, but **no hash is ever formed**, even in the unique-visitors mode. The unique-visitor figure is therefore a lower bound. Each page view keeps only a yes/no flag that a signal was present (not which one, and no header), so Studio's "About this data" can say what share of page views carried one.

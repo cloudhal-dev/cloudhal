@@ -305,10 +305,12 @@ describe("instance and skills", () => {
       references: string[];
     }[];
     expect(skills.map((s) => s.name)).toEqual([
+      "comment-triage",
       "publish-article",
       "rollback",
       "safe-edit",
       "site-bootstrap",
+      "stale-review",
     ]);
     expect(skills.find((s) => s.name === "rollback")?.approval).toContain("rollback");
     expect(skills.find((s) => s.name === "publish-article")).toMatchObject({

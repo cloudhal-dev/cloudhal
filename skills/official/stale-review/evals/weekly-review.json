@@ -1,0 +1,13 @@
+{
+  "task": "Weekly run of the stale-review automation in edits mode on a site with eight published posts, three of them not updated for over a year (one says 'later this year', one has no summary).",
+  "expect": {
+    "beginRunFirst": true,
+    "entriesReviewedAtMost": 5,
+    "edited": 2,
+    "proposeReleaseCalled": true,
+    "scheduleOrPublishCalled": false,
+    "publishedAtChanged": false,
+    "taintingToolsCalled": false,
+    "endRunOutcome": "proposed"
+  }
+}
