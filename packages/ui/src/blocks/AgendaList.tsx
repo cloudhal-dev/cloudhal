@@ -175,7 +175,7 @@ export function AgendaList({
 
   return (
     <section className={cn("grid min-w-0", className)} aria-label={labels.list}>
-      {groups.map(({ day, entries: list }) => {
+      {groups.map(({ day, entries: list }, index) => {
         const isToday = day === today;
         const done = isToday
           ? list.filter((e) => Date.parse(e.at) < clock && scheduleLook(e) === "done")
@@ -193,13 +193,15 @@ export function AgendaList({
               className={cn(
                 "sticky z-1 border-b border-kumo-line bg-kumo-base px-5 py-2",
                 stick === "topbar" ? "top-12" : "top-0",
+                // The first heading follows the card's corners (sticky needs a card that does not clip).
+                index === 0 && "rounded-t-lg",
               )}
             >
-              <span id={headingId}>
+              <div id={headingId}>
                 <Text as="h3" bold>
                   {heading(day)}
                 </Text>
-              </span>
+              </div>
             </div>
             <ul className="m-0 grid list-none divide-y divide-kumo-hairline p-0">
               {done.length > 0 && (

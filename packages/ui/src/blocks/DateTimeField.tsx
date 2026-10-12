@@ -214,7 +214,7 @@ export function DateTimeField({
             </Popover.Content>
           </Popover>
           <InputGroup
-            className="w-auto min-w-0 flex-1 basis-40 whitespace-nowrap"
+            className="w-auto min-w-0 flex-1 basis-56 whitespace-nowrap"
             disabled={disabled}
             data-datetime-zone={timeZone}
           >
