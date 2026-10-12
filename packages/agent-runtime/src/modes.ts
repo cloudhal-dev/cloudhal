@@ -30,10 +30,20 @@ export function scopesForMode(mode: AgentMode): Scope[] {
     "preview:create",
     "analytics:read",
     "comments:read",
+    // RFC-0008 §10.1: the schedule, read-only, in every mode.
+    "schedules:read",
   ];
   if (mode === "plan") return read;
-  // `asset:upload` is part of the default agent-key scopes outside plan (RFC-0004, ADR-0018).
-  return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];
+  // `asset:upload` is part of the default agent-key scopes outside plan (RFC-0004, ADR-0018);
+  // `schedules:write` lets the agent propose and ask for releases (RFC-0008 §10.1).
+  return [
+    ...read,
+    "content:write",
+    "asset:upload",
+    "site:publish",
+    "site:rollback",
+    "schedules:write",
+  ];
 }
 
 /** Limits for an `auto`-mode publish that goes live without a person (see `isLowRiskPublish`). */
@@ -52,11 +62,14 @@ export type AutoCheckCode =
   | "structure"
   | "too-many"
   /** RFC-0004 §6.3: media that does not ride along with an article change. */
-  | "media";
+  | "media"
+  /** RFC-0008 §10.7 (D9): the release would run after the key's window (elevation end or 24 h). */
+  | "outside-window";
 
 /** The `auto`-mode check behind a publish (stored on audit rows and approvals, ADR-0015). */
 export interface AutoCheck {
-  rule: "low-risk-publish";
+  /** `low-risk-release`: the same check applied to a release's items (RFC-0008 §10.3). */
+  rule: "low-risk-publish" | "low-risk-release";
   lowRisk: boolean;
   code: AutoCheckCode;
   /** Pending changes the publish would carry (added + edited + removed). */
@@ -72,6 +85,8 @@ const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
   structure: () => "it changes pages, menus, site settings, taxonomies or redirects",
   "too-many": (c) => `it changes more than ${c.limit} articles`,
   media: () => "it adds or changes media that is not part of an article change",
+  "outside-window": () =>
+    "it would run after your autonomy ends (the elevation's end, or 24 hours from now)",
 };
 
 /** English wording of a check, for agents and audit reasons. */
@@ -193,4 +208,58 @@ export function minutesLeft(until: string, now: Date): number {
 export function endsSoon(until: string, now: Date): boolean {
   const left = minutesLeft(until, now);
   return left > 0 && left <= ELEVATION_NOTICE_MINUTES;
+}
+
+/** The longest an `auto`-mode release may wait without a person (RFC-0008 §10.7, D9). */
+export const AUTO_RELEASE_WINDOW_HOURS = 24;
+
+/** A release item as the low-risk check sees it (RFC-0008 §10.3). */
+export interface ReleaseItemRisk {
+  kind: "set" | "remove";
+  nodeId: string;
+  nodeKind: string;
+  /** The node is live today (the item has a base). */
+  live: boolean;
+  /** Ids the target references (assets that ride with an article). */
+  deps?: readonly string[];
+}
+
+/**
+ * `checkAutoPublish` applied to a release (RFC-0008 §10.3): articles only, nothing removed, at most
+ * `AUTO_PUBLISH_LIMIT` changes; a new asset rides along when an article item of the same release
+ * references it.
+ */
+export function checkAutoRelease(items: readonly ReleaseItemRisk[]): AutoCheck {
+  const riding = new Set<string>();
+  for (const i of items)
+    if (i.kind === "set" && i.nodeKind === "contentEntry")
+      for (const d of i.deps ?? []) riding.add(d);
+  const ref = (i: ReleaseItemRisk) => ({ id: i.nodeId, kind: i.nodeKind });
+  const set = items.filter((i) => i.kind === "set");
+  const check = checkAutoPublish(
+    {
+      added: set.filter((i) => !i.live).map(ref),
+      changed: set.filter((i) => i.live).map((i) => ({ after: ref(i) })),
+      removed: items.filter((i) => i.kind === "remove").map(ref),
+    },
+    {
+      ridingAssets: new Set(
+        set
+          .filter((i) => i.nodeKind === "asset" && !i.live && riding.has(i.nodeId))
+          .map((i) => i.nodeId),
+      ),
+    },
+  );
+  return { ...check, rule: "low-risk-release" };
+}
+
+/**
+ * The latest an `auto`-mode release may run and still go ahead without a person (RFC-0008 §10.7,
+ * D9): the end of the key's elevation (when `auto` comes from one) or 24 hours from now, whichever
+ * comes first.
+ */
+export function autoReleaseWindowEnds(now: Date, elevationUntil?: string): string {
+  const day = now.getTime() + AUTO_RELEASE_WINDOW_HOURS * 3_600_000;
+  const until = elevationUntil ? Date.parse(elevationUntil) : Number.NaN;
+  return new Date(Number.isFinite(until) ? Math.min(day, until) : day).toISOString();
 }

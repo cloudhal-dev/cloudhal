@@ -36,6 +36,10 @@ export interface Approval {
   decidedAt?: string | undefined;
   decidedBy?: string | undefined;
   consumedAt?: string | undefined;
+  /** RFC-0008 §10.4: the release a release tool's request is for (`approvals.release_id`). */
+  releaseId?: string | undefined;
+  /** RFC-0008 §11.2: the automation run the request was filed in (`approvals.run_id`). */
+  runId?: string | undefined;
 }
 
 /** The elevation a person granted for an agent's request (ADR-0016). */
@@ -58,6 +62,15 @@ export interface ApprovalRequest {
   mode?: AgentMode | undefined;
   cause?: ApprovalCause | undefined;
   autoCheck?: AutoCheck | undefined;
+  /** RFC-0008 §10.4: the release this request is for. */
+  releaseId?: string | undefined;
+  /** RFC-0008 §11.2: the automation run that filed it (budgets count requests per run). */
+  runId?: string | undefined;
+  /**
+   * When the request lapses, instead of the store's TTL (RFC-0008 §10.5: a release's request stays
+   * open until the release's time).
+   */
+  expiresAt?: string | undefined;
 }
 
 export type RedeemResult =
@@ -125,9 +138,9 @@ export class ApprovalStore {
     );
     if (same) return (await this.get(same.id)) as Approval;
     const id = newApprovalId();
-    const expires = new Date(now.getTime() + this.#ttlMs).toISOString();
+    const expires = req.expiresAt ?? new Date(now.getTime() + this.#ttlMs).toISOString();
     await this.#sql.run(
-      "INSERT INTO approvals (id, site_id, tool, args_hash, input, actor_kind, actor_id, actor_name, prompt, state_hash, status, created_at, expires_at, mode, cause, auto_check) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
+      "INSERT INTO approvals (id, site_id, tool, args_hash, input, actor_kind, actor_id, actor_name, prompt, state_hash, status, created_at, expires_at, mode, cause, auto_check, release_id, run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)",
       [
         id,
         req.siteId ?? null,
@@ -144,6 +157,8 @@ export class ApprovalStore {
         req.mode ?? null,
         req.cause ?? null,
         req.autoCheck ? JSON.stringify(req.autoCheck) : null,
+        req.releaseId ?? null,
+        req.runId ?? null,
       ],
     );
     return (await this.get(id)) as Approval;
@@ -160,6 +175,8 @@ export class ApprovalStore {
       status?: ApprovalStatus;
       actorId?: string;
       tool?: string;
+      /** RFC-0008: the requests for one release. */
+      releaseId?: string;
       limit?: number;
     } = {},
   ): Promise<Approval[]> {
@@ -176,6 +193,10 @@ export class ApprovalStore {
     if (filter.tool) {
       where.push("tool = ?");
       params.push(filter.tool);
+    }
+    if (filter.releaseId) {
+      where.push("release_id = ?");
+      params.push(filter.releaseId);
     }
     if (filter.status) {
       where.push("status = ?");
@@ -221,6 +242,24 @@ export class ApprovalStore {
       denied += r.changes;
     }
     return denied;
+  }
+
+  /**
+   * Denies the pending requests for a release (RFC-0008 §10.4): it was unscheduled, canceled,
+   * re-pinned or moved, so what a person would approve no longer exists. Returns how many.
+   */
+  async closeForRelease(
+    siteId: string,
+    releaseId: string,
+    by: Actor,
+    reason: string,
+  ): Promise<number> {
+    const now = this.#now().toISOString();
+    const r = await this.#sql.run(
+      "UPDATE approvals SET status = 'denied', decided_at = ?, decided_by = ?, result = ? WHERE status = 'pending' AND site_id = ? AND release_id = ?",
+      [now, by.id, JSON.stringify({ reason }), siteId, releaseId],
+    );
+    return r.changes;
   }
 
   /**
@@ -300,6 +339,8 @@ export class ApprovalStore {
       decidedAt: (r.decided_at as string | null) ?? undefined,
       decidedBy: (r.decided_by as string | null) ?? undefined,
       consumedAt: (r.consumed_at as string | null) ?? undefined,
+      ...(r.release_id ? { releaseId: r.release_id as string } : {}),
+      ...(r.run_id ? { runId: r.run_id as string } : {}),
     };
   }
 }

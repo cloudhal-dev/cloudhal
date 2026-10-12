@@ -36,6 +36,11 @@ const EDITOR: Scope[] = [
   "comments:moderate",
   "comments:reply",
   "commenters:data",
+  // RFC-0008 §10.2: every release and gate (`releases:publish` comes with `site:publish`), and
+  // automations — an automation's key is narrowed to its owner's role on every call (ADR-0018).
+  "schedules:read",
+  "schedules:write",
+  "automations:manage",
 ];
 
 /**
@@ -43,10 +48,20 @@ const EDITOR: Scope[] = [
  * scope reaches the Owner without a migration; Administrator holds every non-wildcard scope.
  */
 export const ROLE_SCOPES: Readonly<Record<Role, readonly Scope[]>> = {
-  contributor: [...READ, "content:draft:own", "asset:upload"],
+  // RFC-0008 §10.2: Contributors read the schedule and make draft releases and requests of their
+  // own work; they approve nothing.
+  contributor: [
+    ...READ,
+    "content:draft:own",
+    "asset:upload",
+    "schedules:read",
+    "schedules:write:own",
+  ],
   // RFC-0006 §9.1: Authors and above read analytics; Contributors do not in v1.
   // RFC-0007 §10.1 (D6): Authors read comments and moderate and reply on their own entries;
   // Contributors get no comment scopes in v1.
+  // RFC-0008 §10.2: Authors schedule and approve their own releases (`releases:publish:own`
+  // comes with `site:publish:own`).
   author: [
     ...READ,
     "content:write:own",
@@ -56,6 +71,8 @@ export const ROLE_SCOPES: Readonly<Record<Role, readonly Scope[]>> = {
     "comments:read",
     "comments:moderate:own",
     "comments:reply:own",
+    "schedules:read",
+    "schedules:write:own",
   ],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
@@ -217,6 +234,15 @@ export const ABILITIES = {
   "comments.replyAny": "comments:reply",
   "commenters.data": "commenters:data",
   "comments.settings": "site:settings",
+  // RFC-0008 §10.1: the calendar; releases and gates of one's own nodes, and of anyone's;
+  // approving releases (own, any); automations; the kill switch and daily cap.
+  "schedules.read": "schedules:read",
+  "schedules.write": "schedules:write:own",
+  "schedules.writeAny": "schedules:write",
+  "releases.approve": "releases:publish:own",
+  "releases.approveAny": "releases:publish",
+  "automations.manage": "automations:manage",
+  "schedules.settings": "site:settings",
   "ownership.transfer": "owner",
 } as const satisfies Record<string, Scope | "owner">;
 
