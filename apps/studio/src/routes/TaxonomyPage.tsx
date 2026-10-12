@@ -208,6 +208,7 @@ export function TaxonomyPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.taxonomy.title") }]} />}
+      icon={<Tag size={24} />}
       title={t("pageHeaders.taxonomy.title")}
       description={t("pageHeaders.taxonomy.description")}
       actions={

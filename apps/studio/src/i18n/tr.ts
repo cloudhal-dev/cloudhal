@@ -29,6 +29,12 @@ export const tr: Messages = {
     off: "Kapalı",
     current: "Geçerli",
   },
+  theme: {
+    label: "Tema",
+    light: "Açık",
+    dark: "Koyu",
+    system: "Sistem",
+  },
   auth: {
     signInTitle: "Tekrar hoş geldin",
     signUpTitle: "Hesabını oluştur",

@@ -11,8 +11,12 @@ import type { Plugin } from "vite";
  * whether the new code can load with the screen that uses it.
  */
 export const BUNDLE_BUDGET = {
-  /** The entry chunk alone, minified bytes. */
-  entryBytes: 280_000,
+  /**
+   * The entry chunk alone, minified bytes. 287 kB on 2026-10-12 with the top bar's theme menu
+   * (light / dark / system: its Sun, Moon and Desktop icons ship every Phosphor weight, ~8.5 kB),
+   * which every screen shows (was 276 kB under a 280 kB budget).
+   */
+  entryBytes: 290_000,
   /**
    * Entry + its static imports, gzip bytes. 456 kB on 2026-10-12, once the analytics wording
    * moved to lazy message namespaces (was 466 kB under a 480 kB budget).

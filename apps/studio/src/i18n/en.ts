@@ -28,6 +28,12 @@ export const en = {
     off: "Off",
     current: "Current",
   },
+  theme: {
+    label: "Theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System",
+  },
   auth: {
     signInTitle: "Welcome back",
     signUpTitle: "Create your account",

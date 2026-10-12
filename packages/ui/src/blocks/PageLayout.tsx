@@ -15,6 +15,9 @@ import { PageHeader } from "./kumo/page-header/page-header.tsx";
 interface PageFrame {
   crumbsSlot: HTMLElement | null;
   setCrumbsSlot: (el: HTMLElement | null) => void;
+  /** The element that scrolls the page (the app shell's content column), for scrollspy and jumps. */
+  scrollRoot: HTMLElement | null;
+  setScrollRoot: (el: HTMLElement | null) => void;
 }
 
 const PageFrameContext = createContext<PageFrame | null>(null);
@@ -22,10 +25,31 @@ const PageFrameContext = createContext<PageFrame | null>(null);
 /** Wraps the app shell so pages can render their breadcrumbs into the top bar. */
 export function PageFrameProvider({ children }: { children: ReactNode }) {
   const [crumbsSlot, setSlot] = useState<HTMLElement | null>(null);
+  const [scrollRoot, setRoot] = useState<HTMLElement | null>(null);
   const setCrumbsSlot = useCallback((el: HTMLElement | null) => setSlot(el), []);
-  const value = useMemo(() => ({ crumbsSlot, setCrumbsSlot }), [crumbsSlot, setCrumbsSlot]);
+  const setScrollRoot = useCallback((el: HTMLElement | null) => setRoot(el), []);
+  const value = useMemo(
+    () => ({ crumbsSlot, setCrumbsSlot, scrollRoot, setScrollRoot }),
+    [crumbsSlot, setCrumbsSlot, scrollRoot, setScrollRoot],
+  );
   return <PageFrameContext.Provider value={value}>{children}</PageFrameContext.Provider>;
 }
+
+/**
+ * Ref callback for the element that scrolls the page — the shell's content column, which scrolls on
+ * its own while the sidebar and the top bar stay put (DESIGN.md §1).
+ */
+export function usePageScrollRootRef(): (el: HTMLElement | null) => void {
+  const frame = useContext(PageFrameContext);
+  return frame?.setScrollRoot ?? noop;
+}
+
+/** The element that scrolls the page, or `null` outside the shell (the document scrolls then). */
+export function usePageScrollRoot(): HTMLElement | null {
+  return useContext(PageFrameContext)?.scrollRoot ?? null;
+}
+
+function noop() {}
 
 /** Where the current page's `crumbs` appear: the left side of the top bar (Kumo `Breadcrumbs` are `h-12`, like the bar). */
 export function PageCrumbsSlot({ className }: { className?: string }) {

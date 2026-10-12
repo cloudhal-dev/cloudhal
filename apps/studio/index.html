@@ -5,19 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cloudhal Studio</title>
     <script>
-      // Follow the OS colour scheme before first paint; Kumo switches themes on data-mode (DESIGN.md §4).
+      // Apply the stored colour scheme (light, dark, or the OS's) before first paint; Kumo switches
+      // themes on data-mode (DESIGN.md §4). Keep the key in sync with src/lib/theme.ts.
       (() => {
+        let stored = null;
+        try {
+          stored = localStorage.getItem("cloudhal.studio.theme");
+        } catch {}
         const dark = window.matchMedia("(prefers-color-scheme: dark)");
-        const apply = () => {
-          document.documentElement.dataset.mode = dark.matches ? "dark" : "light";
-        };
-        apply();
-        dark.addEventListener("change", apply);
+        const mode = stored === "light" || stored === "dark" ? stored : dark.matches ? "dark" : "light";
+        document.documentElement.dataset.mode = mode;
+        document.documentElement.style.colorScheme = mode;
       })();
     </script>
   </head>
-  <body class="bg-kumo-canvas text-kumo-default">
-    <div id="root" class="isolate min-h-screen bg-kumo-canvas"></div>
+  <body class="overscroll-none bg-kumo-canvas text-kumo-default">
+    <div id="root" class="isolate min-h-dvh bg-kumo-canvas"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
