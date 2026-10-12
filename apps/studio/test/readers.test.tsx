@@ -4,7 +4,7 @@
  * the API, "can't read yet" without a reader, never published, no readers, and the numbers.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { OverviewAnalyticsCard, ReadersCard } from "../src/components/Readers.tsx";
 import type {
   AnalyticsFeature,
@@ -25,6 +25,16 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+// The cards load `@cloudhal/ui/charts` (ECharts) lazily on first render of numbers. Evaluate it
+// once up front so a card's lazy import resolves from the module cache instead of racing the
+// first query under machine load; the numbers are then awaited with a generous timeout.
+beforeAll(async () => {
+  await import("@cloudhal/ui/charts");
+}, 60_000);
+
+/** Waits for text that appears once the queries answered and the lazy chart blocks rendered. */
+const findLoaded = (text: string | RegExp) => screen.findByText(text, {}, { timeout: 15_000 });
 
 const FEATURE: AnalyticsFeature = {
   enabled: true,
@@ -194,7 +204,7 @@ describe("Readers card", { timeout: 45_000 }, () => {
   it("shows an article's readers, old addresses and the filtered link", async () => {
     const fetch = serve(...as("author"), status(), nodeStats(STATS()));
     render(wrap(<ReadersCard siteId="site_1" node={PUBLISHED} kind="article" />));
-    expect(await screen.findByText("1,204")).toBeInTheDocument();
+    expect(await findLoaded("1,204")).toBeInTheDocument();
     expect(screen.getByText("Readers")).toBeInTheDocument();
     expect(
       screen.getByText("Old addresses still bring readers: 42 in the last 30 days"),
@@ -210,28 +220,28 @@ describe("Readers card", { timeout: 45_000 }, () => {
     expect(first).toContain("compare=previous");
 
     fireEvent.click(screen.getByRole("tab", { name: "All time" }));
-    await waitFor(() =>
-      expect(
-        analyticsCalls(fetch).some(
-          (u) => u.includes("/nodes/entry_1") && u.includes("from=2026-03-01"),
-        ),
-      ).toBe(true),
+    await waitFor(
+      () =>
+        expect(
+          analyticsCalls(fetch).some(
+            (u) => u.includes("/nodes/entry_1") && u.includes("from=2026-03-01"),
+          ),
+        ).toBe(true),
+      { timeout: 15_000 },
     );
-    expect(
-      await screen.findByText("Old addresses still bring readers: 42 in all"),
-    ).toBeInTheDocument();
+    expect(await findLoaded("Old addresses still bring readers: 42 in all")).toBeInTheDocument();
   });
 
   it("says when part of the range could not be read", async () => {
     serve(...as("editor"), status(), nodeStats(STATS(), true));
     render(wrap(<ReadersCard siteId="site_1" node={PUBLISHED} kind="article" />));
-    expect(await screen.findByText(/numbers may be low/)).toBeInTheDocument();
+    expect(await findLoaded(/numbers may be low/)).toBeInTheDocument();
   });
 
   it("has its own state when nobody read it yet", async () => {
     serve(...as("author"), status(), nodeStats(STATS(0, 0)));
     render(wrap(<ReadersCard siteId="site_1" node={PUBLISHED} kind="article" />));
-    expect(await screen.findByText("No readers yet")).toBeInTheDocument();
+    expect(await findLoaded("No readers yet")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open in analytics" })).not.toBeInTheDocument();
   });
 
@@ -283,7 +293,7 @@ describe("Readers card", { timeout: 45_000 }, () => {
   it("speaks Turkish", async () => {
     serve(...as("author"), status(), nodeStats(STATS()));
     render(wrap(<ReadersCard siteId="site_1" node={PUBLISHED} kind="article" />, "tr"));
-    expect(await screen.findByText("1.204")).toBeInTheDocument();
+    expect(await findLoaded("1.204")).toBeInTheDocument();
     expect(screen.getByText("Okurlar")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Tümü" })).toBeInTheDocument();
     expect(
@@ -338,7 +348,7 @@ describe("Overview analytics card", { timeout: 45_000 }, () => {
   it("shows the last 7 days with the most read content", async () => {
     const fetch = serve(...as("editor"), status(), ...overview(1200));
     render(wrap(<OverviewAnalyticsCard siteId="site_1" />));
-    expect(await screen.findByText("1,200")).toBeInTheDocument();
+    expect(await findLoaded("1,200")).toBeInTheDocument();
     expect(screen.getByText("Last 7 days")).toBeInTheDocument();
     expect(screen.getByText("Ferries")).toBeInTheDocument();
     expect(screen.getByText("No longer exists")).toBeInTheDocument();
@@ -354,7 +364,7 @@ describe("Overview analytics card", { timeout: 45_000 }, () => {
   it("has an empty state before the first visit", async () => {
     serve(...as("editor"), status(), ...overview(0));
     render(wrap(<OverviewAnalyticsCard siteId="site_1" />));
-    expect(await screen.findByText("No visits yet")).toBeInTheDocument();
+    expect(await findLoaded("No visits yet")).toBeInTheDocument();
   });
 
   it("tells a Contributor why without calling the API, and is left out when off", async () => {
