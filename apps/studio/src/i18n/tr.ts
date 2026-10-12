@@ -507,6 +507,7 @@ export const tr: Messages = {
       title: "Son 7 gün",
       view: "Analitiği aç",
       figures: "Son 7 gündeki ziyaretler",
+      mostRead: "En çok okunanlar",
       topContent: "Son 7 günde en çok okunanlar",
       noVisits: "Henüz ziyaret yok",
       noVisitsHint:

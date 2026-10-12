@@ -386,16 +386,21 @@ export function OverviewAnalyticsCard({ siteId }: { siteId: string }) {
             loading={loading}
           />
         </Suspense>
-        <BreakdownMeters
-          rows={rows}
-          locale={locale}
-          limit={3}
-          total={s?.pageviews ?? 0}
-          showOther={false}
-          otherLabel={t("readers.other")}
-          label={t("readers.overview.topContent")}
-          loading={loading}
-        />
+        <div className="grid min-w-0 gap-3">
+          <Text variant="secondary" size="sm" as="h3">
+            {t("readers.overview.mostRead")}
+          </Text>
+          <BreakdownMeters
+            rows={rows}
+            locale={locale}
+            limit={3}
+            total={s?.pageviews ?? 0}
+            showOther={false}
+            otherLabel={t("readers.other")}
+            label={t("readers.overview.topContent")}
+            loading={loading}
+          />
+        </div>
       </div>
     );
   }

@@ -504,6 +504,7 @@ export const en = {
       title: "Last 7 days",
       view: "View analytics",
       figures: "Visits in the last 7 days",
+      mostRead: "Most read",
       topContent: "Most read in the last 7 days",
       noVisits: "No visits yet",
       noVisitsHint: "Numbers appear about a minute after the first visit to a published page.",
