@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppLink } from "./components/AppLink.tsx";
 import { CodeProvider } from "./components/CodeProvider.tsx";
+import { KumoLocale } from "./components/KumoLocale.tsx";
 import { reloadForNewDeploy } from "./components/RouteStates.tsx";
 import { I18nProvider } from "./i18n/index.tsx";
 import { createStudioRouter } from "./router.tsx";
@@ -23,17 +24,19 @@ const router = createStudioRouter(queryClient);
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
     <I18nProvider>
-      <QueryClientProvider client={queryClient}>
-        <LinkProvider component={AppLink}>
-          <TooltipProvider>
-            <CodeProvider>
-              <Toasty>
-                <RouterProvider router={router} />
-              </Toasty>
-            </CodeProvider>
-          </TooltipProvider>
-        </LinkProvider>
-      </QueryClientProvider>
+      <KumoLocale>
+        <QueryClientProvider client={queryClient}>
+          <LinkProvider component={AppLink}>
+            <TooltipProvider>
+              <CodeProvider>
+                <Toasty>
+                  <RouterProvider router={router} />
+                </Toasty>
+              </CodeProvider>
+            </TooltipProvider>
+          </LinkProvider>
+        </QueryClientProvider>
+      </KumoLocale>
     </I18nProvider>
   </StrictMode>,
 );
