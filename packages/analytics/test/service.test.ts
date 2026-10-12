@@ -139,7 +139,7 @@ describe("AnalyticsService", () => {
     expect(r.source).toBe("live");
   });
 
-  it("settings: CAS, changes, purge on enabled/vitals, today's salt deleted when uniques turn off", async () => {
+  it("settings: CAS, changes, purge on enabled/vitals/uniques, today's salt deleted when uniques turn off", async () => {
     const first = await service.updateSettings({
       siteId: FIXTURE_SITE,
       rev: 0,
@@ -148,8 +148,9 @@ describe("AnalyticsService", () => {
     });
     expect(first.after.rev).toBe(1);
     expect(first.changes).toEqual({ uniqueVisitors: { from: false, to: true } });
-    expect(first.purged).toBe(false);
-    expect(purged).toEqual([]);
+    // the purge also resets the Site Worker's memo of settings and salt
+    expect(first.purged).toBe(true);
+    expect(purged).toEqual([FIXTURE_SITE]);
     await getOrCreateSalt(sql, "2026-10-09");
     await getOrCreateSalt(sql, "2026-10-08");
 
@@ -161,7 +162,7 @@ describe("AnalyticsService", () => {
     });
     expect(off.saltDeleted).toBe(true);
     expect(off.purged).toBe(true);
-    expect(purged).toEqual([FIXTURE_SITE]);
+    expect(purged).toEqual([FIXTURE_SITE, FIXTURE_SITE]);
     const salts = await sql.all<{ day: string }>("SELECT day FROM analytics_salts ORDER BY day");
     expect(salts.map((s) => s.day)).toEqual(["2026-10-08"]);
 

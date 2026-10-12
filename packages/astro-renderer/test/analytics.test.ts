@@ -6,7 +6,8 @@
  * suppress the visitor hash (A3); the tag follows the setting (A5).
  */
 import { MemoryAnalytics } from "@cloudhal/analytics";
-import { putAnalyticsSettings, SqlAnalytics } from "@cloudhal/analytics/sql";
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { deleteSalt, putAnalyticsSettings, SqlAnalytics } from "@cloudhal/analytics/sql";
 import type { AnalyticsEvent, ContentEntry, Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
@@ -294,6 +295,58 @@ describe("SiteAnalytics", () => {
     expect(writer.events[0]).toHaveProperty("visitor", expect.stringMatching(/^[0-9a-f]{16}$/));
     expect(writer.events[1]).not.toHaveProperty("visitor");
     expect(writer.events[2]).not.toHaveProperty("visitor");
+  });
+
+  it("never hashes with a salt deleted by switching unique visitors off, also when it is switched on again", async () => {
+    const settings = (rev: number, uniqueVisitors: boolean) =>
+      putAnalyticsSettings(sql, {
+        siteId: site.id,
+        rev,
+        patch: { enabled: true, uniqueVisitors },
+        actorId: actor.id,
+        now: new Date(clock),
+      });
+    await settings(0, true);
+    const { a, writer } = analytics();
+    const service = new AnalyticsService({
+      sql,
+      store: "sql",
+      now: () => new Date(clock),
+      purgeSite: async () => a.reset(),
+    });
+    const visitor = () => (writer.events.at(-1) as { visitor?: string } | undefined)?.visitor;
+    await a.beacon(beacon(view("/about")));
+    const before = visitor();
+    expect(before).toMatch(/^[0-9a-f]{16}$/);
+    // off and on again the same day through the settings route: the salt is deleted, and the
+    // route's purge resets the memo, so the same visitor gets an unlinkable hash
+    await service.updateSettings({
+      siteId: site.id,
+      rev: 1,
+      patch: { uniqueVisitors: false },
+      actorId: actor.id,
+    });
+    await a.beacon(beacon(view("/about")));
+    expect(visitor()).toBeUndefined();
+    await service.updateSettings({
+      siteId: site.id,
+      rev: 2,
+      patch: { uniqueVisitors: true },
+      actorId: actor.id,
+    });
+    await a.beacon(beacon(view("/about")));
+    const after = visitor();
+    expect(after).toMatch(/^[0-9a-f]{16}$/);
+    expect(after).not.toBe(before);
+
+    // without a purge reaching this isolate, the change is seen when the settings memo expires,
+    // and the salt is read again with them
+    await deleteSalt(sql, new Date(clock).toISOString().slice(0, 10));
+    await settings(3, true);
+    clock += 60_001;
+    await a.beacon(beacon(view("/about")));
+    expect(visitor()).toMatch(/^[0-9a-f]{16}$/);
+    expect([before, after]).not.toContain(visitor());
   });
 
   it("checks vitals against the site's sampling", async () => {

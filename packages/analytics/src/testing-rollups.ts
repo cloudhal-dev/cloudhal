@@ -13,6 +13,8 @@ import { FIXTURE_EVENTS, FIXTURE_OTHER_SITE, FIXTURE_SITE, NODE_A } from "./fixt
 import type { AnalyticsQuery } from "./model.ts";
 import { OTHER_KEY, RollupReader, runRollups, writeDailyRows } from "./rollup.ts";
 import {
+  createSaltProvider,
+  deleteSalt,
   deleteSaltsBefore,
   doneRollupDays,
   getEffectiveSettings,
@@ -136,6 +138,31 @@ export function describeAnalyticsStateSuite(label: string, factory: SqlFactory):
       expect(next).toBe("c".repeat(64));
       const left = await sql.all<{ day: string }>("SELECT day FROM analytics_salts ORDER BY day");
       expect(left.map((r) => r.day)).toEqual(["2026-10-10"]);
+    });
+
+    it("the salt provider never keeps a deleted salt past its memo or a reset", async () => {
+      let t = 0;
+      const salt = createSaltProvider(sql, { now: () => t });
+      const first = await salt("2026-10-09");
+      expect(await salt("2026-10-09")).toBe(first);
+      // unique visitors switched off: the row is deleted
+      await deleteSalt(sql, "2026-10-09");
+      // a reset (the purge after a settings change) reads the row again: a new random salt
+      salt.reset();
+      const second = await salt("2026-10-09");
+      expect(second).not.toBe(first);
+      // without a reset, the memo lasts at most 60 s
+      await deleteSalt(sql, "2026-10-09");
+      t += 59_999;
+      expect(await salt("2026-10-09")).toBe(second);
+      t += 1;
+      const third = await salt("2026-10-09");
+      expect([first, second]).not.toContain(third);
+      const stored = await sql.get<{ salt: string }>(
+        "SELECT salt FROM analytics_salts WHERE day = ?",
+        ["2026-10-09"],
+      );
+      expect(stored?.salt).toBe(third);
     });
 
     it("the query budget counts to its limit and then refuses", async () => {

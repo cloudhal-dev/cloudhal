@@ -30,7 +30,11 @@ import {
   type ResolvedNode,
   SharedBeaconRateLimiter,
 } from "@cloudhal/analytics";
-import { createSaltProvider, getAnalyticsSettings } from "@cloudhal/analytics/sql";
+import {
+  createSaltProvider,
+  getAnalyticsSettings,
+  type SaltProvider,
+} from "@cloudhal/analytics/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
 import { PREVIEW_PARAM } from "./resolver.ts";
@@ -158,6 +162,7 @@ export class SiteAnalytics {
   readonly #shared: SharedBeaconRateLimiter | undefined;
   readonly #sampler: RenderEventSampler;
   readonly #salt: (day: string) => Promise<string>;
+  #saltProvider: SaltProvider | undefined;
   #settings: Memo<EffectiveAnalyticsSettings | undefined> | undefined;
   #site: Memo<Site | undefined> | undefined;
 
@@ -172,17 +177,20 @@ export class SiteAnalytics {
         })
       : undefined;
     this.#sampler = new RenderEventSampler({ now: this.#now });
-    let salt: ((day: string) => Promise<string>) | undefined;
     this.#salt = (day) => {
-      salt ??= createSaltProvider(this.#o.sql());
-      return salt(day);
+      this.#saltProvider ??= createSaltProvider(this.#o.sql(), { now: this.#now });
+      return this.#saltProvider(day);
     };
   }
 
-  /** Forget memoised settings and the pointer (a purge follows every settings change, §9.2). */
+  /**
+   * Forget memoised settings, the pointer and the day's salt (a purge follows every settings
+   * change, §9.2, including "unique visitors" on or off, which deletes the salt in D1).
+   */
   reset(): void {
     this.#settings = undefined;
     this.#site = undefined;
+    this.#saltProvider?.reset();
   }
 
   /** True when the deployment collects at all (switch on and a store bound). */
@@ -202,6 +210,7 @@ export class SiteAnalytics {
   async settings(): Promise<EffectiveAnalyticsSettings | undefined> {
     const defaults = this.#o.defaults;
     if (!defaults || !this.#o.writer) return undefined;
+    const before = this.#settings;
     this.#settings = this.#memo(this.#settings, async () =>
       effectiveSettings(
         this.#o.siteId,
@@ -209,6 +218,10 @@ export class SiteAnalytics {
         defaults,
       ),
     );
+    // The salt is never older than the settings it is used with: whenever they are read again
+    // (every 60 s, or after a reset), the salt's row is read again too, so a salt deleted by
+    // switching unique visitors off is not used once this isolate sees the change.
+    if (this.#settings !== before) this.#saltProvider?.reset();
     try {
       const s = await this.#settings.value;
       return s?.enabled ? s : undefined;

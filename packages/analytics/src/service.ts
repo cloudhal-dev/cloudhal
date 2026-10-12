@@ -119,7 +119,7 @@ export interface UpdateSettingsResult {
   readonly after: AnalyticsSettings;
   /** Today's salt was deleted (unique visitors turned off). */
   readonly saltDeleted: boolean;
-  /** The site's cache was purged (enabled or vitals sampling changed); `false` when it failed. */
+  /** The site's cache was purged (enabled, vitals sampling or unique visitors changed); `false` when it failed. */
   readonly purged: boolean;
   /** What changed, `{field: {from, to}}` (the audit row). */
   readonly changes: Readonly<Record<string, { from: unknown; to: unknown }>>;
@@ -342,7 +342,8 @@ export class AnalyticsService {
    * Writes a site's settings (CAS on `rev`). Turning unique visitors off deletes today's salt —
    * the deployment's only one, so every site's hashes start over for the rest of the UTC day
    * (RFC-0006 §6.2; see the implementation notes). Changing `enabled` or `vitalsOneIn` purges the
-   * site's cache so the script tag follows.
+   * site's cache so the script tag follows; changing `uniqueVisitors` purges too, because the purge
+   * makes the Site Worker forget its memoised settings and salt.
    */
   async updateSettings(input: UpdateSettingsInput): Promise<UpdateSettingsResult> {
     const now = this.now();
@@ -363,7 +364,9 @@ export class AnalyticsService {
       saltDeleted = true;
     }
     let purged = false;
-    if ((changes.enabled || changes.vitalsOneIn) && this.#o.purgeSite) {
+    // A purge also resets the Site Worker's memo of settings and the day's salt, so switching
+    // unique visitors on or off purges too: a salt deleted in D1 must not stay in use.
+    if ((changes.enabled || changes.vitalsOneIn || changes.uniqueVisitors) && this.#o.purgeSite) {
       try {
         await this.#o.purgeSite(input.siteId);
         purged = true;

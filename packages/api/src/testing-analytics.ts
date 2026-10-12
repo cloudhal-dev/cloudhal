@@ -322,7 +322,8 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
       expect(on.status, JSON.stringify(on.body)).toBe(200);
       expect(on.body).toMatchObject({
         settings: { uniqueVisitors: true, rev: 1, stored: true },
-        purged: false,
+        // a unique-visitors switch purges too: it resets the Site Worker's settings and salt memo
+        purged: true,
         saltDeleted: false,
       });
       await sql.run("INSERT INTO analytics_salts (day, salt, created_at) VALUES (?, ?, ?)", [
@@ -336,7 +337,7 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
 
       const off = await put("administrator", { rev: 1, uniqueVisitors: false, vitalsOneIn: 10 });
       expect(off.body).toMatchObject({ purged: true, saltDeleted: true });
-      expect(purges).toEqual([siteId]);
+      expect(purges).toEqual([siteId, siteId]);
       expect(await sql.all("SELECT * FROM analytics_salts")).toEqual([]);
 
       for (const bad of [
