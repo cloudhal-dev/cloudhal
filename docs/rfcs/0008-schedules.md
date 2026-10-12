@@ -1,8 +1,8 @@
 # RFC-0008: Schedules — releases, embargoes, scheduled publishing and automations
-- Status: Draft
+- Status: Accepted (2026-10-12, PR #15 approved by Halil with the defaults D1–D15 as drafted; ADR-0023)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-12
 - Related: ADR-0002 (storage, batch-only), ADR-0008 (precompiled validators), ADR-0011 (agent layer, policy engine), ADR-0012 (two Workers, pointer-flip publishing, Workers Cache and purge through the site Worker), ADR-0014 (approvals bound to state), ADR-0015 (agent modes), ADR-0016 (time-boxed elevation; it rejected "a scheduled job that reverts the mode"), ADR-0018 / RFC-0005 (roles, scopes, keys never exceed their creator), ADR-0020 / RFC-0004 (assets and blob GC roots), ADR-0021 / RFC-0006 (analytics: the hourly job, `CLOUDHAL_ANALYTICS_CRON=off`), ADR-0022 / RFC-0007 (comments: `cm1:` bindings, call classes, the shared purge budget, `CLOUDHAL_COMMENTS_CRON=off`), RFC-0001 (open question "a visibility/schedule field"), `docs/security/threat-model.md`, `docs/design/DESIGN.md`
-- Numbering: RFC-0007's non-goals pointed editorial notes at "RFC-0008"; schedules take this number by the owner's decision, and editorial notes take the next free one when written. RFC-0007's sentence should be updated with that RFC.
+- Numbering: RFC-0007's non-goals pointed editorial notes at "RFC-0008"; schedules take this number by the owner's decision, and editorial notes take the next free one when written. RFC-0007's sentence now points at RFC-0009.
 - Owner decisions: Halil, 2026-10-12 (§0.1). This RFC adopts them and does not reopen them. §0.2 lists the defaults this draft chose for the remaining questions; each is marked **[default]** and can change at review.
 - Background: the maintainer's three private research notes on schedules (Studio interface, infrastructure, agents; 2026-10-12). Nothing from them is copied here; the public sources they checked are listed below.
 - Sources (as checked on 2026-10-12; claims not re-verified for this draft are marked **[verify]** and collected in §2):

@@ -26,7 +26,7 @@ Cloudhal sites get first-party reader comments that work on Workers Free, on wor
 ## Non-goals
 - **No third-party script by default.** Turnstile is opt-in per site (§7.6); Disqus-style embeds are out (Alternatives).
 - **No reader accounts in the MVP.** Verified readers (email code or magic link) are v1.1 (§0.1, decision 1); site memberships and paid comments are a later RFC built on them.
-- **No editorial comments.** Notes on drafts inside Studio are a separate later RFC (**RFC-0008**, editorial notes). WordPress 6.9 put its Notes into the comments table and has been excluding them from counts and queries since; editorial notes will get their own tables.
+- **No editorial comments.** Notes on drafts inside Studio are a separate later RFC (**RFC-0009**, editorial notes; RFC-0008 became schedules). WordPress 6.9 put its Notes into the comments table and has been excluding them from counts and queries since; editorial notes will get their own tables.
 - **No federation in this RFC.** Webmention and ActivityPub replies are later RFCs. The `source` enum reserves `webmention` and `activitypub` so they can enter the same queue later; v1 writers refuse them.
 - **No reactions, likes, votes, pins or "best" sorting** in the MVP (v1.1 for likes and pins).
 - **No comments on pages or term archives.** Comments attach to content entries (articles). Pages may follow if asked for.
@@ -43,7 +43,7 @@ Cloudhal sites get first-party reader comments that work on Workers Free, on wor
 1. **MVP identity: guest comments with moderation.** A name and an optional, private email. Every guest comment is held for moderation (`pending`). Verified readers come in v1.1 — email code or magic link through a **second Better Auth instance** on the site Worker, with host-only cookies and Better Auth ≥ 1.7.7 (the release that fixed the magic-link takeover GHSA-965c-763c-88jm) — as the base for future members.
 2. **Default bot protection: our own first-party proof of work**, served from the site's origin, cookie-less, so the CSP stays `'self'`. Turnstile is opt-in per site; when it is on, the CSP widens **only on pages with an open comment form**.
 3. **AI and agents: labels and reversible hides; approval stays with people.** AI moderation runs only when the owner turns it on. Approving comments and publishing replies on the site's behalf always need a person, in every mode (including `auto` and local `bypass`). Hard delete and bans are not available over MCP.
-4. **Reader comments first.** Editorial notes are RFC-0008, mentioned here only as a non-goal.
+4. **Reader comments first.** Editorial notes are RFC-0009, mentioned here only as a non-goal.
 
 #### 0.2 Defaults for the remaining questions (this draft's decisions; changeable at review)
 | # | Question | Default chosen here |
