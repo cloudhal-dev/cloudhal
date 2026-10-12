@@ -240,6 +240,11 @@ export interface CommentsEnv {
   CLOUDHAL_COMMENTS_KEY?: string;
   /** `false` turns comments off for the deployment (`cloudhal.json` `comments.available`). */
   CLOUDHAL_COMMENTS_AVAILABLE?: string;
+  /**
+   * `off` when `cloudhal deploy` had to go without the hourly cron trigger (Workers Free allows 5
+   * per account): the hourly job then runs after admin requests, at most once an hour.
+   */
+  CLOUDHAL_COMMENTS_CRON?: string;
 }
 
 /** True when the deployment serves comments: a valid key and not switched off. */
@@ -249,6 +254,16 @@ export function commentsOn(env: CommentsEnv): boolean {
     typeof key === "string" &&
     key.length >= MIN_SECRET_LENGTH &&
     env.CLOUDHAL_COMMENTS_AVAILABLE !== "false"
+  );
+}
+
+/** One hour between on-request runs of the comments job (no cron trigger). */
+export const ON_REQUEST_HOURLY_MS = 3_600_000;
+
+/** Whether an admin request should run the hourly comments job (no cron trigger, an hour since). */
+export function commentsHourlyDue(env: CommentsEnv, now: number, last: number): boolean {
+  return (
+    commentsOn(env) && env.CLOUDHAL_COMMENTS_CRON === "off" && now - last >= ON_REQUEST_HOURLY_MS
   );
 }
 

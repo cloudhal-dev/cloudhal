@@ -19,6 +19,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type AdminEnv, createAdminWorker } from "../src/admin-worker.ts";
 import {
   adminComments,
+  commentsHourlyDue,
   commentsOn,
   flushCommentPurges,
   runCommentsHourly,
@@ -326,5 +327,49 @@ describe("availability and the Worker", () => {
     expect(s.calls).toEqual([[tag(entry.id)]]);
     expect(lines.some((l) => /^comments hourly: 1 site\(s\)/.test(l))).toBe(true);
     expect(lines.at(-1)).toMatch(/comments purge backstop: 1 request\(s\), 0 failed/);
+  });
+
+  it("without a cron trigger the hourly job runs after an admin request, at most hourly", async () => {
+    const id = newCommentsId(ID_PREFIX.comment);
+    await store.submit(siteId, {
+      id,
+      nodeId: entry.id,
+      name: "Old",
+      text: "Old pending comment",
+      status: "pending",
+      labels: [],
+      ipHmac: null,
+      challengeId: null,
+      proof: "pow",
+      createdAt: new Date(Date.now() - 40 * 86_400_000).toISOString(),
+    });
+    const lines: string[] = [];
+    const worker = createAdminWorker({ log: (l) => lines.push(l) });
+    const waits: Promise<unknown>[] = [];
+    const waiting = { ...ctx, waitUntil: (p: Promise<unknown>) => waits.push(p) };
+    const health = () =>
+      worker.fetch(
+        new Request("https://admin.example/api/health"),
+        env({ CLOUDHAL_COMMENTS_KEY: KEY, CLOUDHAL_COMMENTS_CRON: "off" }),
+        waiting as unknown as ExecutionContext,
+      );
+    expect((await health()).status).toBe(200);
+    await Promise.all(waits);
+    expect(await store.get(siteId, id)).toBeNull();
+    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
+    // the same isolate within the hour: not again
+    await health();
+    await Promise.all(waits);
+    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
+    // with a cron trigger (the default) requests never run it
+    const other = createAdminWorker({ log: (l) => lines.push(l) });
+    await other.fetch(
+      new Request("https://admin.example/api/health"),
+      env({ CLOUDHAL_COMMENTS_KEY: KEY }),
+      waiting as unknown as ExecutionContext,
+    );
+    await Promise.all(waits);
+    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
+    expect(commentsHourlyDue(env({ CLOUDHAL_COMMENTS_CRON: "off" }), 10 ** 13, 0)).toBe(false);
   });
 });

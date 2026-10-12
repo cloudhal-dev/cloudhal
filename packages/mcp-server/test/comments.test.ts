@@ -430,7 +430,39 @@ describe("comment tools", () => {
       expectedRevs: { [c.id]: 1 },
     });
     await call("draft_comment_reply", { siteId, commentId: c.id, text: "Draft reply body" });
+    // a person declines a local draft in their own client: the refusal row keeps no text either
+    await comments.moderate(siteId, {
+      ids: [c.id],
+      action: "approve",
+      actor: AUTHOR,
+      expectedRevs: { [c.id]: 2 },
+    });
+    const server = createCloudhalMcpServer({
+      store,
+      audit,
+      principal: { actor: agent, scopes: ALL, mode: "bypass", local: true },
+      stateKey: "comments-test-state-key-0123456789abcdef",
+      now: () => NOW,
+      comments: deps,
+    });
+    const client = new Client(
+      { name: "declines", version: "1" },
+      { capabilities: { elicitation: { form: {} } } },
+    );
+    client.setRequestHandler("elicitation/create", async () => ({ action: "decline" }));
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st);
+    await client.connect(ct);
+    const declined = await client.callTool({
+      name: "draft_comment_reply",
+      arguments: { siteId, commentId: c.id, text: "Declined draft words" },
+    });
+    expect(declined.isError).toBe(true);
     const rows = await audit.list({ siteId, limit: 50 });
+    expect(
+      rows.find((r) => r.tool === "draft_comment_reply" && r.decision === "deny")?.input,
+    ).toMatchObject({ commentId: c.id, textLength: 20 });
+    expect(JSON.stringify(rows)).not.toContain("Declined draft words");
     const raw = JSON.stringify(rows);
     for (const s of [
       "Secret reader words",

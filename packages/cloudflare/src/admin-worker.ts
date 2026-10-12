@@ -44,6 +44,7 @@ import { R2BlobStore } from "@cloudhal/storage/r2";
 import {
   adminComments,
   type CommentsEnv,
+  commentsHourlyDue,
   commentsOn,
   flushCommentPurges,
   runCommentsHourly,
@@ -184,6 +185,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   // Only plain values survive between requests. Workers do not let one request await I/O started
   // by another (it hangs), so no promise, auth instance or binding wrapper is cached here.
   let migrated = false;
+  /** When this isolate last ran the comments job on a request (no cron trigger); a plain number. */
+  let lastCommentsHourly = 0;
   const ensureMigrated = async (sql: SqlDriver) => {
     if (migrated) return;
     try {
@@ -299,6 +302,24 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           ),
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });
+      // No cron trigger (the account had no free slot, `CLOUDHAL_COMMENTS_CRON=off`): the hourly
+      // comments job runs after an admin request instead, at most once an hour per isolate
+      // (RFC-0007 §8.5, as analytics roll up on read). Bounded and idempotent like the cron run.
+      if (comments && commentsHourlyDue(env, Date.now(), lastCommentsHourly)) {
+        lastCommentsHourly = Date.now();
+        const now = new Date(lastCommentsHourly);
+        ctx.waitUntil(
+          runCommentsHourly({ graph: store, store: comments.store, now })
+            .then((c) =>
+              log(
+                `comments hourly (on request): ${c.sites} site(s), ${c.retained} row(s) past retention${c.more ? " (more next run)" : ""}, ${c.closed} thread(s) closed`,
+              ),
+            )
+            .catch((e) =>
+              log(`comments hourly failed: ${e instanceof Error ? e.message : String(e)}`),
+            ),
+        );
+      }
 
       // Per request: Better Auth keeps request-scoped state (background tasks, plugin promises),
       // and its construction does no I/O.

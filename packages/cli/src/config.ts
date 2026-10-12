@@ -36,6 +36,23 @@ export interface AnalyticsRateLimitConfig {
   readonly namespaceId?: string;
 }
 
+/**
+ * `cloudhal.json` → `comments` (RFC-0007 §4.5, §15.4): deployment defaults for reader comments.
+ * Absent means available (`cloudhal init` writes `{ "available": true }`); comments still stay
+ * **off for every site** until someone turns them on in Studio (owner decision D4), so a deploy
+ * never surprises a site with a comment form.
+ */
+export interface CommentsConfig {
+  /** `false` removes comments from the deployment: no endpoints, no module, no cron work. */
+  readonly available?: boolean;
+  /**
+   * Workers Rate Limiting binding for submissions (RFC-0007 §6.5, `COMMENTS_RL`): `true` for the
+   * defaults (10 a minute per client per Cloudflare location), or `{ limit, namespaceId }`. On top
+   * of the per-isolate and D1 limits, which work without it; off when absent.
+   */
+  readonly rateLimit?: boolean | AnalyticsRateLimitConfig;
+}
+
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
 export interface ProjectConfig {
   readonly siteId: string;
@@ -48,12 +65,14 @@ export interface ProjectConfig {
   readonly domains?: { readonly site?: string; readonly studio?: string };
   /** Site analytics (RFC-0006); absent = off. */
   readonly analytics?: AnalyticsConfig;
+  /** Reader comments (RFC-0007); absent = available, off per site. */
+  readonly comments?: CommentsConfig;
 }
 
 export const CONFIG_FILE = "cloudhal.json";
 
 /** The keys `ProjectConfig` owns; others (e.g. `media`, read by the starter) are kept on write. */
-const OWN_KEYS = new Set(["siteId", "dataDir", "domains", "analytics"]);
+const OWN_KEYS = new Set(["siteId", "dataDir", "domains", "analytics", "comments"]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
 
@@ -73,6 +92,21 @@ export function parseAnalyticsConfig(input: unknown): AnalyticsConfig | undefine
     ...rateLimitOf(o.rateLimit),
     ...bool("dev"),
   };
+}
+
+/** Leniently parsed, like `analytics`: values of the wrong type are left out. */
+export function parseCommentsConfig(input: unknown): CommentsConfig | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const o = input as Record<string, unknown>;
+  return {
+    ...(typeof o.available === "boolean" ? { available: o.available } : {}),
+    ...rateLimitOf(o.rateLimit),
+  };
+}
+
+/** Whether the deployment offers reader comments: on unless `comments.available` is `false`. */
+export function commentsAvailable(cfg: Pick<ProjectConfig, "comments">): boolean {
+  return cfg.comments?.available !== false;
 }
 
 function rateLimitOf(v: unknown): { rateLimit?: boolean | AnalyticsRateLimitConfig } {
@@ -122,6 +156,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   if (typeof cfg.siteId !== "string") throw new Error(`${CONFIG_FILE}: missing siteId`);
   const domains = cfg.domains && typeof cfg.domains === "object" ? cfg.domains : undefined;
   const analytics = parseAnalyticsConfig(cfg.analytics);
+  const comments = parseCommentsConfig(cfg.comments);
   return {
     siteId: cfg.siteId,
     dataDir: cfg.dataDir ?? ".cloudhal",
@@ -134,6 +169,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
         }
       : {}),
     ...(analytics ? { analytics } : {}),
+    ...(comments ? { comments } : {}),
   };
 }
 
