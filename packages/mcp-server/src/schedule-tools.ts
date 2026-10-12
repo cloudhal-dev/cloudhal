@@ -1039,7 +1039,8 @@ export function scheduleTools(): ToolDefinition[] {
           a.expectedRev as number,
         );
         const live = (await liveRefs(ctx.store, site)).some((r) => r.id === node.id);
-        if (!live) return { node: saved, status: "set" };
+        // REST only (§13 `POST …/gates`, `apply`): the gate waits for the next publish.
+        if (!live || a.apply === "with-next-publish") return { node: saved, status: "set" };
         if (!(await gateOnly(ctx, site, saved)))
           return {
             node: saved,
@@ -1263,7 +1264,7 @@ export function scheduleTools(): ToolDefinition[] {
         }
         const saved = await writeGates(ctx, node, { ...node.availability, until }, node.rev);
         const live = (await liveRefs(ctx.store, site)).some((r) => r.id === node.id);
-        if (!live) return { status: "set", node: saved };
+        if (!live || a.apply === "with-next-publish") return { status: "set", node: saved };
         const release = await gateRelease(
           ctx,
           site,
