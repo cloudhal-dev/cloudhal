@@ -1634,6 +1634,314 @@ export class SqlScheduleStore implements SchedulerStore {
     );
   }
 
+  // ───────────────────────────── policy and API (rollout steps 7–8) ─────────────────────────────
+
+  /** The automation an agent key belongs to (§11.2: one key, one automation). */
+  async automationByKey(keyId: string): Promise<Automation | undefined> {
+    const row = await this.#sql.get<AutomationRow>("SELECT * FROM automations WHERE key_id = ?", [
+      keyId,
+    ]);
+    return row ? toAutomation(row) : undefined;
+  }
+
+  /** The automation's run that is `running` and has not reached its end (`lease_until`). */
+  async openAgentRun(
+    siteId: string,
+    automationId: string,
+    now: string,
+  ): Promise<ScheduleRun | undefined> {
+    const row = await this.#sql.get<RunRow>(
+      `SELECT * FROM schedule_runs WHERE site_id = ? AND subject_id = ? AND subject_kind = 'agent-task' AND state = 'running' AND lease_until > ?
+       ORDER BY occurrence_at DESC LIMIT 1`,
+      [siteId, automationId, canonicalInstant(now)],
+    );
+    return row ? toRun(row) : undefined;
+  }
+
+  /** The automation's `ready` run whose window is open at `now` (§8.6: begin_run's target). */
+  async readyAgentRun(
+    siteId: string,
+    automationId: string,
+    now: string,
+  ): Promise<ScheduleRun | undefined> {
+    const at = canonicalInstant(now);
+    const row = await this.#sql.get<RunRow>(
+      `SELECT * FROM schedule_runs WHERE site_id = ? AND subject_id = ? AND subject_kind = 'agent-task' AND state = 'ready'
+       AND window_opens <= ? AND window_closes > ? ORDER BY occurrence_at DESC LIMIT 1`,
+      [siteId, automationId, at, at],
+    );
+    return row ? toRun(row) : undefined;
+  }
+
+  /**
+   * Opens an agent task's window now ("Run now", §13), as the occurrence `now` (to the minute) with
+   * trigger `manual`. False when that occurrence already has a run.
+   */
+  async openManualWindow(input: {
+    automation: Automation;
+    now: string;
+    window: { opensAt: string; closesAt: string };
+  }): Promise<string | undefined> {
+    const a = input.automation;
+    const occurrenceAt = canonicalInstant(Math.floor(Date.parse(input.now) / 60_000) * 60_000);
+    const id = await runId(a.id, occurrenceAt);
+    const res = await this.#sql.run(
+      `INSERT OR IGNORE INTO schedule_runs (${RUN_COLUMNS})
+       SELECT ?, ?, 'agent-task', ?, ?, 'ready', NULL, 'manual', 1, NULL, NULL, ?, ?, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, ?, ?
+       WHERE EXISTS (SELECT 1 FROM automations WHERE id = ? AND site_id = ? AND state = 'active')`,
+      [
+        id,
+        a.siteId,
+        a.id,
+        occurrenceAt,
+        input.window.opensAt,
+        input.window.closesAt,
+        input.now,
+        input.now,
+        a.id,
+        a.siteId,
+      ],
+    );
+    return res.changes === 1 ? id : undefined;
+  }
+
+  /**
+   * What one call inside a run leaves on it (§11.4, §11.5): the taint (kept once set), the anomaly
+   * counters (`counts`) and the usage so far. Only while the run is `running`.
+   */
+  async recordRunCall(
+    siteId: string,
+    id: string,
+    input: {
+      now: string;
+      taint?: { at: string; tool: string };
+      counts?: Record<string, number>;
+      usage?: ScheduleRunUsage;
+    },
+  ): Promise<boolean> {
+    const res = await this.#sql.run(
+      `UPDATE schedule_runs SET taint = COALESCE(taint, ?), counts = COALESCE(?, counts), usage = COALESCE(?, usage), rev = rev + 1, updated_at = ?
+       WHERE id = ? AND site_id = ? AND state = 'running'`,
+      [j(input.taint), j(input.counts), j(input.usage), input.now, id, siteId],
+    );
+    return res.changes === 1;
+  }
+
+  /**
+   * Ends a running agent run other than by `end_run` (§11.4, §11.5): `budget-exceeded`, `killed`
+   * (anomaly), or `failed`. The automation's own state changes through `transitionAutomation`.
+   */
+  async endAgentRunAs(
+    siteId: string,
+    id: string,
+    input: {
+      now: string;
+      state: "budget-exceeded" | "killed" | "failed";
+      error: { code: string; message?: string };
+      usage?: ScheduleRunUsage;
+    },
+  ): Promise<boolean> {
+    const res = await this.#sql.run(
+      `UPDATE schedule_runs SET state = ?, error = ?, usage = COALESCE(?, usage), ended_at = ?, lease_until = NULL, rev = rev + 1, updated_at = ?
+       WHERE id = ? AND site_id = ? AND state = 'running' AND subject_kind = 'agent-task'`,
+      [
+        input.state,
+        JSON.stringify({
+          code: input.error.code,
+          ...(input.error.message ? { message: plainLine(input.error.message) } : {}),
+        }),
+        j(input.usage),
+        input.now,
+        input.now,
+        id,
+        siteId,
+      ],
+    );
+    return res.changes === 1;
+  }
+
+  /**
+   * Changes an automation's name, job settings or recurrence (people, §13 PATCH) with a CAS on
+   * `rev`. The next run is planned again from `now` when the recurrence changes; an agent task's
+   * key never changes here.
+   */
+  async updateAutomation(
+    siteId: string,
+    id: string,
+    change: {
+      expectedRev: number;
+      name?: string;
+      job?: AutomationJob;
+      recurrence?: Omit<AutomationRecurrence, "preset"> & {
+        preset?: AutomationRecurrence["preset"];
+      };
+      minIntervalMinutes?: number;
+    },
+  ): Promise<Automation> {
+    const current = await this.getAutomation(siteId, id);
+    if (!current) throw new ScheduleError("not_found", `automation ${id} not found`);
+    if (current.rev !== change.expectedRev) throw new ScheduleConflictError("automation", id);
+    if (change.job && change.job.kind !== current.job.kind)
+      throw new ScheduleError("invalid_transition", "an automation's job kind cannot change");
+    if (
+      change.job?.kind === "agent-task" &&
+      current.job.kind === "agent-task" &&
+      change.job.keyId !== current.job.keyId
+    )
+      throw new ScheduleError("invalid_transition", "an agent task keeps its key");
+    const now = this.#stamp();
+    let recurrence = current.recurrence;
+    let nextRunAt = current.nextRunAt;
+    if (change.recurrence) {
+      validateRecurrence(change.recurrence, {
+        minIntervalMinutes: change.minIntervalMinutes ?? DEFAULT_MIN_INTERVAL_MINUTES,
+      });
+      recurrence = {
+        start: change.recurrence.start,
+        timeZone: change.recurrence.timeZone,
+        ...(change.recurrence.rule !== undefined ? { rule: change.recurrence.rule } : {}),
+        preset:
+          change.recurrence.preset ?? presetOf(change.recurrence.rule, change.recurrence.start),
+      };
+      nextRunAt = firstRunFrom(recurrence, now)?.at;
+    }
+    const { nextRunAt: _n, pausedReason, ...rest } = current;
+    const ended = change.recurrence !== undefined && nextRunAt === undefined;
+    const state = ended && current.state === "active" ? "ended" : current.state;
+    const next: Automation = {
+      ...rest,
+      ...(change.name !== undefined ? { name: change.name } : {}),
+      ...(change.job ? { job: change.job } : {}),
+      recurrence,
+      state,
+      ...(pausedReason && state !== "ended" ? { pausedReason } : {}),
+      ...(nextRunAt && !ended ? { nextRunAt } : {}),
+      rev: current.rev + 1,
+      updatedAt: now,
+    };
+    assertValid("automation", next);
+    const res = await this.#sql.run(
+      `UPDATE automations SET name = ?, job = ?, start_local = ?, time_zone = ?, rule = ?, preset = ?, state = ?, paused_reason = ?, next_run_at = ?,
+         cursor = CASE WHEN ? THEN NULL ELSE cursor END, rev = rev + 1, updated_at = ?
+       WHERE id = ? AND site_id = ? AND rev = ?`,
+      [
+        next.name,
+        JSON.stringify(next.job),
+        next.recurrence.start,
+        next.recurrence.timeZone,
+        next.recurrence.rule ?? null,
+        next.recurrence.preset,
+        next.state,
+        next.pausedReason ?? null,
+        next.nextRunAt ?? null,
+        change.recurrence ? 1 : 0,
+        now,
+        id,
+        siteId,
+        change.expectedRev,
+      ],
+    );
+    if (res.changes !== 1) throw new ScheduleConflictError("automation", id);
+    return next;
+  }
+
+  /**
+   * Deletes an automation (§11.8): its open runs are killed first, in the same batch; the run rows
+   * stay for history (retention removes them), the audit rows always.
+   */
+  async deleteAutomation(siteId: string, id: string, expectedRev: number): Promise<void> {
+    const now = this.#stamp();
+    const pre = "EXISTS (SELECT 1 FROM automations WHERE id = ? AND site_id = ? AND rev = ?)";
+    const results = await this.#sql.batch([
+      {
+        sql: `UPDATE schedule_runs SET state = 'killed', ended_at = ?, lease_until = NULL, rev = rev + 1, updated_at = ?
+              WHERE subject_id = ? AND state IN ('due', 'ready', 'running') AND ${pre}`,
+        params: [now, now, id, id, siteId, expectedRev],
+      },
+      {
+        sql: "DELETE FROM automations WHERE id = ? AND site_id = ? AND rev = ?",
+        params: [id, siteId, expectedRev],
+      },
+    ]);
+    if ((results[1]?.changes ?? 0) !== 1) {
+      if (!(await this.getAutomation(siteId, id)))
+        throw new ScheduleError("not_found", `automation ${id} not found`);
+      throw new ScheduleConflictError("automation", id);
+    }
+  }
+
+  /**
+   * A person's "Publish now" (§8.6, §13): claims a `scheduled`, `missed` or `expired` release for a
+   * manual run at `now` — the release becomes an `on-approval` release approved by `approval`,
+   * `running` under a fresh lease, with its run row (trigger `manual`) — exactly like the tick's
+   * claim (§8.5), so the executor and `finishRelease` treat it the same way. False when the release
+   * changed, another release of the site is running, or the state does not allow it.
+   */
+  async claimManualRelease(input: {
+    siteId: string;
+    releaseId: string;
+    expectedRev: number;
+    approval: ReleaseApproval;
+    runId: string;
+    token: string;
+    now: string;
+    leaseUntil: string;
+  }): Promise<boolean> {
+    const results = await this.#sql.batch([
+      {
+        sql: `UPDATE releases SET state = 'running', when_kind = 'on-approval', execute_at = ?, time_zone = NULL, local_time = NULL, approval = ?, outcome = NULL,
+                lease_token = ?, lease_until = ?, rev = rev + 1, updated_at = ?
+              WHERE id = ? AND site_id = ? AND rev = ? AND state IN ('scheduled', 'missed', 'expired')
+              AND NOT EXISTS (SELECT 1 FROM releases o WHERE o.site_id = ? AND o.state = 'running' AND o.lease_until > ?)`,
+        params: [
+          input.now,
+          JSON.stringify(input.approval),
+          input.token,
+          input.leaseUntil,
+          input.now,
+          input.releaseId,
+          input.siteId,
+          input.expectedRev,
+          input.siteId,
+          input.now,
+        ],
+      },
+      { sql: HELD_SYNC, params: [input.releaseId, input.releaseId] },
+      {
+        sql: `INSERT INTO schedule_runs (${RUN_COLUMNS})
+              SELECT ?, ?, 'release', ?, ?, 'running', NULL, 'manual', 1, ?, ?, NULL, NULL, ?, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, ?, ?
+              WHERE EXISTS (SELECT 1 FROM releases WHERE id = ? AND lease_token = ?)
+              ON CONFLICT(id) DO UPDATE SET state = 'running', trigger = 'manual', attempt = schedule_runs.attempt + 1,
+                lease_token = excluded.lease_token, lease_until = excluded.lease_until, started_at = excluded.started_at,
+                ended_at = NULL, error = NULL, rev = schedule_runs.rev + 1, updated_at = excluded.updated_at`,
+        params: [
+          input.runId,
+          input.siteId,
+          input.releaseId,
+          input.now,
+          input.token,
+          input.leaseUntil,
+          input.now,
+          input.now,
+          input.now,
+          input.releaseId,
+          input.token,
+        ],
+      },
+    ]);
+    return (results[0]?.changes ?? 0) === 1;
+  }
+
+  /** Lateness (seconds) of release runs that ended since `since`, ascending (`/api/scheduler` p50/p95). */
+  async releaseLateness(since: string, limit = 2_000): Promise<number[]> {
+    const rows = await this.#sql.all<{ lateness_s: number }>(
+      `SELECT lateness_s FROM schedule_runs WHERE subject_kind = 'release' AND state = 'succeeded' AND lateness_s IS NOT NULL AND created_at >= ?
+       ORDER BY lateness_s LIMIT ?`,
+      [canonicalInstant(since), limit],
+    );
+    return rows.map((r) => Number(r.lateness_s));
+  }
+
   // ───────────────────────────── retention ─────────────────────────────
 
   /**

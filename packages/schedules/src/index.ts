@@ -11,6 +11,7 @@ export * from "./budget.ts";
 export * from "./budget-meter.ts";
 export * from "./errors.ts";
 export * from "./ids.ts";
+export * from "./manual.ts";
 export * from "./recurrence.ts";
 export * from "./release.ts";
 export * from "./scheduler.ts";
