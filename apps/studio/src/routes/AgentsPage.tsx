@@ -38,6 +38,7 @@ import { useMemo, useState } from "react";
 import { HowModesWorkCard } from "../components/AgentModes.tsx";
 import { AllowAnalytics } from "../components/AnalyticsKeyAccess.tsx";
 import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
+import { AllowComments } from "../components/CommentKeyAccess.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { ElevateAgentKeyDialog } from "../components/ElevateAgentKeyDialog.tsx";
@@ -441,6 +442,7 @@ function AllKeys({ onRevoke, now }: { onRevoke: (key: AgentKeySummary) => void; 
                       <div className="grid gap-1.5">
                         <KeyScopes agentKey={k} />
                         <AllowAnalytics agentKey={k} others={k.owner?.userId !== me?.userId} />
+                        <AllowComments agentKey={k} others={k.owner?.userId !== me?.userId} />
                       </div>
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
@@ -666,6 +668,7 @@ export function AgentsPage() {
                           <div className="grid gap-1.5">
                             <KeyScopes agentKey={k} />
                             <AllowAnalytics agentKey={k} />
+                            <AllowComments agentKey={k} />
                           </div>
                         </Table.Cell>
                         <Table.Cell className="whitespace-nowrap">
