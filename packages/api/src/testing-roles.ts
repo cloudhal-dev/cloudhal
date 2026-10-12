@@ -1002,6 +1002,80 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       ).toBe(true);
     });
 
+    it('RFC-0006 §9.1: "Allow analytics" adds analytics:read to older keys — own keys or agents:manage, never above the creator\'s role, audited', async () => {
+      const t = await team();
+      const older = ["site:read", "content:read", "preview:create"];
+      const authorKey = await newKey(t.author, { name: "a-old", mode: "plan", scopes: older });
+      const editorKey = await newKey(t.editor, { name: "e-old", mode: "plan", scopes: older });
+      const contributorKey = await newKey(t.contributor, {
+        name: "c-old",
+        mode: "plan",
+        scopes: older,
+      });
+      const add = (p: Person, id: string, body: Json = { addScopes: ["analytics:read"] }) =>
+        call("PATCH", `/api/agent-keys/${id}`, { cookie: p.cookie, body });
+
+      const scopesOf = async (key: string) =>
+        structured<{ scopes: string[] }>(
+          await (await connect(key)).callTool({ name: "get_mode", arguments: {} }),
+        ).scopes;
+      // the agent lacks it before
+      expect(await scopesOf(authorKey.key)).toEqual(older);
+
+      // only analytics:read can be added, and only as a list
+      expect((await add(t.author, authorKey.id, { addScopes: ["content:write"] })).body.error).toBe(
+        "scope_not_addable",
+      );
+      expect((await add(t.author, authorKey.id, { addScopes: "analytics:read" })).status).toBe(400);
+      expect((await add(t.author, authorKey.id, { addScopes: [] })).status).toBe(400);
+      expect(
+        (
+          await add(t.author, authorKey.id, {
+            addScopes: ["analytics:read"],
+            mode: "manual",
+          })
+        ).status,
+      ).toBe(400);
+      // someone else's key is not found without agents:manage
+      expect((await add(t.editor, authorKey.id)).status).toBe(404);
+      // Contributors cannot hold it (narrowed by role), nor can an Administrator give it to them
+      expect((await add(t.contributor, contributorKey.id)).body.error).toBe("scope_above_role");
+      expect((await add(t.administrator, contributorKey.id)).body.error).toBe("scope_above_role");
+
+      // the creator adds it: stored, effective, and nothing else changes
+      const added = await add(t.author, authorKey.id);
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body).toMatchObject({
+        id: authorKey.id,
+        mode: "plan",
+        scopes: [...older, "analytics:read"],
+        effectiveScopes: [...older, "analytics:read"],
+      });
+      // idempotent: a second call changes nothing and is not audited again
+      expect((await add(t.author, authorKey.id)).body.scopes).toEqual([...older, "analytics:read"]);
+      // an Administrator adds it to an Editor's key (agents:manage)
+      const byAdmin = await add(t.administrator, editorKey.id);
+      expect(byAdmin.status, JSON.stringify(byAdmin.body)).toBe(200);
+      expect(byAdmin.body.scopes).toEqual([...older, "analytics:read"]);
+
+      // and holds it on its next connection
+      expect(await scopesOf(authorKey.key)).toEqual([...older, "analytics:read"]);
+
+      const rows = (await audit.list({ deployment: true, limit: 100 })).filter(
+        (r) => r.tool === "agent-key.scopes",
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.input)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyId: authorKey.id, added: ["analytics:read"] }),
+          expect.objectContaining({ keyId: editorKey.id, added: ["analytics:read"] }),
+        ]),
+      );
+      expect(rows.find((r) => r.input && (r.input as Json).keyId === editorKey.id)?.actor.id).toBe(
+        t.administrator.actorId,
+      );
+    });
+
     // ───────────────────────────── I13: removal ─────────────────────────────
 
     it("I13: removal deletes the membership, revokes sessions, disables keys, cancels invites and denies pending requests", async () => {

@@ -35,6 +35,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  ANALYTICS_SETTINGS_SECTION,
+  AnalyticsSettingsSection,
+} from "../components/AnalyticsSettings.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -68,7 +72,7 @@ import {
   validateHostname,
 } from "../lib/site-settings.ts";
 
-const SECTIONS = ["general", "domains", "previews"] as const;
+const SECTIONS = ["general", "domains", ANALYTICS_SETTINGS_SECTION, "previews"] as const;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 
@@ -815,12 +819,20 @@ export function SiteSettingsPage() {
       <ViewOnlyBanner reason={settings.reason} />
       <SettingsLayout
         title={t("common.onThisPage")}
-        sections={SECTIONS.map((id) => ({ id, label: t(`siteSettings.sections.${id}`) }))}
+        sections={SECTIONS.map((id) => ({
+          id,
+          label:
+            id === ANALYTICS_SETTINGS_SECTION
+              ? t("analyticsSettings.title")
+              : t(`siteSettings.sections.${id}`),
+        }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
           <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
           <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
         </ReadOnly>
+        {/* Gated on its own abilities (analytics.read to see, analytics.settings to change). */}
+        <AnalyticsSettingsSection siteId={siteId} />
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>

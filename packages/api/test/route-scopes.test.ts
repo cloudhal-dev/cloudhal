@@ -72,6 +72,8 @@ describe("ROUTE_SCOPES (I15)", () => {
   it("resolves literal segments before parameters", () => {
     expect(requirementFor("POST", "/api/members/transfer-ownership")).toBe("owner");
     expect(requirementFor("PATCH", "/api/members/abc")).toBe("members:manage");
+    // "Allow analytics" ({addScopes}) is the same PATCH: own keys, the service checks the rest.
+    expect(requirementFor("PATCH", "/api/agent-keys/key_x")).toBe("member");
     expect(requirementFor("POST", "/api/members/abc/password-reset")).toBe("members:manage");
     expect(requirementFor("POST", "/api/invites/accept")).toBe("public");
     expect(requirementFor("GET", "/api/auth/get-session")).toBe("public");

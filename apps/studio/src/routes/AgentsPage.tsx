@@ -36,6 +36,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { HowModesWorkCard } from "../components/AgentModes.tsx";
+import { AllowAnalytics } from "../components/AnalyticsKeyAccess.tsx";
 import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
@@ -437,7 +438,10 @@ function AllKeys({ onRevoke, now }: { onRevoke: (key: AgentKeySummary) => void; 
                       <KeyModeCell agentKey={k} now={now} />
                     </Table.Cell>
                     <Table.Cell>
-                      <KeyScopes agentKey={k} />
+                      <div className="grid gap-1.5">
+                        <KeyScopes agentKey={k} />
+                        <AllowAnalytics agentKey={k} others={k.owner?.userId !== me?.userId} />
+                      </div>
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       {k.enabled ? (
@@ -659,7 +663,10 @@ export function AgentsPage() {
                           <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
                         </Table.Cell>
                         <Table.Cell>
-                          <KeyScopes agentKey={k} />
+                          <div className="grid gap-1.5">
+                            <KeyScopes agentKey={k} />
+                            <AllowAnalytics agentKey={k} />
+                          </div>
                         </Table.Cell>
                         <Table.Cell className="whitespace-nowrap">
                           <div className="grid gap-0.5">
