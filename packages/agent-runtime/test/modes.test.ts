@@ -124,8 +124,14 @@ describe("agent modes", () => {
       "content:read",
       "preview:create",
       "analytics:read",
+      "comments:read",
     ]);
     expect(scopesForMode("auto")).toContain("site:publish");
+    // RFC-0007 D2: new keys read comments in every mode, and nothing more about them
+    for (const m of ["plan", "manual", "edits", "auto"] as const) {
+      expect(scopesForMode(m)).toContain("comments:read");
+      expect(scopesForMode(m)).not.toContain("comments:moderate");
+    }
     // RFC-0006 §9.1: new keys read analytics in every mode
     for (const m of ["plan", "manual", "edits", "auto"] as const)
       expect(scopesForMode(m)).toContain("analytics:read");

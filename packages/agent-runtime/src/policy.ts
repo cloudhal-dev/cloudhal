@@ -21,6 +21,12 @@ export type Scope =
   | "asset:upload"
   | "asset:manage"
   | "analytics:read"
+  | "comments:read"
+  | "comments:moderate"
+  | "comments:moderate:own"
+  | "comments:reply"
+  | "comments:reply:own"
+  | "commenters:data"
   | "audit:read"
   | "site:settings"
   | "members:invite"
@@ -48,6 +54,13 @@ export const KEY_SCOPES: readonly Scope[] = [
   // RFC-0006 §9.1: read-only site analytics (aggregates, no personal data). Implies nothing and
   // nothing implies it except `*`.
   "analytics:read",
+  // RFC-0007 §10.1: reader comments. Reading carries no email or IP hash (the contract has no
+  // field for them); moderating and replying have own variants for Authors' entries.
+  "comments:read",
+  "comments:moderate",
+  "comments:moderate:own",
+  "comments:reply",
+  "comments:reply:own",
 ];
 
 /** Scopes only a person holds (through their role): never stored on a key, never satisfy a tool. */
@@ -57,6 +70,8 @@ export const PERSON_SCOPES: readonly Scope[] = [
   "members:invite",
   "members:manage",
   "agents:manage",
+  // RFC-0007 §10.1: commenter emails, a commenter's export and erasure — people only.
+  "commenters:data",
 ];
 
 /** @deprecated use `KEY_SCOPES` (what a key may carry). */
@@ -80,6 +95,8 @@ const IMPLIES: Partial<Record<Scope, readonly Scope[]>> = {
   "site:publish": ["site:publish:own"],
   "asset:manage": ["asset:upload"],
   "members:manage": ["members:invite"],
+  "comments:moderate": ["comments:moderate:own"],
+  "comments:reply": ["comments:reply:own"],
 };
 
 /** `a` grants at least what `b` grants. */
@@ -113,7 +130,9 @@ export function holds(scopes: readonly string[], scope: Scope): boolean {
  */
 export type OwnLimit =
   | { level: "own" | "draft"; target: "entry" }
-  | { level: "own"; target: "changeset" };
+  | { level: "own"; target: "changeset" }
+  /** RFC-0007 §10.1: each comment's entry must be the person's own (its author, or their agent). */
+  | { level: "own"; target: "comment" };
 
 /** Own variants that satisfy a tool scope with a limit, strongest first. */
 const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" | "draft" }[]>> = {
@@ -122,7 +141,25 @@ const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" 
     { scope: "content:draft:own", level: "draft" },
   ],
   "site:publish": [{ scope: "site:publish:own", level: "own" }],
+  "comments:moderate": [{ scope: "comments:moderate:own", level: "own" }],
+  "comments:reply": [{ scope: "comments:reply:own", level: "own" }],
 };
+
+/**
+ * What a call does, decided from its arguments (RFC-0007 §10.2), for tools whose policy depends
+ * on them (`moderate_comments` may hide in `edits` mode but never approve):
+ *
+ * | Class | Meaning | plan | manual | edits | auto | bypass (local) |
+ * |---|---|---|---|---|---|---|
+ * | `read` | changes nothing | ✓ | ✓ | ✓ | ✓ | ✓ |
+ * | `advisory` | changes only notes people read before deciding (labels) | ✗ | ✓ | ✓ | ✓ | ✓ |
+ * | `reduce` | reversible, can only make something less visible | ✗ | waits | ✓ | ✓ | ✓ |
+ * | `person` | makes something public | ✗ | waits | waits | waits | **waits** |
+ *
+ * `person` calls wait with cause `tool` in every mode, `bypass` included, and for people calling
+ * over MCP too (they are asked in their own client). Tools without `classify` behave as before.
+ */
+export type CallClass = "read" | "advisory" | "reduce" | "person";
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -143,7 +180,9 @@ export interface ToolPolicy {
    * The own variants of the tool's scope satisfy it with a limit (RFC-0005 §9): `entry` — the
    * handler checks the target entry; `changeset` — a publish must be own-only.
    */
-  own?: "entry" | "changeset";
+  own?: "entry" | "changeset" | "comment";
+  /** Per-argument policy (RFC-0007 §10.2); `evaluate` receives the call's arguments. */
+  classify?: (args: Record<string, unknown>) => CallClass;
 }
 
 export interface Principal {
@@ -223,7 +262,7 @@ export class PolicyEngine {
   evaluate(
     principal: Principal,
     toolName: string,
-    options: { confirmed?: boolean } = {},
+    options: { confirmed?: boolean; args?: Record<string, unknown> | undefined } = {},
   ): Decision {
     const tool = this.#tools.get(toolName);
     if (!tool) return { kind: "deny", reason: `unknown tool ${toolName}` };
@@ -243,7 +282,9 @@ export class PolicyEngine {
         limit =
           tool.own === "changeset"
             ? { level: "own", target: "changeset" }
-            : { level: variant.level, target: "entry" };
+            : tool.own === "comment"
+              ? { level: "own", target: "comment" }
+              : { level: variant.level, target: "entry" };
         continue;
       }
       missing.push(s);
@@ -265,6 +306,12 @@ export class PolicyEngine {
         };
     }
     const mode = effectiveMode(principal);
+    const limited = limit ? { limit } : {};
+    if (tool.classify)
+      return classified(tool, tool.classify(options.args ?? {}), principal, mode, {
+        confirmed: options.confirmed === true,
+        limited,
+      });
     const writes = tool.annotations.readOnlyHint !== true;
     if (mode === "plan" && writes)
       return {
@@ -277,7 +324,6 @@ export class PolicyEngine {
       tool.annotations.destructiveHint === true ||
       (principal.skill?.approval ?? []).includes(toolName) ||
       (mode === "manual" && writes);
-    const limited = limit ? { limit } : {};
     if (needsApproval && !options.confirmed && mode !== "bypass") {
       // A tool that always asks (publish, rollback) says so first; then plain destructive ones.
       const cause: ApprovalCause = tool.requiresApproval
@@ -308,6 +354,41 @@ export class PolicyEngine {
   }
 }
 
+/** The decision for a classified call (RFC-0007 §10.2), after the scope and skill checks. */
+function classified(
+  tool: ToolPolicy,
+  cls: CallClass,
+  principal: Principal,
+  mode: AgentMode | undefined,
+  o: { confirmed: boolean; limited: { limit?: OwnLimit } },
+): Decision {
+  if (cls === "read") return { kind: "allow", ...o.limited };
+  if (mode === "plan")
+    return {
+      kind: "deny",
+      reason: "plan mode is read-only: propose the change instead",
+      code: "mode",
+    };
+  if (o.confirmed) return { kind: "allow", ...o.limited };
+  const wait = (cause: ApprovalCause, reason: string): Decision => ({
+    kind: "approval-required",
+    reason,
+    cause,
+    ...o.limited,
+  });
+  // A person makes something public, in every mode — `bypass` included — and people over MCP
+  // are asked in their own client.
+  if (cls === "person")
+    return wait("tool", `${tool.name} makes something public: a person decides`);
+  if ((principal.skill?.approval ?? []).includes(tool.name))
+    return wait("skill", `${tool.name} requires approval`);
+  // Labels are notes people read before deciding: free in `manual` (a waiting label would be the
+  // person's own work); reductions wait there.
+  if (cls === "reduce" && mode === "manual")
+    return wait("manual-mode", `manual mode: ${tool.name} needs a person's approval`);
+  return { kind: "allow", ...o.limited };
+}
+
 /**
  * Default scope sets per actor kind, for principals without a membership source (auth-less
  * servers, tests, local scripts). With auth, a person's scopes come from their role (RFC-0005 I1).
@@ -325,6 +406,8 @@ export function defaultScopes(actor: Actor): Scope[] {
         "preview:create",
         "asset:upload",
         "analytics:read",
+        // RFC-0007 D2: agents read comments (never an email or IP hash).
+        "comments:read",
       ];
   }
 }

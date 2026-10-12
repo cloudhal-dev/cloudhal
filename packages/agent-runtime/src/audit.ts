@@ -71,10 +71,14 @@ export class AuditLog {
     this.#sql = sql;
   }
 
-  async record(entry: AuditEntry): Promise<number> {
-    const r = await this.#sql.run(
-      "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check, elevation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
+  /**
+   * The INSERT of one audit row as a statement, for writes that must put it in their own atomic
+   * `batch()`, last (RFC-0007 §4.4: a comment write and its audit row land together or not at all).
+   */
+  static statement(entry: AuditEntry): { sql: string; params: (string | number | null)[] } {
+    return {
+      sql: "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check, elevation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      params: [
         entry.at,
         entry.actor.kind,
         entry.actor.id,
@@ -93,7 +97,12 @@ export class AuditLog {
         entry.autoCheck ? JSON.stringify(entry.autoCheck) : null,
         entry.elevation ? JSON.stringify(entry.elevation) : null,
       ],
-    );
+    };
+  }
+
+  async record(entry: AuditEntry): Promise<number> {
+    const { sql, params } = AuditLog.statement(entry);
+    const r = await this.#sql.run(sql, params);
     return r.lastRowId ?? 0;
   }
 
