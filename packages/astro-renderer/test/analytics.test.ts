@@ -6,7 +6,8 @@
  * suppress the visitor hash (A3); the tag follows the setting (A5).
  */
 import { MemoryAnalytics } from "@cloudhal/analytics";
-import { putAnalyticsSettings, SqlAnalytics } from "@cloudhal/analytics/sql";
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { deleteSalt, putAnalyticsSettings, SqlAnalytics } from "@cloudhal/analytics/sql";
 import type { AnalyticsEvent, ContentEntry, Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
@@ -83,6 +84,13 @@ function analytics(options: Partial<ConstructorParameters<typeof SiteAnalytics>[
     now: () => clock,
     ...options,
   });
+  // As the Site Worker entry does on Cloudflare, whose edge sets CF-Connecting-IP: the caller
+  // passes the trusted address; SiteAnalytics never reads it from the request.
+  const send = a.beacon.bind(a);
+  a.beacon = (request, extra = {}) => {
+    const clientIp = request.headers.get("cf-connecting-ip") ?? undefined;
+    return send(request, { ...(clientIp ? { clientIp } : {}), ...extra });
+  };
   return { a, writer };
 }
 
@@ -296,6 +304,58 @@ describe("SiteAnalytics", () => {
     expect(writer.events[2]).not.toHaveProperty("visitor");
   });
 
+  it("never hashes with a salt deleted by switching unique visitors off, also when it is switched on again", async () => {
+    const settings = (rev: number, uniqueVisitors: boolean) =>
+      putAnalyticsSettings(sql, {
+        siteId: site.id,
+        rev,
+        patch: { enabled: true, uniqueVisitors },
+        actorId: actor.id,
+        now: new Date(clock),
+      });
+    await settings(0, true);
+    const { a, writer } = analytics();
+    const service = new AnalyticsService({
+      sql,
+      store: "sql",
+      now: () => new Date(clock),
+      purgeSite: async () => a.reset(),
+    });
+    const visitor = () => (writer.events.at(-1) as { visitor?: string } | undefined)?.visitor;
+    await a.beacon(beacon(view("/about")));
+    const before = visitor();
+    expect(before).toMatch(/^[0-9a-f]{16}$/);
+    // off and on again the same day through the settings route: the salt is deleted, and the
+    // route's purge resets the memo, so the same visitor gets an unlinkable hash
+    await service.updateSettings({
+      siteId: site.id,
+      rev: 1,
+      patch: { uniqueVisitors: false },
+      actorId: actor.id,
+    });
+    await a.beacon(beacon(view("/about")));
+    expect(visitor()).toBeUndefined();
+    await service.updateSettings({
+      siteId: site.id,
+      rev: 2,
+      patch: { uniqueVisitors: true },
+      actorId: actor.id,
+    });
+    await a.beacon(beacon(view("/about")));
+    const after = visitor();
+    expect(after).toMatch(/^[0-9a-f]{16}$/);
+    expect(after).not.toBe(before);
+
+    // without a purge reaching this isolate, the change is seen when the settings memo expires,
+    // and the salt is read again with them
+    await deleteSalt(sql, new Date(clock).toISOString().slice(0, 10));
+    await settings(3, true);
+    clock += 60_001;
+    await a.beacon(beacon(view("/about")));
+    expect(visitor()).toMatch(/^[0-9a-f]{16}$/);
+    expect([before, after]).not.toContain(visitor());
+  });
+
   it("checks vitals against the site's sampling", async () => {
     const { a, writer } = analytics();
     const vitals = (sampleOneIn: number) => ({
@@ -496,5 +556,37 @@ describe("Node handler (cloudhal dev)", () => {
       { kind: "pageview", path: "/about", channel: "direct" },
       { kind: "render", path: "/gone-page", channel: null },
     ]);
+  });
+
+  it("limits by the socket address: a client-sent CF-Connecting-IP picks nothing off Cloudflare", async () => {
+    const handler = createNodeAnalytics({
+      siteId: site.id,
+      backend: backend(),
+      client,
+      defaults: deploymentDefaults("on", undefined),
+      record: true,
+      now: () => clock,
+    });
+    for (let i = 0; i < 35; i++)
+      await handler(
+        new Request("http://localhost:4321/__cloudhal/e", {
+          method: "POST",
+          body: JSON.stringify(view("/about", { referrer: "" })),
+          headers: {
+            "sec-fetch-site": "same-origin",
+            "user-agent": CHROME,
+            // a new "address" on every request: ignored, the socket address is the key
+            "cf-connecting-ip": `192.0.2.${i}`,
+          },
+        }),
+        page,
+        "127.0.0.1",
+      );
+    await new SqlAnalytics(sql).flush();
+    await new Promise((r) => setTimeout(r, 20));
+    const views = await sql.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM analytics_events WHERE kind = 'pageview'",
+    );
+    expect(views?.n).toBe(30); // the per-client allowance of one minute
   });
 });

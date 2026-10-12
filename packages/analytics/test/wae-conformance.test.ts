@@ -35,7 +35,7 @@ describe("WaeWriter → WaeReader", () => {
       range: { from: "2026-10-07", to: "2026-10-09" },
     });
     expect(r).toEqual({
-      data: { pageviews: 10, visits: 7, visitors: 5 },
+      data: { pageviews: 10, visits: 7, visitors: 5, renders: 4, signals: 1 },
       source: "live",
       estimated: true,
     });

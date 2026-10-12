@@ -13,6 +13,8 @@ import { FIXTURE_EVENTS, FIXTURE_OTHER_SITE, FIXTURE_SITE, NODE_A } from "./fixt
 import type { AnalyticsQuery } from "./model.ts";
 import { OTHER_KEY, RollupReader, runRollups, writeDailyRows } from "./rollup.ts";
 import {
+  createSaltProvider,
+  deleteSalt,
   deleteSaltsBefore,
   doneRollupDays,
   getEffectiveSettings,
@@ -130,6 +132,37 @@ export function describeAnalyticsStateSuite(label: string, factory: SqlFactory):
       await getOrCreateSalt(sql, "2026-10-08");
       expect(await deleteSaltsBefore(sql, "2026-10-09")).toBe(1);
       expect(await getOrCreateSalt(sql, "2026-10-09", { random: () => b })).toBe(x);
+      // the first salt of a new day deletes every earlier one in the same batch, so salts never
+      // outlive their day on deployments without the hourly job (CLOUDHAL_ANALYTICS_CRON=off)
+      const next = await getOrCreateSalt(sql, "2026-10-10", { random: () => "c".repeat(64) });
+      expect(next).toBe("c".repeat(64));
+      const left = await sql.all<{ day: string }>("SELECT day FROM analytics_salts ORDER BY day");
+      expect(left.map((r) => r.day)).toEqual(["2026-10-10"]);
+    });
+
+    it("the salt provider never keeps a deleted salt past its memo or a reset", async () => {
+      let t = 0;
+      const salt = createSaltProvider(sql, { now: () => t });
+      const first = await salt("2026-10-09");
+      expect(await salt("2026-10-09")).toBe(first);
+      // unique visitors switched off: the row is deleted
+      await deleteSalt(sql, "2026-10-09");
+      // a reset (the purge after a settings change) reads the row again: a new random salt
+      salt.reset();
+      const second = await salt("2026-10-09");
+      expect(second).not.toBe(first);
+      // without a reset, the memo lasts at most 60 s
+      await deleteSalt(sql, "2026-10-09");
+      t += 59_999;
+      expect(await salt("2026-10-09")).toBe(second);
+      t += 1;
+      const third = await salt("2026-10-09");
+      expect([first, second]).not.toContain(third);
+      const stored = await sql.get<{ salt: string }>(
+        "SELECT salt FROM analytics_salts WHERE day = ?",
+        ["2026-10-09"],
+      );
+      expect(stored?.salt).toBe(third);
     });
 
     it("the query budget counts to its limit and then refuses", async () => {
@@ -216,10 +249,10 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         const fromRollups = await rollups.query(q);
         expect(fromRollups.source).toBe("rollups");
         const live = await raw.query(q);
-        // rollups keep visitors only on the total; filtered summaries report none
+        // rollups keep visitors and renders only on the total; filtered summaries report none
         const want =
           q.kind === "summary" && q.filter
-            ? { ...(live.data as object), visitors: null }
+            ? { ...(live.data as object), visitors: null, renders: null, signals: null }
             : live.data;
         expect(fromRollups.data).toEqual(want);
       }
@@ -269,6 +302,30 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         [FIXTURE_SITE, "2026-10-07"],
       );
       expect(visitors?.visitors).toBe(3);
+      // people's HTML 200 renders (the estimated cache-hit ratio) sit beside the total
+      expect(rows.find((r) => r.dim === "renders")).toMatchObject({ key: "all" });
+      const renders = await sql.get<{ hits: number }>(
+        "SELECT hits FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'renders'",
+        [FIXTURE_SITE, "2026-10-07"],
+      );
+      expect(renders?.hits).toBe(2);
+      // a day rolled up before renders were kept has no row: the count is unknown, not 0
+      await sql.run(
+        "DELETE FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'renders'",
+        [FIXTURE_SITE, "2026-10-08"],
+      );
+      const partial = await new RollupReader(sql).query({
+        kind: "summary",
+        siteId: FIXTURE_SITE,
+        range: FULL,
+      });
+      expect(partial.data).toMatchObject({ pageviews: 10, renders: null, signals: 1 });
+      // page views with a privacy signal sit beside the total too
+      const signals = await sql.get<{ pageviews: number }>(
+        "SELECT pageviews FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'signals'",
+        [FIXTURE_SITE, "2026-10-07"],
+      );
+      expect(signals?.pageviews).toBe(1);
     });
 
     it("is idempotent: a second run has nothing to do, a redo writes the same rows", async () => {
@@ -356,7 +413,7 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
       const dayOne = { from: "2026-10-07", to: "2026-10-08" };
       expect(
         (await rollups.query({ kind: "summary", siteId: FIXTURE_SITE, range: dayOne })).data,
-      ).toEqual({ pageviews: 0, visits: 0, visitors: null });
+      ).toEqual({ pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 });
       // the next run picks the never-attempted day first, then retries the failed one
       const next = await runRollups({
         reader: raw,
@@ -398,8 +455,9 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         ],
         { source: "sql", now },
       );
-      await getOrCreateSalt(sql, "2026-10-08");
       await getOrCreateSalt(sql, "2026-10-09");
+      // a straggler from before midnight (creating today's salt already deleted yesterday's)
+      await getOrCreateSalt(sql, "2026-10-08");
       await putAnalyticsSettings(sql, {
         siteId: FIXTURE_SITE,
         rev: 0,

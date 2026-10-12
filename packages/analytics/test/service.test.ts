@@ -5,6 +5,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { demoEvents } from "../src/demo.ts";
 import { AnalyticsQueryError, AnalyticsSettingsConflictError } from "../src/errors.ts";
+import { estimatedCacheHitRatio } from "../src/model.ts";
 import {
   AnalyticsService,
   dailyRowsCsv,
@@ -17,6 +18,24 @@ import { getOrCreateSalt, SqlAnalytics, SqlQueryBudget } from "../src/sql/index.
 import { FIXTURE_EVENTS, FIXTURE_SITE, NODE_A } from "../src/testing.ts";
 
 const now = new Date("2026-10-09T05:17:00Z");
+const lines0 = (csv: string) => csv.trimEnd().split("\r\n");
+
+describe("estimated cache-hit ratio", () => {
+  it("is 1 − renders ÷ page views, clamped, and only on Cloudflare", () => {
+    expect(estimatedCacheHitRatio({ pageviews: 10, renders: 4 })).toBe(0.6);
+    expect(estimatedCacheHitRatio({ pageviews: 3, renders: 1 })).toBe(0.667);
+    expect(estimatedCacheHitRatio({ pageviews: 2, renders: 5 })).toBe(0);
+    expect(estimatedCacheHitRatio({ pageviews: 0, renders: 0 })).toBeNull();
+    expect(estimatedCacheHitRatio({ pageviews: 10, renders: null })).toBeNull();
+    const sql = {} as SqlDriver;
+    expect(
+      new AnalyticsService({ sql, store: "wae" }).cacheHitRatio({ pageviews: 10, renders: 4 }),
+    ).toBe(0.6);
+    expect(
+      new AnalyticsService({ sql, store: "sql" }).cacheHitRatio({ pageviews: 10, renders: 4 }),
+    ).toBeNull();
+  });
+});
 
 describe("ranges and filters", () => {
   it("presets cover whole UTC days ending with today", () => {
@@ -116,11 +135,11 @@ describe("AnalyticsService", () => {
       siteId: FIXTURE_SITE,
       range: { from: "2026-10-07", to: "2026-10-09" },
     });
-    expect(r.data).toEqual({ pageviews: 10, visits: 7, visitors: 5 });
+    expect(r.data).toEqual({ pageviews: 10, visits: 7, visitors: 5, renders: 4, signals: 1 });
     expect(r.source).toBe("live");
   });
 
-  it("settings: CAS, changes, purge on enabled/vitals, today's salt deleted when uniques turn off", async () => {
+  it("settings: CAS, changes, purge on enabled/vitals/uniques, today's salt deleted when uniques turn off", async () => {
     const first = await service.updateSettings({
       siteId: FIXTURE_SITE,
       rev: 0,
@@ -129,8 +148,9 @@ describe("AnalyticsService", () => {
     });
     expect(first.after.rev).toBe(1);
     expect(first.changes).toEqual({ uniqueVisitors: { from: false, to: true } });
-    expect(first.purged).toBe(false);
-    expect(purged).toEqual([]);
+    // the purge also resets the Site Worker's memo of settings and salt
+    expect(first.purged).toBe(true);
+    expect(purged).toEqual([FIXTURE_SITE]);
     await getOrCreateSalt(sql, "2026-10-09");
     await getOrCreateSalt(sql, "2026-10-08");
 
@@ -142,7 +162,7 @@ describe("AnalyticsService", () => {
     });
     expect(off.saltDeleted).toBe(true);
     expect(off.purged).toBe(true);
-    expect(purged).toEqual([FIXTURE_SITE]);
+    expect(purged).toEqual([FIXTURE_SITE, FIXTURE_SITE]);
     const salts = await sql.all<{ day: string }>("SELECT day FROM analytics_salts ORDER BY day");
     expect(salts.map((s) => s.day)).toEqual(["2026-10-08"]);
 
@@ -191,7 +211,16 @@ describe("AnalyticsService", () => {
     const status = await service.status(FIXTURE_SITE);
     expect(status.lastRollup).toMatchObject({ day: "2026-10-08", source: "sql" });
     expect(status.budget).toBeNull();
-    expect(status.quota).toMatchObject({ day: "2026-10-08", pageviews: 4 });
+    // locally there is no edge cache: the render count is reported, the ratio is not
+    expect(status.quota).toMatchObject({
+      day: "2026-10-08",
+      pageviews: 4,
+      renders: 2,
+      cacheHitRatio: null,
+    });
+    expect(
+      lines0(await service.exportCsv(FIXTURE_SITE, { from: "2026-10-07", to: "2026-10-08" })),
+    ).toContain("2026-10-07,renders,all,0,0,,2,,,,");
     const csv = await service.exportCsv(FIXTURE_SITE, { from: "2026-10-07", to: "2026-10-09" });
     const lines = csv.trimEnd().split("\r\n");
     expect(lines[0]).toBe("day,dim,key,pageviews,visits,visitors,hits,value,samples,good,poor");

@@ -175,6 +175,10 @@ const SALT_RE = /^[0-9a-f]{64}$/;
 /**
  * The deployment's salt for a UTC day: the first caller inserts a random one (`INSERT OR IGNORE`)
  * and everyone reads the stored row back, so concurrent isolates agree.
+ *
+ * The same atomic `batch()` deletes every salt of an earlier day, so a salt never outlives its day
+ * by more than the first hashed page view of the next one — also on deployments without the hourly
+ * job (`CLOUDHAL_ANALYTICS_CRON=off`), where the cron's own deletion never runs (RFC-0006 §6.2).
  */
 export async function getOrCreateSalt(
   sql: SqlDriver,
@@ -183,10 +187,12 @@ export async function getOrCreateSalt(
 ): Promise<string> {
   const candidate = (options.random ?? randomSalt)();
   if (!SALT_RE.test(candidate)) throw new Error("a salt is 64 lower-case hex characters");
-  await sql.run("INSERT OR IGNORE INTO analytics_salts (day, salt, created_at) VALUES (?, ?, ?)", [
-    day,
-    candidate,
-    (options.now ?? new Date()).toISOString(),
+  await sql.batch([
+    {
+      sql: "INSERT OR IGNORE INTO analytics_salts (day, salt, created_at) VALUES (?, ?, ?)",
+      params: [day, candidate, (options.now ?? new Date()).toISOString()],
+    },
+    { sql: "DELETE FROM analytics_salts WHERE day < ?", params: [day] },
   ]);
   const row = await sql.get<{ salt: string }>("SELECT salt FROM analytics_salts WHERE day = ?", [
     day,
@@ -205,19 +211,41 @@ export async function deleteSalt(sql: SqlDriver, day: string): Promise<void> {
   await sql.run("DELETE FROM analytics_salts WHERE day = ?", [day]);
 }
 
-/** A per-isolate memo of today's salt for the beacon handler (`BeaconContext.salt`). */
-export function createSaltProvider(sql: SqlDriver): (day: string) => Promise<string> {
-  let memo: { day: string; salt: Promise<string> } | undefined;
-  return (day) => {
-    if (memo?.day !== day) {
+/** `BeaconContext.salt` with a way to forget the memoised value. */
+export type SaltProvider = ((day: string) => Promise<string>) & {
+  /** Forget the memoised salt: the next call reads (or creates) the stored row again. */
+  reset(): void;
+};
+
+/**
+ * A per-isolate memo of today's salt for the beacon handler (`BeaconContext.salt`). The stored
+ * row is read again at least every `ttlMs` (default 60 s, the settings memo's lifetime) and after
+ * `reset()`, so a salt deleted in D1 ("unique visitors" switched off) is not used beyond that:
+ * the next read finds no row and a new random salt is created, unlinkable to the deleted one.
+ */
+export function createSaltProvider(
+  sql: SqlDriver,
+  options: { ttlMs?: number; now?: () => number } = {},
+): SaltProvider {
+  const ttl = options.ttlMs ?? 60_000;
+  const now = options.now ?? Date.now;
+  let memo: { day: string; at: number; salt: Promise<string> } | undefined;
+  const provider = (day: string) => {
+    const t = now();
+    if (memo?.day !== day || t - memo.at >= ttl) {
       const salt = getOrCreateSalt(sql, day);
-      memo = { day, salt };
+      memo = { day, at: t, salt };
       salt.catch(() => {
         if (memo?.salt === salt) memo = undefined;
       });
     }
     return memo.salt;
   };
+  return Object.assign(provider, {
+    reset: () => {
+      memo = undefined;
+    },
+  });
 }
 
 // ───────────────────────────── query budget ─────────────────────────────

@@ -16,6 +16,7 @@ import {
   CHANNELS,
   COUNTRY_RE,
   DEVICES,
+  estimatedCacheHitRatio,
   type Filter,
   ID_RE,
   MAX_LIVE_DAYS,
@@ -23,6 +24,7 @@ import {
   type ParsedRange,
   parseRange,
   type Range,
+  type SummaryData,
   startOfUtcDay,
   utcDay,
 } from "./model.ts";
@@ -117,7 +119,7 @@ export interface UpdateSettingsResult {
   readonly after: AnalyticsSettings;
   /** Today's salt was deleted (unique visitors turned off). */
   readonly saltDeleted: boolean;
-  /** The site's cache was purged (enabled or vitals sampling changed); `false` when it failed. */
+  /** The site's cache was purged (enabled, vitals sampling or unique visitors changed); `false` when it failed. */
   readonly purged: boolean;
   /** What changed, `{field: {from, to}}` (the audit row). */
   readonly changes: Readonly<Record<string, { from: unknown; to: unknown }>>;
@@ -134,6 +136,13 @@ export interface QuotaEstimate {
    * with Workers Free's 100,000 requests a day (RFC-0006 §10.1). An estimate.
    */
   readonly requests: number;
+  /** People's HTML `200` renders that day (cache misses); `null` when not known. */
+  readonly renders: number | null;
+  /**
+   * The estimated cache-hit ratio that day (`1 − renders ÷ page views`, RFC-0006 §5.4), only where an
+   * edge cache sits in front of the Worker (`store: "wae"`); otherwise `null`. An estimate.
+   */
+  readonly cacheHitRatio: number | null;
 }
 
 export interface AnalyticsStatus {
@@ -287,6 +296,14 @@ export class AnalyticsService {
     };
   }
 
+  /**
+   * The estimated cache-hit ratio of a summary (`estimatedCacheHitRatio`), but only on Cloudflare
+   * (`store: "wae"`): locally and on Node there is no edge cache, and every page is rendered.
+   */
+  cacheHitRatio(summary: Pick<SummaryData, "pageviews" | "renders">): number | null {
+    return this.#o.store === "wae" ? estimatedCacheHitRatio(summary) : null;
+  }
+
   /** The settings that apply to a site now (its row, or the deployment defaults). */
   settings(siteId: string): Promise<EffectiveAnalyticsSettings> {
     return getEffectiveSettings(this.sql, siteId, this.defaults);
@@ -325,7 +342,8 @@ export class AnalyticsService {
    * Writes a site's settings (CAS on `rev`). Turning unique visitors off deletes today's salt —
    * the deployment's only one, so every site's hashes start over for the rest of the UTC day
    * (RFC-0006 §6.2; see the implementation notes). Changing `enabled` or `vitalsOneIn` purges the
-   * site's cache so the script tag follows.
+   * site's cache so the script tag follows; changing `uniqueVisitors` purges too, because the purge
+   * makes the Site Worker forget its memoised settings and salt.
    */
   async updateSettings(input: UpdateSettingsInput): Promise<UpdateSettingsResult> {
     const now = this.now();
@@ -346,7 +364,9 @@ export class AnalyticsService {
       saltDeleted = true;
     }
     let purged = false;
-    if ((changes.enabled || changes.vitalsOneIn) && this.#o.purgeSite) {
+    // A purge also resets the Site Worker's memo of settings and the day's salt, so switching
+    // unique visitors on or off purges too: a salt deleted in D1 must not stay in use.
+    if ((changes.enabled || changes.vitalsOneIn || changes.uniqueVisitors) && this.#o.purgeSite) {
       try {
         await this.#o.purgeSite(input.siteId);
         purged = true;
@@ -401,7 +421,14 @@ export class AnalyticsService {
         settings.vitalsOneIn > 0 ? Math.round(samples / settings.vitalsOneIn) : 0;
       const pageviews = summary.data.pageviews;
       const beacons = pageviews + vitalsBeacons;
-      return { day: range.from, pageviews, beacons, requests: pageviews + beacons };
+      return {
+        day: range.from,
+        pageviews,
+        beacons,
+        requests: pageviews + beacons,
+        renders: summary.data.renders,
+        cacheHitRatio: this.cacheHitRatio(summary.data),
+      };
     } catch (error) {
       this.#o.onError?.("analytics quota estimate failed", error);
       return null;

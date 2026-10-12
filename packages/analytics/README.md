@@ -21,7 +21,7 @@ The site side (`POST /__cloudhal/e`, the script tag, render events) lives in `@c
 
 ```ts
 type AnalyticsQuery =
-  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null }
+  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null, renders | null, signals | null }
   | { kind: "series"; siteId; range; interval: "hour" | "day"; filter? } // { interval, points[{ t, pageviews, visits }] }
   | { kind: "top"; siteId; range; dimension; limit; filter? }      // { dimension, rows[{ key, pageviews, visits }] }
   | { kind: "vitals"; siteId; range; filter? }                     // { metrics[{ metric, p75, samples, good, needsImprovement, poor }] }
@@ -36,16 +36,19 @@ interface AnalyticsStore extends AnalyticsReader, AnalyticsWriter { kind: "wae" 
 
 `assertAnalyticsQuery(q, { maxDays })` checks a query (ids, enums, ISO instants, ≤ 92 days live, hourly ≤ 7 days, `limit` 1–1000) and throws `AnalyticsQueryError` (`code: "invalid_query"`). Errors carry a `code` for the API: `analytics_unavailable` (503, `retryable`), `analytics_query_failed` (502), `analytics_budget_exceeded`, `unsupported_query`, `conflict` (409), `invalid_settings`.
 
-Semantics every store shares (checked by the conformance suite): a visit is an entrance page view; `visitors` is the sum of daily distinct hashes (`null` when no view in the range carried one); vitals and renders weigh each event by its `sampleOneIn`; p75 is the weighted nearest rank; top lists order by page views, then key, and leave out views without a value.
+Semantics every store shares (checked by the conformance suite): a visit is an entrance page view; `visitors` is the sum of daily distinct hashes (`null` when no view in the range carried one); vitals and renders weigh each event by its `sampleOneIn`; `renders` counts people's HTML `200` renders (no crawler, not a bot) under the node/country/device filter and is `null` under a channel filter or where rollups do not keep it, and `estimatedCacheHitRatio(summary)` turns it into `1 − renders ÷ page views` (an estimate; `AnalyticsService.cacheHitRatio` reports it only for `store: "wae"`); p75 is the weighted nearest rank; top lists order by page views, then key, and leave out views without a value.
 
 ## Site Worker: beacons and render events
 
 ```ts
-import { BeaconRateLimiter, buildRenderEvent, handleBeacon, RenderEventSampler } from "@cloudhal/analytics";
+import { BeaconRateLimiter, buildRenderEvent, handleBeacon, RenderEventSampler, SharedBeaconRateLimiter } from "@cloudhal/analytics";
 import { createSaltProvider, getEffectiveSettings } from "@cloudhal/analytics/sql";
 import { WaeWriter } from "@cloudhal/analytics/wae";
 
 const limiter = new BeaconRateLimiter();          // per isolate
+// optional, across isolates (`analytics.rateLimit`): a Workers Rate Limiting binding keyed by an
+// HMAC under a deployment secret; fails open, so the per-isolate limit always applies
+const shared = env.ANALYTICS_RL ? new SharedBeaconRateLimiter(env.ANALYTICS_RL, { secret }) : undefined;
 const salt = createSaltProvider(sql);             // memoised per UTC day
 return handleBeacon(request, {                    // 204 for every outcome, 405 for other methods
   siteId,
@@ -54,7 +57,8 @@ return handleBeacon(request, {                    // 204 for every outcome, 405 
   resolvePath: (path) => publishedNode(path),     // { nodeId, nodeKind, locale? } or undefined
   writer: new WaeWriter(env.ANALYTICS),
   salt,
-  rateLimit: (ip, kind) => limiter.allow(ip, kind),
+  clientIp: request.headers.get("cf-connecting-ip") ?? undefined, // trusted on Cloudflare only; Node: the socket address
+  rateLimit: async (ip, kind) => (await limiter.allow(ip, kind)) && (await (shared?.allow(ip) ?? true)),
   onError: (m, e) => console.error(m, e),
 });
 ```

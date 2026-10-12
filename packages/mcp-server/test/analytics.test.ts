@@ -133,11 +133,33 @@ describe("analytics tools", () => {
         pageviews: 10,
         visits: 7,
         visitors: 5,
+        renders: 4,
+        // no edge cache in front of SQLite: no ratio
+        cacheHitRatio: null,
+        // one view in ten carried GPC/DNT
+        signals: 1,
+        privacySignalShare: 0.1,
         previous: { pageviews: 0, range: { from: "2026-10-05", to: "2026-10-07" } },
         change: { pageviews: null },
       },
       series: { interval: "hour" },
     });
+    // on Cloudflare (WAE store): 1 − 4 renders ÷ 10 page views, labelled an estimate
+    const onCloudflare = await connect(
+      { scopes: ["analytics:read"] },
+      {
+        analytics: new AnalyticsService({
+          sql,
+          store: "wae",
+          live: new SqlAnalytics(sql),
+          defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 5 },
+          now: () => NOW,
+        }),
+      },
+    );
+    const cf = await onCloudflare.call("get_analytics", { siteId, ...FULL });
+    expect(cf.isError, cf.text).toBe(false);
+    expect(cf.data?.summary).toMatchObject({ renders: 4, cacheHitRatio: 0.6 });
     const top = r.data?.topContent as { nodeId: string; title: string; exists: boolean }[];
     expect(top[0]).toMatchObject({
       nodeId: entry.id,

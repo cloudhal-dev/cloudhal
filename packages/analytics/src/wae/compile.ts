@@ -79,6 +79,11 @@ export interface CompiledWaeQuery {
   readonly query: string;
   /** Summary only: daily distinct visitors, run when the main statement found hashed views. */
   readonly visitors?: string;
+  /**
+   * Summary only: people's HTML `200` renders (no crawler, not a bot), weighted by `sampleOneIn`,
+   * for the estimated cache-hit ratio. Absent under a `channel` filter (renders carry no channel).
+   */
+  readonly renders?: string;
   readonly range: ParsedRange;
 }
 
@@ -115,7 +120,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
       return {
         range,
         query: [
-          `SELECT COUNT(*) AS pageviews, ${visits}, countIf(blob${BLOB.visitor} != '') AS hashed`,
+          `SELECT COUNT(*) AS pageviews, ${visits}, countIf(blob${BLOB.visitor} != '') AS hashed, SUM(double${DOUBLE.privacySignal}) AS signals`,
           from,
           ...w,
         ].join("\n"),
@@ -127,6 +132,16 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
           "GROUP BY day",
           "ORDER BY day",
         ].join("\n"),
+        ...(q.filter?.channel === undefined
+          ? {
+              renders: [
+                `SELECT SUM(double${DOUBLE.sampleOneIn}) AS renders`,
+                from,
+                ...where(q.siteId, "render", range, q.filter),
+                `  AND double${DOUBLE.status} = 200 AND blob${BLOB.crawler} = '' AND blob${BLOB.device} != 'bot'`,
+              ].join("\n"),
+            }
+          : {}),
       };
     }
     case "series": {

@@ -72,6 +72,7 @@ export const FIXTURE_EVENTS: readonly AnalyticsEvent[] = [
     os: "windows",
     visitor: "00000000000000b2",
   }),
+  // GPC or DNT: counted, never hashed
   pv(`${D1}T09:45:00Z`, NODE_HOME, "/", "page", {
     channel: "direct",
     entrance: true,
@@ -79,6 +80,7 @@ export const FIXTURE_EVENTS: readonly AnalyticsEvent[] = [
     device: "desktop",
     browser: "firefox",
     os: "linux",
+    privacySignal: true,
   }),
   pv(`${D1}T10:00:00Z`, NODE_A, "/posts/a", "entry", {
     refHost: "chatgpt.com",
@@ -347,6 +349,56 @@ export const FIXTURE_EVENTS: readonly AnalyticsEvent[] = [
     nodeId: NODE_B,
     nodeKind: "entry",
     device: "desktop",
+  }, // ── cache misses people caused (published HTML 200s): the estimated cache-hit ratio
+  {
+    schemaVersion: 1,
+    kind: "render",
+    siteId: S,
+    timestamp: `${D1}T08:00:05Z`,
+    path: "/posts/a",
+    status: 200,
+    nodeId: NODE_A,
+    nodeKind: "entry",
+    country: "TR",
+    device: "mobile",
+    renderMs: 45,
+  },
+  {
+    schemaVersion: 1,
+    kind: "render",
+    siteId: S,
+    timestamp: `${D1}T09:45:30Z`,
+    path: "/",
+    status: 200,
+    nodeId: NODE_HOME,
+    nodeKind: "page",
+    country: "US",
+    device: "desktop",
+  },
+  {
+    schemaVersion: 1,
+    kind: "render",
+    siteId: S,
+    timestamp: `${D2}T12:00:10Z`,
+    path: "/posts/b",
+    status: 200,
+    nodeId: NODE_B,
+    nodeKind: "entry",
+    country: "GB",
+    device: "tablet",
+    sampleOneIn: 2,
+  },
+  // an unnamed bot's 200 is not a person's cache miss
+  {
+    schemaVersion: 1,
+    kind: "render",
+    siteId: S,
+    timestamp: `${D2}T06:00:00Z`,
+    path: "/posts/a",
+    status: 200,
+    nodeId: NODE_A,
+    nodeKind: "entry",
+    device: "bot",
   },
 ];
 
@@ -379,42 +431,42 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
   c(
     "summary",
     { kind: "summary", siteId: S, range: FULL },
-    { pageviews: 10, visits: 7, visitors: 5 },
+    { pageviews: 10, visits: 7, visitors: 5, renders: 4, signals: 1 },
   ),
   c(
     "summary-day1",
     { kind: "summary", siteId: S, range: { from: D1, to: D2 } },
-    { pageviews: 6, visits: 5, visitors: 3 },
+    { pageviews: 6, visits: 5, visitors: 3, renders: 2, signals: 1 },
   ),
   c(
     "summary-no-visitors",
     { kind: "summary", siteId: S, range: { from: `${D1}T09:40:00Z`, to: `${D1}T09:50:00Z` } },
-    { pageviews: 1, visits: 1, visitors: null },
+    { pageviews: 1, visits: 1, visitors: null, renders: 1, signals: 1 },
   ),
   c(
     "summary-node",
     { kind: "summary", siteId: S, range: FULL, filter: { node: NODE_A } },
-    { pageviews: 5, visits: 3, visitors: 3 },
+    { pageviews: 5, visits: 3, visitors: 3, renders: 1, signals: 0 },
   ),
   c(
     "summary-channel",
     { kind: "summary", siteId: S, range: FULL, filter: { channel: "social" } },
-    { pageviews: 2, visits: 2, visitors: 2 },
+    { pageviews: 2, visits: 2, visitors: 2, renders: null, signals: 0 },
   ),
   c(
     "summary-country",
     { kind: "summary", siteId: S, range: FULL, filter: { country: "DE" } },
-    { pageviews: 2, visits: 2, visitors: 1 },
+    { pageviews: 2, visits: 2, visitors: 1, renders: 0, signals: 0 },
   ),
   c(
     "summary-device",
     { kind: "summary", siteId: S, range: FULL, filter: { device: "desktop" } },
-    { pageviews: 4, visits: 4, visitors: 2 },
+    { pageviews: 4, visits: 4, visitors: 2, renders: 1, signals: 1 },
   ),
   c(
     "summary-empty-site",
     { kind: "summary", siteId: "site_01HZXNOTHING", range: FULL },
-    { pageviews: 0, visits: 0, visitors: null },
+    { pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 },
   ),
   c(
     "series-day",

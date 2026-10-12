@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "pageview",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T08:21:12Z",
+  "path": "/posts/ferry-timetables",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "nodeKind": "entry",
+  "refHost": "duckduckgo.com",
+  "channel": "search",
+  "entrance": true,
+  "country": "DE",
+  "device": "desktop",
+  "browser": "firefox",
+  "os": "linux",
+  "navType": "navigate",
+  "locale": "en",
+  "privacySignal": true
+}

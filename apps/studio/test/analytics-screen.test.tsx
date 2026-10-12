@@ -169,6 +169,10 @@ function analyticsServer(
             visits: 8900,
             visitors: null,
             viewsPerVisit: 1.39,
+            renders: 1240,
+            cacheHitRatio: 0.9,
+            signals: 620,
+            privacySignalShare: 0.05,
             previous: { pageviews: 11000, visits: 8800, visitors: null, range: {} },
           }))
         : undefined,
@@ -259,6 +263,10 @@ describe("AnalyticsPage", () => {
     expect(within(vitals).getByText("Poor")).toBeInTheDocument();
     expect(within(vitals).getByText("p75 2.1 sec · 80% good")).toBeInTheDocument();
     expect(screen.getByText("Cookie-less")).toBeInTheDocument();
+    // the estimated cache-hit ratio, labelled as an estimate
+    const about = screen.getByTestId("analytics-about");
+    expect(within(about).getByText("Cache hits (estimated)")).toBeInTheDocument();
+    expect(within(about).getByText("about 90%")).toBeInTheDocument();
     const csv = screen.getByRole("link", { name: /Export CSV/ });
     expect(csv.getAttribute("href")).toBe(`${A}/export?range=30d`);
     // The default range is sent by name, so the server's clock decides the days.
@@ -387,6 +395,21 @@ describe("AnalyticsPage", () => {
     const banner = await screen.findByTestId("analytics-error", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Cloudflare's analytics service is busy");
     expect(within(banner).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("shows the share of page views with GPC or DNT next to unique visitors", async () => {
+    serve(...analyticsServer());
+    render(wrap(<AnalyticsPage />));
+    await screen.findByText("12,400");
+    // unique visitors off: no hash is formed for anyone, so the share is not shown
+    expect(screen.queryByText("Privacy signals")).toBeNull();
+    cleanup();
+    const unique = statusWith({ settings: { ...SETTINGS, uniqueVisitors: true } });
+    serve(...analyticsServer("owner", { status: { status: 200, body: unique } }));
+    render(wrap(<AnalyticsPage />));
+    const about = await screen.findByTestId("analytics-about");
+    expect(await within(about).findByText("Privacy signals")).toBeInTheDocument();
+    expect(within(about).getByText("5% of page views")).toBeInTheDocument();
   });
 
   it("warns about the Workers Free limit unless the plan is marked paid", async () => {

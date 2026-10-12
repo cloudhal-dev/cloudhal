@@ -16,10 +16,24 @@ export interface AnalyticsConfig {
   readonly queryBudget?: number;
   /** Days of raw events kept in SQLite locally and on Node (default 90). */
   readonly rawRetentionDays?: number;
-  /** Workers Rate Limiting binding (not wired yet; per-isolate limits apply). */
-  readonly rateLimit?: boolean;
+  /**
+   * Workers Rate Limiting binding for the beacon (RFC-0006 §5.5): `true` for the defaults, or
+   * `{ limit, namespaceId }`. A cross-isolate limit on top of the per-isolate one; off when absent.
+   */
+  readonly rateLimit?: boolean | AnalyticsRateLimitConfig;
   /** Record `cloudhal dev` traffic locally (default off: it is the author's own). */
   readonly dev?: boolean;
+}
+
+/** `cloudhal.json` → `analytics.rateLimit` as an object. */
+export interface AnalyticsRateLimitConfig {
+  /** Beacons per client per 60 s across isolates (default 120; 1–10,000). */
+  readonly limit?: number;
+  /**
+   * The binding's `namespace_id`: a positive integer, unique in the Cloudflare account. Default:
+   * derived from the deployment name, so two deployments in one account do not share counters.
+   */
+  readonly namespaceId?: string;
 }
 
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
@@ -56,9 +70,23 @@ export function parseAnalyticsConfig(input: unknown): AnalyticsConfig | undefine
     ...int("vitalsOneIn", (n) => VITALS.includes(n)),
     ...int("queryBudget", (n) => n >= 0),
     ...int("rawRetentionDays", (n) => n >= 1),
-    ...bool("rateLimit"),
+    ...rateLimitOf(o.rateLimit),
     ...bool("dev"),
   };
+}
+
+function rateLimitOf(v: unknown): { rateLimit?: boolean | AnalyticsRateLimitConfig } {
+  if (typeof v === "boolean") return { rateLimit: v };
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const o = v as Record<string, unknown>;
+  const limit =
+    Number.isInteger(o.limit) && (o.limit as number) >= 1 && (o.limit as number) <= 10_000
+      ? { limit: o.limit as number }
+      : {};
+  const id = typeof o.namespaceId === "number" ? String(o.namespaceId) : o.namespaceId;
+  const namespaceId =
+    typeof id === "string" && /^[1-9]\d{0,17}$/.test(id) ? { namespaceId: id } : {};
+  return { rateLimit: { ...limit, ...namespaceId } };
 }
 
 /** Whether the deployment records analytics: the block is there and not switched off. */

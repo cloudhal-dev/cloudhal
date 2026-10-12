@@ -48,8 +48,8 @@ const DIM_COLUMN: Record<Dimension, string> = {
 const INSERT = `INSERT INTO analytics_events (site_id, ts, kind, path, node_id, node_kind, ref_host,
   ref_path, channel, utm_source, utm_medium, utm_campaign, country, device, browser, os, visitor,
   nav_type, locale, crawler, redirect_to, status, entrance, lcp, inp, cls, ttfb, fcp, render_ms,
-  sample_one_in) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-  ?, ?, ?, ?, ?)`;
+  sample_one_in, privacy_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 /** The `analytics_events` row of an event (timestamps normalised to `toISOString()`). */
 export function eventParams(e: AnalyticsEvent): SqlValue[] {
@@ -87,6 +87,7 @@ export function eventParams(e: AnalyticsEvent): SqlValue[] {
     n("fcp"),
     n("renderMs"),
     n("sampleOneIn") ?? 1,
+    e.kind === "pageview" && e.privacySignal ? 1 : null,
   ];
 }
 
@@ -195,17 +196,28 @@ export class SqlAnalytics implements AnalyticsStore {
   async #summary(q: SummaryQuery, range: ParsedRange) {
     const w = where(q.siteId, "pageview", range, q.filter);
     const totals = await this.#sql.get(
-      `SELECT COUNT(*) AS pageviews, COALESCE(SUM(entrance), 0) AS visits FROM analytics_events WHERE ${w.sql}`,
+      `SELECT COUNT(*) AS pageviews, COALESCE(SUM(entrance), 0) AS visits, COALESCE(SUM(privacy_signal), 0) AS signals FROM analytics_events WHERE ${w.sql}`,
       w.params,
     );
     const v = await this.#sql.get(
       `SELECT COUNT(*) AS days, COALESCE(SUM(n), 0) AS visitors FROM (SELECT substr(ts, 1, 10) AS d, COUNT(DISTINCT visitor) AS n FROM analytics_events WHERE ${w.sql} AND visitor IS NOT NULL GROUP BY d)`,
       w.params,
     );
+    let renders: number | null = null;
+    if (q.filter?.channel === undefined) {
+      const rw = where(q.siteId, "render", range, q.filter);
+      const r = await this.#sql.get(
+        `SELECT COALESCE(SUM(sample_one_in), 0) AS renders FROM analytics_events WHERE ${rw.sql} AND status = 200 AND crawler IS NULL AND device != 'bot'`,
+        rw.params,
+      );
+      renders = num(r?.renders);
+    }
     return {
       pageviews: num(totals?.pageviews),
       visits: num(totals?.visits),
       visitors: num(v?.days) > 0 ? num(v?.visitors) : null,
+      renders,
+      signals: num(totals?.signals),
     };
   }
 

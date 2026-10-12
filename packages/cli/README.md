@@ -38,7 +38,7 @@ Each published page carries one first-party script (`/_cloudhal/p.<hash>.js`, un
 | `queryBudget` | `8000` | Uncached WAE queries per UTC day; past it, live numbers pause until midnight UTC and complete days still come from D1. |
 | `rawRetentionDays` | `90` | Raw events kept in SQLite (local and Node only; WAE keeps 3 months). |
 | `dev` | `false` | Record `cloudhal dev` traffic locally (it is your own). |
-| `rateLimit` | `false` | Reserved for the Workers Rate Limiting binding; accepted but not wired yet. |
+| `rateLimit` | `false` | `true` or `{ "limit": 120, "namespaceId": "…" }`: adds a Workers Rate Limiting binding (`ANALYTICS_RL`) that limits beacons per client across isolates (`limit` per 60 s, default 120; the namespace id is derived from the deployment name unless set). On top of the per-isolate limits; whether Workers Free offers the binding is unconfirmed. |
 
 ```json
 { "siteId": "site_…", "analytics": { "enabled": true, "vitalsOneIn": 5 } }

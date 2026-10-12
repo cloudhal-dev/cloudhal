@@ -9,6 +9,7 @@ import {
   normaliseHost,
   normaliseUtm,
   RenderEventSampler,
+  SharedBeaconRateLimiter,
   toRequestPath,
   visitorHash,
 } from "../src/index.ts";
@@ -306,6 +307,45 @@ describe("per-isolate limits", () => {
     expect(await limiter.allow("198.51.100.1", "pageview")).toBe(true);
     t = 60_000;
     expect(await limiter.allow("203.0.113.9", "pageview")).toBe(true);
+  });
+
+  it("keys the shared Rate Limiting binding by a stable HMAC, never the IP, and fails open", async () => {
+    const keys: string[] = [];
+    let allow = true;
+    const binding = {
+      limit: async ({ key }: { key: string }) => {
+        keys.push(key);
+        return { success: allow };
+      },
+    };
+    const secret = "a-deployment-secret-of-32-chars!";
+    const a = new SharedBeaconRateLimiter(binding, { secret });
+    const b = new SharedBeaconRateLimiter(binding, { secret }); // another isolate
+    expect(await a.allow("203.0.113.9")).toBe(true);
+    expect(await b.allow("203.0.113.9")).toBe(true);
+    expect(await a.allow("198.51.100.1")).toBe(true);
+    expect(keys[0]).toMatch(/^[0-9a-f]{32}$/);
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+    expect(keys.join()).not.toContain("203");
+    const other = new SharedBeaconRateLimiter(binding, {
+      secret: "another-secret-of-32-characters!",
+    });
+    expect(await other.keyFor("203.0.113.9")).not.toBe(keys[0]);
+    allow = false;
+    expect(await a.allow("203.0.113.9")).toBe(false);
+    // no IP, no usable secret, or a failing binding: allowed (the per-isolate limits still apply)
+    expect(await a.allow("")).toBe(true);
+    expect(await new SharedBeaconRateLimiter(binding, { secret: "short" }).allow("1.2.3.4")).toBe(
+      true,
+    );
+    const errors: string[] = [];
+    const failing = new SharedBeaconRateLimiter(
+      { limit: () => Promise.reject(new Error("binding down")) },
+      { secret, onError: (m) => errors.push(m) },
+    );
+    expect(await failing.allow("203.0.113.9")).toBe(true);
+    expect(errors).toEqual(["analytics rate limit binding failed"]);
   });
 
   it("samples render floods 1 in 10, then 1 in 100", () => {

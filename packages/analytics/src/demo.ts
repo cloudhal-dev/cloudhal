@@ -206,6 +206,8 @@ export function demoEvents(options: DemoOptions): AnalyticsEvent[] {
         browser,
         os,
         ...(visitor ? { visitor } : {}),
+        // the unhashed views stand for browsers sending GPC or DNT
+        ...(options.uniqueVisitors && !visitor ? { privacySignal: true } : {}),
         navType,
         ...(node.locale ? { locale: node.locale } : {}),
         entrance,

@@ -52,30 +52,34 @@ describe("WaeReader", () => {
     const budget = counting(100);
     const make = () => new WaeReader(wae, { dataset, budget, now: () => now });
     const first = await make().query(q);
-    expect(wae.queries).toHaveLength(2); // totals + daily visitors
+    expect(wae.queries).toHaveLength(3); // totals + daily visitors + people's renders
     const again = await make().query({
       ...q,
       range: { from: "2026-10-07T00:00:00Z", to: "2026-10-09T00:00:00.000Z" },
     });
     expect(again).toEqual(first);
-    expect(wae.queries).toHaveLength(2);
-    expect(budget.taken).toBe(2);
+    expect(wae.queries).toHaveLength(3);
+    expect(budget.taken).toBe(3);
     now = new Date(now.getTime() + 60_001);
     await make().query(q);
-    expect(wae.queries).toHaveLength(4);
-    await make().query({ ...q, filter: { device: "mobile" } });
     expect(wae.queries).toHaveLength(6);
+    await make().query({ ...q, filter: { device: "mobile" } });
+    expect(wae.queries).toHaveLength(9);
+    // a channel filter has no render count (renders carry no channel): no third statement
+    const channel = await make().query({ ...q, filter: { channel: "social" } });
+    expect(channel.data.renders).toBeNull();
+    expect(wae.queries).toHaveLength(11);
   });
 
   it("skips the visitors statement when no view carried a hash", async () => {
     const wae = new FakeWae(dataset);
     const r = await new WaeReader(wae, { dataset, cacheTtlMs: 0 }).query(q);
     expect(r).toEqual({
-      data: { pageviews: 0, visits: 0, visitors: null },
+      data: { pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 },
       source: "live",
       estimated: false,
     });
-    expect(wae.queries).toHaveLength(1);
+    expect(wae.queries).toHaveLength(2); // totals + renders, no visitors
   });
 
   it("stops at the daily budget", async () => {
@@ -100,7 +104,13 @@ describe("WaeReader", () => {
         waits.push(ms);
       },
     });
-    expect((await reader.query(q)).data).toEqual({ pageviews: 3, visits: 2, visitors: null });
+    expect((await reader.query(q)).data).toEqual({
+      pageviews: 3,
+      visits: 2,
+      visitors: null,
+      renders: 0,
+      signals: 0,
+    });
     expect(waits).toEqual([250]);
   });
 

@@ -84,6 +84,44 @@ export interface SummaryData {
   readonly visits: number;
   /** Daily unique visitors, summed over the range's days; `null` when no view carried a hash. */
   readonly visitors: number | null;
+  /**
+   * Pages the site Worker rendered for people: render events with status `200` (published HTML,
+   * which is a cache miss by definition), no known crawler and not a bot, weighted by
+   * `sampleOneIn`; the node, country and device filters apply. `null` when unknown: under a
+   * `channel` filter (render events carry no channel), and from rollups that do not keep it
+   * (filtered summaries, and days rolled up before it was kept). Feeds `estimatedCacheHitRatio`.
+   */
+  readonly renders: number | null;
+  /**
+   * Page views whose beacon carried GPC or DNT (`privacySignal`), under the same filter: counted,
+   * never hashed, so `visitors` is a lower bound. `null` from rollups that do not keep it (filtered
+   * summaries, and days rolled up before it was kept). Views recorded before the field existed
+   * count as without a signal.
+   */
+  readonly signals: number | null;
+}
+
+/** Share of page views that carried a privacy signal (0–1, three decimals); `null` when unknown. */
+export function privacySignalShare(
+  summary: Pick<SummaryData, "pageviews" | "signals">,
+): number | null {
+  if (summary.signals === null || summary.pageviews <= 0) return null;
+  return Math.round(Math.min(1, summary.signals / summary.pageviews) * 1000) / 1000;
+}
+
+/**
+ * The estimated cache-hit ratio (RFC-0006 §5.4): `1 − renders ÷ page views`, clamped to [0, 1] and
+ * rounded to three decimals. An **estimate**: page views come from the script (visitors without
+ * JavaScript, or with it blocked, are not counted) while renders are counted by the Worker, and
+ * only a zone sees real edge cache statistics. `null` without page views or without a render count.
+ * Meaningful only where an edge cache sits in front of the Worker (Cloudflare, `store: "wae"`).
+ */
+export function estimatedCacheHitRatio(
+  summary: Pick<SummaryData, "pageviews" | "renders">,
+): number | null {
+  if (summary.renders === null || summary.pageviews <= 0) return null;
+  const r = 1 - summary.renders / summary.pageviews;
+  return Math.round(Math.min(1, Math.max(0, r)) * 1000) / 1000;
 }
 
 export interface SeriesPoint {

@@ -9,7 +9,7 @@
  * - **The tag** (`<script type="module" src="/_cloudhal/p.<hash>.js" data-v="N">`) goes into the
  *   `<head>` of `200` `text/html` **published** responses only, while the setting is on.
  * - **`POST /__cloudhal/e`** runs `@cloudhal/analytics`' beacon handler: same origin, size, agent,
- *   rate, schema, then the path is resolved against the **published** snapshot with the
+ *   rate (per isolate, then the optional Rate Limiting binding across isolates), schema, then the path is resolved against the **published** snapshot with the
  *   renderer's own `resolveRoute` (the browser never names a node), and one event is written.
  * - **Render events** (§5.4) for published HTML `200`s (cache misses by definition), redirects,
  *   `404`, `410`, `451` and `5xx`, never for previews, `/__cloudhal/*`, `/_cloudhal/*` or `HEAD`;
@@ -25,10 +25,16 @@ import {
   handleBeacon,
   normaliseBeaconPath,
   parseAnalyticsDefaults,
+  type RateLimitBinding,
   RenderEventSampler,
   type ResolvedNode,
+  SharedBeaconRateLimiter,
 } from "@cloudhal/analytics";
-import { createSaltProvider, getAnalyticsSettings } from "@cloudhal/analytics/sql";
+import {
+  createSaltProvider,
+  getAnalyticsSettings,
+  type SaltProvider,
+} from "@cloudhal/analytics/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
 import { PREVIEW_PARAM } from "./resolver.ts";
@@ -124,6 +130,12 @@ export interface SiteAnalyticsOptions {
   readonly hosts?: readonly string[];
   /** Also accept the request's own host (`*.workers.dev` on Cloudflare; every host in dev). */
   readonly acceptRequestHost?: (host: string) => boolean;
+  /**
+   * The optional Workers Rate Limiting binding (`analytics.rateLimit`, RFC-0006 §5.5), checked
+   * after the per-isolate limit and keyed by an HMAC under `secret` (a deployment secret every
+   * isolate has). Absent: the per-isolate limits alone apply.
+   */
+  readonly rateLimit?: { readonly binding: RateLimitBinding; readonly secret: string } | undefined;
   readonly now?: () => number;
   readonly onError?: (message: string, error?: unknown) => void;
 }
@@ -147,8 +159,10 @@ export class SiteAnalytics {
   readonly #o: SiteAnalyticsOptions;
   readonly #now: () => number;
   readonly #limiter: BeaconRateLimiter;
+  readonly #shared: SharedBeaconRateLimiter | undefined;
   readonly #sampler: RenderEventSampler;
   readonly #salt: (day: string) => Promise<string>;
+  #saltProvider: SaltProvider | undefined;
   #settings: Memo<EffectiveAnalyticsSettings | undefined> | undefined;
   #site: Memo<Site | undefined> | undefined;
 
@@ -156,18 +170,27 @@ export class SiteAnalytics {
     this.#o = options;
     this.#now = options.now ?? Date.now;
     this.#limiter = new BeaconRateLimiter({ now: this.#now });
+    this.#shared = options.rateLimit
+      ? new SharedBeaconRateLimiter(options.rateLimit.binding, {
+          secret: options.rateLimit.secret,
+          ...(options.onError ? { onError: options.onError } : {}),
+        })
+      : undefined;
     this.#sampler = new RenderEventSampler({ now: this.#now });
-    let salt: ((day: string) => Promise<string>) | undefined;
     this.#salt = (day) => {
-      salt ??= createSaltProvider(this.#o.sql());
-      return salt(day);
+      this.#saltProvider ??= createSaltProvider(this.#o.sql(), { now: this.#now });
+      return this.#saltProvider(day);
     };
   }
 
-  /** Forget memoised settings and the pointer (a purge follows every settings change, §9.2). */
+  /**
+   * Forget memoised settings, the pointer and the day's salt (a purge follows every settings
+   * change, §9.2, including "unique visitors" on or off, which deletes the salt in D1).
+   */
   reset(): void {
     this.#settings = undefined;
     this.#site = undefined;
+    this.#saltProvider?.reset();
   }
 
   /** True when the deployment collects at all (switch on and a store bound). */
@@ -187,6 +210,7 @@ export class SiteAnalytics {
   async settings(): Promise<EffectiveAnalyticsSettings | undefined> {
     const defaults = this.#o.defaults;
     if (!defaults || !this.#o.writer) return undefined;
+    const before = this.#settings;
     this.#settings = this.#memo(this.#settings, async () =>
       effectiveSettings(
         this.#o.siteId,
@@ -194,6 +218,10 @@ export class SiteAnalytics {
         defaults,
       ),
     );
+    // The salt is never older than the settings it is used with: whenever they are read again
+    // (every 60 s, or after a reset), the salt's row is read again too, so a salt deleted by
+    // switching unique visitors off is not used once this isolate sees the change.
+    if (this.#settings !== before) this.#saltProvider?.reset();
     try {
       const s = await this.#settings.value;
       return s?.enabled ? s : undefined;
@@ -231,7 +259,9 @@ export class SiteAnalytics {
 
   /**
    * `POST /__cloudhal/e`: `204` for every outcome (`405` for another method), `no-store`.
-   * `clientIp` / `country` stand in for `CF-Connecting-IP` / `request.cf.country` off Cloudflare.
+   * `clientIp` is the client's address as the caller knows it (the Site Worker: Cloudflare's
+   * `CF-Connecting-IP`; Node: the socket address); request headers are never trusted for it.
+   * `country` stands in for `request.cf.country` off Cloudflare.
    */
   async beacon(
     request: Request,
@@ -254,7 +284,8 @@ export class SiteAnalytics {
       resolvePath: (path) => publishedNode(source, path),
       writer,
       salt: this.#salt,
-      rateLimit: (ip, kind) => this.#limiter.allow(ip, kind),
+      rateLimit: async (ip, kind) =>
+        (await this.#limiter.allow(ip, kind)) && (await (this.#shared?.allow(ip) ?? true)),
       now: () => new Date(this.#now()),
       ...(extra.clientIp ? { clientIp: extra.clientIp } : {}),
       ...(extra.country ? { country: extra.country } : {}),

@@ -13,6 +13,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { rateLimitNamespaceId } from "../src/cloudflare/config.ts";
 import type { WranglerRunner } from "../src/cloudflare/wrangler.ts";
 import { domain } from "../src/commands/domain.ts";
 import { deploy, init, pullSite, pushSite, readProjectConfig } from "../src/index.ts";
@@ -45,7 +46,17 @@ describe("cloudhal deploy", () => {
   });
 
   it("--dry-run bundles both Workers with the real wrangler and generates configs and secrets", async () => {
+    // RFC-0006 §5.5: `analytics.rateLimit` adds the beacon's Rate Limiting binding, which the
+    // real wrangler must accept in its dry run.
+    const cfgFile = path.join(projectDir, "cloudhal.json");
+    const initial = await readFile(cfgFile, "utf8");
+    const withLimit = JSON.parse(initial) as Record<string, unknown>;
+    await writeFile(
+      cfgFile,
+      JSON.stringify({ ...withLimit, analytics: { enabled: true, rateLimit: { limit: 60 } } }),
+    );
     const r = await deploy({ projectDir, studioDir, dryRun: true });
+    await writeFile(cfgFile, initial);
     expect(r.names).toEqual({
       site: "deploy-me-site",
       admin: "deploy-me-admin",
@@ -73,7 +84,16 @@ describe("cloudhal deploy", () => {
           vitalsOneIn: 5,
         }),
       },
+      ratelimits: [
+        {
+          name: "ANALYTICS_RL",
+          namespace_id: rateLimitNamespaceId("deploy_me_events"),
+          simple: { limit: 60, period: 60 },
+        },
+      ],
     });
+    expect(rateLimitNamespaceId("deploy_me_events")).toMatch(/^1\d{9}$/);
+    expect(rateLimitNamespaceId("other_events")).not.toBe(rateLimitNamespaceId("deploy_me_events"));
     expect(r.analytics).toEqual({ enabled: true, dataset: "deploy_me_events", cron: true });
     const admin = await jsonc(r.adminConfig);
     expect(admin).toMatchObject({

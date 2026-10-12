@@ -50,6 +50,13 @@ interface Env {
    * Without it nothing is collected and no script tag is injected.
    */
   ANALYTICS?: AnalyticsEngineDataset;
+  /**
+   * Optional Workers Rate Limiting binding (`analytics.rateLimit` in cloudhal.json, RFC-0006 §5.5):
+   * a cross-isolate beacon limit on top of the per-isolate one, keyed by an HMAC derived from
+   * `CLOUDHAL_PURGE_TOKEN` (never the IP). Without it, or without the token, only the per-isolate
+   * limits apply.
+   */
+  ANALYTICS_RL?: RateLimit;
   /** `"on"` turns analytics on for the deployment; anything else (or absent) is off. */
   CLOUDHAL_ANALYTICS?: string;
   /** `cloudhal.json`'s `analytics` block as compact JSON: defaults for sites without a settings row. */
@@ -112,6 +119,10 @@ function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
     script: config.analyticsScript,
     hosts: parseHosts(env.CLOUDHAL_SITE_HOSTS),
     acceptRequestHost: (host) => host.endsWith(".workers.dev"),
+    rateLimit:
+      env.ANALYTICS_RL && env.CLOUDHAL_PURGE_TOKEN
+        ? { binding: env.ANALYTICS_RL, secret: env.CLOUDHAL_PURGE_TOKEN }
+        : undefined,
     onError: (m, e) => console.error(m, e),
   });
   return analytics;
@@ -306,7 +317,10 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
             status: request.method === "POST" ? 204 : 405,
             headers: { "cache-control": "no-store" },
           });
-        const answer = await a.beacon(request);
+        // On Cloudflare the edge sets CF-Connecting-IP (a client's own value is overwritten), so
+        // it is the trusted address here; the beacon handler never reads headers for it.
+        const clientIp = request.headers.get("cf-connecting-ip")?.trim();
+        const answer = await a.beacon(request, clientIp ? { clientIp } : {});
         pendingWrites.flush(ctx);
         return answer;
       }

@@ -13,6 +13,7 @@ import { migration0011OpGuards } from "./0011_op_guards.ts";
 import { migration0012Roles } from "./0012_roles.ts";
 import { migration0013Media } from "./0013_media.ts";
 import { migration0014Analytics } from "./0014_analytics.ts";
+import { migration0015AnalyticsPrivacySignal } from "./0015_analytics_privacy_signal.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -30,4 +31,5 @@ export const migrations: readonly Migration[] = [
   migration0012Roles,
   migration0013Media,
   migration0014Analytics,
+  migration0015AnalyticsPrivacySignal,
 ];

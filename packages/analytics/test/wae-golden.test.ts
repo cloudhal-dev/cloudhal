@@ -14,9 +14,10 @@ describe("WAE compiler: golden SQL", () => {
   for (const kase of CONFORMANCE_CASES) {
     it(kase.name, async () => {
       const c = compileWae(kase.query, { dataset });
-      const text = c.visitors
-        ? `${c.query};\n\n-- visitors (only when hashed > 0)\n${c.visitors};\n`
-        : `${c.query};\n`;
+      let text = `${c.query};\n`;
+      if (c.visitors) text += `\n-- visitors (only when hashed > 0)\n${c.visitors};\n`;
+      if (c.renders)
+        text += `\n-- renders (HTML 200s for people: the estimated cache-hit ratio)\n${c.renders};\n`;
       await expect(text).toMatchFileSnapshot(`golden/${kase.name}.sql`);
     });
   }
@@ -24,7 +25,7 @@ describe("WAE compiler: golden SQL", () => {
   it("bounds every statement by site, kind and time, and never weights by sampleInterval", () => {
     for (const kase of CONFORMANCE_CASES) {
       const c = compileWae(kase.query, { dataset });
-      for (const sql of [c.query, c.visitors].filter((s): s is string => !!s)) {
+      for (const sql of [c.query, c.visitors, c.renders].filter((s): s is string => !!s)) {
         expect(sql).toContain(`index1 = '`);
         expect(sql).toMatch(/blob1 = '(pageview|vitals|render)'/);
         expect(sql).toMatch(/timestamp >= '[^']+' AND timestamp < '[^']+'/);

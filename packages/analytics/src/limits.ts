@@ -90,3 +90,79 @@ export class RenderEventSampler {
     return { record: (n - this.#perMinute) % k === 0, sampleOneIn: k };
   }
 }
+
+/** Structurally `RateLimit` from `@cloudflare/workers-types` (a Workers Rate Limiting binding). */
+export interface RateLimitBinding {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
+/** Label of the key derivation: the binding's key never uses the deployment secret as such. */
+const SHARED_KEY_LABEL = "cloudhal analytics rate limit v1";
+
+export interface SharedBeaconRateLimiterOptions {
+  /**
+   * A deployment secret every isolate of the site Worker has (the Site Worker passes its purge
+   * token, at least 16 characters). The HMAC key is derived from it, so a client gets the same key
+   * in every isolate, and the key reveals nothing about the IP to anyone without the secret.
+   */
+  readonly secret: string;
+  /** Binding errors (the beacon is then allowed: the per-isolate limits still apply). */
+  readonly onError?: (message: string, error?: unknown) => void;
+}
+
+/**
+ * The optional cross-isolate limit (RFC-0006 §5.5, `analytics.rateLimit`): a Workers Rate Limiting
+ * binding keyed by `HMAC(derive(secret), ip)`, truncated to 128 bits. `BeaconRateLimiter`'s key is
+ * random per isolate, which would make a shared counter useless; this key is the same in every
+ * isolate, so the binding's counter spans them (Cloudflare keeps it per location, eventually
+ * consistent). The IP is never stored or sent: only the hash reaches the binding, whose counters
+ * live for its period. Page views and vitals share one allowance (`simple.limit` per 60 s).
+ *
+ * Fails open: a binding error, a missing IP or a missing secret allow the beacon, because this
+ * limit is defence in depth on top of the per-isolate one.
+ */
+export class SharedBeaconRateLimiter {
+  readonly #binding: RateLimitBinding;
+  readonly #o: SharedBeaconRateLimiterOptions;
+  #key: Promise<HmacKey> | undefined;
+
+  constructor(binding: RateLimitBinding, options: SharedBeaconRateLimiterOptions) {
+    this.#binding = binding;
+    this.#o = options;
+  }
+
+  #hmacKey(): Promise<HmacKey> {
+    this.#key ??= (async () => {
+      const enc = new TextEncoder();
+      const hmac = { name: "HMAC", hash: "SHA-256" };
+      const root = await crypto.subtle.importKey("raw", enc.encode(this.#o.secret), hmac, false, [
+        "sign",
+      ]);
+      const derived = await crypto.subtle.sign("HMAC", root, enc.encode(SHARED_KEY_LABEL));
+      return (await crypto.subtle.importKey("raw", derived, hmac, false, ["sign"])) as HmacKey;
+    })();
+    return this.#key;
+  }
+
+  /** The binding's key for a client: 32 hex characters, the same in every isolate. */
+  async keyFor(ip: string): Promise<string> {
+    const mac = new Uint8Array(
+      await crypto.subtle.sign("HMAC", await this.#hmacKey(), new TextEncoder().encode(ip)),
+    );
+    let key = "";
+    for (let i = 0; i < 16; i++) key += (mac[i] ?? 0).toString(16).padStart(2, "0");
+    return key;
+  }
+
+  /** True when this beacon is within the shared allowance (or the binding cannot tell). */
+  async allow(ip: string): Promise<boolean> {
+    if (!ip || this.#o.secret.length < 16) return true;
+    try {
+      const outcome = await this.#binding.limit({ key: await this.keyFor(ip) });
+      return outcome?.success !== false;
+    } catch (error) {
+      this.#o.onError?.("analytics rate limit binding failed", error);
+      return true;
+    }
+  }
+}

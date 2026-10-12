@@ -32,6 +32,27 @@ export interface AnalyticsDeployment {
   readonly cron: boolean;
   /** Extra hostnames the site answers on (custom domains), `CLOUDHAL_SITE_HOSTS`. */
   readonly siteHosts?: readonly string[];
+  /** The Workers Rate Limiting binding for the beacon (`analytics.rateLimit`, §5.5). */
+  readonly rateLimit?: { readonly namespaceId: string; readonly limit: number };
+}
+
+/** The beacon's Rate Limiting binding name (RFC-0006 §5.5). */
+export const ANALYTICS_RATE_LIMIT_BINDING = "ANALYTICS_RL";
+/** Beacons per client per 60 s across isolates, unless cloudhal.json says otherwise. */
+export const DEFAULT_BEACON_RATE_LIMIT = 120;
+
+/**
+ * A `namespace_id` for the deployment's beacon limiter: a positive integer derived from the dataset
+ * name (FNV-1a, 9 digits, offset so it never collides with small hand-picked ids), stable across
+ * deploys and different between deployments of one account. cloudhal.json can pin another.
+ */
+export function rateLimitNamespaceId(dataset: string): string {
+  let h = 0x811c9dc5;
+  for (const ch of new TextEncoder().encode(`cloudhal-beacon:${dataset}`)) {
+    h ^= ch;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return String(1_000_000_000 + (h % 1_000_000_000));
 }
 
 export interface DeploymentNames {
@@ -84,6 +105,18 @@ export function siteWorkerConfig(
     ...storageBindings(n),
     // Analytics (RFC-0006 §4): one write binding; the dataset is created on its first write.
     ...(a ? { analytics_engine_datasets: [{ binding: "ANALYTICS", dataset: a.dataset }] } : {}),
+    // Optional cross-isolate beacon limit (§5.5): one key per client (an HMAC, never the IP).
+    ...(a?.rateLimit
+      ? {
+          ratelimits: [
+            {
+              name: ANALYTICS_RATE_LIMIT_BINDING,
+              namespace_id: a.rateLimit.namespaceId,
+              simple: { limit: a.rateLimit.limit, period: 60 },
+            },
+          ],
+        }
+      : {}),
     vars: {
       CLOUDHAL_SITE_ID: n.siteId,
       ...(a

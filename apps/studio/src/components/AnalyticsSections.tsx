@@ -1266,6 +1266,15 @@ export function AboutCard({
             </LinkButton>
           )}
         </SettingRow>
+        {unique && typeof summary?.data.privacySignalShare === "number" && (
+          <SettingRow label={t("analytics.about.signals")} hint={t("analytics.about.signalsHint")}>
+            <Text>
+              {t("analytics.about.signalsValue", {
+                share: fmt.percent(summary.data.privacySignalShare),
+              })}
+            </Text>
+          </SettingRow>
+        )}
         {source && (
           <SettingRow
             label={t("analytics.about.source")}
@@ -1273,6 +1282,21 @@ export function AboutCard({
           >
             <Badge variant="outline">{t(`analytics.about.sources.${source}`)}</Badge>
           </SettingRow>
+        )}
+        {typeof summary?.data.cacheHitRatio === "number" && (
+          <div className="grid gap-2 py-3">
+            <Meter
+              label={t("analytics.about.cacheHits")}
+              value={summary.data.cacheHitRatio * 100}
+              customValue={t("analytics.about.cacheHitsValue", {
+                share: fmt.percent(summary.data.cacheHitRatio),
+              })}
+              indicatorClassName="motion-reduce:transition-none"
+            />
+            <Text variant="secondary" size="sm">
+              {t("analytics.about.cacheHitsHint")}
+            </Text>
+          </div>
         )}
         {quota && (
           <div className="grid gap-2 py-3">

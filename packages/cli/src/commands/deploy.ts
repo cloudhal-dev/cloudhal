@@ -12,6 +12,7 @@
  *      key is asked once in a terminal (non-interactive: off). When analytics switch on or off the
  *      site's cache is purged once, so pages gain or lose the script tag. An account without a free
  *      cron slot gets the admin Worker without the trigger (daily totals then roll up on read).
+ *      `analytics.rateLimit` adds the beacon's Workers Rate Limiting binding (`ANALYTICS_RL`).
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
@@ -25,7 +26,9 @@ import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
   type AnalyticsDeployment,
+  DEFAULT_BEACON_RATE_LIMIT,
   type DeploymentNames,
+  rateLimitNamespaceId,
   readExistingIds,
   siteConfigPath,
   siteWorkerConfig,
@@ -76,6 +79,22 @@ export interface DeployState {
 
 /** Default daily budget of uncached live analytics queries (RFC-0006 §7.7, open question 6). */
 export const DEFAULT_QUERY_BUDGET = 8000;
+
+/** `analytics.rateLimit` as the generated config needs it (RFC-0006 §5.5); `{}` when off. */
+export function rateLimitDeployment(
+  cfg: Pick<ProjectConfig, "analytics">,
+  dataset: string,
+): Pick<AnalyticsDeployment, "rateLimit"> {
+  const r = cfg.analytics?.rateLimit;
+  if (!r) return {};
+  const o = r === true ? {} : r;
+  return {
+    rateLimit: {
+      namespaceId: o.namespaceId ?? rateLimitNamespaceId(dataset),
+      limit: o.limit ?? DEFAULT_BEACON_RATE_LIMIT,
+    },
+  };
+}
 
 export interface DeployOptions {
   readonly projectDir: string;
@@ -322,6 +341,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       budget: cfg.analytics?.queryBudget ?? DEFAULT_QUERY_BUDGET,
       cron: true,
       ...(cfg.domains?.site ? { siteHosts: [cfg.domains.site] } : {}),
+      ...rateLimitDeployment(cfg, datasetName(base.name)),
     };
   }
 
