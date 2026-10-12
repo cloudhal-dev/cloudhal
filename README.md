@@ -13,6 +13,7 @@ Blogs and newsrooms first; documentation sites and research or data documentatio
 - **Policy-first** — humans and agents are the same kind of actor; the policy engine checks every tool call against scopes, not the skill's good intentions.
 - **MCP-native** — the agent surface is a Model Context Protocol server (spec 2026-07-28), usable from Claude, Cursor, Codex or any MCP client.
 - **Self-hostable, Cloudflare-ready** — runs offline on SQLite + filesystem; deploys to Cloudflare Workers/D1/R2 with the same storage interface.
+- **Analytics without cookies** — page views, sources, countries, devices and Core Web Vitals from one first-party script, in Studio, in each article's editor and for agents (read-only MCP tools). No personal data by default; see the [privacy guide for site owners](docs/guides/analytics-privacy.md).
 
 ## Five minutes: create → ask an agent → preview → publish → your domain
 
