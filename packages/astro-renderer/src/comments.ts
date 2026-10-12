@@ -232,9 +232,19 @@ export class SiteComments {
     request: Request,
     extra: { clientAddress?: string | undefined } = {},
   ): Promise<Response | undefined> {
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const path = url.pathname;
     if (!isCommentsPath(path)) return undefined;
     if (!this.available) return notFound();
+    // The same-origin check compares `Host` with the site's hosts. The runtime builds the URL from
+    // that header (Cloudflare, Node), so they agree in production; a proxy in front (a test
+    // harness, a local tunnel) keeps the routed URL but may send its own `Host`. The URL decides.
+    const host = request.headers.get("host");
+    if (host !== null && host.toLowerCase() !== url.host.toLowerCase()) {
+      const headers = new Headers(request.headers);
+      headers.set("host", url.host);
+      request = new Request(request, { headers });
+    }
     try {
       // Without an address every client shares one bucket: stricter, never looser.
       const deps = await this.#deps(request, extra.clientAddress?.trim() || "unknown");

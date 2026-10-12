@@ -185,6 +185,8 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const onChange = (file: string) => {
           if (!file.startsWith(dir)) return;
+          // the local comments key (created on the first comment request) is not content
+          if (file.endsWith("/comments.key")) return;
           clearTimeout(timer);
           timer = setTimeout(() => {
             for (const env of Object.values(server.environments)) {
