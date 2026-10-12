@@ -595,6 +595,11 @@ export const en = {
       "content:write:own": "Create articles and change your own",
       "content:draft:own": "Write drafts and send them to review",
       "site:publish:own": "Publish when every change is your own",
+      "comments:read": "Read reader comments (never emails)",
+      "comments:moderate": "Label and hide comments; approvals wait for you",
+      "comments:moderate:own": "Label and hide comments on your own articles",
+      "comments:reply": "Draft replies to comments; you publish them",
+      "comments:reply:own": "Draft replies on your own articles; you publish them",
     },
     modes: {
       legend: "Mode",
@@ -2199,6 +2204,15 @@ export const en = {
         read: "Only {roles} and above see analytics.",
         settings: "Only {roles} and above can change analytics settings.",
       },
+      comments: {
+        read: "Only {roles} and above see reader comments.",
+        moderate: "Only {roles} and above moderate comments.",
+        moderateAny: "Only {roles} and above moderate comments on others' articles.",
+        reply: "Only {roles} and above reply to comments.",
+        replyAny: "Only {roles} and above reply on others' articles.",
+        settings: "Only {roles} and above can change comment settings.",
+      },
+      commenters: { data: "Only {roles} and above see commenters' emails or erase their data." },
       settings: { write: "Only {roles} and above can change site settings and domains." },
       members: {
         invite: "Only {roles} and above can invite people.",

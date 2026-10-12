@@ -604,6 +604,11 @@ export const tr: Messages = {
       "content:write:own": "Makale oluşturur ve kendi makalelerini değiştirir",
       "content:draft:own": "Taslak yazar ve incelemeye gönderir",
       "site:publish:own": "Tüm değişiklikler kendisininse yayınlar",
+      "comments:read": "Okur yorumlarını okur (e-postalar asla)",
+      "comments:moderate": "Yorumları etiketler ve gizler; onaylar sizi bekler",
+      "comments:moderate:own": "Kendi yazılarınızdaki yorumları etiketler ve gizler",
+      "comments:reply": "Yorumlara yanıt taslağı yazar; siz yayınlarsınız",
+      "comments:reply:own": "Kendi yazılarınızda yanıt taslağı yazar; siz yayınlarsınız",
     },
     modes: {
       legend: "Mod",
@@ -2238,6 +2243,18 @@ export const tr: Messages = {
       analytics: {
         read: "İstatistikleri görmek için en az {role} rolü gerekir.",
         settings: "İstatistik ayarlarını değiştirmek için en az {role} rolü gerekir.",
+      },
+      comments: {
+        read: "Okur yorumlarını görmek için en az {role} rolü gerekir.",
+        moderate: "Yorumları denetlemek için en az {role} rolü gerekir.",
+        moderateAny:
+          "Başkalarının yazılarındaki yorumları denetlemek için en az {role} rolü gerekir.",
+        reply: "Yorumlara yanıt vermek için en az {role} rolü gerekir.",
+        replyAny: "Başkalarının yazılarında yanıt vermek için en az {role} rolü gerekir.",
+        settings: "Yorum ayarlarını değiştirmek için en az {role} rolü gerekir.",
+      },
+      commenters: {
+        data: "Yorumcuların e-postalarını görmek veya verilerini silmek için en az {role} rolü gerekir.",
       },
       settings: {
         write: "Site ayarlarını ve alan adlarını değiştirmek için en az {role} rolü gerekir.",

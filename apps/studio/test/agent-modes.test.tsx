@@ -89,7 +89,13 @@ describe("agent key list", () => {
                 id: "key_plan",
                 name: "Reader",
                 mode: "plan",
-                scopes: ["preview:create", "site:read", "content:read", "analytics:read"],
+                scopes: [
+                  "preview:create",
+                  "site:read",
+                  "content:read",
+                  "analytics:read",
+                  "comments:read",
+                ],
               }),
               key({ id: "key_auto", name: "Newsroom", mode: "auto" }),
               // A server that predates modes: reads as edits.
@@ -109,7 +115,7 @@ describe("agent key list", () => {
     const scopesOf = (id: string) =>
       container.querySelector(`[data-key-id="${id}"] [data-scopes]`) as HTMLElement;
     expect(scopesOf("key_plan")).toHaveAttribute("data-scopes", "mode-default");
-    expect(scopesOf("key_plan")).toHaveTextContent("Mode default · 4 scopes");
+    expect(scopesOf("key_plan")).toHaveTextContent("Mode default · 5 scopes");
     expect(scopesOf("key_auto")).toHaveAttribute("data-scopes", "custom");
     expect(scopesOf("key_auto")).toHaveTextContent("content:write");
 
