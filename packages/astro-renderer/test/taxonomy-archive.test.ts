@@ -514,5 +514,8 @@ describe("redirect output and cache tags", () => {
     expect(preview.has("cache-tag")).toBe(false);
     expect(isCloudhalCacheTag("cloudhal-term-term_ABC123")).toBe(true);
     expect(isCloudhalCacheTag("cloudhal-term-x,evil")).toBe(false);
+    // RFC-0007 §8.1: the purge endpoint accepts an entry's comments tag
+    expect(isCloudhalCacheTag("cloudhal-comments-entry_ABC123")).toBe(true);
+    expect(isCloudhalCacheTag("cloudhal-commentz-entry_ABC123")).toBe(false);
   });
 });

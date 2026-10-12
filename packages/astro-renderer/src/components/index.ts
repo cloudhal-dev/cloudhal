@@ -1,3 +1,4 @@
+export { default as Comments } from "./Comments.astro";
 export { default as ContentList } from "./ContentList.astro";
 export { default as Hero } from "./Hero.astro";
 export { default as Image } from "./Image.astro";

@@ -8,6 +8,7 @@ Everything here is **Worker-safe**: no Node-only import at any entry. The stored
 |---|---|
 | `@cloudhal/comments` | Settings model and `threadState`, normalising, content rules, linkify, proof of work, the submission/report/challenge pipelines and their answers, keys and hashes, isolate limits, purge planner, retention plan. No storage dependency. |
 | `@cloudhal/comments/sql` | `SqlCommentStore` over `SqlDriver` (SQLite locally and on Node, D1 on Cloudflare) for migration `0016_comments`. |
+| `@cloudhal/comments/client` | The browser sources (Node build input only): the comments module (`/_cloudhal/c.<hash>.js`, ≤ 4 KB gzipped) and its proof-of-work worker (`/_cloudhal/cw.<hash>.js`, pure-JS SHA-256, ≤ 1 KB), built by the `cloudhal()` integration; endpoint names and budgets. |
 | `@cloudhal/comments/testing` | `describeCommentStoreConformance`, `describeCommentPipelineSuite`, `countingDriver`, `expectContractComment` (vitest). |
 | `@cloudhal/comments/fixtures/comment-text.json` | The shared link-rule fixture (`parseCommentText` input → paragraphs), for the renderer and Studio's blocks. |
 
