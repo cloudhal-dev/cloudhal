@@ -33,7 +33,13 @@ import {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
-import { checkAvailability, type GateSupport, sameAvailability } from "./availability.ts";
+import {
+  checkAvailability,
+  checkTimeZone,
+  type GateSupport,
+  isTimeZone,
+  sameAvailability,
+} from "./availability.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
@@ -352,6 +358,7 @@ export class SiteGraphStore {
       updatedAt: ts,
     };
     assertValid("site", site);
+    checkTimeZone(site.timeZone);
     await this.#runUnique(
       await insertNodeStatement("site", site, ts),
       "site",
@@ -376,6 +383,9 @@ export class SiteGraphStore {
   async updateSite(site: Site): Promise<Site> {
     const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
     assertValid("site", next);
+    // §4.1: a known zone needs no read; an unknown one is refused unless it is the stored one.
+    if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
+      checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
     const s = await casUpdateStatement("site", next, site.rev);
     const r = await this.#sql.run(s.sql, s.params ?? []);
     if (r.changes !== 1)

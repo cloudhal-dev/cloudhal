@@ -134,6 +134,8 @@ export type InvariantCode =
   | "invalid_availability"
   /** S15: the site's renderer has not confirmed it enforces gates; `availability` is refused. */
   | "gates_unsupported"
+  /** §4.1: `Site.timeZone` is not a zone the writing runtime knows (`Intl.supportedValuesOf`, `UTC`). */
+  | "invalid_time_zone"
   // ── RFC-0008 (releases) ──
   /** §6.2: the node is held by a release awaiting approval, scheduled or running; unschedule it first. */
   | "scheduled_locked";

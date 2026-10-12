@@ -208,6 +208,21 @@ export function isTimeZone(zone: string): boolean {
 }
 
 /**
+ * The writer's check of `Site.timeZone` (§4.1): the schema bounds the shape, this checks the name
+ * against the writing runtime's zones (`isTimeZone`). A zone that is unchanged from `previous` is
+ * accepted, so a site saved under older time-zone data can still be edited. Throws
+ * `InvariantError("invalid_time_zone")`.
+ */
+export function checkTimeZone(zone: string | undefined, previous?: string): void {
+  if (zone === undefined || zone === previous || isTimeZone(zone)) return;
+  throw new InvariantError(
+    "invalid_time_zone",
+    `unknown time zone "${zone}": use an IANA zone name this runtime knows, such as Europe/Istanbul, or UTC`,
+    { timeZone: zone },
+  );
+}
+
+/**
  * The writer guard (invariant S15): a capability the store asks before it accepts `availability`.
  * An older site Worker ignores gates and would show embargoed content, so writes that set or change
  * gates are refused (`gates_unsupported`) until the renderer that serves the site confirms it

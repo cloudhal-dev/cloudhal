@@ -116,3 +116,28 @@ describe("features.schedules.gates is the renderer's answer (note 14)", () => {
   });
 });
 
+describe("Site.timeZone is validated on write (note 15)", () => {
+  it("PUT /api/sites/:id answers 400 invalid_time_zone for a zone the runtime does not know", async () => {
+    const s = await setup({ gates: GATES_ENFORCED });
+    const bad = await s.call(`/api/sites/${s.site.id}`, "PUT", {
+      ...s.site,
+      timeZone: "Europe/Atlantis",
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body).toMatchObject({
+      error: "invalid_time_zone",
+      details: { timeZone: "Europe/Atlantis" },
+    });
+    // the shape is the schema's (`+03:00` is not a zone name): a validation error, also 400
+    expect(
+      (await s.call(`/api/sites/${s.site.id}`, "PUT", { ...s.site, timeZone: "+03:00" })).status,
+    ).toBe(400);
+    const ok = await s.call(`/api/sites/${s.site.id}`, "PUT", {
+      ...s.site,
+      timeZone: "Europe/Istanbul",
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.body.timeZone).toBe("Europe/Istanbul");
+  });
+});
+
