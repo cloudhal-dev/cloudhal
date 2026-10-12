@@ -51,9 +51,15 @@ describe("cloudhal deploy", () => {
     const cfgFile = path.join(projectDir, "cloudhal.json");
     const initial = await readFile(cfgFile, "utf8");
     const withLimit = JSON.parse(initial) as Record<string, unknown>;
+    // RFC-0007 §6.5: `comments.rateLimit` adds the submissions' binding next to it.
+    expect(withLimit.comments).toEqual({ available: true });
     await writeFile(
       cfgFile,
-      JSON.stringify({ ...withLimit, analytics: { enabled: true, rateLimit: { limit: 60 } } }),
+      JSON.stringify({
+        ...withLimit,
+        analytics: { enabled: true, rateLimit: { limit: 60 } },
+        comments: { available: true, rateLimit: true },
+      }),
     );
     const r = await deploy({ projectDir, studioDir, dryRun: true });
     await writeFile(cfgFile, initial);
@@ -90,11 +96,22 @@ describe("cloudhal deploy", () => {
           namespace_id: rateLimitNamespaceId("deploy_me_events"),
           simple: { limit: 60, period: 60 },
         },
+        {
+          name: "COMMENTS_RL",
+          namespace_id: rateLimitNamespaceId("deploy-me", "comments"),
+          simple: { limit: 10, period: 60 },
+        },
       ],
     });
     expect(rateLimitNamespaceId("deploy_me_events")).toMatch(/^1\d{9}$/);
     expect(rateLimitNamespaceId("other_events")).not.toBe(rateLimitNamespaceId("deploy_me_events"));
+    expect(rateLimitNamespaceId("deploy-me", "comments")).not.toBe(
+      rateLimitNamespaceId("deploy-me"),
+    );
     expect(r.analytics).toEqual({ enabled: true, dataset: "deploy_me_events", cron: true });
+    expect(r.comments).toEqual({ available: true, cron: true, rateLimit: true });
+    // the comments key is a secret (`--secrets-file`), never a var in a generated config
+    expect(JSON.stringify(site)).not.toContain("CLOUDHAL_COMMENTS_KEY");
     const admin = await jsonc(r.adminConfig);
     expect(admin).toMatchObject({
       name: "deploy-me-admin",
@@ -114,14 +131,17 @@ describe("cloudhal deploy", () => {
           uniqueVisitors: false,
           vitalsOneIn: 5,
         }),
+        CLOUDHAL_COMMENTS_AVAILABLE: "true",
       },
       triggers: { crons: ["17 * * * *"] },
     });
+    expect(JSON.stringify(admin)).not.toContain("CLOUDHAL_COMMENTS_KEY");
     const secretsFile = path.join(deployDir, "secrets.json");
     expect((await stat(secretsFile)).mode & 0o777).toBe(0o600);
     const secrets = JSON.parse(await readFile(secretsFile, "utf8")) as Record<string, string>;
     expect(Object.keys(secrets).sort()).toEqual([
       "BETTER_AUTH_SECRET",
+      "CLOUDHAL_COMMENTS_KEY",
       "CLOUDHAL_DEPLOY_TOKEN",
       "CLOUDHAL_PREVIEW_SECRET",
       "CLOUDHAL_PURGE_TOKEN",
@@ -132,6 +152,43 @@ describe("cloudhal deploy", () => {
     // stable across runs
     await deploy({ projectDir, studioDir, dryRun: true });
     expect(JSON.parse(await readFile(secretsFile, "utf8"))).toEqual(secrets);
+
+    // RFC-0007 §15.3: comments keep the hourly trigger when analytics are off; with comments
+    // unavailable too, the admin Worker has no trigger. Wrangler accepts both configs.
+    await writeFile(
+      cfgFile,
+      JSON.stringify({
+        ...withLimit,
+        analytics: { enabled: false },
+        domains: { site: "news.example.com" },
+      }),
+    );
+    const commentsOnly = await deploy({ projectDir, studioDir, dryRun: true });
+    const siteC = await jsonc(path.join(projectDir, "wrangler.jsonc"));
+    expect(siteC.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
+      CLOUDHAL_SITE_HOSTS: "news.example.com",
+    });
+    expect(siteC.ratelimits).toBeUndefined();
+    const adminC = await jsonc(commentsOnly.adminConfig);
+    expect(adminC.analytics).toBeUndefined();
+    expect(adminC.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "true" });
+    expect(adminC.triggers).toEqual({ crons: ["17 * * * *"] });
+    expect(commentsOnly.comments).toEqual({ available: true, cron: true });
+    await writeFile(
+      cfgFile,
+      JSON.stringify({
+        ...withLimit,
+        analytics: { enabled: false },
+        comments: { available: false },
+      }),
+    );
+    const none = await deploy({ projectDir, studioDir, dryRun: true });
+    const adminN = await jsonc(none.adminConfig);
+    expect(adminN.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "false" });
+    expect(adminN.triggers).toEqual({ crons: [] });
+    expect(none.comments).toEqual({ available: false });
+    await writeFile(cfgFile, initial);
   });
 
   it("provisions, deploys site before admin, pushes once, and keeps the deployment as source of truth", async () => {
@@ -160,9 +217,18 @@ describe("cloudhal deploy", () => {
     }) as typeof fetch;
 
     const calls: string[] = [];
+    const secretNames: string[][] = [];
     let databaseCreated = false;
     const wrangler: WranglerRunner = async (args) => {
       calls.push(args.filter((a) => !a.includes("/")).join(" "));
+      if (args.includes("--secrets-file"))
+        secretNames.push(
+          Object.keys(
+            JSON.parse(
+              await readFile(args[args.indexOf("--secrets-file") + 1] as string, "utf8"),
+            ) as Record<string, string>,
+          ).sort(),
+        );
       const ok = (stdout = "", records: Record<string, unknown>[] = []) => ({
         code: 0,
         stdout,
@@ -184,12 +250,14 @@ describe("cloudhal deploy", () => {
       return ok();
     };
 
+    const lines: string[] = [];
     const first = await deploy({
       projectDir,
       studioDir,
       wrangler,
       fetch: fakeFetch,
       healthTimeoutMs: 5000,
+      log: (l) => lines.push(l),
     });
     expect(calls).toEqual([
       "d1 info deploy-me-db --json",
@@ -214,6 +282,33 @@ describe("cloudhal deploy", () => {
     expect(purges).toEqual([
       `deploy-me-site.acme.workers.dev Bearer ${secrets.CLOUDHAL_PURGE_TOKEN}`,
     ]);
+    // RFC-0007: comments available (off per site), the key bound to both Workers, never printed;
+    // a non-interactive first deploy creates the database in the automatic location and says how
+    // to choose the EU jurisdiction instead.
+    expect(first.comments).toEqual({ available: true, cron: true, purged: true });
+    expect(first.databaseCreated).toBe("auto");
+    expect(secretNames).toEqual([
+      ["CLOUDHAL_COMMENTS_KEY", "CLOUDHAL_PREVIEW_SECRET", "CLOUDHAL_PURGE_TOKEN"],
+      [
+        "BETTER_AUTH_SECRET",
+        "CLOUDHAL_COMMENTS_KEY",
+        "CLOUDHAL_DEPLOY_TOKEN",
+        "CLOUDHAL_PREVIEW_SECRET",
+        "CLOUDHAL_PURGE_TOKEN",
+        "CLOUDHAL_SETUP_TOKEN",
+        "MCP_STATE_KEY",
+      ],
+    ]);
+    const output = lines.join("\n");
+    expect(output).toMatch(/comments: available on this deployment, and off for every site/);
+    expect(output).toMatch(/automatic location \(non-interactive\).*--jurisdiction eu/);
+    expect(output).not.toContain(secrets.CLOUDHAL_COMMENTS_KEY as string);
+    expect(
+      JSON.parse(await readFile(path.join(projectDir, cfg.dataDir, "deploy/state.json"), "utf8")),
+    ).toMatchObject({
+      comments: "on",
+      jurisdiction: "auto",
+    });
     // the owner account can only be created through the one-time setup link
     expect(first.setupUrl).toBe(
       `https://deploy-me-admin.acme.workers.dev/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`,
@@ -248,8 +343,10 @@ describe("cloudhal deploy", () => {
     });
     expect(second.pushed).toBe(false);
     expect(second.setupUrl).toBeUndefined();
-    // analytics stayed on: no second purge
+    // analytics stayed on, comments stayed available: no second purge
     expect(second.analytics.purged).toBe(false);
+    expect(second.comments).toEqual({ available: true, cron: true });
+    expect(second.databaseCreated).toBeUndefined();
     expect(purges).toHaveLength(1);
     expect(calls[0]).toBe("d1 info deploy-me-db --json");
     expect(calls).not.toContain("d1 create deploy-me-db");
@@ -445,7 +542,9 @@ describe("cloudhal deploy", () => {
     expect(siteOff.vars).toEqual({ CLOUDHAL_SITE_ID: cfg.siteId });
     const adminOff = await jsonc(off.adminConfig);
     expect(adminOff.analytics).toBeUndefined();
-    expect(adminOff.triggers).toEqual({ crons: [] });
+    // reader comments keep the hourly trigger (RFC-0007 §15.3)
+    expect(adminOff.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "true" });
+    expect(adminOff.triggers).toEqual({ crons: ["17 * * * *"] });
     expect(JSON.parse(await readFile(file, "utf8")).analytics).toBeUndefined();
     expect(purges).toHaveLength(1);
 
@@ -479,10 +578,133 @@ describe("cloudhal deploy", () => {
       cron: false,
       purged: true,
     });
-    expect(lines.join("\n")).toMatch(/Cloudflare refused the hourly analytics trigger/);
+    expect(lines.join("\n")).toMatch(
+      /Cloudflare refused the hourly trigger: .*daily totals are then computed when someone opens Analytics in Studio; comment retention and threads closing by time run on Studio's requests/,
+    );
+    expect(on.comments).toEqual({ available: true, cron: false });
     const adminOn = await jsonc(on.adminConfig);
     expect(adminOn.triggers).toEqual({ crons: [] });
-    expect(adminOn.vars).toMatchObject({ CLOUDHAL_ANALYTICS_CRON: "off" });
+    expect(adminOn.vars).toMatchObject({
+      CLOUDHAL_ANALYTICS_CRON: "off",
+      CLOUDHAL_COMMENTS_AVAILABLE: "true",
+      CLOUDHAL_COMMENTS_CRON: "off",
+    });
     expect(purges).toHaveLength(2);
+  });
+
+  it("comments and data location: --jurisdiction eu only when the database is created, availability switches purge once", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const blobs = new MemoryBlobStore();
+    const remote = new SiteGraphStore({ sql, blobs });
+    await remote.init();
+    const cfg = await readProjectConfig(projectDir);
+    const secrets = JSON.parse(
+      await readFile(path.join(projectDir, cfg.dataDir, "deploy/secrets.json"), "utf8"),
+    ) as Record<string, string>;
+    const app = createApi({
+      store: remote,
+      admin: { deployToken: secrets.CLOUDHAL_DEPLOY_TOKEN as string, storage: { sql, blobs } },
+    });
+    const purges: string[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (new URL(req.url).pathname === "/__cloudhal/purge") {
+        purges.push(req.url);
+        return new Response("ok");
+      }
+      return app.fetch(req);
+    }) as typeof fetch;
+    const created = new Set<string>();
+    const calls: string[] = [];
+    const wrangler: WranglerRunner = async (args) => {
+      calls.push(args.filter((a) => !a.includes("/")).join(" "));
+      const ok = (stdout = "", records: Record<string, unknown>[] = []) => ({
+        code: 0,
+        stdout,
+        stderr: "",
+        records,
+      });
+      if (args[0] === "d1" && args[1] === "info")
+        return created.has(args[2] as string)
+          ? ok(JSON.stringify({ uuid: "11111111-2222-3333-4444-555555555555" }))
+          : { code: 1, stdout: "", stderr: "not found", records: [] };
+      if (args[0] === "d1" && args[1] === "create") {
+        created.add(args[2] as string);
+        return ok();
+      }
+      if (args[0] === "deploy" && args.includes("-c"))
+        return ok("", [{ type: "deploy", targets: ["eu-news-admin.acme.workers.dev"] }]);
+      if (args[0] === "deploy")
+        return ok("", [{ type: "deploy", targets: ["https://eu-news-site.acme.workers.dev"] }]);
+      return ok();
+    };
+    const lines: string[] = [];
+    const run = (extra: Partial<Parameters<typeof deploy>[0]> = {}) =>
+      deploy({
+        projectDir,
+        studioDir,
+        wrangler,
+        fetch: fakeFetch,
+        healthTimeoutMs: 5000,
+        log: (l) => lines.push(l),
+        name: "eu-news",
+        ...extra,
+      });
+    await expect(run({ jurisdiction: "us" as never })).rejects.toThrow(
+      '--jurisdiction must be eu (got "us")',
+    );
+
+    // A new database: the flag wins over the question, and the database is created in the EU.
+    const asked: string[] = [];
+    const eu = await run({
+      jurisdiction: "eu",
+      askJurisdiction: async () => {
+        asked.push("asked");
+        return "auto";
+      },
+    });
+    expect(asked).toEqual([]);
+    expect(calls).toContain("d1 create eu-news-db --jurisdiction eu");
+    expect(eu.databaseCreated).toBe("eu");
+    expect(lines.join("\n")).toMatch(/in the EU jurisdiction \(this cannot be changed later\)/);
+
+    // The database exists: the flag changes nothing and says so; the question is never asked.
+    calls.length = 0;
+    lines.length = 0;
+    const again = await run({
+      jurisdiction: "eu",
+      askJurisdiction: async () => {
+        asked.push("asked");
+        return "eu";
+      },
+    });
+    expect(again.databaseCreated).toBeUndefined();
+    expect(asked).toEqual([]);
+    expect(calls.filter((c) => c.startsWith("d1 create"))).toEqual([]);
+    expect(lines.join("\n")).toMatch(/already exists, so --jurisdiction changes nothing/);
+
+    // Interactive, another deployment name: the question decides. Comments switched off for the
+    // deployment: the admin Worker says so and the site cache is purged once (cached pages lose
+    // the comments section).
+    const file = path.join(projectDir, "cloudhal.json");
+    const raw = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    await writeFile(file, JSON.stringify({ ...raw, comments: { available: false } }));
+    purges.length = 0;
+    const off = await run({
+      name: "eu-news-two",
+      askJurisdiction: async () => {
+        asked.push("asked");
+        return "eu";
+      },
+    });
+    await writeFile(file, JSON.stringify(raw));
+    expect(asked).toEqual(["asked"]);
+    expect(off.databaseCreated).toBe("eu");
+    expect(calls).toContain("d1 create eu-news-two-db --jurisdiction eu");
+    expect(off.comments).toEqual({ available: false, purged: true });
+    expect((await jsonc(off.adminConfig)).vars).toMatchObject({
+      CLOUDHAL_COMMENTS_AVAILABLE: "false",
+    });
+    expect(purges).toHaveLength(1);
   });
 });

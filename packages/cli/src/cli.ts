@@ -30,7 +30,10 @@ Usage:
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
-  cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare (uses wrangler login)
+  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu]
+                                                          site + admin Workers on Cloudflare (uses wrangler login);
+                                                          --jurisdiction eu keeps a newly created D1 database
+                                                          in the EU (cannot be changed later)
   cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--admin-url <url>]           local site → deployment
@@ -88,6 +91,9 @@ export async function main(argv: string[]): Promise<number> {
       views: { type: "string" },
       from: { type: "string" },
       out: { type: "string" },
+      jurisdiction: { type: "string" },
+      in: { type: "string" },
+      "with-personal-data": { type: "boolean" },
     },
   });
   const [command, ...rest] = positionals;
@@ -155,13 +161,18 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "deploy": {
+      const where = values.jurisdiction;
+      if (where !== undefined && where !== "eu")
+        throw new Error(`--jurisdiction must be eu (got "${where}")`);
+      const tty = process.stdin.isTTY && process.stdout.isTTY;
       const r = await deploy({
         projectDir,
         ...(values.name ? { name: values.name } : {}),
         ...(values["dry-run"] ? { dryRun: true } : {}),
+        ...(where ? { jurisdiction: where } : {}),
         log: (l) => console.log(l),
-        // The analytics question for projects without the key needs a person at a terminal.
-        ...(process.stdin.isTTY && process.stdout.isTTY ? { prompt: askYesNo } : {}),
+        // The analytics and data-location questions need a person at a terminal.
+        ...(tty ? { prompt: askYesNo, askJurisdiction } : {}),
       });
       if (r.dryRun) {
         console.log(
@@ -361,6 +372,29 @@ export async function main(argv: string[]): Promise<number> {
     default:
       process.stderr.write(`unknown command "${command}"\n\n${HELP}`);
       return 1;
+  }
+}
+
+/**
+ * Where a new D1 database should live (RFC-0007 D7), asked only when `cloudhal deploy` is about to
+ * create it. Enter keeps the automatic location.
+ */
+async function askJurisdiction(): Promise<"auto" | "eu"> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    for (;;) {
+      const answer = (
+        await rl.question(
+          "Where should the D1 database live?\n  1) Automatic: Cloudflare picks the location (default)\n  2) EU jurisdiction: the data stays inside the EU\nA location cannot be changed after the database is created. Choose [1/2]: ",
+        )
+      )
+        .trim()
+        .toLowerCase();
+      if (answer === "" || answer === "1" || answer === "automatic") return "auto";
+      if (answer === "2" || answer === "eu") return "eu";
+    }
+  } finally {
+    rl.close();
   }
 }
 

@@ -40,6 +40,8 @@ export { pullSite, pushSite, type SyncOptions } from "./commands/sync.ts";
 export {
   type AnalyticsConfig,
   CONFIG_FILE,
+  type CommentsConfig,
+  commentsAvailable,
   type ProjectConfig,
   readProjectConfig,
   writeProjectConfig,
