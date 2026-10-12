@@ -1013,3 +1013,11 @@ The open items of the threat model's review of 2026-10-12 (reader comments), one
 | 9 | Workers AI labels (optional) | not started; may slip to v1.1 |
 | 10 | CLI and deployment, guide, threat model, changesets | done (this section); `cloudhal comments seed` not built |
 | — | ADR | ADR-0022 accepted |
+
+## Live acceptance on the maintainer's account (2026-10-12)
+Deployed to the newsroom demo (Workers Paid account; Free-plan checks of step 0 remain open). Comments turned on in Studio with proof of work.
+- A JavaScript comment (challenge 18 bits, solved by the package's solver) and a JavaScript-less form post both stored as `pending`; the form post answered 303 to `#comment-pending`.
+- A replayed challenge and a filled honeypot answered the fake `{"status":"pending"}` and stored nothing; a cross-site post (foreign `Origin`, `Sec-Fetch-Site: cross-site`) answered 403; a challenge for an unknown entry answered 404. `cloudhal comments status --remote` showed exactly two new pending comments.
+- MCP `list_comments` returned reader names and text only inside `<reader-…>` blocks after the untrusted-data preamble; `moderate_comments` (hide and approve) with a key holding only `comments:read` was refused with `missing scope comments:moderate`.
+- Approved in Studio at 14:28:55Z; the comments purge ran in the 20 s batch at 14:29:15Z; the comment was on the cached article page by 14:29:22Z (~27 s, within the one-minute acceptance bound), with the publish budget untouched (1 purge request that minute).
+- Not yet exercised live: an agent in `edits` mode hiding a comment (needs a key with `comments:moderate`), erasure, and the step-0 Free-plan checks.
