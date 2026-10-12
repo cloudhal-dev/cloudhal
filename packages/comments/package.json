@@ -12,7 +12,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./sql": "./src/sql/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./fixtures/*": "./src/fixtures/*"
   },
   "files": [
     "dist",
@@ -54,7 +55,8 @@
       "./testing": {
         "types": "./dist/src/testing.d.ts",
         "default": "./dist/src/testing.js"
-      }
+      },
+      "./fixtures/*": "./dist/src/fixtures/*"
     }
   }
 }

@@ -1,5 +1,6 @@
 import { isValid } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
+import fixture from "../src/fixtures/comment-text.json" with { type: "json" };
 import {
   CONTRACT_FORBIDDEN,
   checkEmail,
@@ -18,6 +19,8 @@ import {
   normalizeEmail,
   normalizeName,
   normalizeText,
+  parseCommentText,
+  safeCommentHref,
   wordTokens,
 } from "../src/index.ts";
 
@@ -232,5 +235,24 @@ describe("linkify (C7)", () => {
     expect(seg).toMatchObject({ kind: "link", text: "https://раураl.com/login" });
     expect(seg?.kind === "link" && seg.href).toMatch(/^https:\/\/xn--[a-z0-9-]+\.com\/login$/);
     expect(commentTextHtml("HTTPS://Example.COM")).toContain('href="https://example.com/"');
+  });
+});
+
+describe("shared link fixture (RFC-0007 §14: one rule for the renderer and Studio)", () => {
+  it("parseCommentText matches every case of fixtures/comment-text.json", () => {
+    for (const c of fixture.cases) expect(parseCommentText(c.text), c.name).toEqual(c.paragraphs);
+    expect(fixture.cases.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it("safeCommentHref is the link rule", () => {
+    expect(safeCommentHref("https://example.com/a?b=1")).toBe("https://example.com/a?b=1");
+    const bad = [
+      "http://example.com",
+      "javascript:alert(1)",
+      "https://bank.example@evil.example",
+      "https://localhost",
+      "www.example.com",
+    ];
+    for (const b of bad) expect(safeCommentHref(b), b).toBeUndefined();
   });
 });
