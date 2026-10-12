@@ -8,8 +8,8 @@ cloudhal build [--snapshot <id>]                        static HTML from the pub
 cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp) for this project
 cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                         MCP server over stdio for this project
-cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--force-downgrade]
-                                                        site + admin Workers on Cloudflare
+cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
+                [--force-downgrade]                     site + admin Workers on Cloudflare
 cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
 cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
                                                         local site → deployment
@@ -45,7 +45,9 @@ Every admin request is also a backstop: when the heartbeat is more than two minu
 - `deploy` refuses to deploy code with a lower schedules level (`cloudhal.schedulesLevel` of `@cloudhal/core-ts`) over a deployment that has open releases or gated pages and entries: older code ignores holds and gates. `--force-downgrade` overrides it.
 - `push` refuses while the deployment has open releases (their pinned versions point into the graph a push replaces); `--cancel-schedules` cancels them first.
 
-**Variables `deploy` does not set (yet).** The admin Worker reads `CLOUDHAL_AUTOMATIONS=off` (automations stop; releases and gates go on) and `CLOUDHAL_TICK_BUDGET=paid` (Workers Paid's tick budget: 900 statements and up to 50 releases per tick instead of 40 and 1). Set them in the Cloudflare dashboard; a later deploy rewrites the Worker's variables.
+**Tick budget and the automations switch.** Every deploy writes `CLOUDHAL_TICK_BUDGET` and `CLOUDHAL_AUTOMATIONS` on the admin Worker:
+- `CLOUDHAL_TICK_BUDGET=free` (default: 40 statements and one release per tick) or `paid` (900 statements and up to 50 releases): `cloudhal deploy --plan paid` or `cloudhal.json` `"schedules": { "plan": "paid" }`. The plan is remembered in `.cloudhal/deploy/state.json`; `--plan free` goes back. Wrangler's login cannot read the account's plan, so the deploy says which budget it used.
+- `CLOUDHAL_AUTOMATIONS=off` with `"schedules": { "automations": false }` (else `on`): automations stop; releases and gates go on. On Node, `cloudhal dev`, `studio`, `mcp` and `schedules run-due` honour `CLOUDHAL_AUTOMATIONS=off` from the environment.
 
 **Commands:**
 - `cloudhal schedules status [--remote]`: the scheduler's mode and state (`running`, `late`, `stopped`, `unknown`), the last tick and the next wake, the code's schedules level, and each site's open releases and gated pages and entries.
