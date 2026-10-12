@@ -44,11 +44,14 @@ Usage:
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
-  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--force-downgrade]
+  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
+                  [--force-downgrade]
                                                           site + admin Workers on Cloudflare (uses wrangler login);
                                                           --jurisdiction eu keeps a newly created D1 database
                                                           in the EU (cannot be changed later); --scheduler picks
                                                           the minute cron trigger or the Durable Object alarm;
+                                                          --plan sizes scheduler ticks for the account's Workers
+                                                          plan (default free; remembered);
                                                           --force-downgrade deploys older schedules code over
                                                           open releases and time gates
   cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
@@ -122,6 +125,7 @@ export async function main(argv: string[]): Promise<number> {
       in: { type: "string" },
       "with-personal-data": { type: "boolean" },
       scheduler: { type: "string" },
+      plan: { type: "string" },
       "force-downgrade": { type: "boolean" },
       "cancel-schedules": { type: "boolean" },
       limit: { type: "string" },
@@ -198,6 +202,9 @@ export async function main(argv: string[]): Promise<number> {
       const ticker = values.scheduler;
       if (ticker !== undefined && ticker !== "cron" && ticker !== "alarm")
         throw new Error(`--scheduler must be cron or alarm (got "${ticker}")`);
+      const plan = values.plan;
+      if (plan !== undefined && plan !== "free" && plan !== "paid")
+        throw new Error(`--plan must be free or paid (got "${plan}")`);
       const tty = process.stdin.isTTY && process.stdout.isTTY;
       const r = await deploy({
         projectDir,
@@ -205,6 +212,7 @@ export async function main(argv: string[]): Promise<number> {
         ...(values["dry-run"] ? { dryRun: true } : {}),
         ...(where ? { jurisdiction: where } : {}),
         ...(ticker ? { scheduler: ticker } : {}),
+        ...(plan ? { plan } : {}),
         ...(values["force-downgrade"] ? { forceDowngrade: true } : {}),
         log: (l) => console.log(l),
         // The analytics and data-location questions need a person at a terminal.

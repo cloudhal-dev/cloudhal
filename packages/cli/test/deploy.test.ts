@@ -182,11 +182,15 @@ describe("cloudhal deploy", () => {
     expect(siteC.ratelimits).toBeUndefined();
     const adminC = await jsonc(commentsOnly.adminConfig);
     expect(adminC.analytics).toBeUndefined();
+    // RFC-0008 §8.2, §11.6: the tick budget and the automations switch are always written
     expect(adminC.vars).toEqual({
       CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "true",
       CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "free",
+      CLOUDHAL_AUTOMATIONS: "on",
     });
+    expect(commentsOnly.schedules).toEqual({ automations: true, plan: "free" });
     expect(adminC.triggers).toEqual({ crons: ["* * * * *"] });
     expect(commentsOnly.comments).toEqual({ available: true, cron: true });
     await writeFile(
@@ -195,6 +199,8 @@ describe("cloudhal deploy", () => {
         ...withLimit,
         analytics: { enabled: false },
         comments: { available: false },
+        // the deployment's automations kill switch and a Workers Paid account (§8.2, §11.6)
+        schedules: { automations: false, plan: "paid" },
       }),
     );
     const none = await deploy({ projectDir, studioDir, dryRun: true });
@@ -203,7 +209,10 @@ describe("cloudhal deploy", () => {
       CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "false",
       CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "paid",
+      CLOUDHAL_AUTOMATIONS: "off",
     });
+    expect(none.schedules).toEqual({ automations: false, plan: "paid" });
     expect(adminN.triggers).toEqual({ crons: ["* * * * *"] });
     expect(none.comments).toEqual({ available: false });
     await writeFile(cfgFile, initial);
@@ -565,7 +574,10 @@ describe("cloudhal deploy", () => {
       CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "true",
       CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "free",
+      CLOUDHAL_AUTOMATIONS: "on",
     });
+    expect(lines.join("\n")).toMatch(/Workers Free tick budget .* `--plan paid` \(remembered\)/);
     expect(adminOff.triggers).toEqual({ crons: ["* * * * *"] });
     expect(JSON.parse(await readFile(file, "utf8")).analytics).toBeUndefined();
     expect(purges).toHaveLength(1);
@@ -639,6 +651,26 @@ describe("cloudhal deploy", () => {
     });
     expect(back.scheduler).toBe("cron");
     expect(adminDeploys).toEqual(['["* * * * *"]']);
+
+    // RFC-0008 §8.2: `--plan paid` sizes ticks for Workers Paid and is remembered in state.json,
+    // so the next deploy without the flag keeps it; `--plan free` goes back.
+    const stateFile = path.join(projectDir, cfg.dataDir, "deploy/state.json");
+    const paid = await run({ prompt: async () => false, wranglerVersion: "4.148.0", plan: "paid" });
+    expect(paid.schedules).toEqual({ automations: true, plan: "paid" });
+    expect((await jsonc(paid.adminConfig)).vars).toMatchObject({ CLOUDHAL_TICK_BUDGET: "paid" });
+    expect(JSON.parse(await readFile(stateFile, "utf8")).plan).toBe("paid");
+    lines.length = 0;
+    const kept = await run({ prompt: async () => false, wranglerVersion: "4.148.0" });
+    expect(kept.schedules.plan).toBe("paid");
+    expect((await jsonc(kept.adminConfig)).vars).toMatchObject({
+      CLOUDHAL_TICK_BUDGET: "paid",
+      CLOUDHAL_AUTOMATIONS: "on",
+    });
+    expect(lines.join("\n")).not.toMatch(/Workers Free tick budget/);
+    const free = await run({ prompt: async () => false, wranglerVersion: "4.148.0", plan: "free" });
+    expect((await jsonc(free.adminConfig)).vars).toMatchObject({ CLOUDHAL_TICK_BUDGET: "free" });
+    expect(JSON.parse(await readFile(stateFile, "utf8")).plan).toBe("free");
+    await expect(run({ plan: "pro" as never })).rejects.toThrow("--plan must be free or paid");
   });
 
   it("comments and data location: --jurisdiction eu only when the database is created, availability switches purge once", async () => {

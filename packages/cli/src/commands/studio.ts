@@ -11,7 +11,7 @@ import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
-import { startLocalScheduler } from "./scheduler-local.ts";
+import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
 
 export interface StudioOptions {
   readonly projectDir: string;
@@ -79,7 +79,12 @@ export async function studio(
     comments,
     ...(ticker ? { scheduler: ticker } : {}),
     // RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite.
-    schedules: { store: new SqlScheduleStore(local.sql), maxNewBodies: Number.POSITIVE_INFINITY },
+    schedules: {
+      store: new SqlScheduleStore(local.sql),
+      maxNewBodies: Number.POSITIVE_INFINITY,
+      // §11.6: `CLOUDHAL_AUTOMATIONS=off` refuses automation keys and stops occurrences.
+      automationsEnabled: automationsEnabled(),
+    },
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [

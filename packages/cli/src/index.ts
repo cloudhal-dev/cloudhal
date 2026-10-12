@@ -47,6 +47,7 @@ export {
   transferOwner,
 } from "./commands/owner.ts";
 export {
+  automationsEnabled,
   type LocalScheduler,
   type LocalSchedulerOptions,
   runLocalTick,

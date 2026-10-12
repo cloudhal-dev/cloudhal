@@ -29,6 +29,11 @@
  *  10. the downgrade guard (RFC-0008 Compatibility): code whose schedules level is lower than the
  *      deployment's would ignore holds and time gates, so it is refused while the deployment has
  *      open releases or gated pages and entries, unless `--force-downgrade`.
+ *  11. the tick budget and the automations switch (RFC-0008 §8.2, §11.6): the admin Worker always
+ *      gets `CLOUDHAL_TICK_BUDGET` (`free` unless `--plan paid` or `schedules.plan` says `paid`; the
+ *      plan is remembered in `state.json`) and `CLOUDHAL_AUTOMATIONS` (`off` when
+ *      `schedules.automations` is `false`). Cloudflare offers no cheap, reliable way to read an
+ *      account's Workers plan with wrangler's login, so the owner says it once.
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
@@ -47,13 +52,16 @@ import {
   type CommentsDeployment,
   DEFAULT_BEACON_RATE_LIMIT,
   DEFAULT_COMMENTS_RATE_LIMIT,
+  DEFAULT_SCHEDULES_DEPLOYMENT,
   type DeploymentNames,
   rateLimitNamespaceId,
   readExistingIds,
   readExistingVars,
   type SchedulerTicker,
+  type SchedulesDeployment,
   siteConfigPath,
   siteWorkerConfig,
+  type WorkersPlan,
   workerNames,
   writeWranglerConfig,
 } from "../cloudflare/config.ts";
@@ -106,6 +114,8 @@ export interface DeployState {
   jurisdiction?: Jurisdiction;
   /** What drives the scheduler (RFC-0008 §8.3): the cron trigger, or the Durable Object alarm. */
   scheduler?: SchedulerTicker;
+  /** The Workers plan the tick budget was sized for (`--plan`, RFC-0008 §8.2). */
+  plan?: WorkersPlan;
 }
 
 /** D1 data location (RFC-0007 D7): `auto` (Cloudflare picks) or the EU jurisdiction. */
@@ -185,6 +195,12 @@ export interface DeployOptions {
    * releases are open or gates are set (RFC-0008 Compatibility). Holds and gates stop working.
    */
   readonly forceDowngrade?: boolean;
+  /**
+   * `--plan free|paid`: the account's Workers plan, which sizes each scheduler tick (RFC-0008 §8.2,
+   * `CLOUDHAL_TICK_BUDGET`). Default: `cloudhal.json` `schedules.plan`, else what the last deploy
+   * used, else `free`. Remembered in `state.json`.
+   */
+  readonly plan?: WorkersPlan;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -338,6 +354,8 @@ export interface DeployResult {
   customStudioUrl?: string;
   /** What drives the scheduler (RFC-0008 §8.3): the minute cron trigger, or the clock's alarm. */
   scheduler: SchedulerTicker;
+  /** The tick budget and the automations switch as deployed (RFC-0008 §8.2, §11.6). */
+  schedules: SchedulesDeployment;
   /** Site analytics as deployed (RFC-0006 §11). */
   analytics: {
     enabled: boolean;
@@ -518,6 +536,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     throw new Error(`--jurisdiction must be eu (got "${String(options.jurisdiction)}")`);
   if (options.scheduler !== undefined && !["cron", "alarm"].includes(options.scheduler))
     throw new Error(`--scheduler must be cron or alarm (got "${String(options.scheduler)}")`);
+  if (options.plan !== undefined && !["free", "paid"].includes(options.plan))
+    throw new Error(`--plan must be free or paid (got "${String(options.plan)}")`);
   let cfg = await readProjectConfig(options.projectDir);
   const dir = deployDir(options.projectDir, cfg.dataDir);
   await mkdir(dir, { recursive: true });
@@ -601,6 +621,21 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     log(
       "scheduler: Durable Object alarm (this account had no free cron slot); `cloudhal deploy --scheduler cron` tries the cron trigger again",
     );
+  // 2d. the tick budget and the automations switch (RFC-0008 §8.2, §11.6)
+  const plan: WorkersPlan =
+    options.plan ?? cfg.schedules?.plan ?? previous?.plan ?? DEFAULT_SCHEDULES_DEPLOYMENT.plan;
+  const schedules: SchedulesDeployment = {
+    automations: cfg.schedules?.automations !== false,
+    plan,
+  };
+  if (plan === "free" && !options.plan && !cfg.schedules?.plan)
+    log(
+      "scheduler: Workers Free tick budget (40 statements, 1 release a tick). On Workers Paid, deploy once with `--plan paid` (remembered) or set `schedules.plan` in cloudhal.json",
+    );
+  if (!schedules.automations)
+    log(
+      "automations: off for this deployment (cloudhal.json `schedules.automations`); releases and time gates go on",
+    );
   // 3. site Worker
   await writeWranglerConfig(
     siteConfigPath(options.projectDir),
@@ -634,6 +669,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       analytics: a,
       comments: c,
       scheduler: ticker,
+      schedules,
     });
   const admin = await prepareAdmin(analytics, comments, scheduler);
 
@@ -655,6 +691,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       siteConfig,
       adminConfig: admin.configPath,
       scheduler,
+      schedules,
       analytics: analytics
         ? { enabled: true, dataset: analytics.dataset, cron: scheduler === "cron" }
         : { enabled: false },
@@ -719,6 +756,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     comments: comments.available ? "on" : "off",
     ...(jurisdiction ? { jurisdiction } : {}),
     scheduler,
+    plan,
   });
 
   // 5. first deploy: push the local site
@@ -800,6 +838,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
     ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
     scheduler,
+    schedules,
     analytics: analytics
       ? {
           enabled: true,

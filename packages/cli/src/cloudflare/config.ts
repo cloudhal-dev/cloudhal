@@ -21,7 +21,9 @@
  * (`* * * * *`, the one slot the hourly jobs used) — or, when Cloudflare refused it, none and
  * `CLOUDHAL_SCHEDULER=alarm` — and always declares the SQLite-backed `SchedulerClock` Durable Object
  * (`SCHEDULER_CLOCK`) with its migration, so switching tickers never needs a migration. The hourly
- * jobs (analytics rollup, comments) run behind watermarks on that tick.
+ * jobs (analytics rollup, comments) run behind watermarks on that tick. `CLOUDHAL_TICK_BUDGET` sizes
+ * each tick for the account's Workers plan and `CLOUDHAL_AUTOMATIONS` is the deployment's
+ * automations switch (§8.2, §11.6); both are always written, so a deploy never drops them.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -36,6 +38,26 @@ export const MINUTE_CRON = "* * * * *";
 
 /** What drives the scheduler on Cloudflare: the cron trigger, or the Durable Object alarm. */
 export type SchedulerTicker = "cron" | "alarm";
+
+/**
+ * The Workers plan a tick is sized for (RFC-0008 §8.2, `CLOUDHAL_TICK_BUDGET`): `free` — 40
+ * statements and one release a tick — or `paid` — 900 statements and up to 50 releases.
+ */
+export type WorkersPlan = "free" | "paid";
+
+/** What the generated admin config needs for schedules (RFC-0008 §8.2, §11.6). */
+export interface SchedulesDeployment {
+  /** `false` writes `CLOUDHAL_AUTOMATIONS=off`: automations stop; releases and gates go on. */
+  readonly automations: boolean;
+  /** The tick budget (`CLOUDHAL_TICK_BUDGET`). */
+  readonly plan: WorkersPlan;
+}
+
+/** A deployment that says nothing: automations on, the Workers Free budget (the safe one). */
+export const DEFAULT_SCHEDULES_DEPLOYMENT: SchedulesDeployment = {
+  automations: true,
+  plan: "free",
+};
 
 /** The scheduler's Durable Object (RFC-0008 §8.3): binding, class and its migration tag. */
 export const SCHEDULER_CLOCK_BINDING = "SCHEDULER_CLOCK";
@@ -203,12 +225,15 @@ export function adminWorkerConfig(
     comments?: CommentsDeployment;
     /** The scheduler's ticker (default `cron`; `alarm` when Cloudflare refused the trigger). */
     scheduler?: SchedulerTicker;
+    /** The tick budget and the automations switch (default: `free`, automations on). */
+    schedules?: SchedulesDeployment;
   },
 ) {
   const names = workerNames(n);
   const a = n.analytics;
   const c = n.comments;
   const scheduler: SchedulerTicker = n.scheduler ?? "cron";
+  const s = n.schedules ?? DEFAULT_SCHEDULES_DEPLOYMENT;
   const vars = {
     // RFC-0008 §11.1: the feed check fetches this site's feed through `SITE` (it serves no other).
     ...(n.siteId ? { CLOUDHAL_SITE_ID: n.siteId } : {}),
@@ -222,6 +247,9 @@ export function adminWorkerConfig(
     ...(c ? { CLOUDHAL_COMMENTS_AVAILABLE: c.available ? "true" : "false" } : {}),
     // RFC-0008 §8.3: which ticker runs `runDue` (the legacy `*_CRON=off` vars are not written again).
     CLOUDHAL_SCHEDULER: scheduler,
+    // §8.2: the statements and releases one tick may spend; §11.6: the deployment's kill switch.
+    CLOUDHAL_TICK_BUDGET: s.plan,
+    CLOUDHAL_AUTOMATIONS: s.automations ? "on" : "off",
   };
   return {
     $schema: "node_modules/wrangler/config-schema.json",

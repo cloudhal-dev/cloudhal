@@ -22,7 +22,7 @@ import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
-import { startLocalScheduler } from "./scheduler-local.ts";
+import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
 
 export interface McpOptions {
   readonly projectDir: string;
@@ -88,6 +88,8 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
       store: new SqlScheduleStore(local.sql),
       scheduler: ticker,
       maxNewBodies: Number.POSITIVE_INFINITY,
+      // §11.6: `CLOUDHAL_AUTOMATIONS=off` refuses automation keys and stops occurrences.
+      automationsEnabled: automationsEnabled(),
     },
     onerror: (e) => process.stderr.write(`cloudhal mcp: ${e.message}\n`),
   });

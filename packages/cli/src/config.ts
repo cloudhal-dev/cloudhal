@@ -53,6 +53,18 @@ export interface CommentsConfig {
   readonly rateLimit?: boolean | AnalyticsRateLimitConfig;
 }
 
+/**
+ * `cloudhal.json` → `schedules` (RFC-0008 §8.2, §11.6): what `cloudhal deploy` writes for the
+ * scheduler. Absent means automations on and the Workers Free tick budget (unless `--plan paid`
+ * was deployed before: `state.json` remembers it).
+ */
+export interface SchedulesConfig {
+  /** `false` turns automations off for the deployment (`CLOUDHAL_AUTOMATIONS=off`). */
+  readonly automations?: boolean;
+  /** The account's Workers plan, which sizes each tick (`CLOUDHAL_TICK_BUDGET`). */
+  readonly plan?: "free" | "paid";
+}
+
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
 export interface ProjectConfig {
   readonly siteId: string;
@@ -67,12 +79,14 @@ export interface ProjectConfig {
   readonly analytics?: AnalyticsConfig;
   /** Reader comments (RFC-0007); absent = available, off per site. */
   readonly comments?: CommentsConfig;
+  /** Schedules (RFC-0008); absent = automations on, the Free tick budget. */
+  readonly schedules?: SchedulesConfig;
 }
 
 export const CONFIG_FILE = "cloudhal.json";
 
 /** The keys `ProjectConfig` owns; others (e.g. `media`, read by the starter) are kept on write. */
-const OWN_KEYS = new Set(["siteId", "dataDir", "domains", "analytics", "comments"]);
+const OWN_KEYS = new Set(["siteId", "dataDir", "domains", "analytics", "comments", "schedules"]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
 
@@ -101,6 +115,16 @@ export function parseCommentsConfig(input: unknown): CommentsConfig | undefined 
   return {
     ...(typeof o.available === "boolean" ? { available: o.available } : {}),
     ...rateLimitOf(o.rateLimit),
+  };
+}
+
+/** Leniently parsed, like `comments`: values of the wrong type are left out. */
+export function parseSchedulesConfig(input: unknown): SchedulesConfig | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const o = input as Record<string, unknown>;
+  return {
+    ...(typeof o.automations === "boolean" ? { automations: o.automations } : {}),
+    ...(o.plan === "free" || o.plan === "paid" ? { plan: o.plan } : {}),
   };
 }
 
@@ -157,6 +181,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   const domains = cfg.domains && typeof cfg.domains === "object" ? cfg.domains : undefined;
   const analytics = parseAnalyticsConfig(cfg.analytics);
   const comments = parseCommentsConfig(cfg.comments);
+  const schedules = parseSchedulesConfig(cfg.schedules);
   return {
     siteId: cfg.siteId,
     dataDir: cfg.dataDir ?? ".cloudhal",
@@ -170,6 +195,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
       : {}),
     ...(analytics ? { analytics } : {}),
     ...(comments ? { comments } : {}),
+    ...(schedules ? { schedules } : {}),
   };
 }
 

@@ -12,6 +12,7 @@ import {
   type DeploymentNames,
   readExistingIds,
   type SchedulerTicker,
+  type SchedulesDeployment,
   writeWranglerConfig,
 } from "./config.ts";
 
@@ -37,6 +38,8 @@ export async function prepareAdminWorker(options: {
   comments?: CommentsDeployment | undefined;
   /** The scheduler's ticker (RFC-0008 §8.3): the minute cron trigger (default) or the clock. */
   scheduler?: SchedulerTicker | undefined;
+  /** The tick budget and the automations switch (RFC-0008 §8.2, §11.6). */
+  schedules?: SchedulesDeployment | undefined;
 }): Promise<PreparedAdmin> {
   const dir = path.join(options.projectDir, options.dataDir, "deploy", "admin");
   await mkdir(dir, { recursive: true });
@@ -63,6 +66,7 @@ export async function prepareAdminWorker(options: {
       ...(options.analytics ? { analytics: options.analytics } : {}),
       ...(options.comments ? { comments: options.comments } : {}),
       ...(options.scheduler ? { scheduler: options.scheduler } : {}),
+      ...(options.schedules ? { schedules: options.schedules } : {}),
     }),
     "Cloudhal admin Worker (API, auth, MCP, Studio)",
   );

@@ -9,6 +9,10 @@
  * It replaces the hourly interval of `startLocalCommentsJob`: the comments job (and the schedules
  * retention) are system jobs behind watermarks on the tick. There is no edge cache, so releases
  * purge nothing (`none`).
+ *
+ * `CLOUDHAL_AUTOMATIONS=off` in the process environment is the deployment's kill switch here too
+ * (§11.6): automations stop (no occurrences, no windows, automation keys refused); releases and
+ * gates go on.
  */
 import { releaseApprovalCheck } from "@cloudhal/api";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
@@ -32,6 +36,16 @@ import { runLocalCommentsJob } from "./comments-local.ts";
 /** The longest the Node timer sleeps (§8.4). */
 export const NODE_TICK_MAX_MS = 60_000;
 
+/**
+ * The deployment's automations switch on Node (RFC-0008 §11.6): `CLOUDHAL_AUTOMATIONS=off` stops
+ * them, as on the admin Worker; anything else (or nothing) leaves them on.
+ */
+export function automationsEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  return env.CLOUDHAL_AUTOMATIONS?.trim().toLowerCase() !== "off";
+}
+
 export interface LocalSchedulerOptions {
   readonly sql: SqlDriver;
   readonly blobs: BlobStore;
@@ -51,6 +65,8 @@ export interface LocalSchedulerOptions {
   readonly siteOrigin?: string | undefined;
   /** The site the local renderer serves (`cloudhal.json` `siteId`). */
   readonly siteId?: string | undefined;
+  /** Automations run (§11.6). Default: `automationsEnabled()` of the process environment. */
+  readonly automations?: boolean | undefined;
 }
 
 /** What the Node ticker adds for the built-in jobs (§11.1): local analytics and the local renderer. */
@@ -128,6 +144,8 @@ export function runLocalTick(
     checkApproval: releaseApprovalCheck({ sql: o.sql, graph: o.graph }),
     // RFC-0008 §11.1: the built-in jobs (their notifications are derived from the runs).
     builtinInputs: () => localBuiltinInputs(o),
+    // §11.6: `CLOUDHAL_AUTOMATIONS=off` stops automations; releases go on.
+    automationsEnabled: o.automations ?? automationsEnabled(),
   });
 }
 

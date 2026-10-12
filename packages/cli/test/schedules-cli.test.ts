@@ -11,14 +11,19 @@ import type { Release } from "@cloudhal/core-contracts";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { ReleaseService } from "@cloudhal/core-ts/releases";
+import { presetRule } from "@cloudhal/schedules";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { adminWorkerConfig } from "../src/cloudflare/config.ts";
+import { parseSchedulesConfig, writeProjectConfig } from "../src/config.ts";
 import {
+  automationsEnabled,
   describeSchedulesStatus,
   init,
   readProjectConfig,
+  runLocalTick,
   schedulesList,
   schedulesRunDue,
   schedulesStatus,
@@ -185,5 +190,96 @@ describe("the Node ticker and `cloudhal schedules` (RFC-0008 §8.4, §16)", () =
       JSON.stringify({ CLOUDHAL_DEPLOY_TOKEN: "x".repeat(40) }),
     );
     await expect(schedulesStatus({ projectDir, remote: true, fetch: f })).rejects.toThrow(/401/);
+  });
+});
+
+describe("the deployment's tick budget and automations switch (RFC-0008 §8.2, §11.6)", () => {
+  const admin = { name: "news", studioDir: "studio", main: "./worker.ts" };
+
+  it("the admin config always carries CLOUDHAL_TICK_BUDGET and CLOUDHAL_AUTOMATIONS", () => {
+    // nothing said: the Workers Free budget, automations on (a redeploy never drops either var)
+    expect(adminWorkerConfig(admin).vars).toMatchObject({
+      CLOUDHAL_TICK_BUDGET: "free",
+      CLOUDHAL_AUTOMATIONS: "on",
+    });
+    expect(
+      adminWorkerConfig({ ...admin, schedules: { automations: false, plan: "paid" } }).vars,
+    ).toMatchObject({ CLOUDHAL_TICK_BUDGET: "paid", CLOUDHAL_AUTOMATIONS: "off" });
+  });
+
+  it("cloudhal.json `schedules` is read leniently and kept on write", async () => {
+    expect(parseSchedulesConfig({ automations: false, plan: "paid" })).toEqual({
+      automations: false,
+      plan: "paid",
+    });
+    expect(parseSchedulesConfig({ automations: "no", plan: "pro" })).toEqual({});
+    expect(parseSchedulesConfig("paid")).toBeUndefined();
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-schedules-cfg-"));
+    try {
+      await writeFile(
+        path.join(tmp, "cloudhal.json"),
+        JSON.stringify({ siteId: "site_abcdefgh", schedules: { plan: "paid" } }),
+      );
+      const cfg = await readProjectConfig(tmp);
+      expect(cfg.schedules).toEqual({ plan: "paid" });
+      await writeProjectConfig(tmp, cfg);
+      expect((await readProjectConfig(tmp)).schedules).toEqual({ plan: "paid" });
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("CLOUDHAL_AUTOMATIONS=off stops automations on Node", async () => {
+    expect(automationsEnabled({})).toBe(true);
+    expect(automationsEnabled({ CLOUDHAL_AUTOMATIONS: "on" })).toBe(true);
+    expect(automationsEnabled({ CLOUDHAL_AUTOMATIONS: "off" })).toBe(false);
+    expect(automationsEnabled({ CLOUDHAL_AUTOMATIONS: " OFF " })).toBe(false);
+
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-schedules-off-"));
+    const projectDir = path.join(tmp, "site");
+    const siteId = (await init({ dir: projectDir, name: "Switched Off" })).siteId;
+    const local = await openLocalStore(
+      path.join(projectDir, (await readProjectConfig(projectDir)).dataDir),
+    );
+    const before = process.env.CLOUDHAL_AUTOMATIONS;
+    try {
+      const created = new SqlScheduleStore(local.sql, {
+        now: () => new Date("2026-10-12T09:00:00.000Z"),
+      });
+      const job = await created.createAutomation({
+        siteId,
+        name: "Stale",
+        job: { kind: "builtin", builtin: "stale-content" },
+        recurrence: {
+          start: "2026-10-12T10:07",
+          timeZone: "UTC",
+          rule: presetRule("daily", "2026-10-12T10:07"),
+        },
+        owner: { id: "user_editor01" },
+      });
+      expect(job.nextRunAt).toBe("2026-10-12T10:07:00.000Z");
+      const schedules = new SqlScheduleStore(local.sql);
+      const tick = (at: string, automations?: boolean) =>
+        runLocalTick({
+          sql: local.sql,
+          blobs: local.blobs,
+          graph: local.store,
+          trigger: "node",
+          at: new Date(at),
+          ...(automations === undefined ? {} : { automations }),
+        });
+      // the process environment is the default: off → the due occurrence does not run
+      process.env.CLOUDHAL_AUTOMATIONS = "off";
+      await tick("2026-10-12T10:07:20.000Z");
+      expect(await schedules.listRuns(siteId, { subjectId: job.id })).toEqual([]);
+      // on again (an explicit option wins over the environment): the occurrence runs
+      await tick("2026-10-12T10:08:20.000Z", true);
+      expect((await schedules.listRuns(siteId, { subjectId: job.id })).length).toBe(1);
+    } finally {
+      if (before === undefined) delete process.env.CLOUDHAL_AUTOMATIONS;
+      else process.env.CLOUDHAL_AUTOMATIONS = before;
+      await local.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
   });
 });
