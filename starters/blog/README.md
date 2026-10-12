@@ -18,5 +18,8 @@ cloudhal build    # static HTML from the published (or latest) snapshot
 - `NAV_CATEGORIES` — append top-level categories (by position) to the header after the pages; `false` for a pages-only menu.
 - `RELATED_POSTS` — how many related posts to show under an article (0 hides the list).
 
+## Analytics
+Themes need nothing for analytics (RFC-0006). Deployed with `cloudhal deploy`, the Site Worker adds the first-party script tag to published pages while analytics are on (`cloudhal.json` → `analytics`, then per site in Studio). `cloudhal dev` records your own visits only with `"dev": true` in that block, which `astro.config.mjs` passes to the `cloudhal()` integration. Static builds (`cloudhal build`) carry no script. What is collected, and a paragraph for your privacy policy: `docs/guides/analytics-privacy.md` in the Cloudhal repository.
+
 ## Redirects in static builds
 A static host cannot be told to answer with a status code by HTML alone. `cloudhal build` therefore writes each redirected path as a small meta-refresh page and also writes `dist/_redirects`, which Cloudflare (Workers/Pages static assets) and Netlify turn into real 301s. Deployed with `cloudhal deploy`, the Site Worker answers redirects itself.

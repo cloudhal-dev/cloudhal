@@ -24,9 +24,53 @@ cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
 
 ### Site analytics (RFC-0006)
 
-`cloudhal.json` → `analytics` sets the deployment defaults: `enabled` (on when the block is there; `cloudhal init` writes `{ "enabled": true }`), `uniqueVisitors`, `vitalsOneIn` (0, 1, 2, 5, 10, 20), `queryBudget` (uncached WAE queries per UTC day, default 8000), `rawRetentionDays` (SQLite, default 90) and `dev` (record `cloudhal dev` traffic). With analytics on, `cloudhal deploy` gives the site Worker a Workers Analytics Engine dataset (`<deployment>_events`, binding `ANALYTICS`) and the `CLOUDHAL_ANALYTICS*` vars, and the admin Worker the Analytics SQL binding (`ANALYTICS_SQL`, no API token), its vars and an hourly cron trigger (`17 * * * *`) for the daily rollups. It needs wrangler 4.145 or newer. When analytics switch on or off, the deploy purges the site's cache once so pages gain or lose the script tag. A project without the key (from before analytics) is asked once in a terminal; a non-interactive deploy keeps analytics off and says how to turn them on. When the account has no free cron trigger (Workers Free allows 5), the admin Worker is deployed without one and daily totals are computed when someone opens Analytics.
+What is collected, what never is, the unique-visitors mode, retention and a ready-made privacy-policy paragraph (English and Turkish): [site analytics and privacy](../../docs/guides/analytics-privacy.md).
 
-Locally, `cloudhal studio` and `cloudhal mcp` read the project's SQLite (`analytics_events`) and roll up finished days hourly. `cloudhal analytics seed --days 30` fills demo traffic for Studio work; `rollup --remote --days 90` backfills a deployment from WAE (3 months are kept there); `export` writes the daily totals as CSV — there is nothing per visitor to export.
+Each published page carries one first-party script (`/_cloudhal/p.<hash>.js`, under 1 KB gzipped) that posts a page view to `POST /__cloudhal/e` on the site Worker. The Worker checks it, resolves the path to a published node and writes the event to Workers Analytics Engine (WAE). The admin Worker reads WAE through the Analytics SQL binding (no API token) and keeps daily totals in D1. Locally and on Node the same model runs on the project's SQLite.
+
+**`cloudhal.json` → `analytics`** (deployment defaults; per-site settings in Studio override them):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | on when the block is there | `false` turns analytics off for the whole deployment: no bindings, no cron, no script. Without the block, analytics are off. `cloudhal init` writes `{ "enabled": true }`. |
+| `uniqueVisitors` | `false` | Daily-salted visitor hash (opt-in; see the guide). |
+| `vitalsOneIn` | `5` | Core Web Vitals from 1 in N page views: `0` (off), `1`, `2`, `5`, `10`, `20`. |
+| `queryBudget` | `8000` | Uncached WAE queries per UTC day; past it, live numbers pause until midnight UTC and complete days still come from D1. |
+| `rawRetentionDays` | `90` | Raw events kept in SQLite (local and Node only; WAE keeps 3 months). |
+| `dev` | `false` | Record `cloudhal dev` traffic locally (it is your own). |
+| `rateLimit` | `false` | Reserved for the Workers Rate Limiting binding; accepted but not wired yet. |
+
+```json
+{ "siteId": "site_…", "analytics": { "enabled": true, "vitalsOneIn": 5 } }
+```
+
+**On Cloudflare.** With analytics on, `cloudhal deploy` adds:
+- to the site Worker, the WAE dataset `<deployment>_events` (binding `ANALYTICS`; Cloudflare creates the dataset on the first write) and the vars `CLOUDHAL_ANALYTICS=on`, `CLOUDHAL_ANALYTICS_DEFAULTS` and, with a custom domain, `CLOUDHAL_SITE_HOSTS`;
+- to the admin Worker, the Analytics SQL binding (`ANALYTICS_SQL`), the vars `CLOUDHAL_ANALYTICS_DATASET`, `CLOUDHAL_ANALYTICS_BUDGET` and `CLOUDHAL_ANALYTICS_DEFAULTS`, and an hourly cron trigger (`17 * * * *`) that rolls finished days into D1, deletes old daily salts and applies retention.
+
+It needs **wrangler 4.145 or newer** (the `analytics` config key); the deploy stops and says so when the project's wrangler is older. The migration `0014_analytics` runs on the admin Worker's first request. When analytics switch on or off, the deploy purges the site's cache once so pages gain or lose the script tag. Workers Free allows 5 cron triggers per account: when none is free, the admin Worker is deployed without one (`CLOUDHAL_ANALYTICS_CRON=off`) and daily totals are computed when someone opens Analytics; every later deploy tries the trigger again.
+
+**Turning it on for an existing deployment.** Projects from before analytics have no `analytics` key. The next interactive `cloudhal deploy` asks once ("Turn on cookie-less analytics for <site>? (Y/n)") and writes the answer to `cloudhal.json`; a non-interactive deploy (CI) keeps analytics off and prints how to turn them on. To decide up front, add `"analytics": { "enabled": true }` (or `false`) and deploy. Adding a script to a live site changes what its privacy policy must say, so update it first ([guide](../../docs/guides/analytics-privacy.md#a-paragraph-for-your-privacy-policy)). Agent keys created before analytics do not get `analytics:read` automatically; allow it per key on Studio's Agents page.
+
+**Limits and costs** (Cloudflare's published numbers as of 2026-10; WAE is not billed yet, its Paid prices are announced):
+
+| | Workers Free | Workers Paid ($5/month) |
+|---|---|---|
+| Worker requests | 100,000/day, cache hits included | 10 M/month included, then $0.30 per million |
+| WAE writes | 100,000/day | 10 M/month included, then $0.25 per million |
+| WAE queries | 10,000/day | 1 M/month included, then $1.00 per million |
+| D1 rows written | 100,000/day (rollups use ≈ 200–2,200 a day) | see [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) |
+| Cron triggers | 5 per account | see [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
+
+Each page view adds one Worker request (the beacon) plus one per sampled vitals view; the script itself is a free static asset. Rough sizes, assuming about 3 cached asset requests per page: a site with 1,000 views a day uses about 5 % of Free's requests; at 20,000 views a day a Free account is over its limit with or without analytics (Free carries about 25,000 views a day without analytics and 19,000 with, 21,000 with vitals off); 200,000 views a day needs Paid, about $11–12 a month in total, of which about $2.20 is analytics. On Free, Studio warns when yesterday's traffic approaches the limit (set "Cloudflare plan" in Site settings › Analytics). Whether the Analytics SQL binding works on Workers Free, and whether its queries count against the 10,000 a day, is not verified yet ([RFC-0006](../../docs/rfcs/0006-site-analytics.md) step 0): if it does not, visits are still recorded and Studio says it can't read them yet.
+
+**Commands:**
+- `cloudhal analytics status [--remote]`: effective settings, the store and reader, the last rolled-up day, the query budget and yesterday's request estimate; `--remote` asks the deployment (deployment token).
+- `cloudhal analytics rollup [--days <n>] [--remote] [--redo]`: compute daily totals for finished days. `--remote --days 90` backfills a deployment from WAE (it keeps 3 months), a few site-days per request until none are pending. `--redo` recomputes days already done (local only).
+- `cloudhal analytics seed [--days <n>] [--views <n>]`: deterministic demo traffic (default 30 days, about 120 views a day) over the published pages, in the local SQLite only; never touches a deployment.
+- `cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]`: daily totals as CSV (default: the last 30 days). There is nothing per visitor to export.
+
+Locally, `cloudhal studio` reads the project's SQLite (`analytics_events`), rolls up finished days at start and hourly, and prunes raw events older than `rawRetentionDays`; `cloudhal mcp` reads the same data for the analytics tools. `cloudhal dev` records only with `analytics.dev`.
 
 ### Migrating tags to terms (RFC-0002)
 
