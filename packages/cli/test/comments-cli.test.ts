@@ -24,7 +24,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   adminWorkerConfig,
-  HOURLY_CRON,
+  MINUTE_CRON,
   rateLimitNamespaceId,
   siteWorkerConfig,
 } from "../src/cloudflare/config.ts";
@@ -66,7 +66,7 @@ describe("cloudhal.json comments and the generated configs", () => {
 
   it("site and admin Worker configs: the binding, the switch and the shared hourly trigger", () => {
     const names = { name: "newsroom" };
-    const on = { available: true, cron: true };
+    const on = { available: true };
     const site = siteWorkerConfig({
       ...names,
       siteId: "site_abcdefgh",
@@ -85,31 +85,32 @@ describe("cloudhal.json comments and the generated configs", () => {
       ...names,
       siteId: "site_abcdefgh",
       siteHosts: ["news.example.com"],
-      comments: { available: false, cron: false, rateLimit: { namespaceId: "4243", limit: 10 } },
+      comments: { available: false, rateLimit: { namespaceId: "4243", limit: 10 } },
     });
     expect(off).not.toHaveProperty("ratelimits");
     expect(off.vars).toEqual({ CLOUDHAL_SITE_ID: "site_abcdefgh" });
 
     const admin = { ...names, studioDir: "studio", main: "./worker.ts" };
     expect(adminWorkerConfig({ ...admin, comments: on })).toMatchObject({
-      vars: { CLOUDHAL_COMMENTS_AVAILABLE: "true" },
-      triggers: { crons: [HOURLY_CRON] },
+      vars: { CLOUDHAL_COMMENTS_AVAILABLE: "true", CLOUDHAL_SCHEDULER: "cron" },
+      triggers: { crons: [MINUTE_CRON] },
     });
-    expect(
-      adminWorkerConfig({ ...admin, comments: { available: true, cron: false } }),
-    ).toMatchObject({
-      vars: { CLOUDHAL_COMMENTS_AVAILABLE: "true", CLOUDHAL_COMMENTS_CRON: "off" },
+    // RFC-0008: without a cron slot the clock ticks; the legacy `CLOUDHAL_COMMENTS_CRON` is gone
+    const alarm = adminWorkerConfig({ ...admin, comments: on, scheduler: "alarm" });
+    expect(alarm).toMatchObject({
+      vars: { CLOUDHAL_COMMENTS_AVAILABLE: "true", CLOUDHAL_SCHEDULER: "alarm" },
       triggers: { crons: [] },
     });
-    expect(
-      adminWorkerConfig({ ...admin, comments: { available: false, cron: false } }),
-    ).toMatchObject({ vars: { CLOUDHAL_COMMENTS_AVAILABLE: "false" }, triggers: { crons: [] } });
-    // with analytics on and comments off, the trigger stays for analytics
-    const analytics = { dataset: "newsroom_events", defaults: {}, budget: 8000, cron: true };
-    expect(
-      adminWorkerConfig({ ...admin, analytics, comments: { available: false, cron: false } })
-        .triggers,
-    ).toEqual({ crons: [HOURLY_CRON] });
+    expect(alarm.vars).not.toHaveProperty("CLOUDHAL_COMMENTS_CRON");
+    expect(adminWorkerConfig({ ...admin, comments: { available: false } })).toMatchObject({
+      vars: { CLOUDHAL_COMMENTS_AVAILABLE: "false" },
+      triggers: { crons: [MINUTE_CRON] },
+    });
+    // the clock is declared in every config, with its SQLite migration
+    expect(alarm).toMatchObject({
+      durable_objects: { bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }] },
+      migrations: [{ tag: "v1", new_sqlite_classes: ["SchedulerClock"] }],
+    });
   });
 });
 

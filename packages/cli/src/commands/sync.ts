@@ -18,6 +18,11 @@ export interface SyncOptions {
   readonly projectDir: string;
   /** Overwrite diverged content on the receiving side. */
   readonly replace?: boolean;
+  /**
+   * `cloudhal push --cancel-schedules` (RFC-0008 §16): cancel the deployment's open releases
+   * before replacing the graph their pins point into. Without it a push refuses while any exist.
+   */
+  readonly cancelSchedules?: boolean;
   /** Admin Worker URL; default from `<dataDir>/deploy/state.json`. */
   readonly adminUrl?: string;
   readonly log?: (line: string) => void;
@@ -106,12 +111,31 @@ export async function pushSite(
     await local.close();
   }
   url.searchParams.set("mode", options.replace ? "replace" : "bootstrap");
+  if (options.cancelSchedules) url.searchParams.set("cancelSchedules", "1");
   const res = await f(url, {
     method: "PUT",
     headers: { ...auth, "content-type": "application/json" },
     body: JSON.stringify(bundle),
   });
   const body = await res.text();
+  if (res.status === 409 && /"error":"schedules_(pending|running)"/.test(body)) {
+    const parsed = JSON.parse(body) as {
+      error: string;
+      message: string;
+      details?: { releases?: { id: string; state: string; executeAt?: string; title?: string }[] };
+    };
+    const list = (parsed.details?.releases ?? [])
+      .map(
+        (r) =>
+          `  ${r.id} ${r.state}${r.executeAt ? ` at ${r.executeAt}` : ""}${r.title ? ` — ${r.title}` : ""}`,
+      )
+      .join("\n");
+    throw new Error(
+      parsed.error === "schedules_running"
+        ? `${parsed.message}`
+        : `the deployment has open releases; a push replaces the graph their pinned versions point into:\n${list}\nCancel them in Studio, or push with --cancel-schedules.`,
+    );
+  }
   if (res.status === 409)
     throw new Error(
       `the deployment has diverged from your local copy: ${brief(body)}\nRun \`cloudhal pull\` first, or \`cloudhal push --replace\` to overwrite.`,

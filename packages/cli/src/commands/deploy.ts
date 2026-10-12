@@ -8,28 +8,37 @@
  *   5. push: the local site (graph, snapshots, blobs) through the admin API — first deploy only;
  *      afterwards the deployment is the source of truth (use `cloudhal pull`).
  *   6. analytics (RFC-0006 §11): with `analytics` on in cloudhal.json both configs get their
- *      bindings, vars and the hourly cron (wrangler ≥ 4.145 is required); a project without the
- *      key is asked once in a terminal (non-interactive: off). When analytics switch on or off the
- *      site's cache is purged once, so pages gain or lose the script tag. An account without a free
- *      cron slot gets the admin Worker without the trigger (daily totals then roll up on read).
- *      `analytics.rateLimit` adds the beacon's Workers Rate Limiting binding (`ANALYTICS_RL`).
+ *      bindings and vars (wrangler ≥ 4.145 is required); a project without the key is asked once in
+ *      a terminal (non-interactive: off). When analytics switch on or off the site's cache is purged
+ *      once, so pages gain or lose the script tag. `analytics.rateLimit` adds the beacon's Workers
+ *      Rate Limiting binding (`ANALYTICS_RL`).
  *   7. reader comments (RFC-0007 §15.4): available unless `comments.available` is `false`, and
  *      still off for every site until someone turns them on in Studio. `CLOUDHAL_COMMENTS_KEY` is
  *      generated once with the other secrets and given to both Workers; the admin Worker gets
- *      `CLOUDHAL_COMMENTS_AVAILABLE` and the hourly cron (even with analytics off; without a free
- *      cron slot the job runs on admin requests); `comments.rateLimit` adds `COMMENTS_RL`. When
- *      availability changes the site's cache is purged once (pages gain or lose the comments tag).
+ *      `CLOUDHAL_COMMENTS_AVAILABLE`; `comments.rateLimit` adds `COMMENTS_RL`. When availability
+ *      changes the site's cache is purged once (pages gain or lose the comments tag).
  *   8. data location (RFC-0007 D7): only when this deploy creates the D1 database, `--jurisdiction
  *      eu` (or the terminal question) creates it in the EU jurisdiction. It cannot change later;
  *      existing databases are never touched.
+ *   9. the scheduler (RFC-0008 §8.2–§8.3, §16): the admin Worker gets the minute cron trigger
+ *      (`* * * * *`, the slot the hourly jobs used), the `SchedulerClock` Durable Object binding and
+ *      migration (always), and `CLOUDHAL_SCHEDULER`. When Cloudflare refuses the trigger (Workers
+ *      Free allows 5 per account) it redeploys without it and with `CLOUDHAL_SCHEDULER=alarm`; the
+ *      ticker is remembered in `state.json` (`--scheduler cron` tries the trigger again). A
+ *      deployment last deployed with the legacy `CLOUDHAL_*_CRON=off` starts as `alarm`.
+ *  10. the downgrade guard (RFC-0008 Compatibility): code whose schedules level is lower than the
+ *      deployment's would ignore holds and time gates, so it is refused while the deployment has
+ *      open releases or gated pages and entries, unless `--force-downgrade`.
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
  */
 import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { datasetName } from "@cloudhal/analytics/wae";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { SCHEDULES_ENGINE_LEVEL } from "@cloudhal/core-ts/releases";
 import { assetDir } from "../assets.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
@@ -41,6 +50,8 @@ import {
   type DeploymentNames,
   rateLimitNamespaceId,
   readExistingIds,
+  readExistingVars,
+  type SchedulerTicker,
   siteConfigPath,
   siteWorkerConfig,
   workerNames,
@@ -93,6 +104,8 @@ export interface DeployState {
   comments?: "on" | "off";
   /** Where a deploy of this project created the D1 database (absent: before RFC-0007). */
   jurisdiction?: Jurisdiction;
+  /** What drives the scheduler (RFC-0008 §8.3): the cron trigger, or the Durable Object alarm. */
+  scheduler?: SchedulerTicker;
 }
 
 /** D1 data location (RFC-0007 D7): `auto` (Cloudflare picks) or the EU jurisdiction. */
@@ -162,6 +175,16 @@ export interface DeployOptions {
    * database gets the automatic location unless `jurisdiction` says otherwise.
    */
   readonly askJurisdiction?: () => Promise<Jurisdiction>;
+  /**
+   * `--scheduler cron|alarm`: the ticker to deploy with (RFC-0008 §8.3). Default: what the last
+   * deploy used, else `cron`; a refused cron trigger always falls back to `alarm`.
+   */
+  readonly scheduler?: SchedulerTicker;
+  /**
+   * `--force-downgrade`: deploy code with a lower schedules level than the deployment's even while
+   * releases are open or gates are set (RFC-0008 Compatibility). Holds and gates stop working.
+   */
+  readonly forceDowngrade?: boolean;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -313,11 +336,13 @@ export interface DeployResult {
   /** Custom domains from cloudhal.json, routed by this deploy. */
   customSiteUrl?: string;
   customStudioUrl?: string;
+  /** What drives the scheduler (RFC-0008 §8.3): the minute cron trigger, or the clock's alarm. */
+  scheduler: SchedulerTicker;
   /** Site analytics as deployed (RFC-0006 §11). */
   analytics: {
     enabled: boolean;
     dataset?: string;
-    /** The hourly rollup trigger is in place (false: the account had no free cron slot). */
+    /** The cron trigger is in place (false: the scheduler runs on the Durable Object alarm). */
     cron?: boolean;
     /** The site's cache was purged because analytics switched on or off. */
     purged?: boolean;
@@ -325,7 +350,7 @@ export interface DeployResult {
   /** Reader comments as deployed (RFC-0007 §15.4); off per site until turned on in Studio. */
   comments: {
     available: boolean;
-    /** The hourly trigger is in place (false: the job runs on admin requests instead). */
+    /** The cron trigger is in place (false: the scheduler runs on the Durable Object alarm). */
     cron?: boolean;
     /** The `COMMENTS_RL` Rate Limiting binding was added. */
     rateLimit?: boolean;
@@ -398,10 +423,101 @@ function jurisdictionChooser(
   };
 }
 
+/** The RFC's words when Cloudflare refuses the trigger (§16). */
+export const CRON_REFUSED_MESSAGE =
+  "Cloudflare refused the cron trigger: this account uses all its cron triggers (Workers Free allows 5). The scheduler runs on a Durable Object alarm instead.";
+
+/**
+ * The schedules level of the code this project deploys: `cloudhal.schedulesLevel` of the
+ * `@cloudhal/core-ts` its admin Worker bundles (0 before RFC-0008), else the CLI's own.
+ */
+export async function projectSchedulesLevel(projectDir: string): Promise<number> {
+  const require = createRequire(path.join(projectDir, "package.json"));
+  const candidates: string[] = [];
+  try {
+    candidates.push(require.resolve("@cloudhal/core-ts/package.json"));
+  } catch {
+    // not a direct dependency of the project
+  }
+  try {
+    const cf = require.resolve("@cloudhal/cloudflare/package.json");
+    candidates.push(createRequire(cf).resolve("@cloudhal/core-ts/package.json"));
+  } catch {
+    // resolved through the CLI below
+  }
+  for (const file of candidates) {
+    try {
+      const pkg = JSON.parse(await readFile(file, "utf8")) as {
+        cloudhal?: { schedulesLevel?: unknown };
+      };
+      const level = pkg.cloudhal?.schedulesLevel;
+      return typeof level === "number" ? level : 0;
+    } catch {
+      // try the next
+    }
+  }
+  return SCHEDULES_ENGINE_LEVEL;
+}
+
+export interface SchedulesStatus {
+  engine?: { schedulesLevel?: number };
+  sites?: { siteId: string; openReleases?: unknown[]; gatedNodes?: number }[];
+}
+
+/**
+ * The downgrade guard (RFC-0008 Compatibility): older code ignores holds (an ordinary publish
+ * would release held nodes) and older site Workers ignore gates. A deployment that answers no
+ * schedules status predates schedules and has nothing to protect.
+ */
+async function downgradeGuard(
+  options: DeployOptions,
+  adminUrl: string,
+  token: string,
+  log: (line: string) => void,
+): Promise<void> {
+  let status: SchedulesStatus;
+  try {
+    const res = await (options.fetch ?? fetch)(new URL("/api/admin/schedules/status", adminUrl), {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (res.status === 404) return;
+    if (!res.ok) {
+      log(
+        `could not read the deployment's schedules (${res.status}); the downgrade check is skipped`,
+      );
+      return;
+    }
+    status = (await res.json()) as SchedulesStatus;
+  } catch (e) {
+    log(
+      `could not reach the deployment to check its schedules (${e instanceof Error ? e.message : String(e)}); the downgrade check is skipped`,
+    );
+    return;
+  }
+  const remote = status.engine?.schedulesLevel ?? 0;
+  const local = await projectSchedulesLevel(options.projectDir);
+  if (remote <= local) return;
+  const open = (status.sites ?? []).reduce((n, s) => n + (s.openReleases?.length ?? 0), 0);
+  const gated = (status.sites ?? []).reduce((n, s) => n + (s.gatedNodes ?? 0), 0);
+  if (open + gated === 0) return;
+  const what = `${open} open release(s) and ${gated} page(s) or entr(ies) with time gates`;
+  if (options.forceDowngrade) {
+    log(
+      `--force-downgrade: deploying schedules level ${local} over level ${remote} with ${what}; held content and embargoes are no longer enforced`,
+    );
+    return;
+  }
+  throw new Error(
+    `This deploy would downgrade the deployment's schedules (level ${remote} → ${local}) while it has ${what}. Older code ignores scheduled holds and time gates, so they could go live early. Upgrade the @cloudhal packages of this project, cancel the releases and remove the gates (\`cloudhal schedules status --remote\` lists them), or deploy with --force-downgrade.`,
+  );
+}
+
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const log = options.log ?? (() => {});
   if (options.jurisdiction !== undefined && !["auto", "eu"].includes(options.jurisdiction))
     throw new Error(`--jurisdiction must be eu (got "${String(options.jurisdiction)}")`);
+  if (options.scheduler !== undefined && !["cron", "alarm"].includes(options.scheduler))
+    throw new Error(`--scheduler must be cron or alarm (got "${String(options.scheduler)}")`);
   let cfg = await readProjectConfig(options.projectDir);
   const dir = deployDir(options.projectDir, cfg.dataDir);
   await mkdir(dir, { recursive: true });
@@ -428,14 +544,13 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       dataset: datasetName(base.name),
       defaults: analyticsDefaultsOf(cfg),
       budget: cfg.analytics?.queryBudget ?? DEFAULT_QUERY_BUDGET,
-      cron: true,
       ...rateLimitDeployment(cfg, datasetName(base.name)),
     };
   }
   // 0b. reader comments (RFC-0007 §15.4): available by default, still off for every site
-  let comments: CommentsDeployment = commentsAvailable(cfg)
-    ? { available: true, cron: true, ...commentsRateLimitDeployment(cfg, base.name) }
-    : { available: false, cron: false };
+  const comments: CommentsDeployment = commentsAvailable(cfg)
+    ? { available: true, ...commentsRateLimitDeployment(cfg, base.name) }
+    : { available: false };
   if (comments.available && previous?.comments !== "on")
     log(
       "comments: available on this deployment, and off for every site until someone turns them on in Studio (Site settings › Comments)",
@@ -470,6 +585,22 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   // 2. secrets
   const secrets = await loadOrCreateSecrets(dir);
+  // 2b. RFC-0008: never deploy code that ignores holds and gates over open releases and gates
+  if (!options.dryRun && previous?.adminUrl)
+    await downgradeGuard(options, previous.adminUrl, secrets.CLOUDHAL_DEPLOY_TOKEN, log);
+  // 2c. the scheduler's ticker: asked for, else the last deploy's, else cron (RFC-0008 §8.3). A
+  // deployment last configured without a cron slot (`CLOUDHAL_*_CRON=off`) starts on the alarm.
+  const legacy = await readExistingVars(path.join(dir, "admin", "wrangler.jsonc"));
+  let scheduler: SchedulerTicker =
+    options.scheduler ??
+    previous?.scheduler ??
+    (legacy.CLOUDHAL_ANALYTICS_CRON === "off" || legacy.CLOUDHAL_COMMENTS_CRON === "off"
+      ? "alarm"
+      : "cron");
+  if (scheduler === "alarm" && !options.scheduler)
+    log(
+      "scheduler: Durable Object alarm (this account had no free cron slot); `cloudhal deploy --scheduler cron` tries the cron trigger again",
+    );
   // 3. site Worker
   await writeWranglerConfig(
     siteConfigPath(options.projectDir),
@@ -487,7 +618,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   // 4. admin Worker
   const skillsDir = await resolveSkillsDir(options.projectDir);
-  const prepareAdmin = (a: AnalyticsDeployment | undefined, c: CommentsDeployment) =>
+  const prepareAdmin = (
+    a: AnalyticsDeployment | undefined,
+    c: CommentsDeployment,
+    ticker: SchedulerTicker,
+  ) =>
     prepareAdminWorker({
       projectDir: options.projectDir,
       dataDir: cfg.dataDir,
@@ -497,8 +632,9 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       domain: cfg.domains?.studio,
       analytics: a,
       comments: c,
+      scheduler: ticker,
     });
-  const admin = await prepareAdmin(analytics, comments);
+  const admin = await prepareAdmin(analytics, comments, scheduler);
 
   if (options.dryRun) {
     await must(
@@ -517,10 +653,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       names,
       siteConfig,
       adminConfig: admin.configPath,
+      scheduler,
       analytics: analytics
-        ? { enabled: true, dataset: analytics.dataset, cron: analytics.cron }
+        ? { enabled: true, dataset: analytics.dataset, cron: scheduler === "cron" }
         : { enabled: false },
-      comments: commentsResult(comments),
+      comments: commentsResult(comments, scheduler),
     };
   }
 
@@ -548,27 +685,14 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     adminDeploy = await run(adminArgs, { cwd: admin.dir });
     if (
       adminDeploy.code !== 0 &&
-      (analytics?.cron || comments.cron) &&
+      scheduler === "cron" &&
       isCronLimitError(adminDeploy.stderr + adminDeploy.stdout)
     ) {
-      // Workers Free allows 5 cron triggers per account (RFC-0006 §11, RFC-0007 §8.5): go
-      // without ours. Analytics then roll up on read; the comments job runs on admin requests.
-      const instead = [
-        ...(analytics
-          ? ["daily totals are then computed when someone opens Analytics in Studio"]
-          : []),
-        ...(comments.available
-          ? [
-              "comment retention and threads closing by time run on Studio's requests, at most hourly",
-            ]
-          : []),
-      ];
-      log(
-        `Cloudflare refused the hourly trigger: this account already uses all its cron triggers (Workers Free allows 5). Deploying without it; ${instead.join("; ")}.`,
-      );
-      if (analytics) analytics = { ...analytics, cron: false };
-      comments = { ...comments, cron: false };
-      await prepareAdmin(analytics, comments);
+      // RFC-0008 §8.3: no free cron slot (Workers Free allows 5 per account). The same Worker
+      // goes without the trigger and the SchedulerClock alarm ticks instead.
+      log(CRON_REFUSED_MESSAGE);
+      scheduler = "alarm";
+      await prepareAdmin(analytics, comments, scheduler);
       adminDeploy = await run(adminArgs, { cwd: admin.dir });
     }
     if (adminDeploy.code !== 0)
@@ -593,6 +717,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     analytics: analytics ? "on" : "off",
     comments: comments.available ? "on" : "off",
     ...(jurisdiction ? { jurisdiction } : {}),
+    scheduler,
   });
 
   // 5. first deploy: push the local site
@@ -656,8 +781,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ];
     if (purged) log(`${what.join(", ")}: purged the site cache`);
   }
-  if (analytics && !analytics.cron)
-    log("analytics: no cron trigger; daily totals are computed when someone opens Analytics");
 
   // First deploy: the owner account can only be created through this one-time link.
   const setupUrl =
@@ -675,23 +798,28 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     ...(setupUrl ? { setupUrl } : {}),
     ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
     ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
+    scheduler,
     analytics: analytics
       ? {
           enabled: true,
           dataset: analytics.dataset,
-          cron: analytics.cron,
+          cron: scheduler === "cron",
           purged: purged && analyticsChanged,
         }
       : { enabled: false, ...(purged && analyticsChanged ? { purged } : {}) },
-    comments: commentsResult(comments, purged && commentsChanged),
+    comments: commentsResult(comments, scheduler, purged && commentsChanged),
     ...(databaseCreated ? { databaseCreated } : {}),
   };
 }
 
-function commentsResult(c: CommentsDeployment, purged?: boolean): DeployResult["comments"] {
+function commentsResult(
+  c: CommentsDeployment,
+  scheduler: SchedulerTicker,
+  purged?: boolean,
+): DeployResult["comments"] {
   return {
     available: c.available,
-    ...(c.available ? { cron: c.cron } : {}),
+    ...(c.available ? { cron: scheduler === "cron" } : {}),
     ...(c.rateLimit ? { rateLimit: true } : {}),
     ...(purged ? { purged } : {}),
   };
