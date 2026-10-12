@@ -5,10 +5,12 @@ import { useI18n } from "../i18n/index.tsx";
 import { api, isNotEnabled, type NotificationsPage, type StudioNotification } from "../lib/api.ts";
 import {
   browserPermission,
+  commentNotice,
   DEFAULT_EXTEND_MINUTES,
   endingParams,
   extendTargetOf,
   freshNotifications,
+  isCommentNotification,
   liveNotifications,
   notificationHref,
   notificationsPollInterval,
@@ -18,6 +20,7 @@ import {
   requestParams,
   shouldRaiseBrowserNotification,
 } from "../lib/notifications.ts";
+import { splitHref } from "./AppLink.tsx";
 import { useExtendElevation } from "./Elevation.tsx";
 import { useShortDuration } from "./ElevationRequest.tsx";
 import { type ToastAction, useToast } from "./Toast.ts";
@@ -54,6 +57,7 @@ function useDescribe() {
   const { t, locale } = useI18n();
   const shortDuration = useShortDuration();
   return (item: StudioNotification) => {
+    if (isCommentNotification(item)) return commentNotice(t, locale, item);
     if (item.kind === "elevation-ending") {
       const p = endingParams(t, locale, item);
       return {
@@ -120,12 +124,25 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
       void qc.invalidateQueries({ queryKey: ["members"] });
       void qc.invalidateQueries({ queryKey: ["invites"] });
     }
+    // Reader comments moved (new pending, reports, an agent's request): refresh the queue.
+    if (fresh.some(isCommentNotification)) {
+      void qc.invalidateQueries({ queryKey: ["comments"] });
+      if (fresh.some((i) => i.kind === "comments-approval"))
+        void qc.invalidateQueries({ queryKey: ["approvals"] });
+    }
     if (fresh.some((i) => i.kind === "role-changed")) {
       void qc.invalidateQueries({ queryKey: ["me"] });
       void qc.invalidateQueries({ queryKey: ["agent-keys"] });
     }
     const { toast, navigate, extend, describe, t } = latest.current;
-    const go = (href: string) => navigate({ to: href as "/" });
+    const go = (href: string) => {
+      const target = splitHref(href);
+      return navigate({
+        to: target.to as "/",
+        ...(target.search ? { search: target.search as never } : {}),
+        ...(target.hash ? { hash: target.hash } : {}),
+      });
+    };
     const system = shouldRaiseBrowserNotification({
       enabled: readBrowserPreference(),
       permission: browserPermission(),
@@ -148,6 +165,14 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
         actions.push({ label: t("notifications.openAgents"), onClick: () => void go(href) });
       } else if (item.kind === "elevation-request") {
         actions.push({ label: t("notifications.request.review"), onClick: () => void go(href) });
+      } else if (isCommentNotification(item)) {
+        actions.push({
+          label:
+            item.kind === "comments-paused"
+              ? t("notifications.comments.settings")
+              : t("notifications.comments.review"),
+          onClick: () => void go(href),
+        });
       } else {
         actions.push({ label: t("notifications.openTeam"), onClick: () => void go(href) });
       }
@@ -155,7 +180,13 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
         id: item.id,
         title,
         description: body,
-        tone: item.kind === "elevation-ending" ? "warning" : "info",
+        tone:
+          item.kind === "elevation-ending" ||
+          item.kind === "comments-reported" ||
+          item.kind === "comments-paused" ||
+          item.kind === "comments-purge-waiting"
+            ? "warning"
+            : "info",
         actions,
       });
       if (system) raiseBrowserNotification(item.id, title, body, () => void go(href));

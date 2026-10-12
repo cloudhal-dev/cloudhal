@@ -30,6 +30,10 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](Comment[A-Za-z]*|ArticleCommentsSummary|comment-model)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
+  // Comment screens' own components and the settings model (the shell keeps `lib/comments.ts`,
+  // the router's search helpers and the bell's words).
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Comment[A-Za-z]*|ArticleCommentsCard)\.tsx$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]comment-settings\.ts$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
 ];

@@ -669,7 +669,8 @@ export type StudioNotification =
   | ElevationEndingNotification
   | ElevationRequestNotification
   | MemberJoinedNotification
-  | RoleChangedNotification;
+  | RoleChangedNotification
+  | CommentNotification;
 
 /** Someone the person invited accepted (RFC-0005 §7; the last 7 days). */
 export interface MemberJoinedNotification {
@@ -1349,6 +1350,19 @@ export type CommentNotification =
       at: string;
     };
 
+/** Every notification kind the bell renders. */
+const KNOWN_NOTIFICATION_KINDS: ReadonlySet<string> = new Set<StudioNotification["kind"]>([
+  "elevation-ending",
+  "elevation-request",
+  "member-joined",
+  "role-changed",
+  "comments-pending",
+  "comments-reported",
+  "comments-paused",
+  "comments-purge-waiting",
+  "comments-approval",
+]);
+
 const commentsPath = (siteId: string) => `/api/sites/${encodeURIComponent(siteId)}`;
 
 export const api = {
@@ -1415,23 +1429,18 @@ export const api = {
       }),
   },
   notifications: {
-    /** What needs the signed-in person's attention; 404 on servers without it (see `isNotEnabled`). */
     /**
-     * The bell's items. Comment notifications (RFC-0007 §13) are left out until the bell renders
-     * them (rollout step 8); `withComments` returns them separately.
+     * What needs the signed-in person's attention, the reader-comment kinds (RFC-0007 §13)
+     * included; 404 on servers without it (see `isNotEnabled`). Kinds this Studio does not know
+     * (a newer server) are left out, so the bell never renders an item it cannot describe.
      */
     list: () =>
       request<NotificationsPage>("/api/notifications").then((page) => ({
         ...page,
-        items: (page?.items ?? []).filter(
-          (n) => !String((n as { kind: string }).kind).startsWith("comments-"),
+        items: (page?.items ?? []).filter((n) =>
+          KNOWN_NOTIFICATION_KINDS.has((n as { kind: string }).kind),
         ),
       })),
-    /** Every item, comment kinds included, for the comment screens. */
-    withComments: () =>
-      request<{ items: (StudioNotification | CommentNotification)[]; noticeMinutes: number }>(
-        "/api/notifications",
-      ),
   },
   skills: {
     list: () => request<SkillSummary[]>("/api/skills"),
@@ -1448,8 +1457,14 @@ export const api = {
      * 403 `cannot_decide` (`details.code`). Approving a person's publish request publishes it and
      * answers with `published`.
      */
+    /**
+     * Approve or deny. A person's publish request answers `published`; an agent's comment request
+     * is carried out on approve (RFC-0007 §10.3) and answers the tool's `result` — or 409
+     * `state_changed` when the comments moved after the agent asked, `carry_out_failed` when the
+     * call itself failed.
+     */
     decide: (siteId: string, id: string, decision: "approve" | "deny") =>
-      request<Approval & { published?: { site: Site; snapshotId: string } }>(
+      request<Approval & { published?: { site: Site; snapshotId: string }; result?: unknown }>(
         `/api/sites/${encodeURIComponent(siteId)}/approvals/${encodeURIComponent(id)}/${decision}`,
         { method: "POST" },
       ),
@@ -1744,6 +1759,12 @@ export const api = {
         method: "PATCH",
         ...json({ addScopes: ["analytics:read"] }),
       }),
+    /** "Allow comments" (RFC-0007 §10.1): adds `comments:read` to an older key; audited. */
+    allowComments: (id: string) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...json({ addScopes: ["comments:read"] }),
+      }),
     /**
      * A more autonomous mode until the time is up, then the key's own mode again (ADR-0016; audited).
      * Replaces an elevation in force. 400 when the mode is not above the key's own, is bypass, or
@@ -2035,8 +2056,11 @@ export const api = {
         method: "POST",
         ...json({ commentIds, mode, reason }),
       }),
-    bans: (siteId: string) =>
-      request<{ items: CommentBan[] }>(`${commentsPath(siteId)}/comment-bans`),
+    /** The site's bans; with `commentId`, only those on that comment's author (by keyed hash). */
+    bans: (siteId: string, commentId?: string) =>
+      request<{ items: CommentBan[] }>(
+        `${commentsPath(siteId)}/comment-bans${query({ commentId })}`,
+      ),
     /** Bans the author of a comment by email and/or this month's IP hash; nobody sees an address. */
     ban: (
       siteId: string,

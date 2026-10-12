@@ -129,6 +129,7 @@ export const en = {
   },
   nav: {
     media: "Media",
+    comments: "Comments",
     overview: "Overview",
     content: "Content",
     history: "History",
@@ -163,6 +164,7 @@ export const en = {
   },
   commands: {
     goMedia: "Go to media",
+    goComments: "Go to comments",
     goAnalytics: "Go to analytics",
     placeholder: "Type a command…",
     empty: "No matching command",
@@ -185,6 +187,9 @@ export const en = {
     goRedirects: "Go to redirects",
   },
   overview: {
+    commentsWaiting: "{count} comments are waiting",
+    commentsWaitingOne: "1 comment is waiting",
+    commentsWaitingDescription: "Readers don't see them until someone approves them.",
     liveSnapshotLabel: "Live snapshot",
     liveSnapshot: "Live snapshot {id}",
     notPublished: "Not published yet",
@@ -1222,6 +1227,42 @@ export const en = {
       title: "{agent} asks for {mode} · {duration}",
       reason: "“{reason}”",
       review: "Review",
+    },
+    comments: {
+      pending: {
+        title: "{count} comments wait for moderation",
+        titleOne: "1 comment waits for moderation",
+        body: "The oldest has waited {age}.",
+        bodyNew: "Nobody sees them until someone approves them.",
+      },
+      reported: {
+        title: "{count} comments were reported",
+        titleOne: "1 comment was reported",
+        body: "Readers flagged them. A report never hides anything by itself.",
+      },
+      paused: {
+        title: "Comments are paused for today",
+        body: "The daily limit ({cap}) was reached. New comments are refused until midnight UTC.",
+      },
+      purgeWaiting: {
+        title: "A hidden comment may still be on the live page",
+        body: "{count} pages wait for the cache to refresh.",
+        purge: "Purge site cache",
+        purged: "The site's cache was purged",
+        failed: "Couldn't purge the cache",
+      },
+      approval: {
+        title: "{agent} asks about comments",
+        tools: {
+          moderate: "It asks to approve or restore comments. They become public once you approve.",
+          reply: "It drafted a reply that would be published under your name.",
+          thread: "It asks to open comments on an article again.",
+          label: "It asks to label comments.",
+        },
+      },
+      review: "Review",
+      open: "Open comments",
+      settings: "Comment settings",
     },
     toast: {
       endingTitle: "{name}'s {mode} mode ends in {left}",

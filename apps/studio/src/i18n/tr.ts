@@ -129,6 +129,7 @@ export const tr: Messages = {
   },
   nav: {
     media: "Medya",
+    comments: "Yorumlar",
     overview: "Genel bakış",
     content: "İçerik",
     history: "Geçmiş",
@@ -163,6 +164,7 @@ export const tr: Messages = {
   },
   commands: {
     goMedia: "Medyaya git",
+    goComments: "Yorumlara git",
     goAnalytics: "Analitiği aç",
     placeholder: "Bir komut yaz…",
     empty: "Eşleşen komut yok",
@@ -185,6 +187,9 @@ export const tr: Messages = {
     goRedirects: "Yönlendirmelere git",
   },
   overview: {
+    commentsWaiting: "{count} yorum onay bekliyor",
+    commentsWaitingOne: "1 yorum onay bekliyor",
+    commentsWaitingDescription: "Biri onaylayana kadar okurlar bu yorumları görmez.",
     liveSnapshotLabel: "Canlı snapshot",
     liveSnapshot: "Canlı snapshot {id}",
     notPublished: "Henüz yayınlanmadı",
@@ -1238,6 +1243,43 @@ export const tr: Messages = {
       title: "{agent}, {mode} modu istiyor · {duration}",
       reason: "“{reason}”",
       review: "İncele",
+    },
+    comments: {
+      pending: {
+        title: "{count} yorum onay bekliyor",
+        titleOne: "1 yorum onay bekliyor",
+        body: "En eskisi {age} bekliyor.",
+        bodyNew: "Biri onaylayana kadar kimse görmez.",
+      },
+      reported: {
+        title: "{count} yorum bildirildi",
+        titleOne: "1 yorum bildirildi",
+        body: "Okurlar bu yorumları işaretledi. Bildirim tek başına hiçbir şeyi gizlemez.",
+      },
+      paused: {
+        title: "Yorumlar bugün için durduruldu",
+        body: "Günlük sınıra ({cap}) ulaşıldı. Yeni yorumlar gece yarısına (UTC) kadar kabul edilmiyor.",
+      },
+      purgeWaiting: {
+        title: "Gizlenen bir yorum canlı sayfada hâlâ görünüyor olabilir",
+        body: "{count} sayfa önbelleğin yenilenmesini bekliyor.",
+        purge: "Site önbelleğini temizle",
+        purged: "Sitenin önbelleği temizlendi",
+        failed: "Önbellek temizlenemedi",
+      },
+      approval: {
+        title: "{agent} yorumlar için onay istiyor",
+        tools: {
+          moderate:
+            "Yorumları onaylamak ya da geri yüklemek istiyor. Sen onaylayınca herkese açık olurlar.",
+          reply: "Senin adınla yayımlanacak bir yanıt taslağı hazırladı.",
+          thread: "Bir yazıda yorumları yeniden açmak istiyor.",
+          label: "Yorumlara etiket eklemek istiyor.",
+        },
+      },
+      review: "İncele",
+      open: "Yorumları aç",
+      settings: "Yorum ayarları",
     },
     toast: {
       endingTitle: "{name}: {mode} modu {left} sonra bitiyor",

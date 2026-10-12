@@ -11,6 +11,7 @@ import { RouteError, RoutePending } from "./components/RouteStates.tsx";
 import { LOCALE_LIST, withMessages } from "./i18n/index.tsx";
 import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
 import { authClient } from "./lib/auth.ts";
+import { isQueueTab, type QueueTab } from "./lib/comments.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
 
@@ -25,20 +26,32 @@ const AnalyticsPage = lazyRouteComponent(
 );
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
 const AgentsPage = lazyRouteComponent(
-  () => withMessages(import("./routes/AgentsPage.tsx"), ["analyticsSettings"]),
+  () => withMessages(import("./routes/AgentsPage.tsx"), ["analyticsSettings", "commentsSettings"]),
   "AgentsPage",
 );
 const ApprovalsPage = lazyRouteComponent(
-  () => import("./routes/ApprovalsPage.tsx"),
+  () => withMessages(import("./routes/ApprovalsPage.tsx"), ["comments"]),
   "ApprovalsPage",
 );
 const ArticleEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers"]),
+  () => withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers", "comments"]),
   "ArticleEditorPage",
 );
 const ArticlesPage = lazyRouteComponent(
   () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers"]),
   "ArticlesPage",
+);
+const CommentsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommentsPage.tsx"), ["comments"]),
+  "CommentsPage",
+);
+const CommentThreadPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommentThreadPage.tsx"), ["comments"]),
+  "CommentThreadPage",
+);
+const CommenterPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommenterPage.tsx"), ["comments"]),
+  "CommenterPage",
 );
 const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
 const InvitePage = lazyRouteComponent(() => import("./routes/InvitePage.tsx"), "InvitePage");
@@ -61,7 +74,12 @@ const SiteOverviewPage = lazyRouteComponent(
 );
 const SiteSettingsPage = lazyRouteComponent(
   // The privacy notice is offered in every language, so every locale's settings words load.
-  () => withMessages(import("./routes/SiteSettingsPage.tsx"), ["analyticsSettings"], LOCALE_LIST),
+  () =>
+    withMessages(
+      import("./routes/SiteSettingsPage.tsx"),
+      ["analyticsSettings", "commentsSettings"],
+      LOCALE_LIST,
+    ),
   "SiteSettingsPage",
 );
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
@@ -250,6 +268,33 @@ const assetRoute = createRoute({
   path: "/media/$assetId",
   component: AssetPage,
 });
+/** Site › Content › Comments (RFC-0007 §14): the moderation queue, `?tab=reported` etc. */
+const commentsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/comments",
+  validateSearch: (search: Record<string, unknown>): { tab?: QueueTab } =>
+    isQueueTab(search.tab) && search.tab !== "pending" ? { tab: search.tab } : {},
+  component: CommentsPage,
+});
+const commentIdParam = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : undefined;
+/** One article's thread: `?comment=<id>` lands on a comment, `?reply=<id>` opens the reply form. */
+const commentThreadRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/comments/$nodeId",
+  validateSearch: (search: Record<string, unknown>): { comment?: string; reply?: string } => {
+    const comment = commentIdParam(search.comment);
+    const reply = commentIdParam(search.reply);
+    return { ...(comment ? { comment } : {}), ...(reply ? { reply } : {}) };
+  },
+  component: CommentThreadPage,
+});
+/** A commenter (`commenters:data`): identity, their comments, ban, export, erase. */
+const commenterRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/commenters/$commenterId",
+  component: CommenterPage,
+});
 /** Site › Settings › Redirects. */
 const redirectsRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -314,6 +359,9 @@ const routeTree = rootRoute.addChildren([
     navigationRoute,
     mediaRoute,
     assetRoute,
+    commentsRoute,
+    commentThreadRoute,
+    commenterRoute,
   ]),
 ]);
 

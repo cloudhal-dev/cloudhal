@@ -62,6 +62,9 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/RedirectsPage.tsx": "list",
   "routes/NavigationPage.tsx": "editor",
   "routes/MediaPage.tsx": "list",
+  "routes/CommentsPage.tsx": "moderation",
+  "routes/CommentThreadPage.tsx": "editor",
+  "routes/CommenterPage.tsx": "editor",
   "routes/AssetPage.tsx": "editor",
   "routes/LoginPage.tsx": "auth",
   "routes/MembersPage.tsx": "list",
@@ -73,6 +76,7 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
 
 export type Template =
   | "list"
+  | "moderation"
   | "queue"
   | "dashboard"
   | "settings"
@@ -85,6 +89,19 @@ export type Template =
 export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
   list: ["PageLayout", "crumbs=", "title=", "Table", "Empty", "LayerCard"],
   queue: ["PageLayout", "crumbs=", "title=", "SectionCard", "SectionEmpty", "Table"],
+  // Reader comments (DESIGN.md §2w): a list whose rows are `CommentRow`s (not table cells, so the
+  // untrusted-text panel and labels fit at 390 px), with selection and the bulk bar.
+  moderation: [
+    "PageLayout",
+    "crumbs=",
+    "title=",
+    "ListToolbar",
+    "BulkActionBar",
+    "CommentRow",
+    "LayerCard",
+    "Empty",
+    "Pagination",
+  ],
   dashboard: ["PageLayout", "crumbs=", "title=", "Columns", "SectionCard"],
   settings: ["PageLayout", "crumbs=", "title=", "SettingsLayout", "SettingsSection"],
   editor: ["PageLayout", "crumbs=", "title=", "EditorLayout", "SectionCard"],
