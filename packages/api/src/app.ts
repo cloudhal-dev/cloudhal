@@ -8,6 +8,7 @@ import {
 } from "@cloudhal/agent-runtime";
 import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
+import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
 import type { ApiDeps, Env } from "./context.ts";
@@ -23,6 +24,7 @@ import { entries } from "./routes/entries.ts";
 import {
   agentModesInfo,
   commentsFeature,
+  gatesEnforcedEverywhere,
   instanceRoutes,
   invitesInfo,
   rolesInfo,
@@ -248,7 +250,10 @@ export function createApi(deps: ApiDeps) {
           // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
           comments: await commentsFeature(deps.comments),
           // RFC-0008 §13: whether schedules are served, the ticker, gates, the limits.
-          schedules: schedulesFeature(schedules),
+          schedules: schedulesFeature(
+            schedules,
+            schedulesAvailable(schedules) && (await gatesEnforcedEverywhere(deps.store)),
+          ),
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),

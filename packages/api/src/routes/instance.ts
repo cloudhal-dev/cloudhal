@@ -100,7 +100,11 @@ export interface SchedulesFeature {
   available: boolean;
   /** What wakes the scheduler (`null` when this server does not know). */
   scheduler: "cron" | "alarm" | "node" | "request" | null;
-  /** The site renderer enforces time gates (writers check per site; see `gates_unsupported`). */
+  /**
+   * The renderer of every site confirmed it enforces time gates (§7.7): on Cloudflare the site
+   * Worker's `GET /__cloudhal/features` handshake over `SITE`; on Node always. `false` means writers
+   * answer `gates_unsupported` (deploy the current site Worker).
+   */
   gates: boolean;
   /** Automations run (`CLOUDHAL_AUTOMATIONS` is not `off`). */
   automations: boolean;
@@ -114,13 +118,34 @@ export interface SchedulesFeature {
   };
 }
 
-/** `features.schedules`; `available: false` without schedule storage. */
-export function schedulesFeature(deps: SchedulesDeps | undefined): SchedulesFeature {
+/**
+ * Whether the renderer of every site enforces time gates (RFC-0008 §7.7): the same check the
+ * writers make (`SiteGraphStore.gatesEnforced`, the site Worker's handshake on Cloudflare,
+ * memoised per isolate once confirmed). A deployment without sites asks its renderer once.
+ */
+export async function gatesEnforcedEverywhere(store: {
+  listSites(): Promise<readonly { id: string }[]>;
+  gatesEnforced(siteId: string): Promise<boolean>;
+}): Promise<boolean> {
+  const sites = await store.listSites();
+  if (sites.length === 0) return store.gatesEnforced("");
+  for (const site of sites) if (!(await store.gatesEnforced(site.id))) return false;
+  return true;
+}
+
+/**
+ * `features.schedules`; `available: false` without schedule storage. `gates` is the renderer's
+ * answer (`gatesEnforcedEverywhere`), reported only where schedules are served.
+ */
+export function schedulesFeature(
+  deps: SchedulesDeps | undefined,
+  gates: boolean,
+): SchedulesFeature {
   const on = schedulesAvailable(deps);
   return {
     available: on,
     scheduler: on ? (deps.scheduler?.mode ?? null) : null,
-    gates: on,
+    gates: on && gates,
     automations: on && deps.automationsEnabled !== false,
     publishNow: on,
     limits: {
