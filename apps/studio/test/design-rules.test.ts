@@ -44,12 +44,14 @@ const uiFiles = files.filter(
 const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/AppFrame.tsx": [
     "Sidebar",
-    "CommandPalette",
+    "CommandMenu",
     "Sidebar.Loading",
     "Sidebar.Trigger",
     "Sidebar.Rail",
     "UserMenu",
   ],
+  // The palette loads with its first opening (bundle-budget.ts): Kumo's CommandPalette in its own module.
+  "components/CommandMenu.tsx": ["CommandPalette"],
   "components/UserMenu.tsx": ["DropdownMenu", "Avatar"],
   "routes/SiteShell.tsx": ["SidebarSwitcher", "Sidebar.MenuBadge", "Sidebar.Collapsible"],
   "components/SitePublish.tsx": ["ButtonGroup", "DropdownMenu", "ApprovalDialog"],

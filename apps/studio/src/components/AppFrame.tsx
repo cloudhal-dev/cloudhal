@@ -1,6 +1,5 @@
 import {
   Button,
-  CommandPalette,
   PageCrumbsSlot,
   PageFrameProvider,
   Sidebar,
@@ -9,13 +8,16 @@ import {
 } from "@cloudhal/ui";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useLocation } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../lib/theme.ts";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { NotificationsBell } from "./NotificationsBell.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import { UserMenu } from "./UserMenu.tsx";
+
+const loadCommandMenu = () => import("./CommandMenu.tsx");
+const CommandMenu = lazy(() => loadCommandMenu().then((m) => ({ default: m.CommandMenu })));
 
 export interface PaletteCommand {
   id: string;
@@ -60,8 +62,13 @@ function AppFrameShell({
   const { t } = useI18n();
   const scrollRootRef = usePageScrollRootRef();
   const [theme] = useThemePreference();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [open, setOpenState] = useState(false);
+  // The palette's chunk loads with its first opening, then it stays mounted (open/close animate).
+  const [wanted, setWanted] = useState(false);
+  const setOpen = (next: boolean | ((open: boolean) => boolean)) => {
+    setWanted(true);
+    setOpenState(next);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,7 +97,6 @@ function AppFrameShell({
       run: () => setThemePreference(p),
     })),
   ];
-  const filtered = allCommands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()));
 
   return (
     // Kumo's aside element is `h-full`, so the provider needs a definite height; the content column
@@ -139,6 +145,7 @@ function AppFrameShell({
               size="sm"
               icon={<MagnifyingGlass />}
               onClick={() => setOpen(true)}
+              onPointerEnter={() => void loadCommandMenu()}
               aria-label={t("nav.search")}
               className="justify-start text-kumo-subtle sm:w-40 lg:w-64"
             >
@@ -165,29 +172,12 @@ function AppFrameShell({
         <main className="min-w-0 flex-1">{children}</main>
         <CloseSheetOnNavigate />
       </div>
-      <CommandPalette.Root
-        open={open}
-        onOpenChange={setOpen}
-        items={filtered}
-        value={query}
-        onValueChange={setQuery}
-        itemToStringValue={(c: PaletteCommand) => c.label}
-        onSelect={(c: PaletteCommand) => {
-          setOpen(false);
-          setQuery("");
-          void c.run();
-        }}
-      >
-        <CommandPalette.Input placeholder={t("commands.placeholder")} />
-        <CommandPalette.List>
-          {filtered.map((c) => (
-            <CommandPalette.Item key={c.id} value={c}>
-              {c.label}
-            </CommandPalette.Item>
-          ))}
-          <CommandPalette.Empty>{t("commands.empty")}</CommandPalette.Empty>
-        </CommandPalette.List>
-      </CommandPalette.Root>
+      {/* Kumo `CommandPalette` (`CommandMenu.tsx`), loaded on the first ⌘K, `/` or hover. */}
+      {wanted ? (
+        <Suspense fallback={null}>
+          <CommandMenu open={open} onOpenChange={setOpenState} commands={allCommands} />
+        </Suspense>
+      ) : null}
     </Sidebar.Provider>
   );
 }
