@@ -806,7 +806,8 @@ export interface ReleaseRightsSource {
  * - a person's approval holds while the approver is still a member who could approve it now
  *   (`releases:publish`, or `:own` with own-only items), else `approval_lost`;
  * - an `auto` approval holds while the key exists, its creator is a member and its effective mode
- *   is still `auto` (`creator_removed`, `auto_window_ended`); a gate-only reduction
+ *   (for an automation's key: capped by the automation's current `modeCap`) is still `auto`
+ *   (`creator_removed`, `auto_window_ended`); a gate-only reduction
  *   (`cloudhal.reduce`) skips the mode rule — any mode that may edit may hide;
  * - without a rights source (no membership: local, tests) every approval holds.
  */
@@ -841,8 +842,15 @@ export function createReleaseApprovalCheck(input: {
     const key = rights.key ? await rights.key(approval.keyId) : undefined;
     if (!key) return lost("creator_removed");
     if (release.metadata?.[RELEASE_META.reduce] === "1") return { ok: true };
-    if (clampMode(key.mode, key.creatorRole === "contributor" ? "edits" : "auto") !== "auto")
-      return lost("auto_window_ended");
+    // An automation's key works no higher than its automation's current modeCap (§11.3): lowering
+    // the cap below `auto` also ends the `auto` releases its runs scheduled.
+    const automation = await input.store.automationByKey(approval.keyId);
+    const cap = automation?.job.kind === "agent-task" ? automation.job.modeCap : "auto";
+    const mode = clampMode(
+      clampMode(key.mode, key.creatorRole === "contributor" ? "edits" : "auto"),
+      cap,
+    );
+    if (mode !== "auto") return lost("auto_window_ended");
     return { ok: true };
   };
 }

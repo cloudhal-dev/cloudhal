@@ -141,3 +141,59 @@ describe("Site.timeZone is validated on write (note 15)", () => {
   });
 });
 
+describe("an agent task's modeCap applies per call (note 18)", () => {
+  const task = {
+    name: "Nightly drafts",
+    job: { kind: "agent-task", instructions: "Draft the digest.", modeCap: "edits" },
+    recurrence: { start: "2026-10-12T02:07", rule: "FREQ=DAILY;BYHOUR=2;BYMINUTE=7" },
+  };
+
+  it("the key is minted at the owner's cap, not at modeCap; a raise and a lower are accepted", async () => {
+    const s = await setup({ gates: GATES_ENFORCED });
+    const created = await s.call(`/api/sites/${s.site.id}/automations`, "POST", task, "editor");
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(s.minted[0]?.mode).toBe("auto");
+    let a = created.body.automation as { id: string; rev: number };
+    const patch = (modeCap: string) =>
+      s.call(
+        `/api/sites/${s.site.id}/automations/${a.id}`,
+        "PATCH",
+        { rev: a.rev, job: { modeCap } },
+        "editor",
+      );
+    const raised = await patch("auto");
+    expect(raised.status, JSON.stringify(raised.body)).toBe(200);
+    expect(raised.body.automation).toMatchObject({ job: { modeCap: "auto" } });
+    a = raised.body.automation as typeof a;
+    const lowered = await patch("plan");
+    expect(lowered.status).toBe(200);
+    expect(lowered.body.automation).toMatchObject({ job: { modeCap: "plan" } });
+    a = lowered.body.automation as typeof a;
+    expect((await patch("bypass")).status).toBe(400);
+  });
+
+  it("a raise above the key's own mode is refused with what to do; a lower still works", async () => {
+    // a key minted before this fix (its mode was the old cap), or lowered on the Agents page
+    const s = await setup({ gates: GATES_ENFORCED, keyMode: "edits" });
+    const created = await s.call(`/api/sites/${s.site.id}/automations`, "POST", task, "editor");
+    let a = created.body.automation as { id: string; rev: number };
+    const patch = (modeCap: string) =>
+      s.call(
+        `/api/sites/${s.site.id}/automations/${a.id}`,
+        "PATCH",
+        { rev: a.rev, job: { modeCap } },
+        "editor",
+      );
+    const refused = await patch("auto");
+    expect(refused.status).toBe(409);
+    expect(refused.body).toMatchObject({
+      error: "mode_cap_above_key",
+      details: { keyMode: "edits", modeCap: "auto" },
+    });
+    const lowered = await patch("manual");
+    expect(lowered.status).toBe(200);
+    a = lowered.body.automation as typeof a;
+    // back up to the key's own mode is fine
+    expect((await patch("edits")).status).toBe(200);
+  });
+});

@@ -7,6 +7,7 @@ import {
   type AgentMode,
   ApprovalStore,
   AuditLog,
+  PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
   type Principal,
   type Scope,
@@ -19,7 +20,7 @@ import { MemoryBlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SchedulesDeps } from "../src/schedules.ts";
+import { createReleaseApprovalCheck, type SchedulesDeps } from "../src/schedules.ts";
 import { createCloudhalMcpServer } from "../src/server.ts";
 import { defineTools, toolPolicies } from "../src/tools.ts";
 
@@ -656,6 +657,64 @@ describe("automation runs over MCP (RFC-0008 §11)", () => {
       summary: "<run-summary>Nothing to &lt;do&gt;</run-summary>",
     });
     expect((await call("list_releases", { siteId: s.site.id })).text).toMatch(/^outside_run/);
+  });
+
+  it("the run's mode is worked out per call: min(key mode, current modeCap); a raise and a lower apply at once", async () => {
+    const setCap = async (modeCap: AgentMode) => {
+      const a = await s.schedules.getAutomation(s.site.id, automationId);
+      if (a?.job.kind !== "agent-task") throw new Error("automation");
+      await s.schedules.updateAutomation(s.site.id, automationId, {
+        expectedRev: a.rev,
+        job: { ...a.job, modeCap: modeCap as "edits" },
+      });
+    };
+    // a key minted at its owner's cap (auto): outside the run get_mode already shows the cap
+    const { call } = await connect(s, runKey("auto"));
+    expect((await call("get_mode", {})).data?.mode).toBe("edits");
+    const r = await call("begin_run", { automationId });
+    expect(r.data?.mode).toBe("edits");
+    // a person raises the cap: the next call works in AUTO (no new key)
+    await setCap("auto");
+    expect((await call("get_mode", {})).data?.mode).toBe("auto");
+    // …and lowers it: the next call is PLAN, and writes are refused
+    await setCap("plan");
+    expect((await call("get_mode", {})).data?.mode).toBe("plan");
+    const write = await call("set_embargo", {
+      siteId: s.site.id,
+      nodeId: s.entry.id,
+      from: plus(5 * HOUR),
+      expectedRev: s.entry.rev,
+    });
+    expect(write.isError).toBe(true);
+    // a key that itself works in EDITS never goes above it, whatever the cap
+    await setCap("auto");
+    const lower = await connect(s, runKey("edits"));
+    expect((await lower.call("get_mode", {})).data?.mode).toBe("edits");
+
+    // at run time (§10.6) an `auto` release of the run's key holds only while the cap is `auto`
+    const check = createReleaseApprovalCheck({
+      graph: s.store,
+      store: s.schedules,
+      ownership: PEOPLE_ONLY_OWNERSHIP,
+      rights: {
+        role: async () => "editor",
+        key: async () => ({ mode: "auto", creatorRole: "editor" }),
+      },
+    });
+    const autoRelease = {
+      siteId: s.site.id,
+      id: "rel_autorun0001",
+      approval: {
+        kind: "auto",
+        by: agent,
+        keyId: KEY,
+        at: NOW.toISOString(),
+        windowEnds: plus(HOUR),
+      },
+    } as unknown as Release;
+    expect(await check(autoRelease, NOW)).toEqual({ ok: true });
+    await setCap("edits");
+    expect(await check(autoRelease, NOW)).toEqual({ ok: false, reason: "auto_window_ended" });
   });
 
   it("after a tainting tool the run may only read, label, hide and pause (D10)", async () => {

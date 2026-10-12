@@ -1822,7 +1822,8 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       const rights = releaseRights(auth.staff, auth.agentKeys);
       expect(await rights.role(t.editor.actorId)).toBe("editor");
       expect(await rights.role("user_nobody000001")).toBeUndefined();
-      expect(await rights.key?.(key.id)).toEqual({ mode: "edits", creatorRole: "editor" });
+      // the key is minted at its owner's cap; the run's mode is capped by modeCap per call
+      expect(await rights.key?.(key.id)).toEqual({ mode: "auto", creatorRole: "editor" });
       await call("DELETE", `/api/agent-keys/${key.id}`, { cookie: t.editor.cookie });
       expect(await rights.key?.(key.id)).toBeUndefined();
     });

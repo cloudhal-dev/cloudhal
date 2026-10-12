@@ -43,7 +43,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { type CommentsDeps, isBoundState } from "./comments.ts";
 import type { MediaToolOptions } from "./common.ts";
-import { type RunContext, resolveRun, type SchedulesDeps } from "./schedules.ts";
+import { type RunContext, resolveRun, runPrincipal, type SchedulesDeps } from "./schedules.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
 
 export interface CloudhalMcpOptions {
@@ -327,7 +327,15 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           if (resolved.kind === "run") {
             run = resolved.run;
             principal = { ...resolved.principal, skill: principal.skill };
-          } else if (resolved.kind === "outside" && !OUTSIDE_RUN_TOOLS.has(def.name)) {
+          } else if (resolved.kind === "outside" && OUTSIDE_RUN_TOOLS.has(def.name)) {
+            // `get_mode` reports the mode the next run works in: capped by `modeCap` (§11.3)
+            const automation = resolved.automation;
+            if (automation?.job.kind === "agent-task")
+              principal = {
+                ...runPrincipal(principal, automation as RunContext["automation"]),
+                skill: principal.skill,
+              };
+          } else if (resolved.kind === "outside") {
             await options.audit?.record({
               at: new Date().toISOString(),
               actor: principal.actor,

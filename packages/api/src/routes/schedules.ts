@@ -17,10 +17,14 @@
  * - `GET /runs`, `GET /runs/:runId`; `GET|PUT /schedule-settings` (kill switch, daily cap).
  */
 import {
+  type AgentMode,
+  clampMode,
   holds,
+  isMoreAutonomous,
   narrow,
   type Principal,
   type Role,
+  modeCap as roleModeCap,
   roleScopes,
   type Scope,
   scopesForMode,
@@ -153,6 +157,19 @@ function automationKeyScopes(
     return untrustedEffectiveScopes(base) as Scope[];
   }
   return base;
+}
+
+const MODE_CAPS: readonly AgentMode[] = ["plan", "manual", "edits", "auto"];
+
+/**
+ * The mode an agent task's key is minted with (§11.2, §11.3): the owner's role cap (`auto` for
+ * Editors and above), never `bypass`. The automation's `modeCap` is not baked into the key: a run's
+ * mode is worked out on every call as min(the key's mode, the current `modeCap`, the owner's current
+ * role cap), so raising or lowering `modeCap` takes effect on the next call (RFC-0008 implementation
+ * note 18).
+ */
+function automationKeyMode(role: Role | undefined): AgentMode {
+  return clampMode("auto", role ? roleModeCap(role) : "auto");
 }
 
 function agentJob(b: Json, keyId: string): AutomationJob {
@@ -656,7 +673,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     const keys = c.get("agentKeys");
     if (!keys) throw apiError(409, "agent_keys_unavailable", "this server cannot mint agent keys");
     const modeCap = typeof job.modeCap === "string" ? job.modeCap : "edits";
-    if (!["plan", "manual", "edits", "auto"].includes(modeCap))
+    if (!MODE_CAPS.includes(modeCap as AgentMode))
       throw badRequest("modeCap is plan, manual, edits or auto (never bypass)");
     const scopes = automationKeyScopes(
       person?.role,
@@ -668,7 +685,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     const key = await keys.create({
       headers: c.req.raw.headers,
       name: `Automation: ${name}`.slice(0, 100),
-      mode: modeCap as "edits",
+      mode: automationKeyMode(person?.role),
       scopes,
       automationId: id,
     });
@@ -723,6 +740,23 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
           "untrusted_write_scopes",
           "an automation that starts reading visitor text needs a new key without write scopes; create a new automation",
         );
+      if (next.kind === "agent-task" && next.modeCap !== a.job.modeCap) {
+        if (!MODE_CAPS.includes(next.modeCap))
+          throw badRequest("modeCap is plan, manual, edits or auto (never bypass)");
+        // A raise takes effect on the next call (the run's mode is min(key, modeCap, role)), unless
+        // the key itself works in a lower mode: a key minted before this rule (with the old cap as
+        // its mode), lowered on the Agents page, or narrowed by its owner's demotion.
+        const key = isMoreAutonomous(next.modeCap, a.job.modeCap)
+          ? await c.get("agentKeys")?.state?.(a.job.keyId)
+          : undefined;
+        if (key && isMoreAutonomous(next.modeCap, key.effectiveMode))
+          throw apiError(
+            409,
+            "mode_cap_above_key",
+            `this automation's key works in ${key.effectiveMode.toUpperCase()} mode at most, so a ${next.modeCap.toUpperCase()} cap would have no effect; create the automation again to mint a new key`,
+            { keyMode: key.effectiveMode, modeCap: next.modeCap },
+          );
+      }
       job = next;
     } else if (j && a.job.kind === "builtin")
       job = { ...a.job, ...j, kind: "builtin" } as AutomationJob;
