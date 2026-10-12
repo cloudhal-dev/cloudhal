@@ -130,6 +130,12 @@ export function describeAnalyticsStateSuite(label: string, factory: SqlFactory):
       await getOrCreateSalt(sql, "2026-10-08");
       expect(await deleteSaltsBefore(sql, "2026-10-09")).toBe(1);
       expect(await getOrCreateSalt(sql, "2026-10-09", { random: () => b })).toBe(x);
+      // the first salt of a new day deletes every earlier one in the same batch, so salts never
+      // outlive their day on deployments without the hourly job (CLOUDHAL_ANALYTICS_CRON=off)
+      const next = await getOrCreateSalt(sql, "2026-10-10", { random: () => "c".repeat(64) });
+      expect(next).toBe("c".repeat(64));
+      const left = await sql.all<{ day: string }>("SELECT day FROM analytics_salts ORDER BY day");
+      expect(left.map((r) => r.day)).toEqual(["2026-10-10"]);
     });
 
     it("the query budget counts to its limit and then refuses", async () => {
@@ -416,8 +422,9 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         ],
         { source: "sql", now },
       );
-      await getOrCreateSalt(sql, "2026-10-08");
       await getOrCreateSalt(sql, "2026-10-09");
+      // a straggler from before midnight (creating today's salt already deleted yesterday's)
+      await getOrCreateSalt(sql, "2026-10-08");
       await putAnalyticsSettings(sql, {
         siteId: FIXTURE_SITE,
         rev: 0,

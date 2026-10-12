@@ -175,6 +175,10 @@ const SALT_RE = /^[0-9a-f]{64}$/;
 /**
  * The deployment's salt for a UTC day: the first caller inserts a random one (`INSERT OR IGNORE`)
  * and everyone reads the stored row back, so concurrent isolates agree.
+ *
+ * The same atomic `batch()` deletes every salt of an earlier day, so a salt never outlives its day
+ * by more than the first hashed page view of the next one — also on deployments without the hourly
+ * job (`CLOUDHAL_ANALYTICS_CRON=off`), where the cron's own deletion never runs (RFC-0006 §6.2).
  */
 export async function getOrCreateSalt(
   sql: SqlDriver,
@@ -183,10 +187,12 @@ export async function getOrCreateSalt(
 ): Promise<string> {
   const candidate = (options.random ?? randomSalt)();
   if (!SALT_RE.test(candidate)) throw new Error("a salt is 64 lower-case hex characters");
-  await sql.run("INSERT OR IGNORE INTO analytics_salts (day, salt, created_at) VALUES (?, ?, ?)", [
-    day,
-    candidate,
-    (options.now ?? new Date()).toISOString(),
+  await sql.batch([
+    {
+      sql: "INSERT OR IGNORE INTO analytics_salts (day, salt, created_at) VALUES (?, ?, ?)",
+      params: [day, candidate, (options.now ?? new Date()).toISOString()],
+    },
+    { sql: "DELETE FROM analytics_salts WHERE day < ?", params: [day] },
   ]);
   const row = await sql.get<{ salt: string }>("SELECT salt FROM analytics_salts WHERE day = ?", [
     day,
