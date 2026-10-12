@@ -34,6 +34,7 @@ import type { ReactNode } from "react";
 import {
   AnalyticsErrorBanner,
   analyticsKeys,
+  useAnalyticsAccess,
   useAnalyticsFeature,
   useAnalyticsStatus,
   useAnalyticsText,
@@ -89,7 +90,7 @@ export function AnalyticsPage() {
   const search = useSearch({ from: "/sites/$siteId/analytics" });
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const gate = useGate("analytics.read");
+  const gate = useAnalyticsAccess();
   const settingsGate = useGate("analytics.settings");
   const { feature } = useAnalyticsFeature();
   const status = useAnalyticsStatus(siteId, gate.allowed);
@@ -112,7 +113,7 @@ export function AnalyticsPage() {
   };
   const missing = isNotEnabled(status.error);
   const situation = analyticsSituation(missing ? undefined : feature, status.data);
-  const readable = gate.allowed && !missing;
+  const readable = gate.ready && gate.allowed && !missing;
   const summary = useSummary(scope, readable);
   const pageviews = summary.data?.data.pageviews;
   const empty = readable && !filter && pageviews === 0;
@@ -244,7 +245,7 @@ export function AnalyticsPage() {
     />
   );
   let body: ReactNode;
-  if (!gate.allowed) body = null;
+  if (!gate.ready || !gate.allowed) body = null;
   else if (missing) body = notRunning;
   else if (empty && situation.deploymentOff) body = notRunning;
   else if (empty && situation.siteOff)

@@ -38,7 +38,7 @@ import {
   errorCode,
   isNotEnabled,
 } from "../lib/api.ts";
-import { useCan } from "./useMe.ts";
+import { useGate, useMe } from "./useMe.ts";
 
 export const analyticsKeys = {
   all: (siteId: string) => ["analytics", siteId] as const,
@@ -58,15 +58,26 @@ export function useAnalyticsFeature(): { feature: AnalyticsFeature | undefined; 
 }
 
 /**
+ * May the signed-in person read analytics (`analytics.read`, Authors and above)? Unlike plain
+ * `useGate`, analytics waits for `/api/me` before asking (`ready`), so a Contributor's Studio never
+ * fires a burst of refused reads; a server without `/api/me` reads as allowed once it has answered.
+ */
+export function useAnalyticsAccess() {
+  const me = useMe();
+  const gate = useGate("analytics.read");
+  return { ready: !me.isPending, allowed: gate.allowed, reason: gate.reason };
+}
+
+/**
  * The site's analytics status (settings, last rollup, budget, yesterday's request estimate). Asked
  * only of people who may read analytics; a server without analytics answers 404 once.
  */
 export function useAnalyticsStatus(siteId: string, enabled = true) {
-  const canRead = useCan("analytics.read");
+  const access = useAnalyticsAccess();
   return useQuery({
     queryKey: analyticsKeys.status(siteId),
     queryFn: () => api.analytics.status(siteId),
-    enabled: enabled && canRead && !!siteId,
+    enabled: enabled && access.ready && access.allowed && !!siteId,
     staleTime: 60_000,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
