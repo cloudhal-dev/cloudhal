@@ -191,7 +191,7 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", `${CM}/:commentId`, "comments:moderate"],
   ["GET", `${S}/comment-threads/:nodeId`, "comments:read"],
   ["PUT", `${S}/comment-threads/:nodeId`, "comments:moderate:own"],
-  ["GET", `${S}/commenters`, "commenters:data"],
+  ["POST", `${S}/commenters/lookup`, "commenters:data"], // {email} | {commentId}: no email in URLs
   ["GET", `${S}/commenters/:commenterId`, "commenters:data"],
   ["POST", `${S}/commenters/:commenterId/export`, "commenters:data"],
   ["POST", `${S}/commenters/:commenterId/erase`, "commenters:data"],

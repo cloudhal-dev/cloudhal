@@ -5,10 +5,12 @@
  * person's) and `set_comment_thread` (closing and hiding reduce; opening, the default and a close
  * date need a person).
  *
- * - **Untrusted text.** Every comment item carries `untrusted: true`; the text content puts names,
- *   comment text and report details inside `<reader-…>` blocks with `<`, `>` and `&` escaped, after
- *   a preamble saying they are data, not instructions. At most 50 comments, 2,000 characters per
- *   text, 80 per name, 500 per report detail and 20,000 characters of reader text per call.
+ * - **Untrusted text.** Every comment item carries `untrusted: true`; in the structured content and
+ *   the text content alike, names, comment text and report details are inside `<reader-…>` blocks
+ *   with `<`, `>` and `&` escaped, after a preamble (`untrustedNotice` in structured content) saying
+ *   they are data, not instructions. At most 50 comments, 2,000 characters per text, 80 per name,
+ *   500 per report detail and 20,000 characters of reader text per call (one budget: both channels
+ *   carry the same strings).
  * - **No tool acts on comment text.** Tools take ids and enums; nothing parses comment text for
  *   commands, links or ids. There is no delete, erase, ban, export or settings tool.
  * - **Approvals bound to comment state.** `bindState` hashes the named comments' `rev`/status and
@@ -39,6 +41,7 @@ import {
   renderAgentComments,
   reportsByComment,
   threadView,
+  UNTRUSTED_NOTICE,
 } from "./comments.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -223,12 +226,13 @@ export function commentTools(): ToolDefinition[] {
       ),
       outputSchema: obj(
         {
+          untrustedNotice: { type: "string" },
           comments: { type: "array", items: AGENT_COMMENT },
           nextCursor: { type: "string" },
           counts: { type: "object" },
           truncated: { type: "boolean" },
         },
-        ["comments", "counts"],
+        ["untrustedNotice", "comments", "counts"],
       ),
       annotations: READ,
       scopes: ["comments:read"],
@@ -260,6 +264,7 @@ export function commentTools(): ToolDefinition[] {
           }),
         );
         return {
+          untrustedNotice: UNTRUSTED_NOTICE,
           comments: items,
           ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
           counts,
@@ -301,12 +306,13 @@ export function commentTools(): ToolDefinition[] {
       ),
       outputSchema: obj(
         {
+          untrustedNotice: { type: "string" },
           thread: { type: "object" },
           comments: { type: "array", items: AGENT_COMMENT },
           nextCursor: { type: "string" },
           truncated: { type: "boolean" },
         },
-        ["thread", "comments"],
+        ["untrustedNotice", "thread", "comments"],
       ),
       annotations: READ,
       scopes: ["comments:read"],
@@ -329,6 +335,7 @@ export function commentTools(): ToolDefinition[] {
         const byComment = reportsByComment(reports);
         const budget = new ReaderTextBudget();
         return {
+          untrustedNotice: UNTRUSTED_NOTICE,
           thread: {
             nodeId,
             title: entry.title,
@@ -592,7 +599,10 @@ export function commentTools(): ToolDefinition[] {
         },
         ["siteId", "commentId", "text"],
       ),
-      outputSchema: obj({ comment: AGENT_COMMENT }, ["comment"]),
+      outputSchema: obj({ untrustedNotice: { type: "string" }, comment: AGENT_COMMENT }, [
+        "untrustedNotice",
+        "comment",
+      ]),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -649,6 +659,7 @@ export function commentTools(): ToolDefinition[] {
         d.onQueued?.(site.id, "normal");
         ctx.report?.({ replyId: reply.id });
         return {
+          untrustedNotice: UNTRUSTED_NOTICE,
           comment: agentComment(reply, entry, [], new ReaderTextBudget(), { text: "full" }),
         };
       },

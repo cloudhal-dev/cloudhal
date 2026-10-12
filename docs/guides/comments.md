@@ -71,7 +71,7 @@ Notifications tell moderators when comments are waiting, when a comment was repo
 
 Agents moderate through seven MCP tools: `list_comments`, `get_comment_thread`, `comments_summary`, `label_comments`, `moderate_comments`, `draft_comment_reply` and `set_comment_thread`. There is no tool to delete, erase, ban, export or change settings.
 
-- **Keys.** New agent keys get `comments:read`. Keys made before comments existed are not widened; give them comment access by creating a new key. A one-click "Allow comments" on Studio's Agents page is planned, as "Allow analytics" exists for analytics. For triage, make a narrow key: `comments:read` and `comments:moderate` only, in `edits` mode. Avoid giving one key both comment access and `content:write` or `site:publish`: comment text is written by strangers and reaches the agent.
+- **Keys.** New agent keys get `comments:read`. Keys made before comments existed are not widened. To give one read access, add `comments:read` to it with `PATCH /api/agent-keys/:id` and `{"addScopes": ["comments:read"]}` (Studio's "Allow comments" on the Agents page, like "Allow analytics"): your own keys, or any key with `agents:manage`, never beyond the key creator's role (a Contributor's key cannot hold it); audited as `agent-key.scopes`. Moderation and reply scopes are never added to an existing key: create a new one. For triage, make a narrow key: `comments:read` and `comments:moderate` only, in `edits` mode. Avoid giving one key both comment access and `content:write` or `site:publish`: comment text is written by strangers and reaches the agent.
 - **What an agent may do on its own**, by the key's mode:
 
   | Call | plan | manual | edits | auto | local `bypass` |
@@ -100,7 +100,14 @@ Every submission passes these checks **before anything is written** to the datab
 
 Add the Turnstile paragraph to your privacy notice (below). Whether Turnstile accepts a `*.workers.dev` hostname is not verified yet (RFC-0007 V2); use a custom domain if it does not.
 
-**Readers without JavaScript** can post through the plain form ("Accept comments from browsers without JavaScript", on by default). These posts carry no proof of work **and no Turnstile token**, so they get stricter limits instead: one per reader every 10 minutes and 20 per site a day. If you turn on Turnstile so that every post is verified, turn this switch off too; readers without JavaScript then see "Comments on this site need JavaScript."
+**Readers without JavaScript** can post through the plain form ("Accept comments from browsers without JavaScript", on by default). These posts carry no proof of work **and no Turnstile token**, so they get stricter limits instead: one per reader every 10 minutes and 20 per site a day.
+
+**With Turnstile on, posts without JavaScript are off** unless you also turn on "Also accept them while Turnstile is on" (`allowWithoutScriptWithTurnstile`). The trade-off:
+
+- **Off (the default with Turnstile):** every stored guest comment passed Turnstile. Readers whose browser runs no JavaScript (some privacy setups, text browsers, some assistive set-ups) see "Comments on this site need JavaScript." and cannot comment.
+- **On:** those readers can comment again, but their posts are not verified by Turnstile or by proof of work. Bots can use the same form, held back only by the limits above (20 such posts a day for the whole site) and by moderation, since every guest comment waits for approval anyway.
+
+Under proof of work the first switch alone decides; the second has no effect.
 
 **Limits** (defaults):
 
@@ -113,6 +120,7 @@ Add the Turnstile paragraph to your privacy notice (below). Whether Turnstile ac
 | Pending comments per article | 200; then that thread pauses |
 | Reports | 5 per reader an hour; 200 per site a day |
 | Optional, across server instances | `comments.rateLimit` in `cloudhal.json`: 10 a minute per reader per Cloudflare location (Workers Rate Limiting binding `COMMENTS_RL`; whether Workers Free offers it is unconfirmed) |
+| Requests without a client address (self-hosting behind a proxy that hides it) | 1 comment a minute for all of them together, and they cannot be banned by address |
 
 The daily limit is what keeps a free account safe. At 1,000 stored comments a day, comments write at most about 7,000 rows a day, about 7 % of D1 Free's 100,000. Exceeding D1's daily writes would stop the whole CMS, not just comments, until midnight UTC. On Workers Paid, 5,000 a day is a reasonable limit.
 
@@ -137,7 +145,7 @@ This is the notice-and-action mechanism of DSA Art. 16, which applies to every h
 | Comment text | Yes | public once approved; agents with `comments:read` |
 | Email | Only if given; encrypted (AES-GCM) with a keyed hash for lookups | only people with `commenters:data` (Editors and above); never agents; never in exports without `--with-personal-data` |
 | IP address | **Never** | read to limit abuse and hash, then dropped |
-| Hashed network address | 30 days by default | nobody: used only for rate limits and bans. It is an HMAC with a random salt per month; salts are deleted when two months old, after which old hashes cannot be recomputed |
+| Hashed network address | at most 30 days | nobody: used only for rate limits and bans. It is an HMAC with a random salt per month; salts are deleted when two months old, after which old hashes cannot be recomputed |
 | User agent, cookies, device storage | **Never** | |
 | Reports | reason, details, optional email (encrypted) | moderators |
 | Moderation history | who did what, with the reason; no text, no email | moderators and Activity |
@@ -150,18 +158,18 @@ This is the notice-and-action mechanism of DSA Art. 16, which applies to every h
 | Spam | deleted after 30 days |
 | Deleted comments | deleted after 30 days (a tombstone stays while approved replies need it) |
 | Hidden comments | kept until a person deletes them (optionally deleted after N days) |
-| Hashed network addresses and proof-of-work ids | cleared after 30 days |
+| Hashed network addresses and proof-of-work ids | cleared after 30 days (you can choose fewer, never more) |
 | Commenter emails | deleted when no comment or report refers to them any more, or on erasure |
 | Resolved reports and statements of reasons | 6 months |
 | Comments of a deleted article | deleted after 30 days |
 
-These can be changed in Site settings › Comments › Retention. **If you change how long hashed network addresses are kept, change your privacy notice too.** The notice below says "up to 30 days", and the setting accepts more.
+These can be changed in Site settings › Comments › Retention. Hashed network addresses and proof-of-work ids are kept **at most 30 days**: the setting accepts 1 to 30, and the hourly job never keeps them longer, even for a value saved before this limit existed. That keeps the notice below ("up to 30 days") true whatever you choose.
 
 On Cloudflare the hourly job is the admin Worker's cron trigger. If your account has no free trigger (Workers Free allows 5), `cloudhal deploy` goes without it and the job runs after Studio and API requests instead, at most once an hour. Locally, `cloudhal studio` and `cloudhal mcp` run it every hour while they are running.
 
 ### Requests from commenters (access, erasure)
 
-People with `commenters:data` find a commenter by email or from any of their comments (Commenter view; REST `GET /api/sites/:siteId/commenters?email=…` or `?commentId=…`).
+People with `commenters:data` find a commenter by email or from any of their comments (Commenter view; REST `POST /api/sites/:siteId/commenters/lookup` with `{"email": …}` or `{"commentId": …}` as JSON, so an address never appears in a URL or a request log).
 - **Export their data** (GDPR Art. 15 and 20): their email and their comments as JSON (`POST …/commenters/:commenterId/export`).
 - **Erase** (GDPR Art. 17), with a required reason:
   - *Anonymise* (the default): every comment by that person shows "Anonymous", their email row is deleted, and their hashed addresses and proof-of-work ids are cleared. The text stays.
@@ -267,6 +275,7 @@ cloudhal comments import --in <file> [--remote]
   - Statuses are kept: approved comments stay approved. This is the one way, besides a person, that a comment becomes approved.
   - Emails are encrypted again under the target deployment's key.
 - **`--remote`** talks to your deployment with the deployment token (`.cloudhal/deploy/secrets.json`), through `/api/admin/sites/:siteId/comments/status|export|import`. Each call is audited as the operator.
+- **Large sites on Workers Free.** D1 Free answers at most 50 queries per Worker request, so every export (the CLI's and Studio's "Export comments", `GET /api/sites/:siteId/comments/export`) comes in pages of 500 comments or 100 commenters, with a `cloudhal-next-cursor` header while more remain; Studio and the CLI fetch the pages for you. A commenter's own export is one query, and "Ban… › Also hide their approved comments" hides up to 1,000 comments a request (Studio repeats it until none are left).
 - Disqus and WordPress importers are planned (v1.1).
 
 ## Costs

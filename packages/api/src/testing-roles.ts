@@ -1078,6 +1078,60 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       );
     });
 
+    it('RFC-0007 §10.1: "Allow comments" adds comments:read to older keys with the same rules, audited', async () => {
+      const t = await team();
+      const older = ["site:read", "content:read", "preview:create", "analytics:read"];
+      const authorKey = await newKey(t.author, { name: "a-pre", mode: "plan", scopes: older });
+      const editorKey = await newKey(t.editor, { name: "e-pre", mode: "plan", scopes: older });
+      const contributorKey = await newKey(t.contributor, {
+        name: "c-pre",
+        mode: "plan",
+        scopes: ["site:read", "content:read", "preview:create"],
+      });
+      const add = (p: Person, id: string, body: Json = { addScopes: ["comments:read"] }) =>
+        call("PATCH", `/api/agent-keys/${id}`, { cookie: p.cookie, body });
+      const scopesOf = async (key: string) =>
+        structured<{ scopes: string[] }>(
+          await (await connect(key)).callTool({ name: "get_mode", arguments: {} }),
+        ).scopes;
+      expect(await scopesOf(authorKey.key)).toEqual(older);
+      // write scopes stay fixed at creation
+      for (const s of ["comments:moderate", "comments:reply", "commenters:data"])
+        expect((await add(t.author, authorKey.id, { addScopes: [s] })).body.error, s).toBe(
+          "scope_not_addable",
+        );
+      // someone else's key without agents:manage; a Contributor's key, by anyone
+      expect((await add(t.editor, authorKey.id)).status).toBe(404);
+      expect((await add(t.contributor, contributorKey.id)).body.error).toBe("scope_above_role");
+      expect((await add(t.administrator, contributorKey.id)).body.error).toBe("scope_above_role");
+      // the creator, and an Administrator for an Editor's key
+      const added = await add(t.author, authorKey.id);
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body).toMatchObject({
+        mode: "plan",
+        scopes: [...older, "comments:read"],
+        effectiveScopes: [...older, "comments:read"],
+      });
+      expect((await add(t.author, authorKey.id)).body.scopes).toEqual([...older, "comments:read"]);
+      const both = await add(t.administrator, editorKey.id, {
+        addScopes: ["analytics:read", "comments:read"],
+      });
+      expect(both.status, JSON.stringify(both.body)).toBe(200);
+      expect(both.body.scopes).toEqual([...older, "comments:read"]);
+      // the agent holds it on its next connection
+      expect(await scopesOf(authorKey.key)).toEqual([...older, "comments:read"]);
+      const rows = (await audit.list({ deployment: true, limit: 100 })).filter(
+        (r) => r.tool === "agent-key.scopes",
+      );
+      expect(rows.map((r) => r.input)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyId: authorKey.id, added: ["comments:read"] }),
+          expect.objectContaining({ keyId: editorKey.id, added: ["comments:read"] }),
+        ]),
+      );
+      expect(rows).toHaveLength(2);
+    });
+
     // ───────────────────────────── I13: removal ─────────────────────────────
 
     it("I13: removal deletes the membership, revokes sessions, disables keys, cancels invites and denies pending requests", async () => {

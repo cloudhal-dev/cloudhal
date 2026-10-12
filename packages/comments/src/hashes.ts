@@ -107,6 +107,24 @@ export async function ipHmac(salt: string, siteId: string, address: string): Pro
   return toHex(mac.slice(0, 16));
 }
 
+/**
+ * The `COMMENTS_RL` Rate Limiting binding's key for a client: an HMAC of its network (IPv6 /64)
+ * under the key derived for that purpose (`cloudhal/comments/rl/v1`), so it is the same in every
+ * isolate and never the raw deployment secret (threat-model review of 2026-10-12, item 9).
+ */
+export async function rateLimitKey(keys: CommentKeys, address: string): Promise<string> {
+  return toHex((await hmac(keys.rateLimit, utf8(clientNetwork(address)))).slice(0, 16));
+}
+
+/** Placeholder address when the runtime vouches for none (a separate, stricter bucket, §6.5). */
+export const UNKNOWN_CLIENT = "unknown";
+
+/** True for an IPv4 or IPv6 address (what the runtime vouches for); false for anything else. */
+export function isClientAddress(address: string): boolean {
+  const a = address.trim();
+  return IPV4.test(a) || expandIpv6(a) !== undefined;
+}
+
 export async function emailHmac(keys: CommentKeys, email: string): Promise<string> {
   return toHex(await hmac(keys.emailHmac, utf8(email.trim().toLowerCase())));
 }

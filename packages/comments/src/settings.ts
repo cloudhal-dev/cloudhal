@@ -28,7 +28,10 @@ export interface RetentionSettings {
   readonly deletedDays: number;
   /** `hidden` (default `null`: kept until a person deletes it). */
   readonly hiddenDays: number | null;
-  /** `ip_hmac` and `challenge_id` on comments and reports (default 30). */
+  /**
+   * `ip_hmac` and `challenge_id` on comments and reports: 1 to 30 days (default 30). The privacy
+   * notice promises "up to 30 days" (RFC-0007 §9.1, §9.6), so it is a ceiling, not just a default.
+   */
   readonly clientDataDays: number;
   /** Resolved reports and statements of reasons of removed comments (default 183, six months). */
   readonly resolvedReportDays: number;
@@ -47,8 +50,18 @@ export interface CommentSettings {
   readonly protection: Protection;
   /** Public Turnstile widget key (the secret is in `comment_secrets`). */
   readonly turnstileSiteKey: string | null;
-  /** Accept JavaScript-less posts under the stricter limits (§6.5). */
+  /**
+   * Accept JavaScript-less posts under the stricter limits (§6.5). They carry no proof of work and
+   * no Turnstile token, so with Turnstile on they are accepted only when
+   * `allowWithoutScriptWithTurnstile` is also true (see `withoutScriptAllowed`).
+   */
   readonly allowWithoutScript: boolean;
+  /**
+   * Keep accepting JavaScript-less posts while Turnstile protects the form (default false). An
+   * owner who turns on Turnstile expects every post to be verified; these posts are not, so the
+   * owner must opt in explicitly (threat-model review of 2026-10-12, item 5).
+   */
+  readonly allowWithoutScriptWithTurnstile: boolean;
   /** Links above this add the `links` label; above 10 the comment is refused. */
   readonly linkLimit: number;
   /** Add the `watch-word` label. */
@@ -79,7 +92,10 @@ export const DEFAULT_RETENTION: RetentionSettings = {
   resolvedReportDays: 183,
 };
 
-/** The defaults: comments off (§0.2 D4), 90-day close, proof of work, JavaScript-less posts on. */
+/**
+ * The defaults: comments off (§0.2 D4), 90-day close, proof of work, JavaScript-less posts on
+ * (under proof of work only: off while Turnstile is on unless the owner allows them there too).
+ */
 export function defaultCommentSettings(siteId: string): CommentSettings {
   return {
     siteId,
@@ -90,6 +106,7 @@ export function defaultCommentSettings(siteId: string): CommentSettings {
     protection: "pow",
     turnstileSiteKey: null,
     allowWithoutScript: true,
+    allowWithoutScriptWithTurnstile: false,
     linkLimit: 2,
     watchWords: [],
     blockedWords: [],
@@ -110,6 +127,11 @@ export const MAX_WORDS = 200;
 export const MAX_WORD_LENGTH = 64;
 export const MAX_COLLECTIONS = 100;
 export const MAX_CLOSE_DAYS = 3650;
+/**
+ * The longest IP hashes and challenge ids are kept (§9.1, §9.3). The disclosure snippet says "up
+ * to 30 days", so settings refuse more and the retention job clamps a stored value to it.
+ */
+export const MAX_CLIENT_DATA_DAYS = 30;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SITE_KEY = /^[A-Za-z0-9_-]{1,128}$/;
@@ -117,12 +139,18 @@ const SITE_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 const isInt = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
-function checkDays(name: string, v: unknown, nullable: boolean): void {
+function checkDays(name: string, v: unknown, nullable: boolean, max = MAX_CLOSE_DAYS): void {
   if (v === null && nullable) return;
-  if (!isInt(v, 1, MAX_CLOSE_DAYS))
+  if (!isInt(v, 1, max))
     throw new CommentSettingsError(
-      `${name} must be a whole number of days from 1 to ${MAX_CLOSE_DAYS}${nullable ? " or null" : ""}`,
+      `${name} must be a whole number of days from 1 to ${max}${nullable ? " or null" : ""}`,
     );
+}
+
+/** `clientDataDays` as the retention job applies it: never above `MAX_CLIENT_DATA_DAYS`. */
+export function clientDataDays(retention: Pick<RetentionSettings, "clientDataDays">): number {
+  const v = retention.clientDataDays;
+  return Number.isInteger(v) && v >= 1 ? Math.min(v, MAX_CLIENT_DATA_DAYS) : MAX_CLIENT_DATA_DAYS;
 }
 
 /** Word lists are stored trimmed, de-duplicated by their folded form, in the order given. */
@@ -166,6 +194,7 @@ export function applySettingsInput(
     "protection",
     "turnstileSiteKey",
     "allowWithoutScript",
+    "allowWithoutScriptWithTurnstile",
     "linkLimit",
     "watchWords",
     "blockedWords",
@@ -256,7 +285,7 @@ export function applySettingsInput(
     checkDays("retention.spamDays", retention.spamDays, false);
     checkDays("retention.deletedDays", retention.deletedDays, false);
     checkDays("retention.hiddenDays", retention.hiddenDays, true);
-    checkDays("retention.clientDataDays", retention.clientDataDays, false);
+    checkDays("retention.clientDataDays", retention.clientDataDays, false, MAX_CLIENT_DATA_DAYS);
     checkDays("retention.resolvedReportDays", retention.resolvedReportDays, false);
   }
 
@@ -269,6 +298,10 @@ export function applySettingsInput(
     protection,
     turnstileSiteKey,
     allowWithoutScript: bool("allowWithoutScript", current.allowWithoutScript),
+    allowWithoutScriptWithTurnstile: bool(
+      "allowWithoutScriptWithTurnstile",
+      current.allowWithoutScriptWithTurnstile,
+    ),
     linkLimit,
     watchWords:
       input.watchWords === undefined
@@ -283,6 +316,23 @@ export function applySettingsInput(
     retention,
     planHint,
   };
+}
+
+/**
+ * Whether posts without JavaScript (no proof of work, no Turnstile token) are accepted (§6.2 step
+ * 7, D11): when the owner allows them, and, while Turnstile is on, only when the owner allowed them
+ * under Turnstile as well.
+ */
+export function withoutScriptAllowed(
+  settings: Pick<
+    CommentSettings,
+    "allowWithoutScript" | "allowWithoutScriptWithTurnstile" | "protection"
+  >,
+): boolean {
+  return (
+    settings.allowWithoutScript &&
+    (settings.protection !== "turnstile" || settings.allowWithoutScriptWithTurnstile)
+  );
 }
 
 /** Whether new comments are accepted in a collection (site and collection both on). */

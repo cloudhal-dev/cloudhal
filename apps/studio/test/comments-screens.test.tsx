@@ -534,6 +534,7 @@ const SETTINGS: CommentSettings = {
   protection: "pow",
   turnstileSiteKey: null,
   allowWithoutScript: true,
+  allowWithoutScriptWithTurnstile: false,
   linkLimit: 2,
   watchWords: [],
   blockedWords: [],

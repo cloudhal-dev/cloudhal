@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applySettingsInput,
+  CommentLimiter,
   CommentSettingsError,
   clientNetwork,
   commentStateHash,
@@ -10,15 +11,20 @@ import {
   deriveCommentKeys,
   difficultyFor,
   emailHmac,
+  ISOLATE_LIMITS,
   ipHmac,
+  isClientAddress,
   issueChallenge,
+  KEY_INFO,
   leadingZeroBits,
+  MAX_CLIENT_DATA_DAYS,
   oldestSaltMonthToKeep,
   openEmail,
   openSecret,
   planPurge,
   purgeBackoffMs,
   ReplayCache,
+  rateLimitKey,
   retentionPlan,
   sealEmail,
   sealSecret,
@@ -26,7 +32,9 @@ import {
   solveChallenge,
   threadClosesAt,
   threadState,
+  UNKNOWN_CLIENT_KEY,
   verifyChallenge,
+  withoutScriptAllowed,
 } from "../src/index.ts";
 
 const SECRET = "test-only-comments-key-0123456789abcdef";
@@ -139,6 +147,43 @@ describe("keys and hashes", () => {
     await expect(ipHmac("short", "site_abcdef", "1.2.3.4")).rejects.toThrow();
   });
 
+  it("the isolate limiter counts an IPv6 /64 as one client; no address is one stricter bucket", async () => {
+    const limiter = new CommentLimiter({ now: () => T0.getTime() });
+    const a = await limiter.clientKey("2001:db8:1:2::1");
+    expect(await limiter.clientKey("2001:db8:1:2:ffff:ffff:ffff:fffe")).toBe(a);
+    expect(await limiter.clientKey("2001:db8:1:3::1")).not.toBe(a);
+    expect(await limiter.clientKey("::ffff:198.51.100.7")).toBe(
+      await limiter.clientKey("198.51.100.7"),
+    );
+    for (let i = 0; i < 3; i++) expect(limiter.allowSubmission(a)).toBe(true);
+    expect(limiter.allowSubmission(a)).toBe(false);
+    // no address the runtime vouches for: one shared key, 1 submission and 5 challenges a minute
+    for (const missing of ["", "unknown", "not-an-address"])
+      expect(await limiter.clientKey(missing)).toBe(UNKNOWN_CLIENT_KEY);
+    expect(limiter.allowSubmission(UNKNOWN_CLIENT_KEY)).toBe(true);
+    expect(limiter.allowSubmission(UNKNOWN_CLIENT_KEY)).toBe(false);
+    for (let i = 0; i < 5; i++) expect(limiter.allowChallenge(UNKNOWN_CLIENT_KEY)).toBe(true);
+    expect(limiter.allowChallenge(UNKNOWN_CLIENT_KEY)).toBe(false);
+    expect(ISOLATE_LIMITS).toMatchObject({
+      unknownSubmissionsPerMinute: 1,
+      unknownChallengesPerMinute: 5,
+    });
+    expect(isClientAddress("2001:db8::1")).toBe(true);
+    expect(isClientAddress("unknown")).toBe(false);
+  });
+
+  it("the COMMENTS_RL key: derived from the deployment secret, one per client network", async () => {
+    const keys = await keysP;
+    const k = await rateLimitKey(keys, "2001:db8:1:2::1");
+    expect(k).toMatch(/^[0-9a-f]{32}$/);
+    expect(await rateLimitKey(keys, "2001:db8:1:2:9::9")).toBe(k);
+    expect(await rateLimitKey(keys, "2001:db8:1:3::1")).not.toBe(k);
+    expect(
+      await rateLimitKey(await deriveCommentKeys(`${SECRET}-other`), "2001:db8:1:2::1"),
+    ).not.toBe(k);
+    expect(KEY_INFO.rateLimit).toBe("cloudhal/comments/rl/v1");
+  });
+
   it("emails: keyed hash on the lower-cased address, AES-GCM bound to the site", async () => {
     const keys = await keysP;
     expect(await emailHmac(keys, " Ayse@Example.com")).toBe(
@@ -231,6 +276,10 @@ describe("settings and threadState (§4.5)", () => {
       { watchWords: Array(201).fill("w") },
       { retention: { pendingDays: 0 } },
       { retention: { forever: 1 } },
+      // the privacy notice says "up to 30 days" for hashed addresses (§9.1, §9.6)
+      { retention: { clientDataDays: 31 } },
+      { retention: { clientDataDays: 3650 } },
+      { retention: { clientDataDays: 0 } },
     ];
     for (const b of bad)
       expect(() => applySettingsInput(d, b as never), JSON.stringify(b)).toThrow(
@@ -247,6 +296,33 @@ describe("settings and threadState (§4.5)", () => {
     expect(ok.retention.hiddenDays).toBe(180);
     expect(ok.retention.pendingDays).toBe(30);
     expect(ok.closeAfterDays).toBeNull();
+    expect(
+      applySettingsInput(d, { retention: { clientDataDays: 7 } }).retention.clientDataDays,
+    ).toBe(7);
+    expect(MAX_CLIENT_DATA_DAYS).toBe(30);
+  });
+
+  it("posts without JavaScript: on under proof of work, off under Turnstile unless allowed there", () => {
+    const d = defaultCommentSettings("site_abcdef");
+    expect(d).toMatchObject({ allowWithoutScript: true, allowWithoutScriptWithTurnstile: false });
+    expect(withoutScriptAllowed(d)).toBe(true);
+    const ts = applySettingsInput(d, { protection: "turnstile", turnstileSiteKey: "0x4AAAAAAA" });
+    expect(withoutScriptAllowed(ts)).toBe(false);
+    expect(
+      withoutScriptAllowed(applySettingsInput(ts, { allowWithoutScriptWithTurnstile: true })),
+    ).toBe(true);
+    expect(
+      withoutScriptAllowed(
+        applySettingsInput(ts, {
+          allowWithoutScriptWithTurnstile: true,
+          allowWithoutScript: false,
+        }),
+      ),
+    ).toBe(false);
+    expect(withoutScriptAllowed(applySettingsInput(d, { allowWithoutScript: false }))).toBe(false);
+    expect(() =>
+      applySettingsInput(d, { allowWithoutScriptWithTurnstile: "yes" } as never),
+    ).toThrow(CommentSettingsError);
   });
 
   it("open until first publication + closeAfterDays (collection, else site)", () => {
@@ -410,6 +486,21 @@ describe("retention plan (§9.3)", () => {
     const hidden = retentionPlan({ ...defaultCommentSettings("s").retention, hiddenDays: 180 }, T0);
     expect(hidden.steps.find((s) => s.kind === "hidden")?.cutoff).toBe(
       new Date(T0.getTime() - 180 * DAY_MS).toISOString(),
+    );
+    // a value stored before the ceiling is clamped: hashes never outlive 30 days
+    const legacy = retentionPlan(
+      { ...defaultCommentSettings("s").retention, clientDataDays: 365 },
+      T0,
+    );
+    expect(legacy.steps.find((s) => s.kind === "client-data")?.cutoff).toBe(
+      new Date(T0.getTime() - 30 * DAY_MS).toISOString(),
+    );
+    const shorter = retentionPlan(
+      { ...defaultCommentSettings("s").retention, clientDataDays: 7 },
+      T0,
+    );
+    expect(shorter.steps.find((s) => s.kind === "client-data")?.cutoff).toBe(
+      new Date(T0.getTime() - 7 * DAY_MS).toISOString(),
     );
     expect(oldestSaltMonthToKeep(new Date("2026-01-15T00:00:00Z"))).toBe("2025-12");
     expect(

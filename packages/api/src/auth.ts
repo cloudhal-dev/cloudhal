@@ -150,7 +150,8 @@ export interface AgentKeyService {
   endElevation(input: { headers: Headers; id: string }): Promise<AgentKeySummary>;
   /**
    * Adds read-only scopes that did not exist when the key was made (`ADDABLE_KEY_SCOPES`, RFC-0006
-   * §9.1 "Allow analytics"): the creator's own key, or any key with `agents:manage`. The scope must
+   * §9.1 "Allow analytics", RFC-0007 §10.1 "Allow comments"): the creator's own key, or any key
+   * with `agents:manage`. The scope must
    * fit both the caller's and the key creator's role (`scope_above_role`): keys stay narrowed to
    * their creator (RFC-0005 I5). `added` is empty when the key already held every scope.
    */
@@ -367,10 +368,13 @@ export class AuthError extends Error {
 
 /**
  * Scopes a person may add to an existing key (`PATCH /api/agent-keys/:id {addScopes}`). Only
- * read-only scopes without personal data that new keys get by default but older keys lack:
- * everything else stays fixed at creation (RFC-0005: promotions never silently empower agents).
+ * read-only scopes that new keys get by default but older keys lack — "Allow analytics"
+ * (RFC-0006 §9.1) and "Allow comments" (RFC-0007 §10.1; reader text reaches the agent as
+ * untrusted data, never an email) — and only within the caller's and the key creator's role, so a
+ * Contributor's key never gets them. Everything else stays fixed at creation (RFC-0005: promotions
+ * never silently empower agents).
  */
-export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read"];
+export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read", "comments:read"];
 
 /** Scopes an API key may carry live under the `cloudhal` permission resource. */
 export const API_KEY_PERMISSION_RESOURCE = "cloudhal";
@@ -693,7 +697,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
       const creator = key.referenceId as string;
       const creatorRole = (await staffStore.member(creator))?.role ?? null;
       // The key is narrowed to its creator's role on every call anyway; refusing here keeps the
-      // stored scopes honest (a Contributor's key cannot hold analytics:read, RFC-0006 §9.1).
+      // stored scopes honest (a Contributor's key cannot hold analytics:read or comments:read).
       const above = [
         ...scopesAboveRole(requested, who.member.role),
         ...(creatorRole ? scopesAboveRole(requested, creatorRole) : requested),

@@ -154,7 +154,7 @@ describe("ROUTE_SCOPES (I15)", () => {
       ["POST", `${s}/comment-bans`, "comments:moderate"],
       ["DELETE", `${s}/comment-bans/ban_x`, "comments:moderate"],
       ["POST", `${cm}/erase`, "commenters:data"],
-      ["GET", `${s}/commenters`, "commenters:data"],
+      ["POST", `${s}/commenters/lookup`, "commenters:data"],
       ["GET", `${s}/commenters/cmr_x`, "commenters:data"],
       ["POST", `${s}/commenters/cmr_x/export`, "commenters:data"],
       ["POST", `${s}/commenters/cmr_x/erase`, "commenters:data"],
@@ -167,6 +167,8 @@ describe("ROUTE_SCOPES (I15)", () => {
       ["POST", cm],
       ["PUT", `${cm}/cmt_abcdef123456`],
       ["DELETE", `${s}/commenters/cmr_x`],
+      // no lookup by query string: an email never goes in a URL
+      ["GET", `${s}/commenters`],
       ["POST", `${cm}/settings`],
       ["GET", `${cm}/cmt_abcdef123456/history`],
     ] as const)

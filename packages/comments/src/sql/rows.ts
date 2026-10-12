@@ -8,6 +8,7 @@ import { CommentSettingsError } from "../errors.ts";
 import { num } from "../model.ts";
 import {
   type CommentSettings,
+  clientDataDays,
   DEFAULT_RETENTION,
   defaultCommentSettings,
   type RetentionSettings,
@@ -85,6 +86,12 @@ export interface SettingsRow extends Record<string, unknown> {
   updated_by: string;
 }
 
+/** Stored retention over the defaults; `clientDataDays` never above the 30-day ceiling (§9.1). */
+function storedRetention(stored: Partial<RetentionSettings>): RetentionSettings {
+  const r = { ...DEFAULT_RETENTION, ...stored };
+  return { ...r, clientDataDays: clientDataDays(r) };
+}
+
 export function toSettings(r: SettingsRow): CommentSettings {
   const base = defaultCommentSettings(r.site_id);
   try {
@@ -96,16 +103,15 @@ export function toSettings(r: SettingsRow): CommentSettings {
       closeAfterDays: r.close_after_days === null ? null : num(r.close_after_days),
       protection: r.protection === "turnstile" ? "turnstile" : "pow",
       turnstileSiteKey: r.turnstile_site_key,
-      allowWithoutScript: num(r.allow_without_script) === 1,
+      // bit 0: allowed; bit 1: also while Turnstile is on (no migration: one INTEGER column)
+      allowWithoutScript: (num(r.allow_without_script) & 1) === 1,
+      allowWithoutScriptWithTurnstile: (num(r.allow_without_script) & 2) === 2,
       linkLimit: num(r.link_limit),
       watchWords: JSON.parse(r.watch_words) as string[],
       blockedWords: JSON.parse(r.blocked_words) as string[],
       dailyCap: num(r.daily_cap),
       aiLabels: r.ai_labels === "workers-ai" ? "workers-ai" : "off",
-      retention: {
-        ...DEFAULT_RETENTION,
-        ...(JSON.parse(r.retention) as Partial<RetentionSettings>),
-      },
+      retention: storedRetention(JSON.parse(r.retention) as Partial<RetentionSettings>),
       planHint: r.plan_hint === "free" || r.plan_hint === "paid" ? r.plan_hint : null,
       rev: num(r.rev),
       updatedAt: r.updated_at,
@@ -124,7 +130,7 @@ export function settingsValues(s: CommentSettings): (string | number | null)[] {
     s.closeAfterDays,
     s.protection,
     s.turnstileSiteKey,
-    s.allowWithoutScript ? 1 : 0,
+    (s.allowWithoutScript ? 1 : 0) | (s.allowWithoutScriptWithTurnstile ? 2 : 0),
     s.linkLimit,
     JSON.stringify(s.watchWords),
     JSON.stringify(s.blockedWords),

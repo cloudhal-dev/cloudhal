@@ -23,8 +23,9 @@ import {
   sealEmail,
 } from "@cloudhal/comments";
 import { exportPage, SqlCommentStore } from "@cloudhal/comments/sql";
+import { countingDriver } from "@cloudhal/comments/testing";
 import type { Actor, Comment, ContentEntry } from "@cloudhal/core-contracts";
-import { canonicalJson, type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
+import { canonicalJson, SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import { defineTools } from "@cloudhal/mcp-server/tools";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
@@ -208,9 +209,9 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       for (const role of ["author", "editor", "administrator", "owner"])
         expect((await call(CM(), role)).status, role).toBe(200);
       // commenter data is for Editors and above
-      expect((await call(`${S()}/commenters?commentId=cmt_abcdef123456`, "author")).status).toBe(
-        403,
-      );
+      const lookup = { method: "POST", body: { commentId: "cmt_abcdef123456" } };
+      expect((await call(`${S()}/commenters/lookup`, "author", lookup)).status).toBe(403);
+      expect((await call(`${S()}/commenters/lookup`, "agent", lookup)).status).toBe(403);
       expect((await call(`${CM()}/export`, "author")).status).toBe(403);
     });
 
@@ -446,6 +447,30 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
           })
         ).status,
       ).toBe(400);
+      // hashed addresses are kept at most 30 days, as the privacy notice says (§9.1, §9.6)
+      const tooLong = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 2, retention: { clientDataDays: 31 } },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(String(tooLong.body.message)).toMatch(/clientDataDays.*1 to 30/);
+      // Turnstile turns posts without JavaScript off until the owner allows them there too
+      const ts = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 2, protection: "turnstile", turnstileSiteKey: "1x00000000publickey" },
+      });
+      expect(ts.body).toMatchObject({
+        settings: { rev: 3, allowWithoutScript: true, allowWithoutScriptWithTurnstile: false },
+        purge: "tags",
+      });
+      const optIn = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 3, allowWithoutScriptWithTurnstile: true },
+      });
+      expect(optIn.body).toMatchObject({
+        settings: { rev: 4, allowWithoutScriptWithTurnstile: true },
+        purge: "tags",
+      });
       const secret = await call(`${CM()}/settings/secrets/turnstile-secret`, "administrator", {
         method: "PUT",
         body: { value: "0x4AAAAAAA-secret-value" },
@@ -469,12 +494,21 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
 
     it("commenters: emails only with commenters:data; erasure anonymises, is audited and purged", async () => {
       const a = await approved("Mine", { email: "Reader@Example.com", name: "Ayla" });
-      const found = await call(`${S()}/commenters?email=reader@example.com`);
+      // the lookup is a POST: an email address never goes in a URL (request logs keep URLs)
+      const lookup = (body: Json, who = "editor") =>
+        call(`${S()}/commenters/lookup`, who, { method: "POST", body });
+      const found = await lookup({ email: "reader@example.com" });
       const who = found.body.commenter as Json;
       expect(who).toMatchObject({ email: "reader@example.com", commentIds: [a.id] });
-      expect((await call(`${S()}/commenters?commentId=${a.id}`)).body.commenter).toMatchObject({
-        id: who.id,
-      });
+      expect((await lookup({ commentId: a.id })).body.commenter).toMatchObject({ id: who.id });
+      expect((await lookup({ email: "nobody@example.com" })).body).toEqual({ commenter: null });
+      for (const bad of [{}, { email: 1 }, { email: "a@b.c", commentId: a.id }, { q: "x" }])
+        expect((await lookup(bad)).status, JSON.stringify(bad)).toBe(400);
+      // the old query-string variant is gone (default-deny: no declared route)
+      const old = await call(`${S()}/commenters?email=reader@example.com`);
+      expect(old.status).not.toBe(200);
+      expect(old.text).not.toContain("reader@example.com");
+      expect((await lookup({ email: "reader@example.com" }, "author")).status).toBe(403);
       const detail = await call(`${S()}/commenters/${who.id}`);
       expect((detail.body.comments as Json[]).map((x) => x.id)).toEqual([a.id]);
       const exported = await call(`${S()}/commenters/${who.id}/export`, "editor", {
@@ -566,16 +600,116 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
         ).status,
       ).toBe(409);
 
+      // JSON lines are data to import again, not a spreadsheet: formula-like text is kept as is
+      // (only CSV exports prefix such cells with ', RFC-0007 §11.2 point 6)
+      const formula = await seed('=HYPERLINK("https://evil.example","Click")');
       const ex = await call(`${CM()}/export`, "editor");
       const lines = ex.text
         .trim()
         .split("\n")
         .map((l) => JSON.parse(l) as Json);
       expect(lines[0]).toMatchObject({ cloudhal: "comments", version: 1, siteId });
-      expect(lines.slice(1).map((l) => l.id)).toHaveLength(3);
+      expect(lines.slice(1).map((l) => l.id)).toHaveLength(4);
+      expect(lines.find((l) => l.id === formula.id)?.body).toEqual({
+        format: "text",
+        text: '=HYPERLINK("https://evil.example","Click")',
+      });
       expect(ex.text).not.toContain("spam@example.com");
       const personal = await call(`${CM()}/export?personal=1`, "editor");
       expect(personal.text).toContain("spam@example.com");
+    });
+
+    it("large sites: every request stays inside D1 Free's 50 queries per invocation", async () => {
+      // every query of the request counted: graph, comments, audit and approvals
+      const counting = countingDriver(sql);
+      store = new SiteGraphStore({ sql: counting, blobs: new MemoryBlobStore() });
+      comments = new SqlCommentStore(counting, { now: () => NOW });
+      audit = new AuditLog(counting);
+      approvals = new ApprovalStore(counting, { now: () => NOW });
+      build();
+      const LIMIT = 50;
+      const measured = async (path: string, init: { method?: string; body?: unknown } = {}) => {
+        counting.reset();
+        const res = await app.request(path, {
+          method: init.method ?? "GET",
+          headers: { "content-type": "application/json", "x-test-user": "editor" },
+          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+        });
+        const text = await res.text();
+        const queries = counting.reads + counting.writes.length;
+        expect(res.status, `${path}: ${text.slice(0, 200)}`).toBeLessThan(300);
+        expect(queries, `${init.method ?? "GET"} ${path}`).toBeLessThan(LIMIT);
+        return { res, text, queries };
+      };
+      // A prolific commenter (1,100 approved comments), 2,000 guests and 120 more commenters,
+      // cloned in SQL from real rows.
+      const loud = await approved("Template", { email: "loud@example.com" });
+      const guest = await seed("Guest template");
+      const loudId = (await comments.findCommenter(siteId, { commentId: loud.id })) as string;
+      const clone = (n: number, prefix: string, from: string, emailId: string | null) =>
+        sql.run(
+          `INSERT INTO comments (id, site_id, node_id, parent_id, in_reply_to_id, source, origin, author, body, status, labels, moderation, email_id, ip_hmac, challenge_id, proof, op, hash, created_at, edited_at, rev)
+           WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < ?)
+           SELECT ? || printf('%06d', k.i), t.site_id, t.node_id, NULL, NULL, t.source, NULL, t.author, t.body, t.status, t.labels, t.moderation, ?, NULL, NULL, t.proof, NULL, t.hash,
+                  strftime('%Y-%m-%dT%H:%M:%fZ', t.created_at, '-' || k.i || ' seconds'), NULL, t.rev
+           FROM k, comments t WHERE t.id = ?`,
+          [n, prefix, emailId, from],
+        );
+      await clone(1_099, "cmt_loud", loud.id, loudId);
+      await clone(2_000, "cmt_guest", guest.id, null);
+      await sql.run(
+        `INSERT INTO commenter_emails (id, site_id, email_hmac, email_ciphertext, email_iv, created_at)
+         WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < 120)
+         SELECT 'cmr_bulk' || printf('%06d', k.i), t.site_id, 'bulk' || k.i, t.email_ciphertext, t.email_iv, t.created_at
+         FROM k, commenter_emails t WHERE t.id = ?`,
+        [loudId],
+      );
+      const total = 3_101;
+
+      // Studio's export, page by page, then with personal data
+      for (const personal of [false, true]) {
+        const lines: Json[] = [];
+        let cursor: string | null = null;
+        let pages = 0;
+        do {
+          const q = new URLSearchParams({
+            ...(personal ? { personal: "1" } : {}),
+            ...(cursor ? { cursor } : {}),
+          });
+          const { res, text } = await measured(`${CM()}/export?${q}`);
+          for (const l of text.trim().split("\n")) lines.push(JSON.parse(l) as Json);
+          cursor = res.headers.get("cloudhal-next-cursor");
+          pages++;
+        } while (cursor && pages < 100);
+        expect(cursor).toBeNull();
+        expect(lines[0]).toMatchObject({ cloudhal: "comments", siteId });
+        expect(lines.filter((l) => l.cloudhal !== undefined)).toHaveLength(1);
+        const ids = lines.filter((l) => typeof l.id === "string").map((l) => l.id);
+        expect(ids).toHaveLength(total);
+        expect(new Set(ids).size).toBe(total);
+        const people = lines.filter((l) => l.commenter !== undefined);
+        expect(people).toHaveLength(personal ? 121 : 0);
+        if (personal) expect(people[0]?.commenter).toMatchObject({ email: "loud@example.com" });
+      }
+
+      // a commenter's own export: every comment, one request
+      const mine = await measured(`${S()}/commenters/${loudId}/export`, { method: "POST" });
+      expect((JSON.parse(mine.text) as { comments: unknown[] }).comments).toHaveLength(1_100);
+
+      // ban and hide past comments: bounded per request; repeating the request finishes it
+      const ban = { commentId: loud.id, subjects: ["email"], reasonCode: "spam", hidePast: true };
+      const first = await measured(`${S()}/comment-bans`, { method: "POST", body: ban });
+      expect(JSON.parse(first.text)).toMatchObject({ hidden: 1_000, more: true });
+      const second = await measured(`${S()}/comment-bans`, { method: "POST", body: ban });
+      expect(JSON.parse(second.text)).toMatchObject({ hidden: 100 });
+      expect(JSON.parse(second.text).more).toBeUndefined();
+      const left = await sql.get<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM comments WHERE email_id = ? AND status = 'approved'",
+        [loudId],
+      );
+      expect(Number(left?.n)).toBe(0);
+      expect(await comments.listBans(siteId)).toHaveLength(1);
+      expect(queued).toContain("takedown");
     });
 
     it("operator (deployment token): status, paged export with personal data, idempotent import", async () => {
@@ -865,6 +999,61 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       expect(yes.status, yes.text).toBe(200);
       expect(yes.body).toMatchObject({ result: { thread: { mode: "open", rev: 1 } } });
       expect(mine.id).toBeTruthy();
+    });
+
+    it("approvals fail closed when the comment binding cannot be computed (C4)", async () => {
+      const input = (id: string) => ({
+        siteId,
+        ids: [id],
+        action: "approve",
+        expectedRevs: { [id]: 1 },
+      });
+      const fileWith = async (args: Json, stateHash: string) =>
+        approvals.request({
+          siteId,
+          tool: "moderate_comments",
+          argsHash: await sha256Hex(canonicalJson(args)),
+          input: args,
+          actor: agent,
+          prompt: "Approve?",
+          stateHash,
+          cause: "tool",
+        });
+      // a request filed with a placeholder (as before this fix) is never carried out
+      const c1 = await seed("Unbound request");
+      for (const placeholder of ["unbound", ""]) {
+        const req = await fileWith(input(c1.id), placeholder);
+        const r = await call(`${S()}/approvals/${req.id}/approve`, "editor", { method: "POST" });
+        expect(r.status, placeholder).toBe(409);
+        expect(r.body.error).toBe("state_changed");
+        expect((await approvals.get(req.id))?.status).toBe("denied");
+      }
+      expect((await comments.get(siteId, c1.id))?.status).toBe("pending");
+
+      // a binding that cannot be computed now: denied, never compared with anything
+      const c2 = await seed("Store fails at decision time");
+      const def = defineTools().find((t) => t.name === "moderate_comments");
+      const bound = await def?.bindState?.(input(c2.id), {
+        store,
+        principal: { actor: agent, scopes: ["comments:read"] },
+        comments: { store: comments },
+      });
+      expect(bound).toMatch(/^cm1:/);
+      const req = await fileWith(input(c2.id), bound as string);
+      const original = comments.stateHash.bind(comments);
+      comments.stateHash = async () => {
+        throw new Error("D1 unavailable");
+      };
+      try {
+        const r = await call(`${S()}/approvals/${req.id}/approve`, "editor", { method: "POST" });
+        expect(r.status).toBe(409);
+        expect(r.body).toMatchObject({ error: "state_changed" });
+        expect(String(r.body.message)).toMatch(/could not be read/);
+      } finally {
+        comments.stateHash = original;
+      }
+      expect((await approvals.get(req.id))?.status).toBe("denied");
+      expect((await comments.get(siteId, c2.id))?.status).toBe("pending");
     });
 
     it("notifications and features.comments", async () => {

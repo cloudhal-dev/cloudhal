@@ -136,6 +136,27 @@ function QueueAside({ siteId, t }: { siteId: string; t: T }) {
   const settingsGate = useGate("comments.settings");
   const exportGate = useGate("comments.moderateAny");
   const personalGate = useGate("commenters.data");
+  // The export is paged on the server (D1 Free's 50 queries per request): fetch every page, save one file.
+  const [exporting, setExporting] = useState<"plain" | "personal">();
+  const runExport = async (personal: boolean) => {
+    setExporting(personal ? "personal" : "plain");
+    try {
+      const blob = await api.comments.exportFile(siteId, personal);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `comments-${siteId}${personal ? "-personal" : ""}.jsonl`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      toast.error(
+        t(personal ? "comments.aside.exportPersonal" : "comments.aside.export"),
+        e instanceof Error ? e.message : String(e),
+      );
+    } finally {
+      setExporting(undefined);
+    }
+  };
   const summary = useQuery({
     queryKey: [...commentsKey(siteId), "summary", "today"],
     queryFn: () => api.comments.summary(siteId, "today"),
@@ -188,27 +209,27 @@ function QueueAside({ siteId, t }: { siteId: string; t: T }) {
               {t("comments.aside.settings")}
             </LinkButton>
             {exportGate.allowed && (
-              <LinkButton
-                href={api.comments.exportUrl(siteId)}
+              <Button
                 variant="ghost"
                 size="sm"
                 icon={DownloadSimple}
-                external
+                loading={exporting === "plain"}
+                onClick={() => void runExport(false)}
                 data-testid="comments-export"
               >
                 {t("comments.aside.export")}
-              </LinkButton>
+              </Button>
             )}
             {exportGate.allowed && personalGate.allowed && (
-              <LinkButton
-                href={api.comments.exportUrl(siteId, true)}
+              <Button
                 variant="ghost"
                 size="sm"
                 icon={DownloadSimple}
-                external
+                loading={exporting === "personal"}
+                onClick={() => void runExport(true)}
               >
                 {t("comments.aside.exportPersonal")}
-              </LinkButton>
+              </Button>
             )}
           </div>
         }

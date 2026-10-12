@@ -1266,6 +1266,11 @@ export interface CommentSettings {
   protection: "pow" | "turnstile";
   turnstileSiteKey: string | null;
   allowWithoutScript: boolean;
+  /**
+   * Also accept posts without JavaScript while Turnstile is on (default false): they carry no
+   * Turnstile token. Without it, turning on Turnstile turns these posts off.
+   */
+  allowWithoutScriptWithTurnstile: boolean;
   linkLimit: number;
   watchWords: string[];
   blockedWords: string[];
@@ -1759,7 +1764,10 @@ export const api = {
         method: "PATCH",
         ...json({ addScopes: ["analytics:read"] }),
       }),
-    /** "Allow comments" (RFC-0007 §10.1): adds `comments:read` to an older key; audited. */
+    /**
+     * "Allow comments" (RFC-0007 §10.1): adds `comments:read` to a key made before comments
+     * existed, with the same rules as `allowAnalytics` (Contributors' keys cannot hold it).
+     */
     allowComments: (id: string) =>
       request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -1975,9 +1983,32 @@ export const api = {
         `${commentsPath(siteId)}/comments/reports/${encodeURIComponent(reportId)}/resolve`,
         { method: "POST", ...json({ resolution }) },
       ),
-    /** A download link (JSON lines); `personal` also needs `commenters:data`. */
-    exportUrl: (siteId: string, personal = false) =>
-      `${commentsPath(siteId)}/comments/export${personal ? "?personal=1" : ""}`,
+    /**
+     * The whole export as one JSON-lines file; `personal` also needs `commenters:data`. The
+     * server answers one page per request (D1 Free's 50 queries per invocation) with
+     * `cloudhal-next-cursor` while more remain; the pages concatenate (the header is on the first).
+     */
+    exportFile: async (siteId: string, personal = false): Promise<Blob> => {
+      const parts: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10_000; page++) {
+        const res: Response = await fetch(
+          `${commentsPath(siteId)}/comments/export${query({ personal: personal ? "1" : undefined, cursor })}`,
+          { credentials: "include" },
+        );
+        if (!res.ok)
+          throw new ApiRequestError(
+            res.status,
+            (await res
+              .json()
+              .catch(() => ({ error: "export_failed", message: res.statusText }))) as ApiError,
+          );
+        parts.push(await res.text());
+        cursor = res.headers.get("cloudhal-next-cursor");
+        if (!cursor) break;
+      }
+      return new Blob(parts, { type: "application/x-ndjson" });
+    },
     settings: (siteId: string) =>
       request<{
         settings: CommentSettings;
@@ -2021,10 +2052,12 @@ export const api = {
         `${commentsPath(siteId)}/comment-threads/${encodeURIComponent(nodeId)}`,
         { method: "PUT", ...json({ rev, ...change }) },
       ),
+    /** A POST with a JSON body, so an email address never goes in a URL (or request logs). */
     findCommenter: (siteId: string, by: { email: string } | { commentId: string }) =>
-      request<{ commenter: Commenter | null }>(
-        `${commentsPath(siteId)}/commenters${query({ ...by })}`,
-      ),
+      request<{ commenter: Commenter | null }>(`${commentsPath(siteId)}/commenters/lookup`, {
+        method: "POST",
+        ...json(by),
+      }),
     commenter: (siteId: string, commenterId: string) =>
       request<{ commenter: Commenter; comments: CommentView[] }>(
         `${commentsPath(siteId)}/commenters/${encodeURIComponent(commenterId)}`,
@@ -2061,8 +2094,13 @@ export const api = {
       request<{ items: CommentBan[] }>(
         `${commentsPath(siteId)}/comment-bans${query({ commentId })}`,
       ),
-    /** Bans the author of a comment by email and/or this month's IP hash; nobody sees an address. */
-    ban: (
+    /**
+     * Bans the author of a comment by email and/or this month's IP hash; nobody sees an address.
+     * With `hidePast` the server hides at most 1,000 approved comments a request (D1 Free's 50
+     * queries per invocation) and says `more`; the ban is an upsert, so this repeats the request
+     * until nothing is left and returns the total hidden.
+     */
+    ban: async (
       siteId: string,
       input: {
         commentId: string;
@@ -2072,11 +2110,17 @@ export const api = {
         note?: string;
         hidePast?: boolean;
       },
-    ) =>
-      request<{ bans: CommentBan[]; hidden: number }>(`${commentsPath(siteId)}/comment-bans`, {
-        method: "POST",
-        ...json(input),
-      }),
+    ): Promise<{ bans: CommentBan[]; hidden: number }> => {
+      let hidden = 0;
+      for (let round = 0; ; round++) {
+        const r = await request<{ bans: CommentBan[]; hidden: number; more?: boolean }>(
+          `${commentsPath(siteId)}/comment-bans`,
+          { method: "POST", ...json(input) },
+        );
+        hidden += r.hidden;
+        if (!r.more || round >= 100) return { bans: r.bans, hidden };
+      }
+    },
     liftBan: (siteId: string, banId: string) =>
       request<{ lifted: boolean }>(
         `${commentsPath(siteId)}/comment-bans/${encodeURIComponent(banId)}`,

@@ -10,7 +10,7 @@
  * | `spam` | deleted after 30 days |
  * | `deleted` | deleted after 30 days; a tombstone stays while approved replies need it |
  * | `hidden` | kept, or deleted after N days when set |
- * | `ip_hmac`, `challenge_id` | cleared after 30 days on comments and reports |
+ * | `ip_hmac`, `challenge_id` | cleared after 30 days (at most; never longer) on comments and reports |
  * | Commenter emails | deleted when nothing refers to them |
  * | Resolved reports, statements of reasons of removed comments | 6 months |
  * | Bans | removed when they expire |
@@ -21,7 +21,7 @@
  * (no text, erased author, status `deleted`), so the replies keep their place.
  */
 import { DAY_MS, utcMonth } from "./model.ts";
-import { DEFAULT_RETENTION, type RetentionSettings } from "./settings.ts";
+import { clientDataDays, DEFAULT_RETENTION, type RetentionSettings } from "./settings.ts";
 
 export const RETENTION_BUDGET = 500;
 /** Comments of a deleted entry are deleted this long after the entry. */
@@ -73,7 +73,8 @@ export function retentionPlan(
     cutoff: ago(Math.min(retention.pendingDays, retention.spamDays, retention.deletedDays)),
   });
   steps.push(
-    { kind: "client-data", cutoff: ago(retention.clientDataDays) },
+    // clamped: a value stored before the 30-day ceiling never keeps hashes longer (§9.1)
+    { kind: "client-data", cutoff: ago(clientDataDays(retention)) },
     { kind: "reports", cutoff: ago(retention.resolvedReportDays) },
     { kind: "events", cutoff: ago(retention.resolvedReportDays) },
     { kind: "emails", cutoff: now.toISOString() },

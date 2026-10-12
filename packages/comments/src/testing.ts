@@ -16,7 +16,12 @@ import { isValid } from "@cloudhal/core-contracts";
 import type { RunResult, SqlDriver, SqlStatement, SqlValue } from "@cloudhal/storage";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { type CommentKeys, deriveCommentKeys } from "./crypto.ts";
-import { CommentConflictError, CommentForbiddenError, CommentInputError } from "./errors.ts";
+import {
+  CommentConflictError,
+  CommentForbiddenError,
+  CommentInputError,
+  CommentSettingsError,
+} from "./errors.ts";
 import { emailHmac, ID_PREFIX, newCommentsId, randomSalt, sealEmail } from "./hashes.ts";
 import { CommentLimiter, DailyCount } from "./limits.ts";
 import { DAY_MS, type PreparedSubmission, utcMonth } from "./model.ts";
@@ -226,6 +231,15 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       expect(s).toMatchObject({ rev: 2, watchWords: ["kripto"], enabled: true });
       expect(s.retention.hiddenDays).toBe(90);
       expect((await ctx.store.settings(OTHER_SITE)).rev).toBe(0);
+      // hashed addresses: at most 30 days (§9.1, §9.6), refused above and clamped when read
+      await expect(
+        ctx.store.putSettings(SITE, { retention: { clientDataDays: 365 } }, 2, EDITOR.id),
+      ).rejects.toBeInstanceOf(CommentSettingsError);
+      await ctx.sql.run(
+        `UPDATE comment_settings SET retention = json_set(retention, '$.clientDataDays', 365) WHERE site_id = ?`,
+        [SITE],
+      );
+      expect((await ctx.store.settings(SITE)).retention.clientDataDays).toBe(30);
     });
 
     it("secrets are encrypted at rest and readable only with the keys", async () => {
@@ -864,6 +878,79 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       expectContractComment(gone);
       expect(gone).toMatchObject({ status: "deleted", author: { kind: "erased" } });
       expect(gone.body).toBeUndefined();
+    });
+
+    it("commenters in three reads; a commenter's comments in one; hiding past comments in bounded batches", async () => {
+      const mine: Comment[] = [];
+      for (let i = 0; i < 5; i++)
+        mine.push(await approve(ctx, await stored(ctx, { email: "loud@example.com" })));
+      const pendingOne = await stored(ctx, { email: "loud@example.com" });
+      const other = await approve(ctx, await stored(ctx, { email: "calm@example.com" }));
+      const guest = await approve(ctx, await stored(ctx));
+      const ids = await Promise.all(
+        ["loud@example.com", "calm@example.com"].map(async (e) =>
+          ctx.store.findCommenter(SITE, { emailHmac: await emailHmac(ctx.keys, e) }),
+        ),
+      );
+      const [loud, calm] = ids as string[];
+      ctx.sql.reset();
+      const many = await ctx.store.commenters(
+        SITE,
+        [calm as string, "cmr_unknown000", loud as string],
+        ctx.keys,
+      );
+      expect(ctx.sql.reads).toBe(3);
+      expect(many.map((w) => [w.id, w.email, w.commentIds.length])).toEqual([
+        [calm, "calm@example.com", 1],
+        [loud, "loud@example.com", 6],
+      ]);
+      expect(await ctx.store.commenters(OTHER_SITE, [loud as string], ctx.keys)).toEqual([]);
+      ctx.sql.reset();
+      const all = await ctx.store.commenterComments(SITE, loud as string);
+      expect(ctx.sql.reads).toBe(1);
+      expect(all.map((c) => c.id).sort()).toEqual([...mine, pendingOne].map((c) => c.id).sort());
+      for (const c of all) expectContractComment(c);
+
+      await expect(
+        ctx.store.hideApprovedOf(SITE, mine[0]?.id as string, { actor: AGENT, reasonCode: "spam" }),
+      ).rejects.toBeInstanceOf(CommentForbiddenError);
+      // batches of 2, at most 2 a call: 4 of the 5 approved, then the last one
+      ctx.sql.reset();
+      const first = await ctx.store.hideApprovedOf(
+        SITE,
+        mine[2]?.id as string,
+        { actor: EDITOR, reasonCode: "spam" },
+        { batch: 2, batches: 2 },
+      );
+      expect(first).toEqual({ hidden: 4, nodeIds: [ENTRY], more: true });
+      expect(ctx.sql.reads).toBe(2);
+      expect(ctx.sql.batches.map((b) => b.length)).toEqual([3, 3]);
+      const second = await ctx.store.hideApprovedOf(
+        SITE,
+        mine[2]?.id as string,
+        { actor: EDITOR, reasonCode: "spam" },
+        { batch: 2, batches: 2 },
+      );
+      expect(second).toEqual({ hidden: 1, nodeIds: [ENTRY], more: false });
+      for (const c of mine) {
+        const now = (await ctx.store.get(SITE, c.id)) as Comment;
+        expectContractComment(now);
+        expect(now).toMatchObject({
+          status: "hidden",
+          rev: c.rev + 1,
+          moderation: { action: "hide", reasonCode: "spam", automated: false },
+        });
+      }
+      // only approved comments of that commenter: pending, other people and guests untouched
+      expect((await ctx.store.get(SITE, pendingOne.id))?.status).toBe("pending");
+      expect((await ctx.store.get(SITE, other.id))?.status).toBe("approved");
+      expect(await count(ctx.sql, "comment_events", "action = 'hide'")).toBe(5);
+      expect(await ctx.store.purgeQueue.queued(SITE)).toMatchObject([{ priority: "takedown" }]);
+      // a guest without an email: just that comment
+      expect(
+        await ctx.store.hideApprovedOf(SITE, guest.id, { actor: EDITOR, reasonCode: "abuse" }),
+      ).toEqual({ hidden: 1, nodeIds: [ENTRY], more: false });
+      expect((await ctx.store.get(SITE, other.id))?.status).toBe("approved");
     });
 
     it("purge queue: sent rows leave unless re-enqueued, failures back off, the log is shared", async () => {
@@ -1523,6 +1610,56 @@ export function describeCommentPipelineSuite(label: string, factory: CommentStor
           t.deps,
         ),
       ).toMatchObject({ status: 403, error: "proof_failed" });
+    });
+
+    it("Turnstile turns posts without JavaScript off unless the owner allows them there too", async () => {
+      const t = await pipeSetup(factory, {
+        turnstile: async () => ({ success: true, hostname: HOST, action: "comment" }),
+      });
+      await t.store.putSettings(
+        SITE,
+        { protection: "turnstile", turnstileSiteKey: "0x4AAAAAAAtest" },
+        1,
+        EDITOR.id,
+      );
+      expect(await t.store.settings(SITE)).toMatchObject({
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: false,
+      });
+      const form = { nodeId: ENTRY, name: "Ali", email: "", website: "", body: "No script here" };
+      const before = t.sql.writes.length;
+      const refused = await handleCommentSubmission(post(form, { form: true }), t.deps);
+      expect(refused).toMatchObject({ status: 403, error: "script_required" });
+      expect(t.sql.writes.length).toBe(before); // nothing written (C2)
+      // the owner's explicit choice: stored alongside, read back, and the post goes through
+      await t.store.putSettings(SITE, { allowWithoutScriptWithTurnstile: true }, 2, EDITOR.id);
+      expect(await t.store.settings(SITE)).toMatchObject({
+        protection: "turnstile",
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: true,
+      });
+      expect(await handleCommentSubmission(post(form, { form: true }), t.deps)).toMatchObject({
+        stored: true,
+      });
+      // the master switch still wins
+      await t.store.putSettings(SITE, { allowWithoutScript: false }, 3, EDITOR.id);
+      expect(
+        await handleCommentSubmission(
+          post({ ...form, body: "Again, no script" }, { form: true }),
+          t.deps,
+        ),
+      ).toMatchObject({ status: 403, error: "script_required" });
+      // back to proof of work: the ordinary switch alone decides
+      await t.store.putSettings(
+        SITE,
+        { protection: "pow", allowWithoutScript: true, allowWithoutScriptWithTurnstile: false },
+        4,
+        EDITOR.id,
+      );
+      expect(await t.store.settings(SITE)).toMatchObject({
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: false,
+      });
     });
   });
 }
