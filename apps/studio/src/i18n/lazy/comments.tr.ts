@@ -319,6 +319,7 @@ export const messages: NamespaceMessages<"comments"> = {
         "Durduruldu: bugünün sınırına ulaşıldı. Yeni yorumlar gece yarısına (UTC) kadar reddediliyor.",
       purging: "Canlı sayfa güncelleniyor",
       purgingHint: "{count} sayfa önbelleğin yenilenmesini bekliyor; genellikle bir dakika içinde.",
+      purgingHintOne: "1 sayfa önbelleğin yenilenmesini bekliyor; genellikle bir dakika içinde.",
       purgeNow: "Site önbelleğini temizle",
       purged: "Sitenin önbelleği temizlendi",
       purgeFailed: "Önbellek temizlenemedi",

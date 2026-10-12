@@ -2,11 +2,14 @@ import { Badge, Button, Tooltip } from "@cloudhal/ui";
 import { ChatsCircle, Warning } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
-import { type AgentKeySummary, api } from "../lib/api.ts";
+import { type AgentKeySummary, api, errorCode } from "../lib/api.ts";
 import { missesComments } from "../lib/comment-settings.ts";
 import { holds, roleCan } from "../lib/roles.ts";
 import { useToast } from "./Toast.ts";
 import { useGate, useRoleRules } from "./useMe.ts";
+
+/** Set when this server refused to add `comments:read` to an existing key (an older API). */
+const ALLOW_COMMENTS_UNSUPPORTED = ["features", "allow-comments-unsupported"] as const;
 
 /**
  * Who may allow comments on a key: for one's own keys, the person's own `comments.read`; for
@@ -36,6 +39,10 @@ function useKeyAccess(agentKey: AgentKeySummary, others: boolean) {
  * badge says so, next to a one-click action that adds only that read scope — audited on the
  * server. A key that reads comments and can also change content gets the §11.2 point 5 hint:
  * reader text reaches an agent that edits the site.
+ *
+ * Feature check: a server that cannot add `comments:read` to an existing key yet answers 400
+ * `scope_not_addable`; Studio then remembers it for the session and leaves only the badge, whose
+ * tooltip says to create a new key.
  */
 export function AllowComments({
   agentKey,
@@ -51,6 +58,12 @@ export function AllowComments({
   const access = useKeyAccess(agentKey, others);
   // Only on deployments with reader comments.
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false });
+  const unsupported = useQuery({
+    queryKey: ALLOW_COMMENTS_UNSUPPORTED,
+    queryFn: () => false,
+    initialData: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  }).data;
   const allow = useMutation({
     mutationFn: () => api.agentKeys.allowComments(agentKey.id),
     onSuccess: async (updated) => {
@@ -62,7 +75,12 @@ export function AllowComments({
         }),
       );
     },
-    onError: (error) => toast.error(t("commentsSettings.keys.failed"), error.message),
+    onError: (error) => {
+      if (errorCode(error) === "scope_not_addable") {
+        qc.setQueryData(ALLOW_COMMENTS_UNSUPPORTED, true);
+        toast.error(t("commentsSettings.keys.failed"), t("commentsSettings.keys.unsupported"));
+      } else toast.error(t("commentsSettings.keys.failed"), error.message);
+    },
   });
   if (!agentKey.enabled || instance.data?.features.comments?.available !== true) return null;
   if (!missesComments(agentKey)) {
@@ -85,22 +103,32 @@ export function AllowComments({
     <div className="flex flex-wrap items-center gap-2" data-comment-access="missing">
       <span className="inline-flex">
         <Tooltip
-          content={<span className="block max-w-72">{t("commentsSettings.keys.missingHint")}</span>}
+          content={
+            <span className="block max-w-72">
+              {t(
+                unsupported
+                  ? "commentsSettings.keys.unsupported"
+                  : "commentsSettings.keys.missingHint",
+              )}
+            </span>
+          }
         >
           <Badge variant="outline">{t("commentsSettings.keys.missing")}</Badge>
         </Tooltip>
       </span>
-      <Button
-        variant="secondary"
-        size="xs"
-        icon={<ChatsCircle />}
-        loading={allow.isPending}
-        onClick={() => allow.mutate()}
-        disabled={!access.allowed}
-        title={access.reason}
-      >
-        {t("commentsSettings.keys.allow")}
-      </Button>
+      {!unsupported && (
+        <Button
+          variant="secondary"
+          size="xs"
+          icon={<ChatsCircle />}
+          loading={allow.isPending}
+          onClick={() => allow.mutate()}
+          disabled={!access.allowed}
+          title={access.reason}
+        >
+          {t("commentsSettings.keys.allow")}
+        </Button>
+      )}
     </div>
   );
 }

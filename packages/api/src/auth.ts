@@ -369,9 +369,8 @@ export class AuthError extends Error {
  * Scopes a person may add to an existing key (`PATCH /api/agent-keys/:id {addScopes}`). Only
  * read-only scopes without personal data that new keys get by default but older keys lack:
  * everything else stays fixed at creation (RFC-0005: promotions never silently empower agents).
- * `comments:read` is Studio's "Allow comments" (RFC-0007 §10.1): reader comments, never emails.
  */
-export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read", "comments:read"];
+export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read"];
 
 /** Scopes an API key may carry live under the `cloudhal` permission resource. */
 export const API_KEY_PERMISSION_RESOURCE = "cloudhal";

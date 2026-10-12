@@ -8,8 +8,7 @@
  *   the caller's role (400 `scope_above_role`), the mode its cap (400 `mode_above_role`)
  * - `PATCH  /:id`         {mode} → summary (own keys; audited `agent-key.mode`), or
  *   {addScopes: ["analytics:read"]} → summary: adds a read-only scope older keys lack (RFC-0006
- *   §9.1 "Allow analytics"; `comments:read`, RFC-0007 §10.1 "Allow comments"; own keys, or any
- *   with `agents:manage`; it must fit the caller's and the
+ *   §9.1 "Allow analytics"; own keys, or any with `agents:manage`; it must fit the caller's and the
  *   creator's role, 400 `scope_above_role`; anything but `ADDABLE_KEY_SCOPES` is 400
  *   `scope_not_addable`; audited `agent-key.scopes` when something was added)
  * - `POST   /:id/elevation` {mode, minutes, reason?} → summary: a more autonomous mode until the

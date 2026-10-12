@@ -140,6 +140,8 @@ export const messages: NamespaceMessages<"commentsSettings"> = {
       allowed: "Yorumlara izin verildi",
       allowedDescription: "{name}, bir sonraki çağrısından itibaren okur yorumlarını okuyabilir.",
       failed: "Yorumlara izin verilemedi",
+      unsupported:
+        "Bu sunucu mevcut bir anahtara henüz yorum erişimi ekleyemiyor. Yeni bir anahtar oluştur: yeni anahtarlar yorumları okur.",
       ownerCannot: "{name} adlı kişinin rolü yorumları okuyamıyor, bu yüzden anahtarı da okuyamaz.",
       writeHint:
         "Bu anahtar okur yorumlarını okuyor ve içeriği değiştirebiliyor: ziyaretçilerin yazdığı metin, siteni düzenleyen bir agent'a ulaşıyor.",

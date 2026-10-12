@@ -142,6 +142,8 @@ export const messages = {
       allowed: "Comments allowed",
       allowedDescription: "{name} can read reader comments from its next call.",
       failed: "Couldn't allow comments",
+      unsupported:
+        "This server can't add comment access to an existing key yet. Create a new key: new keys read comments.",
       ownerCannot: "{name}'s role can't read comments, so their key can't either.",
       writeHint:
         "This key reads reader comments and can change content: text written by visitors reaches an agent that edits your site.",

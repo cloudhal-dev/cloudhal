@@ -236,7 +236,12 @@ function QueueAside({ siteId, t }: { siteId: string; t: T }) {
                     {t("comments.aside.purging")}
                   </Text>
                   <Text variant="secondary" size="sm" as="span">
-                    {t("comments.aside.purgingHint", { count: pendingPurges })}
+                    {plural(
+                      t,
+                      "comments.aside.purgingHint",
+                      "comments.aside.purgingHintOne",
+                      pendingPurges,
+                    )}
                   </Text>
                 </div>
                 {exportGate.allowed && (

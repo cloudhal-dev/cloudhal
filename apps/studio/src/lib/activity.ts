@@ -38,6 +38,14 @@ export const KNOWN_TOOLS = [
   "retire_asset",
   "restore_asset",
   "delete_asset",
+  // RFC-0007 reader comments
+  "list_comments",
+  "get_comment_thread",
+  "comments_summary",
+  "label_comments",
+  "moderate_comments",
+  "draft_comment_reply",
+  "set_comment_thread",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 
