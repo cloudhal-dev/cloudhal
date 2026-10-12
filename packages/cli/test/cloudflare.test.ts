@@ -181,9 +181,10 @@ describe("Site Worker on workerd", () => {
     expect(res.headers.get("x-robots-tag")).toBe("noindex");
     expect(res.headers.get("x-cloudhal-preview-token")).toBeNull();
     expect(res.headers.get("set-cookie")).toBeNull();
-    const links = [...html.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1] as string);
+    // Links people follow keep the token; `<link>`s (stylesheets, the favicon) are static assets.
+    const links = [...html.matchAll(/<a\b[^>]*\shref="(\/[^"]*)"/g)].map((m) => m[1] as string);
     expect(links.length).toBeGreaterThan(0);
-    for (const href of links.filter((h) => !h.startsWith("/_astro/")))
+    for (const href of links)
       expect(href).toContain(`cloudhal-preview=${encodeURIComponent(token)}`);
     // without the token: the published version
     expect(await aboutTitle()).toBe("About");
