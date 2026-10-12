@@ -11,6 +11,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./engine": "./src/engine.ts",
+    "./time": "./src/time-entry.ts",
     "./recurrence": "./src/recurrence.ts",
     "./sql": "./src/sql/index.ts",
     "./testing": "./src/testing.ts"
@@ -48,6 +50,14 @@
       ".": {
         "types": "./dist/src/index.d.ts",
         "default": "./dist/src/index.js"
+      },
+      "./engine": {
+        "types": "./dist/src/engine.d.ts",
+        "default": "./dist/src/engine.js"
+      },
+      "./time": {
+        "types": "./dist/src/time-entry.d.ts",
+        "default": "./dist/src/time-entry.js"
       },
       "./recurrence": {
         "types": "./dist/src/recurrence.d.ts",

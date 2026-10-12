@@ -13,6 +13,7 @@ export * from "./errors.ts";
 export * from "./ids.ts";
 export * from "./recurrence.ts";
 export * from "./release.ts";
+export * from "./release-when.ts";
 export * from "./scheduler.ts";
 export * from "./taint.ts";
 export * from "./text.ts";

@@ -41,6 +41,7 @@ import {
   type PinnedItem,
   RELEASE_LEASE_MS,
   releaseHash,
+  SCHEDULER_ACTOR,
 } from "./release.ts";
 import { cleanCounts, plainLine, plainText } from "./text.ts";
 import {
@@ -52,13 +53,6 @@ import {
 } from "./time.ts";
 
 export type { TickBudget, TickTrigger } from "./budget-meter.ts";
-
-/** The system actor scheduled work runs as (on behalf of a person, §6.3 step 6, S14). */
-export const SCHEDULER_ACTOR = Object.freeze({
-  kind: "system",
-  id: "sys_scheduler",
-  name: "Scheduler",
-} as const);
 
 export interface TickReport {
   /** Releases published plus automation runs and system jobs completed. */
@@ -855,6 +849,51 @@ export async function runDue(nowDate: Date, deps: RunDueDeps): Promise<TickRepor
     deps.log?.(
       `schedules tick (${trigger}): ${report.ran} ran, ${report.late} late, ${report.failed} failed${report.more ? ", more" : ""}${nextWake ? `; next ${nextWake}` : ""}`,
     );
+  return report;
+}
+
+/**
+ * Executes a release the caller already claimed — a person's "Publish now"
+ * (`SqlScheduleStore.claimManualRun`) — and records its end exactly as a tick does: published,
+ * conflict, failed, expired or canceled, or a transient error kept `running` for a retry.
+ */
+export async function runClaimedRelease(
+  deps: Pick<RunDueDeps, "store" | "trigger" | "log"> & { releases: ReleaseExecutor },
+  claimed: {
+    release: Release;
+    items: StoredReleaseItem[];
+    executeAt: string;
+    runId: string;
+    token: string;
+    now: Date;
+    attempt?: number;
+  },
+): Promise<TickReport> {
+  const report: TickReport = { ran: 0, late: 0, failed: 0, more: false };
+  const now = canonicalInstant(claimed.now);
+  await executeClaimed(
+    {
+      ...deps,
+      budget: {
+        maxQueries: Number.POSITIVE_INFINITY,
+        maxReleases: 1,
+        deadlineMs: Number.POSITIVE_INFINITY,
+      },
+    },
+    report,
+    {
+      release: claimed.release,
+      items: claimed.items,
+      executeAt: claimed.executeAt,
+      runId: claimed.runId,
+      attempt: claimed.attempt ?? 1,
+      token: claimed.token,
+      now,
+      nowDate: claimed.now,
+      lateness: latenessSeconds(claimed.executeAt, now),
+      recovering: false,
+    },
+  );
   return report;
 }
 

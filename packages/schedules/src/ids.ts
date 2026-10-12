@@ -15,7 +15,7 @@
  * - Lease tokens are random (`lease_` + 24 characters): unique per claim, so statements later in a
  *   batch can be guarded on "the row carries my token" (AGENTS.md rule 4).
  */
-import { canonicalInstant } from "./time.ts";
+import { canonicalInstant } from "./instant.ts";
 
 export const CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 

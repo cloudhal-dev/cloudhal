@@ -66,6 +66,7 @@ import type {
 } from "../scheduler.ts";
 import { plainLine } from "../text.ts";
 import { canonicalInstant } from "../time.ts";
+import { releaseFinishStatements } from "./finish.ts";
 import {
   type AutomationRow,
   cursorOf,
@@ -215,37 +216,6 @@ SELECT ?, ?, json_extract(value, '$.n'), json_extract(value, '$.o'), json_extrac
   json_extract(value, '$.th'), json_extract(value, '$.br'), json_extract(value, '$.bh'), json_extract(value, '$.d'), json_extract(value, '$.b'),
   CASE WHEN (SELECT state FROM releases WHERE id = ?) IN (${HOLDING_SQL}) THEN 1 ELSE 0 END
 FROM json_each(?) WHERE EXISTS (SELECT 1 FROM releases WHERE id = ? AND hash = ? AND updated_at = ?)`;
-
-function runStateForRelease(finish: ReleaseFinish): {
-  state: ScheduleRun["state"];
-  outcome: ScheduleRun["outcome"] | null;
-  error: ScheduleRun["error"] | null;
-} {
-  switch (finish.state) {
-    case "published":
-      return { state: "succeeded", outcome: "did-work", error: null };
-    case "missed":
-      return { state: "missed", outcome: null, error: null };
-    case "conflict":
-      return { state: "failed", outcome: "nothing-to-do", error: { code: "conflict" } };
-    case "failed":
-      return {
-        state: "failed",
-        outcome: null,
-        error: { code: finish.outcome.kind === "failed" ? finish.outcome.code : "failed" },
-      };
-    case "expired":
-      return {
-        state: "failed",
-        outcome: null,
-        error: {
-          code: finish.outcome.kind === "expired" ? `expired_${finish.outcome.reason}` : "expired",
-        },
-      };
-    case "canceled":
-      return { state: "failed", outcome: null, error: { code: "canceled" } };
-  }
-}
 
 export class SqlScheduleStore implements SchedulerStore {
   readonly #sql: SqlDriver;
@@ -781,46 +751,7 @@ export class SqlScheduleStore implements SchedulerStore {
     finish: ReleaseFinish;
     guard?: SqlStatement;
   }): SqlStatement[] {
-    const extra = input.guard ? ` AND ${input.guard.sql}` : "";
-    const extraParams: readonly SqlValue[] = input.guard?.params ?? [];
-    const owned =
-      "EXISTS (SELECT 1 FROM releases WHERE id = ? AND lease_token = ? AND state = 'running')";
-    const run = runStateForRelease(input.finish);
-    return [
-      {
-        sql: `UPDATE schedule_runs SET state = ?, outcome = ?, error = ?, ended_at = ?, lateness_s = ?, lease_until = NULL, rev = rev + 1, updated_at = ?
-              WHERE id = ? AND lease_token = ? AND ${owned}${extra}`,
-        params: [
-          run.state,
-          run.outcome ?? null,
-          j(run.error),
-          input.now,
-          input.latenessSeconds,
-          input.now,
-          input.runId,
-          input.token,
-          input.releaseId,
-          input.token,
-          ...extraParams,
-        ],
-      },
-      {
-        sql: `UPDATE release_items SET held = 0 WHERE release_id = ? AND ${owned}${extra}`,
-        params: [input.releaseId, input.releaseId, input.token, ...extraParams],
-      },
-      {
-        sql: `UPDATE releases SET state = ?, outcome = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ?
-              WHERE id = ? AND lease_token = ? AND state = 'running'${extra}`,
-        params: [
-          input.finish.state,
-          JSON.stringify(input.finish.outcome),
-          input.now,
-          input.releaseId,
-          input.token,
-          ...extraParams,
-        ],
-      },
-    ];
+    return releaseFinishStatements(input);
   }
 
   async finishRelease(input: {
@@ -919,6 +850,88 @@ export class SqlScheduleStore implements SchedulerStore {
     );
     const results = await this.#sql.batch(statements);
     return (results[results.length - 1]?.changes ?? 0) === 1;
+  }
+
+  /**
+   * "Publish now" (§5.2, §8.6): a person's manual run of a `scheduled`, `missed` or `expired`
+   * release. One batch, decided by the release CAS (`rev` and state, and no other release of the
+   * site running under a live lease, D15): the release becomes `running` with the person's
+   * approval and the time it actually runs, the run row is keyed by that instant (trigger
+   * `manual`), and the items are held again. False when the CAS lost.
+   */
+  async claimManualRun(input: {
+    siteId: string;
+    releaseId: string;
+    expectedRev: number;
+    approval: ReleaseApproval;
+    runId: string;
+    token: string;
+    now: string;
+    leaseUntil: string;
+  }): Promise<boolean> {
+    const at = canonicalInstant(input.now);
+    const results = await this.#sql.batch([
+      {
+        sql: `UPDATE releases SET state = 'running', approval = ?, outcome = NULL, execute_at = ?, lease_token = ?, lease_until = ?, rev = rev + 1, updated_at = ?
+              WHERE id = ? AND site_id = ? AND rev = ? AND state IN ('scheduled', 'missed', 'expired')
+              AND NOT EXISTS (SELECT 1 FROM releases o WHERE o.site_id = ? AND o.state = 'running' AND o.lease_until > ?)`,
+        params: [
+          JSON.stringify(input.approval),
+          at,
+          input.token,
+          input.leaseUntil,
+          at,
+          input.releaseId,
+          input.siteId,
+          input.expectedRev,
+          input.siteId,
+          at,
+        ],
+      },
+      {
+        sql: `INSERT INTO schedule_runs (${RUN_COLUMNS})
+              SELECT ?, ?, 'release', ?, ?, 'running', NULL, 'manual', 1, ?, ?, NULL, NULL, ?, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, ?, ?
+              WHERE EXISTS (SELECT 1 FROM releases WHERE id = ? AND lease_token = ?)`,
+        params: [
+          input.runId,
+          input.siteId,
+          input.releaseId,
+          at,
+          input.token,
+          input.leaseUntil,
+          at,
+          at,
+          at,
+          input.releaseId,
+          input.token,
+        ],
+      },
+      { sql: HELD_SYNC, params: [input.releaseId, input.releaseId] },
+    ]);
+    return (results[0]?.changes ?? 0) === 1;
+  }
+
+  /**
+   * After a published release's purge (§6.3 "After the batch"): the outcome's `purge` becomes what
+   * actually happened (`deferred` when the shared budget was empty, `failed`).
+   */
+  async recordPurge(
+    id: string,
+    purge: "tags" | "everything" | "deferred" | "failed" | "none",
+  ): Promise<void> {
+    await this.#sql.run(
+      "UPDATE releases SET outcome = json_set(outcome, '$.purge', ?) WHERE id = ? AND state = 'published'",
+      [purge, id],
+    );
+  }
+
+  /** The purge plan computed when the release was pinned (§6.1 step 5), if any. */
+  async releasePurgePlan(id: string): Promise<unknown> {
+    const row = await this.#sql.get<{ purge_plan: string | null }>(
+      "SELECT purge_plan FROM releases WHERE id = ?",
+      [id],
+    );
+    return row?.purge_plan ? (JSON.parse(row.purge_plan) as unknown) : undefined;
   }
 
   async moveRelease(input: {
