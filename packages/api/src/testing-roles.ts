@@ -7,12 +7,14 @@ import { ApprovalStore, AuditLog, type Role } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
 import { makePng } from "@cloudhal/core-ts/media/fixtures";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "./app.ts";
 import { createAuth } from "./auth.ts";
 import type { MailMessage } from "./mail.ts";
+import { releaseRights } from "./schedules.ts";
 
 export interface RolesBackend {
   create(): Promise<{ store: SiteGraphStore; sql: SqlDriver; blobs: BlobStore; database: unknown }>;
@@ -76,6 +78,7 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         audit,
         now: clock,
         mcp: { stateKey: "roles-test-state-key-0123456789abcdefgh", audit, approvals },
+        schedules: { store: new SqlScheduleStore(b.sql, { now: clock }), maxNewBodies: Infinity },
         admin: { deployToken: DEPLOY_TOKEN, storage: { sql: b.sql, blobs: b.blobs } },
         ...(withMail ? { mail: { id: "test", send: async (m) => void mailbox.push(m) } } : {}),
       });
@@ -707,9 +710,12 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "site:read",
         "content:read",
         "preview:create",
+        // RFC-0008 §10.1: every key reads the schedule; a Contributor's asks for its own work.
+        "schedules:read",
         "content:draft:own",
         // RFC-0004: Contributors and above upload media (ADR-0018); keys outside plan get it.
         "asset:upload",
+        "schedules:write:own",
       ]);
       const key = await newKey(t.author, { name: "author-bot", mode: "edits" });
       expect(key.scopes).toEqual([
@@ -720,9 +726,12 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "analytics:read",
         // RFC-0007 D2: and comments.
         "comments:read",
+        // RFC-0008 §10.1: and the schedule; an Author's key asks for its own work.
+        "schedules:read",
         "content:write:own",
         "asset:upload",
         "site:publish:own",
+        "schedules:write:own",
       ]);
 
       const agent = await connect(key.key);
@@ -1739,6 +1748,83 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       // Studio's gating reads the same abilities.
       const me = await call("GET", "/api/me", { cookie: t.contributor.cookie });
       expect(me.body.can).toMatchObject({ "assets.upload": true, "assets.manage": false });
+    });
+
+    it("RFC-0008 §11.2: an automation's key works only inside its run; rights re-checked from members and keys", async () => {
+      const t = await team();
+      const created = await call("POST", `/api/sites/${siteId}/automations`, {
+        cookie: t.editor.cookie,
+        body: {
+          name: "Morning desk",
+          job: {
+            kind: "agent-task",
+            instructions: "Propose a release for the morning.",
+            modeCap: "edits",
+            readsUntrustedText: false,
+            windowMinutes: 30,
+          },
+          recurrence: {
+            start: "2026-01-01T03:00",
+            timeZone: "UTC",
+            rule: "FREQ=DAILY;BYHOUR=3;BYMINUTE=0",
+          },
+        },
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      const automation = created.body.automation as { id: string };
+      const key = created.body.key as { id: string; secret: string; scopes: string[] };
+      expect(key.scopes).toContain("schedules:write");
+      expect(key.scopes).not.toContain("automations:manage");
+      // the key lists as the automation's
+      const keys = await call("GET", "/api/agent-keys", { cookie: t.editor.cookie });
+      expect(
+        (keys.body as unknown as { id: string; automationId?: string }[]).find(
+          (k) => k.id === key.id,
+        ),
+      ).toMatchObject({
+        automationId: automation.id,
+      });
+      const client = await connect(key.secret);
+      const outside = await client.callTool({ name: "list_releases", arguments: { siteId } });
+      expect(text(outside)).toMatch(/^outside_run/);
+      // a person opens a window now; the key begins its run
+      const opened = await call(
+        "POST",
+        `/api/sites/${siteId}/automations/${automation.id}/run-now`,
+        {
+          cookie: t.editor.cookie,
+          body: {},
+        },
+      );
+      expect(opened.status, JSON.stringify(opened.body)).toBe(200);
+      const begun = await client.callTool({
+        name: "begin_run",
+        arguments: { automationId: automation.id },
+      });
+      expect(begun.isError, text(begun)).toBeFalsy();
+      const envelope = structured<{ runId: string; mode: string; tools: string[] }>(begun);
+      expect(envelope.mode).toBe("edits");
+      const inside = await client.callTool({ name: "list_releases", arguments: { siteId } });
+      expect(inside.isError, text(inside)).toBeFalsy();
+      const ended = await client.callTool({
+        name: "end_run",
+        arguments: {
+          runId: envelope.runId,
+          summary: "Nothing for the morning.",
+          outcome: "nothing-to-do",
+        },
+      });
+      expect(ended.isError, text(ended)).toBeFalsy();
+      expect(text(await client.callTool({ name: "list_releases", arguments: { siteId } }))).toMatch(
+        /^outside_run/,
+      );
+      // the re-check's rights source reads members and keys now
+      const rights = releaseRights(auth.staff, auth.agentKeys);
+      expect(await rights.role(t.editor.actorId)).toBe("editor");
+      expect(await rights.role("user_nobody000001")).toBeUndefined();
+      expect(await rights.key?.(key.id)).toEqual({ mode: "edits", creatorRole: "editor" });
+      await call("DELETE", `/api/agent-keys/${key.id}`, { cookie: t.editor.cookie });
+      expect(await rights.key?.(key.id)).toBeUndefined();
     });
   });
 }

@@ -35,7 +35,8 @@
     "@better-auth/api-key": "catalog:",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/mcp-server": "workspace:*",
-    "@cloudhal/astro-renderer": "workspace:*"
+    "@cloudhal/astro-renderer": "workspace:*",
+    "@cloudhal/schedules": "workspace:*"
   },
   "peerDependencies": {
     "@hono/node-server": "^2.0.0",

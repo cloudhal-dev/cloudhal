@@ -125,8 +125,13 @@ describe("agent modes", () => {
       "preview:create",
       "analytics:read",
       "comments:read",
+      "schedules:read",
     ]);
     expect(scopesForMode("auto")).toContain("site:publish");
+    // RFC-0008 §10.1: schedules:read everywhere; manual and up may propose and ask
+    expect(scopesForMode("plan")).not.toContain("schedules:write");
+    for (const m of ["manual", "edits", "auto"] as const)
+      expect(scopesForMode(m)).toContain("schedules:write");
     // RFC-0007 D2: new keys read comments in every mode, and nothing more about them
     for (const m of ["plan", "manual", "edits", "auto"] as const) {
       expect(scopesForMode(m)).toContain("comments:read");

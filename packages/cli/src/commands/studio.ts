@@ -5,6 +5,7 @@ import { createApi } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
@@ -71,6 +72,8 @@ export async function studio(
     analytics,
     comments,
     ...(ticker ? { scheduler: ticker } : {}),
+    // RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite.
+    schedules: { store: new SqlScheduleStore(local.sql), maxNewBodies: Number.POSITIVE_INFINITY },
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [

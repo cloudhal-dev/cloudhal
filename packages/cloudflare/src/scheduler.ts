@@ -24,6 +24,7 @@
  * `CLOUDHAL_ANALYTICS_CRON=off` / `CLOUDHAL_COMMENTS_CRON=off`; both read as `alarm` until the next
  * `cloudhal deploy` removes them.
  */
+import { releaseApprovalCheck } from "@cloudhal/api";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { type CachePurgePlan, SiteGraphStore, siteCacheTag } from "@cloudhal/core-ts";
@@ -319,9 +320,10 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
         ),
     );
   };
+  const blobs = new R2BlobStore(env.BLOBS);
   return runScheduledTick({
     sql,
-    blobs: new R2BlobStore(env.BLOBS),
+    blobs,
     now: o.now,
     trigger: o.trigger,
     // cron wakes every minute anyway; the clock and the backstop compute the next wake
@@ -336,6 +338,8 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
       }),
     purge: ({ counted }) => releasePurger(env, counted, { log: o.log, wake: flush }),
     automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
+    // RFC-0008 §10.6: the approver may still approve it, an auto release's key still holds.
+    checkApproval: releaseApprovalCheck({ sql, graph: new SiteGraphStore({ sql, blobs }) }),
   });
 }
 

@@ -32,6 +32,13 @@ export type Scope =
   | "members:invite"
   | "members:manage"
   | "agents:manage"
+  // RFC-0008 §10.1: schedules — the calendar, releases, gates, automations and runs.
+  | "schedules:read"
+  | "schedules:write"
+  | "schedules:write:own"
+  | "releases:publish"
+  | "releases:publish:own"
+  | "automations:manage"
   | "*";
 
 /**
@@ -61,6 +68,15 @@ export const KEY_SCOPES: readonly Scope[] = [
   "comments:moderate:own",
   "comments:reply",
   "comments:reply:own",
+  // RFC-0008 §10.1: read the schedule; create and change releases and gates (`own`: only one's
+  // own nodes); approve releases and let `auto`-mode releases run without a person (`own`: every
+  // item is one's own). `releases:publish` is implied by `site:publish`; it exists on its own so
+  // an owner can give a key "schedule, never publish now".
+  "schedules:read",
+  "schedules:write",
+  "schedules:write:own",
+  "releases:publish",
+  "releases:publish:own",
 ];
 
 /** Scopes only a person holds (through their role): never stored on a key, never satisfy a tool. */
@@ -72,6 +88,9 @@ export const PERSON_SCOPES: readonly Scope[] = [
   "agents:manage",
   // RFC-0007 §10.1: commenter emails, a commenter's export and erasure — people only.
   "commenters:data",
+  // RFC-0008 §10.1 (D7): creating, editing, resuming, running and deleting automations — standing
+  // rules of autonomy stay with people.
+  "automations:manage",
 ];
 
 /** @deprecated use `KEY_SCOPES` (what a key may carry). */
@@ -92,7 +111,11 @@ export function isKeyScope(value: unknown): value is Scope {
 const IMPLIES: Partial<Record<Scope, readonly Scope[]>> = {
   "content:write": ["content:write:own"],
   "content:write:own": ["content:draft:own"],
-  "site:publish": ["site:publish:own"],
+  // RFC-0008 §10.1: publishing later is no more power than publishing now.
+  "site:publish": ["site:publish:own", "releases:publish"],
+  "site:publish:own": ["releases:publish:own"],
+  "releases:publish": ["releases:publish:own"],
+  "schedules:write": ["schedules:write:own"],
   "asset:manage": ["asset:upload"],
   "members:manage": ["members:invite"],
   "comments:moderate": ["comments:moderate:own"],
@@ -132,7 +155,12 @@ export type OwnLimit =
   | { level: "own" | "draft"; target: "entry" }
   | { level: "own"; target: "changeset" }
   /** RFC-0007 §10.1: each comment's entry must be the person's own (its author, or their agent). */
-  | { level: "own"; target: "comment" };
+  | { level: "own"; target: "comment" }
+  /**
+   * RFC-0008 §10.1: every node a release (or a gate) touches must be the person's own — an entry
+   * whose author is the person or one of their agents (`ownOnlyChangeSet`'s rule).
+   */
+  | { level: "own"; target: "release" };
 
 /** Own variants that satisfy a tool scope with a limit, strongest first. */
 const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" | "draft" }[]>> = {
@@ -143,6 +171,8 @@ const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" 
   "site:publish": [{ scope: "site:publish:own", level: "own" }],
   "comments:moderate": [{ scope: "comments:moderate:own", level: "own" }],
   "comments:reply": [{ scope: "comments:reply:own", level: "own" }],
+  "schedules:write": [{ scope: "schedules:write:own", level: "own" }],
+  "releases:publish": [{ scope: "releases:publish:own", level: "own" }],
 };
 
 /**
@@ -154,12 +184,16 @@ const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" 
  * | `read` | changes nothing | ✓ | ✓ | ✓ | ✓ | ✓ |
  * | `advisory` | changes only notes people read before deciding (labels) | ✗ | ✓ | ✓ | ✓ | ✓ |
  * | `reduce` | reversible, can only make something less visible | ✗ | waits | ✓ | ✓ | ✓ |
+ * | `publish` | makes content public, or removes it, at a time | ✗ | waits | waits | low-risk in window ✓, else waits | ✓ |
  * | `person` | makes something public | ✗ | waits | waits | waits | **waits** |
  *
  * `person` calls wait with cause `tool` in every mode, `bypass` included, and for people calling
- * over MCP too (they are asked in their own client). Tools without `classify` behave as before.
+ * over MCP too (they are asked in their own client). `publish` (RFC-0008 §10.3) follows ADR-0015's
+ * publish rules instead: in `auto` mode the decision carries `autoApprove: "low-risk-release"` and
+ * the server applies the low-risk check and the window rule (§10.7) to the release itself.
+ * Tools without `classify` behave as before.
  */
-export type CallClass = "read" | "advisory" | "reduce" | "person";
+export type CallClass = "read" | "advisory" | "reduce" | "publish" | "person";
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -180,7 +214,7 @@ export interface ToolPolicy {
    * The own variants of the tool's scope satisfy it with a limit (RFC-0005 §9): `entry` — the
    * handler checks the target entry; `changeset` — a publish must be own-only.
    */
-  own?: "entry" | "changeset" | "comment";
+  own?: "entry" | "changeset" | "comment" | "release";
   /** Per-argument policy (RFC-0007 §10.2); `evaluate` receives the call's arguments. */
   classify?: (args: Record<string, unknown>) => CallClass;
 }
@@ -198,6 +232,11 @@ export interface Principal {
   elevation?: { from: AgentMode; until: string } | undefined;
   /** The API key an agent authenticated with (lets it ask for an elevation of that key). */
   keyId?: string | undefined;
+  /**
+   * RFC-0008 §11.2: the key is an automation's key (`purpose: "automation"` in its metadata). It
+   * works only inside an open run of that automation, except `begin_run` and `get_mode`.
+   */
+  automationId?: string | undefined;
   /**
    * The person behind the call (RFC-0005): for people themselves, for agents the person who created
    * the key. Absent when there is no membership source (auth-less servers, local stdio): such
@@ -237,8 +276,12 @@ export type Decision =
       reason: string;
       /** Why a person must decide: the tool always asks, it is destructive, the skill asks, or manual mode. */
       cause: ApprovalCause;
-      /** `auto` mode: the caller may skip the person when the change is low risk. */
-      autoApprove?: "low-risk-publish";
+      /**
+       * `auto` mode: the caller may skip the person when the change is low risk — a publish now
+       * (`low-risk-publish`, ADR-0015) or a release inside the key's window (`low-risk-release`,
+       * RFC-0008 §10.7).
+       */
+      autoApprove?: "low-risk-publish" | "low-risk-release";
       /** The own limit the call runs under once approved. */
       limit?: OwnLimit;
     };
@@ -257,6 +300,11 @@ export class PolicyEngine {
 
   tool(name: string): ToolPolicy | undefined {
     return this.#tools.get(name);
+  }
+
+  /** Every tool, in registration order (a run envelope lists the ones a run may call). */
+  tools(): ToolPolicy[] {
+    return [...this.#tools.values()];
   }
 
   evaluate(
@@ -284,7 +332,9 @@ export class PolicyEngine {
             ? { level: "own", target: "changeset" }
             : tool.own === "comment"
               ? { level: "own", target: "comment" }
-              : { level: variant.level, target: "entry" };
+              : tool.own === "release"
+                ? { level: "own", target: "release" }
+                : { level: variant.level, target: "entry" };
         continue;
       }
       missing.push(s);
@@ -382,6 +432,19 @@ function classified(
     return wait("tool", `${tool.name} makes something public: a person decides`);
   if ((principal.skill?.approval ?? []).includes(tool.name))
     return wait("skill", `${tool.name} requires approval`);
+  // RFC-0008 §10.3: scheduled publishing follows ADR-0015's publish rules. `bypass` (local only)
+  // lets it through; `auto` may skip the person for a low-risk release inside the window, which
+  // the server decides from the release; every other mode, and people over MCP, wait.
+  if (cls === "publish") {
+    if (mode === "bypass") return { kind: "allow", ...o.limited };
+    return {
+      kind: "approval-required",
+      reason: `${tool.name} makes content public or removes it at a time: a person approves it`,
+      cause: mode === "manual" ? "manual-mode" : "tool",
+      ...(mode === "auto" ? { autoApprove: "low-risk-release" as const } : {}),
+      ...o.limited,
+    };
+  }
   // Labels are notes people read before deciding: free in `manual` (a waiting label would be the
   // person's own work); reductions wait there.
   if (cls === "reduce" && mode === "manual")
@@ -408,6 +471,8 @@ export function defaultScopes(actor: Actor): Scope[] {
         "analytics:read",
         // RFC-0007 D2: agents read comments (never an email or IP hash).
         "comments:read",
+        // RFC-0008 §10.1: agents read the schedule.
+        "schedules:read",
       ];
   }
 }

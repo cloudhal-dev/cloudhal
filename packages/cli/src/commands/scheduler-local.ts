@@ -10,6 +10,7 @@
  * retention) are system jobs behind watermarks on the tick. There is no edge cache, so releases
  * purge nothing (`none`).
  */
+import { releaseApprovalCheck } from "@cloudhal/api";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import {
@@ -87,6 +88,8 @@ export function runLocalTick(
     log,
     systemJobs: ({ counted }) =>
       localSystemJobs(counted, o.graph, { comments: o.comments !== false, log }),
+    // RFC-0008 §10.6: the approver may still approve it, an auto release's key still holds.
+    checkApproval: releaseApprovalCheck({ sql: o.sql, graph: o.graph }),
   });
 }
 

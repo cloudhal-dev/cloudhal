@@ -43,6 +43,7 @@ import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
@@ -51,6 +52,7 @@ import { siteGateSupport } from "./features.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
   type BackstopState,
+  releasePurger,
   requestBackstop,
   runAdminTick,
   type SchedulerEnv,
@@ -376,6 +378,12 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           : {}),
         analytics: adminAnalytics(env, sql, { log }),
         ...(comments ? { comments } : {}),
+        // RFC-0008 §12–§13: the schedule routes and tools; "Publish now" purges like a tick.
+        schedules: {
+          store: new SqlScheduleStore(sql),
+          purge: releasePurger(env, sql, { log }),
+          automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
+        },
         scheduler: {
           ...schedulerRuntime(env, log),
           runDue: (trigger) =>

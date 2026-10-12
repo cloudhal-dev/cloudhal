@@ -65,6 +65,8 @@ In practice every ticker calls `runScheduledTick` from `@cloudhal/core-ts/releas
 
 `runDue` claims each occurrence with a compare-and-swap and a fresh lease token and guards every later write on that token, so concurrent ticks produce one effect (S3). Releases run one at a time per site in time order (D15), at most an hour late (S8), with back-off retries and lease recovery. `SqlScheduleStore.releaseFinishStatements(…, guard)` gives `publishRelease` the statements that end a release to append to its own guarded batch.
 
+For the API and MCP (rollout steps 7–8) the store also has `automationByKey`, `openAgentRun`, `readyAgentRun`, `openManualWindow`, `recordRunCall`, `endAgentRunAs`, `updateAutomation`, `deleteAutomation`, `retitleRelease` and `releaseLateness`. The scheduler's `checkApproval` is `createReleaseApprovalCheck` from `@cloudhal/mcp-server/schedules` (re-exported by `@cloudhal/api` with `releaseRights`).
+
 Statements per path (counted by `TickMeter`, Workers Free budget 40):
 
 | Path | Statements |

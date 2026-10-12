@@ -15,6 +15,7 @@ import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import type { CommentsDeps } from "./comments.ts";
 import type { MediaToolOptions } from "./common.ts";
+import type { SchedulesDeps } from "./schedules.ts";
 import { createCloudhalMcpServer } from "./server.ts";
 
 export interface HttpOptions {
@@ -31,6 +32,8 @@ export interface HttpOptions {
   analytics?: AnalyticsService | undefined;
   /** Reader comments for the comment tools (RFC-0007 §11). */
   comments?: CommentsDeps | undefined;
+  /** Schedules for the schedule tools and automation runs (RFC-0008 §12). */
+  schedules?: SchedulesDeps | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
   confirmTokenFallback?: boolean | undefined;
@@ -64,6 +67,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         media: options.media,
         analytics: options.analytics,
         comments: options.comments,
+        schedules: options.schedules,
         now: options.now,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,
