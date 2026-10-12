@@ -19,6 +19,7 @@ import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import { ListViewsCell, ListViewsHead, useListViews } from "../components/ListViews.tsx";
 import {
   InMenuBadge,
   MenuDeleteNotice,
@@ -42,6 +43,7 @@ export function PagesPage() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
   const pageMenus = usePageMenus(siteId);
+  const viewsColumn = useListViews(siteId);
   const [toDelete, setToDelete] = useState<Page | undefined>();
   // Pages are structure: Editors and above (RFC-0005 §2.2).
   const pagesGate = useGate("pages.write");
@@ -123,11 +125,12 @@ export function PagesPage() {
                 <Table.Head>{t("overview.columns.path")}</Table.Head>
                 <Table.Head>{t("overview.columns.status")}</Table.Head>
                 <Table.Head>{t("overview.columns.updated")}</Table.Head>
+                {viewsColumn && <ListViewsHead />}
                 <Table.Head />
               </Table.Row>
             </Table.Header>
             {pages.isPending ? (
-              <TableSkeleton columns={5} />
+              <TableSkeleton columns={viewsColumn ? 6 : 5} />
             ) : (
               <Table.Body>
                 {paging.pageItems.map((p) => (
@@ -164,6 +167,7 @@ export function PagesPage() {
                         {new Date(p.updatedAt).toLocaleString(locale)}
                       </Text>
                     </Table.Cell>
+                    {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={p.id} />}
                     <Table.Cell className="text-right">
                       <RowMenu
                         onOpen={() =>

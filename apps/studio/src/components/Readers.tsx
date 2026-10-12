@@ -14,10 +14,8 @@ import { ChartLine, Hourglass, LockSimple, RocketLaunch } from "@phosphor-icons/
 import { useQuery } from "@tanstack/react-query";
 import { lazy, type ReactNode, Suspense, useState } from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
-import { type AnalyticsFeature, api } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import {
-  type AnalyticsAvailability,
-  analyticsAvailability,
   analyticsHref,
   channelRows,
   DEFAULT_READERS_RANGE,
@@ -29,7 +27,7 @@ import {
   seriesPoints,
 } from "../lib/readers.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
-import { useGate, useMe } from "./useMe.ts";
+import { useAnalyticsCard } from "./useAnalyticsCard.ts";
 
 // ECharts reaches only people who see a chart: the editors and the overview load
 // `@cloudhal/ui/charts` on first render of a card that has numbers (RFC-0006 §10.4).
@@ -39,48 +37,6 @@ const ReadersSummary = lazy(() =>
 const AnalyticsTimeseries = lazy(() =>
   import("@cloudhal/ui/charts").then((m) => ({ default: m.AnalyticsTimeseries })),
 );
-
-/** `/api/instance` → `features.analytics`, shared with every gated screen (`["instance"]`). */
-function useAnalyticsFeature(): { feature: AnalyticsFeature | undefined; known: boolean } {
-  const instance = useQuery({
-    queryKey: ["instance"],
-    queryFn: api.instance,
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
-  return { feature: instance.data?.features.analytics, known: !instance.isPending };
-}
-
-/**
- * Whether the analytics cards appear and may ask the API: `null` while that is unknown or when
- * analytics are off (for the deployment or this site) — the card is left out; else the
- * availability and the gate. Contributors never call the analytics API (§10.2): the person's
- * abilities must be known first, and the site's status is read only when they may.
- */
-function useAnalyticsCard(siteId: string): {
-  availability: Exclude<AnalyticsAvailability, "off">;
-  reason: string | undefined;
-} | null {
-  const { feature, known } = useAnalyticsFeature();
-  const me = useMe();
-  const gate = useGate("analytics.read");
-  const availability = analyticsAvailability(feature);
-  const status = useQuery({
-    queryKey: ["analytics", siteId, "status"],
-    queryFn: () => api.analytics.status(siteId),
-    enabled: availability === "on" && me.data !== undefined && gate.allowed,
-    staleTime: 60_000,
-    retry: false,
-  });
-  if (!known || availability === "off" || me.data === undefined) return null;
-  if (!gate.allowed) return { availability, reason: gate.reason };
-  if (availability === "on") {
-    // An unreadable status does not hide the card: the node query says what went wrong.
-    if (status.isPending) return null;
-    if (status.data?.settings.enabled === false) return null;
-  }
-  return { availability, reason: undefined };
-}
 
 function NotPermitted({ reason }: { reason: string | undefined }) {
   const t = useT();

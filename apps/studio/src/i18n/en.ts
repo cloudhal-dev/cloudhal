@@ -511,6 +511,10 @@ export const en = {
       untitled: "Untitled",
       gone: "No longer exists",
     },
+    listColumn: {
+      title: "Views · 30 days",
+      notTop: "Not among the {count} most read in the last 30 days",
+    },
   },
   status: { draft: "Draft", review: "In review", published: "Published", archived: "Archived" },
   site: {
