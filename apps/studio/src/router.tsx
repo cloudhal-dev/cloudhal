@@ -8,6 +8,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { RouteError, RoutePending } from "./components/RouteStates.tsx";
+import { LOCALE_LIST, withMessages } from "./i18n/index.tsx";
 import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
@@ -19,20 +20,26 @@ import { SiteShell } from "./routes/SiteShell.tsx";
  */
 const AccountPage = lazyRouteComponent(() => import("./routes/AccountPage.tsx"), "AccountPage");
 const AnalyticsPage = lazyRouteComponent(
-  () => import("./routes/AnalyticsPage.tsx"),
+  () => withMessages(import("./routes/AnalyticsPage.tsx"), ["analytics"]),
   "AnalyticsPage",
 );
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
-const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
+const AgentsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/AgentsPage.tsx"), ["analyticsSettings"]),
+  "AgentsPage",
+);
 const ApprovalsPage = lazyRouteComponent(
   () => import("./routes/ApprovalsPage.tsx"),
   "ApprovalsPage",
 );
 const ArticleEditorPage = lazyRouteComponent(
-  () => import("./routes/ArticleEditorPage.tsx"),
+  () => withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers"]),
   "ArticleEditorPage",
 );
-const ArticlesPage = lazyRouteComponent(() => import("./routes/ArticlesPage.tsx"), "ArticlesPage");
+const ArticlesPage = lazyRouteComponent(
+  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers"]),
+  "ArticlesPage",
+);
 const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
 const InvitePage = lazyRouteComponent(() => import("./routes/InvitePage.tsx"), "InvitePage");
 const ResetPasswordPage = lazyRouteComponent(
@@ -41,16 +48,20 @@ const ResetPasswordPage = lazyRouteComponent(
 );
 const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
-  () => import("./routes/PageEditorPage.tsx"),
+  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers"]),
   "PageEditorPage",
 );
-const PagesPage = lazyRouteComponent(() => import("./routes/PagesPage.tsx"), "PagesPage");
+const PagesPage = lazyRouteComponent(
+  () => withMessages(import("./routes/PagesPage.tsx"), ["readers"]),
+  "PagesPage",
+);
 const SiteOverviewPage = lazyRouteComponent(
-  () => import("./routes/SiteOverviewPage.tsx"),
+  () => withMessages(import("./routes/SiteOverviewPage.tsx"), ["readers"]),
   "SiteOverviewPage",
 );
 const SiteSettingsPage = lazyRouteComponent(
-  () => import("./routes/SiteSettingsPage.tsx"),
+  // The privacy notice is offered in every language, so every locale's settings words load.
+  () => withMessages(import("./routes/SiteSettingsPage.tsx"), ["analyticsSettings"], LOCALE_LIST),
   "SiteSettingsPage",
 );
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");

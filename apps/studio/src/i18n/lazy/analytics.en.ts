@@ -1,0 +1,296 @@
+/**
+ * English `analytics.*`, a lazy message namespace (`../namespaces.ts`, DESIGN.md §1 "Lazy
+ * message namespaces"): loaded with the Analytics screen, not with every page. The source of
+ * truth for its keys; `analytics.tr.ts` is typed against it.
+ */
+export const messages = {
+  analytics: {
+    page: {
+      title: "Analytics",
+      description: "Visits to your site, counted without cookies or personal data.",
+    },
+    refresh: "Refresh analytics",
+    noData: "No data",
+    other: "Other",
+    gate: { title: "Analytics is for Authors and above" },
+    range: {
+      group: "Date range",
+      today: "Today",
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days",
+      "12m": "12 months",
+      custom: "Custom…",
+      customTitle: "Custom range",
+      apply: "Apply",
+      pickHint: "Choose the first and the last day.",
+      tooLong: "Choose at most 2 years.",
+      timezone: "Days are in UTC",
+      previousMonth: "Previous month",
+      nextMonth: "Next month",
+      months: "Months",
+      dayToday: "Today, {date}",
+      daySelected: "{date}, selected",
+      compare: "Compare",
+    },
+    delta: {
+      change: "{value} vs the previous period",
+      flat: "About the same as the previous period",
+    },
+    chart: {
+      timezone: "Times in UTC",
+      showTable: "Show as table",
+      showChart: "Show as chart",
+      time: "Time (UTC)",
+    },
+    metrics: {
+      pageviews: "Page views",
+      visits: "Visits",
+      visitors: "Unique visitors",
+      viewsPerVisit: "Views per visit",
+      previousPageviews: "Page views, previous period",
+      visitsHint:
+        "A visit starts when someone arrives from another site, a search, a link or by typing the address.",
+      aboutVisits: "About visits",
+      visitorsHint:
+        "Daily unique visitors, summed: someone who comes back on another day counts again.",
+      aboutVisitors: "About unique visitors",
+    },
+    columns: {
+      content: "Page",
+      channel: "Channel",
+      referrer: "Referrer",
+      country: "Country",
+      share: "Share",
+      status: "Status",
+      requested: "Requested path",
+      hits: "Hits",
+      linkedFrom: "Linked from",
+      lastSeen: "Last seen",
+      oldPath: "Old path",
+      target: "Goes to",
+      crawler: "Crawler",
+      kind: "Kind",
+      rendered: "Pages rendered",
+    },
+    traffic: {
+      title: "Traffic",
+      figures: "Traffic, {range}",
+      chartDescription: "Page views {pageviews} and visits {visits}, {range}.",
+      export: "Export CSV",
+      partial: "Part of this period could not be read, so some figures may be low.",
+      estimated: "Some figures are estimates.",
+    },
+    content: {
+      title: "Top content",
+      caption: "Top content, {range}",
+      showAll: "Show all",
+      empty: "No page views in this period",
+      gone: "No longer exists",
+      kinds: { entry: "Article", page: "Page", archive: "Archive" },
+    },
+    sources: {
+      title: "Sources",
+      caption: "Sources, {range}",
+      tabs: { channels: "Channels", referrers: "Referrers", campaigns: "Campaigns" },
+      campaigns: { utmCampaign: "Campaign", utmSource: "Source", utmMedium: "Medium" },
+      empty: {
+        channels: "No visits in this period",
+        referrers: "No visits came from other sites",
+        campaigns: "No campaign visits",
+      },
+      campaignsHint:
+        "Add utm_source, utm_medium and utm_campaign to the links you share to see them here.",
+      referrersNote:
+        "Only the site name is kept, never the full address. Referrers are shown, not linked.",
+    },
+    channels: {
+      direct: "Direct",
+      internal: "Internal",
+      search: "Search",
+      social: "Social",
+      ai: "AI assistants",
+      email: "Email",
+      paid: "Paid",
+      referral: "Other sites",
+    },
+    countries: {
+      title: "Countries",
+      map: "Page views by country, {range}",
+      other: "Other countries",
+      empty: "No countries yet",
+      unknown: "Unknown",
+      tor: "Tor",
+      high: "High",
+      low: "Low",
+    },
+    devices: {
+      title: "Devices",
+      tabs: { device: "Device", browser: "Browser", os: "OS" },
+      empty: "No devices yet",
+      desktop: "Desktop",
+      mobile: "Mobile",
+      tablet: "Tablet",
+      bot: "Bots",
+      unknown: "Unknown",
+    },
+    browsers: {
+      chrome: "Chrome",
+      edge: "Edge",
+      firefox: "Firefox",
+      safari: "Safari",
+      samsung: "Samsung Internet",
+      opera: "Opera",
+      other: "Other",
+    },
+    oses: {
+      windows: "Windows",
+      macos: "macOS",
+      ios: "iOS",
+      android: "Android",
+      linux: "Linux",
+      chromeos: "ChromeOS",
+      other: "Other",
+    },
+    vitals: {
+      title: "Core Web Vitals",
+      tabs: { all: "All", mobile: "Mobile", desktop: "Desktop" },
+      metrics: {
+        lcp: { short: "LCP", name: "Largest Contentful Paint" },
+        inp: { short: "INP", name: "Interaction to Next Paint" },
+        cls: { short: "CLS", name: "Cumulative Layout Shift" },
+      },
+      ratings: { good: "Good", needsImprovement: "Needs improvement", poor: "Poor" },
+      good: "Good page views",
+      value: "p75 {p75} · {good} good",
+      p75Only: "p75 {p75}",
+      noSamples: "No samples",
+      empty: "No page speed samples in this period",
+      off: "Page speed is not measured",
+      offDescription:
+        "Turn on page speed sampling in the analytics settings to see LCP, INP and CLS.",
+      turnOn: "Analytics settings",
+      sample: "From 1 in {n} page views. Measured in your visitors' browsers.",
+      sampleEvery: "From every page view. Measured in your visitors' browsers.",
+    },
+    errors: {
+      title: "Analytics could not be loaded",
+      busyTitle: "Cloudflare's analytics service is busy",
+      busyDescription: "Try again in a moment; complete days still show from daily totals.",
+      retry: "Try again",
+      card: "This could not be loaded",
+      cardTitle: "Errors and redirects",
+      tabs: { errors: "Broken links", redirects: "Redirects" },
+      empty: { errors: "No broken links in this period", redirects: "No redirects were followed" },
+      noReferrer: "Typed or external",
+      createRedirectFor: "Create a redirect for {path}",
+      createRedirect: "Create redirect…",
+      note: "Includes every error, cached or not. Requested paths are what visitors asked for: they are shown, never linked.",
+      redirectsNote: "Old addresses that still bring visitors, for example after a slug change.",
+    },
+    crawlers: {
+      title: "AI and search crawlers",
+      cacheMisses: "Cache misses only",
+      description:
+        "Pages rendered for crawlers when the cache missed; cached responses are not seen, so these are lower bounds.",
+      empty: "No crawler renders in this period",
+      classes: { ai: "AI", search: "Search", social: "Social", monitor: "Monitor", other: "Other" },
+    },
+    about: {
+      title: "About this data",
+      privacy: "Privacy",
+      privacyHint:
+        "No cookies, no IP addresses or browser details stored, nothing that follows visitors across sites.",
+      cookieless: "Cookie-less",
+      uniqueVisitors: "Unique visitors",
+      uniqueVisitorsHint:
+        "Counted with a random value that is deleted every day, only when the site owner turns it on.",
+      on: "On",
+      off: "Off",
+      change: "Change in settings",
+      source: "Source",
+      estimated: "Some figures are estimates.",
+      sources: { live: "Live", rollups: "Daily totals", mixed: "Live and daily totals" },
+      requests: "Requests from analytics yesterday",
+      requestsValue: "{used} of {limit} a day on Workers Free",
+      requestsHint:
+        "Page views and page speed samples each send one request. Workers Paid has no daily limit.",
+      signals: "Privacy signals",
+      signalsValue: "{share} of page views",
+      signalsHint:
+        "Page views from browsers sending Global Privacy Control or Do Not Track are counted but never hashed, so unique visitors are a lower bound.",
+      cacheHits: "Cache hits (estimated)",
+      cacheHitsValue: "about {share}",
+      cacheHitsHint:
+        "1 − pages the site rendered ÷ page views in this period. An estimate: visitors without JavaScript are not counted as page views.",
+      budget: "Live queries today",
+      budgetValue: "{used} of {limit}",
+      updated: "Daily totals updated",
+      rollupsScheduled: "Complete days are summed every hour; today is read live.",
+      rollupsOnRead: "Daily totals are computed when you open Analytics.",
+    },
+    banners: {
+      notRunning: {
+        title: "Analytics is not running on this deployment",
+        description:
+          "Set analytics.enabled in cloudhal.json and deploy again to start counting visits.",
+      },
+      cantRead: {
+        title: "Studio can't read visits yet",
+        description:
+          "Visits are being recorded. Studio can't read them on this Cloudflare plan yet; they are kept for 3 months.",
+      },
+      quota: {
+        title: "Analytics may push you past the Workers Free limit",
+        description:
+          "Each page view sends a request, and page speed samples send more. Lower the sampling or move to Workers Paid if you get close.",
+        meter: "Requests yesterday",
+        meterValue: "{used} of {limit} a day",
+        settings: "Analytics settings",
+      },
+      budget: {
+        title: "Live numbers are paused for today",
+        description:
+          "Today's query budget is used up. Live numbers resume at midnight UTC; complete days still show.",
+      },
+      siteOff: {
+        title: "Analytics is off for this site",
+        description: "No new visits are counted. Earlier visits still show below.",
+      },
+    },
+    filter: {
+      title: "Showing {label} only",
+      clear: "Show all traffic",
+      kinds: {
+        node: "Visits to this page only.",
+        channel: "Visits from this channel only.",
+        country: "Visits from this country only.",
+        device: "Visits from this kind of device only.",
+      },
+    },
+    off: { turnOn: "Turn on in settings" },
+    empty: {
+      notRunning: {
+        title: "Analytics is not running",
+        description:
+          "This deployment does not record visits. Turn on analytics in cloudhal.json, then deploy.",
+      },
+      off: {
+        title: "Analytics is off for this site",
+        description:
+          "Turn it on to count visits with a 1 KB script from your own site. No cookies.",
+      },
+      cantRead: { title: "Studio can't read visits yet" },
+      noVisits: {
+        title: "No visits yet",
+        description: "Numbers appear about a minute after the first visit to a published page.",
+        openSite: "Open the site",
+      },
+      noVisitsInRange: {
+        title: "No visits in this period",
+        description: "Nobody visited in the chosen days. Earlier visits are there.",
+        action: "Show the last 12 months",
+      },
+    },
+  },
+} as const;

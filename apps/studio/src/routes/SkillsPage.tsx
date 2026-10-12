@@ -24,7 +24,7 @@ import { ListToolbar } from "../components/ListToolbar.tsx";
 import { ApprovalTool, SkillDetailDialog, SkillScope } from "../components/SkillDetailDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { usePaging } from "../components/usePaging.ts";
-import { useT } from "../i18n/index.tsx";
+import { type TFunction, useT } from "../i18n/index.tsx";
 import { api, type SkillSummary } from "../lib/api.ts";
 import { matchesSkill, orderSkillScopes, SKILL_META_KEY, skillCallSnippet } from "../lib/skills.ts";
 
@@ -87,7 +87,7 @@ function AddYourOwn() {
   );
 }
 
-function referencesLabel(t: ReturnType<typeof useT>, count: number) {
+function referencesLabel(t: TFunction, count: number) {
   if (count === 0) return t("skills.none");
   return count === 1 ? t("skills.referenceOne") : t("skills.referenceCount", { count });
 }

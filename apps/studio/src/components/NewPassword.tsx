@@ -1,5 +1,5 @@
 import { Meter, Text } from "@cloudhal/ui";
-import { useT } from "../i18n/index.tsx";
+import { type TFunction, useT } from "../i18n/index.tsx";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../lib/account.ts";
 import { passwordStrength, type Strength } from "../lib/roles.ts";
 import { PasswordField } from "./PasswordField.tsx";
@@ -40,7 +40,7 @@ export type NewPasswordErrors = { password?: string | undefined; confirm?: strin
 
 /** Checks a new password pair the way the server will (length), plus that both fields match. */
 export function newPasswordErrors(
-  t: ReturnType<typeof useT>,
+  t: TFunction,
   password: string,
   confirm: string,
 ): NewPasswordErrors {

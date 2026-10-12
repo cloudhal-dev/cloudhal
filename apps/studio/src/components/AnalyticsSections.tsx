@@ -136,7 +136,7 @@ export function useSummary(scope: AnalyticsScope, enabled = true) {
 
 /** A card whose report failed: says so where the content would be, with "Try again". */
 function CardError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
-  const t = useT();
+  const t = useT("analytics");
   return (
     <SectionEmpty
       icon={<WarningCircle size={32} className="text-kumo-inactive" />}

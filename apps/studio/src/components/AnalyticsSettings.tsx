@@ -22,7 +22,14 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { LOCALES, type Locale, translate, useI18n } from "../i18n/index.tsx";
+import {
+  LOCALE_LIST,
+  LOCALES,
+  type Locale,
+  translate,
+  useI18n,
+  useMessages,
+} from "../i18n/index.tsx";
 import {
   type AnalyticsForm,
   deploymentState,
@@ -98,7 +105,7 @@ function SwitchField({
 }
 
 function SectionSkeleton() {
-  const { t } = useI18n();
+  const { t } = useI18n("analyticsSettings");
   return (
     <div className="grid gap-3" role="status">
       <span className="sr-only">{t("common.loading")}</span>
@@ -111,7 +118,7 @@ function SectionSkeleton() {
 
 /** "Not running" / "can't read yet" (RFC-0006 §8, A1): why the numbers may be missing. */
 function DeploymentBanner({ feature }: { feature: AnalyticsFeature | undefined }) {
-  const { t } = useI18n();
+  const { t } = useI18n("analyticsSettings");
   const state = deploymentState(feature);
   if (state === "ready") return null;
   return (
@@ -136,7 +143,7 @@ function DeploymentBanner({ feature }: { feature: AnalyticsFeature | undefined }
 
 /** Where visits go and how they come back (`features.analytics`), as label/value rows. */
 function DeploymentFacts({ feature }: { feature: AnalyticsFeature }) {
-  const { t } = useI18n();
+  const { t } = useI18n("analyticsSettings");
   const recording = feature.enabled && feature.store !== "none";
   return (
     <dl
@@ -180,7 +187,9 @@ function DeploymentFacts({ feature }: { feature: AnalyticsFeature }) {
 
 /** The site owner's privacy-notice paragraph (RFC-0006 §6.5), in the variant the switches give. */
 function PrivacyNotice({ uniqueVisitors, unsaved }: { uniqueVisitors: boolean; unsaved: boolean }) {
-  const { t, locale } = useI18n();
+  const { t, locale } = useI18n("analyticsSettings");
+  // The notice is offered in every Studio language (the route preloads them all).
+  useMessages(["analyticsSettings"], LOCALE_LIST);
   const toast = useToast();
   const [language, setLanguage] = useState<Locale>(locale);
   const heading = translate(language, "analyticsSettings.notice.heading");
@@ -254,7 +263,7 @@ function UniqueVisitorsConfirm({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
-  const { t } = useI18n();
+  const { t } = useI18n("analyticsSettings");
   return (
     <LayerDialog.Alert open={open} onOpenChange={onOpenChange}>
       <LayerDialog.Content size="base" closeLabel={t("common.close")}>
@@ -298,7 +307,7 @@ function UniqueVisitorsConfirm({
  * `rev`, a 409 offers the latest copy and keeps the other unsaved edits.
  */
 export function AnalyticsSettingsSection({ siteId }: { siteId: string }) {
-  const { t } = useI18n();
+  const { t } = useI18n("analyticsSettings");
   const toast = useToast();
   const qc = useQueryClient();
   const me = useMe();

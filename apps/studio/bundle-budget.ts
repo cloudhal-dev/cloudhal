@@ -13,8 +13,11 @@ import type { Plugin } from "vite";
 export const BUNDLE_BUDGET = {
   /** The entry chunk alone, minified bytes. */
   entryBytes: 280_000,
-  /** Entry + its static imports, gzip bytes. */
-  initialGzipBytes: 480_000,
+  /**
+   * Entry + its static imports, gzip bytes. 456 kB on 2026-10-12, once the analytics wording
+   * moved to lazy message namespaces (was 466 kB under a 480 kB budget).
+   */
+  initialGzipBytes: 470_000,
 };
 
 /** Modules that must never be in the initial load (analytics-only, loaded by lazy routes). */
@@ -25,6 +28,8 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|calendar-locale|charts|useChartFrame|useChartPalette)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
+  // Lazy message namespaces: their words load with the screens that show them.
+  /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
 ];
 
 /** The part of a Rollup/Rolldown output chunk the check reads. */

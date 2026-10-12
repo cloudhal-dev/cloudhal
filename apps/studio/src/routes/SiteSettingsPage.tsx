@@ -801,7 +801,7 @@ function PreviewLinksSection({
 
 /** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
-  const t = useT();
+  const t = useT("analyticsSettings");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });

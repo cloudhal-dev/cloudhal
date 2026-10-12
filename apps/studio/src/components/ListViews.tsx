@@ -38,7 +38,7 @@ export function useListViews(siteId: string): ListViewsColumn {
 }
 
 export function ListViewsHead() {
-  const t = useT();
+  const t = useT("readers");
   return (
     <Table.Head className="text-right whitespace-nowrap">
       {t("readers.listColumn.title")}
@@ -47,8 +47,8 @@ export function ListViewsHead() {
 }
 
 export function ListViewsCell({ views, nodeId }: { views: ListViews | undefined; nodeId: string }) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("readers");
+  const { locale } = useI18n("readers");
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   if (!views)
     return (

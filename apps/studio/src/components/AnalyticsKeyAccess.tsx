@@ -14,7 +14,7 @@ import { useGate, useRoleRules } from "./useMe.ts";
  * keys stay narrowed to their creator's role (RFC-0005 I5), so a Contributor's key cannot hold it.
  */
 function useKeyAccess(agentKey: AgentKeySummary, others: boolean) {
-  const t = useT();
+  const t = useT("analyticsSettings");
   const own = useGate("analytics.read");
   const rules = useRoleRules();
   if (!others) return own;
@@ -45,7 +45,7 @@ export function AllowAnalytics({
   /** Someone else's key, in the Administrators' "All keys" view. */
   others?: boolean;
 }) {
-  const t = useT();
+  const t = useT("analyticsSettings");
   const toast = useToast();
   const qc = useQueryClient();
   const access = useKeyAccess(agentKey, others);

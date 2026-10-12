@@ -97,7 +97,7 @@ export function SiteShell() {
     },
     {
       id: "analytics",
-      label: t("analytics.nav.command"),
+      label: t("commands.goAnalytics"),
       run: () => navigate({ to: "/sites/$siteId/analytics", params: { siteId } }),
     },
     {
@@ -209,9 +209,9 @@ export function SiteShell() {
                 icon={ChartLine}
                 href={`${base}/analytics`}
                 active={is(`${base}/analytics`)}
-                tooltip={t("analytics.nav.label")}
+                tooltip={t("nav.analytics")}
               >
-                {t("analytics.nav.label")}
+                {t("nav.analytics")}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

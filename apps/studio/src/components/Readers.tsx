@@ -39,7 +39,7 @@ const AnalyticsTimeseries = lazy(() =>
 );
 
 function NotPermitted({ reason }: { reason: string | undefined }) {
-  const t = useT();
+  const t = useT("readers");
   return (
     <SectionEmpty
       icon={<LockSimple size={32} className="text-kumo-inactive" />}
@@ -50,7 +50,7 @@ function NotPermitted({ reason }: { reason: string | undefined }) {
 }
 
 function CantReadYet() {
-  const t = useT();
+  const t = useT("readers");
   return (
     <SectionEmpty
       icon={<Hourglass size={32} className="text-kumo-inactive" />}
@@ -90,8 +90,8 @@ export interface ReadersCardProps {
  * node never published and one without readers.
  */
 export function ReadersCard({ siteId, node, kind }: ReadersCardProps) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("readers");
+  const { locale } = useI18n("readers");
   const card = useAnalyticsCard(siteId);
   const [range, setRange] = useState<ReadersRange>(DEFAULT_READERS_RANGE);
   const published = everPublished(node);
@@ -230,8 +230,8 @@ export function ReadersCard({ siteId, node, kind }: ReadersCardProps) {
  * Contributors, "can't read yet" without a reader.
  */
 export function OverviewAnalyticsCard({ siteId }: { siteId: string }) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("readers");
+  const { locale } = useI18n("readers");
   const card = useAnalyticsCard(siteId);
   const readable = card !== null && card.reason === undefined && card.availability === "on";
   const q = { range: "7d" as const };

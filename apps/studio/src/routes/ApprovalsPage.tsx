@@ -45,7 +45,7 @@ import { useToast } from "../components/Toast.ts";
 import { useMe, useMemberRoles, useRoleRules, useSelf } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { type TFunction, useI18n, useT } from "../i18n/index.tsx";
 import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
 import {
   type Approval,
@@ -132,7 +132,7 @@ function useDecideReason() {
 }
 
 /** A 403 `cannot_decide` in the person's language (`details.code`). */
-function cannotDecideMessage(t: ReturnType<typeof useT>, error: unknown): string | undefined {
+function cannotDecideMessage(t: TFunction, error: unknown): string | undefined {
   if (errorCode(error) !== "cannot_decide") return undefined;
   const code = errorDetail(error, "code");
   const known = ["own_request", "not_key_creator", "mode_above_role", "missing_scope", "not_own"];
