@@ -40,6 +40,9 @@ const STRINGS = {
     pageOf: (page: number, pages: number) => `Page ${page} of ${pages}`,
     feed: "RSS feed",
     posts: (n: number) => (n === 1 ? "1 post" : `${n} posts`),
+    /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
+    embargoed: (when: string) => `Embargoed until ${when}. Only previews show it until then.`,
+    expired: (when: string) => `Expired on ${when}. Only previews show it now.`,
   },
   tr: {
     home: "Ana sayfa",
@@ -51,6 +54,10 @@ const STRINGS = {
     pageOf: (page: number, pages: number) => `Sayfa ${page} / ${pages}`,
     feed: "RSS beslemesi",
     posts: (n: number) => `${n} yazı`,
+    embargoed: (when: string) =>
+      `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
+    expired: (when: string) =>
+      `${when} tarihinde yayından kalktı. Artık yalnızca önizlemede görünür.`,
   },
 } as const;
 

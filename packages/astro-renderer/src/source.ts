@@ -12,7 +12,15 @@ import type {
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SiteGraphStore } from "@cloudhal/core-ts";
 import { matchRedirect, termName } from "@cloudhal/core-ts";
+import {
+  gateInstants,
+  hasGates,
+  inheritedGate,
+  isAvailable,
+  nextInstant,
+} from "@cloudhal/core-ts/availability";
 import { matches, parseFilter, resolveFilter } from "@cloudhal/core-ts/filter";
+import { assetRefsOf } from "@cloudhal/core-ts/media";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
 
 /**
@@ -86,6 +94,12 @@ export interface GraphSource {
   asset?(id: string): Promise<Asset | undefined>;
   /** The asset behind a media URL's 16-hex prefix (the media route). */
   assetByPrefix?(prefix16: string): Promise<Asset | undefined>;
+  /**
+   * RFC-0008 §7.4: the next instant (ms since the epoch) at which a time gate changes what this
+   * source shows; undefined when none lies ahead or the source ignores gates (previews, drafts).
+   * Optional for sources that predate gates.
+   */
+  nextGate?(): Promise<number | undefined>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -129,17 +143,44 @@ function visible<T extends { status: Page["status"] }>(nodes: T[], includeDrafts
     : nodes.filter((n) => n.status === "published");
 }
 
-/** Reads the current nodes on every call. Drafts are included so authors can preview them in dev. */
+/**
+ * Reads the current nodes on every call. Drafts are included so authors can preview them in dev,
+ * and so are gated nodes (a preview shows embargoed and expired content, RFC-0008 §7.3). Without
+ * drafts it serves what the public would see: published nodes whose gates are open at `now`.
+ */
 export class LiveSource implements GraphSource {
   readonly mode = "live";
   readonly #store: SiteGraphStore;
   readonly #siteId: string;
   readonly #includeDrafts: boolean;
+  readonly #now: () => number;
 
-  constructor(store: SiteGraphStore, siteId: string, options: { includeDrafts?: boolean } = {}) {
+  constructor(
+    store: SiteGraphStore,
+    siteId: string,
+    options: { includeDrafts?: boolean; now?: () => number } = {},
+  ) {
     this.#store = store;
     this.#siteId = siteId;
     this.#includeDrafts = options.includeDrafts ?? true;
+    this.#now = options.now ?? Date.now;
+  }
+
+  /** Drafts and gated nodes, or what the public sees now. */
+  #visible<T extends Page | ContentEntry>(nodes: T[]): T[] {
+    if (this.#includeDrafts) return visible(nodes, true);
+    const now = this.#now();
+    return nodes.filter((n) => isAvailable(n, now));
+  }
+
+  async nextGate(): Promise<number | undefined> {
+    if (this.#includeDrafts) return undefined;
+    const [pages, entries] = await Promise.all([
+      this.#store.listPages(this.#siteId),
+      this.#store.listContentEntries(this.#siteId),
+    ]);
+    const published = [...pages, ...entries].filter((n) => n.status === "published");
+    return nextInstant(gateInstants(published), this.#now());
   }
 
   async site(): Promise<Site> {
@@ -150,7 +191,7 @@ export class LiveSource implements GraphSource {
 
   async pages(): Promise<Page[]> {
     const site = await this.site();
-    const pages = visible(await this.#store.listPages(this.#siteId), this.#includeDrafts);
+    const pages = this.#visible(await this.#store.listPages(this.#siteId));
     const order = new Map(site.pageIds.map((id, i) => [id, i]));
     return pages.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
   }
@@ -162,10 +203,7 @@ export class LiveSource implements GraphSource {
 
   async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
-    const all = visible(
-      await this.#store.listContentEntries(this.#siteId, collection),
-      this.#includeDrafts,
-    );
+    const all = this.#visible(await this.#store.listContentEntries(this.#siteId, collection));
     return all.filter((e) => e.locale === loc).sort(byNewest);
   }
 
@@ -178,14 +216,14 @@ export class LiveSource implements GraphSource {
   }
   async allEntries(locale?: string): Promise<ContentEntry[]> {
     const loc = locale ?? (await this.site()).defaultLocale;
-    return visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
+    return this.#visible(await this.#store.listContentEntries(this.#siteId))
       .filter((e) => e.locale === loc)
       .sort(byNewest);
   }
 
   async entryById(id: string): Promise<ContentEntry | undefined> {
     const entry = await this.#store.getContentEntry(id);
-    return entry && entry.siteId === this.#siteId && visible([entry], this.#includeDrafts).length
+    return entry && entry.siteId === this.#siteId && this.#visible([entry]).length
       ? entry
       : undefined;
   }
@@ -220,7 +258,7 @@ export class LiveSource implements GraphSource {
       this.#store.listContentEntries(this.#siteId, { locale: loc }),
     ]);
     const f = compile(filter, taxonomies, terms);
-    const out = visible(entries, this.#includeDrafts)
+    const out = this.#visible(entries)
       .filter((e) => matches(f, e))
       .sort(byNewest);
     return options.limit === undefined ? out : out.slice(0, options.limit);
@@ -264,8 +302,9 @@ export class LiveSource implements GraphSource {
       menu,
       {
         site,
-        pages,
-        entries,
+        // drafts: everything but archived (the lookup decides); public: what is available now
+        pages: this.#includeDrafts ? pages : this.#visible(pages),
+        entries: this.#includeDrafts ? entries : this.#visible(entries),
         taxonomies,
         terms,
         includeDrafts: this.#includeDrafts,
@@ -299,8 +338,10 @@ export class LiveSource implements GraphSource {
   }
 }
 
+/** Everything a snapshot shows before gates are applied; built once per snapshot and isolate. */
 interface Loaded {
   site: Site;
+  /** Published pages in `Site.pageIds` order and published entries, gates not yet applied. */
   pages: Page[];
   entries: ContentEntry[];
   taxonomies: Taxonomy[];
@@ -310,18 +351,88 @@ interface Loaded {
   assets: Asset[];
   /** Assets by id and by 16-hex URL prefix, built once per snapshot (RFC-0004 §7.1). */
   assetIndex: Map<string, Asset>;
+  /**
+   * The gate index (RFC-0008 §7.4): every instant at which a published page's or entry's gate
+   * changes, sorted. Empty for a site that schedules nothing — then nothing is filtered at all.
+   */
+  gates: number[];
 }
 
-/** Reads exactly the node bodies captured in a snapshot (immutable; only published nodes are rendered). */
+/** What a snapshot shows at one instant (or, for previews, regardless of gates). */
+interface View {
+  site: Site;
+  pages: Page[];
+  entries: ContentEntry[];
+  taxonomies: Taxonomy[];
+  terms: Term[];
+  redirects: Redirect[];
+  menus: Menu[];
+  assets: Asset[];
+  assetIndex: ReadonlyMap<string, Asset>;
+}
+
+/** State shared by every view of one snapshot: the loaded nodes and the asset gates. */
+interface Shared {
+  loaded?: Promise<Loaded> | undefined;
+  assetGates?: Promise<ReadonlyMap<string, number>>;
+}
+
+/** Who may see the nodes of a snapshot: the clock gates are checked against, or nobody (previews). */
+type Clock = (() => number) | null;
+
+/**
+ * The embargo instant each asset inherits (RFC-0008 §7.2): an asset whose every live referrer —
+ * published pages and entries, shown terms — has an embargo is hidden until the earliest one
+ * opens. Only assets used by a gated node can inherit anything, so only their referrers are read.
+ */
+function assetGates(loaded: Loaded): Map<string, number> {
+  const out = new Map<string, number>();
+  const gated = [...loaded.pages, ...loaded.entries].filter(hasGates);
+  const kindOf = (n: Page | ContentEntry) => ("collection" in n ? "contentEntry" : "page");
+  const candidates = new Set(gated.flatMap((n) => assetRefsOf(kindOf(n), n).map((r) => r.assetId)));
+  if (candidates.size === 0) return out;
+  const referrers = new Map<string, Array<{ availability?: Page["availability"] }>>();
+  const add = (kind: string, node: Page | ContentEntry | Term, gate: Page["availability"]) => {
+    for (const ref of assetRefsOf(kind, node)) {
+      if (!candidates.has(ref.assetId)) continue;
+      const list = referrers.get(ref.assetId) ?? [];
+      list.push(gate === undefined ? {} : { availability: gate });
+      referrers.set(ref.assetId, list);
+    }
+  };
+  for (const p of loaded.pages) add("page", p, p.availability);
+  for (const e of loaded.entries) add("contentEntry", e, e.availability);
+  for (const t of loaded.terms) if (shown(t, false)) add("term", t, undefined);
+  for (const [id, list] of referrers) {
+    const from = inheritedGate(list)?.from;
+    if (from !== undefined) out.set(id, Date.parse(from));
+  }
+  return out;
+}
+
+/**
+ * Reads exactly the node bodies captured in a snapshot (immutable; only published nodes are
+ * rendered). Time gates (RFC-0008 §7) apply on top: by default against the wall clock at each
+ * call; `at(now)` fixes the instant for one request (the Site Worker does, so a page and the
+ * lists on it agree); `ungated()` is the preview view, which shows gated nodes.
+ */
 export class SnapshotSource implements GraphSource {
   readonly mode = "snapshot";
   readonly #store: SiteGraphStore;
   readonly #snapshot: Snapshot;
-  #cache: Promise<Loaded> | undefined;
+  readonly #shared: Shared;
+  readonly #clock: Clock;
+  #view: { now: number | null; view: Promise<View> } | undefined;
 
-  constructor(store: SiteGraphStore, snapshot: Snapshot) {
+  constructor(
+    store: SiteGraphStore,
+    snapshot: Snapshot,
+    options: { now?: () => number; shared?: Shared; ungated?: boolean } = {},
+  ) {
     this.#store = store;
     this.#snapshot = snapshot;
+    this.#shared = options.shared ?? {};
+    this.#clock = options.ungated ? null : (options.now ?? Date.now);
   }
 
   static async open(store: SiteGraphStore, snapshotId: string): Promise<SnapshotSource> {
@@ -334,9 +445,41 @@ export class SnapshotSource implements GraphSource {
     return this.#snapshot;
   }
 
+  /** This snapshot as the public sees it at `now` (one instant for a whole request). */
+  at(now: number): SnapshotSource {
+    return new SnapshotSource(this.#store, this.#snapshot, {
+      now: () => now,
+      shared: this.#shared,
+    });
+  }
+
+  /** This snapshot with gates ignored: previews show embargoed and expired nodes (§7.3). */
+  ungated(): SnapshotSource {
+    return new SnapshotSource(this.#store, this.#snapshot, {
+      shared: this.#shared,
+      ungated: true,
+    });
+  }
+
+  /** True when this view ignores gates (a preview). */
+  get gatesIgnored(): boolean {
+    return this.#clock === null;
+  }
+
+  /**
+   * The next instant (ms) at which anything this snapshot shows changes because of a gate, after
+   * this view's `now`; undefined when no gate lies ahead (or gates are ignored). The Site Worker
+   * caps the edge cache with it (§7.4).
+   */
+  async nextGate(): Promise<number | undefined> {
+    if (this.#clock === null) return undefined;
+    const { gates } = await this.#load();
+    return gates.length === 0 ? undefined : nextInstant(gates, this.#clock());
+  }
+
   /** Reads the snapshot's nodes once; kinds this renderer does not know are ignored. */
   #load(): Promise<Loaded> {
-    this.#cache ??= (async () => {
+    this.#shared.loaded ??= (async () => {
       const read = <T>(refs: NodeRef[]) =>
         Promise.all(refs.map((r) => this.#store.readSnapshotNode<T & Site>(r)));
       const siteRef = this.#snapshot.nodes.find((n) => n.kind === "site");
@@ -365,39 +508,80 @@ export class SnapshotSource implements GraphSource {
         assetIndex.set(a.sha256.slice(0, 16), a);
       }
       const order = new Map((site as Site).pageIds.map((id, i) => [id, i]));
+      const shownPages = visible(pages, false).sort(
+        (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
+      );
+      const shownEntries = visible(entries, false);
       return {
         site: site as Site,
-        pages: visible(pages, false).sort(
-          (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
-        ),
-        entries: visible(entries, false),
+        pages: shownPages,
+        entries: shownEntries,
         taxonomies,
         terms,
         redirects,
         menus,
         assets,
         assetIndex,
+        gates: gateInstants([...shownPages, ...shownEntries]),
       };
     })();
-    return this.#cache;
+    this.#shared.loaded.catch(() => {
+      this.#shared.loaded = undefined;
+    });
+    return this.#shared.loaded;
+  }
+
+  #assetGates(loaded: Loaded): Promise<ReadonlyMap<string, number>> {
+    this.#shared.assetGates ??= Promise.resolve().then(() => assetGates(loaded));
+    return this.#shared.assetGates;
+  }
+
+  /**
+   * What this view shows: every published node when gates are ignored or the snapshot has none;
+   * otherwise the nodes (and inherited assets) whose gates are open at this view's instant.
+   */
+  #current(): Promise<View> {
+    const now = this.#clock === null ? null : this.#clock();
+    if (this.#view?.now === now) return this.#view.view;
+    const view = (async (): Promise<View> => {
+      const loaded = await this.#load();
+      if (now === null || loaded.gates.length === 0) return loaded;
+      const gates = await this.#assetGates(loaded);
+      const hidden = new Set([...gates].filter(([, from]) => !(from <= now)).map(([id]) => id));
+      const assets =
+        hidden.size === 0 ? loaded.assets : loaded.assets.filter((a) => !hidden.has(a.id));
+      const assetIndex =
+        hidden.size === 0
+          ? loaded.assetIndex
+          : new Map([...loaded.assetIndex].filter(([, a]) => !hidden.has(a.id)));
+      return {
+        ...loaded,
+        pages: loaded.pages.filter((p) => isAvailable(p, now)),
+        entries: loaded.entries.filter((e) => isAvailable(e, now)),
+        assets,
+        assetIndex,
+      };
+    })();
+    this.#view = { now, view };
+    return view;
   }
 
   async site(): Promise<Site> {
-    return (await this.#load()).site;
+    return (await this.#current()).site;
   }
 
   async pages(): Promise<Page[]> {
-    return (await this.#load()).pages;
+    return (await this.#current()).pages;
   }
 
   async pageByPath(path: string, locale?: string): Promise<Page | undefined> {
-    const { site, pages } = await this.#load();
+    const { site, pages } = await this.#current();
     const loc = locale ?? site.defaultLocale;
     return pages.find((p) => p.path === path && p.locale === loc);
   }
 
   async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
-    const { site, entries } = await this.#load();
+    const { site, entries } = await this.#current();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.collection === collection && e.locale === loc).sort(byNewest);
   }
@@ -410,22 +594,22 @@ export class SnapshotSource implements GraphSource {
     return (await this.entries(collection, locale)).find((e) => e.slug === slug);
   }
   async allEntries(locale?: string): Promise<ContentEntry[]> {
-    const { site, entries } = await this.#load();
+    const { site, entries } = await this.#current();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
   }
 
-  /** A published entry of this snapshot by id (any locale). */
+  /** A published entry of this snapshot by id (any locale), if its gates are open. */
   async entryById(id: string): Promise<ContentEntry | undefined> {
-    return (await this.#load()).entries.find((e) => e.id === id);
+    return (await this.#current()).entries.find((e) => e.id === id);
   }
 
   async taxonomies(): Promise<Taxonomy[]> {
-    return (await this.#load()).taxonomies;
+    return (await this.#current()).taxonomies;
   }
 
   async terms(key: string): Promise<Term[]> {
-    const { site, taxonomies, terms } = await this.#load();
+    const { site, taxonomies, terms } = await this.#current();
     const tax = taxonomies.find((t) => t.key === key);
     if (!tax) return [];
     return terms
@@ -438,7 +622,7 @@ export class SnapshotSource implements GraphSource {
   }
 
   async vocabulary(key?: string): Promise<Term[]> {
-    const { site, taxonomies, terms } = await this.#load();
+    const { site, taxonomies, terms } = await this.#current();
     if (key === undefined) return [...terms].sort(byPosition(site.defaultLocale));
     const tax = taxonomies.find((t) => t.key === key);
     if (!tax) return [];
@@ -449,7 +633,7 @@ export class SnapshotSource implements GraphSource {
     filter: string,
     options: { locale?: string; limit?: number } = {},
   ): Promise<ContentEntry[]> {
-    const { site, entries, taxonomies, terms } = await this.#load();
+    const { site, entries, taxonomies, terms } = await this.#current();
     const loc = options.locale ?? site.defaultLocale;
     const f = compile(filter, taxonomies, terms);
     const out = entries.filter((e) => e.locale === loc && matches(f, e)).sort(byNewest);
@@ -465,15 +649,15 @@ export class SnapshotSource implements GraphSource {
   }
 
   async redirectFor(path: string): Promise<RedirectMatch | undefined> {
-    return matchRedirect((await this.#load()).redirects, path);
+    return matchRedirect((await this.#current()).redirects, path);
   }
 
   async redirects(): Promise<Redirect[]> {
-    return (await this.#load()).redirects;
+    return (await this.#current()).redirects;
   }
 
   async menu(key: string): Promise<Menu | undefined> {
-    return (await this.#load()).menus.find((m) => m.key === key);
+    return (await this.#current()).menus.find((m) => m.key === key);
   }
 
   async navigation(
@@ -481,35 +665,36 @@ export class SnapshotSource implements GraphSource {
     locale?: string,
     options: NavigationOptions = {},
   ): Promise<Navigation | undefined> {
-    const loaded = await this.#load();
-    const menu = loaded.menus.find((m) => m.key === key);
+    const view = await this.#current();
+    const menu = view.menus.find((m) => m.key === key);
     if (!menu) return undefined;
-    // Only published pages and entries are loaded: anything else resolves as missing (hidden).
+    // Only published pages and entries whose gates are open are here: anything else resolves as
+    // missing, so its menu item is hidden (RFC-0003 §7.1, RFC-0008 §7.2).
     return navigationFor(
       menu,
       {
-        site: loaded.site,
-        pages: loaded.pages,
-        entries: loaded.entries,
-        taxonomies: loaded.taxonomies,
-        terms: loaded.terms,
+        site: view.site,
+        pages: view.pages,
+        entries: view.entries,
+        taxonomies: view.taxonomies,
+        terms: view.terms,
         ...(options.collectionIndex ? { collectionIndex: options.collectionIndex } : {}),
       },
-      locale ?? loaded.site.defaultLocale,
+      locale ?? view.site.defaultLocale,
     );
   }
 
   async assets(): Promise<Asset[]> {
-    return (await this.#load()).assets;
+    return (await this.#current()).assets;
   }
 
   async asset(id: string): Promise<Asset | undefined> {
-    return id.startsWith("asset_") ? (await this.#load()).assetIndex.get(id) : undefined;
+    return id.startsWith("asset_") ? (await this.#current()).assetIndex.get(id) : undefined;
   }
 
   async assetByPrefix(prefix16: string): Promise<Asset | undefined> {
     return /^[0-9a-f]{16}$/.test(prefix16)
-      ? (await this.#load()).assetIndex.get(prefix16)
+      ? (await this.#current()).assetIndex.get(prefix16)
       : undefined;
   }
 }
