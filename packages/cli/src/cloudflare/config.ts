@@ -10,30 +10,42 @@
  *
  * Site analytics (RFC-0006 §11), when `cloudhal.json` turns them on: the site Worker writes to a
  * Workers Analytics Engine dataset (`ANALYTICS`), the admin Worker reads it through the Analytics
- * SQL binding (`ANALYTICS_SQL`, no API token) and rolls finished days up on an hourly cron trigger.
+ * SQL binding (`ANALYTICS_SQL`, no API token) and rolls finished days up hourly.
  *
  * Reader comments (RFC-0007 §15.3–15.4), available unless `cloudhal.json` says otherwise: both
  * Workers get the secret `CLOUDHAL_COMMENTS_KEY` (through `--secrets-file`, never in a config), the
- * admin Worker `CLOUDHAL_COMMENTS_AVAILABLE` and the same hourly cron (retention, threads closed
- * by time, the purge backstop) even when analytics are off, and the site Worker, with
- * `comments.rateLimit`, a Workers Rate Limiting binding (`COMMENTS_RL`).
+ * admin Worker `CLOUDHAL_COMMENTS_AVAILABLE`, and the site Worker, with `comments.rateLimit`, a
+ * Workers Rate Limiting binding (`COMMENTS_RL`).
+ *
+ * The scheduler (RFC-0008 §8.2–§8.3, §16): the admin Worker always has the minute cron trigger
+ * (`* * * * *`, the one slot the hourly jobs used) — or, when Cloudflare refused it, none and
+ * `CLOUDHAL_SCHEDULER=alarm` — and always declares the SQLite-backed `SchedulerClock` Durable Object
+ * (`SCHEDULER_CLOCK`) with its migration, so switching tickers never needs a migration. The hourly
+ * jobs (analytics rollup, comments) run behind watermarks on that tick.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const COMPATIBILITY_DATE = "2026-10-01";
 
-/** The admin Worker's hourly job: analytics rollups (RFC-0006 §7.5) and comments (RFC-0007 §8.5). */
-export const HOURLY_CRON = "17 * * * *";
-/** @deprecated the trigger is shared with comments; use `HOURLY_CRON`. */
-export const ANALYTICS_CRON = HOURLY_CRON;
+/**
+ * The admin Worker's one cron trigger (RFC-0008 §8.2): the scheduler's minute tick. It replaces the
+ * hourly `17 * * * *` in the same slot; the hourly jobs run behind watermarks on it.
+ */
+export const MINUTE_CRON = "* * * * *";
+
+/** What drives the scheduler on Cloudflare: the cron trigger, or the Durable Object alarm. */
+export type SchedulerTicker = "cron" | "alarm";
+
+/** The scheduler's Durable Object (RFC-0008 §8.3): binding, class and its migration tag. */
+export const SCHEDULER_CLOCK_BINDING = "SCHEDULER_CLOCK";
+export const SCHEDULER_CLOCK_CLASS = "SchedulerClock";
+export const SCHEDULER_CLOCK_MIGRATION = "v1";
 
 /** What the generated configs need for reader comments (RFC-0007 §15.3–15.4). */
 export interface CommentsDeployment {
   /** `cloudhal.json` `comments.available` (default true); `false` sets `CLOUDHAL_COMMENTS_AVAILABLE=false`. */
   readonly available: boolean;
-  /** The hourly cron trigger; `false` when the account has no free cron slot (the job then runs on admin requests). */
-  readonly cron: boolean;
   /** The submissions' Rate Limiting binding (`comments.rateLimit`, §6.5). */
   readonly rateLimit?: { readonly namespaceId: string; readonly limit: number };
 }
@@ -51,8 +63,6 @@ export interface AnalyticsDeployment {
   readonly defaults: Readonly<Record<string, unknown>>;
   /** Uncached live queries per UTC day (admin Worker). */
   readonly budget: number;
-  /** The hourly cron trigger; `false` when the account has no free cron slot (§11). */
-  readonly cron: boolean;
   /** Extra hostnames the site answers on (custom domains), `CLOUDHAL_SITE_HOSTS`. */
   readonly siteHosts?: readonly string[];
   /** The Workers Rate Limiting binding for the beacon (`analytics.rateLimit`, §5.5). */
@@ -189,30 +199,25 @@ export function adminWorkerConfig(
     domain?: string;
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
+    /** The scheduler's ticker (default `cron`; `alarm` when Cloudflare refused the trigger). */
+    scheduler?: SchedulerTicker;
   },
 ) {
   const names = workerNames(n);
   const a = n.analytics;
   const c = n.comments;
-  // One hourly trigger serves both jobs (RFC-0006 §7.5, RFC-0007 §15.3): comments need it even
-  // when analytics are off. Without either the cron list is empty, so the trigger goes away.
-  const cron = Boolean(a?.cron || (c?.available && c.cron));
+  const scheduler: SchedulerTicker = n.scheduler ?? "cron";
   const vars = {
     ...(a
       ? {
           CLOUDHAL_ANALYTICS_DATASET: a.dataset,
           CLOUDHAL_ANALYTICS_BUDGET: String(a.budget),
           CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify(a.defaults),
-          ...(a.cron ? {} : { CLOUDHAL_ANALYTICS_CRON: "off" }),
         }
       : {}),
-    ...(c
-      ? {
-          CLOUDHAL_COMMENTS_AVAILABLE: c.available ? "true" : "false",
-          // no trigger: the hourly comments job runs on admin requests instead (at most hourly)
-          ...(c.available && !c.cron ? { CLOUDHAL_COMMENTS_CRON: "off" } : {}),
-        }
-      : {}),
+    ...(c ? { CLOUDHAL_COMMENTS_AVAILABLE: c.available ? "true" : "false" } : {}),
+    // RFC-0008 §8.3: which ticker runs `runDue` (the legacy `*_CRON=off` vars are not written again).
+    CLOUDHAL_SCHEDULER: scheduler,
   };
   return {
     $schema: "node_modules/wrangler/config-schema.json",
@@ -226,8 +231,14 @@ export function adminWorkerConfig(
     // Analytics (RFC-0006 §7.3): reads WAE through the binding, no API token; vars for the
     // dataset, the query budget and the defaults. Comments (RFC-0007): the availability switch.
     ...(a ? { analytics: { binding: "ANALYTICS_SQL" } } : {}),
-    ...(Object.keys(vars).length > 0 ? { vars } : {}),
-    triggers: { crons: cron ? [HOURLY_CRON] : [] },
+    vars,
+    // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
+    // switching between the cron trigger and the alarm never needs a migration (§8.3).
+    durable_objects: {
+      bindings: [{ name: SCHEDULER_CLOCK_BINDING, class_name: SCHEDULER_CLOCK_CLASS }],
+    },
+    migrations: [{ tag: SCHEDULER_CLOCK_MIGRATION, new_sqlite_classes: [SCHEDULER_CLOCK_CLASS] }],
+    triggers: { crons: scheduler === "cron" ? [MINUTE_CRON] : [] },
     ...customDomain(n.domain),
     assets: {
       directory: n.studioDir,
@@ -249,6 +260,22 @@ export async function writeWranglerConfig(
 ): Promise<void> {
   const body = `// ${header}\n// Generated by \`cloudhal deploy\`; resource ids are filled in by wrangler on first deploy.\n${JSON.stringify(config, null, 2)}\n`;
   await writeFile(file, body);
+}
+
+/**
+ * The vars of an existing generated config (`{}` when there is none): what the last deploy set,
+ * e.g. the legacy `CLOUDHAL_*_CRON=off` of a deployment without a cron slot (RFC-0008 §16).
+ */
+export async function readExistingVars(file: string): Promise<Record<string, string>> {
+  try {
+    const text = (await readFile(file, "utf8")).replace(/^\s*\/\/.*$/gm, "");
+    const cfg = JSON.parse(text) as { vars?: Record<string, unknown> };
+    return Object.fromEntries(
+      Object.entries(cfg.vars ?? {}).filter((e): e is [string, string] => typeof e[1] === "string"),
+    );
+  } catch {
+    return {};
+  }
 }
 
 /** Reads ids wrangler wrote back into an existing config, so regenerating keeps them. */

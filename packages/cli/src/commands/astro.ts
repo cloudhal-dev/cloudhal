@@ -1,18 +1,22 @@
 import path from "node:path";
+import { openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
+import { startLocalScheduler } from "./scheduler-local.ts";
 import { resolveBuildSnapshot } from "./snapshot.ts";
 
 export interface DevOptions {
   readonly projectDir: string;
   readonly port?: number;
   readonly host?: boolean;
+  /** `false` skips the scheduler's Node ticker (RFC-0008 §8.4). */
+  readonly scheduler?: boolean;
 }
 
 /** Starts the Astro dev server for the project (live source, drafts visible). Returns a stop function. */
 export async function dev(
   options: DevOptions,
 ): Promise<{ stop(): Promise<void>; url: string | undefined }> {
-  await readProjectConfig(options.projectDir); // fail early with a clear message
+  const cfg = await readProjectConfig(options.projectDir); // fail early with a clear message
   process.env.CLOUDHAL_SOURCE = "live";
   // Note: Astro skips its dev middleware entirely when `process.env.VITEST` is set, so a dev
   // server cannot be started inside a Vitest worker; tests spawn the CLI as a child process.
@@ -35,7 +39,23 @@ export async function dev(
         : `[${addr.address}]`
       : addr.address;
   const url = addr && host ? `http://${host}:${addr.port}/` : undefined;
-  return { stop: () => server.stop(), url };
+  // RFC-0008 §8.4: releases publish on time while the preview runs (its own connection to the
+  // project's SQLite; leases keep it safe beside Studio's and the MCP server's tickers).
+  const local =
+    options.scheduler === false
+      ? undefined
+      : await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  const ticker = local
+    ? startLocalScheduler({ sql: local.sql, blobs: local.blobs, graph: local.store })
+    : undefined;
+  return {
+    stop: async () => {
+      ticker?.stop();
+      await server.stop();
+      await local?.close();
+    },
+    url,
+  };
 }
 
 export interface BuildOptions {

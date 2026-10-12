@@ -117,6 +117,7 @@ export function createApi(deps: ApiDeps) {
     c.set("uploadSecret", uploadSecret);
     c.set("analytics", deps.analytics);
     c.set("comments", deps.comments);
+    c.set("scheduler", deps.scheduler);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);

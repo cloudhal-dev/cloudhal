@@ -24,6 +24,16 @@
  *   appends commenter lines with their email (§9.4: the operator may)
  * - `POST /api/admin/sites/:siteId/comments/import` ← JSON lines (≤ 200 per call) → the import
  *   report: idempotent by id and importer origin, entries and parents checked, audited
+ * - `GET  /api/admin/schedules/status` → the scheduler's health, the schedules level, and per site
+ *   the open releases and gated nodes (RFC-0008 §8.7, §13): `cloudhal schedules status --remote`
+ *   and `cloudhal deploy`'s downgrade guard
+ * - `GET  /api/admin/sites/:siteId/schedules/releases?state&limit` → release summaries
+ *   (`cloudhal schedules list --remote`)
+ * - `POST /api/admin/schedules/run-due` → one tick now, the operator's (`cloudhal schedules
+ *   run-due --remote`)
+ * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
+ *   pins would point into a replaced graph) unless `?cancelSchedules=1` cancels them first
+ *   (`cloudhal push --cancel-schedules`).
  */
 
 import { AnalyticsQueryError } from "@cloudhal/analytics";
@@ -47,6 +57,13 @@ import {
   SyncConflictError,
   withPrimaryDomain,
 } from "@cloudhal/core-ts";
+import {
+  gatedNodeCount,
+  ReleaseService,
+  releaseSummary,
+  SCHEDULES_ENGINE_LEVEL,
+  schedulerHealthReport,
+} from "@cloudhal/core-ts/releases";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
 import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
@@ -87,6 +104,22 @@ async function commentsSite(
     return c.json({ error: "not_found", message: "site not found" }, 404);
   return { d, siteId };
 }
+
+/** Admin answers are never cached (Workers Cache caches header-less GETs, RFC-0008 step 0). */
+const NO_STORE = { "cache-control": "no-store", "cloudflare-cdn-cache-control": "no-store" };
+
+const RELEASE_STATES = new Set([
+  "draft",
+  "awaiting_approval",
+  "scheduled",
+  "running",
+  "published",
+  "conflict",
+  "missed",
+  "expired",
+  "failed",
+  "canceled",
+]);
 
 export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env> {
   return (
@@ -293,6 +326,58 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
         });
         return c.json(report);
       })
+      .get("/schedules/status", async (c) => {
+        const store = c.get("store");
+        const now = c.get("now")();
+        const releases = new ReleaseService({ graph: store, sql: storage.sql });
+        const sites = [];
+        for (const site of await store.listSites())
+          sites.push({
+            siteId: site.id,
+            name: site.name,
+            ...(site.timeZone ? { timeZone: site.timeZone } : {}),
+            openReleases: (await releases.openReleases(site.id)).map(releaseSummary),
+            gatedNodes: await gatedNodeCount(storage.sql, site.id, now),
+          });
+        return c.json(
+          {
+            engine: { schedulesLevel: SCHEDULES_ENGINE_LEVEL },
+            scheduler: await schedulerHealthReport(storage.sql, {
+              now,
+              mode: c.get("scheduler")?.mode ?? "request",
+            }),
+            sites,
+          },
+          200,
+          NO_STORE,
+        );
+      })
+      .post("/schedules/run-due", async (c) => {
+        const run = c.get("scheduler")?.runDue;
+        if (!run)
+          return c.json(
+            { error: "not_found", message: "this server has no scheduler to run" },
+            404,
+            NO_STORE,
+          );
+        return c.json(await run("manual"), 200, NO_STORE);
+      })
+      .get("/sites/:siteId/schedules/releases", async (c) => {
+        const siteId = param(c, "siteId");
+        if (!(await c.get("store").getSite(siteId)))
+          return c.json({ error: "not_found", message: "site not found" }, 404, NO_STORE);
+        const state = c.req.query("state");
+        const states = state ? state.split(",").filter((s) => RELEASE_STATES.has(s)) : [];
+        const limit = Number(c.req.query("limit") ?? 50);
+        const list = await new ReleaseService({
+          graph: c.get("store"),
+          sql: storage.sql,
+        }).list(siteId, {
+          ...(states.length ? { states: states as never } : {}),
+          limit: Number.isInteger(limit) ? limit : 50,
+        });
+        return c.json({ releases: list.map(releaseSummary) }, 200, NO_STORE);
+      })
       .get("/sites/:siteId/bundle", async (c) => {
         const siteId = param(c, "siteId");
         if (!(await c.get("store").getSite(siteId)))
@@ -361,8 +446,37 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
         const bundle = (await c.req.json()) as SiteBundle;
         if (bundle.siteId !== param(c, "siteId"))
           throw badRequest("bundle.siteId must match the URL");
+        // RFC-0008 §16: a replaced graph would invalidate open releases' pins.
+        const store = c.get("store");
+        if (await store.getSite(bundle.siteId)) {
+          const releases = new ReleaseService({ graph: store, sql: storage.sql });
+          const open = await releases.openReleases(bundle.siteId);
+          if (open.length > 0) {
+            if (c.req.query("cancelSchedules") !== "1")
+              return c.json(
+                {
+                  error: "schedules_pending",
+                  message: `the site has ${open.length} open release(s); cancel them first or push with --cancel-schedules`,
+                  details: { releases: open.map(releaseSummary) },
+                },
+                409,
+              );
+            if (open.some((r) => r.state === "running"))
+              return c.json(
+                {
+                  error: "schedules_running",
+                  message: "a release is being published right now; push again in a minute",
+                },
+                409,
+              );
+            for (const r of open)
+              await releases.cancel(bundle.siteId, r.id, {
+                expectedRev: r.rev,
+                by: OPERATOR_ACTOR,
+              });
+          }
+        }
         try {
-          const store = c.get("store");
           const before = (await store.getSite(bundle.siteId))?.publishedSnapshotId;
           const result = await importSite(storage, bundle, {
             mode,

@@ -152,7 +152,9 @@ export const snapshots: Hono<Env> = new Hono<Env>()
       reason?: Snapshot["reason"];
       publish?: boolean;
     };
-    const reason = body.reason ?? "manual";
+    // A snapshot made to go live is a publish: it keeps scheduled nodes at their live version
+    // (RFC-0008 §6.2), so publishing it cannot release them early.
+    const reason = body.reason ?? (body.publish ? "publish" : "manual");
     if (!REASONS.has(reason)) throw badRequest("invalid reason");
     const actor = c.get("actor") ?? { kind: "system" as const, id: "sys_api00000001" };
     const principal = c.get("principal");

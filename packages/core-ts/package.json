@@ -21,7 +21,8 @@
     "./time": "./src/time.ts",
     "./media": "./src/media/index.ts",
     "./media-node": "./src/media-node.ts",
-    "./media/fixtures": "./src/media/fixtures.ts"
+    "./media/fixtures": "./src/media/fixtures.ts",
+    "./releases": "./src/releases.ts"
   },
   "files": [
     "dist",
@@ -34,6 +35,7 @@
   },
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "marked": "catalog:",
     "temporal-polyfill": "catalog:"
@@ -107,7 +109,14 @@
       "./media/fixtures": {
         "types": "./dist/src/media/fixtures.d.ts",
         "default": "./dist/src/media/fixtures.js"
+      },
+      "./releases": {
+        "types": "./dist/src/releases.d.ts",
+        "default": "./dist/src/releases.js"
       }
     }
+  },
+  "cloudhal": {
+    "schedulesLevel": 1
   }
 }
