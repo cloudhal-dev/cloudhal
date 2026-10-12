@@ -22,6 +22,10 @@ export const ID_PREFIX = {
   /** RFC-0003 menus and their items. */
   menu: "menu",
   menuItem: "item",
+  /** RFC-0004 media files. */
+  asset: "asset",
+  /** RFC-0004 §5.5 single-use upload tickets (`media_uploads.id`). */
+  upload: "upl",
   snapshot: "snap",
   user: "user",
   agent: "agent",

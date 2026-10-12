@@ -1,0 +1,7 @@
+{
+  "reason": "Every beacon names the page it was sent from",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview"
+  }
+}

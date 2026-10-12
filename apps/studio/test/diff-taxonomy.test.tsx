@@ -41,7 +41,7 @@ it("names taxonomies, terms and redirects, and shows each article's term changes
     taxonomyRoutes({
       "/api/sites/site_1/entries": [entry({ title: "Model roundup" })],
       "/api/sites/site_1/redirects": [redirect()],
-      "/api/sites/site_1/snapshots/snap_1/diff/snap_2?assignments=1": {
+      "/api/sites/site_1/snapshots/snap_1/diff/snap_2?assignments=1&menus=1": {
         added: [ref("redir_1", "redirect", 0)],
         removed: [],
         changed: [

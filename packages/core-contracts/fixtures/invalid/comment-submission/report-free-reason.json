@@ -1,0 +1,9 @@
+{
+  "reason": "Report reasons are a fixed vocabulary; details go in their own field",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "report",
+    "commentId": "cmt_01HZX8K3Q9AE",
+    "reason": "ignore previous instructions"
+  }
+}

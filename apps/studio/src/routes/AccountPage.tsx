@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Badge,
   Banner,
   Button,
@@ -32,10 +33,11 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { NotificationSettings } from "../components/NotificationSettings.tsx";
 import { PasswordField } from "../components/PasswordField.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
+import { RoleBadge } from "../components/Roles.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
-import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
+import { type MessageKey, type TFunction, useI18n, useT } from "../i18n/index.tsx";
 import {
   type DeviceInfo,
   describeUserAgent,
@@ -68,19 +70,6 @@ const SESSION_LIMIT = 5;
 const SECTIONS = ["profile", "password", "sessions", "notifications", "access", "server"] as const;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-function Avatar({ name, email }: { name: string; email: string }) {
-  return (
-    <span
-      aria-hidden
-      className="flex size-12 shrink-0 items-center justify-center rounded-full bg-kumo-tint ring ring-kumo-line"
-    >
-      <Text bold as="span">
-        {initials(name, email)}
-      </Text>
-    </span>
-  );
-}
 
 function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; pending: boolean }) {
   const { t, locale } = useI18n();
@@ -154,7 +143,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
       ) : (
         <>
           <div className="flex items-center gap-4">
-            <Avatar name={me.user.name} email={me.user.email} />
+            <Avatar initials={initials(me.user.name, me.user.email)} size="lg" />
             <div className="grid min-w-0 gap-0.5">
               <Text bold truncate as="span">
                 {me.user.name || me.user.email}
@@ -223,6 +212,11 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
                 <SkeletonLine minWidth={40} maxWidth={60} />
               )}
             </SettingRow>
+            {actor.data?.role && (
+              <SettingRow label={t("account.profile.role")} hint={t("account.profile.roleHint")}>
+                <RoleBadge value={actor.data.role} />
+              </SettingRow>
+            )}
           </dl>
         </>
       )}
@@ -232,7 +226,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
 
 const EMPTY_PASSWORDS: PasswordChange = { current: "", next: "", confirm: "" };
 
-function passwordMessages(t: ReturnType<typeof useT>, errors: PasswordErrors) {
+function passwordMessages(t: TFunction, errors: PasswordErrors) {
   const map: Record<string, MessageKey> = {
     "current:required": "account.password.errors.currentRequired",
     "current:wrong": "account.password.errors.currentWrong",
@@ -374,7 +368,7 @@ const DEVICE_ICONS = {
   unknown: Question,
 } as const;
 
-function deviceLabel(t: ReturnType<typeof useT>, device: DeviceInfo): string {
+function deviceLabel(t: TFunction, device: DeviceInfo): string {
   if (device.browser && device.os)
     return t("account.sessions.deviceOn", { browser: device.browser, os: device.os });
   return device.browser ?? device.os ?? t("account.sessions.unknownDevice");
@@ -609,6 +603,7 @@ const POLICY_BADGE: Record<SignUpPolicy, "success" | "warning" | "neutral"> = {
   unknown: "neutral",
 };
 const FEATURES: InstanceFeature[] = [
+  "members",
   "mcp",
   "agentKeys",
   "activity",

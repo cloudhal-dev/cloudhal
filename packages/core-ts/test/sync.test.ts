@@ -1,6 +1,9 @@
+import type { ContentEntry } from "@cloudhal/core-contracts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
+import { mediaBlobKey } from "../src/assets.ts";
+import { PNG_1X1 } from "../src/media/fixtures.ts";
 import { seedStarterSite } from "../src/seed.ts";
 import { SiteGraphStore } from "../src/store.ts";
 import { copySite, exportSite, importSite, SyncConflictError } from "../src/sync.ts";
@@ -235,5 +238,44 @@ describe("copySite", () => {
       await expect(importSite(await pair(), b), name).rejects.toThrow(error);
     }
     await expect(importSite(await pair(), bundle)).resolves.toBeDefined();
+  });
+
+  it("copies media bytes before the bundle; a target without them refuses it (RFC-0004 §4.7)", async () => {
+    const src = await pair();
+    const dst = await pair();
+    const site = await seedStarterSite(src.store, { name: "Sync", slug: "sync" });
+    const { asset } = await src.store.ingestAsset({
+      siteId: site.id,
+      bytes: PNG_1X1,
+      filename: "dot.png",
+      uploadedBy: actor,
+      source: { kind: "upload" },
+    });
+    const entry = (await src.store.listContentEntries(site.id))[0] as ContentEntry;
+    await src.store.updateContentEntry({
+      ...entry,
+      coverImage: { assetId: asset.id, alt: "" } as NonNullable<ContentEntry["coverImage"]>,
+    });
+    await src.store.createSnapshot(site.id, { actor, reason: "manual" });
+    const bundle = await exportSite(src, site.id);
+    expect(bundle.media).toEqual([
+      { sha256: asset.sha256, bytes: asset.bytes, mediaType: "image/png" },
+    ]);
+    await expect(importSite(dst, bundle)).rejects.toMatchObject({ code: "missing_media" });
+    // A bundle cannot hide an asset's content by leaving it out of the list.
+    await expect(importSite(dst, { ...bundle, media: [] })).rejects.toMatchObject({
+      code: "missing_media",
+    });
+    await copySite(src, dst, site.id);
+    expect(await dst.blobs.get(mediaBlobKey(site.id, asset.sha256))).toEqual(PNG_1X1);
+    expect((await dst.store.getAsset(asset.id))?.sha256).toBe(asset.sha256);
+    expect((await dst.store.blobState(site.id, asset.sha256))?.state).toBe("stored");
+    expect((await dst.store.assetUsage(site.id, [asset.id])).get(asset.id)?.total).toBe(1);
+    const snap = (await dst.store.listSnapshots(site.id))[0];
+    const rows = await dst.sql.all<{ sha256: string }>(
+      "SELECT sha256 FROM snapshot_blobs WHERE snapshot_id = ?",
+      [snap?.id ?? ""],
+    );
+    expect(rows.map((r) => r.sha256)).toEqual([asset.sha256]);
   });
 });

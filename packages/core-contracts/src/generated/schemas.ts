@@ -1282,7 +1282,8 @@ export const SnapshotSchema = {
             "taxonomy",
             "term",
             "redirect",
-            "menu"
+            "menu",
+            "asset"
           ]
         },
         "rev": {
@@ -2821,6 +2822,1150 @@ export const MenuSchema = {
   }
 } as const;
 
+export const AnalyticsEventSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/analytics-event.schema.json",
+  "title": "AnalyticsEvent",
+  "description": "One site analytics event as stored (RFC-0006): a page view or a Core Web Vitals sample reported by the site's first-party script, or a response the site Worker rendered itself (cache miss, redirect, 404, 410, 5xx). Written by the site Worker after it validated and enriched a beacon. The named fields are the columns of the local/self-host SQLite store; each one documents its fixed slot in a Workers Analytics Engine data point (index1 = siteId, blob1 = kind, blob2 = schemaVersion). Slots never move and new fields are only appended. Never carries an IP address, a user agent, a full referrer URL, a query string or a cookie.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "AnalyticsPageviewEvent",
+      "description": "A published page, article or archive was shown to a visitor (the site's script ran).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "nodeId",
+        "nodeKind",
+        "channel",
+        "entrance",
+        "device",
+        "browser",
+        "os",
+        "navType"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pageview"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob3. The published route the view resolved to; never a query string."
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4. The page, entry or term the server resolved the path to, so stats survive slug changes."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "refHost": {
+          "$ref": "#/$defs/AnalyticsHostname"
+        },
+        "channel": {
+          "$ref": "#/$defs/AnalyticsChannel"
+        },
+        "utmSource": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob8."
+        },
+        "utmMedium": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob9."
+        },
+        "utmCampaign": {
+          "$ref": "#/$defs/AnalyticsUtmValue",
+          "description": "WAE blob10."
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "browser": {
+          "$ref": "#/$defs/AnalyticsBrowser"
+        },
+        "os": {
+          "$ref": "#/$defs/AnalyticsOs"
+        },
+        "visitor": {
+          "$ref": "#/$defs/AnalyticsVisitorHash"
+        },
+        "navType": {
+          "$ref": "#/$defs/AnalyticsNavType"
+        },
+        "locale": {
+          "$ref": "#/$defs/Locale",
+          "description": "WAE blob17. Locale of the resolved node, not the visitor's Accept-Language."
+        },
+        "entrance": {
+          "type": "boolean",
+          "description": "WAE double1 (1 or 0). The view starts a visit: the referrer is empty or another site, and the navigation is not a reload, back/forward or restore."
+        },
+        "privacySignal": {
+          "type": "boolean",
+          "description": "WAE double10 (1 or 0). The beacon request carried Global Privacy Control (Sec-GPC: 1) or Do Not Track (DNT: 1), so no visitor hash was formed. Only this flag is kept, never which signal or any header. Absent means no signal (and on events written before the field existed)."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsVitalsEvent",
+      "description": "Core Web Vitals of one sampled page view, measured by the site's own script and sent when the page is hidden. Code checks that at least one metric is present (the schema subset has no cross-property rules).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "nodeId",
+        "nodeKind",
+        "device",
+        "sampleOneIn"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "vitals"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob3."
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "browser": {
+          "$ref": "#/$defs/AnalyticsBrowser"
+        },
+        "lcp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double3. Largest Contentful Paint."
+        },
+        "inp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double4. Interaction to Next Paint."
+        },
+        "cls": {
+          "type": "number",
+          "description": "WAE double5, stored multiplied by 1000. Cumulative Layout Shift (unitless).",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ttfb": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double6. Time to First Byte."
+        },
+        "fcp": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double7. First Contentful Paint."
+        },
+        "sampleOneIn": {
+          "$ref": "#/$defs/AnalyticsSampleOneIn"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsRenderEvent",
+      "description": "The site Worker answered a request itself (a cache miss, redirect, 404, 410 or error). Cache hits never run the Worker, so these are not page views. The requested path is visitor-controlled text and is always shown as such.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "siteId",
+        "timestamp",
+        "path",
+        "status",
+        "device"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "render"
+          ]
+        },
+        "siteId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE index1."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "path": {
+          "$ref": "#/$defs/AnalyticsRequestPath"
+        },
+        "status": {
+          "type": "integer",
+          "description": "WAE double2. HTTP status the Worker answered with.",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "WAE blob4. The node rendered or redirected from, when the path resolved to one."
+        },
+        "nodeKind": {
+          "$ref": "#/$defs/AnalyticsNodeKind"
+        },
+        "redirectTo": {
+          "type": "string",
+          "description": "WAE blob19. Target of a 301, 302 or 308: a site path or an https URL, without query string.",
+          "pattern": "^(?:/|https://)[!-~]*$",
+          "maxLength": 512
+        },
+        "refHost": {
+          "$ref": "#/$defs/AnalyticsHostname"
+        },
+        "refPath": {
+          "$ref": "#/$defs/Path",
+          "description": "WAE blob20. Same-site referrers only: the page that linked here, which finds broken internal links."
+        },
+        "country": {
+          "$ref": "#/$defs/AnalyticsCountry"
+        },
+        "device": {
+          "$ref": "#/$defs/AnalyticsDevice"
+        },
+        "crawler": {
+          "$ref": "#/$defs/AnalyticsCrawlerName"
+        },
+        "renderMs": {
+          "$ref": "#/$defs/AnalyticsMillis",
+          "description": "WAE double8. Time the Worker spent answering."
+        },
+        "sampleOneIn": {
+          "$ref": "#/$defs/AnalyticsSampleOneIn"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "AnalyticsBrowser": {
+      "type": "string",
+      "description": "WAE blob13. Browser family, without version.",
+      "enum": [
+        "chrome",
+        "edge",
+        "firefox",
+        "safari",
+        "samsung",
+        "opera",
+        "other"
+      ]
+    },
+    "AnalyticsChannel": {
+      "type": "string",
+      "description": "WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.",
+      "enum": [
+        "direct",
+        "internal",
+        "search",
+        "social",
+        "ai",
+        "email",
+        "paid",
+        "referral"
+      ]
+    },
+    "AnalyticsCountry": {
+      "type": "string",
+      "description": "WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.",
+      "pattern": "^[A-Z][A-Z0-9]$"
+    },
+    "AnalyticsCrawlerName": {
+      "type": "string",
+      "description": "WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+    },
+    "AnalyticsDevice": {
+      "type": "string",
+      "description": "WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.",
+      "enum": [
+        "desktop",
+        "mobile",
+        "tablet",
+        "bot",
+        "unknown"
+      ]
+    },
+    "AnalyticsHostname": {
+      "type": "string",
+      "description": "WAE blob6. Host of an external referrer: lower case, without www., port, path or query.",
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+      "maxLength": 253
+    },
+    "AnalyticsMillis": {
+      "type": "integer",
+      "description": "Whole milliseconds (the server rounds), capped at ten minutes.",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "AnalyticsNavType": {
+      "type": "string",
+      "description": "WAE blob16. How the page was reached; restore = back/forward cache.",
+      "enum": [
+        "navigate",
+        "reload",
+        "back_forward",
+        "prerender",
+        "restore"
+      ]
+    },
+    "AnalyticsNodeKind": {
+      "type": "string",
+      "description": "WAE blob5. The kind of node the path resolved to.",
+      "enum": [
+        "page",
+        "entry",
+        "archive"
+      ]
+    },
+    "AnalyticsOs": {
+      "type": "string",
+      "description": "WAE blob14. Operating system family, without version.",
+      "enum": [
+        "windows",
+        "macos",
+        "ios",
+        "android",
+        "linux",
+        "chromeos",
+        "other"
+      ]
+    },
+    "AnalyticsRequestPath": {
+      "type": "string",
+      "description": "WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.",
+      "pattern": "^/[!-~]*$",
+      "maxLength": 256
+    },
+    "AnalyticsSampleOneIn": {
+      "type": "integer",
+      "description": "WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "AnalyticsUtmValue": {
+      "type": "string",
+      "description": "A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.",
+      "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$"
+    },
+    "AnalyticsVisitorHash": {
+      "type": "string",
+      "description": "WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "Path": {
+      "type": "string",
+      "description": "Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
+export const AnalyticsBeaconSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json",
+  "title": "AnalyticsBeacon",
+  "description": "What a site's first-party analytics script sends to POST /__cloudhal/e (RFC-0006): JSON as text/plain, at most 2 KB. Everything in it is untrusted. The server keeps a beacon only after the same-origin, bot and rate checks, normalises the path and resolves it to a published route, reduces the referrer to a host, normalises UTM values, and derives everything else (node, country, device, visitor) itself. The script never sends an identifier, a cookie or a full URL.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "AnalyticsPageviewBeacon",
+      "description": "Sent once per page view, when the page is first visible (after prerendering, and again on a back/forward cache restore).",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "path"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pageview"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/BeaconPath"
+        },
+        "referrer": {
+          "type": "string",
+          "description": "The host of document.referrer only (the script drops scheme, path and query); empty or absent for direct visits.",
+          "maxLength": 253
+        },
+        "utmSource": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "utmMedium": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "utmCampaign": {
+          "$ref": "#/$defs/BeaconUtm"
+        },
+        "navType": {
+          "type": "string",
+          "enum": [
+            "navigate",
+            "reload",
+            "back_forward",
+            "prerender",
+            "restore"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "AnalyticsVitalsBeacon",
+      "description": "Sent once, when a sampled page view is hidden, with the Core Web Vitals measured so far.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "path",
+        "sampleOneIn"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "vitals"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/BeaconPath"
+        },
+        "lcp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "inp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "cls": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ttfb": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "fcp": {
+          "$ref": "#/$defs/BeaconMillis"
+        },
+        "sampleOneIn": {
+          "type": "integer",
+          "description": "The vitals sampling the script was served with (one page view in N); the server checks it against the site's setting.",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "BeaconMillis": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "BeaconPath": {
+      "type": "string",
+      "description": "location.pathname as the browser reports it (no query string, no fragment).",
+      "pattern": "^/[^?#\\s]*$",
+      "maxLength": 1024
+    },
+    "BeaconUtm": {
+      "type": "string",
+      "description": "A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    }
+  }
+} as const;
+
+export const CommentSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/comment.schema.json",
+  "title": "Comment",
+  "description": "A reader comment on a published content entry, as stored in D1 (outside the site graph), returned to people and agents, and exported (RFC-0007). It is not a graph node: it never enters a snapshot, a diff or a site bundle, and a content rollback never changes it. The record carries no personal data beyond the display name the commenter chose: an email address, an IP address or its hash, a user agent and a proof-of-work challenge live in separate columns and tables that this contract cannot express (additionalProperties: false), so no reader of the contract — Studio lists, MCP tools, exports — can leak them. Text is plain text; renderers escape it and turn only https links into anchors with rel=\"ugc nofollow noopener noreferrer\".",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "nodeId",
+    "source",
+    "author",
+    "status",
+    "createdAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/CommentId"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "nodeId": {
+      "$ref": "#/$defs/Id",
+      "description": "The content entry the comment belongs to, by id, so threads survive slug changes (RFC-0002)."
+    },
+    "parentId": {
+      "$ref": "#/$defs/CommentId",
+      "description": "The comment this one is nested under for display. Absent for a top-level comment. In v1 the tree is two levels deep: a parent is always top-level, and a reply to a reply is nested under the same top-level comment with `inReplyToId` pointing at the comment it answers."
+    },
+    "inReplyToId": {
+      "$ref": "#/$defs/CommentId",
+      "description": "The comment this one answers when that is not `parentId` itself (a reply to a reply). Only with `parentId`, in the same thread."
+    },
+    "source": {
+      "type": "string",
+      "description": "Where the comment came from: `native` (the site's own form or Studio), `import` (an importer; see `origin`). `webmention` and `activitypub` are reserved for later RFCs and are refused by v1 writers.",
+      "enum": [
+        "native",
+        "import",
+        "webmention",
+        "activitypub"
+      ]
+    },
+    "origin": {
+      "$ref": "#/$defs/CommentOrigin"
+    },
+    "author": {
+      "$ref": "#/$defs/CommentAuthor"
+    },
+    "body": {
+      "$ref": "#/$defs/CommentBody"
+    },
+    "status": {
+      "$ref": "#/$defs/CommentStatus"
+    },
+    "labels": {
+      "type": "array",
+      "description": "Advisory labels from rules, classifiers, agents and people. Labels never change what readers see; only a status change does.",
+      "items": {
+        "$ref": "#/$defs/CommentLabel"
+      },
+      "maxItems": 32
+    },
+    "moderation": {
+      "$ref": "#/$defs/CommentModeration"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "editedAt": {
+      "$ref": "#/$defs/Timestamp",
+      "description": "Set when the text changed after it was first stored (v1.1 edit window; staff replies edited in Studio)."
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    }
+  },
+  "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
+    "CommentAuthor": {
+      "description": "Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "GuestCommentAuthor",
+          "description": "A guest: only the display name they typed. Guest comments are always held for moderation in v1.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "guest"
+              ]
+            },
+            "name": {
+              "$ref": "#/$defs/CommentDisplayName"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReaderCommentAuthor",
+          "description": "A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "readerId",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "reader"
+              ]
+            },
+            "readerId": {
+              "$ref": "#/$defs/Id"
+            },
+            "name": {
+              "$ref": "#/$defs/CommentDisplayName"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "StaffCommentAuthor",
+          "description": "A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "personId",
+            "name",
+            "badge"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "staff"
+              ]
+            },
+            "personId": {
+              "type": "string",
+              "description": "The person who wrote or approved the reply.",
+              "pattern": "^user_[A-Za-z0-9]{6,32}$"
+            },
+            "name": {
+              "$ref": "#/$defs/CommentDisplayName"
+            },
+            "badge": {
+              "type": "string",
+              "description": "What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.",
+              "enum": [
+                "author",
+                "team"
+              ]
+            },
+            "draftedBy": {
+              "$ref": "#/$defs/Actor"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ErasedCommentAuthor",
+          "description": "The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "erased"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "CommentBody": {
+      "type": "object",
+      "description": "The comment text. v1 has only `text`: plain text with line breaks, no markup. A later RFC may add a restricted Markdown format. Absent only when the text was deleted (status `deleted`, or an erasure that removed the text); the record then stays as a tombstone while approved replies hang under it.",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "text"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "text"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "description": "NFC-normalised, CRLF turned into LF, trimmed: 1 to 5,000 characters. Tabs and line feeds are the only control characters allowed; bidirectional overrides are refused so a comment cannot disguise itself in Studio.",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"
+        }
+      }
+    },
+    "CommentDisplayName": {
+      "type": "string",
+      "description": "Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"
+    },
+    "CommentId": {
+      "type": "string",
+      "description": "A comment id: `cmt_` and 6 to 32 letters or digits.",
+      "pattern": "^cmt_[A-Za-z0-9]{6,32}$"
+    },
+    "CommentLabel": {
+      "type": "object",
+      "description": "An advisory label. `rule` labels come from the submission pipeline (word lists, link count, instruction-like text); `classifier` from an opt-in classifier (Workers AI, Akismet); `agent` from `label_comments`; `person` from Studio. `by` is the agent or person that set it (absent for rules and classifiers).",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "source",
+        "at"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": [
+            "spam-suspect",
+            "toxic",
+            "off-topic",
+            "question",
+            "needs-reply",
+            "praise",
+            "personal-data",
+            "links",
+            "watch-word",
+            "instruction-like"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "rule",
+            "classifier",
+            "agent",
+            "person"
+          ]
+        },
+        "by": {
+          "$ref": "#/$defs/Actor"
+        },
+        "confidence": {
+          "type": "integer",
+          "description": "0 to 100, when the source reports one.",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "CommentModeration": {
+      "type": "object",
+      "description": "The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "actor",
+        "at",
+        "automated"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "hide",
+            "spam",
+            "hold",
+            "restore",
+            "delete",
+            "erase"
+          ]
+        },
+        "actor": {
+          "$ref": "#/$defs/Actor"
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "reasonCode": {
+          "type": "string",
+          "description": "Required by writers for hide, spam, delete and erase.",
+          "enum": [
+            "spam",
+            "abuse",
+            "off-topic",
+            "personal-data",
+            "illegal-content",
+            "legal-order",
+            "author-request",
+            "erasure-request",
+            "duplicate",
+            "other"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "description": "Free text from the moderator, plain text, at most 500 characters.",
+          "maxLength": 500,
+          "pattern": "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+        },
+        "automated": {
+          "type": "boolean",
+          "description": "True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."
+        }
+      }
+    },
+    "CommentOrigin": {
+      "type": "object",
+      "description": "For imported comments: the system and its id, so importers are idempotent.",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "id"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "enum": [
+            "cloudhal",
+            "disqus",
+            "wordpress"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "The comment's id in that system: printable ASCII, at most 200 characters.",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[!-~]+$"
+        }
+      }
+    },
+    "CommentStatus": {
+      "type": "string",
+      "description": "Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.",
+      "enum": [
+        "pending",
+        "approved",
+        "hidden",
+        "spam",
+        "deleted"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
+export const CommentSubmissionSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/comment-submission.schema.json",
+  "title": "CommentSubmission",
+  "description": "What a browser may send to the site Worker's comment endpoints (RFC-0007): `POST /__cloudhal/comments` (a comment) and `POST /__cloudhal/comments/report` (a report). Forms post application/x-www-form-urlencoded and the comments module posts JSON; the server builds this object from either (the endpoint sets `kind`, the server sets `schemaVersion`) and checks it with the precompiled validator before anything else reads it. Everything in it is untrusted. It is loose where the server normalises (it trims, NFC-normalises and re-checks text against the stored Comment contract) and strict where a browser has no business sending something: there is no field for a status, a site, an author kind, a label, an IP address or anything the server derives itself.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "CommentPostSubmission",
+      "description": "A new comment or a reply.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "nodeId",
+        "name",
+        "body"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "comment"
+          ]
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id",
+          "description": "The entry commented on. The server accepts it only for a published entry with an open thread, and works out the page to return to itself."
+        },
+        "parentId": {
+          "$ref": "#/$defs/SubmissionCommentId",
+          "description": "The comment replied to; it must be approved and in the same thread. The server decides `parentId`/`inReplyToId` of the stored comment."
+        },
+        "name": {
+          "type": "string",
+          "description": "The display name as typed (the form says it is shown publicly).",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional and never shown. Kept only for moderation, erasure and export requests (v1.1: reply notifications after double opt-in).",
+          "maxLength": 254,
+          "pattern": "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"
+        },
+        "body": {
+          "type": "string",
+          "description": "The comment as typed; the server trims and normalises it, then requires 2 to 5,000 characters.",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "challenge": {
+          "$ref": "#/$defs/SubmissionChallenge"
+        },
+        "solution": {
+          "$ref": "#/$defs/SubmissionSolution"
+        },
+        "turnstileToken": {
+          "$ref": "#/$defs/SubmissionTurnstileToken"
+        },
+        "website": {
+          "$ref": "#/$defs/SubmissionHoneypot"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "CommentReportSubmission",
+      "description": "A reader's notice that a comment breaks the site's rules or the law (EU DSA Art. 16). A report never hides anything by itself: it puts the comment in front of a person.",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "commentId",
+        "reason"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "report"
+          ]
+        },
+        "commentId": {
+          "$ref": "#/$defs/SubmissionCommentId"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "spam",
+            "abuse",
+            "personal-data",
+            "illegal-content",
+            "other"
+          ]
+        },
+        "details": {
+          "type": "string",
+          "description": "Why, as typed; at most 1,000 characters after normalising.",
+          "maxLength": 4000
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional, never shown: where the site may answer the notice.",
+          "maxLength": 254,
+          "pattern": "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"
+        },
+        "challenge": {
+          "$ref": "#/$defs/SubmissionChallenge"
+        },
+        "solution": {
+          "$ref": "#/$defs/SubmissionSolution"
+        },
+        "turnstileToken": {
+          "$ref": "#/$defs/SubmissionTurnstileToken"
+        },
+        "website": {
+          "$ref": "#/$defs/SubmissionHoneypot"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "SubmissionChallenge": {
+      "type": "string",
+      "description": "The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).",
+      "minLength": 16,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"
+    },
+    "SubmissionCommentId": {
+      "type": "string",
+      "pattern": "^cmt_[A-Za-z0-9]{6,32}$"
+    },
+    "SubmissionHoneypot": {
+      "type": "string",
+      "description": "A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.",
+      "maxLength": 2048
+    },
+    "SubmissionSolution": {
+      "type": "string",
+      "description": "The counter that solves the challenge, in decimal.",
+      "pattern": "^(?:0|[1-9][0-9]{0,15})$"
+    },
+    "SubmissionTurnstileToken": {
+      "type": "string",
+      "description": "Cloudflare Turnstile's response token, when the site turned Turnstile on.",
+      "minLength": 1,
+      "maxLength": 2048
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -2834,4 +3979,8 @@ export const schemas = {
   "redirect": RedirectSchema,
   "asset": AssetSchema,
   "menu": MenuSchema,
+  "analytics-event": AnalyticsEventSchema,
+  "analytics-beacon": AnalyticsBeaconSchema,
+  "comment": CommentSchema,
+  "comment-submission": CommentSubmissionSchema,
 } as const;

@@ -1,7 +1,11 @@
 import type { ErrorObject } from "ajv";
 import type { RootSchemaName } from "../scripts/schema-list.ts";
 import type {
+  AnalyticsBeacon,
+  AnalyticsEvent,
   Asset,
+  Comment,
+  CommentSubmission,
   ContentEntry,
   Menu,
   Page,
@@ -30,6 +34,10 @@ export interface ContractTypes {
   redirect: Redirect;
   asset: Asset;
   menu: Menu;
+  "analytics-event": AnalyticsEvent;
+  "analytics-beacon": AnalyticsBeacon;
+  comment: Comment;
+  "comment-submission": CommentSubmission;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -45,6 +53,10 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   redirect: v.validateRedirect,
   asset: v.validateAsset,
   menu: v.validateMenu,
+  "analytics-event": v.validateAnalyticsEvent,
+  "analytics-beacon": v.validateAnalyticsBeacon,
+  comment: v.validateComment,
+  "comment-submission": v.validateCommentSubmission,
 };
 
 export class ContractValidationError extends Error {

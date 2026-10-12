@@ -25,6 +25,9 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <SeoHead meta={meta} />
+    {/* public/: static assets, answered before the Site Worker runs (no render, no analytics event) */}
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="generator" content="Cloudhal" />
   </head>
   <body class="min-h-screen bg-white text-zinc-900 antialiased">

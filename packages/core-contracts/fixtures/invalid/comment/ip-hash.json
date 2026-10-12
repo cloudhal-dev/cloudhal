@@ -1,0 +1,22 @@
+{
+  "reason": "The IP HMAC is a column for rate limits and bans, never part of the record people and agents read",
+  "data": {
+    "schemaVersion": 1,
+    "id": "cmt_01HZX8K3Q9AA",
+    "siteId": "site_01HZX8K3Q9ST",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "source": "native",
+    "author": {
+      "kind": "guest",
+      "name": "Ayşe Yılmaz"
+    },
+    "body": {
+      "format": "text",
+      "text": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?"
+    },
+    "status": "pending",
+    "createdAt": "2026-10-12T08:14:03Z",
+    "rev": 0,
+    "ipHash": "9f2c4e1a7b3d5f60"
+  }
+}

@@ -6,6 +6,7 @@ import {
   termCacheTag,
 } from "@cloudhal/astro-renderer/cache-tags";
 import { archiveFeedXml, FEED_LIMIT } from "@cloudhal/astro-renderer/feeds";
+import { loadAssetIndex } from "@cloudhal/astro-renderer/media";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
@@ -49,6 +50,7 @@ export const GET: APIRoute = async ({ request, url, params }) => {
     origin: siteOrigin(site, url),
     archive: route.archive,
     taxonomy: route.index,
+    assets: await loadAssetIndex(source),
   });
   return new Response(body, { headers });
 };

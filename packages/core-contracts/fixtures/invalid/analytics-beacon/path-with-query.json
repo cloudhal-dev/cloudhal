@@ -1,0 +1,8 @@
+{
+  "reason": "The script sends location.pathname, never the query string",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "path": "/posts/x?token=abc"
+  }
+}

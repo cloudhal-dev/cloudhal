@@ -12,6 +12,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./tools": "./src/tools.ts",
+    "./analytics": "./src/analytics-reports.ts",
+    "./comments": "./src/comments.ts",
     "./stdio": "./src/stdio.ts",
     "./http": "./src/http.ts"
   },
@@ -25,14 +27,17 @@
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
+    "@cloudhal/analytics": "workspace:*",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/astro-renderer": "workspace:*",
+    "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "@modelcontextprotocol/server": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "better-sqlite3": "catalog:",
     "typescript": "catalog:",
@@ -52,6 +57,14 @@
       "./tools": {
         "types": "./dist/src/tools.d.ts",
         "default": "./dist/src/tools.js"
+      },
+      "./analytics": {
+        "types": "./dist/src/analytics-reports.d.ts",
+        "default": "./dist/src/analytics-reports.js"
+      },
+      "./comments": {
+        "types": "./dist/src/comments.d.ts",
+        "default": "./dist/src/comments.js"
       },
       "./stdio": {
         "types": "./dist/src/stdio.d.ts",

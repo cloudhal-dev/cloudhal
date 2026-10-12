@@ -1,0 +1,151 @@
+import type { NamespaceMessages } from "../namespaces.ts";
+
+/** Turkish `commentsSettings.*` (lazy namespace; keys from `commentsSettings.en.ts`). */
+export const messages: NamespaceMessages<"commentsSettings"> = {
+  commentsSettings: {
+    title: "Yorumlar",
+    description:
+      "Okurların yazılara yorum yapmasına izin ver. Her misafir yorumu, kimse görmeden önce bir kişinin onayını bekler.",
+    status: { on: "Açık", off: "Kapalı", unavailable: "Kullanılamıyor" },
+    noAccessTitle: "Yorum ayarlarını göremiyorsun",
+    unavailableTitle: "Bu sunucuda yorumlar kullanılamıyor",
+    unavailableDescription:
+      "Bu kurulum okur yorumları olmadan çalışıyor (CLOUDHAL_COMMENTS_KEY yok ya da cloudhal.json içinde comments.available false).",
+    enabled: {
+      label: "Yorumları kabul et",
+      hint: "Okurlar aşağıdaki koleksiyonlara yorum yapabilir. Yorumları onay bekler; biri onaylamadan hiçbiri herkese açık olmaz.",
+    },
+    collections: {
+      label: "Koleksiyonlar",
+      hint: "Okurların yorum yapabileceği yerler. Her koleksiyon yorum dizilerini kendi takvimiyle kapatabilir.",
+      closeAfter: "{collection} koleksiyonunda dizileri kapat",
+      sameAsSite: "Siteyle aynı",
+    },
+    showWhenOff: {
+      label: "Yorumlar kapalıyken onaylı yorumları göstermeye devam et",
+      hint: "Böylece yorumları kapatmak yalnızca yenilerini durdurur; konuşma sayfada kalır.",
+    },
+    closeAfter: {
+      label: "Dizileri şu süreden sonra kapat",
+      hint: "Her yazının yayın tarihinden itibaren sayılır. Bir yazı bunu kendi Yorumlar kartında değiştirebilir.",
+      never: "Hiçbir zaman",
+      days: "{days} gün",
+      year: "1 yıl",
+    },
+    protection: {
+      legend: "Bot koruması",
+      pow: "İş kanıtı (proof of work)",
+      powHint:
+        "Okurun tarayıcısı birkaç yüz milisaniyelik bir iş yapar. Üçüncü taraf yok, çözülecek bulmaca yok.",
+      powBadge: "Varsayılan",
+      turnstile: "Cloudflare Turnstile",
+      turnstileHint:
+        "Yorumların açık olduğu sayfalara Cloudflare'in betiğini ekler. Bir site anahtarı ve gizli anahtarı gerekir.",
+      siteKey: "Turnstile site anahtarı",
+      siteKeyHint: "Cloudflare panelindeki Turnstile bileşeninden.",
+      siteKeyInvalid: "Site anahtarını göründüğü gibi yapıştır (harf, rakam, _ ve -).",
+      secret: "Turnstile gizli anahtarı",
+      secretHint: "Yalnızca yazılır: kaydettikten sonra Studio onu bir daha göstermez.",
+      secretSaved: "Kaydedildi",
+      secretSavedOn: "{date} tarihinde kaydedildi",
+      secretMissing: "Henüz kaydedilmedi",
+      secretReplace: "Değiştir",
+      secretRemove: "Kaldır",
+      secretSave: "Gizli anahtarı kaydet",
+      secretSavedToast: "Turnstile gizli anahtarı kaydedildi",
+      secretRemovedToast: "Turnstile gizli anahtarı kaldırıldı",
+      secretFailed: "Gizli anahtar kaydedilemedi",
+      keysMissing:
+        "Bu kurulumda CLOUDHAL_COMMENTS_KEY yok, bu yüzden gizli anahtarlar saklanamıyor. İş kanıtını kullan ya da anahtarı ekleyip yeniden dağıt.",
+      csp: "Yorum formu açık olan sayfalar o zaman İçerik Güvenliği Politikalarında challenges.cloudflare.com'dan gelen betiklere ve çerçevelere izin verir. Diğer sayfalarda hiçbir şey değişmez.",
+      needsSecret: "Gizli anahtarı da kaydet; yoksa Turnstile açıkken yorumlar reddedilir.",
+    },
+    noScript: {
+      label: "JavaScript'i kapalı tarayıcılardan yorum kabul et",
+      hint: "Betikleri kapalı okurlar da düz bir formla, daha sıkı sınırlar altında yorum yapabilir.",
+    },
+    linkLimit: {
+      label: "Etiketlenmeden önce izin verilen bağlantı sayısı",
+      hint: "Daha fazla bağlantı içeren yorumlar “Bağlantılar” etiketini alır. 0 ile 10 arası.",
+      invalid: "0 ile 10 arasında bir tam sayı kullan.",
+    },
+    words: {
+      watch: "İzlenen kelimeler",
+      watchHint:
+        "Bu kelimeleri içeren yorumlar “İzlenen kelime” etiketini alır. Diğerleri gibi yine seni bekler.",
+      blocked: "Engellenen kelimeler",
+      blockedHint:
+        "Bu kelimeleri içeren yorumlar doğrudan spama düşer. Eşleştirme büyük-küçük harfe ve Türkçe noktalı harflere bakmaz.",
+      invalid: "En çok 64 karakterlik en çok 200 kelime.",
+    },
+    dailyCap: {
+      label: "Günde saklanan yorum sayısı",
+      hint: "Bu sınır aşılınca yeni yorumlar gece yarısına (UTC) kadar reddedilir. Her yorum yaklaşık {rows} veritabanı yazması tutar; günde {cap} yorum yaklaşık {writes} yazma eder.",
+      invalid: "1 ile 100.000 arasında bir tam sayı kullan.",
+      today: "Bugün saklanan",
+      todayValue: "{cap} sınırdan {used}",
+    },
+    ai: {
+      label: "Yorumları Workers AI ile etiketle",
+      hint: "Cloudflare hesabındaki bir model etiket önerir (spam, saldırgan, soru…). Etiketler hiçbir şeyi yayımlamaz ya da gizlemez.",
+      unavailable: "Bu kurulumda henüz kullanılamıyor.",
+      confirmTitle: "Yorumlar Workers AI'a gönderilsin mi?",
+      confirmDescription:
+        "Etiket önermek için her yeni yorumun metni kendi Cloudflare hesabındaki bir Workers AI modeline gönderilir. Adlar ve e-postalar gönderilmez.",
+      confirmBanner:
+        "Workers AI'ın ücretsiz günlük kotası içinde çalışır; kota dolunca etiketleme ertesi güne kadar durur. Gizlilik bildiriminde bundan söz et (aşağıdaki metin söz ediyor).",
+      confirm: "Yapay zekâ etiketlerini aç",
+    },
+    retention: {
+      title: "Saklama",
+      hint: "Cloudhal'ın artık göstermediği yorumları ne kadar tuttuğu. Silme işlemleri saatte bir çalışır.",
+      pendingDays: "Karar verilmemiş bekleyen yorumlar",
+      spamDays: "Spam",
+      deletedDays: "Silinen yorumlar",
+      hiddenDays: "Gizli yorumlar",
+      clientDataDays: "Ağ özetleri ve doğrulama kimlikleri",
+      resolvedReportDays: "Çözülen bildirimler ve gerekçe beyanları",
+      days: "{days} gün",
+      keep: "Silinene kadar tut",
+      sixMonths: "6 ay",
+      year: "1 yıl",
+    },
+    notice: {
+      title: "Gizlilik bildirimi",
+      hint: "Sitendeki gizlilik sayfasına yapıştır. Yukarıdaki anahtarları izler.",
+      unsaved: "Kaydedilmemiş değişikliklerini gösteriyor.",
+      languages: "Bildirimin dili",
+      heading: "Yorumlar",
+      base: "Yorum yaptığında gönderdiğin adı ve metni, verirsen e-posta adresini saklarız. E-postan hiçbir zaman gösterilmez ve yalnızca yorumunla ilgili talepleri yanıtlamak için kullanılır. Kötüye kullanımı önlemek için ağ adresinin karıştırılmış bir biçimini en çok 30 gün tutarız; adresin kendisini hiçbir zaman saklamayız. Yorumlar yayımlanmadan önce incelenir. Yorumlar için çerez kullanmayız. Adının ya da yorumunun kaldırılmasını istediğin zaman isteyebilirsin.",
+      turnstile:
+        "Botları uzak tutmak için yorum formu Cloudflare Turnstile kullanır; Turnstile, tarayıcın ve bağlantın hakkındaki bilgileri Cloudflare'in gizlilik politikasına göre işler.",
+      ai: "Yorumlar, bir kişi incelemeden önce barındırma sağlayıcımız Cloudflare'in çalıştırdığı otomatik bir sınıflandırıcıyla kontrol edilebilir.",
+      copy: "Bildirimi kopyala",
+      copied: "Bildirim kopyalandı",
+      legal:
+        "Bilgi amaçlıdır, hukuki tavsiye değildir. Okurlarının verilerinden sorumlu olan sensin.",
+    },
+    saved: "Yorum ayarları kaydedildi",
+    savedPurged: "Yorumlu sayfalar bir dakika içinde güncellenir.",
+    failed: "Yorum ayarları kaydedilemedi",
+    conflictTitle: "Bu ayarlar başka bir yerde değişti",
+    conflictDescription:
+      "Sen açtıktan sonra biri yorum ayarlarını kaydetti. Son hâlini yükle: diğer değişikliklerin kalır.",
+    loadLatest: "Son hâlini yükle",
+    keys: {
+      missing: "Yorum yok",
+      missingHint:
+        "Bu anahtar, agent'lar okur yorumlarını okuyamazken ya da bu yetki olmadan oluşturuldu. Anahtarlar kendiliğinden yetki kazanmaz: agent'ın yorumları okuyabilmesi için izin ver (e-postaları asla). Onaylamak, yanıtlamak ve yeniden açmak yine bir kişiyi bekler.",
+      allow: "Yorumlara izin ver",
+      allowed: "Yorumlara izin verildi",
+      allowedDescription: "{name}, bir sonraki çağrısından itibaren okur yorumlarını okuyabilir.",
+      failed: "Yorumlara izin verilemedi",
+      unsupported:
+        "Bu sunucu mevcut bir anahtara henüz yorum erişimi ekleyemiyor. Yeni bir anahtar oluştur: yeni anahtarlar yorumları okur.",
+      ownerCannot: "{name} adlı kişinin rolü yorumları okuyamıyor, bu yüzden anahtarı da okuyamaz.",
+      writeHint:
+        "Bu anahtar okur yorumlarını okuyor ve içeriği değiştirebiliyor: ziyaretçilerin yazdığı metin, siteni düzenleyen bir agent'a ulaşıyor.",
+      writeHintBadge: "Yorum okur, içerik düzenler",
+    },
+  },
+};

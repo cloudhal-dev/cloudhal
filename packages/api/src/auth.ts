@@ -31,6 +31,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { ActorResolver, PrincipalResolver } from "./context.ts";
 import { type MemberRow, StaffStore } from "./staff.ts";
 
@@ -71,7 +72,12 @@ export interface AuthOptions {
   };
   /** Clock for time-boxed elevations and invites (tests). */
   readonly now?: () => Date;
+  /** Requests one API key may make per window (default 600 per minute); see `resolvePrincipal`. */
+  readonly agentKeyRateLimit?: { readonly windowMs: number; readonly max: number };
 }
+
+/** The default per-key request budget: generous for an agent session, a brake on a runaway loop. */
+export const AGENT_KEY_RATE_LIMIT = { windowMs: 60_000, max: 600 } as const;
 
 export interface CloudhalAuth {
   readonly handler: (request: Request) => Promise<Response>;
@@ -142,6 +148,18 @@ export interface AgentKeyService {
   }): Promise<AgentKeySummary>;
   /** Ends an elevation early: the creator's own key, or any key with `agents:manage`. */
   endElevation(input: { headers: Headers; id: string }): Promise<AgentKeySummary>;
+  /**
+   * Adds read-only scopes that did not exist when the key was made (`ADDABLE_KEY_SCOPES`, RFC-0006
+   * §9.1 "Allow analytics", RFC-0007 §10.1 "Allow comments"): the creator's own key, or any key
+   * with `agents:manage`. The scope must
+   * fit both the caller's and the key creator's role (`scope_above_role`): keys stay narrowed to
+   * their creator (RFC-0005 I5). `added` is empty when the key already held every scope.
+   */
+  addScopes(input: {
+    headers: Headers;
+    id: string;
+    scopes: Scope[];
+  }): Promise<{ key: AgentKeySummary; added: Scope[] }>;
   /** The caller's keys; `all` lists every key (`agents:manage`). */
   list(input: { headers: Headers; all?: boolean }): Promise<AgentKeySummary[]>;
   /** Revokes a key: the caller's own, or any key with `agents:manage`. */
@@ -309,8 +327,10 @@ function createInstance(options: AuthOptions, staff: StaffStore) {
       apiKey({
         apiKeyHeaders: API_KEY_HEADER,
         enableMetadata: true,
-        // The plugin's default (10 requests per key per day) would stall any real agent session.
-        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
+        // Cloudhal limits keys itself (`resolvePrincipal`): the plugin's window only resets after a
+        // pause as long as the window, so an agent polling steadily was locked out for good once it
+        // had made `maxRequests` calls in total — and the refusal surfaced as "unauthorized".
+        rateLimit: { enabled: false },
       }),
     ],
   });
@@ -345,6 +365,16 @@ export class AuthError extends Error {
     this.code = options.code ?? "auth";
   }
 }
+
+/**
+ * Scopes a person may add to an existing key (`PATCH /api/agent-keys/:id {addScopes}`). Only
+ * read-only scopes that new keys get by default but older keys lack — "Allow analytics"
+ * (RFC-0006 §9.1) and "Allow comments" (RFC-0007 §10.1; reader text reaches the agent as
+ * untrusted data, never an email) — and only within the caller's and the key creator's role, so a
+ * Contributor's key never gets them. Everything else stays fixed at creation (RFC-0005: promotions
+ * never silently empower agents).
+ */
+export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read", "comments:read"];
 
 /** Scopes an API key may carry live under the `cloudhal` permission resource. */
 export const API_KEY_PERMISSION_RESOURCE = "cloudhal";
@@ -482,6 +512,7 @@ function personRef(member: MemberRow): PersonRef {
 export function createAuth(options: AuthOptions): CloudhalAuth {
   const now = options.now ?? (() => new Date());
   const staffStore = new StaffStore(options.sql, now);
+  const keyLimit = options.agentKeyRateLimit ?? AGENT_KEY_RATE_LIMIT;
   const instance = createInstance(options, staffStore);
   const api = instance.api as unknown as {
     verifyApiKey(input: { body: { key: string } }): Promise<VerifiedApiKey>;
@@ -655,6 +686,41 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
       });
       return toSummary(row, now(), (await staffStore.member(creator))?.role ?? null);
     },
+    async addScopes({ headers, id, scopes: requested }) {
+      const bad = requested.filter((s) => !ADDABLE_KEY_SCOPES.includes(s));
+      if (bad.length || !requested.length)
+        throw new AuthError(
+          `only ${ADDABLE_KEY_SCOPES.join(", ")} can be added to an existing key${bad.length ? ` (not ${bad.join(", ")})` : ""}`,
+          { code: "scope_not_addable" },
+        );
+      const { who, key } = await keyFor(headers, id, true);
+      const creator = key.referenceId as string;
+      const creatorRole = (await staffStore.member(creator))?.role ?? null;
+      // The key is narrowed to its creator's role on every call anyway; refusing here keeps the
+      // stored scopes honest (a Contributor's key cannot hold analytics:read or comments:read).
+      const above = [
+        ...scopesAboveRole(requested, who.member.role),
+        ...(creatorRole ? scopesAboveRole(requested, creatorRole) : requested),
+      ];
+      if (above.length)
+        throw new AuthError(
+          `${creatorRole === who.member.role ? "your role" : "the key creator's role"} cannot give a key ${[...new Set(above)].join(", ")}`,
+          { code: "scope_above_role" },
+        );
+      const stored = storedScopes(key);
+      const added = [...new Set(requested)].filter((s) => !holds(stored, s));
+      if (!added.length) return { key: toSummary(key, now(), creatorRole), added };
+      const elevation = elevationOf(key, now());
+      const row = await api.updateApiKey({
+        body: {
+          keyId: id,
+          userId: creator,
+          permissions: { [API_KEY_PERMISSION_RESOURCE]: [...stored, ...added] },
+          metadata: { mode: modeOf(key), ...(elevation ? { elevation } : {}) },
+        },
+      });
+      return { key: toSummary(row, now(), creatorRole), added };
+    },
     async list({ headers, all }) {
       const who = await caller(headers, "sign in to list agent keys");
       const at = now();
@@ -805,6 +871,22 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
     if (key) {
       const verified = await api.verifyApiKey({ body: { key } });
       if (!verified.valid || !verified.key) return undefined;
+      // A fixed window per key (`rateLimit` table): it resets every window however busy the key is.
+      if (
+        !(await staffStore.hit(`cloudhal:key:${verified.key.id}`, keyLimit.windowMs, keyLimit.max))
+      )
+        throw new HTTPException(429, {
+          res: Response.json(
+            {
+              error: "rate_limited",
+              message: `this API key made more than ${keyLimit.max} requests in ${Math.round(keyLimit.windowMs / 1000)} s; wait and try again`,
+            },
+            {
+              status: 429,
+              headers: { "retry-after": String(Math.ceil(keyLimit.windowMs / 1000)) },
+            },
+          ),
+        });
       // An agent never exceeds its creator (I5): no creator membership, no key.
       const creator = verified.key.referenceId
         ? await staffStore.member(verified.key.referenceId)

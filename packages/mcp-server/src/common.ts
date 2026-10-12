@@ -4,6 +4,7 @@
  */
 import {
   type ApprovalStore,
+  type CallClass,
   checkEntryLimit,
   type OwnershipResolver,
   type OwnLimit,
@@ -12,7 +13,9 @@ import {
   type Scope,
   type ToolAnnotations,
 } from "@cloudhal/agent-runtime";
-import type { ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
+import type { AnalyticsService } from "@cloudhal/analytics/service";
+import { CommentsError } from "@cloudhal/comments";
+import type { Actor, ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { InvariantCode, SiteGraphStore } from "@cloudhal/core-ts";
 import {
   ConflictError,
@@ -21,6 +24,8 @@ import {
   NotFoundError,
   UniqueConstraintError,
 } from "@cloudhal/core-ts";
+import type { FetchTransport } from "@cloudhal/core-ts/media";
+import type { CommentsDeps } from "./comments.ts";
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -46,8 +51,49 @@ export interface ToolDefinition {
    * handler (and `precheck`) check the target with `entryLimitCheck`; `changeset` — `runTool`
    * checks that a publish is own-only.
    */
-  own?: "entry" | "changeset";
+  own?: "entry" | "changeset" | "comment";
+  /**
+   * Per-argument policy (RFC-0007 §10.2): `read`, `advisory`, `reduce` or `person`. `person`
+   * calls wait for a person in every mode, `bypass` included.
+   */
+  classify?: (args: Record<string, unknown>) => CallClass;
+  /**
+   * What an approval of this call is bound to, instead of the site graph's `stateHash` (RFC-0007
+   * §10.3): comment tools bind to the `cm1:` hash of the comments and threads they name.
+   */
+  bindState?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
+  /**
+   * Approving a request for this tool in Studio runs it at once as the approving person
+   * (RFC-0007 §10.3); the agent never redeems it.
+   */
+  carryOutOnApproval?: boolean;
+  /**
+   * The text content of a result (default: the result as JSON). Comment tools write reader text
+   * inside labelled untrusted blocks (RFC-0007 §11.2).
+   */
+  renderText?: (result: unknown) => string;
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
+  /**
+   * What the audit log keeps of the arguments (default: all of them, truncated). `upload_asset`
+   * replaces its base64 payload with its size, so file bytes never land in the audit table.
+   */
+  auditArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+}
+
+/** Media settings of a deployment for the asset tools (RFC-0004 §5.6–§5.7). */
+export interface MediaToolOptions {
+  /**
+   * How `fetch_asset_url` reaches the network: `nodeTransport()` from `@cloudhal/core-ts/media-node`
+   * on Node (resolves, checks and pins every address), `workersTransport()` (the default) on Workers.
+   */
+  fetchTransport?: FetchTransport | undefined;
+  /** Hosts agents may fetch from, for every site (each site may add `cloudhal.media.allowHosts`). */
+  allowHosts?: readonly string[] | undefined;
+  /** This deployment's own hosts (Studio, admin API, workers.dev): never fetched. */
+  blockedHosts?: readonly string[] | undefined;
+  /** Per agent key per day (default 100 assets and 500 MB; audited as a denial when exceeded). */
+  agentDailyAssets?: number | undefined;
+  agentDailyBytes?: number | undefined;
 }
 
 export interface ToolContext {
@@ -70,6 +116,22 @@ export interface ToolContext {
   ownership?: OwnershipResolver | undefined;
   /** Set by `runTool`: the own limit this call runs under (absent = full scope). */
   limit?: OwnLimit | undefined;
+  /** Media settings (fetch transport, host lists, daily limits). */
+  media?: MediaToolOptions | undefined;
+  /** Site analytics (RFC-0006): the analytics tools answer `analytics_disabled` without it. */
+  analytics?: AnalyticsService | undefined;
+  /** Reader comments (RFC-0007): the comment tools answer `comments_disabled` without them. */
+  comments?: CommentsDeps | undefined;
+  /**
+   * Set by `runTool`: a person said yes to this call in their own client (or a decided approval
+   * is being carried out), so a `person`-class call may run.
+   */
+  confirmed?: boolean | undefined;
+  /**
+   * Set when Studio carries out an approved request (RFC-0007 §10.3): `principal` is the approving
+   * person, `requestedBy` the agent that asked.
+   */
+  approval?: { readonly id: string; readonly requestedBy: Actor } | undefined;
 }
 
 /**
@@ -120,7 +182,10 @@ export type ToolErrorCode =
   | "unknown_taxonomy"
   | "unknown_term"
   | "ambiguous_term"
-  | "invalid_filter";
+  | "invalid_filter"
+  | "analytics_disabled"
+  | "analytics_unavailable"
+  | "comments_disabled";
 
 export class ToolError extends Error {
   override readonly name = "ToolError";
@@ -200,7 +265,21 @@ function invariantHint(e: InvariantError): string | undefined {
     case "invalid_labels":
       return "names and synonyms must not repeat another term's name, synonym or slug; reuse that term or pick another name";
     case "too_large":
-      return "split the operation, or ask a person for the staged job";
+      return typeof e.details.limit === "number"
+        ? "use a smaller file; larger files are uploaded by a person in Studio"
+        : "split the operation, or ask a person for the staged job";
+    case "unknown_asset":
+      return "call list_assets for this site's files, or add one with upload_asset or fetch_asset_url";
+    case "retired_asset":
+      return "pick another file (list_assets), or ask a person to restore this one";
+    case "in_use":
+      return "remove those uses first (update_entry, update_page), or retire the file instead";
+    case "fetch_blocked":
+      return "use a public https address of the file itself; internal hosts, IP addresses and redirects into them are refused";
+    case "reserved_path":
+      return "paths under /media/<16 hex digits>/ belong to media files";
+    case "retry":
+      return "call the tool again in a few seconds";
     default:
       return undefined;
   }
@@ -209,6 +288,18 @@ function invariantHint(e: InvariantError): string | undefined {
 /** Store errors as `ToolError`s with stable codes; anything else is returned unchanged. */
 export function toToolError(e: unknown): unknown {
   if (e instanceof ToolError) return e;
+  // Comment store errors (RFC-0007): stable codes, the store's message says what to fix.
+  if (e instanceof CommentsError)
+    return new ToolError(
+      e.code === "not_found"
+        ? "not_found"
+        : e.code === "conflict"
+          ? "conflict"
+          : e.code === "forbidden"
+            ? "denied"
+            : "invalid",
+      e.message,
+    );
   if (e instanceof ConflictError) return new ToolError("conflict", e.message);
   if (e instanceof NotFoundError) return new ToolError("not_found", e.message);
   if (e instanceof UniqueConstraintError)

@@ -26,7 +26,9 @@ const require = createRequire(path.join(ROOT, "packages/core-ts/package.json"));
 export const PACKAGES = [
   "core-contracts",
   "storage",
+  "analytics",
   "core-ts",
+  "comments",
   "astro-renderer",
   "agent-runtime",
   "mcp-server",

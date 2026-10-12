@@ -37,3 +37,5 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0018](0018-roles-and-invites.md) | Staff roles are scope sets; agent keys never exceed their creator; approvals follow roles; invites are one-time links (RFC-0005) |
 | [0019](0019-navigation-menus.md) | Menus are Menu nodes with a tree of id-referenced items; agent edits always approved (RFC-0003) |
 | [0020](0020-assets-and-media.md) | Assets are content-addressed nodes with SHA-256; SSRF-safe agent fetch; asset:upload / asset:manage (RFC-0004) |
+| [0021](0021-site-analytics.md) | Site analytics: first-party cookie-less script, Workers Analytics Engine via bindings (no token), D1 rollups, `analytics:read` (RFC-0006) |
+| [0022](0022-reader-comments.md) | Reader comments: guest comments held for moderation, D1 outside the graph, first-party proof of work, agents label and hide while people approve (RFC-0007) |

@@ -147,43 +147,66 @@ export function ModePicker({
 }) {
   const t = useT();
   const rules = useAgentModeRules();
-  const modes = only ? rules.modes.filter((m) => only.includes(m)) : rules.modes;
+  // Only the modes the person's role may give a key (RFC-0005 §5.2); the cap is said below.
+  const modes = only ? rules.keyModes.filter((m) => only.includes(m)) : rules.keyModes;
   return (
-    <Radio.Group appearance="card" value={value} onValueChange={(v) => onValueChange(v as KeyMode)}>
-      <Radio.Legend className="sr-only">{legend}</Radio.Legend>
-      {modes.map((mode) => (
-        <Radio.Item
-          key={mode}
-          value={mode}
-          label={
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1" data-mode-option={mode}>
-              <span className="flex h-lh items-center text-kumo-subtle">
-                <ModeIcon mode={mode} />
-              </span>
-              <span>{t(`agents.modes.names.${mode}`)}</span>
-              <RiskBadge risk={MODE_RISK[mode]} />
-              {current === mode && <Badge variant="outline">{t("agents.modes.current")}</Badge>}
-            </span>
-          }
-          description={
-            <span className="grid gap-1.5 pt-0.5">
-              <span>{t(`agents.modes.descriptions.${mode}`)}</span>
-              <span className="flex items-start gap-1.5">
-                <span className="flex h-lh items-center">
-                  <HandPalm size={14} />
+    <div className="grid gap-3">
+      <Radio.Group
+        appearance="card"
+        value={value}
+        onValueChange={(v) => onValueChange(v as KeyMode)}
+      >
+        <Radio.Legend className="sr-only">{legend}</Radio.Legend>
+        {modes.map((mode) => (
+          <Radio.Item
+            key={mode}
+            value={mode}
+            label={
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1" data-mode-option={mode}>
+                <span className="flex h-lh items-center text-kumo-subtle">
+                  <ModeIcon mode={mode} />
                 </span>
-                <span>
-                  <Text as="span" size="sm" bold>
-                    {t("agents.modes.waitsLabel")}
-                  </Text>{" "}
-                  {t(`agents.modes.waits.${mode}`)}
+                <span>{t(`agents.modes.names.${mode}`)}</span>
+                <RiskBadge risk={MODE_RISK[mode]} />
+                {current === mode && <Badge variant="outline">{t("agents.modes.current")}</Badge>}
+              </span>
+            }
+            description={
+              <span className="grid gap-1.5 pt-0.5">
+                <span>{t(`agents.modes.descriptions.${mode}`)}</span>
+                <span className="flex items-start gap-1.5">
+                  <span className="flex h-lh items-center">
+                    <HandPalm size={14} />
+                  </span>
+                  <span>
+                    <Text as="span" size="sm" bold>
+                      {t("agents.modes.waitsLabel")}
+                    </Text>{" "}
+                    {t(`agents.modes.waits.${mode}`)}
+                  </span>
                 </span>
               </span>
-            </span>
-          }
-        />
-      ))}
-    </Radio.Group>
+            }
+          />
+        ))}
+      </Radio.Group>
+      {rules.cap && <RoleCapHint cap={rules.cap} />}
+    </div>
+  );
+}
+
+/** "Your role allows keys up to Edits mode." — under a capped mode picker (RFC-0005 §5.2). */
+export function RoleCapHint({ cap }: { cap: KeyMode }) {
+  const t = useT();
+  return (
+    <div className="flex items-start gap-2" data-testid="role-cap">
+      <span className="flex h-lh items-center text-kumo-subtle">
+        <ShieldCheck size={16} />
+      </span>
+      <Text variant="secondary" size="sm">
+        {t("agents.roleCap", { mode: t(`agents.modes.names.${cap}`) })}
+      </Text>
+    </div>
   );
 }
 

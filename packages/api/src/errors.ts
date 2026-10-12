@@ -1,4 +1,6 @@
 import { OwnLimitError } from "@cloudhal/agent-runtime";
+import { AnalyticsError } from "@cloudhal/analytics";
+import { CommentsError } from "@cloudhal/comments";
 import { ContractValidationError } from "@cloudhal/core-contracts";
 import {
   ConflictError,
@@ -24,7 +26,25 @@ export interface ApiErrorBody {
  * for a request that can never succeed as written, 422 for a well-formed request the data
  * invariants refuse right now.
  */
-export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 422> = {
+export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422 | 503> = {
+  // RFC-0004 (assets and media)
+  unsupported_type: 415,
+  type_mismatch: 415,
+  too_many_pixels: 422,
+  svg_unsafe: 422,
+  metadata_unsupported: 422,
+  quota_exceeded: 409,
+  purged: 410,
+  in_use: 409,
+  unknown_asset: 422,
+  retired_asset: 422,
+  fetch_blocked: 422,
+  fetch_failed: 422,
+  retry: 503,
+  reserved_path: 409,
+  missing_media: 409,
+  invalid_asset: 400,
+  // RFC-0002
   too_large: 409,
   slug_taken: 409,
   path_conflict: 409,
@@ -42,7 +62,7 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 422> = {
   not_allowed: 422,
   invalid_labels: 422,
   invalid_redirect: 422,
-  // RFC-0003 menus (the REST routes come later; the codes are mapped now).
+  // RFC-0003 menus (`routes/menus.ts`).
   key_taken: 409,
   unknown_target: 422,
   unknown_item: 422,
@@ -110,8 +130,52 @@ export function errorHandler(err: Error, c: Context): Response {
   if (err instanceof NotFoundError) {
     return c.json<ApiErrorBody>({ error: "not_found", message: err.message }, 404);
   }
+  if (err instanceof AnalyticsError) return analyticsError(err, c);
+  // RFC-0007: comment store errors carry stable codes.
+  if (err instanceof CommentsError)
+    return c.json<ApiErrorBody>(
+      { error: err.code, message: err.message },
+      err.code === "not_found"
+        ? 404
+        : err.code === "conflict"
+          ? 409
+          : err.code === "forbidden"
+            ? 403
+            : 400,
+    );
   console.error(err);
   return c.json<ApiErrorBody>({ error: "internal", message: "internal error" }, 500);
+}
+
+/**
+ * Analytics errors (RFC-0006 §7.3, §9.2): `invalid_query` and `invalid_settings` 400, `conflict`
+ * 409 (stale settings `rev`), `analytics_unavailable` 503 with `retryable` and `Retry-After: 30`,
+ * `analytics_query_failed` 502 (the message never names the dataset).
+ */
+function analyticsError(err: AnalyticsError, c: Context): Response {
+  switch (err.code) {
+    case "invalid_query":
+    case "invalid_settings":
+    case "unsupported_query":
+      return c.json<ApiErrorBody>({ error: err.code, message: err.message }, 400);
+    case "conflict":
+      return c.json<ApiErrorBody>(
+        { error: "conflict", message: err.message, details: { kind: "analyticsSettings" } },
+        409,
+      );
+    case "analytics_query_failed":
+      return c.json<ApiErrorBody>({ error: err.code, message: err.message }, 502);
+    default:
+      c.header("retry-after", "30");
+      return c.json<ApiErrorBody>(
+        {
+          error: "analytics_unavailable",
+          message: err.message,
+          details: { retryable: err.retryable || err.code === "analytics_budget_exceeded" },
+        },
+        503,
+      );
+  }
 }
 
 export function notFound(message: string): HTTPException {
@@ -134,7 +198,7 @@ export function unauthorized(): HTTPException {
 
 /** A JSON error with any status (RFC-0005 codes: `missing_scope`, `rank`, `invite_gone`, …). */
 export function apiError(
-  status: 400 | 401 | 403 | 404 | 409 | 410 | 415 | 429,
+  status: 400 | 401 | 403 | 404 | 409 | 410 | 413 | 415 | 422 | 429,
   error: string,
   message: string,
   details?: unknown,

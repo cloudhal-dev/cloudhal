@@ -1,4 +1,5 @@
 import type {
+  Asset,
   ContentEntry,
   Menu,
   NodeRef,
@@ -27,6 +28,11 @@ export interface GraphSource {
   entryBySlug(collection: string, slug: string, locale?: string): Promise<ContentEntry | undefined>;
   /** Every visible entry of a locale, newest first, across collections (feeds, sitemaps). */
   allEntries(locale?: string): Promise<ContentEntry[]>;
+  /**
+   * A visible entry by id, any locale (reader comments name the entry by id, RFC-0007 §6.2).
+   * Optional for sources that predate comments.
+   */
+  entryById?(id: string): Promise<ContentEntry | undefined>;
   /** The site's taxonomies (RFC-0002). */
   taxonomies(): Promise<Taxonomy[]>;
   /**
@@ -70,6 +76,16 @@ export interface GraphSource {
     locale?: string,
     options?: NavigationOptions,
   ): Promise<Navigation | undefined>;
+  /**
+   * RFC-0004: every asset this source shows — a snapshot's captured assets, or the site's current
+   * ones (any status: retired assets keep rendering where they are used). Optional for sources
+   * that predate media.
+   */
+  assets?(): Promise<Asset[]>;
+  /** The asset with this id, if this source shows it. */
+  asset?(id: string): Promise<Asset | undefined>;
+  /** The asset behind a media URL's 16-hex prefix (the media route). */
+  assetByPrefix?(prefix16: string): Promise<Asset | undefined>;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -167,6 +183,13 @@ export class LiveSource implements GraphSource {
       .sort(byNewest);
   }
 
+  async entryById(id: string): Promise<ContentEntry | undefined> {
+    const entry = await this.#store.getContentEntry(id);
+    return entry && entry.siteId === this.#siteId && visible([entry], this.#includeDrafts).length
+      ? entry
+      : undefined;
+  }
+
   taxonomies(): Promise<Taxonomy[]> {
     return this.#store.listTaxonomies(this.#siteId);
   }
@@ -251,6 +274,29 @@ export class LiveSource implements GraphSource {
       locale ?? site.defaultLocale,
     );
   }
+
+  async assets(): Promise<Asset[]> {
+    const out: Asset[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.#store.listAssets(this.#siteId, {
+        limit: 200,
+        ...(cursor ? { cursor } : {}),
+      });
+      out.push(...page.assets);
+      cursor = page.nextCursor;
+    } while (cursor);
+    return out;
+  }
+
+  async asset(id: string): Promise<Asset | undefined> {
+    const a = await this.#store.getAsset(id);
+    return a?.siteId === this.#siteId ? a : undefined;
+  }
+
+  assetByPrefix(prefix16: string): Promise<Asset | undefined> {
+    return this.#store.getAssetByPrefix(this.#siteId, prefix16);
+  }
 }
 
 interface Loaded {
@@ -261,6 +307,9 @@ interface Loaded {
   terms: Term[];
   redirects: Redirect[];
   menus: Menu[];
+  assets: Asset[];
+  /** Assets by id and by 16-hex URL prefix, built once per snapshot (RFC-0004 §7.1). */
+  assetIndex: Map<string, Asset>;
 }
 
 /** Reads exactly the node bodies captured in a snapshot (immutable; only published nodes are rendered). */
@@ -303,12 +352,18 @@ export class SnapshotSource implements GraphSource {
         (await read<T>(
           this.#snapshot.nodes.filter((n) => (n.kind as string) === kind),
         )) as unknown as T[];
-      const [taxonomies, terms, redirects, menus] = await Promise.all([
+      const [taxonomies, terms, redirects, menus, assets] = await Promise.all([
         byKind<Taxonomy>("taxonomy"),
         byKind<Term>("term"),
         byKind<Redirect>("redirect"),
         byKind<Menu>("menu"),
+        byKind<Asset>("asset"),
       ]);
+      const assetIndex = new Map<string, Asset>();
+      for (const a of assets) {
+        assetIndex.set(a.id, a);
+        assetIndex.set(a.sha256.slice(0, 16), a);
+      }
       const order = new Map((site as Site).pageIds.map((id, i) => [id, i]));
       return {
         site: site as Site,
@@ -320,6 +375,8 @@ export class SnapshotSource implements GraphSource {
         terms,
         redirects,
         menus,
+        assets,
+        assetIndex,
       };
     })();
     return this.#cache;
@@ -356,6 +413,11 @@ export class SnapshotSource implements GraphSource {
     const { site, entries } = await this.#load();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  /** A published entry of this snapshot by id (any locale). */
+  async entryById(id: string): Promise<ContentEntry | undefined> {
+    return (await this.#load()).entries.find((e) => e.id === id);
   }
 
   async taxonomies(): Promise<Taxonomy[]> {
@@ -435,5 +497,19 @@ export class SnapshotSource implements GraphSource {
       },
       locale ?? loaded.site.defaultLocale,
     );
+  }
+
+  async assets(): Promise<Asset[]> {
+    return (await this.#load()).assets;
+  }
+
+  async asset(id: string): Promise<Asset | undefined> {
+    return id.startsWith("asset_") ? (await this.#load()).assetIndex.get(id) : undefined;
+  }
+
+  async assetByPrefix(prefix16: string): Promise<Asset | undefined> {
+    return /^[0-9a-f]{16}$/.test(prefix16)
+      ? (await this.#load()).assetIndex.get(prefix16)
+      : undefined;
   }
 }

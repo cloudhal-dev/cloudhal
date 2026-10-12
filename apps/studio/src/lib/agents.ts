@@ -2,22 +2,86 @@ import type {
   AgentMode,
   AgentModesInfo,
   AgentScope,
+  AnyScope,
   Approval,
   AuditRow,
   AutoCheck,
   KeyMode,
 } from "./api.ts";
+import { holds, narrowScopes, weakerScopes } from "./roles.ts";
 
 export type GrantableScope = Exclude<AgentScope, "*">;
 export type ScopeGroup = "read" | "write" | "release";
 
 /** How the create-key dialog groups scopes: what an agent may see, change, and make live. */
 export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
-  read: ["site:read", "content:read"],
-  write: ["content:write", "site:write", "preview:create"],
+  read: ["site:read", "content:read", "analytics:read", "comments:read"],
+  write: ["content:write", "asset:upload", "asset:manage", "site:write", "preview:create"],
   release: ["site:publish", "site:rollback"],
 };
-export const ALL_GRANTABLE: GrantableScope[] = Object.values(SCOPE_GROUPS).flat();
+
+/**
+ * Every scope a key can carry, in display order, with the own-limited variants a role narrows to
+ * (RFC-0005 §1) next to their full scope and the asset scopes (RFC-0004) with the writes.
+ */
+const SCOPE_ORDER: GrantableScope[] = [
+  "site:read",
+  "content:read",
+  "analytics:read",
+  "comments:read",
+  "content:write",
+  "content:write:own",
+  "content:draft:own",
+  "site:write",
+  "preview:create",
+  "asset:manage",
+  "asset:upload",
+  "site:publish",
+  "site:publish:own",
+  "site:rollback",
+  "comments:moderate",
+  "comments:moderate:own",
+  "comments:reply",
+  "comments:reply:own",
+];
+export const ALL_GRANTABLE: GrantableScope[] = SCOPE_ORDER;
+
+/** One checkbox in the create dialog's scope groups, narrowed to the person's role. */
+export interface ScopeOption {
+  /** What the key gets when ticked: the scope, or the own variant the role holds instead. */
+  scope: GrantableScope;
+  /** Set when the role narrows `from` to `scope` (an Author's `content:write` → `…:own`). */
+  from?: GrantableScope;
+  /** The role holds neither the scope nor a weaker variant: shown, but not offered. */
+  disabled: boolean;
+}
+
+/**
+ * The scopes of a group as the person may grant them (RFC-0005 §5.1): each scope the role holds;
+ * else its strongest own variant the role holds (unless the group lists that variant itself); else
+ * the scope, disabled — never hidden.
+ */
+export function scopeOptions(group: ScopeGroup, roleScopes?: readonly AnyScope[]): ScopeOption[] {
+  return SCOPE_GROUPS[group].map((scope) => {
+    if (!roleScopes || holds(roleScopes, scope)) return { scope, disabled: false };
+    const weaker = weakerScopes(scope).find((w) => holds(roleScopes, w)) as
+      | GrantableScope
+      | undefined;
+    // A weaker scope the group already offers on its own (`asset:manage` → `asset:upload`) is not
+    // repeated as a variant: the stronger one is shown disabled instead.
+    if (!weaker || SCOPE_GROUPS[group].includes(weaker)) return { scope, disabled: true };
+    return { scope: weaker, from: scope, disabled: false };
+  });
+}
+
+/** Which group an own variant or asset scope belongs to (for its badge tone). */
+const GROUP_OF_VARIANT: Partial<Record<GrantableScope, ScopeGroup>> = {
+  "content:write:own": "write",
+  "content:draft:own": "write",
+  "asset:upload": "write",
+  "asset:manage": "write",
+  "site:publish:own": "release",
+};
 
 /** Modes an owner can give an API key, in order of increasing autonomy (ADR-0015). */
 export const KEY_MODES: readonly KeyMode[] = ["plan", "manual", "edits", "auto"];
@@ -39,9 +103,15 @@ export function ownModeOf(key: { mode?: unknown } | undefined): KeyMode {
  * (`modeRules`); this copy of `scopesForMode` is the fallback for servers that do not report them.
  */
 export function scopesForMode(mode: AgentMode): GrantableScope[] {
-  const read: GrantableScope[] = ["site:read", "content:read", "preview:create"];
+  const read: GrantableScope[] = [
+    "site:read",
+    "content:read",
+    "preview:create",
+    "analytics:read",
+    "comments:read",
+  ];
   if (mode === "plan") return read;
-  return [...read, "content:write", "site:publish", "site:rollback"];
+  return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];
 }
 
 /** Same set of scopes, in any order. */
@@ -135,9 +205,19 @@ export const ELEVATION_NOTICE_MINUTES = 10;
 
 /** The mode rules Studio applies: the server's (`/api/instance`) when reported, else Studio's copy. */
 export interface ModeRules {
-  /** Key modes to offer, in order (only ones Studio has words for). */
+  /** Key modes the server knows, in order (only ones Studio has words for); explanations use these. */
   modes: readonly KeyMode[];
+  /**
+   * The modes the signed-in person may give a key: `modes` up to their role's cap (RFC-0005 §5.2;
+   * a Contributor's keys stop at Edits). Pickers and elevations offer only these.
+   */
+  keyModes: readonly KeyMode[];
+  /** The role's cap when it is below the most autonomous mode, else undefined. */
+  cap: KeyMode | undefined;
+  /** The person's role scopes, when known: key scopes are narrowed to them (RFC-0005 §5.1). */
+  roleScopes: readonly AnyScope[] | undefined;
   defaultMode: KeyMode;
+  /** The scopes a key in `mode` gets, narrowed to the person's role. */
   scopesFor: (mode: AgentMode) => GrantableScope[];
   autoPublishLimit: number;
   /** Bounds of a time-boxed elevation, in whole minutes. */
@@ -146,14 +226,27 @@ export interface ModeRules {
   noticeMinutes: number;
 }
 
-export function modeRules(info?: AgentModesInfo | undefined): ModeRules {
+export function modeRules(
+  info?: AgentModesInfo | undefined,
+  role?: { cap: AgentMode | undefined; scopes: readonly AnyScope[] | undefined } | undefined,
+): ModeRules {
   const offered = info?.modes.filter(isKeyMode) ?? [];
   const grantable = (scopes: readonly AgentScope[] | undefined) =>
     scopes?.filter((s): s is GrantableScope => (ALL_GRANTABLE as AgentScope[]).includes(s));
+  const modes = offered.length > 0 ? KEY_MODES.filter((m) => offered.includes(m)) : KEY_MODES;
+  const capIndex = role?.cap ? KEY_MODES.indexOf(role.cap as KeyMode) : -1;
+  const keyModes = capIndex >= 0 ? modes.filter((m) => KEY_MODES.indexOf(m) <= capIndex) : modes;
+  const cap = keyModes.length < modes.length ? keyModes.at(-1) : undefined;
+  const roleScopes = role?.scopes;
+  const base = (mode: AgentMode) => grantable(info?.scopes[mode]) ?? scopesForMode(mode);
+  const preferred = isKeyMode(info?.default) ? info.default : DEFAULT_MODE;
   return {
-    modes: offered.length > 0 ? KEY_MODES.filter((m) => offered.includes(m)) : KEY_MODES,
-    defaultMode: isKeyMode(info?.default) ? info.default : DEFAULT_MODE,
-    scopesFor: (mode) => grantable(info?.scopes[mode]) ?? scopesForMode(mode),
+    modes,
+    keyModes,
+    cap,
+    roleScopes,
+    defaultMode: keyModes.includes(preferred) ? preferred : (keyModes.at(-1) ?? preferred),
+    scopesFor: (mode) => (roleScopes ? narrowScopes(base(mode), roleScopes) : base(mode)),
     autoPublishLimit: info?.autoPublishLimit ?? AUTO_PUBLISH_LIMIT,
     elevation: validBounds(info?.elevation) ?? {
       minMinutes: ELEVATION_MIN_MINUTES,
@@ -187,7 +280,7 @@ export function scopeGroup(scope: AgentScope): ScopeGroup | "all" {
   >) {
     if (scopes.includes(scope)) return group;
   }
-  return "read";
+  return GROUP_OF_VARIANT[scope] ?? "read";
 }
 
 /** Badge variant per scope group: neutral to read, blue tint to write, amber to publish/roll back. */

@@ -1,5 +1,8 @@
 /** `/mcp` over HTTP: session cookie → human (approval-gated), API key → agent (scope-limited). */
+
 import { ApprovalStore, AuditLog } from "@cloudhal/agent-runtime";
+import { AnalyticsService } from "@cloudhal/analytics/service";
+import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -9,7 +12,11 @@ import { describe, expect, it } from "vitest";
 import { createApi } from "../src/app.ts";
 import { createAuth } from "../src/auth.ts";
 
-async function setup(now?: () => Date, withApprovals = false) {
+async function setup(
+  now?: () => Date,
+  withApprovals = false,
+  agentKeyRateLimit?: { windowMs: number; max: number },
+) {
   const db = new Database(":memory:");
   const sql = new BetterSqlite3Driver(db);
   const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
@@ -21,6 +28,7 @@ async function setup(now?: () => Date, withApprovals = false) {
     baseURL: "http://localhost",
     secret: "test-secret-test-secret-test-secret",
     ...(now ? { now } : {}),
+    ...(agentKeyRateLimit ? { agentKeyRateLimit } : {}),
   });
   const audit = new AuditLog(sql);
   const approvals = withApprovals ? new ApprovalStore(sql, now ? { now } : {}) : undefined;
@@ -33,6 +41,12 @@ async function setup(now?: () => Date, withApprovals = false) {
     ...(now ? { now } : {}),
     agentKeys: auth.agentKeys,
     staff: auth.staff,
+    analytics: new AnalyticsService({
+      sql,
+      store: "sql",
+      live: new SqlAnalytics(sql),
+      defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 5 },
+    }),
   });
 
   const signUp = await app.request("/api/auth/sign-up/email", {
@@ -176,6 +190,37 @@ describe("MCP over HTTP", () => {
 });
 
 describe("agent modes on API keys (ADR-0015)", () => {
+  it("limits a key per fixed window: 429 with Retry-After, and a steadily polling agent is never locked out", async () => {
+    let clock = new Date("2026-10-09T00:00:00.000Z");
+    const { app, cookie } = await setup(() => clock, false, { windowMs: 60_000, max: 5 });
+    const create = await app.request("/api/agent-keys", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ name: "poller", scopes: ["site:read"] }),
+    });
+    const { key } = (await create.json()) as { key: string };
+    // Keys are limited when they are resolved, before any route: REST answers agent keys with 403
+    // (they work over /mcp), which is all a call needs to show it was not rate limited.
+    const call = () => app.request("/api/sites", { headers: { "x-api-key": key } });
+    const tick = (ms: number) => {
+      clock = new Date(clock.getTime() + ms);
+    };
+    // A burst: five calls in the window pass, the sixth is refused as a rate limit, not a 401.
+    for (let i = 0; i < 5; i++) expect((await call()).status).toBe(403);
+    const over = await call();
+    expect(over.status).toBe(429);
+    expect(over.headers.get("retry-after")).toBe("60");
+    expect(((await over.json()) as { error: string }).error).toBe("rate_limited");
+    tick(61_000);
+    expect((await call()).status).toBe(403);
+    // One call every 15 s for ten minutes (40 calls, far more than `max` in total) always passes:
+    // the window resets every minute even though the key is never idle for a whole minute.
+    for (let i = 0; i < 40; i++) {
+      tick(15_000);
+      expect((await call()).status, `call ${i}`).toBe(403);
+    }
+  });
+
   it("creates keys by mode, changes the mode for the next call, audits it, refuses bypass", async () => {
     const { app, siteId, cookie, connect, audit } = await setup();
     const post = (body: unknown) =>
@@ -190,7 +235,13 @@ describe("agent modes on API keys (ADR-0015)", () => {
     expect(res.status).toBe(201);
     const key = (await res.json()) as { id: string; key: string; mode: string; scopes: string[] };
     expect(key.mode).toBe("plan");
-    expect(key.scopes).toEqual(["site:read", "content:read", "preview:create"]);
+    expect(key.scopes).toEqual([
+      "site:read",
+      "content:read",
+      "preview:create",
+      "analytics:read",
+      "comments:read",
+    ]);
 
     const client = await connect({ "x-api-key": key.key });
     expect(client.getInstructions()).toContain("PLAN mode");
@@ -201,6 +252,10 @@ describe("agent modes on API keys (ADR-0015)", () => {
     expect((denied.content[0] as { text: string }).text).toMatch(
       /missing scope content:write|plan mode/,
     );
+    // RFC-0006: a new key reads analytics in every mode, plan included, over /mcp.
+    const stats = await client.callTool({ name: "get_analytics", arguments: { siteId } });
+    expect(stats.isError, JSON.stringify(stats.content)).toBeFalsy();
+    expect(stats.structuredContent).toMatchObject({ siteId, summary: { pageviews: 0 } });
 
     // owner switches it to edits — but the key's scopes stay what they were (a mode never grants)
     const patch = await app.request(`/api/agent-keys/${key.id}`, {

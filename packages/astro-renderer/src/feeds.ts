@@ -6,6 +6,7 @@
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
 import type { ArchiveSummary, ArchiveView } from "./archive.ts";
 import { markdownText, renderBody } from "./markdown.ts";
+import type { AssetIndex } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { absoluteUrl } from "./seo.ts";
 import { entryTaxonomy, type TaxonomyIndex } from "./taxonomy.ts";
@@ -45,6 +46,8 @@ export interface FeedOptions {
    * it (or for an entry not migrated to terms) the deprecated `tags` are the categories.
    */
   taxonomy?: TaxonomyIndex;
+  /** The site's assets: cover images get type, size and dimensions; `asset:` links resolve (RFC-0004 §7.7). */
+  assets?: AssetIndex;
 }
 
 /** Category names of an item: public terms (section first), else legacy tags. */
@@ -65,7 +68,16 @@ export function rssXml(options: FeedOptions): string {
     .map((e) => {
       const url = `${origin}${entryPath(e)}`;
       const date = new Date(e.publishedAt ?? e.createdAt).toUTCString();
-      const image = absoluteUrl(origin, e.coverImage?.src);
+      const cover = e.coverImage?.assetId ? options.assets?.get(e.coverImage.assetId) : undefined;
+      const image = cover
+        ? absoluteUrl(
+            origin,
+            cover.storage.kind === "external" ? cover.storage.url : e.coverImage?.src,
+          )
+        : absoluteUrl(origin, e.coverImage?.src);
+      const mediaAttrs = cover
+        ? ` type="${xml(cover.mediaType)}" fileSize="${cover.bytes}"${cover.image ? ` width="${cover.image.width}" height="${cover.image.height}"` : ""}`
+        : "";
       const author = e.author.kind === "human" && e.author.name ? e.author.name : site.name;
       return [
         "<item>",
@@ -76,8 +88,8 @@ export function rssXml(options: FeedOptions): string {
         `<dc:creator>${cdata(author)}</dc:creator>`,
         ...itemCategories(e, options.taxonomy).map((t) => `<category>${xml(t)}</category>`),
         e.summary ? `<description>${cdata(e.summary)}</description>` : "",
-        image ? `<media:content url="${xml(image)}" medium="image"/>` : "",
-        `<content:encoded>${cdata(renderBody(e.body))}</content:encoded>`,
+        image ? `<media:content url="${xml(image)}" medium="image"${mediaAttrs}/>` : "",
+        `<content:encoded>${cdata(renderBody(e.body, options.assets ? { assets: options.assets, locale: e.locale, defaultLocale: site.defaultLocale } : undefined))}</content:encoded>`,
         "</item>",
       ]
         .filter(Boolean)

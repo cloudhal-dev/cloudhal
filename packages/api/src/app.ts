@@ -6,6 +6,7 @@ import {
   PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
 } from "@cloudhal/agent-runtime";
+import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
@@ -14,11 +15,21 @@ import { errorHandler, unauthorized } from "./errors.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
+import { assets, siteMedia } from "./routes/assets.ts";
+import { comments } from "./routes/comments.ts";
 import { entries } from "./routes/entries.ts";
-import { agentModesInfo, instanceRoutes, invitesInfo, rolesInfo } from "./routes/instance.ts";
+import {
+  agentModesInfo,
+  commentsFeature,
+  instanceRoutes,
+  invitesInfo,
+  rolesInfo,
+} from "./routes/instance.ts";
 import { inviteRoutes } from "./routes/invites.ts";
 import { memberRoutes } from "./routes/members.ts";
+import { menus } from "./routes/menus.ts";
 import { migrations } from "./routes/migrations.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
@@ -30,6 +41,7 @@ import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
 import { terms } from "./routes/terms.ts";
 import { routeGuard } from "./scopes.ts";
+import { randomUploadSecret, type UploadSecret } from "./uploads.ts";
 
 /**
  * Better Auth endpoints that are only used server-side: membership changes go through Cloudhal's
@@ -47,6 +59,14 @@ export function createApi(deps: ApiDeps) {
   app.onError(errorHandler);
   const clock = deps.now ?? (() => new Date());
   const ownership: OwnershipResolver = deps.staff?.ownership ?? PEOPLE_ONLY_OWNERSHIP;
+  // Upload tickets (RFC-0004 §5.5) are signed with a secret every instance shares when there is
+  // one; a server without one (local tools) signs with a key of its own process.
+  const uploadSecret: UploadSecret =
+    [deps.preview?.secret, deps.mcp?.stateKey].find(
+      (s): s is string | Uint8Array =>
+        s !== undefined &&
+        (typeof s === "string" ? new TextEncoder().encode(s) : s).byteLength >= 32,
+    ) ?? randomUploadSecret();
   let engine: PolicyEngine | undefined;
   const policy = () => {
     engine ??= new PolicyEngine(toolPolicies(defineTools()));
@@ -94,6 +114,9 @@ export function createApi(deps: ApiDeps) {
     c.set("policy", policy);
     c.set("mail", deps.mail);
     c.set("now", clock);
+    c.set("uploadSecret", uploadSecret);
+    c.set("analytics", deps.analytics);
+    c.set("comments", deps.comments);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -162,6 +185,8 @@ export function createApi(deps: ApiDeps) {
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
       now: deps.now,
       ownership,
+      analytics: deps.analytics,
+      comments: deps.comments,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -188,7 +213,7 @@ export function createApi(deps: ApiDeps) {
   app.route(
     "/api",
     instanceRoutes(
-      () => ({
+      async () => ({
         signUp: deps.signUp ?? "unknown",
         features: {
           agentKeys: Boolean(deps.agentKeys),
@@ -199,6 +224,10 @@ export function createApi(deps: ApiDeps) {
           approvals: Boolean(deps.mcp?.approvals),
           elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
           members: Boolean(deps.staff),
+          // RFC-0006 §8: where events go, whether Studio can read them, the budget.
+          analytics: deps.analytics?.feature() ?? ANALYTICS_OFF,
+          // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
+          comments: await commentsFeature(deps.comments),
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
@@ -228,6 +257,15 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/terms", terms);
   app.route("/api/sites/:siteId/redirects", redirects);
   app.route("/api/sites/:siteId/migrations", migrations);
+  // RFC-0003 §5: navigation menus (people; agents use the MCP menu tools).
+  app.route("/api/sites/:siteId/menus", menus);
+  // RFC-0004 §6.1: the media library (people; agents use the MCP asset tools).
+  app.route("/api/sites/:siteId/assets", assets);
+  app.route("/api/sites/:siteId/media", siteMedia);
+  // RFC-0006 §9.2: site analytics (people; agents use the MCP analytics tools).
+  if (deps.analytics) app.route("/api/sites/:siteId/analytics", analytics);
+  // RFC-0007 §12: reader comments (people; agents use the MCP comment tools).
+  if (deps.comments) app.route("/api/sites/:siteId", comments);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

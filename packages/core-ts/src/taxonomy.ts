@@ -14,6 +14,7 @@ import {
   type Term,
 } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement, SqlValue } from "@cloudhal/storage";
+import type { RefPlan } from "./assets.ts";
 import {
   ConflictError,
   InvariantError,
@@ -22,9 +23,11 @@ import {
   UniqueConstraintError,
 } from "./errors.ts";
 import { parseFilter, RESERVED_FIELDS, resolveFilter, toSql } from "./filter.ts";
+import { nodeHash } from "./hash.ts";
 import { ID_PREFIX } from "./ids.ts";
 import { foldName, humanizeSlug, type Resolution, resolveTermInputs, termName } from "./names.ts";
 import {
+  and,
   type Cond,
   casUpdateStatement,
   insertNodeStatement,
@@ -49,6 +52,11 @@ export interface StoreKernel {
   readonly sql: SqlDriver;
   stamp(): string;
   newId(prefix: string): string;
+  /**
+   * RFC-0004: plans the asset references of a term write (term image, archive social images,
+   * archive intros): canonical ImageRefs, the guard and the `asset_refs` rewrite.
+   */
+  refs?(siteId: string, draft: Term, stored: Term | undefined): Promise<RefPlan<Term>>;
 }
 
 /** Governance operations refuse to touch more entries than this in one batch (RFC-0002 §4.3). */
@@ -684,9 +692,12 @@ export class TaxonomyEngine {
     const reclaim = opts.reclaim === true;
     const holders = this.#checkSlug(terms, term.slug, term.id, reclaim);
 
+    const refs = await this.#k.refs?.(term.siteId, term, undefined);
+    const written = refs?.node ?? term;
     const batch = this.#batch(site.id, ts);
     if (reclaim) await this.#releaseSlug(batch, holders, term.slug, ts);
-    await batch.insert("term", term, this.#slugGuard(term, reclaim));
+    await batch.insert("term", written, and(this.#slugGuard(term, reclaim), refs?.guard));
+    batch.append(...(refs?.statements(await nodeHash(written)) ?? []));
     for (const [id, hash] of await this.#hashes(chain.map((t) => t.id)))
       batch.expectUnchanged(id, hash);
     if (tax.archive.enabled && (reclaim || isPublic(term))) {
@@ -701,9 +712,10 @@ export class TaxonomyEngine {
         const now = await this.#termsOf(tax);
         this.#checkSlug(now, term.slug, term.id, reclaim);
         this.#checkParent(tax, term, term.parentId, new Map(now.map((t) => [t.id, t])), now);
+        await refs?.diagnose();
       },
     });
-    return term;
+    return written;
   }
 
   /** Invariant 9 for `term` under `parentId`; returns the new ancestor chain (nearest first). */
@@ -767,9 +779,19 @@ export class TaxonomyEngine {
     assertValid("term", next);
     const tax = (await this.getTaxonomy(next.taxonomyId)) as Taxonomy;
     this.#checkLabels(next, await this.site(next.siteId), await this.#termsOf(tax));
-    const r = await this.#sql.run(...stmt(await casUpdateStatement("term", next, stored.rev)));
-    if (r.changes !== 1) throw new ConflictError("term", t.id, t.rev, await this.#revOf(t.id));
-    return next;
+    const refs = await this.#k.refs?.(next.siteId, next, stored);
+    const written = refs?.node ?? next;
+    const statement = await casUpdateStatement("term", written, stored.rev, refs?.guard);
+    const extra = refs?.statements(await nodeHash(written)) ?? [];
+    const r = extra.length
+      ? (await this.#sql.batch([statement, ...extra]))[0]
+      : await this.#sql.run(...stmt(statement));
+    if (r?.changes !== 1) {
+      const rev = await this.#revOf(t.id);
+      if (rev === stored.rev) await refs?.diagnose();
+      throw new ConflictError("term", t.id, t.rev, rev);
+    }
+    return written;
   }
 
   /** Entries per term: all statuses, published, and the latest `updatedAt` of those entries. */

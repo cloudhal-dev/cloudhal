@@ -11,5 +11,5 @@
     "module": "esnext",
     "moduleResolution": "bundler"
   },
-  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "vite.config.ts", "bundle-budget.ts", "vitest.config.ts"]
 }

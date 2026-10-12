@@ -9,9 +9,14 @@
     "directory": "packages/ui"
   },
   "type": "module",
+  "sideEffects": [
+    "./src/blocks/charts.ts",
+    "*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./code": "./src/code.ts",
+    "./charts": "./src/charts.ts",
     "./styles.css": "./src/styles.css"
   },
   "files": [
@@ -24,7 +29,8 @@
   },
   "dependencies": {
     "@cloudflare/kumo": "catalog:",
-    "@cloudhal/core-contracts": "workspace:*"
+    "@cloudhal/core-contracts": "workspace:*",
+    "echarts": "catalog:"
   },
   "peerDependencies": {
     "@phosphor-icons/react": "^2.1.10",

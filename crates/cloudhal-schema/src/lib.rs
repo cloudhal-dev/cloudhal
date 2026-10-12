@@ -6,7 +6,11 @@
 
 pub mod generated;
 
+pub use generated::analytics_beacon::AnalyticsBeacon;
+pub use generated::analytics_event::AnalyticsEvent;
 pub use generated::asset::Asset;
+pub use generated::comment::Comment;
+pub use generated::comment_submission::CommentSubmission;
 pub use generated::content_entry::ContentEntry;
 pub use generated::menu::Menu;
 pub use generated::page::Page;

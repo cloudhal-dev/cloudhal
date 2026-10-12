@@ -13,17 +13,19 @@ export interface DiffRow {
   to?: number;
 }
 
+// Assets come before the pages and articles that show them (RFC-0004 §2.4).
 const KIND_ORDER: Record<NodeRef["kind"], number> = {
   site: 0,
   menu: 1,
   taxonomy: 2,
   term: 3,
-  page: 4,
-  contentEntry: 5,
-  redirect: 6,
+  asset: 4,
+  page: 5,
+  contentEntry: 6,
+  redirect: 7,
 };
 
-/** Flattens the API diff into rows grouped by change: site, menus, taxonomies, terms, pages, articles, redirects. */
+/** Flattens the API diff into rows grouped by change: site, menus, taxonomies, terms, media, pages, articles, redirects. */
 export function diffRows(diff: SnapshotDiff): Record<Change, DiffRow[]> {
   const sort = (rows: DiffRow[]) =>
     rows.sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.id.localeCompare(b.id));

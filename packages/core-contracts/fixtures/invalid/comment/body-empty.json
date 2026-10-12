@@ -1,0 +1,21 @@
+{
+  "reason": "An empty text is not a comment",
+  "data": {
+    "schemaVersion": 1,
+    "id": "cmt_01HZX8K3Q9AA",
+    "siteId": "site_01HZX8K3Q9ST",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "source": "native",
+    "author": {
+      "kind": "guest",
+      "name": "Ayşe Yılmaz"
+    },
+    "body": {
+      "format": "text",
+      "text": ""
+    },
+    "status": "pending",
+    "createdAt": "2026-10-12T08:14:03Z",
+    "rev": 0
+  }
+}

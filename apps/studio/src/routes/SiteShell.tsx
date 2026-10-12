@@ -3,26 +3,34 @@ import {
   Article,
   CalendarDots,
   Camera,
+  ChartLine,
+  ChatsCircle,
   ClockCounterClockwise,
   FileText,
   GearSix,
   Globe,
   HandPalm,
   House,
+  Images,
   Robot,
   Signpost,
   SquaresFour,
   Tag,
+  TreeStructure,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
+import { usePublishMode, usePublishSite } from "../components/Publish.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useCan } from "../components/useMe.ts";
+import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { pendingCommentsCount } from "../lib/comments.ts";
 
 /** Site surface: sidebar scoped to one site, with the site switcher in the header. */
 export function SiteShell() {
@@ -49,6 +57,13 @@ export function SiteShell() {
   // Proposed terms wait for a person (RFC-0002 §8): their count rides on the sidebar item.
   const taxonomy = useTaxonomyData(siteId);
   const proposedTerms = taxonomy.items.filter((i) => i.term.status === "proposed").length;
+  // Reader comments (RFC-0007 §14): on deployments that have them, for people who may read them;
+  // the pending count rides on the bell's digest (own articles' count for Authors).
+  const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false });
+  const canReadComments = useCan("comments.read");
+  const comments = instance.data?.features.comments?.available === true && canReadComments;
+  const notifications = useNotifications();
+  const pendingComments = pendingCommentsCount(notifications.data?.items, siteId);
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -74,24 +89,27 @@ export function SiteShell() {
     },
   });
   const snapshot = useMutation({
-    mutationFn: (publish: boolean) =>
-      api.snapshots.create(siteId, {
-        label: publish ? t("snapshots.publishedFromStudio") : t("snapshots.fromStudio"),
-        publish,
-      }),
-    onSuccess: async (_r, publish) => {
+    mutationFn: () => api.snapshots.create(siteId, { label: t("snapshots.fromStudio") }),
+    onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
-      await qc.invalidateQueries({ queryKey: ["site", siteId] });
-      toast.success(publish ? t("snapshots.published") : t("snapshots.created"));
+      toast.success(t("snapshots.created"));
     },
     onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
   });
+  // Publishing follows the role: live, a request an Editor approves (202), or not at all (§2s).
+  const publish = usePublishSite(siteId);
+  const publishing = usePublishMode(siteId);
 
   const commands: PaletteCommand[] = [
     {
       id: "overview",
       label: t("commands.goOverview"),
       run: () => navigate({ to: "/sites/$siteId", params: { siteId } }),
+    },
+    {
+      id: "analytics",
+      label: t("commands.goAnalytics"),
+      run: () => navigate({ to: "/sites/$siteId/analytics", params: { siteId } }),
     },
     {
       id: "pages",
@@ -107,6 +125,25 @@ export function SiteShell() {
       id: "taxonomy",
       label: t("commands.goTaxonomy"),
       run: () => navigate({ to: "/sites/$siteId/taxonomy", params: { siteId } }),
+    },
+    {
+      id: "media",
+      label: t("commands.goMedia"),
+      run: () => navigate({ to: "/sites/$siteId/media", params: { siteId } }),
+    },
+    ...(comments
+      ? [
+          {
+            id: "comments",
+            label: t("commands.goComments"),
+            run: () => navigate({ to: "/sites/$siteId/comments", params: { siteId } }),
+          },
+        ]
+      : []),
+    {
+      id: "navigation",
+      label: t("commands.goNavigation"),
+      run: () => navigate({ to: "/sites/$siteId/navigation", params: { siteId } }),
     },
     {
       id: "redirects",
@@ -139,10 +176,22 @@ export function SiteShell() {
       label: t("commands.goSkills"),
       run: () => navigate({ to: "/agents/skills" }),
     },
+    { id: "team", label: t("commands.goTeam"), run: () => navigate({ to: "/team" }) },
     { id: "account", label: t("commands.goAccount"), run: () => navigate({ to: "/account" }) },
     { id: "new-article", label: t("commands.newArticle"), run: () => createArticle.mutate() },
-    { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate(false) },
-    { id: "publish", label: t("commands.publishSite"), run: () => snapshot.mutate(true) },
+    { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate() },
+    ...(publishing.mode === "none"
+      ? []
+      : [
+          {
+            id: "publish",
+            label:
+              publishing.mode === "request"
+                ? t("publishing.requestCommand")
+                : t("commands.publishSite"),
+            run: () => publish.mutate({ label: t("snapshots.publishedFromStudio") }),
+          },
+        ]),
     { id: "all-sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
   ];
 
@@ -176,6 +225,14 @@ export function SiteShell() {
               >
                 {t("nav.home")}
               </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={ChartLine}
+                href={`${base}/analytics`}
+                active={is(`${base}/analytics`)}
+                tooltip={t("nav.analytics")}
+              >
+                {t("nav.analytics")}
+              </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
@@ -208,6 +265,25 @@ export function SiteShell() {
                 {t("nav.taxonomy")}
                 {proposedTerms > 0 && <Sidebar.MenuBadge>{proposedTerms}</Sidebar.MenuBadge>}
               </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={Images}
+                href={`${base}/media`}
+                active={is(`${base}/media`)}
+                tooltip={t("nav.media")}
+              >
+                {t("nav.media")}
+              </Sidebar.MenuButton>
+              {comments && (
+                <Sidebar.MenuButton
+                  icon={ChatsCircle}
+                  href={`${base}/comments`}
+                  active={is(`${base}/comments`) || is(`${base}/commenters`)}
+                  tooltip={t("nav.comments")}
+                >
+                  {t("nav.comments")}
+                  {pendingComments > 0 && <Sidebar.MenuBadge>{pendingComments}</Sidebar.MenuBadge>}
+                </Sidebar.MenuButton>
+              )}
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
@@ -282,6 +358,14 @@ export function SiteShell() {
                 tooltip={t("nav.siteSettings")}
               >
                 {t("nav.siteSettings")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={TreeStructure}
+                href={`${base}/navigation`}
+                active={is(`${base}/navigation`)}
+                tooltip={t("nav.navigation")}
+              >
+                {t("nav.navigation")}
               </Sidebar.MenuButton>
               <Sidebar.MenuButton
                 icon={Signpost}

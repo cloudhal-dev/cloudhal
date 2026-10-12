@@ -9,6 +9,7 @@ import {
   type Principal,
   type Scope,
   type ToolPolicy,
+  weakerScopes,
 } from "../src/policy.ts";
 import {
   abilities,
@@ -75,6 +76,16 @@ describe("roles", () => {
       ["members:manage", ["administrator", "owner"]],
       ["site:settings", ["administrator", "owner"]],
       ["agents:manage", ["administrator", "owner"]],
+      // RFC-0006 §9.1: Authors and above see analytics; Contributors do not in v1.
+      ["analytics:read", ["author", "editor", "administrator", "owner"]],
+      // RFC-0007 §10.1 (D6): Authors moderate and reply on their own entries, Editors and above
+      // everywhere; emails only through `commenters:data` (Editor+); Contributors nothing.
+      ["comments:read", ["author", "editor", "administrator", "owner"]],
+      ["comments:moderate:own", ["author", "editor", "administrator", "owner"]],
+      ["comments:moderate", ["editor", "administrator", "owner"]],
+      ["comments:reply:own", ["author", "editor", "administrator", "owner"]],
+      ["comments:reply", ["editor", "administrator", "owner"]],
+      ["commenters:data", ["editor", "administrator", "owner"]],
     ];
     for (const [scope, roles] of table)
       for (const role of ROLES)
@@ -105,6 +116,32 @@ describe("roles", () => {
     expect(abilities("administrator", roleScopes("administrator"))["ownership.transfer"]).toBe(
       false,
     );
+    // RFC-0006: analytics for Authors and above, its settings for Administrators and above.
+    expect(author["analytics.read"]).toBe(true);
+    expect(author["analytics.settings"]).toBe(false);
+    expect(abilities("contributor", roleScopes("contributor"))["analytics.read"]).toBe(false);
+    const admin = abilities("administrator", roleScopes("administrator"));
+    expect(admin["analytics.read"] && admin["analytics.settings"]).toBe(true);
+    expect(abilities("editor", roleScopes("editor"))["analytics.settings"]).toBe(false);
+    // RFC-0007: Authors moderate their own entries' comments; Editors any, and see emails.
+    expect(author["comments.read"] && author["comments.moderate"] && author["comments.reply"]).toBe(
+      true,
+    );
+    expect(author["comments.moderateAny"] || author["commenters.data"]).toBe(false);
+    const editor = abilities("editor", roleScopes("editor"));
+    expect(editor["comments.moderateAny"] && editor["commenters.data"]).toBe(true);
+    expect(editor["comments.settings"]).toBe(false);
+    expect(admin["comments.settings"]).toBe(true);
+    const contributor = abilities("contributor", roleScopes("contributor"));
+    expect(contributor["comments.read"] || contributor["comments.moderate"]).toBe(false);
+  });
+
+  it("narrows comment scopes on an Author's key to the own variants; emails never on a key", () => {
+    expect(
+      narrow(["comments:read", "comments:moderate", "comments:reply"], roleScopes("author")),
+    ).toEqual(["comments:read", "comments:moderate:own", "comments:reply:own"]);
+    expect(narrow(["comments:moderate"], roleScopes("contributor"))).toEqual([]);
+    expect(narrow(["commenters:data", "*"], roleScopes("editor"))).not.toContain("commenters:data");
   });
 });
 
@@ -121,6 +158,22 @@ describe("narrow (I5)", () => {
       ),
     ).toEqual(["site:read", "content:read", "content:draft:own"]);
     expect(narrow(["content:write", "site:write"], ["*"])).toEqual(["content:write", "site:write"]);
+  });
+
+  it("analytics:read is a key scope that narrows away for Contributors (RFC-0006 §9.1)", () => {
+    expect(KEY_SCOPES).toContain("analytics:read");
+    expect(narrow(["site:read", "analytics:read"], roleScopes("author"))).toEqual([
+      "site:read",
+      "analytics:read",
+    ]);
+    expect(narrow(["site:read", "analytics:read"], roleScopes("contributor"))).toEqual([
+      "site:read",
+    ]);
+    // it implies nothing, and nothing but `*` implies it
+    expect(weakerScopes("analytics:read")).toEqual([]);
+    for (const s of [...KEY_SCOPES, ...PERSON_SCOPES].filter((x) => x !== "analytics:read"))
+      expect(implies(s, "analytics:read"), s).toBe(false);
+    expect(implies("*", "analytics:read")).toBe(true);
   });
 
   it("never lets person-only scopes or * onto a key", () => {

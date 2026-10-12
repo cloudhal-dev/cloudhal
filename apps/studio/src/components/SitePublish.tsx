@@ -1,45 +1,49 @@
 import { ApprovalDialog, Button, ButtonGroup, DropdownMenu } from "@cloudhal/ui";
-import { Camera, CaretDown, RocketLaunch } from "@phosphor-icons/react";
+import { Camera, CaretDown, PaperPlaneTilt, RocketLaunch } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { usePublishMode, usePublishSite } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
 
 /**
  * The site surface's Publish split button (top bar, every site screen): Publish → `ApprovalDialog`
- * → snapshot + publish; the menu takes a snapshot without publishing (DESIGN.md §1, §2d).
+ * → snapshot + publish; the menu takes a snapshot without publishing (DESIGN.md §1, §2d). It follows
+ * the person's role (§2s): an Author whose changes include others' work sends "Request publish"
+ * (the server files a request an Editor approves, 202); a Contributor sees Publish disabled with
+ * the reason, since an Editor publishes their work.
  */
 export function SitePublish({ siteId }: { siteId: string }) {
   const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const { mode, reason } = usePublishMode(siteId);
+  const publish = usePublishSite(siteId, { onDone: () => setOpen(false) });
   const snapshot = useMutation({
-    mutationFn: (publish: boolean) =>
-      api.snapshots.create(siteId, {
-        label: publish ? t("snapshots.publishedFromStudio") : t("snapshots.fromStudio"),
-        publish,
-      }),
-    onSuccess: async (_r, publish) => {
+    mutationFn: () => api.snapshots.create(siteId, { label: t("snapshots.fromStudio") }),
+    onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
-      await qc.invalidateQueries({ queryKey: ["site", siteId] });
-      setOpen(false);
-      toast.success(publish ? t("snapshots.publishedSnapshot") : t("snapshots.created"));
+      toast.success(t("snapshots.created"));
     },
     onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
   });
+  const request = mode === "request";
   return (
     <>
       <ButtonGroup aria-label={t("site.publish")}>
         <Button
           variant="primary"
           size="sm"
-          icon={<RocketLaunch />}
+          icon={request ? <PaperPlaneTilt /> : <RocketLaunch />}
           onClick={() => setOpen(true)}
-          loading={snapshot.isPending}
+          loading={publish.isPending || snapshot.isPending}
+          disabled={mode === "none"}
+          title={reason}
+          data-publish-mode={mode}
         >
-          {t("site.publish")}
+          {request ? t("publishing.request") : t("site.publish")}
         </Button>
         <DropdownMenu>
           <DropdownMenu.Trigger
@@ -54,7 +58,7 @@ export function SitePublish({ siteId }: { siteId: string }) {
             }
           />
           <DropdownMenu.Content align="end">
-            <DropdownMenu.Item icon={Camera} onClick={() => snapshot.mutate(false)}>
+            <DropdownMenu.Item icon={Camera} onClick={() => snapshot.mutate()}>
               {t("commands.createSnapshot")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
@@ -63,12 +67,12 @@ export function SitePublish({ siteId }: { siteId: string }) {
       <ApprovalDialog
         open={open}
         onOpenChange={setOpen}
-        title={t("snapshots.publishTitle")}
-        description={t("site.publishDescription")}
-        confirmLabel={t("common.publish")}
+        title={request ? t("publishing.requestTitle") : t("snapshots.publishTitle")}
+        description={request ? t("publishing.requestDescription") : t("site.publishDescription")}
+        confirmLabel={request ? t("publishing.sendRequest") : t("common.publish")}
         cancelLabel={t("common.cancel")}
-        busy={snapshot.isPending}
-        onConfirm={() => snapshot.mutate(true)}
+        busy={publish.isPending}
+        onConfirm={() => publish.mutate({ label: t("snapshots.publishedFromStudio") })}
       />
     </>
   );

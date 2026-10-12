@@ -6,7 +6,14 @@ import type { ContentEntry, Site, Taxonomy, Term } from "@cloudhal/core-contract
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
-import { listCacheTag, nodeCacheTag, siteCacheTag, termCacheTag } from "../src/cache-tags.ts";
+import {
+  assetCacheTag,
+  listCacheTag,
+  nodeCacheTag,
+  siteCacheTag,
+  termCacheTag,
+} from "../src/cache-tags.ts";
+import { PNG_1X1 } from "../src/media/fixtures.ts";
 import { seedStarterSite } from "../src/seed.ts";
 import { type PublishChange, SiteGraphStore } from "../src/store.ts";
 
@@ -150,6 +157,38 @@ describe("planCachePurge", () => {
   it("a term's name: its term tag (and ancestors) and the site's lists", async () => {
     await store.updateTerm({ ...news, labels: { en: { name: "Latest news" } } });
     expect(await tagsOf()).toEqual([termCacheTag(news.id), listCacheTag(site.id)].sort());
+  });
+
+  it("media (RFC-0004 §7.4): a changed asset purges its URLs and what shows it; never the site", async () => {
+    const { asset } = await store.ingestAsset({
+      siteId: site.id,
+      bytes: PNG_1X1,
+      filename: "dot.png",
+      uploadedBy: human,
+      source: { kind: "upload" },
+      fields: { decorative: true },
+    });
+    const cover = { assetId: asset.id, alt: "" } as NonNullable<ContentEntry["coverImage"]>;
+    await store.updateContentEntry({ ...hello, coverImage: cover });
+    // A new asset purges nothing of its own; the article that now shows it is purged as an entry.
+    const added = await tagsOf();
+    expect(added).toContain(nodeCacheTag(hello.id));
+    expect(added).not.toContain(assetCacheTag(asset.id));
+    expect(added).not.toContain(siteCacheTag(site.id));
+
+    // A changed asset (a new slug: its URL moves): its media URLs and the article showing it.
+    const renamed = await store.updateAsset({ ...asset, slug: "dot-renamed" });
+    expect(await tagsOf()).toEqual([assetCacheTag(asset.id), nodeCacheTag(hello.id)].sort());
+
+    // Removed from the live snapshot: its media URLs go too.
+    const now = (await store.getContentEntry(hello.id)) as ContentEntry;
+    const { coverImage: _c, ...bare } = now;
+    await store.updateContentEntry(bare as ContentEntry);
+    await store.deleteAsset(renamed);
+    const removed = await tagsOf();
+    expect(removed).toContain(assetCacheTag(asset.id));
+    expect(removed).toContain(nodeCacheTag(hello.id));
+    expect(removed).not.toContain(siteCacheTag(site.id));
   });
 
   it("structure purges the site: pages, redirects, term slugs, the site's settings", async () => {

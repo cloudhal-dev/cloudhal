@@ -6,9 +6,12 @@ import { useT } from "../i18n/index.tsx";
 export function RowMenu({
   onOpen,
   onDelete,
+  deleteDisabledReason,
 }: {
   onOpen: () => void;
   onDelete?: (() => void) | undefined;
+  /** The person's role cannot delete this row: the item stays, disabled, with the reason (§2s). */
+  deleteDisabledReason?: string | undefined;
 }) {
   const t = useT();
   return (
@@ -35,11 +38,19 @@ export function RowMenu({
         <DropdownMenu.Item icon={ArrowSquareOut} onClick={onOpen}>
           {t("sites.open")}
         </DropdownMenu.Item>
-        {onDelete && (
-          <DropdownMenu.Item icon={Trash} variant="danger" onClick={onDelete}>
-            {t("common.delete")}
-          </DropdownMenu.Item>
-        )}
+        {onDelete &&
+          (deleteDisabledReason ? (
+            // A disabled item takes no pointer events, so the tooltip hangs on a wrapper.
+            <Tooltip content={deleteDisabledReason} side="left" render={<div />}>
+              <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                {t("common.delete")}
+              </DropdownMenu.Item>
+            </Tooltip>
+          ) : (
+            <DropdownMenu.Item icon={Trash} variant="danger" onClick={onDelete}>
+              {t("common.delete")}
+            </DropdownMenu.Item>
+          ))}
       </DropdownMenu.Content>
     </DropdownMenu>
   );

@@ -1,0 +1,19 @@
+---
+/**
+ * Reader comments under an article (RFC-0007 §8.1): approved comments, the plain HTML form on open
+ * threads, "Comments are closed" on closed ones, nothing on hidden or off ones, a placeholder in
+ * previews. The route loads the view in its frontmatter with `loadComments` (it sets the cache tag
+ * and, for Turnstile sites, the page's CSP); themes place this and style the `cloudhal-comment*`
+ * classes. Words default to the entry's locale (English or Turkish); pass `strings` to override.
+ */
+import type { CommentStrings } from "../comments-html.ts";
+import { commentsHtml } from "../comments-html.ts";
+import type { CommentsView } from "../comments-view.ts";
+
+interface Props {
+  view: CommentsView | undefined;
+  strings?: CommentStrings;
+}
+const { view, strings } = Astro.props;
+---
+<Fragment set:html={commentsHtml(view, strings)} />

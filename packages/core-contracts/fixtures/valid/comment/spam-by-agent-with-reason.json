@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "cmt_01HZX8K3Q9AE",
+  "siteId": "site_01HZX8K3Q9ST",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "source": "native",
+  "author": {
+    "kind": "guest",
+    "name": "Best Deals"
+  },
+  "body": {
+    "format": "text",
+    "text": "Cheap watches here https://spam.example and https://spam2.example"
+  },
+  "status": "spam",
+  "createdAt": "2026-10-12T08:14:03Z",
+  "rev": 1,
+  "labels": [
+    {
+      "label": "links",
+      "source": "rule",
+      "at": "2026-10-12T08:14:03Z"
+    },
+    {
+      "label": "spam-suspect",
+      "source": "classifier",
+      "confidence": 97,
+      "at": "2026-10-12T08:14:04Z"
+    }
+  ],
+  "moderation": {
+    "action": "spam",
+    "actor": {
+      "kind": "agent",
+      "id": "agent_01HZX8K3Q9YZ",
+      "name": "Comment triage"
+    },
+    "at": "2026-10-12T08:16:00Z",
+    "reasonCode": "spam",
+    "note": "Two shop links, no relation to the article.",
+    "automated": true
+  }
+}

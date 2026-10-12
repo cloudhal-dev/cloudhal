@@ -13,6 +13,8 @@ Blogs and newsrooms first; documentation sites and research or data documentatio
 - **Policy-first** — humans and agents are the same kind of actor; the policy engine checks every tool call against scopes, not the skill's good intentions.
 - **MCP-native** — the agent surface is a Model Context Protocol server (spec 2026-07-28), usable from Claude, Cursor, Codex or any MCP client.
 - **Self-hostable, Cloudflare-ready** — runs offline on SQLite + filesystem; deploys to Cloudflare Workers/D1/R2 with the same storage interface.
+- **Analytics without cookies** — page views, sources, countries, devices and Core Web Vitals from one first-party script, in Studio, in each article's editor and for agents (read-only MCP tools). No personal data by default; see the [privacy guide for site owners](docs/guides/analytics-privacy.md).
+- **Reader comments, moderated** — first-party comments on articles: a plain form that works without JavaScript, a cookie-less proof of work instead of a CAPTCHA (Cloudflare Turnstile optional), every guest comment held for a person, agents that label and hide but never approve, erasure and DSA reports built in. Comments live in your database, outside snapshots. Off for each site until you turn them on; see the [guide for site owners](docs/guides/comments.md).
 
 ## Five minutes: create → ask an agent → preview → publish → your domain
 
@@ -31,6 +33,10 @@ npx cloudhal deploy                         # Cloudflare Workers + D1 + R2 with 
 npx cloudhal domain set news.example.com    # your own domain (zone in the same account)
 npx cloudhal deploy
 ```
+
+New projects count visits from the first deploy: cookie-less, first-party, read by Studio through Cloudflare bindings without an API token. Switch it off per site in Studio or for the deployment with `"analytics": { "enabled": false }` in `cloudhal.json`; existing deployments are asked once on their next deploy. Requirements (wrangler ≥ 4.145, an hourly cron trigger), Workers Free and Paid limits and the `cloudhal analytics` commands are in the [CLI README](packages/cli/README.md#site-analytics-rfc-0006); what is collected is in the [privacy guide](docs/guides/analytics-privacy.md).
+
+Reader comments are available on every deployment and off for every site until you turn them on in Studio. The first deploy in a terminal asks where the database should live; `--jurisdiction eu` keeps it in the EU (also in CI), and that choice cannot be changed later. Setup, moderation, agents, spam protection, privacy and a ready-made privacy paragraph are in the [comments guide](docs/guides/comments.md).
 
 The first deploy prints a one-time link for the owner account. In Studio you create keys for remote agents and choose each key's **mode**. Approvals wait in Studio, and every agent call is in the activity log.
 
@@ -64,7 +70,9 @@ packages/core-contracts   JSON Schema source of truth, generated TypeScript + pr
 packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs, R2 adapters; migrations
 packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 packages/astro-renderer   Astro 7 integration, live/snapshot data sources, section components
-packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull
+packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
+packages/comments         reader comments (RFC-0007): rules, proof of work, submission pipeline, SQLite/D1 store
+packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull / analytics / comments
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
 packages/mcp-server       MCP server: 20 semantic tools, approval gate, agent modes, skills as resources; stdio + HTTP
@@ -76,7 +84,9 @@ skills/official           site-bootstrap, safe-edit, publish-article, rollback (
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
 docs/design               DESIGN.md — the binding admin design system (Kumo)
+docs/guides               guides for site owners (analytics and privacy, reader comments)
 docs/rfcs                 design proposals (RFC-0001: Site Graph)
+docs/security             threat model
 .agents/skills            skills for coding agents working on this repo
 apps/demo-newsroom        Cloudhal's own newsroom, published by an agent through Cloudhal (dogfooding)
 packages/create-cloudhal  npm create cloudhal

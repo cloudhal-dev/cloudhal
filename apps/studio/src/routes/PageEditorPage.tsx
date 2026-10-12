@@ -46,14 +46,19 @@ import {
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { ImageRefField } from "../components/MediaPicker.tsx";
+import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
+import { ReadersCard } from "../components/Readers.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useGate } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewPage } from "../lib/api.ts";
-import { cleanSeo, hasErrors, validateSeo } from "../lib/seo.ts";
+import { cleanSeo, hasErrors, validateImageRef, validateSeo } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 
@@ -98,7 +103,22 @@ function duplicateOf(page: Page, title: string): NewPage {
 /** Field rows inside a section card: stacked on phones, side by side when there is room. */
 const FIELD_ROW = "items-start gap-x-4 gap-y-5";
 
-function SectionForm({ section, onChange }: { section: Section; onChange: (s: Section) => void }) {
+/** Where a section's image comes from: the site (media library, primary domain). */
+interface MediaContext {
+  siteId: string;
+  defaultLocale: string;
+  host: string | undefined;
+}
+
+function SectionForm({
+  section,
+  onChange,
+  media,
+}: {
+  section: Section;
+  onChange: (s: Section) => void;
+  media: MediaContext;
+}) {
   const t = useT();
   switch (section.kind) {
     case "hero":
@@ -117,6 +137,19 @@ function SectionForm({ section, onChange }: { section: Section; onChange: (s: Se
             required={false}
             className="w-full"
           />
+          {/* The hero's picture is optional (RFC-0004 §2.2 slot `HeroSection.image`). */}
+          <ImageRefField
+            siteId={media.siteId}
+            defaultLocale={media.defaultLocale}
+            image={section.image}
+            savedSrc={undefined}
+            host={media.host}
+            errors={validateImageRef(section.image)}
+            showErrors={false}
+            onChange={(image) => onChange(setOptional(section, "image", image))}
+            testId={`hero-${section.id}`}
+            labels={{ empty: t("editor.heroNoImage") }}
+          />
         </>
       );
     case "richText":
@@ -134,20 +167,18 @@ function SectionForm({ section, onChange }: { section: Section; onChange: (s: Se
     case "image":
       return (
         <>
-          <Grid variant="2up" gap="none" className={FIELD_ROW}>
-            <Input
-              label={t("editor.imageUrl")}
-              value={section.image.src}
-              onValueChange={(v) => onChange({ ...section, image: { ...section.image, src: v } })}
-              className="w-full"
-            />
-            <Input
-              label={t("editor.altText")}
-              value={section.image.alt}
-              onValueChange={(v) => onChange({ ...section, image: { ...section.image, alt: v } })}
-              className="w-full"
-            />
-          </Grid>
+          <ImageRefField
+            siteId={media.siteId}
+            defaultLocale={media.defaultLocale}
+            image={section.image}
+            savedSrc={undefined}
+            host={media.host}
+            errors={validateImageRef(section.image)}
+            showErrors={false}
+            // The section needs an image: clearing the fields keeps an empty address to fill in.
+            onChange={(image) => onChange({ ...section, image: image ?? { src: "", alt: "" } })}
+            testId={`image-${section.id}`}
+          />
           <Input
             label={t("editor.caption")}
             value={section.caption ?? ""}
@@ -209,12 +240,16 @@ export function PageEditorPage() {
   const [showErrors, setShowErrors] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Menus linking here (RFC-0003): named in the delete dialog, listed in the "In menus" card.
+  const menuRefs = useMenuReferences(siteId, { kind: "page", id: pageId });
   const [removeIndex, setRemoveIndex] = useState<number | undefined>();
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
   const dirty = isDirty(draft, query.data);
+  // Pages are structure: Editors and above; others read them (RFC-0005 §2.2, DESIGN.md §2s).
+  const readOnlyReason = useGate("pages.write").reason;
   const save = useMutation({
     mutationFn: (page: Page) => api.pages.update(cleanSeo(page)),
     onSuccess: async (saved) => {
@@ -349,19 +384,32 @@ export function PageEditorPage() {
             onPublish={() => {
               if (valid()) setPublishOpen(true);
             }}
+            readOnlyReason={readOnlyReason}
             menu={
-              <>
-                <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
-                  {t("editor.duplicate")}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  icon={Trash}
-                  variant="danger"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  {t("editor.deletePage")}
-                </DropdownMenu.Item>
-              </>
+              readOnlyReason ? (
+                // Disabled items take no pointer events, so the tooltip hangs on a wrapper.
+                <Tooltip content={readOnlyReason} side="left" render={<div />}>
+                  <DropdownMenu.Item icon={Copy} disabled>
+                    {t("editor.duplicate")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                    {t("editor.deletePage")}
+                  </DropdownMenu.Item>
+                </Tooltip>
+              ) : (
+                <>
+                  <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
+                    {t("editor.duplicate")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    icon={Trash}
+                    variant="danger"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    {t("editor.deletePage")}
+                  </DropdownMenu.Item>
+                </>
+              )
             }
           />
           <Button
@@ -370,7 +418,8 @@ export function PageEditorPage() {
               if (valid()) save.mutate(draft);
             }}
             loading={save.isPending}
-            disabled={!dirty}
+            disabled={!dirty || readOnlyReason !== undefined}
+            title={readOnlyReason}
             data-testid="save"
           >
             {t("common.save")}
@@ -379,6 +428,7 @@ export function PageEditorPage() {
       }
     >
       <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
+      <ViewOnlyBanner reason={readOnlyReason} />
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -390,7 +440,12 @@ export function PageEditorPage() {
           />
         }
         main={
-          <>
+          // Read-only for roles below Editor: one disabled fieldset turns every field off (§2s).
+          <fieldset
+            disabled={readOnlyReason !== undefined}
+            className="grid min-w-0 content-start gap-6"
+            data-read-only={readOnlyReason ? "true" : undefined}
+          >
             <SectionCard title={t("editor.page")}>
               <Grid variant="2up" gap="none" className={FIELD_ROW}>
                 <Input
@@ -465,16 +520,26 @@ export function PageEditorPage() {
                         </>
                       }
                     >
-                      <SectionForm section={s} onChange={(next) => updateSection(i, next)} />
+                      <SectionForm
+                        section={s}
+                        onChange={(next) => updateSection(i, next)}
+                        media={{
+                          siteId,
+                          defaultLocale: site.data?.defaultLocale ?? draft.locale,
+                          host,
+                        }}
+                      />
                     </SectionCard>
                   );
                 })
               )}
             </div>
-          </>
+          </fieldset>
         }
         aside={
           <>
+            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="page" />
+            <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
             <DetailsCard
               rows={[
                 {
@@ -500,6 +565,7 @@ export function PageEditorPage() {
               description={t("editor.deletePageHint")}
               actionLabel={t("editor.deletePage")}
               onAction={() => setDeleteOpen(true)}
+              disabledReason={readOnlyReason}
             />
           </>
         }
@@ -537,6 +603,7 @@ export function PageEditorPage() {
         onOpenChange={setDeleteOpen}
         resourceType={t("editor.page")}
         resourceName={draft.path}
+        notice={<MenuDeleteNotice refs={menuRefs.data} kind="page" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           await remove.mutateAsync(draft);

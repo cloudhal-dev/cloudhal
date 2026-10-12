@@ -129,3 +129,19 @@ fn asset() {
 fn menu() {
     check::<cloudhal_schema::Menu>("menu");
 }
+#[test]
+fn analytics_event() {
+    check::<cloudhal_schema::AnalyticsEvent>("analytics-event");
+}
+#[test]
+fn analytics_beacon() {
+    check::<cloudhal_schema::AnalyticsBeacon>("analytics-beacon");
+}
+#[test]
+fn comment() {
+    check::<cloudhal_schema::Comment>("comment");
+}
+#[test]
+fn comment_submission() {
+    check::<cloudhal_schema::CommentSubmission>("comment-submission");
+}

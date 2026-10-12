@@ -8,7 +8,10 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { RouteError, RoutePending } from "./components/RouteStates.tsx";
+import { LOCALE_LIST, withMessages } from "./i18n/index.tsx";
+import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
 import { authClient } from "./lib/auth.ts";
+import { isQueueTab, type QueueTab } from "./lib/comments.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
 
@@ -17,29 +20,66 @@ import { SiteShell } from "./routes/SiteShell.tsx";
  * renders immediately. `defaultPreload: "intent"` fetches a screen's chunk on hover/focus.
  */
 const AccountPage = lazyRouteComponent(() => import("./routes/AccountPage.tsx"), "AccountPage");
+const AnalyticsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/AnalyticsPage.tsx"), ["analytics"]),
+  "AnalyticsPage",
+);
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
-const AgentsPage = lazyRouteComponent(() => import("./routes/AgentsPage.tsx"), "AgentsPage");
+const AgentsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/AgentsPage.tsx"), ["analyticsSettings", "commentsSettings"]),
+  "AgentsPage",
+);
 const ApprovalsPage = lazyRouteComponent(
-  () => import("./routes/ApprovalsPage.tsx"),
+  () => withMessages(import("./routes/ApprovalsPage.tsx"), ["comments"]),
   "ApprovalsPage",
 );
 const ArticleEditorPage = lazyRouteComponent(
-  () => import("./routes/ArticleEditorPage.tsx"),
+  () => withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers", "comments"]),
   "ArticleEditorPage",
 );
-const ArticlesPage = lazyRouteComponent(() => import("./routes/ArticlesPage.tsx"), "ArticlesPage");
+const ArticlesPage = lazyRouteComponent(
+  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers"]),
+  "ArticlesPage",
+);
+const CommentsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommentsPage.tsx"), ["comments"]),
+  "CommentsPage",
+);
+const CommentThreadPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommentThreadPage.tsx"), ["comments"]),
+  "CommentThreadPage",
+);
+const CommenterPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CommenterPage.tsx"), ["comments"]),
+  "CommenterPage",
+);
 const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
+const InvitePage = lazyRouteComponent(() => import("./routes/InvitePage.tsx"), "InvitePage");
+const ResetPasswordPage = lazyRouteComponent(
+  () => import("./routes/ResetPasswordPage.tsx"),
+  "ResetPasswordPage",
+);
+const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
-  () => import("./routes/PageEditorPage.tsx"),
+  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers"]),
   "PageEditorPage",
 );
-const PagesPage = lazyRouteComponent(() => import("./routes/PagesPage.tsx"), "PagesPage");
+const PagesPage = lazyRouteComponent(
+  () => withMessages(import("./routes/PagesPage.tsx"), ["readers"]),
+  "PagesPage",
+);
 const SiteOverviewPage = lazyRouteComponent(
-  () => import("./routes/SiteOverviewPage.tsx"),
+  () => withMessages(import("./routes/SiteOverviewPage.tsx"), ["readers"]),
   "SiteOverviewPage",
 );
 const SiteSettingsPage = lazyRouteComponent(
-  () => import("./routes/SiteSettingsPage.tsx"),
+  // The privacy notice is offered in every language, so every locale's settings words load.
+  () =>
+    withMessages(
+      import("./routes/SiteSettingsPage.tsx"),
+      ["analyticsSettings", "commentsSettings"],
+      LOCALE_LIST,
+    ),
   "SiteSettingsPage",
 );
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
@@ -53,6 +93,12 @@ const TermEditorPage = lazyRouteComponent(
   () => import("./routes/TermEditorPage.tsx"),
   "TermEditorPage",
 );
+const NavigationPage = lazyRouteComponent(
+  () => import("./routes/NavigationPage.tsx"),
+  "NavigationPage",
+);
+const MediaPage = lazyRouteComponent(() => import("./routes/MediaPage.tsx"), "MediaPage");
+const AssetPage = lazyRouteComponent(() => import("./routes/AssetPage.tsx"), "AssetPage");
 const RedirectsPage = lazyRouteComponent(
   () => import("./routes/RedirectsPage.tsx"),
   "RedirectsPage",
@@ -77,6 +123,20 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginPage,
+});
+/**
+ * Public token pages (RFC-0005 §7): the link's secret is in the fragment (`#chinv_…`, `#chrst_…`),
+ * which the page takes and strips at once; no session needed.
+ */
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invite",
+  component: InvitePage,
+});
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset-password",
+  component: ResetPasswordPage,
 });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -114,6 +174,14 @@ const accountSettingsRoute = createRoute({
   path: "/account",
   component: AccountPage,
 });
+/** Settings › Team (RFC-0005): members, invites; `?view=activity` for the deployment's events. */
+const teamRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/team",
+  validateSearch: (search: Record<string, unknown>): { view?: "activity" } =>
+    search.view === "activity" ? { view: "activity" } : {},
+  component: MembersPage,
+});
 
 // Site surface
 const siteRoute = createRoute({
@@ -126,6 +194,14 @@ const siteIndexRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/",
   component: SiteOverviewPage,
+});
+/** Site › Overview › Analytics (RFC-0006 §10.1): `?range=7d` or `?from=&to=`, `&compare=0`, `&filter=`. */
+const analyticsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/analytics",
+  validateSearch: (search: Record<string, unknown>): AnalyticsSearch =>
+    validateAnalyticsSearch(search),
+  component: AnalyticsPage,
 });
 const pagesRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -166,6 +242,58 @@ const termEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/taxonomy/$termId",
   component: TermEditorPage,
+});
+/** Site › Settings › Navigation (RFC-0003 §8): `?menu=<key>&item=<itemId>`. */
+const navigationRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/navigation",
+  validateSearch: (search: Record<string, unknown>): { menu?: string; item?: string } => {
+    const menu = slugParam(search.menu);
+    const item =
+      typeof search.item === "string" && /^item_[A-Za-z0-9]{6,32}$/.test(search.item)
+        ? search.item
+        : undefined;
+    return { ...(menu ? { menu } : {}), ...(item ? { item } : {}) };
+  },
+  component: NavigationPage,
+});
+/** Site › Content › Media (RFC-0004 §8): the library, and one file's page. */
+const mediaRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/media",
+  component: MediaPage,
+});
+const assetRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/media/$assetId",
+  component: AssetPage,
+});
+/** Site › Content › Comments (RFC-0007 §14): the moderation queue, `?tab=reported` etc. */
+const commentsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/comments",
+  validateSearch: (search: Record<string, unknown>): { tab?: QueueTab } =>
+    isQueueTab(search.tab) && search.tab !== "pending" ? { tab: search.tab } : {},
+  component: CommentsPage,
+});
+const commentIdParam = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : undefined;
+/** One article's thread: `?comment=<id>` lands on a comment, `?reply=<id>` opens the reply form. */
+const commentThreadRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/comments/$nodeId",
+  validateSearch: (search: Record<string, unknown>): { comment?: string; reply?: string } => {
+    const comment = commentIdParam(search.comment);
+    const reply = commentIdParam(search.reply);
+    return { ...(comment ? { comment } : {}), ...(reply ? { reply } : {}) };
+  },
+  component: CommentThreadPage,
+});
+/** A commenter (`commenters:data`): identity, their comments, ban, export, erase. */
+const commenterRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/commenters/$commenterId",
+  component: CommenterPage,
 });
 /** Site › Settings › Redirects. */
 const redirectsRoute = createRoute({
@@ -210,10 +338,13 @@ const articleEditorRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  inviteRoute,
+  resetPasswordRoute,
   indexRoute,
-  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute]),
+  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute, teamRoute]),
   siteRoute.addChildren([
     siteIndexRoute,
+    analyticsRoute,
     pagesRoute,
     articlesRoute,
     snapshotsRoute,
@@ -225,6 +356,12 @@ const routeTree = rootRoute.addChildren([
     taxonomyRoute,
     termEditorRoute,
     redirectsRoute,
+    navigationRoute,
+    mediaRoute,
+    assetRoute,
+    commentsRoute,
+    commentThreadRoute,
+    commenterRoute,
   ]),
 ]);
 

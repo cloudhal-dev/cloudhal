@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "cmt_01HZX8K3Q9AI",
+  "siteId": "site_01HZX8K3Q9ST",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "source": "import",
+  "author": {
+    "kind": "guest",
+    "name": "old_reader"
+  },
+  "body": {
+    "format": "text",
+    "text": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?"
+  },
+  "status": "approved",
+  "createdAt": "2019-03-02T17:45:00Z",
+  "rev": 0,
+  "origin": {
+    "system": "disqus",
+    "id": "5873041229"
+  }
+}

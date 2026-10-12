@@ -6,6 +6,7 @@
 import { ApprovalStore, AuditLog, type Role } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
+import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -374,6 +375,38 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
             }),
         },
         {
+          name: "read menus",
+          allowed: roles,
+          run: (p) => call("GET", `/api/sites/${siteId}/menus`, { cookie: p.cookie }),
+        },
+        {
+          name: "preview a menu",
+          allowed: roles,
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus/preview`, {
+              cookie: p.cookie,
+              body: { menus: [{ key: "primary" }] },
+            }),
+        },
+        {
+          name: "create a menu (RFC-0003: Editor and above)",
+          allowed: ["editor", "administrator", "owner"],
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus`, {
+              cookie: p.cookie,
+              body: { key: `menu-${p.role}`, items: [] },
+            }),
+        },
+        {
+          name: "create a menu from pages",
+          allowed: ["editor", "administrator", "owner"],
+          run: (p) =>
+            call("POST", `/api/sites/${siteId}/menus/from-pages`, {
+              cookie: p.cookie,
+              body: { key: `pages-${p.role}`, dryRun: true },
+            }),
+        },
+        {
           name: "tags migration",
           allowed: ["administrator", "owner"],
           run: (p) =>
@@ -675,13 +708,20 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "content:read",
         "preview:create",
         "content:draft:own",
+        // RFC-0004: Contributors and above upload media (ADR-0018); keys outside plan get it.
+        "asset:upload",
       ]);
       const key = await newKey(t.author, { name: "author-bot", mode: "edits" });
       expect(key.scopes).toEqual([
         "site:read",
         "content:read",
         "preview:create",
+        // RFC-0006: Authors and above read analytics; new keys get it in every mode.
+        "analytics:read",
+        // RFC-0007 D2: and comments.
+        "comments:read",
         "content:write:own",
+        "asset:upload",
         "site:publish:own",
       ]);
 
@@ -962,6 +1002,134 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       expect(
         (await audit.list({ deployment: true })).some((r) => r.tool === "agent-key.revoke"),
       ).toBe(true);
+    });
+
+    it('RFC-0006 §9.1: "Allow analytics" adds analytics:read to older keys — own keys or agents:manage, never above the creator\'s role, audited', async () => {
+      const t = await team();
+      const older = ["site:read", "content:read", "preview:create"];
+      const authorKey = await newKey(t.author, { name: "a-old", mode: "plan", scopes: older });
+      const editorKey = await newKey(t.editor, { name: "e-old", mode: "plan", scopes: older });
+      const contributorKey = await newKey(t.contributor, {
+        name: "c-old",
+        mode: "plan",
+        scopes: older,
+      });
+      const add = (p: Person, id: string, body: Json = { addScopes: ["analytics:read"] }) =>
+        call("PATCH", `/api/agent-keys/${id}`, { cookie: p.cookie, body });
+
+      const scopesOf = async (key: string) =>
+        structured<{ scopes: string[] }>(
+          await (await connect(key)).callTool({ name: "get_mode", arguments: {} }),
+        ).scopes;
+      // the agent lacks it before
+      expect(await scopesOf(authorKey.key)).toEqual(older);
+
+      // only analytics:read can be added, and only as a list
+      expect((await add(t.author, authorKey.id, { addScopes: ["content:write"] })).body.error).toBe(
+        "scope_not_addable",
+      );
+      expect((await add(t.author, authorKey.id, { addScopes: "analytics:read" })).status).toBe(400);
+      expect((await add(t.author, authorKey.id, { addScopes: [] })).status).toBe(400);
+      expect(
+        (
+          await add(t.author, authorKey.id, {
+            addScopes: ["analytics:read"],
+            mode: "manual",
+          })
+        ).status,
+      ).toBe(400);
+      // someone else's key is not found without agents:manage
+      expect((await add(t.editor, authorKey.id)).status).toBe(404);
+      // Contributors cannot hold it (narrowed by role), nor can an Administrator give it to them
+      expect((await add(t.contributor, contributorKey.id)).body.error).toBe("scope_above_role");
+      expect((await add(t.administrator, contributorKey.id)).body.error).toBe("scope_above_role");
+
+      // the creator adds it: stored, effective, and nothing else changes
+      const added = await add(t.author, authorKey.id);
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body).toMatchObject({
+        id: authorKey.id,
+        mode: "plan",
+        scopes: [...older, "analytics:read"],
+        effectiveScopes: [...older, "analytics:read"],
+      });
+      // idempotent: a second call changes nothing and is not audited again
+      expect((await add(t.author, authorKey.id)).body.scopes).toEqual([...older, "analytics:read"]);
+      // an Administrator adds it to an Editor's key (agents:manage)
+      const byAdmin = await add(t.administrator, editorKey.id);
+      expect(byAdmin.status, JSON.stringify(byAdmin.body)).toBe(200);
+      expect(byAdmin.body.scopes).toEqual([...older, "analytics:read"]);
+
+      // and holds it on its next connection
+      expect(await scopesOf(authorKey.key)).toEqual([...older, "analytics:read"]);
+
+      const rows = (await audit.list({ deployment: true, limit: 100 })).filter(
+        (r) => r.tool === "agent-key.scopes",
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.input)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyId: authorKey.id, added: ["analytics:read"] }),
+          expect.objectContaining({ keyId: editorKey.id, added: ["analytics:read"] }),
+        ]),
+      );
+      expect(rows.find((r) => r.input && (r.input as Json).keyId === editorKey.id)?.actor.id).toBe(
+        t.administrator.actorId,
+      );
+    });
+
+    it('RFC-0007 §10.1: "Allow comments" adds comments:read to older keys with the same rules, audited', async () => {
+      const t = await team();
+      const older = ["site:read", "content:read", "preview:create", "analytics:read"];
+      const authorKey = await newKey(t.author, { name: "a-pre", mode: "plan", scopes: older });
+      const editorKey = await newKey(t.editor, { name: "e-pre", mode: "plan", scopes: older });
+      const contributorKey = await newKey(t.contributor, {
+        name: "c-pre",
+        mode: "plan",
+        scopes: ["site:read", "content:read", "preview:create"],
+      });
+      const add = (p: Person, id: string, body: Json = { addScopes: ["comments:read"] }) =>
+        call("PATCH", `/api/agent-keys/${id}`, { cookie: p.cookie, body });
+      const scopesOf = async (key: string) =>
+        structured<{ scopes: string[] }>(
+          await (await connect(key)).callTool({ name: "get_mode", arguments: {} }),
+        ).scopes;
+      expect(await scopesOf(authorKey.key)).toEqual(older);
+      // write scopes stay fixed at creation
+      for (const s of ["comments:moderate", "comments:reply", "commenters:data"])
+        expect((await add(t.author, authorKey.id, { addScopes: [s] })).body.error, s).toBe(
+          "scope_not_addable",
+        );
+      // someone else's key without agents:manage; a Contributor's key, by anyone
+      expect((await add(t.editor, authorKey.id)).status).toBe(404);
+      expect((await add(t.contributor, contributorKey.id)).body.error).toBe("scope_above_role");
+      expect((await add(t.administrator, contributorKey.id)).body.error).toBe("scope_above_role");
+      // the creator, and an Administrator for an Editor's key
+      const added = await add(t.author, authorKey.id);
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body).toMatchObject({
+        mode: "plan",
+        scopes: [...older, "comments:read"],
+        effectiveScopes: [...older, "comments:read"],
+      });
+      expect((await add(t.author, authorKey.id)).body.scopes).toEqual([...older, "comments:read"]);
+      const both = await add(t.administrator, editorKey.id, {
+        addScopes: ["analytics:read", "comments:read"],
+      });
+      expect(both.status, JSON.stringify(both.body)).toBe(200);
+      expect(both.body.scopes).toEqual([...older, "comments:read"]);
+      // the agent holds it on its next connection
+      expect(await scopesOf(authorKey.key)).toEqual([...older, "comments:read"]);
+      const rows = (await audit.list({ deployment: true, limit: 100 })).filter(
+        (r) => r.tool === "agent-key.scopes",
+      );
+      expect(rows.map((r) => r.input)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyId: authorKey.id, added: ["comments:read"] }),
+          expect.objectContaining({ keyId: editorKey.id, added: ["comments:read"] }),
+        ]),
+      );
+      expect(rows).toHaveLength(2);
     });
 
     // ───────────────────────────── I13: removal ─────────────────────────────
@@ -1477,6 +1645,100 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       );
       expect(live?.reason).toBe("publish");
       await client.close();
+    });
+
+    it("assets (RFC-0004, ADR-0018): Contributors and Authors upload and edit their own files, Editors manage all, takedown is the Owner's", async () => {
+      const t = await team();
+      const assets = `/api/sites/${siteId}/assets`;
+      const upload = async (p: Person, side: number) => {
+        const bytes = makePng({ width: side, height: side });
+        const tk = await call("POST", `${assets}/uploads`, {
+          cookie: p.cookie,
+          body: {
+            files: [
+              {
+                filename: `${p.role}.png`,
+                mediaType: "image/png",
+                bytes: bytes.byteLength,
+                alt: p.role,
+              },
+            ],
+          },
+        });
+        expect(tk.status, JSON.stringify(tk.body)).toBe(201);
+        const file = (tk.body.files as { url: string }[])[0] as { url: string };
+        const res = await app.request(`${ORIGIN}${file.url}`, {
+          method: "PUT",
+          headers: {
+            cookie: p.cookie,
+            "content-type": "image/png",
+            "content-length": String(bytes.byteLength),
+          },
+          body: bytes as Uint8Array<ArrayBuffer>,
+        });
+        const body = (await res.json()) as Json;
+        expect(res.status, JSON.stringify(body)).toBe(201);
+        return body.asset as { id: string; rev: number; uploadedBy: { id: string } };
+      };
+      const own = await upload(t.contributor, 5);
+      expect(own.uploadedBy.id).toBe(t.contributor.actorId);
+      const authors = await upload(t.author, 6);
+      const editors = await upload(t.editor, 7);
+      const edit = (p: Person, id: string, rev: number) =>
+        call("PUT", `${assets}/${id}`, { cookie: p.cookie, body: { rev, credit: `by ${p.role}` } });
+
+      // Own uploads: editable by the uploader; others' are refused with words.
+      expect((await edit(t.contributor, own.id, 0)).status).toBe(200);
+      const notOwn = await edit(t.contributor, editors.id, 0);
+      expect(notOwn.status).toBe(403);
+      expect(notOwn.body.error).toBe("not_own");
+      expect((await edit(t.author, own.id, 1)).status).toBe(403);
+      expect((await edit(t.author, authors.id, 0)).status).toBe(200);
+      const detail = (p: Person, id: string) =>
+        call("GET", `${assets}/${id}`, { cookie: p.cookie });
+      expect((await detail(t.contributor, own.id)).body.editable).toBe(true);
+      expect((await detail(t.contributor, editors.id)).body.editable).toBe(false);
+      expect((await detail(t.editor, own.id)).body.editable).toBe(true);
+
+      // Retire, restore and delete are asset:manage (Editor and above).
+      for (const p of [t.contributor, t.author]) {
+        const retire = await call("POST", `${assets}/${authors.id}/retire`, {
+          cookie: p.cookie,
+          body: { rev: 1 },
+        });
+        expect(retire.status).toBe(403);
+        expect(retire.body.error).toBe("missing_scope");
+        const del = await call("DELETE", `${assets}/${authors.id}?rev=1`, { cookie: p.cookie });
+        expect(del.status).toBe(403);
+      }
+      expect((await edit(t.editor, own.id, 1)).status).toBe(200);
+      const retired = await call("POST", `${assets}/${own.id}/retire`, {
+        cookie: t.editor.cookie,
+        body: { rev: 2 },
+      });
+      expect(retired.status).toBe(200);
+      expect(
+        (await call("DELETE", `${assets}/${authors.id}?rev=1`, { cookie: t.editor.cookie })).status,
+      ).toBe(204);
+
+      // Takedown: the Owner only (RFC-0004 §4.6), audited.
+      const purge = (p: Person) =>
+        call("POST", `${assets}/${editors.id}/purge`, {
+          cookie: p.cookie,
+          body: { reason: "Personal data in the photo" },
+        });
+      for (const p of [t.editor, t.administrator]) {
+        const r = await purge(p);
+        expect(r.status).toBe(403);
+        expect(r.body.error).toBe("owner_only");
+      }
+      expect((await purge(t.owner)).status).toBe(200);
+      const rows = await audit.list({ siteId, tool: "asset.purge" });
+      expect(rows.map((r) => r.actor.id)).toEqual([t.owner.actorId]);
+
+      // Studio's gating reads the same abilities.
+      const me = await call("GET", "/api/me", { cookie: t.contributor.cookie });
+      expect(me.body.can).toMatchObject({ "assets.upload": true, "assets.manage": false });
     });
   });
 }

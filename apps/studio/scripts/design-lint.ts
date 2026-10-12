@@ -52,6 +52,7 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/AgentsPage.tsx": "list",
   "routes/SkillsPage.tsx": "list",
   "routes/SiteOverviewPage.tsx": "dashboard",
+  "routes/AnalyticsPage.tsx": "dashboard",
   "routes/SiteSettingsPage.tsx": "settings",
   "routes/AccountPage.tsx": "settings",
   "routes/PageEditorPage.tsx": "editor",
@@ -59,21 +60,55 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/TaxonomyPage.tsx": "list",
   "routes/TermEditorPage.tsx": "editor",
   "routes/RedirectsPage.tsx": "list",
+  "routes/NavigationPage.tsx": "editor",
+  "routes/MediaPage.tsx": "list",
+  "routes/CommentsPage.tsx": "moderation",
+  "routes/CommentThreadPage.tsx": "editor",
+  "routes/CommenterPage.tsx": "editor",
+  "routes/AssetPage.tsx": "editor",
   "routes/LoginPage.tsx": "auth",
+  "routes/MembersPage.tsx": "list",
+  "routes/InvitePage.tsx": "token",
+  "routes/ResetPasswordPage.tsx": "token",
   "routes/SiteShell.tsx": "shell",
   "routes/AccountShell.tsx": "shell",
 };
 
-export type Template = "list" | "queue" | "dashboard" | "settings" | "editor" | "auth" | "shell";
+export type Template =
+  | "list"
+  | "moderation"
+  | "queue"
+  | "dashboard"
+  | "settings"
+  | "editor"
+  | "auth"
+  | "token"
+  | "shell";
 
 /** What each template must be composed from (names must appear in the file). DESIGN.md §2a–2f. */
 export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
   list: ["PageLayout", "crumbs=", "title=", "Table", "Empty", "LayerCard"],
   queue: ["PageLayout", "crumbs=", "title=", "SectionCard", "SectionEmpty", "Table"],
+  // Reader comments (DESIGN.md §2w): a list whose rows are `CommentRow`s (not table cells, so the
+  // untrusted-text panel and labels fit at 390 px), with selection and the bulk bar.
+  moderation: [
+    "PageLayout",
+    "crumbs=",
+    "title=",
+    "ListToolbar",
+    "BulkActionBar",
+    "CommentRow",
+    "LayerCard",
+    "Empty",
+    "Pagination",
+  ],
   dashboard: ["PageLayout", "crumbs=", "title=", "Columns", "SectionCard"],
   settings: ["PageLayout", "crumbs=", "title=", "SettingsLayout", "SettingsSection"],
   editor: ["PageLayout", "crumbs=", "title=", "EditorLayout", "SectionCard"],
   auth: ["AuthLayout", "Tabs", "Input", "Button"],
+  // Public token pages (`/invite`, `/reset-password`, DESIGN.md §2r): the auth frame without tabs,
+  // the link's state as a Banner, skeleton lines while it is inspected, a new-password field.
+  token: ["AuthLayout", "takeHashToken", "Banner", "Button", "Input", "LinkSkeleton|SkeletonLine"],
   shell: ["AppFrame", "Sidebar.Group", "Sidebar.MenuButton", "SidebarSwitcher"],
 };
 
@@ -228,6 +263,15 @@ export function lintSource(rel: string, text: string, scope: Scope): Violation[]
     );
   if (/dangerouslySetInnerHTML|\.innerHTML\s*=/.test(text))
     add("no-html-injection", "never inject HTML — agent/server text is always plain <Text>");
+  // Kumo's chart and map tooltip hooks insert their return value as raw HTML (RFC-0006 §10.1):
+  // country names and paths come from data, so the escaping default tooltip is the only one.
+  const htmlTooltip = /\b(?:tooltipFormatter|dangerousHtmlFormatter)\s*[=:]/.exec(text);
+  if (htmlTooltip)
+    add(
+      "no-html-tooltip",
+      "chart/map tooltip formatters are injected as HTML — keep Kumo's default (escaped) tooltip; name regions through the data (CountryMap does) and put details in the table",
+      htmlTooltip.index,
+    );
   for (const m of text.matchAll(
     /from\s+["'](lucide-react|@heroicons\/[^"']+|react-icons[^"']*|@tabler\/icons-react|@radix-ui\/react-icons)["']/g,
   ))
