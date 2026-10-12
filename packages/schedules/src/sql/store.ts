@@ -1181,17 +1181,33 @@ export class SqlScheduleStore implements SchedulerStore {
     const a = input.automation;
     const owned = "EXISTS (SELECT 1 FROM automations WHERE id = ? AND lease_token = ?)";
     if (!input.step.done) {
-      const res = await this.#sql.run(
-        `UPDATE automations SET cursor = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ? WHERE id = ? AND lease_token = ?`,
-        [JSON.stringify(input.step.cursor), input.now, a.id, input.token],
-      );
-      return res.changes === 1;
+      const cursor = input.step.cursor;
+      if (!cursor.taint) {
+        const res = await this.#sql.run(
+          `UPDATE automations SET cursor = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ? WHERE id = ? AND lease_token = ?`,
+          [JSON.stringify(cursor), input.now, a.id, input.token],
+        );
+        return res.changes === 1;
+      }
+      // A step that read untrusted text marks the running run at once (§11.4), not only at its end.
+      const results = await this.#sql.batch([
+        {
+          sql: `UPDATE schedule_runs SET taint = COALESCE(taint, ?), rev = rev + 1, updated_at = ?
+                WHERE id = ? AND state = 'running' AND ${owned}`,
+          params: [JSON.stringify(cursor.taint), input.now, input.runId, a.id, input.token],
+        },
+        {
+          sql: `UPDATE automations SET cursor = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ? WHERE id = ? AND lease_token = ?`,
+          params: [JSON.stringify(cursor), input.now, a.id, input.token],
+        },
+      ]);
+      return (results[1]?.changes ?? 0) === 1;
     }
     const step = input.step;
     const nextState = step.pause ? step.pause.state : step.nextRunAt ? "active" : "ended";
     const results = await this.#sql.batch([
       {
-        sql: `UPDATE schedule_runs SET state = ?, outcome = ?, summary = ?, counts = ?, findings = ?, error = ?, ended_at = ?, rev = rev + 1, updated_at = ?
+        sql: `UPDATE schedule_runs SET state = ?, outcome = ?, summary = ?, counts = ?, findings = ?, error = ?, taint = COALESCE(taint, ?), ended_at = ?, rev = rev + 1, updated_at = ?
               WHERE id = ? AND state = 'running' AND ${owned}`,
         params: [
           step.run.state,
@@ -1200,6 +1216,7 @@ export class SqlScheduleStore implements SchedulerStore {
           j(step.run.counts),
           j(step.run.findings),
           j(step.run.error),
+          j(step.run.taint),
           input.now,
           input.now,
           input.runId,
@@ -1917,6 +1934,205 @@ export class SqlScheduleStore implements SchedulerStore {
       [canonicalInstant(since), limit],
     );
     return rows.map((r) => Number(r.lateness_s));
+  }
+
+  // ───────────────────────────── built-in jobs ─────────────────────────────
+
+  /**
+   * "Run now" for a built-in (§13): a run for this minute (`trigger: manual`) and a cursor that
+   * points at it, with `nextRunAt` moved to now so the next tick steps it; when the run ends the
+   * automation returns to its scheduled `nextRunAt`. One batch, a CAS on `rev`; undefined when the
+   * automation is not active, a run is in progress, or this minute already has a run.
+   */
+  async startBuiltinNow(input: {
+    automation: Automation;
+    now: string;
+  }): Promise<string | undefined> {
+    const a = input.automation;
+    if (a.job.kind !== "builtin") return undefined;
+    const now = canonicalInstant(input.now);
+    const occurrenceAt = canonicalInstant(Math.floor(Date.parse(now) / 60_000) * 60_000);
+    const id = await runId(a.id, occurrenceAt);
+    const cursor = {
+      runId: id,
+      occurrenceAt,
+      attempt: 1,
+      manual: a.nextRunAt ? { nextRunAt: a.nextRunAt } : {},
+    };
+    const results = await this.#sql.batch([
+      {
+        sql: `UPDATE automations SET cursor = ?, next_run_at = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ?
+              WHERE id = ? AND site_id = ? AND rev = ? AND state = 'active' AND cursor IS NULL
+                AND (lease_until IS NULL OR lease_until <= ?)
+                AND NOT EXISTS (SELECT 1 FROM schedule_runs WHERE id = ?)`,
+        params: [JSON.stringify(cursor), occurrenceAt, now, a.id, a.siteId, a.rev, now, id],
+      },
+      {
+        sql: `INSERT OR IGNORE INTO schedule_runs (${RUN_COLUMNS})
+              SELECT ?, ?, 'builtin', ?, ?, 'running', NULL, 'manual', 1, NULL, NULL, NULL, NULL, ?, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, ?, ?
+              WHERE EXISTS (SELECT 1 FROM automations WHERE id = ? AND json_extract(cursor, '$.runId') = ?)`,
+        params: [id, a.siteId, a.id, occurrenceAt, now, now, now, a.id, id],
+      },
+    ]);
+    return (results[1]?.changes ?? 0) === 1 ? id : undefined;
+  }
+
+  /**
+   * One bounded `cleanup` step for a site (§11.1, one batch): runs older than 90 days (their
+   * findings with them) and terminal releases older than 400 days, at most `limit` of each;
+   * finding lists over 200 trimmed; leases left on rows that no longer need them cleared (expired
+   * automation leases, terminal releases and runs); and stale open rows closed — agent windows that
+   * closed over an hour ago (`missed`), claims never started for a day (`missed`), built-in runs no
+   * cursor continues any more (`failed`, `abandoned`). A `running` release keeps its lease: the
+   * tick recovers it (§6.3).
+   */
+  async cleanupSite(
+    siteId: string,
+    now: string,
+    options: { limit?: number; runDays?: number; releaseDays?: number; maxFindings?: number } = {},
+  ): Promise<{ counts: Record<string, number>; more: boolean }> {
+    const t = Date.parse(canonicalInstant(now));
+    const at = canonicalInstant(t);
+    const runCutoff = canonicalInstant(t - (options.runDays ?? 90) * 86_400_000);
+    const releaseCutoff = canonicalInstant(t - (options.releaseDays ?? 400) * 86_400_000);
+    const hourAgo = canonicalInstant(t - 3_600_000);
+    const dayAgo = canonicalInstant(t - 86_400_000);
+    const limit = options.limit ?? 200;
+    const max = options.maxFindings ?? 200;
+    const old = `SELECT id FROM releases WHERE site_id = ? AND state IN (${TERMINAL_SQL}) AND updated_at < ? ORDER BY updated_at LIMIT ?`;
+    const r = await this.#sql.batch([
+      {
+        sql: `DELETE FROM schedule_runs WHERE id IN (SELECT id FROM schedule_runs WHERE site_id = ? AND created_at < ? AND state NOT IN ('due', 'ready', 'running') ORDER BY created_at LIMIT ?)`,
+        params: [siteId, runCutoff, limit],
+      },
+      {
+        sql: `DELETE FROM release_items WHERE release_id IN (${old})`,
+        params: [siteId, releaseCutoff, limit],
+      },
+      { sql: `DELETE FROM releases WHERE id IN (${old})`, params: [siteId, releaseCutoff, limit] },
+      {
+        sql: `UPDATE schedule_runs SET findings = (SELECT json_group_array(json(value)) FROM (SELECT value FROM json_each(schedule_runs.findings) LIMIT ?))
+              WHERE site_id = ? AND findings IS NOT NULL AND json_array_length(findings) > ?`,
+        params: [max, siteId, max],
+      },
+      {
+        sql: `UPDATE automations SET lease_token = NULL, lease_until = NULL WHERE site_id = ? AND lease_until IS NOT NULL AND lease_until <= ?`,
+        params: [siteId, at],
+      },
+      {
+        sql: `UPDATE releases SET lease_token = NULL, lease_until = NULL WHERE site_id = ? AND state IN (${TERMINAL_SQL}) AND (lease_token IS NOT NULL OR lease_until IS NOT NULL)`,
+        params: [siteId],
+      },
+      {
+        sql: `UPDATE schedule_runs SET lease_token = NULL, lease_until = NULL WHERE site_id = ? AND state NOT IN ('due', 'ready', 'running') AND (lease_token IS NOT NULL OR lease_until IS NOT NULL)`,
+        params: [siteId],
+      },
+      {
+        sql: `UPDATE schedule_runs SET state = 'missed', ended_at = ?, rev = rev + 1, updated_at = ?
+              WHERE site_id = ? AND subject_kind = 'agent-task' AND state = 'ready' AND window_closes <= ?`,
+        params: [at, at, siteId, hourAgo],
+      },
+      {
+        sql: `UPDATE schedule_runs SET state = 'missed', ended_at = ?, lease_token = NULL, lease_until = NULL, rev = rev + 1, updated_at = ?
+              WHERE site_id = ? AND state = 'due' AND created_at <= ?`,
+        params: [at, at, siteId, dayAgo],
+      },
+      {
+        sql: `UPDATE schedule_runs SET state = 'failed', error = '{"code":"abandoned"}', ended_at = ?, rev = rev + 1, updated_at = ?
+              WHERE site_id = ? AND subject_kind = 'builtin' AND state = 'running' AND COALESCE(started_at, created_at) <= ?
+                AND NOT EXISTS (SELECT 1 FROM automations a WHERE a.id = schedule_runs.subject_id AND a.cursor IS NOT NULL
+                  AND json_extract(a.cursor, '$.runId') = schedule_runs.id)`,
+        params: [at, at, siteId, dayAgo],
+      },
+    ]);
+    const n = (i: number) => r[i]?.changes ?? 0;
+    const counts = {
+      "runs-deleted": n(0),
+      "releases-deleted": n(2),
+      "findings-trimmed": n(3),
+      "leases-cleared": n(4) + n(5) + n(6),
+      "stale-runs-closed": n(7) + n(8) + n(9),
+    };
+    return { counts, more: n(0) >= limit || n(2) >= limit };
+  }
+
+  /**
+   * The schedule side of the weekly digest (§11.1), three reads: releases that went live, are due
+   * next week, or ended badly this week; nodes in two pending releases; and the latest finished
+   * run of each other built-in automation of the site, with its counts.
+   */
+  async digestData(
+    siteId: string,
+    automationId: string,
+    window: { from: string; now: string; to: string },
+  ): Promise<{
+    releases: {
+      id: string;
+      title?: string;
+      state: ReleaseState;
+      section: "published" | "scheduled" | "attention";
+      at: string;
+    }[];
+    overlaps: number;
+    automations: {
+      id: string;
+      name: string;
+      job: string;
+      counts: Record<string, number>;
+      endedAt?: string;
+    }[];
+  }> {
+    const rows = await this.#sql.all<{
+      id: string;
+      title: string | null;
+      state: ReleaseState;
+      section: "published" | "scheduled" | "attention";
+      at: string;
+    }>(
+      `SELECT id, title, state, section, at FROM (
+         SELECT id, title, state,
+           CASE WHEN state = 'published' AND updated_at >= ? THEN 'published'
+                WHEN state IN ('scheduled', 'awaiting_approval') AND execute_at >= ? AND execute_at < ? THEN 'scheduled'
+                WHEN state IN ('missed', 'conflict', 'failed', 'expired') AND updated_at >= ? THEN 'attention'
+           END AS section,
+           CASE WHEN state IN ('scheduled', 'awaiting_approval') THEN execute_at
+                ELSE COALESCE(json_extract(outcome, '$.at'), updated_at) END AS at
+         FROM releases WHERE site_id = ? AND (updated_at >= ? OR (state IN ('scheduled', 'awaiting_approval') AND execute_at < ?)))
+       WHERE section IS NOT NULL ORDER BY at, id LIMIT 1000`,
+      [window.from, window.now, window.to, window.from, siteId, window.from, window.to],
+    );
+    const overlaps = [...(await this.overlaps(siteId)).values()].filter((r) => r.length > 1).length;
+    const runs = await this.#sql.all<{
+      id: string;
+      name: string;
+      job: string | null;
+      counts: string | null;
+      ended_at: string | null;
+    }>(
+      `SELECT a.id, a.name, json_extract(a.job, '$.builtin') AS job, r.counts, r.ended_at
+       FROM automations a JOIN schedule_runs r ON r.id = (
+         SELECT id FROM schedule_runs WHERE subject_id = a.id AND state = 'succeeded' ORDER BY occurrence_at DESC LIMIT 1)
+       WHERE a.site_id = ? AND a.id <> ? AND json_extract(a.job, '$.kind') = 'builtin'
+       ORDER BY a.name, a.id`,
+      [siteId, automationId],
+    );
+    return {
+      releases: rows.map((x) => ({
+        id: x.id,
+        ...(x.title ? { title: x.title } : {}),
+        state: x.state,
+        section: x.section,
+        at: x.at,
+      })),
+      overlaps,
+      automations: runs.map((x) => ({
+        id: x.id,
+        name: x.name,
+        job: x.job ?? "builtin",
+        counts: x.counts ? (JSON.parse(x.counts) as Record<string, number>) : {},
+        ...(x.ended_at ? { endedAt: x.ended_at } : {}),
+      })),
+    };
   }
 
   // ───────────────────────────── retention ─────────────────────────────

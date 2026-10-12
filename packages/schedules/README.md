@@ -67,6 +67,20 @@ In practice every ticker calls `runScheduledTick` from `@cloudhal/core-ts/releas
 
 For the API and MCP (rollout steps 7–8) the store also has `automationByKey`, `openAgentRun`, `readyAgentRun`, `openManualWindow`, `recordRunCall`, `endAgentRunAs`, `updateAutomation`, `deleteAutomation`, `retitleRelease` and `releaseLateness`. The scheduler's `checkApproval` is `createReleaseApprovalCheck` from `@cloudhal/mcp-server/schedules` (re-exported by `@cloudhal/api` with `releaseRights`).
 
+## Built-in automations (§11.1, rollout step 9)
+
+`createBuiltinRunner(sources)` is the `BuiltinRunner` for the five jobs; `@cloudhal/core-ts/automations` implements `BuiltinSources` over the site graph (`graphBuiltinRunner`), and `runScheduledTick` uses it by default. Every job runs in bounded steps — one per tick, at most `BUILTIN_STEP_COST[job]` statements — and keeps its position in `automations.cursor`, so a large site spans several ticks and a crash between them continues the same run. Findings (Studio-only JSON on the run, at most 200; counts exact) carry stable codes:
+
+| Job | Steps | Finding codes | Counts |
+|---|---|---|---|
+| `broken-links` | pages of 50 live pages, entries, terms and menus; then the week's 404 rows (taints: `broken_links`) | `broken-internal-link`, `broken-media-reference`, `broken-menu-target`, `link-to-gated-content`, `not-found-path` (with a redirect `proposal`) | per code, `broken-links`, `nodes-scanned`, `links-checked` |
+| `stale-content` | pages of 200 entries (route fields only) | `stale-entry` (oldest first) | `stale-entries`, `entries-scanned` |
+| `feed-check` | `/rss.xml`, then `/sitemap.xml` (taints: `feed_check`) | `feed-unreachable`, `feed-invalid`, `feed-item-incomplete`, `feed-future-date`, `feed-missing-entry`, `feed-gated-node` (the gate self-check), `feed-asset-not-live` | per code, `documents-checked`, `feed-problems`, `feed-errors` |
+| `weekly-digest` | one | `digest-published`, `digest-scheduled`, `digest-attention`, `digest-open-findings` (sections) | `published`, `scheduled`, `needs-attention`, `open-findings` |
+| `cleanup` | retention batches until nothing is left, then reminders | `stale-draft` | `runs-deleted`, `releases-deleted`, `findings-trimmed`, `leases-cleared`, `stale-runs-closed`, `stale-drafts` |
+
+Every built-in run also records `counts.steps` and `counts.statements` (its budget use). A step that reads visitor text or a fetched document returns `taint`; the running run is marked at once. `RunDueDeps.notify` (`ScheduleNotifier`) receives `automation-findings`, `automation-digest`, `automation-failed` and `automation-paused` after the run's end is committed; Studio's notifications are derived from the run rows by `@cloudhal/api`. A person's "Run now" is `SqlScheduleStore.startBuiltinNow`: a `manual` run for this minute that the next tick steps, after which the automation returns to its schedule. Nothing seeds automations: people create them in Studio (D7).
+
 Statements per path (counted by `TickMeter`, Workers Free budget 40):
 
 | Path | Statements |
@@ -77,7 +91,13 @@ Statements per path (counted by `TickMeter`, Workers Free budget 40):
 | Release published by `runScheduledTick` with the real `publishRelease` (core-ts suite, no asset blobs) | 17 |
 | Release missed | 7 |
 | Release recovered (expired lease or transient error) | 13 |
-| Built-in step | 8 |
+| Built-in step (claim, a two-statement step, finish) | 8 |
+| Built-in step that taints the run (more to do) | 10 |
+| `broken-links` tick (core-ts suite: a page of live nodes) | 9–10 |
+| `stale-content` tick | 8–9 |
+| `feed-check` tick | 9 |
+| `weekly-digest` tick | 13 |
+| `cleanup` tick (retention batch / draft reminders) | 17 / 8 |
 | Agent-task occurrence recorded | 6 |
 | Agent-task window closed | 8 |
 | First tick registering system jobs | 3 |
