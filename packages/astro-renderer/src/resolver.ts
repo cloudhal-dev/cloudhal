@@ -4,8 +4,10 @@
  * - **Published** (default): the site's `publishedSnapshotId` pointer decides what renders, so
  *   publish and rollback are pointer flips — no rebuild, no redeploy. Snapshots are immutable,
  *   so their sources are cached per isolate; the pointer itself is re-read after `pointerTtlMs`.
+ * - **Time gates** (RFC-0008 §7): the published source is the snapshot as seen at the request's
+ *   instant (`SnapshotSource.at`), so embargoed and expired pages and entries are absent.
  * - **Preview**: a signed token (`?cloudhal-preview=<token>`, then a cookie) shows drafts (`live`)
- *   or any snapshot. Tokens are minted by the admin API (`mintPreviewToken`). `?cloudhal-preview=exit`
+ *   or any snapshot, gated nodes included. Tokens are minted by the admin API (`mintPreviewToken`). `?cloudhal-preview=exit`
  *   leaves preview mode.
  */
 import type { Site } from "@cloudhal/core-contracts";
@@ -20,6 +22,8 @@ export type Resolution =
       kind: "published";
       source: SnapshotSource;
       snapshotId: string;
+      /** The request's instant (ms): what the source's gates were checked against. */
+      at: number;
       previewError?: string;
       /** Clears a stale or exited preview cookie. */
       setCookie?: string;
@@ -147,10 +151,11 @@ export class SiteResolver {
             this.#o.siteId,
             this.#o.now(),
           );
+          // Previews show drafts and gated nodes alike (RFC-0008 §7.3); they are never cached.
           const source =
             claims.target === "live"
               ? new LiveSource(this.#o.store, this.#o.siteId, { includeDrafts: true })
-              : await this.snapshot(claims.target.snapshot);
+              : (await this.snapshot(claims.target.snapshot)).ungated();
           if (source instanceof SnapshotSource && source.snapshot.siteId !== this.#o.siteId)
             throw new Error("snapshot belongs to another site");
           const maxAge = Math.max(0, claims.exp - Math.floor(this.#o.now() / 1000));
@@ -176,11 +181,14 @@ export class SiteResolver {
         ...(previewError ? { previewError } : {}),
         ...(clearCookie ? { setCookie: clearCookie } : {}),
       };
-    const source = await this.snapshot(site.publishedSnapshotId);
+    // One instant for the whole request (RFC-0008 §7.1): a page and the lists on it agree.
+    const at = this.#o.now();
+    const source = (await this.snapshot(site.publishedSnapshotId)).at(at);
     const published: Resolution = {
       kind: "published",
       source,
       snapshotId: site.publishedSnapshotId,
+      at,
       ...(previewError ? { previewError } : {}),
     };
     // Leaving preview: the cookie must be cleared on a published response too.

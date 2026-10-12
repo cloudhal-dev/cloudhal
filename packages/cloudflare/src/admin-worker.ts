@@ -49,6 +49,7 @@ import {
   flushCommentPurges,
   runCommentsHourly,
 } from "./comments.ts";
+import { siteGateSupport } from "./features.ts";
 import { purgeSiteCache } from "./purge.ts";
 
 export interface AdminEnv extends CommentsEnv {
@@ -187,6 +188,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   let migrated = false;
   /** When this isolate last ran the comments job on a request (no cron trigger); a plain number. */
   let lastCommentsHourly = 0;
+  /** The site Worker confirmed it enforces time gates (RFC-0008 §7.7); a plain boolean. */
+  let gatesConfirmed = false;
   const ensureMigrated = async (sql: SqlDriver) => {
     if (migrated) return;
     try {
@@ -279,6 +282,18 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       const store: SiteGraphStore = new SiteGraphStore({
         sql,
         blobs,
+        // S15: `availability` is refused until the site Worker says it enforces gates.
+        gates: siteGateSupport({
+          fetch: siteBinding
+            ? (u, init) => siteBinding.fetch(u, init as never) as unknown as Promise<Response>
+            : undefined,
+          token: purgeToken,
+          confirmed: () => gatesConfirmed,
+          remember: () => {
+            gatesConfirmed = true;
+          },
+          log,
+        }),
         onPublished: async (site, change) => {
           const binding = env.SITE;
           if (!binding || !env.CLOUDHAL_PURGE_TOKEN) return;

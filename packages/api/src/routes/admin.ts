@@ -37,6 +37,7 @@ import {
 } from "@cloudhal/comments/sql";
 import {
   exportSite,
+  InvariantError,
   importSite,
   isHostname,
   mediaBlobKey,
@@ -363,7 +364,10 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
         try {
           const store = c.get("store");
           const before = (await store.getSite(bundle.siteId))?.publishedSnapshotId;
-          const result = await importSite(storage, bundle, { mode });
+          const result = await importSite(storage, bundle, {
+            mode,
+            gates: { enforced: (siteId) => store.gatesEnforced(siteId) },
+          });
           const after = await store.getSite(bundle.siteId);
           // A replaced site may point production elsewhere: purge the edge cache like a publish.
           if (after && after.publishedSnapshotId !== before)
@@ -375,6 +379,12 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
               { error: "conflict", message: e.message, details: { differing: e.differing } },
               409,
             );
+          // RFC-0008: refused gates keep their code (409 gates_unsupported, 400 invalid_availability).
+          if (
+            e instanceof InvariantError &&
+            (e.code === "gates_unsupported" || e.code === "invalid_availability")
+          )
+            throw e;
           if (e instanceof Error) throw badRequest(e.message);
           throw e;
         }

@@ -36,7 +36,13 @@
               "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
               "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
               "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
-              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "temporal-polyfill": "RFC-0008 §9.4: import Temporal from temporal-polyfill/implementation only, never a native or global Temporal.",
+              "temporal-polyfill/global": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+              "temporal-polyfill/shim": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+              "temporal-polyfill/full": "RFC-0008 §9.4: import temporal-polyfill/implementation only.",
+              "temporal-polyfill/full/global": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+              "temporal-polyfill/full/shim": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation."
             }
           }
         }
@@ -87,7 +93,13 @@
                   "@cloudflare/kumo": "Apps import Kumo through @cloudhal/ui (one entry point, our blocks included).",
                   "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
                   "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
-                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "temporal-polyfill": "RFC-0008 §9.4: import Temporal from temporal-polyfill/implementation only, never a native or global Temporal.",
+                  "temporal-polyfill/global": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+                  "temporal-polyfill/shim": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+                  "temporal-polyfill/full": "RFC-0008 §9.4: import temporal-polyfill/implementation only.",
+                  "temporal-polyfill/full/global": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation.",
+                  "temporal-polyfill/full/shim": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation."
                 }
               }
             }

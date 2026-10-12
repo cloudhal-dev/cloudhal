@@ -128,7 +128,12 @@ export type InvariantCode =
   /** A site bundle references media bytes the target does not have. */
   | "missing_media"
   /** Invariants 4 and 5: the asset's fields break a kind, storage or immutability rule. */
-  | "invalid_asset";
+  | "invalid_asset"
+  // ── RFC-0008 (time gates) ──
+  /** `availability` without a gate, with a gate that does not parse, or `from` not before `until`. */
+  | "invalid_availability"
+  /** S15: the site's renderer has not confirmed it enforces gates; `availability` is refused. */
+  | "gates_unsupported";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

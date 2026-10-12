@@ -5,13 +5,14 @@
  * published snapshot by default, drafts/any snapshot behind a signed preview link.
  *
  * Response headers set here drive the Workers Cache (ADR-0012): published pages are cached at the
- * edge under `Cache-Tag: cloudhal-site-<siteId>` until a publish/rollback purges that tag; previews
- * are never cached.
+ * edge under `Cache-Tag: cloudhal-site-<siteId>` until a publish/rollback purges that tag, and
+ * never past the snapshot's next time gate (RFC-0008 §7.4); previews are never cached.
  */
 import { env } from "cloudflare:workers";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { edgeMaxAge } from "@cloudhal/core-ts/availability";
 import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
@@ -136,9 +137,14 @@ export async function getSource(
     h.set("x-cloudhal-mode", "unpublished");
     return undefined;
   }
-  // Published: browsers revalidate, the edge keeps it until a publish purges the tag.
+  // Published: browsers revalidate, the edge keeps it until a publish purges the tag — or, when a
+  // time gate lies ahead, until that gate (RFC-0008 §7.4): any page may list any entry, so the
+  // cap is site-wide and a gate needs no purge.
   h.set("cache-control", "public, max-age=0, must-revalidate");
-  h.set("cloudflare-cdn-cache-control", "public, max-age=31536000");
+  h.set(
+    "cloudflare-cdn-cache-control",
+    `public, max-age=${edgeMaxAge(await resolution.source.nextGate(), resolution.at)}`,
+  );
   // Pages add per-node tags next to this one (`addCacheTags`, `cache-tags.ts`).
   h.set("cache-tag", siteCacheTag(siteId));
   h.set("x-cloudhal-mode", "published");

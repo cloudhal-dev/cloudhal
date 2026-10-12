@@ -8,6 +8,10 @@
  *   `{ "tags": [...] }` (at most 100, Cloudflare's limit per purge request) purges only those tags
  *   (`cloudhal-site-`, `-node-`, `-term-`, `-list-`, see `cache-tags.ts`) — what the admin Worker
  *   sends after working out what a publish changed; without one, everything is purged.
+ * - `GET /__cloudhal/features` (Bearer `CLOUDHAL_PURGE_TOKEN`) says what this Worker enforces, so
+ *   the admin Worker never writes data an older site Worker would mishandle (RFC-0008 §7.7):
+ *   `{ "gates": 1 }` — every public path checks pages' and entries' time gates per request and
+ *   caps the edge cache at the next one. Until it answers so, writers refuse `availability`.
  * - Redirects (RFC-0002) are answered by the routes themselves (real 301s, `no-store` here like
  *   every non-200), so a publish that adds or removes one needs no purge of its own.
  * - Preview responses get every internal link rewritten to keep the signed token, so navigation
@@ -40,6 +44,7 @@ import {
   serveMedia,
 } from "@cloudhal/astro-renderer/runtime";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
+import { GATES_FEATURE_VERSION } from "@cloudhal/core-ts/availability";
 import {
   ANALYTICS_BEACON_PATH,
   deploymentDefaults,
@@ -201,6 +206,29 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/** True when the request carries the shared purge token (the admin Worker over `SITE`). */
+function fromAdmin(request: Request, env: Env): boolean {
+  const expected = env.CLOUDHAL_PURGE_TOKEN;
+  const given = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  return !!expected && timingSafeEqual(given, expected);
+}
+
+/**
+ * What this site Worker enforces (RFC-0008 §7.6–§7.7): the admin Worker asks before it lets anyone
+ * write time gates. Authenticated like the purge (it is not a public endpoint), never cached.
+ */
+function features(request: Request, env: Env): Response {
+  const headers = { "cache-control": "no-store", "cloudflare-cdn-cache-control": "no-store" };
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response("method not allowed", {
+      status: 405,
+      headers: { ...headers, allow: "GET" },
+    });
+  if (!fromAdmin(request, env))
+    return Response.json({ error: "unauthorized" }, { status: 401, headers });
+  return Response.json({ gates: GATES_FEATURE_VERSION }, { headers });
+}
+
 async function purge(
   request: Request,
   env: Env,
@@ -348,6 +376,7 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
+      if (url.pathname === "/__cloudhal/features") return features(request, env);
       const siteId = env.CLOUDHAL_SITE_ID ?? options.siteId;
       const a = siteId ? siteAnalytics(env, siteId) : undefined;
       // Analytics beacons (RFC-0006 §5.2): 204 for every outcome, never cached (POST).

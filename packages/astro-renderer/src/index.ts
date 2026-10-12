@@ -7,6 +7,7 @@
  */
 export * from "./archive.ts";
 export * from "./cache-tags.ts";
+export * from "./gates.ts";
 export { type CloudhalRendererConfig, cloudhal } from "./integration.ts";
 export { renderBody, renderEntryArticle, renderMarkdown, safeHref } from "./markdown.ts";
 export * from "./navigation.ts";

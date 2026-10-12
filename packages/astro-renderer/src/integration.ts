@@ -167,6 +167,13 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         const { writeStaticMedia } = await import("./static-media.ts");
         const media = await writeStaticMedia(resolved, dir);
         if (media > 0) logger.info(`copied ${media} media file(s) to /media`);
+        // RFC-0008: a static build cannot open or close a time gate by itself.
+        const { staticNextGate } = await import("./static-gates.ts");
+        const next = await staticNextGate(resolved, Date.now());
+        if (next !== undefined)
+          logger.warn(
+            `this build shows the site as of now; a time gate changes it at ${new Date(next).toISOString()} — build again then (the Cloudflare Site Worker needs no rebuild)`,
+          );
       },
       /** On Cloudflare every project page is rendered per request (pointer-flip publishing). */
       "astro:route:setup": ({ route }) => {
