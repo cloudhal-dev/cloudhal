@@ -7,6 +7,7 @@
  */
 import type { AnalyticsChannel, AnalyticsDevice } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
+import { assessBotTraffic, type BotTrafficSignal } from "./bots.ts";
 import { AnalyticsQueryError } from "./errors.ts";
 import {
   type AnalyticsQuery,
@@ -404,6 +405,19 @@ export class AnalyticsService {
       ...(options.redo ? { redo: true } : {}),
       source: this.#o.store === "wae" ? "wae" : "sql",
     });
+  }
+
+  /**
+   * The "possible bot traffic" signal for a period (RFC-0006 §5.5, `bots.ts`): its last 7 days by
+   * the hour, live (hourly series are never rolled up), budgeted like every live read. Returns the
+   * results read too, for the REST envelope's `source`/`estimated`/`partial`.
+   */
+  async botTraffic(
+    siteId: string,
+    range: Range,
+  ): Promise<{ signal: BotTrafficSignal; results: AnalyticsResult[] }> {
+    await this.#rollupOnRead(siteId);
+    return assessBotTraffic(this.#reader, { siteId, range, now: this.now() });
   }
 
   /** Yesterday's request estimate (§10.1), from rollups when the day is done, else live. */

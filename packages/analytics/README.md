@@ -6,13 +6,13 @@ Everything here is **Worker-safe** (AGENTS.md rule 5): SQLite is reached only th
 
 | Export | What |
 |---|---|
-| `@cloudhal/analytics` | query model and result types, classifiers, normalisation, visitor hash, per-isolate limits, settings rules, event builders, the beacon handler, `MemoryAnalytics`, `demoEvents` (demo data for `cloudhal analytics seed`) |
+| `@cloudhal/analytics` | query model and result types, the possible-bot-traffic signal (`assessBotTraffic`), classifiers, normalisation, visitor hash, per-isolate limits, settings rules, event builders, the beacon handler, `MemoryAnalytics`, `demoEvents` (demo data for `cloudhal analytics seed`) |
 | `@cloudhal/analytics/sql` | `SqlAnalytics` (raw events in `analytics_events`), settings / salt / rollup-run / query-budget accessors |
 | `@cloudhal/analytics/wae` | `WaeWriter`, `WaeReader`, `compileWae`, the fixed data-point layout |
 | `@cloudhal/analytics/rollup` | `runRollups`, `RollupReader`, `collectDailyRows`, `writeDailyRows` |
 | `@cloudhal/analytics/reader` | `CompositeReader` (rollups for complete days, the rest live), `mergeResults` |
 | `@cloudhal/analytics/service` | `AnalyticsService` (one per deployment: composite reads, settings with the salt and purge rules, rollups, status, CSV export of rollups), `presetRange`, `rangeFromParams`, `parseFilterParam`, `ANALYTICS_OFF` |
-| `@cloudhal/analytics/testing` | conformance, state and rollup suites; `FIXTURE_EVENTS`, `CONFORMANCE_CASES` |
+| `@cloudhal/analytics/testing` | conformance, bot-traffic, state and rollup suites; `FIXTURE_EVENTS`, `CONFORMANCE_CASES` |
 | `@cloudhal/analytics/client` | the browser sources (`pageview.browser.js`, `vitals.browser.js` with `web-vitals`) and their names; build input for the `cloudhal()` integration, which ships them as `/_cloudhal/p.<hash>.js` (≤ `PAGEVIEW_GZIP_BUDGET`, 1 KB gzipped) and `/_cloudhal/v.<hash>.js`. Node only (build time) |
 
 The site side (`POST /__cloudhal/e`, the script tag, render events) lives in `@cloudhal/astro-renderer` (`SiteAnalytics` in `./analytics`, used by the Site Worker entry and the `cloudhal dev` middleware).
@@ -37,6 +37,17 @@ interface AnalyticsStore extends AnalyticsReader, AnalyticsWriter { kind: "wae" 
 `assertAnalyticsQuery(q, { maxDays })` checks a query (ids, enums, ISO instants, ≤ 92 days live, hourly ≤ 7 days, `limit` 1–1000) and throws `AnalyticsQueryError` (`code: "invalid_query"`). Errors carry a `code` for the API: `analytics_unavailable` (503, `retryable`), `analytics_query_failed` (502), `analytics_budget_exceeded`, `unsupported_query`, `conflict` (409), `invalid_settings`.
 
 Semantics every store shares (checked by the conformance suite): a visit is an entrance page view; `visitors` is the sum of daily distinct hashes (`null` when no view in the range carried one); vitals and renders weigh each event by its `sampleOneIn`; `renders` counts people's HTML `200` renders (no crawler, not a bot) under the node/country/device filter and is `null` under a channel filter or where rollups do not keep it, and `estimatedCacheHitRatio(summary)` turns it into `1 − renders ÷ page views` (an estimate; `AnalyticsService.cacheHitRatio` reports it only for `store: "wae"`); p75 is the weighted nearest rank; top lists order by page views, then key, and leave out views without a value.
+
+## Possible bot traffic
+
+```ts
+import { assessBotTraffic, classifyBotTraffic, BOT_TRAFFIC_THRESHOLDS } from "@cloudhal/analytics";
+const { signal, results } = await assessBotTraffic(reader, { siteId, range, now }); // or service.botTraffic(siteId, range)
+// signal: { level: "none" | "watch" | "likely", reasons: [{ code, detail, value, threshold, key? }],
+//           hour, pageviews, baseline, window, partial? }
+```
+
+The visible check against beacon inflation (RFC-0006 §5.5). It looks at the period's last 7 days by the hour (never past the current hour) and needs only aggregates every store keeps: the busiest hour must have ≥ 200 page views and ≥ 10× the median hour (`hourly_spike`); then, in that hour, ≥ 80 % `direct` entrances out of ≥ 50 (`direct_entrances`), one browser family with ≥ 95 % of page views (`single_browser`), one page with ≥ 90 % (`single_page`). `likely` = ≥ 20× with mostly direct entrances, or with one browser on one page (the RFC's rule is the first); `watch` = ≥ 10× with mostly direct entrances or one browser; anything else — a post going viral from a social site — is `none`, and `reasons` is empty. It issues one hourly `series` query, plus three one-hour `top` queries (channels, browsers, pages) only when the gate passes, so the WAE statements are shapes already verified live (`test/golden/bots-*.sql`). A spent live budget answers `none` with `partial`. The conformance suite `describeBotTrafficConformance` runs it on every store.
 
 ## Site Worker: beacons and render events
 

@@ -4,9 +4,20 @@
  * Regenerate with `pnpm vitest run test/wae-golden.test.ts -u` and review the diff.
  */
 import { describe, expect, it } from "vitest";
+import { assessBotTraffic } from "../src/bots.ts";
 import { AnalyticsQueryError } from "../src/errors.ts";
-import { CONFORMANCE_CASES, FIXTURE_SITE, INVALID_QUERIES } from "../src/testing.ts";
-import { compileWae } from "../src/wae/index.ts";
+import {
+  BOT_FIXTURE_EVENTS,
+  BOT_NOW,
+  BOT_RANGE,
+  BOT_SITE_LIKELY,
+  BOT_SITE_SMALL,
+  CONFORMANCE_CASES,
+  FIXTURE_SITE,
+  INVALID_QUERIES,
+} from "../src/testing.ts";
+import { compileWae, WaeReader } from "../src/wae/index.ts";
+import { FakeWae } from "./helpers/fake-wae.ts";
 
 const dataset = "newsroom_events";
 
@@ -21,6 +32,27 @@ describe("WAE compiler: golden SQL", () => {
       await expect(text).toMatchFileSnapshot(`golden/${kase.name}.sql`);
     });
   }
+
+  // The bot-traffic check (src/bots.ts) sends existing shapes of the model; its statements are
+  // pinned here too, in the order it sends them, and checked against the live dialect rules.
+  for (const [name, siteId, statements] of [
+    ["bots-quiet", BOT_SITE_SMALL, 1],
+    ["bots-spike", BOT_SITE_LIKELY, 4],
+  ] as const)
+    it(name, async () => {
+      const wae = new FakeWae(dataset);
+      wae.load(BOT_FIXTURE_EVENTS);
+      const reader = new WaeReader(wae, { dataset, cacheTtlMs: 0 });
+      await assessBotTraffic(reader, { siteId, range: BOT_RANGE, now: BOT_NOW });
+      expect(wae.queries).toHaveLength(statements);
+      for (const sql of wae.queries) {
+        // never an aliased dimension column next to GROUP BY / ORDER BY (refused live)
+        expect(sql).not.toMatch(/\b(?:blob|double)\d+ AS \w+/);
+        expect(sql).not.toMatch(/quantileWeighted/);
+        expect(sql).toMatch(/timestamp >= '[^']+' AND timestamp < '[^']+'/);
+      }
+      await expect(`${wae.queries.join(";\n\n")};\n`).toMatchFileSnapshot(`golden/${name}.sql`);
+    });
 
   it("bounds every statement by site, kind and time, and never weights by sampleInterval", () => {
     for (const kase of CONFORMANCE_CASES) {

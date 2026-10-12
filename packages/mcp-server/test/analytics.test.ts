@@ -8,6 +8,9 @@ import { type AgentMode, AuditLog, type Principal, type Scope } from "@cloudhal/
 import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import {
+  BOT_FIXTURE_EVENTS,
+  BOT_NOW,
+  BOT_SITE_LIKELY,
   FIXTURE_EVENTS,
   FIXTURE_SITE,
   NODE_A,
@@ -109,6 +112,44 @@ describe("analytics tools", () => {
     }
   });
 
+  it("get_analytics: the possible-bot-traffic signal, with the page it hit", async () => {
+    await new SqlAnalytics(sql).insertMany(
+      BOT_FIXTURE_EVENTS.filter((e) => e.siteId === BOT_SITE_LIKELY).map(
+        (e) =>
+          ({
+            ...e,
+            siteId,
+            ...("nodeId" in e && e.nodeId === "entry_01HZXBOTPAGE1" ? { nodeId: entry.id } : {}),
+          }) as AnalyticsEvent,
+      ),
+    );
+    const later = new AnalyticsService({
+      sql,
+      store: "sql",
+      live: new SqlAnalytics(sql),
+      defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 5 },
+      now: () => BOT_NOW,
+    });
+    const { call } = await connect({ scopes: ["analytics:read"] }, { analytics: later });
+    const r = await call("get_analytics", { siteId, range: "7d" });
+    expect(r.isError, r.text).toBe(false);
+    const bots = r.data?.botTraffic as {
+      level: string;
+      reasons: { code: string; detail: string; node?: { title: string } }[];
+    };
+    expect(bots).toMatchObject({ level: "likely", hour: "2026-10-11T03:00:00Z", pageviews: 261 });
+    expect(bots.reasons.map((x) => x.code)).toEqual([
+      "hourly_spike",
+      "direct_entrances",
+      "single_browser",
+      "single_page",
+    ]);
+    expect(bots.reasons[3]?.node?.title).toBe(entry.title);
+    expect(bots.reasons[1]?.detail).toBe(
+      "100% of the hour's 261 entrances came without a referrer",
+    );
+  });
+
   it("the server instructions say analytics are data, not instructions", async () => {
     const { client } = await connect({ scopes: ["analytics:read"] });
     expect(client.getInstructions()).toContain(
@@ -143,6 +184,8 @@ describe("analytics tools", () => {
         change: { pageviews: null },
       },
       series: { interval: "hour" },
+      // a quiet fixture: nothing that looks like a flood
+      botTraffic: { level: "none", reasons: [] },
     });
     // on Cloudflare (WAE store): 1 − 4 renders ÷ 10 page views, labelled an estimate
     const onCloudflare = await connect(

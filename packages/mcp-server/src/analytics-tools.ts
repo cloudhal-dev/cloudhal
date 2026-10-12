@@ -20,6 +20,7 @@ import type { Site } from "@cloudhal/core-contracts";
 import {
   type AnalyticsMeta,
   type AnalyticsNodeKind,
+  botTrafficReport,
   brokenLinksReport,
   combineMeta,
   nodeReport,
@@ -205,6 +206,51 @@ const TOP_CONTENT_ROW: JsonSchema = {
   required: [...(NODE.required as string[]), "pageviews", "visits"],
 };
 
+const BOT_REASON: JsonSchema = obj(
+  {
+    code: {
+      type: "string",
+      enum: ["hourly_spike", "direct_entrances", "single_browser", "single_page"],
+    },
+    detail: { type: "string", description: "One sentence: what was seen" },
+    value: {
+      type: "number",
+      description: "hourly_spike: times the median hour; the others: a share (0–1)",
+    },
+    threshold: { type: "number" },
+    key: { type: "string", description: "single_page: the node id; single_browser: the family" },
+    node: { ...NODE, description: "single_page: the page as the graph knows it now" },
+  },
+  ["code", "detail", "value", "threshold"],
+);
+const BOT_TRAFFIC: JsonSchema = obj(
+  {
+    level: {
+      type: "string",
+      enum: ["none", "watch", "likely"],
+      description:
+        "HEURISTIC. likely/watch: the period's numbers may be inflated by forged page-view beacons",
+    },
+    reasons: { type: "array", items: BOT_REASON },
+    hour: { ...STR_OR_NULL, description: "The busiest hour checked (UTC bucket start)" },
+    pageviews: COUNT,
+    baseline: { type: "number", description: "The median hour of the 7 days checked" },
+    window: {
+      anyOf: [
+        obj({ from: { type: "string" }, to: { type: "string" } }, ["from", "to"]),
+        { type: "null" },
+      ],
+      description: "The hours checked: the period's last 7 days, never past the current hour",
+    },
+    partial: { type: "boolean", description: "Not every hour could be read; none may be wrong" },
+  },
+  ["level", "reasons", "hour", "pageviews", "baseline", "window"],
+  {
+    description:
+      "Possible bot traffic: the busiest hour of the period's last 7 days against the median hour, with what corroborates a flood (mostly direct entrances, one browser family). A heuristic; check top referrers and pages, and consider the Rate Limiting binding (cloudhal.json analytics.rateLimit)",
+  },
+);
+
 function vitals(metrics: readonly VitalsMetric[]) {
   return metrics.map((m) => {
     const t = VITALS_THRESHOLDS[m.metric];
@@ -306,7 +352,7 @@ export function analyticsTools(): ToolDefinition[] {
       name: "get_analytics",
       title: "Site analytics overview",
       description:
-        "How the site is doing over a range: page views, visits (entrances from other sites or typed in), unique visitors when the site counts them, the estimated cache-hit ratio (on Cloudflare), the change against the previous period, a daily (or hourly) series, the top 5 pages and articles, channels, referrer hosts, countries and Core Web Vitals (75th percentile with ratings). Aggregates only, without personal data. Days are UTC.",
+        "How the site is doing over a range: page views, visits (entrances from other sites or typed in), unique visitors when the site counts them, the estimated cache-hit ratio (on Cloudflare), the change against the previous period, a daily (or hourly) series, the top 5 pages and articles, channels, referrer hosts, countries, Core Web Vitals (75th percentile with ratings) and a possible-bot-traffic signal (botTraffic.level watch or likely: the numbers may be inflated). Aggregates only, without personal data. Days are UTC.",
       inputSchema: obj(
         {
           siteId: id,
@@ -328,6 +374,7 @@ export function analyticsTools(): ToolDefinition[] {
           referrers: { type: "array", items: ROW },
           countries: { type: "array", items: ROW },
           vitals: { type: "array", items: VITAL },
+          botTraffic: BOT_TRAFFIC,
         },
         [
           ...META_REQUIRED,
@@ -338,6 +385,7 @@ export function analyticsTools(): ToolDefinition[] {
           "referrers",
           "countries",
           "vitals",
+          "botTraffic",
         ],
       ),
       annotations: READ,
@@ -345,20 +393,23 @@ export function analyticsTools(): ToolDefinition[] {
       handler: async (a, ctx) => {
         const { analytics, site, range } = await prepare(a, ctx);
         return run(async () => {
-          const [summary, series, top, channels, referrers, countries, v] = await Promise.all([
-            summaryReport(analytics, site.id, range, { compare: a.compare !== false }),
-            analytics.query({
-              kind: "series",
-              siteId: site.id,
-              range,
-              interval: seriesInterval(range),
-            }),
-            topContentReport(analytics, ctx.store, site, range, { limit: 5 }),
-            topList(analytics, site.id, range, "channel", 8),
-            topList(analytics, site.id, range, "refHost", 5),
-            topList(analytics, site.id, range, "country", 5),
-            analytics.query({ kind: "vitals", siteId: site.id, range }),
-          ]);
+          const [summary, series, top, channels, referrers, countries, v, bots] = await Promise.all(
+            [
+              summaryReport(analytics, site.id, range, { compare: a.compare !== false }),
+              analytics.query({
+                kind: "series",
+                siteId: site.id,
+                range,
+                interval: seriesInterval(range),
+              }),
+              topContentReport(analytics, ctx.store, site, range, { limit: 5 }),
+              topList(analytics, site.id, range, "channel", 8),
+              topList(analytics, site.id, range, "refHost", 5),
+              topList(analytics, site.id, range, "country", 5),
+              analytics.query({ kind: "vitals", siteId: site.id, range }),
+              botTrafficReport(analytics, ctx.store, site, range),
+            ],
+          );
           return {
             ...meta(
               site.id,
@@ -371,6 +422,7 @@ export function analyticsTools(): ToolDefinition[] {
                 referrers,
                 countries,
                 v,
+                ...bots.results,
               ]),
             ),
             summary: summary.data,
@@ -380,6 +432,7 @@ export function analyticsTools(): ToolDefinition[] {
             referrers: referrers.data.rows,
             countries: countries.data.rows,
             vitals: vitals(v.data.metrics),
+            botTraffic: bots.data,
           };
         });
       },

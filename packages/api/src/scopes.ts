@@ -154,6 +154,7 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // settings (privacy decisions, outside the graph) for Administrators, audited
   ["GET", `${AN}/status`, "analytics:read"],
   ["GET", `${AN}/summary`, "analytics:read"],
+  ["GET", `${AN}/bots`, "analytics:read"],
   ["GET", `${AN}/series`, "analytics:read"],
   ["GET", `${AN}/top/:dimension`, "analytics:read"],
   ["GET", `${AN}/vitals`, "analytics:read"],

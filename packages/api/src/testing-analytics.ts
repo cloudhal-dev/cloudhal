@@ -16,6 +16,9 @@ import { type AnalyticsReader, AnalyticsUnavailableError } from "@cloudhal/analy
 import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import {
+  BOT_FIXTURE_EVENTS,
+  BOT_NOW,
+  BOT_SITE_LIKELY,
   FIXTURE_EVENTS,
   FIXTURE_SITE,
   NODE_A,
@@ -94,20 +97,20 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
       });
     };
 
-    const build = (live?: AnalyticsReader) => {
+    const build = (live?: AnalyticsReader, now = NOW) => {
       service = new AnalyticsService({
         sql,
         store: "sql",
         live: live ?? new SqlAnalytics(sql),
         defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 5 },
-        now: () => NOW,
+        now: () => now,
         purgeSite: async (id) => {
           purges.push(id);
         },
       });
       app = createApi({
         store,
-        now: () => NOW,
+        now: () => now,
         audit,
         analytics: service,
         admin: { deployToken: DEPLOY_TOKEN, storage: { sql, blobs: undefined as never } },
@@ -230,6 +233,50 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
       expect(term?.node).toMatchObject({ kind: "archive", exists: true, path: "/category/news" });
       const channels = await call(`${base()}/top/channel?${FULL}`);
       expect((channels.body.data as { dimension: string }).dimension).toBe("channel");
+    });
+
+    it("bots: the possible-bot-traffic signal, its page joined to the graph", async () => {
+      // the burst of the bot fixtures' "likely" site (page 1), moved onto the seeded site; its
+      // quiet week is left out (fewer D1 writes), so the usual hour is 0
+      await new SqlAnalytics(sql).insertMany(
+        BOT_FIXTURE_EVENTS.filter(
+          (e) => e.siteId === BOT_SITE_LIKELY && e.timestamp.startsWith("2026-10-11T03:"),
+        ).map(
+          (e) =>
+            ({
+              ...e,
+              siteId,
+              ...("nodeId" in e && e.nodeId === "entry_01HZXBOTPAGE1" ? { nodeId: entry.id } : {}),
+            }) as AnalyticsEvent,
+        ),
+      );
+      build(undefined, BOT_NOW);
+      const r = await call(`${base()}/bots?range=7d`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      expect(r.body).toMatchObject({
+        range: { from: "2026-10-06", to: "2026-10-13" },
+        source: "live",
+        data: {
+          level: "likely",
+          hour: "2026-10-11T03:00:00Z",
+          pageviews: 261,
+          baseline: 0,
+          window: { from: "2026-10-05T13:00:00Z", to: "2026-10-12T13:00:00Z" },
+        },
+      });
+      const reasons = (r.body.data as { reasons: { code: string; node?: Json }[] }).reasons;
+      expect(reasons.map((x) => x.code)).toEqual([
+        "hourly_spike",
+        "direct_entrances",
+        "single_browser",
+        "single_page",
+      ]);
+      expect(reasons[3]?.node).toMatchObject({ nodeId: entry.id, title: entry.title });
+      // a period before the burst: nothing to say
+      const before = await call(`${base()}/bots?from=2026-10-01&to=2026-10-08`);
+      expect(before.body.data).toMatchObject({ level: "none", reasons: [] });
+      expect((await call(`${base()}/bots?range=7d`, "contributor")).status).toBe(403);
+      expect((await call(`${base()}/bots?range=1y`)).status).toBe(400);
     });
 
     it("refuses what the query model does not allow, with 400 invalid_query", async () => {

@@ -9,6 +9,7 @@
  * `@cloudhal/analytics/reader`; conformance suites: `@cloudhal/analytics/testing`.
  */
 export * from "./beacon.ts";
+export * from "./bots.ts";
 export * from "./channels.ts";
 export * from "./demo.ts";
 export * from "./errors.ts";
