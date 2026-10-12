@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "cmt_01HZX8K3Q9AD",
+  "siteId": "site_01HZX8K3Q9ST",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "source": "native",
+  "author": {
+    "kind": "guest",
+    "name": "Mehmet"
+  },
+  "body": {
+    "format": "text",
+    "text": "It does since September.\nThe 08:10 does not."
+  },
+  "status": "approved",
+  "createdAt": "2026-10-12T10:00:00Z",
+  "rev": 1,
+  "parentId": "cmt_01HZX8K3Q9AB",
+  "inReplyToId": "cmt_01HZX8K3Q9AC",
+  "moderation": {
+    "action": "approve",
+    "actor": {
+      "kind": "human",
+      "id": "user_01HZX8K3Q9HU"
+    },
+    "at": "2026-10-12T10:05:00Z",
+    "automated": false
+  }
+}

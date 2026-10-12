@@ -1,0 +1,8 @@
+{
+  "reason": "A report names the comment it is about",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "report",
+    "reason": "spam"
+  }
+}
