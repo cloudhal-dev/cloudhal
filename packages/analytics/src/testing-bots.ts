@@ -223,12 +223,13 @@ export function describeBotTrafficConformance(label: string, factory: Conformanc
     const reference = new MemoryAnalytics();
     for (const e of BOT_FIXTURE_EVENTS) reference.write(e);
 
+    // ~1,600 events: Miniflare D1 takes a while on a loaded machine (batches of 100 inserts)
     beforeAll(async () => {
       const s = await factory.create();
       reader = s.reader;
       close = s.close;
       await s.load(BOT_FIXTURE_EVENTS);
-    });
+    }, 240_000);
 
     afterAll(async () => {
       await close?.();

@@ -236,9 +236,12 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
     });
 
     it("bots: the possible-bot-traffic signal, its page joined to the graph", async () => {
-      // the bot fixtures' "likely" site, moved onto the seeded site; its burst is on page 1
+      // the burst of the bot fixtures' "likely" site (page 1), moved onto the seeded site; its
+      // quiet week is left out (fewer D1 writes), so the usual hour is 0
       await new SqlAnalytics(sql).insertMany(
-        BOT_FIXTURE_EVENTS.filter((e) => e.siteId === BOT_SITE_LIKELY).map(
+        BOT_FIXTURE_EVENTS.filter(
+          (e) => e.siteId === BOT_SITE_LIKELY && e.timestamp.startsWith("2026-10-11T03:"),
+        ).map(
           (e) =>
             ({
               ...e,
@@ -257,7 +260,7 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
           level: "likely",
           hour: "2026-10-11T03:00:00Z",
           pageviews: 261,
-          baseline: 1,
+          baseline: 0,
           window: { from: "2026-10-05T13:00:00Z", to: "2026-10-12T13:00:00Z" },
         },
       });
