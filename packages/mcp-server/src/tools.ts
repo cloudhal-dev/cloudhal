@@ -16,6 +16,7 @@ import type {
   ToolPolicy,
 } from "@cloudhal/agent-runtime";
 import {
+  type CallClass,
   checkAutoPublish,
   describeAutoCheck,
   describeOwnOnly,
@@ -34,6 +35,12 @@ import {
 import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
+import {
+  afterRunCall,
+  checkRunBudget,
+  checkRunCall,
+  withinDailyWriteCap,
+} from "@cloudhal/schedules";
 import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
 import { commentTools } from "./comment-tools.ts";
@@ -64,6 +71,8 @@ import {
   menuTools,
   publishMenuLines,
 } from "./menu-tools.ts";
+import { scheduleTools } from "./schedule-tools.ts";
+import { RUN_COUNTS, type RunContext } from "./schedules.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
 import {
   applyTermsInput,
@@ -341,6 +350,8 @@ export function defineTools(): ToolDefinition[] {
     ...analyticsTools(),
     // RFC-0007 §11: reader comments (read, advisory labels, reductions; approvals for the rest).
     ...commentTools(),
+    // RFC-0008 §12: the schedule, releases, gates and automation runs.
+    ...scheduleTools(),
     ...elevationTools(),
   ].map((t) => ({
     ...t,
@@ -1185,7 +1196,13 @@ export async function runTool(
   });
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
   const limit = decision.kind === "deny" ? undefined : decision.limit;
-  ctx = { ...ctx, limit, confirmed: deps.confirmed === true };
+  ctx = {
+    ...ctx,
+    limit,
+    confirmed: deps.confirmed === true,
+    policy: deps.policy,
+    ...(deps.audit ? { audit: deps.audit } : {}),
+  };
   // Own-only publish (I10): an Author's (or their agent's) publish that carries someone else's
   // work, or structure, waits for someone whose role allows it (cause `role`).
   if (limit?.target === "changeset" && !deps.approved && siteId && decision.kind !== "deny") {
@@ -1212,8 +1229,28 @@ export async function runTool(
     ...(ctx.principal.actor.kind === "agent" && ctx.principal.elevation
       ? { elevation: ctx.principal.elevation }
       : {}),
+    // RFC-0008 §5.1: a run's rows carry the run and its automation; release tools the release.
+    ...(ctx.run ? { runId: ctx.run.run.id, automationId: ctx.run.automation.id } : {}),
+    ...(typeof args.releaseId === "string" ? { releaseId: args.releaseId } : {}),
   };
+  // Inside an automation run (RFC-0008 §11.4–§11.5): the run's site, the taint rule, the budget.
+  const run = ctx.run;
+  const cls = runCallClass(def, args);
+  if (run) {
+    const refusal = await runRefusal(def, args, ctx, run, cls, decision);
+    if (refusal) {
+      await deps.audit?.record({
+        ...base,
+        decision: "deny",
+        reason: refusal.message,
+        outcome: "error",
+      });
+      await noteRunCall(ctx, run, def.name, cls, "refused");
+      throw refusal;
+    }
+  }
   if (decision.kind === "deny") {
+    if (run) await noteRunCall(ctx, run, def.name, cls, "refused");
     await deps.audit?.record({
       ...base,
       decision: "deny",
@@ -1258,6 +1295,65 @@ export async function runTool(
       };
   }
   const checked = autoCheck ? { autoCheck } : {};
+  // RFC-0008 §10.4: release tools file their own request bound to `rl1:` (or take `auto`'s
+  // low-risk path), so their handler runs with the waiting decision instead of the generic gate.
+  if (
+    decision.kind === "approval-required" &&
+    def.handlesApproval &&
+    !deps.confirmed &&
+    decision.cause !== "role" &&
+    ((ctx.approvals && ctx.principal.actor.kind === "agent") ||
+      decision.autoApprove === "low-risk-release")
+  ) {
+    const pending = decision;
+    let effect: Record<string, unknown> | undefined;
+    const callCtx: ToolContext = {
+      ...ctx,
+      pending,
+      report: (e) => {
+        effect = { ...effect, ...e };
+      },
+    };
+    try {
+      const result = await def.handler(args, callCtx);
+      const waits = (result as { status?: string } | undefined)?.status === "approval-pending";
+      const releaseId =
+        (result as { release?: { id?: string } } | undefined)?.release?.id ??
+        (typeof effect?.releaseId === "string" ? effect.releaseId : undefined);
+      await deps.audit?.record({
+        ...base,
+        ...(effect ? { input: { ...audited, effect } } : {}),
+        ...(releaseId ? { releaseId } : {}),
+        decision: waits ? "approval-required" : "allow",
+        reason: waits
+          ? pending.reason
+          : `auto mode: scheduled without a person (${describeAutoCheck((effect?.autoCheck as AutoCheck | undefined) ?? { rule: "low-risk-release", lowRisk: true, code: "low-risk", changes: 0, limit: 20 })})`,
+        ...(waits ? { cause: pending.cause } : {}),
+        outcome: waits ? "pending" : "ok",
+        durationMs: Date.now() - started,
+      });
+      if (run) await noteRunCall(ctx, run, def.name, cls, "allowed");
+      return { decision: { kind: "allow" }, result };
+    } catch (raw) {
+      const e = toToolError(raw);
+      await deps.audit?.record({
+        ...base,
+        decision: "allow",
+        outcome: "error",
+        reason: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - started,
+      });
+      if (run)
+        await noteRunCall(
+          ctx,
+          run,
+          def.name,
+          cls,
+          e instanceof ToolError && e.code === "denied" ? "refused" : "allowed",
+        );
+      throw e;
+    }
+  }
   if (decision.kind === "approval-required" && !autoNote) {
     const approvalPrompt = def.approvalPrompt
       ? await def.approvalPrompt(args, ctx)
@@ -1270,6 +1366,7 @@ export async function runTool(
       ...checked,
       outcome: "pending",
     });
+    if (run) await noteRunCall(ctx, run, def.name, cls, "allowed");
     return { decision, approvalPrompt, ...checked };
   }
   // What the call did beyond its arguments (assignment deltas, a governance operation) goes into
@@ -1284,9 +1381,15 @@ export async function runTool(
   try {
     const result = await def.handler(args, callCtx);
     const snapshotId = (result as { snapshot?: { id?: string } } | undefined)?.snapshot?.id;
+    const releaseId =
+      (result as { release?: { id?: string } } | undefined)?.release?.id ??
+      (typeof (effect as { releaseId?: unknown } | undefined)?.releaseId === "string"
+        ? (effect as { releaseId: string }).releaseId
+        : undefined);
     await deps.audit?.record({
       ...base,
       ...(effect ? { input: { ...audited, effect } } : {}),
+      ...(releaseId ? { releaseId } : {}),
       decision: "allow",
       outcome: "ok",
       snapshotId,
@@ -1294,6 +1397,7 @@ export async function runTool(
       ...(autoNote ? { reason: autoNote } : {}),
       ...checked,
     });
+    if (run) await noteRunCall(ctx, run, def.name, cls, "allowed");
     return {
       decision: { kind: "allow" },
       result,
@@ -1309,6 +1413,139 @@ export async function runTool(
       reason: e instanceof Error ? e.message : String(e),
       durationMs: Date.now() - started,
     });
+    if (run)
+      await noteRunCall(
+        ctx,
+        run,
+        def.name,
+        cls,
+        e instanceof ToolError && e.code === "denied" ? "refused" : "allowed",
+      );
     throw e;
   }
+}
+
+/** Bookkeeping tools a run may always call: they never count against its budget. */
+const RUN_BOOKKEEPING = new Set(["end_run", "get_mode", "pause_automation", "begin_run"]);
+
+/** A call's class inside a run (§11.4): its own `classify`, else read-only or not. */
+function runCallClass(def: ToolDefinition, args: Record<string, unknown>): CallClass {
+  if (def.classify) return def.classify(args);
+  return def.annotations.readOnlyHint === true ? "read" : "advisory";
+}
+
+/**
+ * Why a run may not make this call (RFC-0008 §10.7, §11.4, §11.5), or undefined: another site,
+ * `request_elevation` (code `run`), no egress, the taint rule, the run's budget (which ends the run
+ * and pauses its automation) and the site's daily cap on automation writes.
+ */
+async function runRefusal(
+  def: ToolDefinition,
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+  run: RunContext,
+  cls: CallClass,
+  decision: Decision,
+): Promise<ToolError | undefined> {
+  const siteId = run.automation.siteId;
+  if (typeof args.siteId === "string" && args.siteId !== siteId)
+    return new ToolError("outside_run", `this run works on site ${siteId} only`);
+  if (def.name === "request_elevation")
+    return new ToolError(
+      "run",
+      "a run's autonomy is fixed by its automation (modeCap); request_elevation is not available inside runs",
+    );
+  const taint = checkRunCall(run.state, { tool: def.name, class: cls });
+  if (!taint.allowed) return new ToolError(taint.code, taint.message);
+  if (RUN_BOOKKEEPING.has(def.name) || !ctx.schedules) return undefined;
+  const store = ctx.schedules.store;
+  const now = (ctx.now?.() ?? new Date()).toISOString();
+  const writes = decision.kind === "allow" && def.annotations.readOnlyHint !== true;
+  const usage = await store.runUsage(siteId, run.run.id);
+  const budget = checkRunBudget(
+    run.automation.job.budget,
+    usage,
+    { startedAt: run.run.startedAt ?? now, now },
+    { write: writes, approvalRequest: decision.kind === "approval-required" },
+  );
+  if (!budget.ok) {
+    await store.endAgentRunAs(siteId, run.run.id, {
+      now,
+      state: "budget-exceeded",
+      error: { code: "budget_exceeded", message: budget.exceeded },
+      usage,
+    });
+    const a = await store.getAutomation(siteId, run.automation.id);
+    if (a?.state === "active")
+      await store
+        .transitionAutomation(siteId, a.id, {
+          expectedRev: a.rev,
+          to: "auto-paused",
+          pausedReason: "budget",
+        })
+        .catch(() => undefined);
+    return new ToolError(
+      "budget_exceeded",
+      `the run's ${budget.exceeded} budget is used up: the run ended and the automation is paused until a person resumes it`,
+    );
+  }
+  if (writes) {
+    const settings = await store.settings(siteId);
+    if (
+      !withinDailyWriteCap(await store.automationWritesToday(siteId, now), settings.dailyWriteCap)
+    )
+      return new ToolError(
+        "budget_exceeded",
+        `daily_write_cap: automations on this site made ${settings.dailyWriteCap} changes today (UTC); try tomorrow or ask a person to raise the cap`,
+      );
+  }
+  return undefined;
+}
+
+/**
+ * Records a call on its run (§11.4): the taint from the first tainting tool on, the anomaly counters
+ * and the usage. More than 50 reductions or 10 refusals in a row end the run (`killed`) and pause
+ * the automation.
+ */
+async function noteRunCall(
+  ctx: ToolContext,
+  run: RunContext,
+  tool: string,
+  cls: CallClass,
+  result: "allowed" | "refused",
+): Promise<void> {
+  const store = ctx.schedules?.store;
+  if (!store) return;
+  const siteId = run.automation.siteId;
+  const now = (ctx.now?.() ?? new Date()).toISOString();
+  const next = afterRunCall(run.state, { tool, class: cls }, result, now);
+  run.state = next.state;
+  const counts = {
+    ...(run.run.counts ?? {}),
+    [RUN_COUNTS.reduce]: next.state.reduceCalls,
+    [RUN_COUNTS.refusals]: next.state.consecutiveRefusals,
+  };
+  const usage = await store.runUsage(siteId, run.run.id);
+  await store.recordRunCall(siteId, run.run.id, {
+    now,
+    ...(next.state.taint ? { taint: next.state.taint } : {}),
+    counts,
+    usage,
+  });
+  if (!next.kill) return;
+  await store.endAgentRunAs(siteId, run.run.id, {
+    now,
+    state: "killed",
+    error: { code: next.kill },
+    usage,
+  });
+  const a = await store.getAutomation(siteId, run.automation.id);
+  if (a?.state === "active")
+    await store
+      .transitionAutomation(siteId, a.id, {
+        expectedRev: a.rev,
+        to: "auto-paused",
+        pausedReason: "failures",
+      })
+      .catch(() => undefined);
 }

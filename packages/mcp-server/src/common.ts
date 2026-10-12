@@ -4,11 +4,14 @@
  */
 import {
   type ApprovalStore,
+  type AuditLog,
   type CallClass,
   checkEntryLimit,
+  type Decision,
   type OwnershipResolver,
   type OwnLimit,
   OwnLimitError,
+  type PolicyEngine,
   type Principal,
   type Scope,
   type ToolAnnotations,
@@ -25,7 +28,9 @@ import {
   UniqueConstraintError,
 } from "@cloudhal/core-ts";
 import type { FetchTransport } from "@cloudhal/core-ts/media";
+import { ScheduleConflictError, ScheduleError } from "@cloudhal/schedules";
 import type { CommentsDeps } from "./comments.ts";
+import { type RunContext, ScheduleRequestError, type SchedulesDeps } from "./schedules.ts";
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -51,7 +56,7 @@ export interface ToolDefinition {
    * handler (and `precheck`) check the target with `entryLimitCheck`; `changeset` — `runTool`
    * checks that a publish is own-only.
    */
-  own?: "entry" | "changeset" | "comment";
+  own?: "entry" | "changeset" | "comment" | "release";
   /**
    * Per-argument policy (RFC-0007 §10.2): `read`, `advisory`, `reduce` or `person`. `person`
    * calls wait for a person in every mode, `bypass` included.
@@ -67,6 +72,13 @@ export interface ToolDefinition {
    * (RFC-0007 §10.3); the agent never redeems it.
    */
   carryOutOnApproval?: boolean;
+  /**
+   * RFC-0008 §10.4: the tool files its own approval request (a release bound to its `rl1:` hash,
+   * open until the release's time) instead of the generic gate. When the decision for an agent is
+   * `approval-required` and the server has out-of-band approvals — or `auto` mode offers the
+   * low-risk path — the handler runs with `ctx.pending` set and answers `approval-pending` itself.
+   */
+  handlesApproval?: boolean;
   /**
    * The text content of a result (default: the result as JSON). Comment tools write reader text
    * inside labelled untrusted blocks (RFC-0007 §11.2).
@@ -132,6 +144,19 @@ export interface ToolContext {
    * person, `requestedBy` the agent that asked.
    */
   approval?: { readonly id: string; readonly requestedBy: Actor } | undefined;
+  /** Schedules (RFC-0008): the schedule tools answer `schedules_disabled` without them. */
+  schedules?: SchedulesDeps | undefined;
+  /** Set by the server for an automation key's call: its open run (RFC-0008 §11.2). */
+  run?: RunContext | undefined;
+  /**
+   * Set by `runTool` for a `handlesApproval` tool whose decision waits for a person: the handler
+   * files the request itself (or takes the `auto` low-risk path).
+   */
+  pending?: Extract<Decision, { kind: "approval-required" }> | undefined;
+  /** Set by `runTool`: the policy engine (a run envelope lists the tools the run may call). */
+  policy?: PolicyEngine | undefined;
+  /** Set by `runTool`: the audit log (`get_run` lists a run's rows). */
+  audit?: AuditLog | undefined;
 }
 
 /**
@@ -185,7 +210,14 @@ export type ToolErrorCode =
   | "invalid_filter"
   | "analytics_disabled"
   | "analytics_unavailable"
-  | "comments_disabled";
+  | "comments_disabled"
+  // RFC-0008: schedules and automation runs
+  | "schedules_disabled"
+  | "outside_run"
+  | "tainted"
+  | "no_egress_in_runs"
+  | "budget_exceeded"
+  | "run";
 
 export class ToolError extends Error {
   override readonly name = "ToolError";
@@ -288,6 +320,22 @@ function invariantHint(e: InvariantError): string | undefined {
 /** Store errors as `ToolError`s with stable codes; anything else is returned unchanged. */
 export function toToolError(e: unknown): unknown {
   if (e instanceof ToolError) return e;
+  // Schedule errors (RFC-0008): a refused input keeps its code in the text and the details.
+  if (e instanceof ScheduleError)
+    return new ToolError(
+      e.code === "not_found" ? "not_found" : "invalid",
+      `${e.code}: ${e.message}`,
+      {
+        code: e.code,
+      },
+    );
+  if (e instanceof ScheduleConflictError)
+    return new ToolError(
+      "conflict",
+      `${e.message}; read it again (get_release) and pass the current rev`,
+      { kind: e.kind, id: e.id },
+    );
+  if (e instanceof ScheduleRequestError) return new ToolError("invalid", e.message);
   // Comment store errors (RFC-0007): stable codes, the store's message says what to fix.
   if (e instanceof CommentsError)
     return new ToolError(

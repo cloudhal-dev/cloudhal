@@ -19,6 +19,7 @@ import {
   REMOTE_AGENT_MODES,
 } from "@cloudhal/agent-runtime";
 import { canonicalJson, sha256Hex } from "@cloudhal/core-ts";
+import { budgetLeft, runEndsAt } from "@cloudhal/schedules";
 import { type JsonSchema, type ToolContext, type ToolDefinition, ToolError } from "./common.ts";
 
 export const REQUEST_ELEVATION = "request_elevation";
@@ -74,6 +75,9 @@ function ownMode(ctx: ToolContext): AgentMode {
 /** Why this principal cannot ask for an elevation at all, if it cannot. */
 function cannotRequest(ctx: ToolContext): string | undefined {
   if (ctx.principal.actor.kind !== "agent") return "only agents ask for an elevation";
+  // RFC-0008 §10.7: an automation's autonomy is fixed in advance by its modeCap.
+  if (ctx.principal.automationId)
+    return "an automation's key works in the mode its automation allows; ask a person to change the automation";
   if (ctx.principal.local)
     return "this is a local server: restart `cloudhal mcp` with the --mode you need";
   if (!ctx.principal.keyId) return "elevations apply to API keys; this principal has none";
@@ -141,6 +145,29 @@ export function elevationTools(): ToolDefinition[] {
             items: { type: "string" },
             description: "Your effective scopes right now (narrowed to the person's role).",
           },
+          run: {
+            type: "object",
+            additionalProperties: false,
+            description:
+              "Inside an automation run (RFC-0008 §11.2): the run, when it ends, the budget left and whether it read untrusted text (then it may only read, label, hide and pause).",
+            properties: {
+              runId: { type: "string" },
+              automationId: { type: "string" },
+              endsAt: { type: "string" },
+              budgetLeft: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  toolCalls: { type: "number" },
+                  writes: { type: "number" },
+                  approvalRequests: { type: "number" },
+                },
+                required: ["toolCalls", "writes", "approvalRequests"],
+              },
+              tainted: { type: "boolean" },
+            },
+            required: ["runId", "automationId", "endsAt", "budgetLeft", "tainted"],
+          },
         },
         required: ["mode", "ownMode", "canRequestElevation", "requestableModes"],
       },
@@ -149,11 +176,32 @@ export function elevationTools(): ToolDefinition[] {
       handler: async (_a, ctx) => {
         const mode = effectiveMode(ctx.principal) ?? null;
         const person = ctx.principal.person;
+        const run = ctx.run;
+        const runInfo =
+          run && ctx.schedules
+            ? {
+                run: {
+                  runId: run.run.id,
+                  automationId: run.automation.id,
+                  endsAt: runEndsAt(
+                    run.run.window ?? { closesAt: run.run.startedAt ?? "" },
+                    run.run.startedAt ?? new Date().toISOString(),
+                    run.automation.job.budget.maxMinutes,
+                  ),
+                  budgetLeft: budgetLeft(
+                    run.automation.job.budget,
+                    await ctx.schedules.store.runUsage(run.automation.siteId, run.run.id),
+                  ),
+                  tainted: run.state.taint !== undefined,
+                },
+              }
+            : {};
         const who = {
           ...(person
             ? { person: { role: person.role, ...(person.name ? { name: person.name } : {}) } }
             : {}),
           scopes: [...ctx.principal.scopes],
+          ...runInfo,
         };
         if (mode === null)
           return { mode, ownMode: null, canRequestElevation: false, requestableModes: [], ...who };
