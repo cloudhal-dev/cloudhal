@@ -1,8 +1,29 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { Suspense } from "react";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { en } from "../src/i18n/en.ts";
-import { I18nProvider, type MessageKey, translate, useT } from "../src/i18n/index.tsx";
+import {
+  I18nProvider,
+  LOCALE_LIST,
+  type Locale,
+  loadNamespace,
+  type MessageKey,
+  NAMESPACES,
+  resetNamespaces,
+  translate,
+  useI18n,
+  useT,
+  withMessages,
+} from "../src/i18n/index.tsx";
+import { messages as analyticsEn } from "../src/i18n/lazy/analytics.en.ts";
+import { messages as analyticsTr } from "../src/i18n/lazy/analytics.tr.ts";
+import { messages as analyticsSettingsEn } from "../src/i18n/lazy/analyticsSettings.en.ts";
+import { messages as analyticsSettingsTr } from "../src/i18n/lazy/analyticsSettings.tr.ts";
+import { messages as readersEn } from "../src/i18n/lazy/readers.en.ts";
+import { messages as readersTr } from "../src/i18n/lazy/readers.tr.ts";
 import { tr } from "../src/i18n/tr.ts";
+
+afterEach(cleanup);
 
 function leaves(obj: object, prefix = ""): string[] {
   return Object.entries(obj).flatMap(([k, v]) =>
@@ -32,5 +53,90 @@ describe("i18n", () => {
       </I18nProvider>,
     );
     expect(screen.getByText("Kaydet")).toBeInTheDocument();
+  });
+});
+
+describe("lazy message namespaces", () => {
+  const modules = {
+    analytics: [analyticsEn, analyticsTr],
+    analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
+    readers: [readersEn, readersTr],
+  } as const;
+
+  // The setup file loads every namespace; these tests start from nothing and restore it.
+  afterAll(() =>
+    Promise.all(LOCALE_LIST.flatMap((l) => NAMESPACES.map((ns) => loadNamespace(ns, l)))),
+  );
+
+  it("keeps English and Turkish on the same keys, and out of the core catalogs", () => {
+    expect(Object.keys(modules).sort()).toEqual([...NAMESPACES].sort());
+    for (const [ns, [enModule, trModule]] of Object.entries(modules)) {
+      expect(Object.keys(enModule)).toEqual([ns]);
+      expect(leaves(trModule).sort()).toEqual(leaves(enModule).sort());
+      expect(leaves(enModule).length).toBeGreaterThan(0);
+      expect(en).not.toHaveProperty(ns);
+      expect(tr).not.toHaveProperty(ns);
+    }
+  });
+
+  it("loads a namespace when a component asks for it, without ever showing its keys", async () => {
+    resetNamespaces();
+    expect(translate("tr", "readers.title")).toBe("readers.title");
+    const seen: string[] = [];
+    function Probe() {
+      const t = useT("readers");
+      seen.push(t("readers.title"));
+      return <span>{t("readers.title")}</span>;
+    }
+    // Awaited: React retries a suspended render inside the act scope that started it.
+    await act(async () => {
+      render(
+        <I18nProvider initialLocale="tr">
+          <Suspense fallback={<span>waiting</span>}>
+            <Probe />
+          </Suspense>
+        </I18nProvider>,
+      );
+    });
+    expect(await screen.findByText("Okurlar")).toBeInTheDocument();
+    expect(seen).toEqual(["Okurlar"]);
+    expect(translate("tr", "readers.title")).toBe("Okurlar");
+    // Only the language on screen was fetched.
+    expect(translate("en", "readers.title")).toBe("readers.title");
+  });
+
+  it("loads a route's namespaces together with its module", async () => {
+    resetNamespaces();
+    const route = await withMessages(Promise.resolve({ Page: "module" }), ["analytics"], ["en"]);
+    expect(route).toEqual({ Page: "module" });
+    expect(translate("en", "analytics.range.apply")).toBe("Apply");
+    expect(translate("tr", "analytics.range.apply")).toBe("Apply");
+  });
+
+  it("switches the language only once the namespaces on screen are there in it", async () => {
+    resetNamespaces();
+    await loadNamespace("readers", "en");
+    let fallbacks = 0;
+    let switchTo: (locale: Locale) => void = () => {};
+    function Fallback() {
+      fallbacks++;
+      return null;
+    }
+    function Probe() {
+      const { t, setLocale } = useI18n("readers");
+      switchTo = setLocale;
+      return <span>{t("readers.title")}</span>;
+    }
+    render(
+      <I18nProvider initialLocale="en">
+        <Suspense fallback={<Fallback />}>
+          <Probe />
+        </Suspense>
+      </I18nProvider>,
+    );
+    expect(screen.getByText("Readers")).toBeInTheDocument();
+    await act(async () => switchTo("tr"));
+    expect(await screen.findByText("Okurlar")).toBeInTheDocument();
+    expect(fallbacks).toBe(0);
   });
 });

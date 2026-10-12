@@ -33,7 +33,8 @@ pnpm kumo ls|doc <Name>|blocks|add <Block>|ai   # Kumo CLI: component list, API 
 - `starters/blog` — the theme boundary: `src/pages/[...path].astro`, `src/layouts`, `src/theme.ts`.
 - `packages/api` — Hono app (`createApi`), Better Auth (`src/auth.ts`), error mapping; shared suite `src/testing.ts` on sqlite + D1.
 - `packages/ui` — `export * from "@cloudflare/kumo"` + blocks; `styles.css` is the only Tailwind entry for admin UIs.
-- `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`).
+- `patches/` — `pnpm patch` files (`patchedDependencies` in `pnpm-workspace.yaml`). `@cloudflare__kumo@2.14.0.patch` adds `TimeseriesChart`'s `tooltipTimestampFormat` (DESIGN.md §2v "Kumo locale"); when upgrading Kumo, re-check it and the gaps in `docs/design/kumo-upstream-notes.md` before re-creating or dropping it.
+- `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`, or to a lazy namespace `src/i18n/lazy/<ns>.{en,tr}.ts` — `analytics`, `analyticsSettings`, `readers`; DESIGN.md §1).
 - `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals · `docs/design/DESIGN.md` the binding admin design system (Kumo).
 - `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`, and Cloudflare's official **`kumo-design`** (installed from `cloudflare/kumo`, tracked in `skills-lock.json`; update with `npx skills update`). Any admin-UI change loads `kumo-design` + `studio-ui` and follows `docs/design/DESIGN.md`.
 
@@ -47,7 +48,7 @@ pnpm kumo ls|doc <Name>|blocks|add <Block>|ai   # Kumo CLI: component list, API 
 7. **Admin UIs** import UI primitives from `@cloudhal/ui` only (`@cloudflare/kumo`/`@base-ui/react` in apps are lint errors) and are composed from Kumo components and blocks: every screen is a `PageLayout` with a registered template, sections are `SectionCard`s, no hand-made cards, headers, containers or raw HTML controls. Look APIs up with `pnpm kumo doc <Name>` before writing markup; if Kumo lacks something, add a block to `packages/ui/src/blocks`, never a one-off in a screen. `pnpm design:lint` must pass (it also runs after every agent edit via `.claude/settings.json`).
 8. **Skills** (`SKILL.md`) use only the six spec fields; Cloudhal data goes in `metadata` as `cloudhal.*` string keys.
 9. **Secrets** never in code, fixtures or docs. Test values live in `.env.example`.
-10. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts`; no hard-coded English in `apps/studio`.
+10. **UI strings** go through `useT()` with keys in both `en.ts` and `tr.ts` (or both files of a lazy namespace, read with `useT("<ns>")`); no hard-coded English in `apps/studio`.
 11. Conventional commits, `git commit -s` (DCO). Changeset for published-package changes.
 
 ## Versions (pinned via pnpm catalog / Cargo workspace)

@@ -53,7 +53,8 @@ export function useChartFrame<W extends HTMLElement = HTMLDivElement>(
 
   useEffect(() => {
     for (const chart of chartsIn(frameRef.current)) {
-      if (patch) chart.setOption(patch);
+      // Lazily, like Kumo's own updates: both merge into the model and draw on the next frame.
+      if (patch) chart.setOption(patch, { lazyUpdate: true });
       if (reducedMotion) chart.setOption({ animation: false });
     }
   });

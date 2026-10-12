@@ -18,7 +18,7 @@ import {
 } from "@cloudhal/ui";
 import { EyeSlash, Image as ImageIcon, MagnifyingGlass, Trash } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
-import { type MessageKey, useT } from "../i18n/index.tsx";
+import { type MessageKey, type TFunction, useT } from "../i18n/index.tsx";
 import { imageRefPreviewUrl } from "../lib/media.ts";
 import {
   descriptionStatus,
@@ -285,7 +285,7 @@ export function ArticleSeoPreviewCard({
 }
 
 function descriptionHint(
-  t: ReturnType<typeof useT>,
+  t: TFunction,
   status: LengthStatus,
   count: number,
   missing: MessageKey,

@@ -136,7 +136,7 @@ export function useSummary(scope: AnalyticsScope, enabled = true) {
 
 /** A card whose report failed: says so where the content would be, with "Try again". */
 function CardError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
-  const t = useT();
+  const t = useT("analytics");
   return (
     <SectionEmpty
       icon={<WarningCircle size={32} className="text-kumo-inactive" />}
@@ -914,6 +914,8 @@ export function CountriesCard({ scope, total }: { scope: AnalyticsScope; total?:
             value: t("analytics.metrics.pageviews"),
             share: t("analytics.columns.share"),
             other: t("analytics.countries.other"),
+            high: t("analytics.countries.high"),
+            low: t("analytics.countries.low"),
           }}
           empty={
             <SectionEmpty

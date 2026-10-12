@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AnalyticsTimeseries, CountryMap, ReadersSummary } from "../src/charts.ts";
+import { AnalyticsTimeseries, CountryMap, echarts, ReadersSummary } from "../src/charts.ts";
 import {
   AnalyticsQuotaBanner,
   AnalyticsRangePicker,
@@ -16,6 +16,7 @@ import {
   BreakdownTable,
   compareValues,
   createAnalyticsFormatter,
+  firstDayOfWeek,
   foldBreakdown,
   isValidCustomRange,
   mixHex,
@@ -30,6 +31,7 @@ import {
   AnalyticsCountryMapFixture,
   breakdownLabels,
   rangeLabels,
+  rangeLabelsTr,
   timeseriesLabels,
 } from "./analytics-fixtures.ts";
 
@@ -325,26 +327,114 @@ describe("AnalyticsRangePicker", () => {
         onChange={onChange}
         labels={rangeLabels}
         locale="en"
+        now={NOW.getTime()}
       />,
     );
     const trigger = screen.getByRole("button", { name: /^Sep 1\s–\s30, 2026$/ });
     expect(trigger).toHaveAttribute("aria-pressed", "true");
     await act(async () => fireEvent.click(trigger));
     expect(await screen.findByText("Custom range")).toBeInTheDocument();
+    // The range in force is preselected, its last month on the right.
     const apply = screen.getByRole("button", { name: "Apply" });
-    expect(apply).toBeDisabled();
-    expect(screen.getByText("Choose the first and the last day.")).toBeInTheDocument();
-    const days = screen
-      .getAllByRole("button")
-      .filter((b) => /\d{4}$/.test(b.getAttribute("aria-label") ?? ""));
-    fireEvent.click(days[10] as HTMLElement);
-    fireEvent.click(days[13] as HTMLElement);
     expect(apply).toBeEnabled();
+    const september = screen.getByRole("grid", { name: "September 2026" });
+    expect(screen.getByRole("grid", { name: "August 2026" })).toBeInTheDocument();
+    expect(
+      within(september).getByRole("button", { name: "Tuesday, September 1, 2026, selected" }),
+    ).toBeInTheDocument();
+    // Two clicks pick a new range.
+    fireEvent.click(within(september).getByRole("button", { name: /^Thursday, September 10/ }));
+    fireEvent.click(within(september).getByRole("button", { name: /^Sunday, September 13/ }));
+    expect(
+      within(september).getByRole("button", { name: "Thursday, September 10, 2026, selected" }),
+    ).toBeInTheDocument();
+    expect(
+      within(september).getByRole("button", { name: "Tuesday, September 1, 2026" }),
+    ).toBeInTheDocument();
     fireEvent.click(apply);
     expect(onChange).toHaveBeenCalledTimes(1);
-    const range = onChange.mock.calls[0]?.[0] as { from: string; to: string };
-    expect(range.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000).toBe(4);
+    expect(onChange).toHaveBeenCalledWith({ from: "2026-09-10", to: "2026-09-14" });
+  });
+
+  it("speaks English in the calendar: month and weekday names, navigation, the week from Sunday", async () => {
+    render(
+      <AnalyticsRangePicker
+        value={{ preset: "30d" }}
+        onChange={() => {}}
+        labels={rangeLabels}
+        locale="en"
+        now={NOW.getTime()}
+      />,
+    );
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Custom…" })));
+    expect(screen.getByText("Choose the first and the last day.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByRole("grid", { name: "September 2026" })).toBeInTheDocument();
+    const october = screen.getByRole("grid", { name: "October 2026" });
+    const weekdays = [...october.querySelectorAll(".rdp-weekday")];
+    expect(weekdays[0]).toHaveTextContent("Sun");
+    expect(weekdays[0]).toHaveAttribute("aria-label", "Sunday");
+    expect(screen.getByRole("navigation", { name: "Months" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous month" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next month" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Today, Friday, October 9, 2026" })).toBeEnabled();
+    // Nothing after today (UTC) can be picked: there is no data yet.
+    expect(
+      within(october).getByRole("button", { name: "Saturday, October 10, 2026" }),
+    ).toBeDisabled();
+    expect(screen.getByText("Days are in UTC")).toBeInTheDocument();
+    expect(screen.queryByText(/Reset Dates|Timezone:/)).toBeNull();
+  });
+
+  it("speaks Turkish in the calendar: Turkish months and weekdays, the week from Monday", async () => {
+    const onChange = vi.fn();
+    render(
+      <AnalyticsRangePicker
+        value={{ preset: "30d" }}
+        onChange={onChange}
+        labels={rangeLabelsTr}
+        locale="tr"
+        now={NOW.getTime()}
+      />,
+    );
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Özel…" })));
+    expect(screen.getByText("Özel aralık")).toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "Eylül 2026" })).toBeInTheDocument();
+    const october = screen.getByRole("grid", { name: "Ekim 2026" });
+    const weekdays = [...october.querySelectorAll(".rdp-weekday")];
+    expect(weekdays.map((w) => w.textContent)).toEqual([
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz",
+    ]);
+    expect(weekdays[0]).toHaveAttribute("aria-label", "Pazartesi");
+    expect(screen.getByRole("navigation", { name: "Aylar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Önceki ay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sonraki ay" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByText("Günler UTC saatine göre")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Bugün, 9 Ekim 2026 Cuma" }));
+    expect(screen.getByRole("button", { name: "Bugün, 9 Ekim 2026 Cuma, seçili" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Uygula" }));
+    expect(onChange).toHaveBeenCalledWith({ from: "2026-10-09", to: "2026-10-10" });
+  });
+});
+
+describe("calendar locale", () => {
+  it("starts the week on the locale's first day", () => {
+    expect(firstDayOfWeek("en")).toBe(0);
+    expect(firstDayOfWeek("en-US")).toBe(0);
+    expect(firstDayOfWeek("tr")).toBe(1);
+    expect(firstDayOfWeek("en-GB")).toBe(1);
   });
 });
 
@@ -453,6 +543,51 @@ describe("AnalyticsTimeseries", () => {
     );
     expect(screen.getByRole("button", { name: "Show as table" })).toBeDisabled();
     expect(screen.queryByText("290")).toBeNull();
+    // The block's own status speaks; Kumo's English "Loading chart" is hidden from assistive tech.
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+    expect(screen.queryByRole("status", { name: "Loading chart" })).toBeNull();
+  });
+
+  /** Hovers the chart at the bucket `ms` (UTC) the way ECharts reports it to Kumo. */
+  async function hover(ms: number) {
+    const el = document.querySelector<HTMLElement>("[_echarts_instance_]");
+    const chart = el ? echarts.getInstanceByDom(el) : undefined;
+    expect(chart).toBeDefined();
+    const chartTime = ms + new Date(ms).getTimezoneOffset() * 60_000;
+    await act(async () => {
+      chart?.trigger("updateaxispointer", { axesInfo: [{ value: chartTime }] });
+    });
+  }
+
+  it("writes the tooltip's time in the Studio locale and in UTC (en, tr)", async () => {
+    const { unmount } = render(
+      <AnalyticsTimeseries
+        series={series}
+        granularity="day"
+        locale="en"
+        labels={timeseriesLabels}
+        now={day(9) + 3_600_000}
+      />,
+    );
+    await hover(day(8));
+    expect(await screen.findByText("Thu, Oct 8, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Times in UTC")).toBeInTheDocument();
+    unmount();
+
+    render(
+      <AnalyticsTimeseries
+        series={series}
+        granularity="hour"
+        locale="tr"
+        labels={{ ...timeseriesLabels, timezone: "Saatler UTC" }}
+        now={day(9) + 3_600_000}
+      />,
+    );
+    await hover(day(8));
+    expect(
+      await screen.findByText(createAnalyticsFormatter("tr").bucket(day(8), "hour")),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^8 Eki/)).toBeInTheDocument();
   });
 });
 
@@ -465,6 +600,8 @@ describe("CountryMap", () => {
     other: "Other countries",
     unknown: "Unknown",
     tor: "Tor",
+    high: "High",
+    low: "Low",
   };
   const rows = [
     { country: "DE", value: 500 },
@@ -507,6 +644,40 @@ describe("CountryMap", () => {
       />,
     );
     expect(screen.getByText("No visits yet")).toBeInTheDocument();
+  });
+
+  it("labels the colour legend in the Studio language (en, tr)", () => {
+    const legendText = () => {
+      const el = document.querySelector<HTMLElement>("[_echarts_instance_]");
+      const option = el ? echarts.getInstanceByDom(el)?.getOption() : undefined;
+      return (option?.visualMap as { text?: string[] }[] | undefined)?.[0]?.text;
+    };
+    const { rerender } = render(
+      <CountryMap rows={rows} geoJson={AnalyticsCountryMapFixture} locale="en" labels={labels} />,
+    );
+    expect(legendText()).toEqual(["High", "Low"]);
+    rerender(
+      <CountryMap
+        rows={rows}
+        geoJson={AnalyticsCountryMapFixture}
+        locale="tr"
+        labels={{ ...labels, high: "Yüksek", low: "Düşük" }}
+      />,
+    );
+    expect(legendText()).toEqual(["Yüksek", "Düşük"]);
+  });
+});
+
+describe("Kumo patch (patches/@cloudflare__kumo@2.14.0.patch)", () => {
+  it("is applied: TimeseriesChart takes tooltipTimestampFormat", async () => {
+    const { readFile, readdir } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    // Tests run in packages/ui; Kumo is its dependency.
+    const chunks = join(process.cwd(), "node_modules/@cloudflare/kumo/dist/chunks");
+    const chart = (await readdir(chunks)).find((f) => /^chart-.*\.js$/.test(f));
+    expect(chart).toBeDefined();
+    const source = await readFile(join(chunks, chart as string), "utf8");
+    expect(source).toContain("formatTimestamp: tooltipTimestampFormat ?? formatTimestamp");
   });
 });
 

@@ -66,6 +66,7 @@ export {
   previousAnalyticsRange,
   type ResolvedAnalyticsRange,
   resolveAnalyticsRange,
+  utcMidnight,
 } from "./blocks/analytics-range.ts";
 export {
   type BreakdownLabels,
@@ -77,6 +78,11 @@ export {
   foldBreakdown,
 } from "./blocks/Breakdown.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
+export {
+  type CalendarLabels,
+  calendarLocaleProps,
+  firstDayOfWeek,
+} from "./blocks/calendar-locale.ts";
 export {
   InsetPanel,
   type InsetPanelProps,

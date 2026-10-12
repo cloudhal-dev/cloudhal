@@ -28,7 +28,7 @@ import {
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { type MessageKey, useI18n } from "../i18n/index.tsx";
+import { type NamespaceKey, useI18n } from "../i18n/index.tsx";
 import type { AnalyticsFilter } from "../lib/analytics.ts";
 import {
   type AnalyticsChannel,
@@ -120,14 +120,14 @@ const KNOWN = {
  * region names through `Intl`). Memoised per locale.
  */
 export function useAnalyticsText() {
-  const { t, locale } = useI18n();
+  const { t, locale } = useI18n("analytics");
   return useMemo(() => {
     const fmt = createAnalyticsFormatter(locale);
     const name =
       (group: keyof typeof KNOWN, prefix: string) =>
       (key: string): string =>
         (KNOWN[group] as readonly string[]).includes(key)
-          ? t(`${prefix}.${key}` as MessageKey)
+          ? t(`${prefix}.${key}` as NamespaceKey<"analytics">)
           : key;
     const countryNames: CountryNameLabels = {
       unknown: t("analytics.countries.unknown"),
@@ -146,7 +146,16 @@ export function useAnalyticsText() {
       customTitle: t("analytics.range.customTitle"),
       apply: t("analytics.range.apply"),
       cancel: t("common.cancel"),
-      timezone: t("analytics.utc"),
+      timezone: t("analytics.range.timezone"),
+      calendar: {
+        previousMonth: t("analytics.range.previousMonth"),
+        nextMonth: t("analytics.range.nextMonth"),
+        navigation: t("analytics.range.months"),
+        day: (date, { today, selected }) => {
+          const named = selected ? t("analytics.range.daySelected", { date }) : date;
+          return today ? t("analytics.range.dayToday", { date: named }) : named;
+        },
+      },
       pickHint: t("analytics.range.pickHint"),
       tooLong: t("analytics.range.tooLong"),
       compare: t("analytics.range.compare"),
@@ -157,6 +166,7 @@ export function useAnalyticsText() {
       showTable: t("analytics.chart.showTable"),
       showChart: t("analytics.chart.showChart"),
       time: t("analytics.chart.time"),
+      loading: t("common.loading"),
     });
     const breakdown = (item: string, value: string, extra: Partial<BreakdownLabels> = {}) => ({
       item,
@@ -214,7 +224,7 @@ export function AnalyticsErrorBanner({
   onRetry: () => void;
   retrying?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t } = useI18n("analytics");
   if (!error) return null;
   const busy = isRetryable(error);
   return (

@@ -40,12 +40,17 @@ export function isoDay(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-/** The calendar day a person picked (local fields of a picker's `Date`), as an ISO date. */
+/**
+ * The day a person picked in a calendar that runs in UTC (`DatePicker timeZone="UTC"` hands out
+ * days at UTC midnight), as an ISO date.
+ */
 export function pickedDay(date: Date): string {
-  const y = String(date.getFullYear()).padStart(4, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return isoDay(date.getTime());
+}
+
+/** UTC midnight of an ISO date, as a `Date` (what a UTC calendar shows and selects). */
+export function utcMidnight(iso: string): Date {
+  return new Date(`${iso}T00:00:00Z`);
 }
 
 /** `iso` plus `days` (may be negative). */

@@ -49,6 +49,24 @@ describe("checkBundleBudget", () => {
     expect(problems.join("\n")).not.toContain("analytics-range");
   });
 
+  it("reports lazy message namespaces and the date picker in the initial load", () => {
+    const bundle = Object.fromEntries([
+      chunk("index.js", {
+        isEntry: true,
+        moduleIds: [
+          "/repo/apps/studio/src/i18n/en.ts",
+          "/repo/apps/studio/src/i18n/namespaces.ts",
+          "/repo/apps/studio/src/i18n/lazy/analytics.en.ts",
+          "/repo/node_modules/@cloudflare/kumo/dist/chunks/date-picker-abc.js",
+        ],
+      }),
+    ]);
+    const { problems } = checkBundleBudget(bundle, budget);
+    expect(problems).toHaveLength(2);
+    expect(problems.join("\n")).toContain("i18n/lazy/analytics.en.ts");
+    expect(problems.join("\n")).toContain("chunks/date-picker-abc.js");
+  });
+
   it("reports an entry or initial load over budget", () => {
     const bundle = Object.fromEntries([
       chunk("index.js", { isEntry: true, code: Math.random().toString(36).repeat(200) }),

@@ -23,10 +23,36 @@ export const rangeLabels = {
   customTitle: "Custom range",
   apply: "Apply",
   cancel: "Cancel",
-  timezone: "UTC",
+  timezone: "Days are in UTC",
   pickHint: "Choose the first and the last day.",
   tooLong: "Choose at most 2 years.",
   compare: "Compare with the previous period",
+  calendar: {
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    navigation: "Months",
+    day: (date: string, { today, selected }: { today: boolean; selected: boolean }) =>
+      `${today ? "Today, " : ""}${date}${selected ? ", selected" : ""}`,
+  },
+};
+
+/** The Turkish words Studio passes (`tr.ts`); month and weekday names come from `Intl`. */
+export const rangeLabelsTr = {
+  ...rangeLabels,
+  group: "Tarih aralığı",
+  custom: "Özel…",
+  customTitle: "Özel aralık",
+  apply: "Uygula",
+  cancel: "Vazgeç",
+  timezone: "Günler UTC saatine göre",
+  pickHint: "İlk ve son günü seç.",
+  calendar: {
+    previousMonth: "Önceki ay",
+    nextMonth: "Sonraki ay",
+    navigation: "Aylar",
+    day: (date: string, { today, selected }: { today: boolean; selected: boolean }) =>
+      `${today ? "Bugün, " : ""}${date}${selected ? ", seçili" : ""}`,
+  },
 };
 
 export const timeseriesLabels = {
@@ -35,6 +61,7 @@ export const timeseriesLabels = {
   showTable: "Show as table",
   showChart: "Show as chart",
   time: "Time (UTC)",
+  loading: "Loading…",
 };
 
 /** Two boxes standing in for countries, keyed like Natural Earth (`ISO_A2_EH`). */

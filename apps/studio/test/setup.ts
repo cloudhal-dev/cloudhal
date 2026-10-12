@@ -1,5 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 import { configure } from "@testing-library/react";
+import { beforeAll } from "vitest";
+import { LOCALE_LIST, loadNamespace, NAMESPACES } from "../src/i18n/index.tsx";
+
+// Lazy message namespaces (src/i18n/namespaces.ts) arrive with their routes in the app. Screens
+// rendered on their own in tests get them up front, in every locale; test/i18n.test.tsx covers
+// the loading itself.
+beforeAll(() =>
+  Promise.all(LOCALE_LIST.flatMap((locale) => NAMESPACES.map((ns) => loadNamespace(ns, locale)))),
+);
 
 // findBy*/waitFor default to 1 s; with the whole monorepo testing in parallel (turbo) a screen can
 // take longer to settle. The test timeout (vitest.config.ts) stays the upper bound.

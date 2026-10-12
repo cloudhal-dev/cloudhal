@@ -37,7 +37,7 @@ import { RoleBadge } from "../components/Roles.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
-import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
+import { type MessageKey, type TFunction, useI18n, useT } from "../i18n/index.tsx";
 import {
   type DeviceInfo,
   describeUserAgent,
@@ -226,7 +226,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
 
 const EMPTY_PASSWORDS: PasswordChange = { current: "", next: "", confirm: "" };
 
-function passwordMessages(t: ReturnType<typeof useT>, errors: PasswordErrors) {
+function passwordMessages(t: TFunction, errors: PasswordErrors) {
   const map: Record<string, MessageKey> = {
     "current:required": "account.password.errors.currentRequired",
     "current:wrong": "account.password.errors.currentWrong",
@@ -368,7 +368,7 @@ const DEVICE_ICONS = {
   unknown: Question,
 } as const;
 
-function deviceLabel(t: ReturnType<typeof useT>, device: DeviceInfo): string {
+function deviceLabel(t: TFunction, device: DeviceInfo): string {
   if (device.browser && device.os)
     return t("account.sessions.deviceOn", { browser: device.browser, os: device.os });
   return device.browser ?? device.os ?? t("account.sessions.unknownDevice");

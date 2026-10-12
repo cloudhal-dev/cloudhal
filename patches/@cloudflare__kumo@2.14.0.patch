@@ -1,0 +1,38 @@
+diff --git a/dist/chunks/chart-kd1xd6crso2i956o.js b/dist/chunks/chart-kd1xd6crso2i956o.js
+index e3f77e571783acc063b0780ec1cba6f1c6dfc71b..98b549913906a9db150626d45778c640d1e22bc5 100644
+--- a/dist/chunks/chart-kd1xd6crso2i956o.js
++++ b/dist/chunks/chart-kd1xd6crso2i956o.js
+@@ -534,7 +534,7 @@ const DEFAULT_X_AXIS_TICK_COUNT = 5;
+ * />
+ * ```
+ */
+-const TimeseriesChart = forwardRef(function TimeseriesChart({ echarts, type = "line", data, markers, thresholds, xAxisName, xAxisTickCount, xAxisTickFormat, yAxisTickFormat, yAxisTickLabelFormat, yAxisName, yAxisTickCount, yAxisMinInterval, tooltipValueFormat, tooltipFooter, onTimeRangeChange, height = 350, incomplete, enableLegendSelection = false, isDarkMode, gradient, loading, ariaDescription, optionUpdateBehavior, tooltipMode = "all", tooltipMaxItems = 10, tooltipFollowCursor = "both", tooltipBoundary }, ref) {
++const TimeseriesChart = forwardRef(function TimeseriesChart({ echarts, type = "line", data, markers, thresholds, xAxisName, xAxisTickCount, xAxisTickFormat, yAxisTickFormat, yAxisTickLabelFormat, yAxisName, yAxisTickCount, yAxisMinInterval, tooltipValueFormat, tooltipTimestampFormat, tooltipFooter, onTimeRangeChange, height = 350, incomplete, enableLegendSelection = false, isDarkMode, gradient, loading, ariaDescription, optionUpdateBehavior, tooltipMode = "all", tooltipMaxItems = 10, tooltipFollowCursor = "both", tooltipBoundary }, ref) {
+ 	const chartRef = useRef(null);
+ 	const containerRef = useRef(null);
+ 	const mergedRef = useCallback((instance) => {
+@@ -899,7 +899,7 @@ const TimeseriesChart = forwardRef(function TimeseriesChart({ echarts, type = "l
+ 				children: /* @__PURE__ */ jsx(TooltipContent, {
+ 					state: tooltipState,
+ 					formatValue: tooltipValueFormat ?? yAxisTickLabelFormat,
+-					formatTimestamp,
++					formatTimestamp: tooltipTimestampFormat ?? formatTimestamp,
+ 					footer: tooltipFooter
+ 				})
+ 			})
+diff --git a/dist/index-CtTNoYA2.d.ts b/dist/index-CtTNoYA2.d.ts
+index 9a91d01b583e81478c5e68a020c4de03e2c2b433..f54598308d6a1f7b2bf7aa403b1c0bff42a1328a 100644
+--- a/dist/index-CtTNoYA2.d.ts
++++ b/dist/index-CtTNoYA2.d.ts
+@@ -88,6 +88,11 @@ interface TimeseriesChartProps {
+    * deprecated `yAxisTickLabelFormat` prop.
+    */
+   tooltipValueFormat?: (value: number) => string;
++  /**
++   * Cloudhal patch (patches/@cloudflare__kumo@2.14.0.patch): formats the tooltip's timestamp
++   * heading. When omitted, the browser locale's "Oct 9, 14:00:00" is shown.
++   */
++  tooltipTimestampFormat?: (timestamp: number) => string;
+   /**
+    * Footer text rendered below the series rows in the tooltip.
+    * Intended for brief context such as data freshness or aggregation details.
