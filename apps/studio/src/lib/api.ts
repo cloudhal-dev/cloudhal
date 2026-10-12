@@ -1457,6 +1457,16 @@ export const api = {
         ...json({ mode }),
       }),
     /**
+     * "Allow analytics" (RFC-0006 §9.1): adds `analytics:read` to a key made before it existed. Own
+     * keys, or any with `agents.manage`; audited. 400 `scope_above_role` when the key's creator
+     * cannot read analytics (Contributors). Harmless when the key already holds it.
+     */
+    allowAnalytics: (id: string) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...json({ addScopes: ["analytics:read"] }),
+      }),
+    /**
      * A more autonomous mode until the time is up, then the key's own mode again (ADR-0016; audited).
      * Replaces an elevation in force. 400 when the mode is not above the key's own, is bypass, or
      * `minutes` is out of bounds.
