@@ -152,7 +152,7 @@ export const AGENT_CAPS = {
   full: 2000,
   name: 80,
   reportDetails: 500,
-  /** Reader text (names, comment text, report details) per call. */
+  /** Text per call: names (readers' and staff's), comment and reply text, report details. */
   perCall: 20_000,
 } as const;
 
@@ -268,7 +268,8 @@ export function agentComment(
       : a.kind === "staff"
         ? {
             kind: "staff",
-            name: a.name,
+            // staff names are not reader text, but they count toward the per-call budget too
+            name: take(a.name, AGENT_CAPS.name),
             badge: a.badge,
             ...(a.draftedBy ? { draftedBy: a.draftedBy.name ?? a.draftedBy.id } : {}),
           }

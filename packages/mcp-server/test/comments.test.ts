@@ -13,14 +13,14 @@ import {
 } from "@cloudhal/agent-runtime";
 import { ID_PREFIX, newCommentsId } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
-import type { Actor, CommentLabel, ContentEntry } from "@cloudhal/core-contracts";
+import type { Actor, Comment, CommentLabel, ContentEntry } from "@cloudhal/core-contracts";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LOCAL_DEVELOPER } from "../src/comment-tools.ts";
-import type { CommentsDeps } from "../src/comments.ts";
+import { agentComment, type CommentsDeps, ReaderTextBudget } from "../src/comments.ts";
 import { createCloudhalMcpServer } from "../src/server.ts";
 import { defineTools } from "../src/tools.ts";
 
@@ -230,6 +230,28 @@ describe("comment tools", () => {
     for (const k of ["email", "ip_hmac", "ipHmac", "challenge", "aaaaaaaa"])
       expect(raw).not.toContain(k);
     expect(r.data?.counts).toMatchObject({ pending: 1 });
+  });
+
+  it("staff names and reply texts count toward the per-call budget", () => {
+    const budget = new ReaderTextBudget(100);
+    const staff = {
+      schemaVersion: 1,
+      id: "cmt_staff0000001",
+      siteId: "site_abcdef",
+      nodeId: "entry_abcdef",
+      source: "native",
+      author: { kind: "staff", name: "S".repeat(90), badge: "team", personId: "user_abcdef" },
+      body: { format: "text", text: "x".repeat(50) },
+      status: "approved",
+      createdAt: NOW.toISOString(),
+      rev: 1,
+    } as unknown as Comment;
+    const v = agentComment(staff, undefined, [], budget, { text: "full" });
+    // the name is capped at 80 and charged; 20 characters of the budget are left for the text
+    expect(v.author).toMatchObject({ kind: "staff", name: "S".repeat(80) });
+    expect(inner(v.text as string)).toBe("x".repeat(20));
+    expect(v.truncated).toBe(true);
+    expect(budget.truncated).toBe(true);
   });
 
   it("caps reader text: 280 by default, 2,000 in full, 20,000 per call", async () => {

@@ -113,6 +113,7 @@ Add the Turnstile paragraph to your privacy notice (below). Whether Turnstile ac
 | Pending comments per article | 200; then that thread pauses |
 | Reports | 5 per reader an hour; 200 per site a day |
 | Optional, across server instances | `comments.rateLimit` in `cloudhal.json`: 10 a minute per reader per Cloudflare location (Workers Rate Limiting binding `COMMENTS_RL`; whether Workers Free offers it is unconfirmed) |
+| Requests without a client address (self-hosting behind a proxy that hides it) | 1 comment a minute for all of them together, and they cannot be banned by address |
 
 The daily limit is what keeps a free account safe. At 1,000 stored comments a day, comments write at most about 7,000 rows a day, about 7 % of D1 Free's 100,000. Exceeding D1's daily writes would stop the whole CMS, not just comments, until midnight UTC. On Workers Paid, 5,000 a day is a reasonable limit.
 

@@ -18,6 +18,7 @@ import {
   type PreparedSubmission,
   type RenderPage,
   randomSalt,
+  rateLimitKey,
   solveChallenge,
 } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
@@ -592,5 +593,78 @@ describe("SiteComments endpoints on SQLite", () => {
     expect(row?.ip_hmac).toBe(await ipHmac(salt as string, site.id, "198.51.100.77"));
     expect(row?.ip_hmac).not.toBe(await ipHmac(salt as string, site.id, "203.0.113.98"));
     expect(randomSalt()).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("keys the COMMENTS_RL binding by a derived key and the client's /64, never the raw secret", async () => {
+    const keysSeen: string[] = [];
+    const c = make({
+      rateLimit: {
+        limit: async ({ key }: { key: string }) => {
+          keysSeen.push(key);
+          return { success: true };
+        },
+      },
+    });
+    for (const [i, address] of ["2001:db8:1:2::a", "2001:db8:1:2:ffff::b"].entries())
+      await c.handle(
+        post({ nodeId: hello.id, name: "A", body: `Rotating ${i}`, ...(await solved()) }),
+        { clientAddress: address },
+      );
+    const keys = await deriveCommentKeys(KEY);
+    expect(keysSeen).toHaveLength(2);
+    // one client network, one key, in every isolate
+    expect(keysSeen[0]).toBe(keysSeen[1]);
+    expect(keysSeen[0]).toBe(await rateLimitKey(keys, "2001:db8:1:2::1"));
+    expect(keysSeen[0]).toMatch(/^[0-9a-f]{32}$/);
+    // the old key: an HMAC under the raw deployment secret
+    const raw = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(KEY),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const legacy = new Uint8Array(
+      await crypto.subtle.sign(
+        "HMAC",
+        raw,
+        new TextEncoder().encode("cloudhal/comments/rl/v1\n2001:0db8:0001:0002::/64"),
+      ),
+    );
+    expect(keysSeen[0]).not.toBe(Buffer.from(legacy.slice(0, 16)).toString("hex"));
+  });
+
+  it("requests without a client address share one stricter bucket that an IP ban never hits", async () => {
+    const c = make();
+    const first = (await c.handle(
+      post({ nodeId: hello.id, name: "A", body: "No address 1", ...(await solved()) }),
+    )) as Response;
+    expect(first.status).toBe(200);
+    // one submission a minute for all of them together
+    const second = (await c.handle(
+      post({ nodeId: hello.id, name: "B", body: "No address 2", ...(await solved()) }),
+      { clientAddress: "" },
+    )) as Response;
+    expect(second.status).toBe(429);
+    // a real client is not affected
+    const real = (await c.handle(
+      post({ nodeId: hello.id, name: "C", body: "With an address", ...(await solved()) }),
+      { clientAddress: "198.51.100.5" },
+    )) as Response;
+    expect(real.status).toBe(200);
+    const [unknown] = await sql.all<{ id: string; ip_hmac: string }>(
+      "SELECT id, ip_hmac FROM comments WHERE body = 'No address 1'",
+    );
+    const salt = (await comments.readSalt(clock.toISOString().slice(0, 7))) as string;
+    expect(unknown?.ip_hmac).toBe(await ipHmac(salt, site.id, "unknown"));
+    // banning that author by IP would ban everyone without an address: only the email is banned
+    const bans = await comments.ban(site.id, {
+      commentId: unknown?.id as string,
+      subjects: ["ip"],
+      until: null,
+      reasonCode: "spam",
+      by: { kind: "human", id: "user_editor0001", name: "Editor" },
+    });
+    expect(bans).toEqual([]);
   });
 });

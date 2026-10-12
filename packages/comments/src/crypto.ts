@@ -85,6 +85,8 @@ export interface CommentKeys {
   readonly email: AesKey;
   /** AES-GCM for `comment_secrets` (the owner's Turnstile secret). */
   readonly secrets: AesKey;
+  /** Keys the optional `COMMENTS_RL` Rate Limiting binding by client network (§6.5). */
+  readonly rateLimit: HmacKey;
 }
 
 export const KEY_INFO = {
@@ -92,6 +94,7 @@ export const KEY_INFO = {
   emailHmac: "cloudhal/comments/email-hmac/v1",
   email: "cloudhal/comments/email/v1",
   secrets: "cloudhal/comments/secrets/v1",
+  rateLimit: "cloudhal/comments/rl/v1",
 } as const;
 
 /** The deployment secret must carry at least 128 bits; generated ones carry 256. */
@@ -116,17 +119,19 @@ export async function deriveCommentKeys(secret: string): Promise<CommentKeys> {
     );
   const hmacAlg = { name: "HMAC", hash: "SHA-256", length: 256 };
   const aesAlg = { name: "AES-GCM", length: 256 };
-  const [pow, emailHmac, email, secrets] = await Promise.all([
+  const [pow, emailHmac, email, secrets, rateLimit] = await Promise.all([
     derive(KEY_INFO.pow, hmacAlg, ["sign"]),
     derive(KEY_INFO.emailHmac, hmacAlg, ["sign"]),
     derive(KEY_INFO.email, aesAlg, ["encrypt", "decrypt"]),
     derive(KEY_INFO.secrets, aesAlg, ["encrypt", "decrypt"]),
+    derive(KEY_INFO.rateLimit, hmacAlg, ["sign"]),
   ]);
   return {
     pow: pow as HmacKey,
     emailHmac: emailHmac as HmacKey,
     email: email as AesKey,
     secrets: secrets as AesKey,
+    rateLimit: rateLimit as HmacKey,
   };
 }
 

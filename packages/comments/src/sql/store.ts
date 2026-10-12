@@ -33,10 +33,12 @@ import {
   commentRecordHash,
   commentStateHash,
   ID_PREFIX,
+  ipHmac,
   newCommentsId,
   openEmail,
   openSecret,
   sealSecret,
+  UNKNOWN_CLIENT,
 } from "../hashes.ts";
 import {
   type AuditStatement,
@@ -78,6 +80,7 @@ import {
   type ThreadInput,
   type ThreadRow,
   type ThreadState,
+  utcMonth,
 } from "../model.ts";
 import {
   CONTRACT_FORBIDDEN,
@@ -1688,11 +1691,20 @@ export class SqlCommentStore implements SubmissionStore {
     assertNote(input.note);
     if (input.until !== null && Number.isNaN(Date.parse(input.until)))
       throw new CommentInputError("until must be an ISO timestamp or null");
-    const row = await this.sql.get<{ ip_hmac: string | null; email_hmac: string | null }>(
-      `SELECT c.ip_hmac, e.email_hmac FROM comments c LEFT JOIN commenter_emails e ON e.id = c.email_id WHERE c.id = ? AND c.site_id = ?`,
+    const row = await this.sql.get<{
+      ip_hmac: string | null;
+      email_hmac: string | null;
+      created_at: string;
+    }>(
+      `SELECT c.ip_hmac, e.email_hmac, c.created_at FROM comments c LEFT JOIN commenter_emails e ON e.id = c.email_id WHERE c.id = ? AND c.site_id = ?`,
       [input.commentId, siteId],
     );
     if (!row) throw new CommentNotFoundError();
+    // Requests without a client address share one hash (§6.5); banning it would ban all of them.
+    if (row.ip_hmac && input.subjects.includes("ip")) {
+      const salt = await this.readSalt(utcMonth(new Date(row.created_at)));
+      if (salt && row.ip_hmac === (await ipHmac(salt, siteId, UNKNOWN_CLIENT))) row.ip_hmac = null;
+    }
     const now = this.#now().toISOString();
     const out: CommentBan[] = [];
     const statements: SqlStatement[] = [];

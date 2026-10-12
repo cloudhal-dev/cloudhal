@@ -1,12 +1,15 @@
 /**
  * Per-isolate limits and memos for the site Worker (RFC-0007 §6.5). Nothing here is stored and no
- * IP address is kept: clients are counted by HMAC(per-isolate random key, address), and the
- * counters are dropped every window.
+ * IP address is kept: clients are counted by HMAC(per-isolate random key, network) — an IPv6
+ * address by its /64, like the D1 limits and the IP hash — and the counters are dropped every
+ * window. Requests without an address the runtime vouches for share one separate bucket with
+ * stricter limits, so they can neither pass as many clients nor use up real clients' allowance.
  *
  * | Limit | Default |
  * |---|---|
  * | Challenges per client | 20 a minute |
  * | Submissions per client | 3 a minute |
+ * | Challenges / submissions, all clients without an address together | 5 / 1 a minute |
  * | Submissions per site | 30 a minute |
  *
  * The cross-isolate limits (stored comments per client, the daily cap, JavaScript-less posts,
@@ -14,13 +17,20 @@
  * count for 30 s and increments it locally after each store.
  */
 import { type HmacKey, hmac, toHex, utf8 } from "./crypto.ts";
+import { clientNetwork, isClientAddress } from "./hashes.ts";
 import { MINUTE_MS } from "./model.ts";
 
 export const ISOLATE_LIMITS = {
   challengesPerClientPerMinute: 20,
   submissionsPerClientPerMinute: 3,
   submissionsPerSitePerMinute: 30,
+  /** Every request without a client address, together (one shared, stricter bucket). */
+  unknownChallengesPerMinute: 5,
+  unknownSubmissionsPerMinute: 1,
 } as const;
+
+/** The isolate key of requests without a client address (an HMAC key is 24 hex characters). */
+export const UNKNOWN_CLIENT_KEY = "unknown-client";
 
 /** Stored-row limits read from D1 (§6.5). */
 export const STORED_LIMITS = {
@@ -68,6 +78,8 @@ export interface CommentLimiterOptions {
   readonly challengesPerMinute?: number;
   readonly submissionsPerMinute?: number;
   readonly sitePerMinute?: number;
+  readonly unknownChallengesPerMinute?: number;
+  readonly unknownSubmissionsPerMinute?: number;
   readonly now?: () => number;
 }
 
@@ -88,23 +100,40 @@ export class CommentLimiter {
       submissionsPerMinute:
         options.submissionsPerMinute ?? ISOLATE_LIMITS.submissionsPerClientPerMinute,
       sitePerMinute: options.sitePerMinute ?? ISOLATE_LIMITS.submissionsPerSitePerMinute,
+      unknownChallengesPerMinute:
+        options.unknownChallengesPerMinute ?? ISOLATE_LIMITS.unknownChallengesPerMinute,
+      unknownSubmissionsPerMinute:
+        options.unknownSubmissionsPerMinute ?? ISOLATE_LIMITS.unknownSubmissionsPerMinute,
     };
   }
 
-  /** HMAC(per-isolate key, address): the isolate's client key; never stored. */
+  /**
+   * HMAC(per-isolate key, client network): the isolate's client key; never stored. An IPv6
+   * address counts by its /64, so rotating within one's own prefix gains nothing; a request
+   * without an address gets `UNKNOWN_CLIENT_KEY`.
+   */
   async clientKey(address: string): Promise<string> {
+    if (!isClientAddress(address)) return UNKNOWN_CLIENT_KEY;
     this.#key ??= crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256" }, false, [
       "sign",
     ]) as Promise<HmacKey>;
-    return toHex((await hmac(await this.#key, utf8(address))).slice(0, 12));
+    return toHex((await hmac(await this.#key, utf8(clientNetwork(address)))).slice(0, 12));
   }
 
   allowChallenge(clientKey: string): boolean {
-    return this.#challenges.hit(clientKey, this.#limits.challengesPerMinute, this.#now());
+    const limit =
+      clientKey === UNKNOWN_CLIENT_KEY
+        ? this.#limits.unknownChallengesPerMinute
+        : this.#limits.challengesPerMinute;
+    return this.#challenges.hit(clientKey, limit, this.#now());
   }
 
   allowSubmission(clientKey: string): boolean {
-    return this.#submissions.hit(clientKey, this.#limits.submissionsPerMinute, this.#now());
+    const limit =
+      clientKey === UNKNOWN_CLIENT_KEY
+        ? this.#limits.unknownSubmissionsPerMinute
+        : this.#limits.submissionsPerMinute;
+    return this.#submissions.hit(clientKey, limit, this.#now());
   }
 
   allowSite(siteId: string): boolean {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applySettingsInput,
+  CommentLimiter,
   CommentSettingsError,
   clientNetwork,
   commentStateHash,
@@ -10,8 +11,11 @@ import {
   deriveCommentKeys,
   difficultyFor,
   emailHmac,
+  ISOLATE_LIMITS,
   ipHmac,
+  isClientAddress,
   issueChallenge,
+  KEY_INFO,
   leadingZeroBits,
   MAX_CLIENT_DATA_DAYS,
   oldestSaltMonthToKeep,
@@ -20,6 +24,7 @@ import {
   planPurge,
   purgeBackoffMs,
   ReplayCache,
+  rateLimitKey,
   retentionPlan,
   sealEmail,
   sealSecret,
@@ -27,6 +32,7 @@ import {
   solveChallenge,
   threadClosesAt,
   threadState,
+  UNKNOWN_CLIENT_KEY,
   verifyChallenge,
 } from "../src/index.ts";
 
@@ -138,6 +144,43 @@ describe("keys and hashes", () => {
     expect(await ipHmac(salt, "site_other1", "2001:db8:1:2::5")).not.toBe(h);
     expect(await ipHmac("b".repeat(64), "site_abcdef", "2001:db8:1:2::5")).not.toBe(h);
     await expect(ipHmac("short", "site_abcdef", "1.2.3.4")).rejects.toThrow();
+  });
+
+  it("the isolate limiter counts an IPv6 /64 as one client; no address is one stricter bucket", async () => {
+    const limiter = new CommentLimiter({ now: () => T0.getTime() });
+    const a = await limiter.clientKey("2001:db8:1:2::1");
+    expect(await limiter.clientKey("2001:db8:1:2:ffff:ffff:ffff:fffe")).toBe(a);
+    expect(await limiter.clientKey("2001:db8:1:3::1")).not.toBe(a);
+    expect(await limiter.clientKey("::ffff:198.51.100.7")).toBe(
+      await limiter.clientKey("198.51.100.7"),
+    );
+    for (let i = 0; i < 3; i++) expect(limiter.allowSubmission(a)).toBe(true);
+    expect(limiter.allowSubmission(a)).toBe(false);
+    // no address the runtime vouches for: one shared key, 1 submission and 5 challenges a minute
+    for (const missing of ["", "unknown", "not-an-address"])
+      expect(await limiter.clientKey(missing)).toBe(UNKNOWN_CLIENT_KEY);
+    expect(limiter.allowSubmission(UNKNOWN_CLIENT_KEY)).toBe(true);
+    expect(limiter.allowSubmission(UNKNOWN_CLIENT_KEY)).toBe(false);
+    for (let i = 0; i < 5; i++) expect(limiter.allowChallenge(UNKNOWN_CLIENT_KEY)).toBe(true);
+    expect(limiter.allowChallenge(UNKNOWN_CLIENT_KEY)).toBe(false);
+    expect(ISOLATE_LIMITS).toMatchObject({
+      unknownSubmissionsPerMinute: 1,
+      unknownChallengesPerMinute: 5,
+    });
+    expect(isClientAddress("2001:db8::1")).toBe(true);
+    expect(isClientAddress("unknown")).toBe(false);
+  });
+
+  it("the COMMENTS_RL key: derived from the deployment secret, one per client network", async () => {
+    const keys = await keysP;
+    const k = await rateLimitKey(keys, "2001:db8:1:2::1");
+    expect(k).toMatch(/^[0-9a-f]{32}$/);
+    expect(await rateLimitKey(keys, "2001:db8:1:2:9::9")).toBe(k);
+    expect(await rateLimitKey(keys, "2001:db8:1:3::1")).not.toBe(k);
+    expect(
+      await rateLimitKey(await deriveCommentKeys(`${SECRET}-other`), "2001:db8:1:2::1"),
+    ).not.toBe(k);
+    expect(KEY_INFO.rateLimit).toBe("cloudhal/comments/rl/v1");
   });
 
   it("emails: keyed hash on the lower-cased address, AES-GCM bound to the site", async () => {

@@ -4,15 +4,20 @@
  *
  * - **Text:** NFC; `\r\n` and `\r` → `\n`; control characters other than tab and line feed, C1
  *   controls and the bidirectional embedding, override and isolate characters (U+202A–U+202E,
- *   U+2066–U+2069) removed; trailing whitespace per line removed; more than two blank lines
- *   collapsed to two; trimmed.
- * - **Names:** NFC; the same characters removed (tabs and line breaks become spaces); internal
- *   whitespace collapsed to one space; trimmed.
+ *   U+2066–U+2069) removed; so are the directional marks (LRM U+200E, RLM U+200F, ALM U+061C)
+ *   and the zero-width characters (ZWSP U+200B, ZWNJ U+200C, ZWJ U+200D, WJ U+2060, BOM U+FEFF),
+ *   except a ZWJ joining two emoji (👩‍💻 stays one emoji); trailing whitespace per line removed;
+ *   more than two blank lines collapsed to two; trimmed.
+ * - **Names:** NFC; the same characters removed, every ZWJ included (tabs and line breaks become
+ *   spaces); internal whitespace collapsed to one space; trimmed.
  * - **Email:** trimmed and lower-cased.
  *
  * The contract refuses control and bidi characters; the server removes them rather than refusing
  * the comment, so a reader who pasted an invisible character is not stuck, and a comment cannot
- * disguise itself in Studio either way. Lengths count Unicode code points, as the validator does.
+ * disguise itself in Studio either way. Directional marks and zero-width characters are removed
+ * too, so they cannot split a blocked word, glue look-alike names or hide in a link, but the
+ * contract still allows them: imported comments (other systems, Persian text with ZWNJ, emoji
+ * sequences) stay valid. Lengths count Unicode code points, as the validator does.
  */
 import { EMAIL_MAX, NAME_MAX, TEXT_MAX, TEXT_MIN } from "./model.ts";
 
@@ -21,6 +26,14 @@ import { EMAIL_MAX, NAME_MAX, TEXT_MAX, TEXT_MIN } from "./model.ts";
 const BIDI = "\\u202A-\\u202E\\u2066-\\u2069";
 const UNSAFE_IN_TEXT = new RegExp(`[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F${BIDI}]`, "gu");
 const UNSAFE_IN_NAME = new RegExp(`[\\u0000-\\u001F\\u007F-\\u009F${BIDI}]`, "gu");
+/** Directional marks and zero-width characters (ZWJ is handled apart in text, see below). */
+const INVISIBLE = "\\u061C\\u200B\\u200C\\u200E\\u200F\\u2060\\uFEFF";
+const INVISIBLE_RE = new RegExp(`[${INVISIBLE}]`, "gu");
+const ZWJ_RE = /\u200D/gu;
+/** A ZWJ not between two emoji (an emoji may carry VS16 or a skin tone before the joiner). */
+const LONE_ZWJ_RE =
+  /(?<!\p{Extended_Pictographic}|\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])\u200D|\u200D(?!\p{Extended_Pictographic})/gu;
+
 /** The contract's own refusal set (for tests and defensive checks). */
 export const CONTRACT_FORBIDDEN = new RegExp(`[\\u0000-\\u0008\\u000B-\\u001F\\u007F${BIDI}]`, "u");
 
@@ -48,6 +61,8 @@ export function normalizeText(raw: string): string {
     .normalize("NFC")
     .replace(/\r\n?/g, "\n")
     .replace(UNSAFE_IN_TEXT, "")
+    .replace(INVISIBLE_RE, "")
+    .replace(LONE_ZWJ_RE, "")
     .split("\n")
     .map((line) => line.replace(/[^\S\n]+$/u, ""))
     .join("\n")
@@ -60,6 +75,8 @@ export function normalizeName(raw: string): string {
     .normalize("NFC")
     .replace(/[\t\n\r\v\f]/g, " ")
     .replace(UNSAFE_IN_NAME, "")
+    .replace(INVISIBLE_RE, "")
+    .replace(ZWJ_RE, "")
     .replace(/\s+/gu, " ")
     .trim();
 }

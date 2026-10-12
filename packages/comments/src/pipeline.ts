@@ -32,7 +32,16 @@
 import type { CommentLabel, CommentModeration } from "@cloudhal/core-contracts";
 import { validationErrors } from "@cloudhal/core-contracts";
 import { type CommentKeys, sha256Hex } from "./crypto.ts";
-import { emailHmac, ID_PREFIX, ipHmac, newCommentsId, randomSalt, sealEmail } from "./hashes.ts";
+import {
+  emailHmac,
+  ID_PREFIX,
+  ipHmac,
+  isClientAddress,
+  newCommentsId,
+  randomSalt,
+  sealEmail,
+  UNKNOWN_CLIENT,
+} from "./hashes.ts";
 import { type CommentLimiter, type DailyCount, STORED_LIMITS } from "./limits.ts";
 import {
   addMs,
@@ -478,10 +487,13 @@ async function clientHash(
 ): Promise<{ ipHmac: string; newSalt?: { month: string; salt: string } }> {
   const month = utcMonth(now);
   const stored = salt ?? (await deps.store.readSalt(month));
-  if (stored) return { ipHmac: await ipHmac(stored, deps.siteId, deps.clientAddress) };
+  // without an address the runtime vouches for, every such client shares the `unknown` hash: one
+  // bucket for the D1 limits (stricter), which an IP ban never targets (SqlCommentStore.ban)
+  const address = isClientAddress(deps.clientAddress) ? deps.clientAddress : UNKNOWN_CLIENT;
+  if (stored) return { ipHmac: await ipHmac(stored, deps.siteId, address) };
   const fresh = randomSalt();
   return {
-    ipHmac: await ipHmac(fresh, deps.siteId, deps.clientAddress),
+    ipHmac: await ipHmac(fresh, deps.siteId, address),
     newSalt: { month, salt: fresh },
   };
 }

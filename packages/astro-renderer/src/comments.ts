@@ -22,22 +22,19 @@ import {
   type CommentKeys,
   CommentLimiter,
   challengeResponse,
-  clientNetwork,
   DailyCount,
   deriveCommentKeys,
   handleChallengeRequest,
   handleCommentSubmission,
   handleReportSubmission,
-  hmacRaw,
   MIN_SECRET_LENGTH,
   memoize,
   type PipelineDeps,
   type PublishedEntry,
   ReplayCache,
+  rateLimitKey,
   submissionResponse,
   type TurnstileResult,
-  toHex,
-  utf8,
 } from "@cloudhal/comments";
 import type { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
@@ -174,7 +171,6 @@ export class SiteComments {
     const keys = await this.#deriveKeys();
     const store = await this.#o.store();
     const siteId = this.#o.siteId;
-    const secret = this.#o.secret as string;
     const binding = this.#o.rateLimit;
     const doFetch = this.#o.fetch ?? fetch;
     return {
@@ -193,14 +189,10 @@ export class SiteComments {
       ...(binding
         ? {
             // the isolate's client key differs per isolate; the binding needs one key per client
-            // across isolates: an HMAC of the client's network under the deployment secret
-            rateLimit: async () => {
-              const mac = await hmacRaw(
-                utf8(secret),
-                `cloudhal/comments/rl/v1\n${clientNetwork(clientAddress)}`,
-              );
-              return (await binding.limit({ key: toHex(mac.slice(0, 16)) })).success;
-            },
+            // across isolates: an HMAC of the client's network under a key derived from the
+            // deployment secret for this purpose (never the raw secret)
+            rateLimit: async () =>
+              (await binding.limit({ key: await rateLimitKey(keys, clientAddress) })).success,
           }
         : {}),
       turnstile: async ({ token, remoteip, idempotencyKey }): Promise<TurnstileResult> => {

@@ -54,6 +54,33 @@ describe("normalising (§6.4)", () => {
     expect(CONTRACT_FORBIDDEN.test(out)).toBe(false);
   });
 
+  it("removes directional marks and zero-width characters (ZWJ kept only inside emoji)", () => {
+    const marks = [0x200e, 0x200f, 0x061c, 0x200b, 0x200c, 0x200d, 0x2060, 0xfeff].map(U);
+    // spliced between letters: every one of them disappears
+    const text = normalizeText(`${U(0xfeff)}buy k${marks.join("r")}ipto now${U(0x200b)}`);
+    expect(text).toBe("buy krrrrrrripto now");
+    for (const m of marks) expect(text).not.toContain(m);
+    expect(
+      evaluateContent(
+        { name: "A", text: normalizeText(`k${U(0x200b)}r${U(0x200c)}ipto`) },
+        rules({ blocked: ["kripto"] }),
+      ),
+    ).toMatchObject({ ok: true, status: "spam" });
+    // a look-alike name cannot hide invisible characters, not even a ZWJ
+    expect(normalizeName(`Ay${U(0x200f)}şe${U(0x200d)} ${U(0x2060)}Yılmaz${U(0x061c)}`)).toBe(
+      "Ayşe Yılmaz",
+    );
+    // emoji sequences keep their joiner in text; a lone ZWJ after a letter does not
+    const coder = `${U(0x1f469)}${U(0x200d)}${U(0x1f4bb)}`;
+    const rainbow = `${U(0x1f3f3)}${U(0xfe0f)}${U(0x200d)}${U(0x1f308)}`;
+    expect(normalizeText(`Hi ${coder} ${rainbow} a${U(0x200d)}b`)).toBe(
+      `Hi ${coder} ${rainbow} ab`,
+    );
+    expect(normalizeName(`Dev ${coder}`)).toBe(`Dev ${U(0x1f469)}${U(0x1f4bb)}`);
+    // the result is always valid against the contract, which itself still allows them
+    expect(CONTRACT_FORBIDDEN.test(text)).toBe(false);
+  });
+
   it("a bidi-disguised text cannot reach the contract", () => {
     const text = normalizeText(`Totally harmless ${U(0x202e)}txt.exe${U(0x202c)} comment`);
     expect(text).toBe("Totally harmless txt.exe comment");
