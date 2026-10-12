@@ -339,29 +339,31 @@ export function AnalyticsPage() {
       description={t("analytics.page.description")}
       actions={
         gate.allowed ? (
-          <>
-            <AnalyticsRangePicker
-              value={range}
-              onChange={(next) =>
-                setSearch({
-                  range: undefined,
-                  from: undefined,
-                  to: undefined,
-                  ...searchForRange(next),
-                })
-              }
-              labels={text.rangePicker}
-              locale={text.locale}
-              compare={compare}
-              onCompareChange={(on) => setSearch({ compare: on ? undefined : "0" })}
-            />
-            <RefreshButton
-              variant="secondary"
-              aria-label={t("analytics.refresh")}
-              loading={fetching}
-              onClick={() => void qc.invalidateQueries({ queryKey: analyticsKeys.all(siteId) })}
-            />
-          </>
+          <AnalyticsRangePicker
+            value={range}
+            onChange={(next) =>
+              setSearch({
+                range: undefined,
+                from: undefined,
+                to: undefined,
+                ...searchForRange(next),
+              })
+            }
+            labels={text.rangePicker}
+            locale={text.locale}
+            compare={compare}
+            onCompareChange={(on) => setSearch({ compare: on ? undefined : "0" })}
+            // In the picker's own row, so on phones it wraps with Custom… and Compare.
+            trailing={
+              <RefreshButton
+                size="sm"
+                variant="secondary"
+                aria-label={t("analytics.refresh")}
+                loading={fetching}
+                onClick={() => void qc.invalidateQueries({ queryKey: analyticsKeys.all(siteId) })}
+              />
+            }
+          />
         ) : undefined
       }
     >

@@ -3501,6 +3501,7 @@ export const tr: Messages = {
       tabs: { errors: "Kırık bağlantılar", redirects: "Yönlendirmeler" },
       empty: { errors: "Bu dönemde kırık bağlantı yok", redirects: "Hiç yönlendirme izlenmedi" },
       noReferrer: "Yazılmış ya da dışarıdan",
+      createRedirectFor: "{path} için yönlendirme oluştur",
       createRedirect: "Yönlendirme oluştur…",
       note: "Önbellekte olsun olmasın her hatayı içerir. İstenen yollar ziyaretçilerin istediği adreslerdir: gösterilir, asla bağlantı verilmez.",
       redirectsNote:

@@ -3429,6 +3429,7 @@ export const en = {
       tabs: { errors: "Broken links", redirects: "Redirects" },
       empty: { errors: "No broken links in this period", redirects: "No redirects were followed" },
       noReferrer: "Typed or external",
+      createRedirectFor: "Create a redirect for {path}",
       createRedirect: "Create redirect…",
       note: "Includes every error, cached or not. Requested paths are what visitors asked for: they are shown, never linked.",
       redirectsNote: "Old addresses that still bring visitors, for example after a slug change.",

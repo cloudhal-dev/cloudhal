@@ -29,6 +29,7 @@ import {
   Table,
   Tabs,
   Text,
+  Tooltip,
   WORKERS_FREE_DAILY_REQUESTS,
 } from "@cloudhal/ui";
 import { AnalyticsTimeseries, CountryMap } from "@cloudhal/ui/charts";
@@ -831,16 +832,31 @@ function ErrorRowView({
       </Table.Cell>
       <Table.Cell sticky="right" className="text-right">
         {row.status === 404 || row.status === 410 ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Signpost />}
-            disabled={!canRedirect}
-            title={redirectReason}
-            onClick={onRedirect}
-          >
-            {t("analytics.errors.createRedirect")}
-          </Button>
+          canRedirect ? (
+            <Tooltip
+              content={t("analytics.errors.createRedirect")}
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  shape="square"
+                  icon={<Signpost />}
+                  aria-label={t("analytics.errors.createRedirectFor", { path: row.path })}
+                  onClick={onRedirect}
+                />
+              }
+            />
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              shape="square"
+              icon={<Signpost />}
+              aria-label={t("analytics.errors.createRedirectFor", { path: row.path })}
+              disabled
+              title={redirectReason}
+            />
+          )
         ) : null}
       </Table.Cell>
     </Table.Row>
