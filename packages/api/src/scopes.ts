@@ -49,6 +49,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", "/api/admin/sites/:siteId/analytics/rollup", "deploy-token"],
   ["GET", "/api/admin/sites/:siteId/analytics/status", "deploy-token"],
   ["GET", "/api/admin/sites/:siteId/analytics/export", "deploy-token"],
+  // RFC-0007 §12, §15.4: `cloudhal comments status|export|import --remote`
+  ["GET", "/api/admin/sites/:siteId/comments/status", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/comments/export", "deploy-token"],
+  ["POST", "/api/admin/sites/:siteId/comments/import", "deploy-token"],
 
   // deployment
   ["GET", "/api/instance", "member"],

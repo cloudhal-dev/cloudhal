@@ -8,7 +8,8 @@ cloudhal build [--snapshot <id>]                        static HTML from the pub
 cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp) for this project
 cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                         MCP server over stdio for this project
-cloudhal deploy [--name <base>] [--dry-run]             site + admin Workers on Cloudflare
+cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu]
+                                                        site + admin Workers on Cloudflare
 cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
 cloudhal push [--replace] [--admin-url <url>]           local site → deployment
 cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
@@ -20,7 +21,53 @@ cloudhal analytics rollup [--days <n>] [--remote] [--redo]
 cloudhal analytics seed [--days <n>] [--views <n>]      demo traffic, local SQLite only
 cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
                                                         daily totals as CSV
+cloudhal comments status [--remote]                     reader comments (RFC-0007): counts, daily cap, purges
+cloudhal comments export [--remote] [--with-personal-data --out <file>]
+                                                        comments as JSON lines
+cloudhal comments import --in <file> [--remote]         idempotent; safe to run again
 ```
+
+### Reader comments (RFC-0007)
+
+Setup, moderation, agents, spam protection, privacy, erasure and a ready-made privacy paragraph (English and Turkish): [reader comments](../../docs/guides/comments.md).
+
+Comments are **available** on a deployment unless `cloudhal.json` says otherwise, and **off for every site** until someone turns them on in Studio. A deploy never adds a comment form by surprise.
+
+**`cloudhal.json` → `comments`:**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `available` | `true` (also when the block is missing) | `false` removes comments from the deployment: no endpoints, no script, no hourly comments work. `cloudhal init` writes `{ "available": true }`. |
+| `rateLimit` | `false` | `true` or `{ "limit": 10, "namespaceId": "…" }`: a Workers Rate Limiting binding (`COMMENTS_RL`) on the site Worker that limits submissions per client across isolates (`limit` per 60 s, default 10; the namespace id is derived from the deployment name unless set). On top of the per-isolate and D1 limits, which work without it. |
+
+**On Cloudflare.** `cloudhal deploy`:
+- generates `CLOUDHAL_COMMENTS_KEY` once into `.cloudhal/deploy/secrets.json` (0600) and gives it to **both** Workers through `--secrets-file`; it is never printed or written into a config. Losing it makes stored emails and the Turnstile secret unreadable;
+- sets `CLOUDHAL_COMMENTS_AVAILABLE` on the admin Worker;
+- keeps the hourly cron trigger (`17 * * * *`) for comments even when analytics are off. Without a free cron slot the admin Worker goes without it (`CLOUDHAL_COMMENTS_CRON=off`) and runs the comments job after requests, at most hourly;
+- sets `CLOUDHAL_SITE_HOSTS` for a custom domain and, with `comments.rateLimit`, adds `COMMENTS_RL`;
+- purges the site's cache once when availability changes.
+
+The migration `0016_comments` runs on the admin Worker's first request. Existing deployments get comments on their next deploy, still off for every site.
+
+**Data location.** A D1 database's jurisdiction is chosen when it is created and cannot be changed:
+- the first `cloudhal deploy` in a terminal asks "Automatic" or "EU jurisdiction";
+- `--jurisdiction eu` decides in advance (CI);
+- a non-interactive first deploy without the flag uses the automatic location and says how to choose;
+- once the database exists the flag changes nothing, and the deploy says so;
+- to move, export the comments, deploy under a new `--name` with `--jurisdiction eu`, and import.
+
+**Commands:**
+- `cloudhal comments status [--remote]`: whether comments are available and the key is there, the site's switch, collections and protection, counts by status, the oldest pending comment, today's stored submissions against the daily cap, and the purge queue with the purge requests of the last minute (Workers Cache allows 5).
+- `cloudhal comments export [--remote] [--with-personal-data --out <file>]`: JSON lines (a header, then one `Comment` per line, oldest first) to stdout or `--out`. `--with-personal-data` appends commenter lines with their email and needs `--out`, which is then written owner-only.
+- `cloudhal comments import --in <file> [--remote]`: idempotent by id and by importer origin, in batches of 50 lines.
+  - Each record must name an article of the target site, so push the site first.
+  - The site comes from the target, statuses are kept, and emails are encrypted again under the target's key.
+  - Replies whose parent arrives later are retried once.
+  - Refused lines are listed with their line number, and the command exits 1.
+
+`--remote` uses the deployment token and the operator routes `/api/admin/sites/:siteId/comments/status|export|import`; each call is audited as the operator.
+
+**Locally.** `cloudhal dev` takes comments on the project's SQLite. The key is `CLOUDHAL_COMMENTS_KEY` from the environment, or `.cloudhal/comments.key` (random, created on first use, 0600). `cloudhal studio` and `cloudhal mcp` use the same store. Node has no cron, so they run the hourly comments job (retention, comments of deleted articles, threads closed by time, old salts) at start and every hour, and empty the local purge queue (there is no edge cache).
 
 ### Site analytics (RFC-0006)
 

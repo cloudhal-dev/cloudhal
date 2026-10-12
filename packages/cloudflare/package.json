@@ -12,7 +12,8 @@
   "exports": {
     "./admin": "./src/admin-worker.ts",
     "./workerd-prelude": "./src/workerd-prelude.ts",
-    "./purge": "./src/purge.ts"
+    "./purge": "./src/purge.ts",
+    "./comments": "./src/comments.ts"
   },
   "files": [
     "dist",
@@ -56,6 +57,10 @@
       "./purge": {
         "types": "./dist/src/purge.d.ts",
         "default": "./dist/src/purge.js"
+      },
+      "./comments": {
+        "types": "./dist/src/comments.d.ts",
+        "default": "./dist/src/comments.js"
       }
     }
   }

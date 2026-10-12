@@ -8,7 +8,7 @@ import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
-import { localComments } from "./comments-local.ts";
+import { localComments, startLocalCommentsJob } from "./comments-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
 export interface StudioOptions {
@@ -18,6 +18,8 @@ export interface StudioOptions {
   readonly studioDist?: string;
   /** Skip authentication (local scripts only). */
   readonly noAuth?: boolean;
+  /** `false` skips the hourly comments job (tests). */
+  readonly commentsJob?: boolean;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -53,11 +55,15 @@ export async function studio(
   const stopRollups = analytics.feature().enabled
     ? startLocalRollups(analytics, local, cfg.analytics)
     : () => {};
+  // RFC-0007 §12: the comment routes on the project's SQLite; Node has no cron, so the hourly
+  // comments job (retention, threads closed by time, old salts) runs on a timer while Studio runs.
+  const comments = await localComments(local.sql, local.dataDir);
+  const stopCommentsJob =
+    options.commentsJob === false ? () => {} : startLocalCommentsJob(local.store, comments.store);
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,
-    // RFC-0007 §12: the comment routes on the project's SQLite.
-    comments: await localComments(local.sql, local.dataDir),
+    comments,
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [
@@ -110,6 +116,7 @@ export async function studio(
     url: `http://localhost:${port}/`,
     stop: async () => {
       stopRollups();
+      stopCommentsJob();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await local.close();
     },
