@@ -33,6 +33,7 @@ describe("migrate", () => {
       "0013_media",
       "0014_analytics",
       "0015_analytics_privacy_signal",
+      "0016_comments",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -51,6 +52,7 @@ describe("migrate", () => {
       "0013_media",
       "0014_analytics",
       "0015_analytics_privacy_signal",
+      "0016_comments",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -69,6 +71,17 @@ describe("migrate", () => {
       "approvals",
       "asset_refs",
       "audit",
+      "cache_purge_log",
+      "comment_bans",
+      "comment_events",
+      "comment_purge_queue",
+      "comment_reports",
+      "comment_salts",
+      "comment_secrets",
+      "comment_settings",
+      "comment_threads",
+      "commenter_emails",
+      "comments",
       "invitation",
       "media_blobs",
       "media_uploads",
@@ -107,6 +120,7 @@ describe("migrate", () => {
       "0013_media",
       "0014_analytics",
       "0015_analytics_privacy_signal",
+      "0016_comments",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -124,6 +138,7 @@ describe("migrate", () => {
       "0013_media",
       "0014_analytics",
       "0015_analytics_privacy_signal",
+      "0016_comments",
     ]);
     await h.dispose();
   });
@@ -148,6 +163,7 @@ describe("migrate", () => {
       "0013_media",
       "0014_analytics",
       "0015_analytics_privacy_signal",
+      "0016_comments",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

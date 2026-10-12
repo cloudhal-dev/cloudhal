@@ -68,6 +68,7 @@ packages/storage          SqlDriver/BlobStore interfaces; better-sqlite3, D1, fs
 packages/core-ts          Site Graph store: CAS, snapshots, diff, publish, rollback
 packages/astro-renderer   Astro 7 integration, live/snapshot data sources, section components
 packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
+packages/comments         reader comments (RFC-0007): rules, proof of work, submission pipeline, SQLite/D1 store
 packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull / analytics
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
