@@ -940,10 +940,10 @@ All 37 golden statements were run against the deployed dataset through the Analy
 5. **Site Worker and renderer — done.** The vitals module is ≈ 3.6 KB gzipped, more than §5.1's estimate; the page-view script is within its 1 KB budget.
 6. **Admin Worker — done** (`scheduled`, `features.analytics`, on-read rollups without a cron).
 7. **Policy and API — done.**
-8. **MCP — done.** `get_analytics` has no cache-hit ratio.
-9. **CLI — done.** The Rate Limiting binding is not wired.
-10. **Studio — done** in three parts (screen; settings section and "Allow analytics" on older keys; Readers card, overview card and Kumo locale). Left: the Articles list's "Views · 30 days" column (§10.2), the bot-traffic banner and cache-hit ratio (§10.1), the GPC/DNT share; Kumo 2.14's locale gaps (the map legend, the calendar, "Timezone" and "Reset Dates" stay English); the bundle growth of the eagerly loaded chunks (about 115 kB and 120 kB minified, step 10 notes).
-11. **Docs and security — done** (this section). Open: the four review items above.
+8. **MCP — done.** `get_analytics` has no cache-hit ratio. *Since built: the estimated ratio and the GPC/DNT share (leftovers notes below).*
+9. **CLI — done.** The Rate Limiting binding is not wired. *Since built (`analytics.rateLimit`, leftovers notes below).*
+10. **Studio — done** in three parts (screen; settings section and "Allow analytics" on older keys; Readers card, overview card and Kumo locale). Left: the Articles list's "Views · 30 days" column (§10.2), the bot-traffic banner and cache-hit ratio (§10.1), the GPC/DNT share (*since built, except the bot-traffic banner*); Kumo 2.14's locale gaps (the map legend, the calendar, "Timezone" and "Reset Dates" stay English); the bundle growth of the eagerly loaded chunks (about 115 kB and 120 kB minified, step 10 notes).
+11. **Docs and security — done** (this section). Open: the four review items above. *Since then items 1–3 are fixed (review fixes below); item 4 (nothing calls `deleteSiteAnalytics`) stays open. The threat model lists each item's status.*
 
 ## Implementation notes (leftovers: Rate Limiting binding, cache-hit ratio, GPC/DNT share)
 The three leftovers named in the step 2–4, 5 and 6–9 notes above.
