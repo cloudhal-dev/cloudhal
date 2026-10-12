@@ -1,0 +1,10 @@
+{
+  "task": "Publish the draft 'Agents and taxonomies' about AI agents on a site whose category taxonomy is required.",
+  "expect": {
+    "vocabularyReadFirst": ["list_taxonomies", "list_terms"],
+    "primaryCategorySet": true,
+    "categoryProposed": false,
+    "statusAfter": "published",
+    "publishRequestedApproval": true
+  }
+}

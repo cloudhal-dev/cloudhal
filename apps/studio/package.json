@@ -1,0 +1,41 @@
+{
+  "name": "@cloudhal/studio",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudhal Studio \u2014 the admin UI (Vite + React SPA on Kumo)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/ui": "workspace:*",
+    "@phosphor-icons/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "better-auth": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "happy-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "redir_01HZX8K3Q9R3",
+  "siteId": "site_01HZX8K3Q9EF",
+  "from": "/tag/llms",
+  "to": "/tag/llm",
+  "status": 301,
+  "match": "prefix",
+  "reason": "merge",
+  "source": {
+    "kind": "term",
+    "id": "term_01HZX8K3Q9MG"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-08T10:00:00Z",
+  "updatedAt": "2026-10-08T10:00:00Z"
+}

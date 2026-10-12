@@ -1,0 +1,84 @@
+{
+  "name": "@cloudhal/storage",
+  "version": "0.0.1",
+  "description": "Cloudhal storage interfaces (SQL driver, blob store) with Cloudflare D1/R2 and local SQLite/filesystem adapters",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/storage"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sqlite": "./src/sql/better-sqlite3.ts",
+    "./d1": "./src/sql/d1.ts",
+    "./r2": "./src/blob/r2.ts",
+    "./fs": "./src/blob/fs.ts",
+    "./testing": "./src/testing.ts",
+    "./migrations/*": "./migrations/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "miniflare": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./sqlite": {
+        "types": "./dist/src/sql/better-sqlite3.d.ts",
+        "default": "./dist/src/sql/better-sqlite3.js"
+      },
+      "./d1": {
+        "types": "./dist/src/sql/d1.d.ts",
+        "default": "./dist/src/sql/d1.js"
+      },
+      "./r2": {
+        "types": "./dist/src/blob/r2.d.ts",
+        "default": "./dist/src/blob/r2.js"
+      },
+      "./fs": {
+        "types": "./dist/src/blob/fs.d.ts",
+        "default": "./dist/src/blob/fs.js"
+      },
+      "./testing": {
+        "types": "./dist/src/testing.d.ts",
+        "default": "./dist/src/testing.js"
+      },
+      "./migrations/*": "./dist/migrations/*"
+    }
+  }
+}

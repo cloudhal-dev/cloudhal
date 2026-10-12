@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "entry_01HZX8K3Q9MD",
+  "siteId": "site_01HZX8K3Q9EF",
+  "collection": "posts",
+  "slug": "ferries-at-dawn",
+  "locale": "en",
+  "status": "review",
+  "title": "Ferries at dawn",
+  "summary": "How the newsroom agent researched and drafted this piece.",
+  "body": {
+    "format": "markdown",
+    "value": "![](asset:asset_01HZX8K3Q9PH)\n\nThe [hourly data](asset:asset_01HZX8K3Q9DS) is on Zenodo."
+  },
+  "fields": {
+    "readingMinutes": 4,
+    "category": "product",
+    "featured": true
+  },
+  "tags": [],
+  "author": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9YZ",
+    "name": "Newsroom Agent"
+  },
+  "coverImage": {
+    "assetId": "asset_01HZX8K3Q9PH",
+    "src": "/media/9f2c4e1a7b3d5f60/bosphorus-at-dawn.jpg",
+    "alt": "",
+    "width": 3000,
+    "height": 2000
+  },
+  "rev": 2,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z"
+}

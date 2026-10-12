@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "asset_01HZX8K3Q9HF",
+  "siteId": "site_01HZX8K3Q9EF",
+  "kind": "other",
+  "mediaType": "application/octet-stream",
+  "bytes": 438000000,
+  "sha256": "3b8e2f1c0d9a7b6e5f4c3d2a1b0e9f8c7d6e5a4b3c2d1e0f9a8b7c6d5e4f3a2b",
+  "slug": "model-weights",
+  "storage": {
+    "kind": "external",
+    "url": "https://huggingface.co/example-lab/tiny-model/resolve/main/model.safetensors",
+    "landingPage": "https://huggingface.co/example-lab/tiny-model",
+    "checksum": "computed",
+    "verifiedAt": "2026-10-08T12:00:00Z"
+  },
+  "title": {
+    "en": "Model weights (safetensors)"
+  },
+  "license": {
+    "kind": "url",
+    "url": "https://example.org/licenses/research-only",
+    "name": "Research-only licence"
+  },
+  "status": "active",
+  "uploadedBy": {
+    "kind": "human",
+    "id": "user_01HZX8K3Q9HU",
+    "name": "Halil"
+  },
+  "source": {
+    "kind": "link"
+  },
+  "metadata": {
+    "cloudhal.note": "verified with cloudhal media verify"
+  },
+  "rev": 1,
+  "createdAt": "2026-10-08T12:00:00Z",
+  "updatedAt": "2026-10-08T12:05:00Z"
+}

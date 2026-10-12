@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cloudhal Studio</title>
+    <script>
+      // Follow the OS colour scheme before first paint; Kumo switches themes on data-mode (DESIGN.md §4).
+      (() => {
+        const dark = window.matchMedia("(prefers-color-scheme: dark)");
+        const apply = () => {
+          document.documentElement.dataset.mode = dark.matches ? "dark" : "light";
+        };
+        apply();
+        dark.addEventListener("change", apply);
+      })();
+    </script>
+  </head>
+  <body class="bg-kumo-canvas text-kumo-default">
+    <div id="root" class="isolate min-h-screen bg-kumo-canvas"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

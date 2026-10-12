@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "cmt_01HZX8K3Q9AC",
+  "siteId": "site_01HZX8K3Q9ST",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "source": "native",
+  "author": {
+    "kind": "staff",
+    "personId": "user_01HZX8K3Q9HU",
+    "name": "Halil",
+    "badge": "author",
+    "draftedBy": {
+      "kind": "agent",
+      "id": "agent_01HZX8K3Q9YZ",
+      "name": "Comment triage"
+    }
+  },
+  "body": {
+    "format": "text",
+    "text": "Yes, the 07:40 runs every day. Details: https://example.org/ferries"
+  },
+  "status": "approved",
+  "createdAt": "2026-10-12T09:30:00Z",
+  "rev": 1,
+  "parentId": "cmt_01HZX8K3Q9AB",
+  "moderation": {
+    "action": "approve",
+    "actor": {
+      "kind": "human",
+      "id": "user_01HZX8K3Q9HU",
+      "name": "Halil"
+    },
+    "at": "2026-10-12T09:30:00Z",
+    "automated": false
+  }
+}

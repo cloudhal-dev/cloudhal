@@ -1,0 +1,185 @@
+{
+  "name": "@cloudhal/astro-renderer",
+  "version": "0.0.1",
+  "description": "Render a Cloudhal Site Graph with Astro: data sources (live/snapshot), section components and the cloudhal() integration",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/astro-renderer"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./source": "./src/source.ts",
+    "./routing": "./src/routing.ts",
+    "./seo": "./src/seo.ts",
+    "./feeds": "./src/feeds.ts",
+    "./taxonomy": "./src/taxonomy.ts",
+    "./archive": "./src/archive.ts",
+    "./cache-tags": "./src/cache-tags.ts",
+    "./navigation": "./src/navigation.ts",
+    "./integration": "./src/integration.ts",
+    "./components": "./src/components/index.ts",
+    "./components/*": "./src/components/*",
+    "./runtime": {
+      "workerd": "./src/runtime-workerd.ts",
+      "default": "./src/runtime.ts"
+    },
+    "./preview": "./src/preview.ts",
+    "./resolver": "./src/resolver.ts",
+    "./markdown": "./src/markdown.ts",
+    "./cloudflare-entry": "./src/cloudflare-entry.ts",
+    "./media": "./src/media.ts",
+    "./media-route": "./src/media-route.ts",
+    "./media-middleware": "./src/media-middleware.ts",
+    "./analytics": "./src/analytics.ts",
+    "./analytics-middleware": "./src/analytics-middleware.ts",
+    "./comments": "./src/comments-view.ts",
+    "./comments-middleware": "./src/comments-middleware.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "marked": "catalog:",
+    "@cloudhal/analytics": "workspace:*",
+    "vite": "catalog:",
+    "@cloudhal/comments": "workspace:*"
+  },
+  "peerDependencies": {
+    "astro": "^7.3.0",
+    "@astrojs/cloudflare": "^14.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "astro": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@astrojs/cloudflare": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@astrojs/cloudflare": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./source": {
+        "types": "./dist/src/source.d.ts",
+        "default": "./dist/src/source.js"
+      },
+      "./routing": {
+        "types": "./dist/src/routing.d.ts",
+        "default": "./dist/src/routing.js"
+      },
+      "./seo": {
+        "types": "./dist/src/seo.d.ts",
+        "default": "./dist/src/seo.js"
+      },
+      "./feeds": {
+        "types": "./dist/src/feeds.d.ts",
+        "default": "./dist/src/feeds.js"
+      },
+      "./taxonomy": {
+        "types": "./dist/src/taxonomy.d.ts",
+        "default": "./dist/src/taxonomy.js"
+      },
+      "./archive": {
+        "types": "./dist/src/archive.d.ts",
+        "default": "./dist/src/archive.js"
+      },
+      "./cache-tags": {
+        "types": "./dist/src/cache-tags.d.ts",
+        "default": "./dist/src/cache-tags.js"
+      },
+      "./navigation": {
+        "types": "./dist/src/navigation.d.ts",
+        "default": "./dist/src/navigation.js"
+      },
+      "./integration": {
+        "types": "./dist/src/integration.d.ts",
+        "default": "./dist/src/integration.js"
+      },
+      "./components": {
+        "types": "./dist/src/components/index.d.ts",
+        "default": "./dist/src/components/index.js"
+      },
+      "./components/*": "./dist/src/components/*",
+      "./runtime": {
+        "workerd": {
+          "types": "./dist/src/runtime-workerd.d.ts",
+          "default": "./dist/src/runtime-workerd.js"
+        },
+        "default": {
+          "types": "./dist/src/runtime.d.ts",
+          "default": "./dist/src/runtime.js"
+        }
+      },
+      "./preview": {
+        "types": "./dist/src/preview.d.ts",
+        "default": "./dist/src/preview.js"
+      },
+      "./resolver": {
+        "types": "./dist/src/resolver.d.ts",
+        "default": "./dist/src/resolver.js"
+      },
+      "./markdown": {
+        "types": "./dist/src/markdown.d.ts",
+        "default": "./dist/src/markdown.js"
+      },
+      "./cloudflare-entry": {
+        "types": "./dist/src/cloudflare-entry.d.ts",
+        "default": "./dist/src/cloudflare-entry.js"
+      },
+      "./media": {
+        "types": "./dist/src/media.d.ts",
+        "default": "./dist/src/media.js"
+      },
+      "./media-route": {
+        "types": "./dist/src/media-route.d.ts",
+        "default": "./dist/src/media-route.js"
+      },
+      "./media-middleware": {
+        "types": "./dist/src/media-middleware.d.ts",
+        "default": "./dist/src/media-middleware.js"
+      },
+      "./analytics": {
+        "types": "./dist/src/analytics.d.ts",
+        "default": "./dist/src/analytics.js"
+      },
+      "./analytics-middleware": {
+        "types": "./dist/src/analytics-middleware.d.ts",
+        "default": "./dist/src/analytics-middleware.js"
+      },
+      "./comments": {
+        "types": "./dist/src/comments-view.d.ts",
+        "default": "./dist/src/comments-view.js"
+      },
+      "./comments-middleware": {
+        "types": "./dist/src/comments-middleware.d.ts",
+        "default": "./dist/src/comments-middleware.js"
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "task": "Change the About page title to 'About us' and mention that the newsletter is weekly.",
+  "expect": { "snapshots": 2, "statusUnchanged": true, "previewCalled": true }
+}

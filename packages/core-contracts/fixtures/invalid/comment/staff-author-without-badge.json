@@ -1,0 +1,22 @@
+{
+  "reason": "Staff replies say whether the article's author or the team wrote them",
+  "data": {
+    "schemaVersion": 1,
+    "id": "cmt_01HZX8K3Q9AA",
+    "siteId": "site_01HZX8K3Q9ST",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "source": "native",
+    "author": {
+      "kind": "staff",
+      "personId": "user_01HZX8K3Q9HU",
+      "name": "Halil"
+    },
+    "body": {
+      "format": "text",
+      "text": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?"
+    },
+    "status": "pending",
+    "createdAt": "2026-10-12T08:14:03Z",
+    "rev": 0
+  }
+}

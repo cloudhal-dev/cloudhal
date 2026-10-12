@@ -2,7 +2,7 @@
   "name": "cloudhal-monorepo",
   "private": true,
   "version": "0.0.0",
-  "description": "Cloudhal \u2014 the open-source, agent-native site platform (monorepo root)",
+  "description": "Cloudhal — the open-source, agent-native site platform (monorepo root)",
   "license": "Apache-2.0",
   "packageManager": "pnpm@12.10.1",
   "engines": {
@@ -10,9 +10,12 @@
   },
   "type": "module",
   "scripts": {
-    "check": "turbo run check",
+    "check": "biome check . && turbo run typecheck && turbo run test --concurrency=3",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "design:lint": "node apps/studio/scripts/design-lint.ts",
+    "design:shots": "node apps/studio/scripts/screenshots.ts",
+    "kumo": "pnpm --filter @cloudhal/ui exec kumo",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "gen": "turbo run gen:ts gen:rs",
@@ -20,8 +23,10 @@
     "cargo:test": "cargo test --workspace --locked",
     "cargo:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
     "changeset": "changeset",
-    "release": "changeset publish",
-    "gen:ts": "turbo run gen:ts"
+    "release": "pnpm build:packages && changeset publish",
+    "gen:ts": "turbo run gen:ts",
+    "build:packages": "node scripts/build-packages.ts",
+    "smoke:pack": "node scripts/smoke-pack.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

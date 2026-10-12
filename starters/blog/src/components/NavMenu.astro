@@ -1,0 +1,35 @@
+---
+/**
+ * An item with children as a disclosure (`<details>`, no JavaScript): the item's link (or a group's
+ * label) as the summary, its children below. Renders up to three levels; deeper items are left out
+ * (the menu's `maxDepth` is data, the theme decides what it shows). The active trail starts open.
+ */
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import NavLink from "./NavLink.astro";
+
+interface Props {
+  item: ActiveNavItem;
+  on: string;
+  off: string;
+  /** 1 for a top-level item. */
+  level?: number;
+}
+const { item, on, off, level = 1 } = Astro.props;
+const MAX_LEVEL = 3;
+---
+<details class="ch-nav-menu" open={item.inTrail && level > 1 ? true : undefined}>
+  <summary class={item.current || item.inTrail ? on : off}>
+    {item.href ? <NavLink item={item} on={on} off={off} /> : <span>{item.label}</span>}
+  </summary>
+  <ul>
+    {item.children.map((child) => (
+      <li>
+        {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
+          <Astro.self item={child} on={on} off={off} level={level + 1} />
+        ) : (
+          <NavLink item={child} on={on} off={off} />
+        )}
+      </li>
+    ))}
+  </ul>
+</details>

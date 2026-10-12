@@ -92,12 +92,16 @@ export interface HeroSection {
   cta?: Link;
 }
 /**
- * Reference to a media asset. src may be a relative asset path or an absolute URL.
+ * Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.
  *
  * This interface was referenced by `Page`'s JSON-Schema
  * via the `definition` "ImageRef".
  */
 export interface ImageRef {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  assetId?: string;
   src: string;
   alt: string;
   width?: number;
@@ -133,8 +137,14 @@ export interface ContentListSection {
   collection: Slug;
   limit: number;
   sort: "newest" | "oldest" | "title";
+  /**
+   * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
+   */
+  filter?: string;
 }
 /**
+ * Search and social metadata of a routable node (page, term archive).
+ *
  * This interface was referenced by `Page`'s JSON-Schema
  * via the `definition` "Seo".
  */
@@ -143,6 +153,7 @@ export interface Seo {
   description?: string;
   noindex?: boolean;
   canonical?: string;
+  ogImage?: ImageRef;
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

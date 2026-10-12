@@ -1,0 +1,87 @@
+{
+  "name": "@cloudhal/api",
+  "version": "0.0.1",
+  "description": "Cloudhal HTTP API (Hono): sites, pages, entries, snapshots, auth — runs on Node and Cloudflare Workers",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/api"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts",
+    "./auth": "./src/auth.ts",
+    "./auth/node": "./src/auth-node.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/analytics": "workspace:*",
+    "@cloudhal/comments": "workspace:*",
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "hono": "catalog:",
+    "better-auth": "catalog:",
+    "@better-auth/api-key": "catalog:",
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/astro-renderer": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hono/node-server": "^2.0.0",
+    "better-sqlite3": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@hono/node-server": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hono/node-server": "catalog:",
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "miniflare": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@modelcontextprotocol/client": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./node": {
+        "types": "./dist/src/node.d.ts",
+        "default": "./dist/src/node.js"
+      },
+      "./auth": {
+        "types": "./dist/src/auth.d.ts",
+        "default": "./dist/src/auth.js"
+      },
+      "./auth/node": {
+        "types": "./dist/src/auth-node.d.ts",
+        "default": "./dist/src/auth-node.js"
+      }
+    }
+  }
+}

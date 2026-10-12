@@ -1,0 +1,37 @@
+# @cloudhal/astro-renderer
+
+Renders a Cloudhal Site Graph with Astro 7. Three pieces:
+
+| Export | What |
+|---|---|
+| `@cloudhal/astro-renderer/integration` | `cloudhal({ dataDir, siteId })` — exposes the project config as `virtual:cloudhal/config`, externalises the native SQLite module, and in dev watches the data directory to clear Astro's route cache when pages are added (Astro ≥6.3 caches `getStaticPaths()` across requests). |
+| `@cloudhal/astro-renderer/runtime` | `getSource(config)` — a `GraphSource`: **live** nodes in dev (drafts visible), a **snapshot** in builds (`CLOUDHAL_SOURCE=snapshot:<id>`). |
+| `@cloudhal/astro-renderer/components` | `Sections` dispatcher + `Hero`, `RichText`, `Image`, `ContentList` `.astro` components. Themes override any of them through the `components` prop. |
+
+A page route in a starter looks like this:
+
+```astro
+---
+import { Sections } from "@cloudhal/astro-renderer/components";
+import { getSource } from "@cloudhal/astro-renderer/runtime";
+import config from "virtual:cloudhal/config";
+export async function getStaticPaths() {
+  const source = await getSource(config);
+  return (await source.pages()).map((p) => ({ params: { path: p.path === "/" ? undefined : p.path.slice(1) } }));
+}
+const source = await getSource(config);
+const page = await source.pageByPath(Astro.params.path ? `/${Astro.params.path}` : "/");
+---
+<Sections sections={page.sections} />
+```
+
+`.astro` files ship as source (no build step); the consumer's Astro compiles them. `astro` is a peer dependency.
+
+## Site analytics (RFC-0006)
+
+The renderer carries the site side of Cloudhal's cookie-less analytics (`@cloudhal/analytics`):
+
+- **Scripts.** On a Site Worker build (`target: "cloudflare"`) the `cloudhal()` integration bundles `@cloudhal/analytics/client` with Astro's Vite into two hashed static assets, `/_cloudhal/p.<hash>.js` (the page-view script, ≤ 1 KB gzipped, held there by a test) and `/_cloudhal/v.<hash>.js` (vitals, `web-vitals`, loaded by one page view in N). No cookies, no storage, no identifiers, nothing third-party; the CSP stays `script-src 'self'; connect-src 'self'`.
+- **Site Worker** (`cloudflare-entry.ts`, `analytics.ts`). `POST /__cloudhal/e` answers `204` for every outcome (`405` for other methods) and writes one event through `WaeWriter(env.ANALYTICS)`; published HTML `200`s get `<script type="module" src="/_cloudhal/p.<hash>.js" data-v="N">` in `<head>` while the site's setting is on (never previews, errors or feeds); responses the Worker renders become `render` events (published HTML `200`s, redirects, `404`, `410`, `451`, `5xx`). A purge re-reads the settings.
+- **What the Site Worker expects** (written by `cloudhal deploy` in rollout step 9): the Analytics Engine binding `ANALYTICS` (dataset `<deployment>_events`), `CLOUDHAL_ANALYTICS = "on"`, `CLOUDHAL_ANALYTICS_DEFAULTS` (`cloudhal.json`'s `analytics` block as JSON; `enabled` defaults to `true`), migration `0014_analytics` in D1 (until it has run, analytics count as off), and optionally `CLOUDHAL_SITE_HOSTS` (extra hostnames; `Site.domains` and `*.workers.dev` request hosts are accepted already). Without the switch or the binding nothing is collected and no tag is added.
+- **`cloudhal dev`** (`analytics-middleware.ts`, `analytics-node.ts`). The same endpoint; it records into the local SQLite store (`analytics_events`) only with `analytics.dev: true` (the integration's `analytics` option, which the blog starter passes from `cloudhal.json`, or `CLOUDHAL_ANALYTICS`, `CLOUDHAL_ANALYTICS_DEFAULTS` and `CLOUDHAL_ANALYTICS_DEV=1` in the environment), and then serves the scripts and injects the tag. Static builds carry no analytics.

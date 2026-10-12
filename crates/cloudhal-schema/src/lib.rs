@@ -6,13 +6,22 @@
 
 pub mod generated;
 
+pub use generated::analytics_beacon::AnalyticsBeacon;
+pub use generated::analytics_event::AnalyticsEvent;
+pub use generated::asset::Asset;
+pub use generated::comment::Comment;
+pub use generated::comment_submission::CommentSubmission;
 pub use generated::content_entry::ContentEntry;
+pub use generated::menu::Menu;
 pub use generated::page::Page;
 pub use generated::project::Project;
+pub use generated::redirect::Redirect;
 pub use generated::section::Section;
 pub use generated::site::Site;
 pub use generated::skill_manifest::SkillManifest;
 pub use generated::snapshot::Snapshot;
+pub use generated::taxonomy::Taxonomy;
+pub use generated::term::Term;
 
 /// Current contract version. Every root document carries `schemaVersion` equal to this.
 pub const CONTRACT_SCHEMA_VERSION: u64 = 1;

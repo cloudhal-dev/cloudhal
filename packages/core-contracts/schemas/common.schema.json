@@ -60,10 +60,14 @@
     },
     "ImageRef": {
       "type": "object",
-      "description": "Reference to a media asset. src may be a relative asset path or an absolute URL.",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
       "additionalProperties": false,
       "required": ["src", "alt"],
       "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
         "src": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "alt": { "type": "string", "maxLength": 500 },
         "width": { "type": "integer", "minimum": 1 },
@@ -78,6 +82,24 @@
         "label": { "type": "string", "minLength": 1, "maxLength": 200 },
         "href": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "external": { "type": "boolean" }
+      }
+    },
+    "Path": {
+      "type": "string",
+      "description": "Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
+    },
+    "Seo": {
+      "type": "object",
+      "description": "Search and social metadata of a routable node (page, term archive).",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 500 },
+        "noindex": { "type": "boolean" },
+        "canonical": { "type": "string", "maxLength": 2048 },
+        "ogImage": { "$ref": "#/$defs/ImageRef" }
       }
     },
     "PublishStatus": {

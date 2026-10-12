@@ -1,0 +1,204 @@
+---
+/**
+ * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
+ * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
+ * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
+ * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
+ * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
+ * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
+ */
+import config from "virtual:cloudhal/config";
+import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
+import {
+  addCacheTags,
+  listCacheTag,
+  nodeCacheTag,
+  termCacheTag,
+} from "@cloudhal/astro-renderer/cache-tags";
+import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
+import { Comments, Sections } from "@cloudhal/astro-renderer/components";
+import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
+import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
+import {
+  type ActiveRoute,
+  activeItem,
+  derivedNavigation,
+  markActive,
+  markCurrent,
+  navigationCacheTags,
+} from "@cloudhal/astro-renderer/navigation";
+import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
+import { getSource } from "@cloudhal/astro-renderer/runtime";
+import { archiveHead, entryHead, pageHead, siteOrigin } from "@cloudhal/astro-renderer/seo";
+import {
+  entryTaxonomy,
+  loadTaxonomyIndex,
+  relatedEntries,
+  termAncestors,
+} from "@cloudhal/astro-renderer/taxonomy";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import Archive from "../components/Archive.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import PostTerms from "../components/PostTerms.astro";
+import RelatedPosts from "../components/RelatedPosts.astro";
+import Base from "../layouts/Base.astro";
+import {
+  ARCHIVE_PAGE_SIZE,
+  collectionIndex,
+  components,
+  NAV_CATEGORIES,
+  RELATED_POSTS,
+  strings,
+} from "../theme.ts";
+
+export async function getStaticPaths() {
+  const source = await getSource(config);
+  const { pages } = await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE });
+  return pages.map((path) => ({
+    params: { path: path === "/" ? undefined : path.slice(1) },
+  }));
+}
+
+const source = await getSource(config, Astro);
+if (!source) return new Response("This site has not been published yet.", { status: 503 });
+const site = await source.site();
+const path = Astro.params.path ? `/${Astro.params.path}` : "/";
+const route = await resolveRoute(source, path, {
+  perPage: ARCHIVE_PAGE_SIZE,
+  search: Astro.url.search,
+});
+if (route.kind === "redirect")
+  return new Response(null, { status: route.status, headers: { location: route.location } });
+if (route.kind === "gone") return new Response(null, { status: 410 });
+if (route.kind === "not-found" || route.kind === "feed") return new Response(null, { status: 404 });
+
+const origin = siteOrigin(site, Astro.url);
+const locale = site.defaultLocale;
+// Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
+// `?comments=<n>` past the last page is a 404.
+const comments =
+  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
+if (comments?.notFound) return new Response(null, { status: 404 });
+// Media (RFC-0004): assets resolve `assetId` and `asset:<id>`; previews never use transformations.
+const media: MediaContext = {
+  assets: await loadAssetIndex(source),
+  locale,
+  defaultLocale: site.defaultLocale,
+  transform: config.media?.transform ?? "none",
+  preview: Astro.response.headers.get("x-cloudhal-mode") === "preview",
+  onMiss: (id) =>
+    console.warn(`cloudhal: ${path} refers to ${id}, which this version does not have`),
+};
+const t = strings(locale);
+const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);
+const primary = await source.navigation("primary", locale, { collectionIndex });
+const footerMenu = await source.navigation("footer", locale, { collectionIndex });
+const derivedCategories = !primary && NAV_CATEGORIES;
+const needsEntries = derivedCategories || (route.kind === "entry" && RELATED_POSTS > 0);
+const all = needsEntries ? await source.allEntries() : [];
+const categories = derivedCategories
+  ? archiveSummaries(
+      index,
+      all.filter((e) => e.status === "published"),
+    ).filter((a) => a.taxonomy.key === "category" && !a.term.parentId)
+  : [];
+// The active item: exact path, longest prefix, then the entry's category or collection.
+const activeRoute: ActiveRoute = {
+  path,
+  ...(route.kind === "entry" ? { entry: route.entry } : {}),
+  ...(route.kind === "archive" ? { archiveTermId: route.archive.term.id } : {}),
+};
+const ancestors = (id: string) => {
+  const term = index.terms.get(id);
+  return term ? termAncestors(index, term).map((a) => a.id) : [];
+};
+const nav = primary
+  ? markActive(primary, activeItem(primary, activeRoute, ancestors))
+  : markCurrent(derivedNavigation(site, await source.pages(), categories, locale), path);
+const footer = footerMenu
+  ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
+  : undefined;
+// Edge-cache tags next to the site tag (published responses on Cloudflare only), so a publish
+// purges only the responses that show what changed (`cache-tags.ts`). The tags a purge must reach
+// come first; the header's categories (names shown on every page) last.
+const tags: string[] = [];
+
+let entries: Record<string, ContentEntry[]> = {};
+let terms = entryTaxonomy(undefined, { tags: [] });
+let related: ContentEntry[] = [];
+if (route.kind === "page") {
+  tags.push(nodeCacheTag(route.page.id));
+  // Lists of the site's entries change with any entry: the site's list tag covers them.
+  if (route.page.sections.some((s) => s.kind === "contentList")) tags.push(listCacheTag(site.id));
+  const collections = [
+    ...new Set(
+      route.page.sections.filter((s) => s.kind === "contentList").map((s) => s.collection),
+    ),
+  ];
+  entries = Object.fromEntries(
+    await Promise.all(collections.map(async (c) => [c, await source.entries(c)])),
+  );
+  // A section with a `filter` (RFC-0002 §5) lists its own entries, keyed by section id.
+  for (const s of route.page.sections)
+    if (s.kind === "contentList" && s.filter)
+      entries[s.id] = await source
+        .entriesByFilter(`collection:${s.collection}+${s.filter}`)
+        .catch((err: unknown) => {
+          console.warn(`cloudhal: section ${s.id} has an invalid filter: ${String(err)}`);
+          return [];
+        });
+} else if (route.kind === "entry") {
+  terms = entryTaxonomy(index, route.entry);
+  related = relatedEntries(route.entry, all, index, RELATED_POSTS);
+  tags.push(
+    nodeCacheTag(route.entry.id),
+    // the related posts it links to: a retitled or removed one purges this page too
+    ...related.map((e) => nodeCacheTag(e.id)),
+    ...terms.groups.flatMap((g) => g.terms.map((s) => termCacheTag(s.id))),
+    ...terms.trail.map((s) => termCacheTag(s.id)),
+  );
+} else {
+  tags.push(
+    // which entries the archive lists (and how many pages it has) changes with its membership
+    listCacheTag(route.archive.term.id),
+    termCacheTag(route.archive.term.id),
+    ...route.archive.trail.map((s) => termCacheTag(s.id)),
+    ...route.archive.entries.map((e) => nodeCacheTag(e.id)),
+  );
+}
+tags.push(
+  ...categories.map((a) => termCacheTag(a.term.id)),
+  ...navigationCacheTags(primary),
+  ...navigationCacheTags(footerMenu),
+);
+addCacheTags(Astro.response.headers, tags);
+
+const meta =
+  route.kind === "page"
+    ? pageHead(site, route.page, origin, media)
+    : route.kind === "entry"
+      ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
+      : archiveHead(site, route.archive, origin, media);
+---
+<Base site={site} meta={meta} nav={nav} footer={footer}>
+  {route.kind === "page" && (
+    <Sections sections={route.page.sections} entries={entries} components={components} media={media} />
+  )}
+  {route.kind === "entry" && (
+    <Fragment>
+      <Breadcrumbs
+        label={t.breadcrumb}
+        items={[
+          { name: t.home, href: "/" },
+          ...terms.trail.map((s) => ({ name: s.name, href: s.href })),
+          { name: route.entry.title },
+        ]}
+      />
+      <Fragment set:html={renderEntryArticle(route.entry, locale, media)} />
+      <PostTerms taxonomy={terms} locale={locale} />
+      <RelatedPosts title={t.related} entries={related} locale={locale} />
+      <Comments view={comments} />
+    </Fragment>
+  )}
+  {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}
+</Base>

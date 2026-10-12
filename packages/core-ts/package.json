@@ -1,0 +1,102 @@
+{
+  "name": "@cloudhal/core-ts",
+  "version": "0.0.1",
+  "description": "Cloudhal Site Graph core (TypeScript): load/save nodes with optimistic locking, snapshots, diff, publish and rollback; taxonomies, terms, redirects and menus",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/core-ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./local": "./src/local.ts",
+    "./filter": "./src/filter.ts",
+    "./names": "./src/names.ts",
+    "./taxonomy-report": "./src/taxonomy-report.ts",
+    "./menu": "./src/menu.ts",
+    "./cache-tags": "./src/cache-tags.ts",
+    "./media": "./src/media/index.ts",
+    "./media-node": "./src/media-node.ts",
+    "./media/fixtures": "./src/media/fixtures.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "marked": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "miniflare": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./local": {
+        "types": "./dist/src/local.d.ts",
+        "default": "./dist/src/local.js"
+      },
+      "./filter": {
+        "types": "./dist/src/filter.d.ts",
+        "default": "./dist/src/filter.js"
+      },
+      "./names": {
+        "types": "./dist/src/names.d.ts",
+        "default": "./dist/src/names.js"
+      },
+      "./taxonomy-report": {
+        "types": "./dist/src/taxonomy-report.d.ts",
+        "default": "./dist/src/taxonomy-report.js"
+      },
+      "./menu": {
+        "types": "./dist/src/menu.d.ts",
+        "default": "./dist/src/menu.js"
+      },
+      "./cache-tags": {
+        "types": "./dist/src/cache-tags.d.ts",
+        "default": "./dist/src/cache-tags.js"
+      },
+      "./media": {
+        "types": "./dist/src/media/index.d.ts",
+        "default": "./dist/src/media/index.js"
+      },
+      "./media-node": {
+        "types": "./dist/src/media-node.d.ts",
+        "default": "./dist/src/media-node.js"
+      },
+      "./media/fixtures": {
+        "types": "./dist/src/media/fixtures.d.ts",
+        "default": "./dist/src/media/fixtures.js"
+      }
+    }
+  }
+}

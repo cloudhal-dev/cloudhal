@@ -1,0 +1,35 @@
+---
+import type { ImageSection } from "@cloudhal/core-contracts";
+import { safeSrc } from "../markdown.ts";
+import { assetCaption, imageAttributes, type MediaContext } from "../media.ts";
+
+interface Props {
+  section: ImageSection;
+  /** Assets of the page's source, transform and locale (RFC-0004 §7.5). */
+  media?: MediaContext;
+}
+const { section, media } = Astro.props;
+// An `assetId` resolves through the source; otherwise (or for a reader without media) `src` is used.
+const asset = section.image.assetId ? media?.assets?.get(section.image.assetId) : undefined;
+const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+const locale = media?.locale ?? defaultLocale;
+const attrs = asset
+  ? imageAttributes(asset, section.image, {
+      locale,
+      defaultLocale,
+      transform: media?.transform ?? "none",
+      sizes: "(min-width: 48rem) 48rem, 100vw",
+      ...(media?.preview ? { preview: true } : {}),
+    })
+  : undefined;
+// Section fields can be written by agents: only safe URL schemes reach the page.
+const src = attrs ? undefined : safeSrc(section.image.src);
+const caption = asset
+  ? assetCaption(asset, locale, defaultLocale, section.caption)
+  : section.caption;
+---
+<figure class="ch-image" data-section-id={section.id} data-kind="image">
+  {attrs && <img src={attrs.src} srcset={attrs.srcset} sizes={attrs.sizes} alt={attrs.alt} width={attrs.width || undefined} height={attrs.height || undefined} loading={attrs.loading} decoding={attrs.decoding} style={attrs.style} />}
+  {src && <img src={src} alt={section.image.alt} width={section.image.width} height={section.image.height} />}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

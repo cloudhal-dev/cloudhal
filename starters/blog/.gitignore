@@ -1,0 +1,6 @@
+dist/
+.astro/
+.cloudhal/
+node_modules/
+cloudhal.json
+.wrangler/

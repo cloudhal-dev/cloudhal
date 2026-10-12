@@ -1,0 +1,30 @@
+{
+  "name": "@cloudhal/starter-blog",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudhal blog starter (Astro). Copied by `cloudhal init`.",
+  "type": "module",
+  "scripts": {
+    "dev": "cloudhal dev",
+    "build": "cloudhal build",
+    "studio": "cloudhal studio",
+    "snapshot": "cloudhal snapshot",
+    "mcp": "cloudhal mcp",
+    "deploy": "cloudhal deploy",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@cloudhal/astro-renderer": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "astro": "catalog:",
+    "better-sqlite3": "catalog:",
+    "tailwindcss": "catalog:",
+    "@astrojs/cloudflare": "catalog:",
+    "@cloudhal/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:",
+    "@cloudhal/cloudflare": "workspace:*"
+  }
+}

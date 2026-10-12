@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "menu_01HZX8K3Q9FT",
+  "siteId": "site_01HZX8K3Q9EF",
+  "key": "footer",
+  "maxDepth": 1,
+  "items": [
+    {
+      "id": "item_01HZX8K3Q9PV",
+      "kind": "page",
+      "pageId": "page_01HZX8K3Q9PV",
+      "labels": {
+        "en": "Privacy"
+      }
+    },
+    {
+      "id": "item_01HZX8K3Q9RS",
+      "kind": "url",
+      "href": "https://status.example.com:8443/feed?format=rss#latest",
+      "labels": {
+        "en": "Status"
+      }
+    },
+    {
+      "id": "item_01HZX8K3Q9MX",
+      "kind": "url",
+      "href": "https://xn--bcher-kva.example/",
+      "labels": {
+        "de": "Bücher"
+      }
+    }
+  ],
+  "rev": 0,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:00:00Z",
+  "metadata": {
+    "cloudhal.createdFrom": "pages"
+  }
+}

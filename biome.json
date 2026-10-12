@@ -1,6 +1,10 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": [
       "**",
@@ -9,7 +13,8 @@
       "!**/dist",
       "!**/target",
       "!**/.turbo",
-      "!**/node_modules"
+      "!**/node_modules",
+      "!apps/studio/src/assets/geo"
     ]
   },
   "formatter": {
@@ -28,7 +33,10 @@
           "options": {
             "paths": {
               "@base-ui/react": "Import UI primitives through @cloudhal/ui, never Base UI directly.",
-              "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui."
+              "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
+              "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
             }
           }
         }
@@ -36,9 +44,65 @@
     }
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
   },
   "json": {
-    "parser": { "allowComments": true, "allowTrailingCommas": false }
-  }
+    "parser": {
+      "allowComments": true,
+      "allowTrailingCommas": false
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@base-ui/react": "Import UI primitives through @cloudhal/ui, never Base UI directly.",
+                  "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
+                  "@cloudflare/kumo": "Apps import Kumo through @cloudhal/ui (one entry point, our blocks included).",
+                  "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/ui/src/blocks/kumo/**"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }

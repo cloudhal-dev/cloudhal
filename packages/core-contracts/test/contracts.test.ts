@@ -61,3 +61,31 @@ for (const name of ROOT_SCHEMAS) {
     });
   });
 }
+
+/**
+ * RFC-0002: the store tells node kinds apart by an explicit `kind` column, and `sync` checks an
+ * untrusted body against the schema of the kind its row claims. That is only sound if no document
+ * is valid under two node schemas, so every node fixture must fail every other node schema.
+ */
+const NODE_SCHEMAS = [
+  "site",
+  "page",
+  "content-entry",
+  "taxonomy",
+  "term",
+  "redirect",
+  "asset",
+  "menu",
+] as const;
+
+describe("node schemas are mutually exclusive", () => {
+  it.each(NODE_SCHEMAS)("valid %s fixtures fail every other node schema", async (own) => {
+    for (const file of await listJson(path.join(FIXTURES, "valid", own))) {
+      const data = JSON.parse(await readFile(path.join(FIXTURES, "valid", own, file), "utf8"));
+      for (const other of NODE_SCHEMAS) {
+        if (other === own) continue;
+        expect(ajv.validate(other, data), `${own}/${file} is also a valid ${other}`).toBe(false);
+      }
+    }
+  });
+});

@@ -1,0 +1,35 @@
+---
+import type { HeroSection } from "@cloudhal/core-contracts";
+import { safeHref, safeSrc } from "../markdown.ts";
+import { imageAttributes, type MediaContext } from "../media.ts";
+
+interface Props {
+  section: HeroSection;
+  /** Assets of the page's source, transform and locale (RFC-0004 §7.5). */
+  media?: MediaContext;
+}
+const { section, media } = Astro.props;
+const asset = section.image?.assetId ? media?.assets?.get(section.image.assetId) : undefined;
+const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+const attrs =
+  asset && section.image
+    ? imageAttributes(asset, section.image, {
+        locale: media?.locale ?? defaultLocale,
+        defaultLocale,
+        transform: media?.transform ?? "none",
+        sizes: "100vw",
+        priority: true,
+        ...(media?.preview ? { preview: true } : {}),
+      })
+    : undefined;
+// Section fields can be written by agents: only safe URL schemes reach the page.
+const imageSrc = !attrs && section.image ? safeSrc(section.image.src) : undefined;
+const ctaHref = section.cta ? safeHref(section.cta.href) : undefined;
+---
+<section class="ch-hero" data-section-id={section.id} data-kind="hero">
+  <h1>{section.heading}</h1>
+  {section.subheading && <p class="ch-hero__sub">{section.subheading}</p>}
+  {attrs && <img src={attrs.src} srcset={attrs.srcset} sizes={attrs.sizes} alt={attrs.alt} width={attrs.width || undefined} height={attrs.height || undefined} loading={attrs.loading} decoding={attrs.decoding} fetchpriority={attrs.fetchpriority} style={attrs.style} />}
+  {section.image && imageSrc && <img src={imageSrc} alt={section.image.alt} width={section.image.width} height={section.image.height} />}
+  {section.cta && ctaHref && <a class="ch-hero__cta" href={ctaHref} rel={section.cta.external ? "noopener noreferrer" : undefined}>{section.cta.label}</a>}
+</section>

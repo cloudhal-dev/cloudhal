@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "menu_01HZX8K3Q9SB",
+  "siteId": "site_01HZX8K3Q9DC",
+  "key": "sidebar",
+  "maxDepth": 6,
+  "items": [
+    {
+      "id": "item_01HZX8K3Q9G1",
+      "kind": "group",
+      "labels": {
+        "en": "Guides"
+      },
+      "children": [
+        {
+          "id": "item_01HZX8K3Q9P1",
+          "kind": "page",
+          "pageId": "page_01HZX8K3Q9P1",
+          "children": [
+            {
+              "id": "item_01HZX8K3Q9G2",
+              "kind": "group",
+              "labels": {
+                "en": "Deploying"
+              },
+              "children": [
+                {
+                  "id": "item_01HZX8K3Q9P2",
+                  "kind": "page",
+                  "pageId": "page_01HZX8K3Q9P2"
+                },
+                {
+                  "id": "item_01HZX8K3Q9P3",
+                  "kind": "page",
+                  "pageId": "page_01HZX8K3Q9P3"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "item_01HZX8K3Q9RF",
+      "kind": "url",
+      "href": "https://developers.cloudflare.com/workers/",
+      "labels": {
+        "en": "Workers docs",
+        "tr": "Workers belgeleri"
+      }
+    }
+  ],
+  "rev": 1,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:05:00Z"
+}

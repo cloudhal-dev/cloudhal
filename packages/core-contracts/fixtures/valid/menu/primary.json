@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "menu_01HZX8K3Q9PR",
+  "siteId": "site_01HZX8K3Q9EF",
+  "key": "primary",
+  "maxDepth": 3,
+  "items": [
+    {
+      "id": "item_01HZX8K3Q9HM",
+      "kind": "page",
+      "pageId": "page_01HZX8K3Q9HM"
+    },
+    {
+      "id": "item_01HZX8K3Q9BL",
+      "kind": "collection",
+      "collection": "posts",
+      "labels": {
+        "en": "Blog",
+        "tr": "Yazılar"
+      }
+    },
+    {
+      "id": "item_01HZX8K3Q9TP",
+      "kind": "group",
+      "labels": {
+        "en": "Topics",
+        "tr": "Konular"
+      },
+      "children": [
+        {
+          "id": "item_01HZX8K3Q9NW",
+          "kind": "term",
+          "termId": "term_01HZX8K3Q9NW",
+          "children": [
+            {
+              "id": "item_01HZX8K3Q9LC",
+              "kind": "term",
+              "termId": "term_01HZX8K3Q9LC",
+              "labels": {
+                "en": "Local news"
+              }
+            }
+          ]
+        },
+        {
+          "id": "item_01HZX8K3Q9HW",
+          "kind": "contentEntry",
+          "entryId": "entry_01HZX8K3Q9HW",
+          "labels": {
+            "en": "Start here",
+            "tr": "Buradan başlayın"
+          }
+        }
+      ]
+    },
+    {
+      "id": "item_01HZX8K3Q9AB",
+      "kind": "page",
+      "pageId": "page_01HZX8K3Q9AB",
+      "labels": {
+        "en": "About us",
+        "tr": "Hakkımızda"
+      }
+    },
+    {
+      "id": "item_01HZX8K3Q9GH",
+      "kind": "url",
+      "href": "https://github.com/cloudhal-dev/cloudhal",
+      "newTab": true,
+      "labels": {
+        "en": "GitHub"
+      }
+    }
+  ],
+  "rev": 4,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T11:30:00Z"
+}

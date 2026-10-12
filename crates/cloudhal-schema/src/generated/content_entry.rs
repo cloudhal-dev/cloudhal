@@ -261,7 +261,14 @@ pub struct ContentEntry {
     pub status: PublishStatus,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub summary: ::std::option::Option<ContentEntrySummary>,
+    #[doc = "Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2."]
     pub tags: ::std::vec::Vec<Slug>,
+    #[doc = "Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object."]
+    #[serde(
+        default,
+        skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
+    )]
+    pub terms: ::std::collections::HashMap<Slug, TermAssignment>,
     pub title: ContentEntryTitle,
     #[serde(rename = "updatedAt")]
     pub updated_at: Timestamp,
@@ -429,11 +436,17 @@ impl<'de> ::serde::Deserialize<'de> for Id {
             })
     }
 }
-#[doc = "Reference to a media asset. src may be a relative asset path or an absolute URL."]
+#[doc = "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ImageRef {
     pub alt: ImageRefAlt,
+    #[doc = "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."]
+    #[serde(
+        rename = "assetId",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub asset_id: ::std::option::Option<Id>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub height: ::std::option::Option<::std::num::NonZeroU64>,
     pub src: ImageRefSrc,
@@ -818,6 +831,15 @@ impl<'de> ::serde::Deserialize<'de> for Slug {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
     }
+}
+#[doc = "Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TermAssignment {
+    pub ids: ::std::vec::Vec<Id>,
+    #[doc = "The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub primary: ::std::option::Option<Id>,
 }
 #[doc = "RFC 3339 / ISO 8601 instant in UTC."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]

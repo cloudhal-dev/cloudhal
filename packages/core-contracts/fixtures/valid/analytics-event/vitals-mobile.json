@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "kind": "vitals",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T08:14:41Z",
+  "path": "/posts/ferry-timetables",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "nodeKind": "entry",
+  "country": "TR",
+  "device": "mobile",
+  "browser": "safari",
+  "lcp": 2140,
+  "inp": 96,
+  "cls": 0.042,
+  "ttfb": 180,
+  "fcp": 910,
+  "sampleOneIn": 5
+}

@@ -14,3 +14,10 @@ packages/core-contracts/schemas/.bundled/
 # Internal working notes (roadmap, research, team state) — never committed
 .internal/
 .10x/
+
+# Agent worktrees (Claude Code)
+.claude/worktrees/
+
+# Package build output
+.build/
+.shots/

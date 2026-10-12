@@ -40,9 +40,19 @@
     },
     "tags": {
       "type": "array",
+      "description": "Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2.",
+      "deprecated": true,
       "items": { "$ref": "common.schema.json#/$defs/Slug" },
       "uniqueItems": true,
       "maxItems": 50
+    },
+    "terms": {
+      "type": "object",
+      "description": "Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object.",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/Slug" },
+      "minProperties": 1,
+      "maxProperties": 10,
+      "additionalProperties": { "$ref": "#/$defs/TermAssignment" }
     },
     "author": { "$ref": "common.schema.json#/$defs/Actor" },
     "coverImage": { "$ref": "common.schema.json#/$defs/ImageRef" },
@@ -53,6 +63,25 @@
     "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
   },
   "$defs": {
+    "TermAssignment": {
+      "type": "object",
+      "description": "Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.",
+      "additionalProperties": false,
+      "required": ["ids"],
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/Id" },
+          "minItems": 1,
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "primary": {
+          "$ref": "common.schema.json#/$defs/Id",
+          "description": "The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."
+        }
+      }
+    },
     "Body": {
       "type": "object",
       "additionalProperties": false,

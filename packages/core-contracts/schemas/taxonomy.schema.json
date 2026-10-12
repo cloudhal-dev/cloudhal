@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/taxonomy.schema.json",
+  "title": "Taxonomy",
+  "description": "A classification scheme of a site (e.g. 'category', 'tag', 'series') and its rules: hierarchy, who may create terms, how many terms an entry takes, and how its archives are published. Terms are separate nodes (term.schema.json) that point here by id (RFC-0002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "key",
+    "labels",
+    "hierarchical",
+    "allowNewTerms",
+    "required",
+    "archive",
+    "feed",
+    "minEntriesToIndex",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "key": {
+      "$ref": "common.schema.json#/$defs/Slug",
+      "description": "Stable name of the taxonomy, unique per site and immutable once created. ContentEntry.terms and filter expressions use it (e.g. 'category:news')."
+    },
+    "labels": {
+      "type": "object",
+      "description": "Display names per locale. Must contain the site's default locale.",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/Locale" },
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/TaxonomyLabel" }
+    },
+    "hierarchical": {
+      "type": "boolean",
+      "description": "Terms may have a parent term (categories). Flat when false (tags)."
+    },
+    "allowNewTerms": {
+      "type": "string",
+      "description": "Who may add terms. none: people only. propose: agents may create terms with status 'proposed' that wait for a person. free: agents may create active terms.",
+      "enum": ["none", "propose", "free"]
+    },
+    "required": {
+      "type": "boolean",
+      "description": "An entry in review or published status must have at least one term of this taxonomy and an explicit primary term."
+    },
+    "maxPerEntry": {
+      "type": "integer",
+      "description": "Most terms of this taxonomy one entry may carry. Absent: the contract limit of 50.",
+      "minimum": 1,
+      "maximum": 50
+    },
+    "collections": {
+      "type": "array",
+      "description": "Collections this taxonomy applies to. Absent: every collection.",
+      "items": { "$ref": "common.schema.json#/$defs/Slug" },
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true
+    },
+    "archive": { "$ref": "#/$defs/TaxonomyArchive" },
+    "feed": {
+      "type": "boolean",
+      "description": "Publish an RSS feed per term at <archive.basePath>/<slug>/rss.xml. Requires archive.enabled."
+    },
+    "minEntriesToIndex": {
+      "type": "integer",
+      "description": "Archives listing fewer published entries than this are served with robots 'noindex, follow' and left out of the sitemap.",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "TaxonomyLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["singular", "plural"],
+      "properties": {
+        "singular": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "plural": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "TaxonomyArchive": {
+      "type": "object",
+      "description": "Public archive pages: <basePath>/<term-slug> and <basePath>/<term-slug>/page/<n>.",
+      "additionalProperties": false,
+      "required": ["enabled", "basePath"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "basePath": { "$ref": "common.schema.json#/$defs/Path" }
+      }
+    }
+  }
+}

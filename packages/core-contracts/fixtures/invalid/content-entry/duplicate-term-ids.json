@@ -1,0 +1,38 @@
+{
+  "reason": "a term is assigned at most once per taxonomy",
+  "data": {
+    "schemaVersion": 1,
+    "id": "entry_01HZX8K3Q9WX",
+    "siteId": "site_01HZX8K3Q9EF",
+    "collection": "posts",
+    "slug": "first-agent-written-article",
+    "locale": "en",
+    "status": "published",
+    "title": "The first agent-written article",
+    "summary": "How the newsroom agent researched and drafted this piece.",
+    "body": {
+      "format": "markdown",
+      "value": "# Hello\n\nBody text."
+    },
+    "fields": {},
+    "tags": [],
+    "terms": {
+      "category": {
+        "ids": ["term_01HZX8K3Q9AI", "term_01HZX8K3Q9NW"],
+        "primary": "term_01HZX8K3Q9AI"
+      },
+      "tag": {
+        "ids": ["term_01HZX8K3Q9LL", "term_01HZX8K3Q9LL"]
+      }
+    },
+    "author": {
+      "kind": "agent",
+      "id": "agent_01HZX8K3Q9YZ",
+      "name": "Newsroom Agent"
+    },
+    "publishedAt": "2026-10-08T10:00:00Z",
+    "rev": 5,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

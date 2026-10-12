@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "cmt_01HZX8K3Q9AB",
+  "siteId": "site_01HZX8K3Q9ST",
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "source": "native",
+  "author": {
+    "kind": "guest",
+    "name": "Ayşe Yılmaz"
+  },
+  "body": {
+    "format": "text",
+    "text": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?"
+  },
+  "status": "approved",
+  "createdAt": "2026-10-12T08:14:03Z",
+  "rev": 2,
+  "labels": [
+    {
+      "label": "question",
+      "source": "agent",
+      "by": {
+        "kind": "agent",
+        "id": "agent_01HZX8K3Q9YZ",
+        "name": "Comment triage"
+      },
+      "confidence": 92,
+      "at": "2026-10-12T08:20:00Z"
+    },
+    {
+      "label": "needs-reply",
+      "source": "person",
+      "by": {
+        "kind": "human",
+        "id": "user_01HZX8K3Q9HU",
+        "name": "Halil"
+      },
+      "at": "2026-10-12T09:01:00Z"
+    }
+  ],
+  "moderation": {
+    "action": "approve",
+    "actor": {
+      "kind": "human",
+      "id": "user_01HZX8K3Q9HU",
+      "name": "Halil"
+    },
+    "at": "2026-10-12T09:01:00Z",
+    "automated": false
+  }
+}

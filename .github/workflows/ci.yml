@@ -30,7 +30,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm turbo run typecheck
-      - run: pnpm turbo run test
+      # Each vitest starts a worker per core; more than two packages at once oversubscribes the
+      # 4-vCPU runner and slow tests (auth, D1, workerd) hit their timeouts.
+      - run: pnpm turbo run test --concurrency=2
+      - name: Publishable packages build (and publishConfig is current)
+        if: matrix.node == 24
+        run: |
+          node scripts/build-packages.ts --check
+          pnpm build:packages
 
   rust:
     name: Rust (test · clippy · fmt)

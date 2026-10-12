@@ -5,6 +5,59 @@
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::clone_on_copy)]
 
+#[doc = "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ContentListSectionFilter(::std::string::String);
+impl ::std::ops::Deref for ContentListSectionFilter {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<ContentListSectionFilter> for ::std::string::String {
+    fn from(value: ContentListSectionFilter) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for ContentListSectionFilter {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 512usize {
+            return Err("longer than 512 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for ContentListSectionFilter {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for ContentListSectionFilter {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ContentListSectionFilter {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "`ContentListSectionSort`"]
 #[derive(
     :: serde :: Deserialize,
@@ -223,11 +276,17 @@ impl<'de> ::serde::Deserialize<'de> for Id {
             })
     }
 }
-#[doc = "Reference to a media asset. src may be a relative asset path or an absolute URL."]
+#[doc = "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ImageRef {
     pub alt: ImageRefAlt,
+    #[doc = "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."]
+    #[serde(
+        rename = "assetId",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub asset_id: ::std::option::Option<Id>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub height: ::std::option::Option<::std::num::NonZeroU64>,
     pub src: ImageRefSrc,
@@ -638,6 +697,9 @@ pub enum Section {
     #[serde(rename = "contentList")]
     ContentList {
         collection: Slug,
+        #[doc = "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        filter: ::std::option::Option<ContentListSectionFilter>,
         id: Id,
         limit: ::std::num::NonZeroU64,
         sort: ContentListSectionSort,

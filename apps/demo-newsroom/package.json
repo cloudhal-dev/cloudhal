@@ -1,0 +1,25 @@
+{
+  "name": "@cloudhal/demo-newsroom",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudhal's own newsroom, written by an agent through Cloudhal's MCP server (dogfooding).",
+  "type": "module",
+  "scripts": {
+    "agent": "node scripts/editor-agent.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "@types/node": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

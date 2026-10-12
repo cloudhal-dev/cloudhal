@@ -109,3 +109,39 @@ fn snapshot() {
 fn skill_manifest() {
     check::<cloudhal_schema::SkillManifest>("skill-manifest");
 }
+#[test]
+fn taxonomy() {
+    check::<cloudhal_schema::Taxonomy>("taxonomy");
+}
+#[test]
+fn term() {
+    check::<cloudhal_schema::Term>("term");
+}
+#[test]
+fn redirect() {
+    check::<cloudhal_schema::Redirect>("redirect");
+}
+#[test]
+fn asset() {
+    check::<cloudhal_schema::Asset>("asset");
+}
+#[test]
+fn menu() {
+    check::<cloudhal_schema::Menu>("menu");
+}
+#[test]
+fn analytics_event() {
+    check::<cloudhal_schema::AnalyticsEvent>("analytics-event");
+}
+#[test]
+fn analytics_beacon() {
+    check::<cloudhal_schema::AnalyticsBeacon>("analytics-beacon");
+}
+#[test]
+fn comment() {
+    check::<cloudhal_schema::Comment>("comment");
+}
+#[test]
+fn comment_submission() {
+    check::<cloudhal_schema::CommentSubmission>("comment-submission");
+}

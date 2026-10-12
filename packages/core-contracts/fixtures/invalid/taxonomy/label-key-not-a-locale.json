@@ -1,0 +1,28 @@
+{
+  "reason": "label keys must be BCP 47 locales",
+  "data": {
+    "schemaVersion": 1,
+    "id": "tax_01HZX8K3Q9TG",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "tag",
+    "labels": {
+      "English": {
+        "singular": "Tag",
+        "plural": "Tags"
+      }
+    },
+    "hierarchical": false,
+    "allowNewTerms": "propose",
+    "required": false,
+    "maxPerEntry": 10,
+    "archive": {
+      "enabled": true,
+      "basePath": "/tag"
+    },
+    "feed": true,
+    "minEntriesToIndex": 3,
+    "rev": 2,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

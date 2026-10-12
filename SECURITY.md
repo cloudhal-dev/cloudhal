@@ -29,3 +29,5 @@ Pre-1.0: only the latest minor of each published package receives security fixes
 ## Scope notes for agent-native features
 
 In scope: policy engine, scope enforcement on MCP tools, snapshot/rollback integrity, tenant isolation, secrets handling in capabilities, skill loading. Prompt-injection findings are in scope when they lead to an action the policy engine should have blocked.
+
+See [docs/security/threat-model.md](docs/security/threat-model.md) for what Cloudhal protects, how, and the risks accepted for the alpha.

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "term_01HZX8K3Q9MG",
+  "siteId": "site_01HZX8K3Q9EF",
+  "taxonomyId": "tax_01HZX8K3Q9TG",
+  "slug": "llms",
+  "status": "retired",
+  "visibility": "public",
+  "labels": {
+    "en": {
+      "name": "LLMs"
+    }
+  },
+  "mergedInto": "term_01HZX8K3Q9LL",
+  "rev": 3,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T10:00:00Z"
+}

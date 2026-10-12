@@ -1,0 +1,20 @@
+{
+  "reason": "only pages, entries and terms have URLs",
+  "data": {
+    "schemaVersion": 1,
+    "id": "redir_01HZX8K3Q9R1",
+    "siteId": "site_01HZX8K3Q9EF",
+    "from": "/posts/first-agent-article",
+    "to": "/posts/first-agent-written-article",
+    "status": 301,
+    "match": "exact",
+    "reason": "slug-change",
+    "source": {
+      "kind": "site",
+      "id": "site_01HZX8K3Q9EF"
+    },
+    "rev": 0,
+    "createdAt": "2026-10-08T10:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/* Section defaults; a theme overrides these or swaps components. */
+.ch-hero {
+  @apply py-12;
+}
+.ch-hero h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-hero__sub {
+  @apply mt-3 text-lg text-zinc-600;
+}
+.ch-hero__cta {
+  @apply mt-6 inline-block rounded bg-zinc-900 px-4 py-2 text-white;
+}
+.ch-article-header {
+  @apply space-y-2 border-b border-zinc-200 pt-8 pb-6;
+}
+.ch-article-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-summary {
+  @apply text-lg text-zinc-600;
+}
+.ch-article-header time {
+  @apply text-sm text-zinc-500;
+}
+.ch-richtext {
+  @apply space-y-4 py-6 leading-relaxed;
+}
+.ch-richtext h1 {
+  @apply text-3xl font-bold;
+}
+.ch-richtext h2 {
+  @apply text-2xl font-semibold;
+}
+.ch-image {
+  @apply py-6;
+}
+.ch-image figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-contentlist {
+  @apply py-6;
+}
+.ch-contentlist ul {
+  @apply space-y-4;
+}
+.ch-contentlist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-contentlist p {
+  @apply text-sm text-zinc-600;
+}
+
+/* Breadcrumbs, term chips, archives, pagination, related posts (RFC-0002). */
+.ch-breadcrumbs ol {
+  @apply flex flex-wrap gap-1 pt-6 text-sm text-zinc-500;
+}
+.ch-breadcrumbs li + li::before {
+  content: "›";
+  @apply mr-1 text-zinc-400;
+}
+.ch-breadcrumbs a {
+  @apply hover:text-zinc-900;
+}
+.ch-terms {
+  @apply flex flex-wrap gap-2 border-t border-zinc-200 py-4;
+}
+.ch-terms__group {
+  @apply flex flex-wrap gap-2;
+}
+.ch-chip {
+  @apply inline-block rounded-full border border-zinc-300 px-3 py-1 text-sm text-zinc-700;
+}
+a.ch-chip {
+  @apply hover:border-zinc-900 hover:text-zinc-900;
+}
+.ch-terms__group[data-taxonomy="category"] .ch-chip {
+  @apply border-zinc-900 bg-zinc-900 text-white hover:text-white;
+}
+.ch-archive-header {
+  @apply space-y-2 border-b border-zinc-200 pt-4 pb-6;
+}
+.ch-archive-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-archive-kind {
+  @apply text-sm font-medium tracking-wide text-zinc-500 uppercase;
+}
+.ch-archive-meta {
+  @apply flex gap-4 text-sm text-zinc-500;
+}
+.ch-archive-meta a {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-archive-image {
+  @apply mt-4 w-full rounded;
+}
+.ch-entrylist {
+  @apply space-y-6 py-6;
+}
+.ch-entrylist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-entrylist p {
+  @apply text-sm text-zinc-600;
+}
+.ch-entrylist time {
+  @apply text-xs text-zinc-500;
+}
+.ch-pagination {
+  @apply flex items-center justify-between border-t border-zinc-200 py-6 text-sm text-zinc-600;
+}
+.ch-pagination a {
+  @apply font-medium text-zinc-900 underline-offset-4 hover:underline;
+}
+.ch-related {
+  @apply border-t border-zinc-200 pt-6;
+}
+.ch-related h2 {
+  @apply text-xl font-semibold;
+}
+
+/* Navigation menus (RFC-0003): dropdowns and nested items as disclosures, no JavaScript. */
+.ch-nav-menu {
+  @apply relative;
+}
+.ch-nav-menu summary {
+  @apply cursor-pointer list-none;
+}
+.ch-nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+.ch-nav-menu summary::after {
+  content: "▾";
+  @apply ml-1 text-xs;
+}
+.ch-nav-menu > ul {
+  @apply absolute z-10 mt-2 min-w-40 space-y-1 rounded border border-zinc-200 bg-white p-2 shadow-sm;
+}
+footer .ch-nav-menu > ul {
+  @apply bottom-full mb-2;
+}
+.ch-nav-menu .ch-nav-menu > ul {
+  @apply static mt-1 border-0 p-0 pl-3 shadow-none;
+}
+
+/* Reader comments (RFC-0007): `<Comments />` renders plain HTML; these rules only style it. */
+.cloudhal-comments {
+  @apply space-y-4 border-t border-zinc-200 py-8;
+}
+.cloudhal-comments h2 {
+  @apply text-2xl font-semibold;
+}
+.cloudhal-comment-list,
+.cloudhal-comment-replies {
+  @apply space-y-4;
+}
+.cloudhal-comment-replies {
+  @apply mt-4 border-l border-zinc-200 pl-4;
+}
+.cloudhal-comment-meta {
+  @apply flex flex-wrap items-baseline gap-2 text-sm text-zinc-500;
+}
+.cloudhal-comment-author {
+  @apply font-semibold text-zinc-900;
+}
+.cloudhal-comment-badge {
+  @apply rounded bg-zinc-100 px-1.5 text-xs text-zinc-700;
+}
+.cloudhal-comment-body {
+  @apply mt-1 space-y-2 leading-relaxed;
+}
+.cloudhal-comment-body a,
+.cloudhal-comment-context {
+  @apply underline underline-offset-4;
+}
+.cloudhal-comment-actions {
+  @apply mt-1 flex flex-wrap items-start gap-3 text-sm text-zinc-500;
+}
+.cloudhal-comment-actions summary,
+.cloudhal-comment-reply {
+  @apply cursor-pointer underline-offset-4 hover:underline;
+}
+.cloudhal-comment-removed > p {
+  @apply text-sm text-zinc-500 italic;
+}
+.cloudhal-comment-note {
+  @apply rounded border border-zinc-300 bg-zinc-50 p-3 text-sm;
+}
+.cloudhal-comment-form,
+.cloudhal-report-form {
+  @apply max-w-xl space-y-3;
+}
+.cloudhal-comment-form h3 {
+  @apply text-lg font-semibold;
+}
+.cloudhal-comment-form label,
+.cloudhal-report-form label {
+  @apply block text-sm font-medium;
+}
+.cloudhal-comment-form small,
+.cloudhal-comment-privacy {
+  @apply block text-xs text-zinc-500;
+}
+.cloudhal-comment-form :is(input, textarea),
+.cloudhal-report-form :is(input, textarea, select) {
+  @apply w-full rounded border border-zinc-300 px-2 py-1;
+}
+.cloudhal-comment-form [aria-invalid="true"] {
+  @apply border-red-600;
+}
+.cloudhal-comment-form button,
+.cloudhal-report-form button {
+  @apply rounded bg-zinc-900 px-4 py-2 text-white;
+}
+.cloudhal-comment-form button[data-cancel-reply] {
+  @apply bg-zinc-200 text-zinc-900;
+}
+.cloudhal-comments-pages a {
+  @apply text-sm underline underline-offset-4;
+}

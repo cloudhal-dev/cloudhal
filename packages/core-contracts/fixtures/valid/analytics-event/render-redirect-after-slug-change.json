@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "render",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T11:05:00Z",
+  "path": "/posts/ferries",
+  "status": 301,
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "nodeKind": "entry",
+  "redirectTo": "/posts/ferry-timetables",
+  "refHost": "bsky.app",
+  "device": "mobile"
+}

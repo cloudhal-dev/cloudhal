@@ -83,9 +83,18 @@ export interface ContentEntry {
     [k: string]: unknown | undefined;
   };
   /**
+   * @deprecated
+   * Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2.
+   *
    * @maxItems 50
    */
   tags: Slug[];
+  /**
+   * Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object.
+   */
+  terms?: {
+    [k: string]: TermAssignment | undefined;
+  };
   author: Actor;
   coverImage?: ImageRef;
   publishedAt?: Timestamp;
@@ -103,6 +112,23 @@ export interface Body {
   value: string;
 }
 /**
+ * Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "TermAssignment".
+ */
+export interface TermAssignment {
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  ids: [Id, ...Id[]];
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  primary?: string;
+}
+/**
  * This interface was referenced by `ContentEntry`'s JSON-Schema
  * via the `definition` "Actor".
  */
@@ -112,12 +138,16 @@ export interface Actor {
   name?: string;
 }
 /**
- * Reference to a media asset. src may be a relative asset path or an absolute URL.
+ * Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.
  *
  * This interface was referenced by `ContentEntry`'s JSON-Schema
  * via the `definition` "ImageRef".
  */
 export interface ImageRef {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  assetId?: string;
   src: string;
   alt: string;
   width?: number;

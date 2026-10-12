@@ -3,6 +3,7 @@ packages:
   - packages/*
   - capabilities/*/*
   - starters/*
+  - examples/*
 
 catalogMode: strict
 
@@ -17,7 +18,52 @@ catalog:
   turbo: 2.11.7
   typescript: 7.0.2
   vitest: 5.0.3
+  better-sqlite3: 13.0.3
+  "@types/better-sqlite3": ^9.6.0
+  miniflare: 4.20260730.0
+  "@cloudflare/workers-types": ^5.20261007.1
+  astro: ^7.3.6
+  "@astrojs/cloudflare": 14.3.4
+  wrangler: 4.148.0
+  "@tailwindcss/vite": ^4.3.3
+  tailwindcss: ^4.3.3
+  marked: ^18.1.0
+  hono: ^4.13.13
+  "@hono/node-server": ^2.1.3
+  better-auth: 1.7.7
+  "@better-auth/kysely-adapter": 1.7.7
+  "@better-auth/api-key": 1.7.7
+  "@modelcontextprotocol/server": 2.3.1
+  "@modelcontextprotocol/client": 2.3.1
+  zod: 4.6.5
+  "@better-auth/cli": ^1.4.21
+  "@cloudflare/kumo": ^2.14.0
+  echarts: ^6.1.0
+  "@base-ui/react": ^1.8.0
+  "@phosphor-icons/react": ^2.1.10
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
+  "@tanstack/react-router": ^1.170.41
+  "@tanstack/react-query": ^5.104.1
+  vite: ^8.3.3
+  "@vitejs/plugin-react": ^6.1.2
+  "@testing-library/react": ^16.3.3
+  "@testing-library/dom": ^10.4.2
+  "@testing-library/jest-dom": ^7.0.1
+  "@testing-library/user-event": ^14.6.7
+  happy-dom: ^20.14.5
+  web-vitals: 6.2.2
 
 # Native build scripts must be explicitly approved (pnpm 12 `allowBuilds`).
 allowBuilds:
   esbuild: true
+  better-sqlite3: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - "@cloudflare/workers-types@5.20261007.1"
+
+patchedDependencies:
+  '@cloudflare/kumo@2.14.0': patches/@cloudflare__kumo@2.14.0.patch

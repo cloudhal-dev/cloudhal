@@ -1,0 +1,8 @@
+{
+  "task": "Publish the draft 'Written in Studio'.",
+  "expect": {
+    "statusAfter": "published",
+    "publishRequestedApproval": true,
+    "checklistApplied": true
+  }
+}

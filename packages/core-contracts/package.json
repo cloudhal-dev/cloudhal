@@ -11,16 +11,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schemas/*": "./schemas/*"
+    "./schemas/*": "./schemas/*",
+    "./bundle": "./scripts/bundle.ts"
   },
   "files": [
+    "dist",
     "schemas",
-    "src",
-    "!src/**/*.test.ts"
+    "README.md"
   ],
   "scripts": {
     "bundle": "tsx scripts/bundle.ts",
-    "gen:ts": "tsx scripts/gen-ts.ts",
+    "gen:ts": "tsx scripts/gen-ts.ts && tsx scripts/gen-validators.ts",
     "gen:rs": "tsx scripts/gen-rs.ts",
     "gen": "pnpm gen:ts && pnpm gen:rs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -29,11 +30,30 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "ajv": "catalog:",
-    "ajv-formats": "catalog:",
     "json-schema-to-typescript": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "ajv": "catalog:",
+    "ajv-formats": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./schemas/*": "./schemas/*",
+      "./bundle": {
+        "types": "./dist/scripts/bundle.d.ts",
+        "default": "./dist/scripts/bundle.js"
+      }
+    }
   }
 }

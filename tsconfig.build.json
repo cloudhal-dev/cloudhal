@@ -1,0 +1,34 @@
+{
+  // Declaration emit for the publishable packages (scripts/build-packages.ts). One program so that
+  // cross-package imports resolve to sources; each package keeps only its own .d.ts files.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "packages",
+    "outDir": ".build/types",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "sourceMap": false,
+    "noEmit": false,
+    // pnpm does not hoist @types to the root; the CLI package depends on both.
+    "typeRoots": ["packages/cli/node_modules/@types", "packages/cli/node_modules"],
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": [
+    "packages/core-contracts/src",
+    "packages/core-contracts/scripts",
+    "packages/storage/src",
+    "packages/storage/migrations",
+    "packages/analytics/src",
+    "packages/comments/src",
+    "packages/core-ts/src",
+    "packages/astro-renderer/src",
+    "packages/agent-runtime/src",
+    "packages/mcp-server/src",
+    "packages/api/src",
+    "packages/cloudflare/src",
+    "packages/cli/src",
+    "packages/cli/bin",
+    "packages/create-cloudhal/bin"
+  ],
+  "exclude": ["**/*.test.ts", "**/test/**", "**/testing.ts", "**/*.astro"]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "@cloudhal/cli",
+  "version": "0.0.1",
+  "description": "cloudhal — create, run and build Cloudhal sites locally",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "bin": {
+    "cloudhal": "./bin/cloudhal.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@cloudhal/analytics": "workspace:*",
+    "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/storage": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "@cloudhal/api": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/cloudflare": "workspace:*",
+    "@cloudhal/comments": "workspace:*"
+  },
+  "peerDependencies": {
+    "astro": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "astro": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
+    "wrangler": "catalog:",
+    "@cloudflare/workers-types": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      }
+    },
+    "bin": {
+      "cloudhal": "./dist/bin/cloudhal.js"
+    }
+  }
+}

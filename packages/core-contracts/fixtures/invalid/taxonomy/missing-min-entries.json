@@ -1,0 +1,28 @@
+{
+  "reason": "minEntriesToIndex is required (no schema defaults)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "tax_01HZX8K3Q9TG",
+    "siteId": "site_01HZX8K3Q9EF",
+    "key": "tag",
+    "labels": {
+      "en": {
+        "singular": "Tag",
+        "plural": "Tags",
+        "description": "Topics an article touches."
+      }
+    },
+    "hierarchical": false,
+    "allowNewTerms": "propose",
+    "required": false,
+    "maxPerEntry": 10,
+    "archive": {
+      "enabled": true,
+      "basePath": "/tag"
+    },
+    "feed": true,
+    "rev": 2,
+    "createdAt": "2026-10-08T09:00:00Z",
+    "updatedAt": "2026-10-08T10:00:00Z"
+  }
+}

@@ -1,0 +1,57 @@
+import { Button, DropdownMenu, Tooltip } from "@cloudhal/ui";
+import { ArrowSquareOut, DotsThree, Trash } from "@phosphor-icons/react";
+import { useT } from "../i18n/index.tsx";
+
+/** The "…" menu at the end of a table row (DESIGN.md §2a). */
+export function RowMenu({
+  onOpen,
+  onDelete,
+  deleteDisabledReason,
+}: {
+  onOpen: () => void;
+  onDelete?: (() => void) | undefined;
+  /** The person's role cannot delete this row: the item stays, disabled, with the reason (§2s). */
+  deleteDisabledReason?: string | undefined;
+}) {
+  const t = useT();
+  return (
+    <DropdownMenu>
+      {/* Tooltip outside, trigger inside: Kumo's Tooltip forwards extra props to its own root, so
+          `Trigger render={<Tooltip …/>}` would swallow the trigger's props and never open. */}
+      <Tooltip
+        content={t("site.rowMenu")}
+        render={
+          <DropdownMenu.Trigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                shape="square"
+                icon={<DotsThree weight="bold" />}
+                aria-label={t("site.rowMenu")}
+              />
+            }
+          />
+        }
+      />
+      <DropdownMenu.Content align="end">
+        <DropdownMenu.Item icon={ArrowSquareOut} onClick={onOpen}>
+          {t("sites.open")}
+        </DropdownMenu.Item>
+        {onDelete &&
+          (deleteDisabledReason ? (
+            // A disabled item takes no pointer events, so the tooltip hangs on a wrapper.
+            <Tooltip content={deleteDisabledReason} side="left" render={<div />}>
+              <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                {t("common.delete")}
+              </DropdownMenu.Item>
+            </Tooltip>
+          ) : (
+            <DropdownMenu.Item icon={Trash} variant="danger" onClick={onDelete}>
+              {t("common.delete")}
+            </DropdownMenu.Item>
+          ))}
+      </DropdownMenu.Content>
+    </DropdownMenu>
+  );
+}

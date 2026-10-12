@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "pageview",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T08:15:40Z",
+  "path": "/",
+  "nodeId": "page_01HZX8K3Q9HM",
+  "nodeKind": "page",
+  "channel": "internal",
+  "entrance": false,
+  "device": "desktop",
+  "browser": "firefox",
+  "os": "linux",
+  "navType": "back_forward"
+}
