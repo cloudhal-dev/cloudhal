@@ -36,7 +36,10 @@
               "@radix-ui/themes": "Cloudhal admin UIs use Kumo via @cloudhal/ui.",
               "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
               "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
-              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+              "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+              "temporal-polyfill": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4).",
+              "temporal-polyfill/global": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4).",
+              "temporal-polyfill/shim": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4)."
             }
           }
         }
@@ -87,7 +90,10 @@
                   "@cloudflare/kumo": "Apps import Kumo through @cloudhal/ui (one entry point, our blocks included).",
                   "lucide-react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
                   "react-icons": "Icons come from @phosphor-icons/react (Kumo's icon set).",
-                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set)."
+                  "@heroicons/react": "Icons come from @phosphor-icons/react (Kumo's icon set).",
+                  "temporal-polyfill": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4).",
+                  "temporal-polyfill/global": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4).",
+                  "temporal-polyfill/shim": "Import Temporal from temporal-polyfill/implementation only: never a global or native Temporal, and never Temporal.Now (RFC-0008 §9.4)."
                 }
               }
             }
