@@ -119,6 +119,8 @@ export interface AgentKeySummary {
   agentId: string;
   /** Who created the key (listed with `all`, for Administrators). */
   owner?: { userId: string; name: string | null; role: Role | null };
+  /** RFC-0008 §11.2: the automation this key belongs to (it works only inside its runs). */
+  automationId?: string;
 }
 
 export interface AgentKeyService {
@@ -132,6 +134,11 @@ export interface AgentKeyService {
     name: string;
     mode?: AgentMode;
     scopes?: Scope[];
+    /**
+     * RFC-0008 §11.2: mint an automation's key (metadata `{ automationId, purpose: "automation" }`):
+     * it works only inside that automation's run windows.
+     */
+    automationId?: string;
   }): Promise<AgentKeySummary & { key: string }>;
   /** Changes one of the caller's keys' mode; takes effect on the agent's next call. */
   setMode(input: { headers: Headers; id: string; mode: AgentMode }): Promise<AgentKeySummary>;
@@ -162,6 +169,13 @@ export interface AgentKeyService {
   }): Promise<{ key: AgentKeySummary; added: Scope[] }>;
   /** The caller's keys; `all` lists every key (`agents:manage`). */
   list(input: { headers: Headers; all?: boolean }): Promise<AgentKeySummary[]>;
+  /**
+   * A key's state now, server-side, for the scheduler's re-check of `auto` releases (RFC-0008
+   * §10.6): enabled, its creator's role (`null` once they left) and the mode its next call runs in.
+   */
+  state?(
+    keyId: string,
+  ): Promise<{ enabled: boolean; creatorRole: Role | null; effectiveMode: AgentMode } | undefined>;
   /** Revokes a key: the caller's own, or any key with `agents:manage`. */
   delete(input: { headers: Headers; id: string }): Promise<AgentKeySummary | undefined>;
 }
@@ -374,7 +388,12 @@ export class AuthError extends Error {
  * Contributor's key never gets them. Everything else stays fixed at creation (RFC-0005: promotions
  * never silently empower agents).
  */
-export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read", "comments:read"];
+export const ADDABLE_KEY_SCOPES: readonly Scope[] = [
+  "analytics:read",
+  "comments:read",
+  // RFC-0008 §10.1: "Allow schedules" (read-only: the calendar, releases, automations, runs).
+  "schedules:read",
+];
 
 /** Scopes an API key may carry live under the `cloudhal` permission resource. */
 export const API_KEY_PERMISSION_RESOURCE = "cloudhal";
@@ -416,6 +435,14 @@ function permissionsOf(row: ApiKeyRow): string[] | undefined {
   }
   const granted = perms && typeof perms === "object" ? perms[API_KEY_PERMISSION_RESOURCE] : null;
   return Array.isArray(granted) ? granted : undefined;
+}
+
+/** RFC-0008 §11.2: the automation an automation key belongs to. */
+function automationOf(row: ApiKeyRow): string | undefined {
+  const meta = metadataOf(row);
+  return meta.purpose === "automation" && typeof meta.automationId === "string"
+    ? meta.automationId
+    : undefined;
 }
 
 function modeOf(row: ApiKeyRow): AgentMode {
@@ -487,6 +514,7 @@ function toSummary(row: ApiKeyRow, now: Date, role: Role | null | undefined): Ag
     ...(elevation ? { elevation } : {}),
     effectiveMode: clampMode(effective, cap),
     agentId: agentIdForKey(row.id),
+    ...(automationOf(row) ? { automationId: automationOf(row) as string } : {}),
   };
 }
 
@@ -613,7 +641,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
   };
 
   const agentKeys: AgentKeyService = {
-    async create({ headers, name, mode = DEFAULT_AGENT_MODE, scopes: requested }) {
+    async create({ headers, name, mode = DEFAULT_AGENT_MODE, scopes: requested, automationId }) {
       const who = await caller(headers, "sign in to create agent keys");
       if (!REMOTE_AGENT_MODES.includes(mode))
         throw new AuthError(`mode "${mode}" is not available for API keys (bypass is local only)`);
@@ -639,7 +667,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
           name,
           userId: who.userId,
           permissions: { [API_KEY_PERMISSION_RESOURCE]: scopes },
-          metadata: { mode },
+          metadata: { mode, ...(automationId ? { automationId, purpose: "automation" } : {}) },
         },
       });
       await staffStore.recordAgent(agentIdForKey(row.id), who.userId, row.id);
@@ -753,6 +781,13 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
           };
         })
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+    async state(keyId) {
+      const key = await keyById(keyId);
+      if (!key) return undefined;
+      const role = (await staffStore.member(key.referenceId ?? ""))?.role ?? null;
+      const summary = toSummary(key, now(), role);
+      return { enabled: summary.enabled, creatorRole: role, effectiveMode: summary.effectiveMode };
     },
     async delete({ headers, id }) {
       const { key } = await keyFor(headers, id, true);
@@ -910,6 +945,7 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
         mode: elevation?.mode ?? base,
         ...(elevation ? { elevation: { from: base, until: elevation.until } } : {}),
         keyId: verified.key.id,
+        ...(automationOf(verified.key) ? { automationId: automationOf(verified.key) } : {}),
         person: personRef(creator),
       };
     }

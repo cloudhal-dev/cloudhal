@@ -11,6 +11,12 @@
  *   oldest; Authors count their own entries), `comments-reported` (open reports), `comments-paused`
  *   (the daily cap was reached), `comments-purge-waiting` (a takedown has waited over 2 minutes for
  *   the live page) and `comments-approval` (an agent's comment request this person can decide).
+ * - schedules (RFC-0008 §14): `schedule-approval-due` (a release awaiting approval runs within 60
+ *   minutes; for people who may decide it), `schedule-upcoming` (within 15 minutes) and
+ *   `schedule-published` (the last 24 hours) for its creator and approver; `schedule-conflict`,
+ *   `schedule-missed`, `schedule-expired` and `schedule-failed` (the last 7 days) for them and for
+ *   Editors; `scheduler-stalled` for Administrators and anyone with a release due within 24 hours;
+ *   `automation-paused`, `automation-failed` and `automation-digest` for an automation's owner.
  *
  * People only. Each item has a stable `id`, so a client can remember what it already showed.
  */
@@ -28,6 +34,8 @@ import {
 import { PURGE_LIMITS, utcDay, utcDayStart } from "@cloudhal/comments";
 import type { Actor } from "@cloudhal/core-contracts";
 import { commentsAvailable } from "@cloudhal/mcp-server/comments";
+import { approvalProblem, executeAtOf, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import { schedulerHealth } from "@cloudhal/schedules";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { unauthorized } from "../errors.ts";
@@ -41,7 +49,51 @@ const COMMENT_REQUEST_TOOLS = new Set([
   "label_comments",
 ]);
 
+/** RFC-0008 §14: what a release notification says, as data (Studio words it). */
+export interface ReleaseNotice {
+  id: string;
+  kind:
+    | "schedule-approval-due"
+    | "schedule-upcoming"
+    | "schedule-published"
+    | "schedule-conflict"
+    | "schedule-missed"
+    | "schedule-expired"
+    | "schedule-failed";
+  siteId: string;
+  releaseId: string;
+  title: string | null;
+  /** The release's time (or when it ran). */
+  executeAt: string | null;
+  /** Lateness for `schedule-published` and `schedule-missed`, the reason or code otherwise. */
+  latenessSeconds?: number;
+  reason?: string;
+  /** Conflicts: how many nodes changed since approval. */
+  changed?: number;
+  at: string;
+}
+
 export type Notification =
+  | ReleaseNotice
+  | {
+      /** Scheduled work is not running (§8.7); `hour` keeps one notice per hour. */
+      id: string;
+      kind: "scheduler-stalled";
+      state: "late" | "stopped" | "unknown";
+      lastTickAt: string | null;
+      at: string;
+    }
+  | {
+      id: string;
+      kind: "automation-paused" | "automation-failed" | "automation-digest";
+      siteId: string;
+      automationId: string;
+      name: string;
+      /** The pause reason, the run's error code, or nothing for a digest. */
+      reason?: string;
+      runId?: string;
+      at: string;
+    }
   | {
       id: string;
       kind: "elevation-ending";
@@ -245,6 +297,189 @@ async function commentNotifications(c: Context<Env>, now: Date): Promise<Notific
   return out;
 }
 
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+/** The schedule kinds (RFC-0008 §14), computed from state; nothing is stored. */
+async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notification[]> {
+  const deps = c.get("schedules");
+  const principal = c.get("principal");
+  if (!schedulesAvailable(deps) || !principal) return [];
+  const roles = Boolean(c.get("staff")) && principal.person !== undefined;
+  const can = (s: Scope) => !roles || holds(principal.scopes, s);
+  if (!can("schedules:read")) return [];
+  const me = principal.person?.id ?? principal.actor.id;
+  const ownership = c.get("ownership");
+  const graph = c.get("store");
+  const at = now.toISOString();
+  const t = now.getTime();
+  const editor = can("releases:publish");
+  const out: Notification[] = [];
+  let dueWithin24hForMe = false;
+  let dueWithin24h = false;
+  for (const site of await graph.listSites()) {
+    await deps.store.expireOverdueApprovals(site.id, at);
+    for (const r of await deps.store.listReleases(site.id, { limit: 200 })) {
+      const creator = (await ownership.personOf(r.createdBy)) === me;
+      const approver = r.approval?.kind === "person" && r.approval.by.id === me;
+      const mine = creator || approver;
+      const when = executeAtOf(r.when, r.updatedAt) ?? null;
+      const due = when ? Date.parse(when) : Number.NaN;
+      const base = {
+        siteId: site.id,
+        releaseId: r.id,
+        title: r.title ?? null,
+        executeAt: when,
+      };
+      const outcomeAt = r.outcome && "at" in r.outcome ? Date.parse(r.outcome.at) : Number.NaN;
+      const recent = (days: number) => Number.isFinite(outcomeAt) && t - outcomeAt <= days * DAY;
+      if ((r.state === "scheduled" || r.state === "awaiting_approval") && due - t <= DAY) {
+        dueWithin24h = true;
+        if (mine) dueWithin24hForMe = true;
+      }
+      switch (r.state) {
+        case "awaiting_approval":
+          if (due - t <= 60 * MINUTE && due >= t) {
+            const decides =
+              !roles ||
+              (r.createdBy.id !== principal.actor.id &&
+                (await approvalProblem(
+                  graph,
+                  ownership,
+                  principal,
+                  r.items.map((item) => ({ item, deps: [] })),
+                )) === undefined);
+            if (decides)
+              out.push({
+                id: `schedule-approval-due:${r.id}:${when}`,
+                kind: "schedule-approval-due",
+                ...base,
+                at,
+              });
+          }
+          break;
+        case "scheduled":
+          if (mine && due >= t && due - t <= 15 * MINUTE)
+            out.push({
+              id: `schedule-upcoming:${r.id}:${when}`,
+              kind: "schedule-upcoming",
+              ...base,
+              at,
+            });
+          break;
+        case "published":
+          if (mine && recent(1) && r.outcome?.kind === "published")
+            out.push({
+              id: `schedule-published:${r.id}`,
+              kind: "schedule-published",
+              ...base,
+              latenessSeconds: r.outcome.latenessSeconds,
+              at: r.outcome.at,
+            });
+          break;
+        case "conflict":
+          if ((mine || editor) && recent(7) && r.outcome?.kind === "conflict")
+            out.push({
+              id: `schedule-conflict:${r.id}`,
+              kind: "schedule-conflict",
+              ...base,
+              changed: r.outcome.conflicts.length,
+              at: r.outcome.at,
+            });
+          break;
+        case "missed":
+          if ((mine || editor) && recent(7) && r.outcome?.kind === "missed")
+            out.push({
+              id: `schedule-missed:${r.id}`,
+              kind: "schedule-missed",
+              ...base,
+              latenessSeconds: r.outcome.latenessSeconds,
+              at: r.outcome.at,
+            });
+          break;
+        case "expired":
+          if ((creator || editor) && recent(7) && r.outcome?.kind === "expired")
+            out.push({
+              id: `schedule-expired:${r.id}`,
+              kind: "schedule-expired",
+              ...base,
+              reason: r.outcome.reason,
+              at: r.outcome.at,
+            });
+          break;
+        case "failed":
+          if ((mine || editor) && recent(7) && r.outcome?.kind === "failed")
+            out.push({
+              id: `schedule-failed:${r.id}`,
+              kind: "schedule-failed",
+              ...base,
+              reason: r.outcome.code,
+              at: r.outcome.at,
+            });
+          break;
+      }
+    }
+    for (const a of await deps.store.listAutomations(site.id)) {
+      if (a.owner.id !== me) continue;
+      if (a.state === "auto-paused" || a.state === "broken")
+        out.push({
+          id: `automation-paused:${a.id}:${a.rev}`,
+          kind: "automation-paused",
+          siteId: site.id,
+          automationId: a.id,
+          name: a.name,
+          ...(a.pausedReason ? { reason: a.pausedReason } : {}),
+          at: a.updatedAt,
+        });
+      for (const run of await deps.store.listRuns(site.id, { subjectId: a.id, limit: 20 })) {
+        const ended = Date.parse(run.endedAt ?? run.updatedAt);
+        const failed =
+          run.state === "failed" || (run.state === "missed" && a.job.kind === "agent-task");
+        if (failed && t - ended <= DAY)
+          out.push({
+            id: `automation-failed:${run.id}`,
+            kind: "automation-failed",
+            siteId: site.id,
+            automationId: a.id,
+            name: a.name,
+            runId: run.id,
+            reason: run.error?.code ?? run.state,
+            at: run.endedAt ?? run.updatedAt,
+          });
+        if (
+          a.job.kind === "builtin" &&
+          a.job.builtin === "weekly-digest" &&
+          run.state === "succeeded" &&
+          t - ended <= 7 * DAY
+        )
+          out.push({
+            id: `automation-digest:${run.id}`,
+            kind: "automation-digest",
+            siteId: site.id,
+            automationId: a.id,
+            name: a.name,
+            runId: run.id,
+            at: run.endedAt ?? run.updatedAt,
+          });
+      }
+    }
+  }
+  // §8.7: stalled — for Administrators, and for anyone with a release due within 24 hours.
+  if (can("site:settings") || dueWithin24hForMe) {
+    const heartbeat = await deps.store.heartbeat();
+    const health = schedulerHealth(heartbeat, now, { dueWithin24h });
+    if (!health.healthy && (health.state !== "unknown" || dueWithin24h))
+      out.push({
+        id: `scheduler-stalled:${at.slice(0, 13)}`,
+        kind: "scheduler-stalled",
+        state: health.state as "late" | "stopped" | "unknown",
+        lastTickAt: health.lastTickAt ?? null,
+        at,
+      });
+  }
+  return out;
+}
+
 export function notificationRoutes(clock: () => Date): Hono<Env> {
   return new Hono<Env>().get("/", async (c) => {
     if (!c.get("actor")) throw unauthorized();
@@ -334,18 +569,30 @@ export function notificationRoutes(clock: () => Date): Hono<Env> {
     }
 
     items.push(...(await commentNotifications(c, now)));
+    items.push(...(await scheduleNotifications(c, now)));
 
     // Soonest-ending elevations first, then the newest requests, comment work and member events.
     const order: Record<Notification["kind"], number> = {
       "elevation-ending": 0,
       "elevation-request": 1,
-      "comments-purge-waiting": 2,
-      "comments-approval": 3,
-      "comments-reported": 4,
-      "comments-pending": 5,
-      "comments-paused": 6,
-      "member-joined": 7,
-      "role-changed": 8,
+      "scheduler-stalled": 2,
+      "schedule-approval-due": 3,
+      "schedule-conflict": 4,
+      "schedule-missed": 5,
+      "schedule-failed": 6,
+      "schedule-expired": 7,
+      "schedule-upcoming": 8,
+      "comments-purge-waiting": 9,
+      "comments-approval": 10,
+      "comments-reported": 11,
+      "comments-pending": 12,
+      "comments-paused": 13,
+      "automation-paused": 14,
+      "automation-failed": 15,
+      "schedule-published": 16,
+      "automation-digest": 17,
+      "member-joined": 18,
+      "role-changed": 19,
     };
     const time = (n: Notification) =>
       n.kind === "elevation-ending" ? n.until : n.kind === "elevation-request" ? n.createdAt : n.at;

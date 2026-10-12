@@ -10,6 +10,7 @@ import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
+import type { SchedulesDeps } from "@cloudhal/mcp-server/schedules";
 import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
@@ -91,6 +92,13 @@ export interface ApiDeps {
    * and bans, the MCP comment tools, the comment notifications and `features.comments`.
    */
   readonly comments?: CommentsDeps;
+  /**
+   * Schedules (RFC-0008): mounts the schedule routes (`/api/sites/:id/schedule`, releases, gates,
+   * automations, runs, settings) and `/api/scheduler`, the MCP schedule tools and automation runs,
+   * the schedule notifications and `features.schedules`. `executor` (the `ReleaseExecutor`,
+   * `publishRelease` in core-ts) runs "Publish now"; `scheduler` serves the operator's manual tick.
+   */
+  readonly schedules?: SchedulesDeps;
 }
 
 export type Env = {
@@ -118,5 +126,7 @@ export type Env = {
     analytics: AnalyticsService | undefined;
     /** Reader comments (RFC-0007); undefined on servers without them. */
     comments: CommentsDeps | undefined;
+    /** Schedules (RFC-0008); undefined on servers without them. */
+    schedules: SchedulesDeps | undefined;
   };
 };

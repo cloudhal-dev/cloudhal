@@ -24,6 +24,10 @@
  *   appends commenter lines with their email (§9.4: the operator may)
  * - `POST /api/admin/sites/:siteId/comments/import` ← JSON lines (≤ 200 per call) → the import
  *   report: idempotent by id and importer origin, entries and parents checked, audited
+ * - `GET  /api/admin/schedules/status` → the scheduler's health (RFC-0008 §13):
+ *   `cloudhal schedules status --remote`
+ * - `POST /api/admin/schedules/run-due` ← {budget?: "free"|"paid"} → the tick report: the
+ *   operator's manual tick through the injected `Scheduler` (503 without one), audited
  */
 
 import { AnalyticsQueryError } from "@cloudhal/analytics";
@@ -48,11 +52,14 @@ import {
   withPrimaryDomain,
 } from "@cloudhal/core-ts";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
+import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import { TICK_BUDGETS } from "@cloudhal/schedules";
 import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest } from "../errors.ts";
 import { param } from "../params.ts";
+import { schedulerStatus } from "./schedules.ts";
 
 export function timingSafeEqual(a: string, b: string): boolean {
   const ea = new TextEncoder().encode(a);
@@ -96,6 +103,36 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
         if (!given || !timingSafeEqual(given, deployToken))
           return c.json({ error: "unauthorized", message: "deployment token required" }, 401);
         await next();
+      })
+      // RFC-0008 §13: `cloudhal schedules status --remote` and the operator's manual tick.
+      .get("/schedules/status", async (c) => {
+        const deps = c.get("schedules");
+        if (!schedulesAvailable(deps))
+          return c.json({ error: "not_found", message: "schedules are not enabled" }, 404);
+        c.header("cache-control", "no-store");
+        return c.json(await schedulerStatus(deps, c.get("now")()));
+      })
+      .post("/schedules/run-due", async (c) => {
+        const deps = c.get("schedules");
+        if (!schedulesAvailable(deps))
+          return c.json({ error: "not_found", message: "schedules are not enabled" }, 404);
+        if (!deps.scheduler)
+          return c.json(
+            { error: "scheduler_unavailable", message: "this server has no scheduler to run" },
+            503,
+          );
+        const body = ((await c.req.json().catch(() => ({}))) ?? {}) as { budget?: unknown };
+        const budget = body.budget === "paid" ? TICK_BUDGETS.paid : TICK_BUDGETS.free;
+        const report = await deps.scheduler.runDue(c.get("now")(), budget, "manual");
+        await c.get("audit")?.record({
+          at: c.get("now")().toISOString(),
+          actor: OPERATOR_ACTOR,
+          tool: "schedules.run-due",
+          decision: "allow",
+          outcome: "ok",
+          input: { ran: report.ran, late: report.late, failed: report.failed, more: report.more },
+        });
+        return c.json(report);
       })
       // Owner lockout recovery (RFC-0005 §3, open question 7): the operator, already root for site
       // data, makes an existing member the Owner; the current Owner becomes an Administrator.

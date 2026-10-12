@@ -28,6 +28,8 @@ const M = `${S}/menus`;
 const A = `${S}/assets`;
 const AN = `${S}/analytics`;
 const CM = `${S}/comments`;
+const RL = `${S}/releases/:releaseId`;
+const AU = `${S}/automations`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -53,12 +55,17 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites/:siteId/comments/status", "deploy-token"],
   ["GET", "/api/admin/sites/:siteId/comments/export", "deploy-token"],
   ["POST", "/api/admin/sites/:siteId/comments/import", "deploy-token"],
+  // RFC-0008 §13: `cloudhal schedules status --remote` and the operator's manual tick
+  ["GET", "/api/admin/schedules/status", "deploy-token"],
+  ["POST", "/api/admin/schedules/run-due", "deploy-token"],
 
   // deployment
   ["GET", "/api/instance", "member"],
   ["GET", "/api/skills", "member"],
   ["GET", "/api/notifications", "member"],
   ["GET", "/api/activity", "audit:read"],
+  // RFC-0008 §8.7: mode, last tick, next wake, 7-day lag, healthy
+  ["GET", "/api/scheduler", "signed-in"],
 
   // agent keys: own keys for every member; others' keys need agents:manage (checked in the service)
   ["GET", "/api/agent-keys", "member"],
@@ -198,6 +205,39 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/comment-bans`, "comments:moderate"],
   ["POST", `${S}/comment-bans`, "comments:moderate"],
   ["DELETE", `${S}/comment-bans/:banId`, "comments:moderate"],
+  // schedules (RFC-0008 §13): reads for everyone with schedules:read; releases and gates of one's
+  // own work with schedules:write:own (handlers check "own" and who may approve: own approval
+  // when the role allows it, else a request); "Publish now" with releases:publish:own; lifting an
+  // embargo is Editor and above (the handler checks releases:publish, D8); automations people-only
+  // (automations:manage, D7); the kill switch and daily cap site:settings
+  ["GET", `${S}/schedule`, "schedules:read"],
+  ["GET", `${S}/releases`, "schedules:read"],
+  ["POST", `${S}/releases`, "schedules:write:own"],
+  ["GET", RL, "schedules:read"],
+  ["GET", `${RL}/diff`, "schedules:read"],
+  ["PATCH", RL, "schedules:write:own"],
+  ["POST", `${RL}/items`, "schedules:write:own"],
+  ["POST", `${RL}/schedule`, "schedules:write:own"],
+  ["POST", `${RL}/reschedule`, "schedules:write:own"],
+  ["POST", `${RL}/repin`, "schedules:write:own"],
+  ["POST", `${RL}/unschedule`, "schedules:write:own"],
+  ["POST", `${RL}/cancel`, "schedules:write:own"],
+  ["POST", `${RL}/publish-now`, "releases:publish:own"],
+  ["POST", `${S}/gates`, "schedules:write:own"],
+  ["POST", `${S}/gates/:nodeId/lift`, "releases:publish:own"],
+  ["GET", AU, "schedules:read"],
+  ["POST", AU, "automations:manage"],
+  ["POST", `${AU}/preview-rule`, "schedules:read"],
+  ["GET", `${AU}/:automationId`, "schedules:read"],
+  ["PATCH", `${AU}/:automationId`, "automations:manage"],
+  ["POST", `${AU}/:automationId/pause`, "automations:manage"],
+  ["POST", `${AU}/:automationId/resume`, "automations:manage"],
+  ["POST", `${AU}/:automationId/run-now`, "automations:manage"],
+  ["DELETE", `${AU}/:automationId`, "automations:manage"],
+  ["GET", `${S}/runs`, "schedules:read"],
+  ["GET", `${S}/runs/:runId`, "schedules:read"],
+  ["GET", `${S}/schedule-settings`, "schedules:read"],
+  ["PUT", `${S}/schedule-settings`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

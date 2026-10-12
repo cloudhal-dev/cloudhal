@@ -25,6 +25,13 @@ import {
 } from "@cloudhal/agent-runtime";
 import type { AnalyticsFeature } from "@cloudhal/analytics/service";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
+import { type SchedulesDeps, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import {
+  LATE_LIMIT_SECONDS,
+  MAX_HORIZON_DAYS,
+  MAX_RELEASE_ITEMS,
+  REQUEST_HORIZON_DAYS,
+} from "@cloudhal/schedules";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 
@@ -49,6 +56,8 @@ export interface InstanceInfo {
     analytics: AnalyticsFeature;
     /** Reader comments (RFC-0007 §12). */
     comments: CommentsFeature;
+    /** Schedules (RFC-0008 §13). */
+    schedules: SchedulesFeature;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;
@@ -84,6 +93,42 @@ export async function commentsFeature(deps: CommentsDeps | undefined): Promise<C
     aiLabels: false,
     keys: on && Boolean(deps.keys),
     purge: { pending },
+  };
+}
+
+export interface SchedulesFeature {
+  available: boolean;
+  /** What wakes the scheduler (`null` when this server does not know). */
+  scheduler: "cron" | "alarm" | "node" | "request" | null;
+  /** The site renderer enforces time gates (writers check per site; see `gates_unsupported`). */
+  gates: boolean;
+  /** Automations run (`CLOUDHAL_AUTOMATIONS` is not `off`). */
+  automations: boolean;
+  /** "Publish now" can run here (a release executor is wired). */
+  publishNow: boolean;
+  limits: {
+    maxItems: number;
+    horizonDays: number;
+    requestHorizonDays: number;
+    lateMinutes: number;
+  };
+}
+
+/** `features.schedules`; `available: false` without schedule storage. */
+export function schedulesFeature(deps: SchedulesDeps | undefined): SchedulesFeature {
+  const on = schedulesAvailable(deps);
+  return {
+    available: on,
+    scheduler: on ? (deps.ticker ?? null) : null,
+    gates: on,
+    automations: on && deps.automationsEnabled !== false,
+    publishNow: on && deps.executor !== undefined,
+    limits: {
+      maxItems: MAX_RELEASE_ITEMS,
+      horizonDays: MAX_HORIZON_DAYS,
+      requestHorizonDays: REQUEST_HORIZON_DAYS,
+      lateMinutes: LATE_LIMIT_SECONDS / 60,
+    },
   };
 }
 
