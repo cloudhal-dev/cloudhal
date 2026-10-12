@@ -183,6 +183,7 @@ describe("cloudhal deploy", () => {
     const adminC = await jsonc(commentsOnly.adminConfig);
     expect(adminC.analytics).toBeUndefined();
     expect(adminC.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "true",
       CLOUDHAL_SCHEDULER: "cron",
     });
@@ -199,6 +200,7 @@ describe("cloudhal deploy", () => {
     const none = await deploy({ projectDir, studioDir, dryRun: true });
     const adminN = await jsonc(none.adminConfig);
     expect(adminN.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "false",
       CLOUDHAL_SCHEDULER: "cron",
     });
@@ -560,6 +562,7 @@ describe("cloudhal deploy", () => {
     expect(adminOff.analytics).toBeUndefined();
     // the scheduler keeps its minute trigger (RFC-0008 §8.2)
     expect(adminOff.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
       CLOUDHAL_COMMENTS_AVAILABLE: "true",
       CLOUDHAL_SCHEDULER: "cron",
     });

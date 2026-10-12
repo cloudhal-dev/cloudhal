@@ -627,6 +627,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       projectDir: options.projectDir,
       dataDir: cfg.dataDir,
       names: withIds,
+      siteId: cfg.siteId,
       studioDir,
       skillsDir,
       domain: cfg.domains?.studio,

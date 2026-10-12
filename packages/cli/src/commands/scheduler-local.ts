@@ -14,6 +14,11 @@ import { releaseApprovalCheck } from "@cloudhal/api";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import {
+  type BuiltinInputs,
+  type NotFoundAnalytics,
+  notFoundFromAnalytics,
+} from "@cloudhal/core-ts/automations";
+import {
   runScheduledTick,
   type SchedulerControl,
   type TickReport,
@@ -37,6 +42,37 @@ export interface LocalSchedulerOptions {
   /** Clock and timers (tests). */
   readonly now?: () => Date;
   readonly maxIntervalMs?: number;
+  /** The project's analytics (the broken-link sweep's 404 rows, RFC-0008 §11.1). */
+  readonly analytics?: NotFoundAnalytics | undefined;
+  /**
+   * Where the local renderer serves the site (`cloudhal dev`): the feed check fetches its
+   * `/rss.xml` and `/sitemap.xml` there. Absent (Studio, MCP): the feed check has nothing to fetch.
+   */
+  readonly siteOrigin?: string | undefined;
+  /** The site the local renderer serves (`cloudhal.json` `siteId`). */
+  readonly siteId?: string | undefined;
+}
+
+/** What the Node ticker adds for the built-in jobs (§11.1): local analytics and the local renderer. */
+export function localBuiltinInputs(o: LocalSchedulerOptions): BuiltinInputs {
+  const origin = o.siteOrigin;
+  return {
+    ...(o.analytics ? { notFound: notFoundFromAnalytics(o.analytics) } : {}),
+    ...(origin
+      ? {
+          fetchDocument: async ({ siteId, path }: { siteId: string; path: string }) => {
+            if (o.siteId && o.siteId !== siteId) return undefined;
+            const res = await fetch(new URL(path, origin));
+            const contentType = res.headers.get("content-type");
+            return {
+              status: res.status,
+              ...(contentType ? { contentType } : {}),
+              body: await res.text(),
+            };
+          },
+        }
+      : {}),
+  };
 }
 
 /** The deployment's periodic jobs on Node: the comments job and the schedules retention. */
@@ -90,6 +126,8 @@ export function runLocalTick(
       localSystemJobs(counted, o.graph, { comments: o.comments !== false, log }),
     // RFC-0008 §10.6: the approver may still approve it, an auto release's key still holds.
     checkApproval: releaseApprovalCheck({ sql: o.sql, graph: o.graph }),
+    // RFC-0008 §11.1: the built-in jobs (their notifications are derived from the runs).
+    builtinInputs: () => localBuiltinInputs(o),
   });
 }
 

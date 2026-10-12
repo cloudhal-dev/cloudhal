@@ -815,9 +815,18 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
       );
       return c.json({ runId, window });
     }
-    // Built-in jobs run in bounded steps on their schedule (rollout step 9); "Run now" for them
-    // comes with the built-in runner.
-    throw apiError(409, "not_available", "built-in jobs run on their schedule in this version");
+    // Built-ins (rollout step 9): a run for this minute that the next tick steps in bounded
+    // steps; afterwards the automation returns to its scheduled next run.
+    const runId = await deps.store.startBuiltinNow({ automation: a, now: at.toISOString() });
+    if (!runId)
+      throw apiError(
+        409,
+        "conflict",
+        "a run of this automation is in progress or already ran this minute",
+      );
+    poke(deps, at.toISOString());
+    await auditPerson(c, "automation.run-now", {}, { siteId: s.id, automationId: a.id, runId });
+    return c.json({ runId });
   })
   .delete("/automations/:automationId", async (c) => {
     const deps = schedulesOf(c);

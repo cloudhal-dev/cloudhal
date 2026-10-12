@@ -29,6 +29,11 @@ import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { type CachePurgePlan, SiteGraphStore, siteCacheTag } from "@cloudhal/core-ts";
 import {
+  type BuiltinInputs,
+  type NotFoundAnalytics,
+  notFoundFromAnalytics,
+} from "@cloudhal/core-ts/automations";
+import {
   CRON_RUNTIME,
   type ReleasePurge,
   type ReleasePurger,
@@ -66,6 +71,8 @@ export interface SchedulerEnv {
   CLOUDHAL_SCHEDULER?: string;
   /** `paid` lifts the per-tick budget to Workers Paid's (§8.2); default `free`. */
   CLOUDHAL_TICK_BUDGET?: string;
+  /** The site the site Worker serves (the feed check fetches only that site's feed). */
+  CLOUDHAL_SITE_ID?: string;
   /** `off`: automations stop; releases and gates are unaffected (§11.6). */
   CLOUDHAL_AUTOMATIONS?: string;
   /** Legacy (before RFC-0008): `off` meant "no cron slot", read as `alarm`. */
@@ -209,7 +216,9 @@ export type AnalyticsRollup = (
     readonly retained: number;
     readonly failed: readonly { siteId: string; day: string; error: string }[];
   }>;
-  feature(): { reader: string };
+  feature(): { reader: string; enabled?: boolean };
+  /** Analytics' `renders` report (the broken-link sweep's 404 rows, RFC-0008 §11.1). */
+  query?: NotFoundAnalytics["query"];
 };
 
 /**
@@ -282,6 +291,54 @@ export function adminSystemJobs(
   return jobs;
 }
 
+// ───────────────────────────── built-in jobs ─────────────────────────────
+
+const SITE_ORIGIN = "https://site.internal";
+
+/**
+ * Fetches the site's own `/rss.xml` or `/sitemap.xml` through the `SITE` binding, as readers get
+ * them (RFC-0008 §11.1 `feed-check`). The site Worker serves one site (`CLOUDHAL_SITE_ID`): for
+ * any other site of the deployment the answer is undefined (not served from here).
+ */
+export function siteDocumentFetcher(
+  env: SchedulerEnv,
+): NonNullable<BuiltinInputs["fetchDocument"]> | undefined {
+  const site = env.SITE;
+  if (!site) return undefined;
+  return async ({ siteId, path }) => {
+    if (env.CLOUDHAL_SITE_ID && env.CLOUDHAL_SITE_ID !== siteId) return undefined;
+    const res = await site.fetch(`${SITE_ORIGIN}${path}`, {
+      headers: { accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.1" },
+    });
+    const contentType = res.headers.get("content-type");
+    return {
+      status: res.status,
+      ...(contentType ? { contentType } : {}),
+      body: await res.text(),
+    };
+  };
+}
+
+/** What the admin Worker adds for the built-in jobs: analytics' 404 rows and the feed fetcher. */
+export function adminBuiltinInputs(
+  env: SchedulerEnv,
+  analytics: ReturnType<AnalyticsRollup> | undefined,
+): BuiltinInputs {
+  const query = analytics?.query;
+  const fetchDocument = siteDocumentFetcher(env);
+  return {
+    ...(analytics && query
+      ? {
+          notFound: notFoundFromAnalytics({
+            feature: () => ({ enabled: analytics.feature().enabled === true }),
+            query: (q) => query.call(analytics, q),
+          }),
+        }
+      : {}),
+    ...(fetchDocument ? { fetchDocument } : {}),
+  };
+}
+
 // ───────────────────────────── one tick ─────────────────────────────
 
 export interface AdminTickOptions {
@@ -338,6 +395,8 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
       }),
     purge: ({ counted }) => releasePurger(env, counted, { log: o.log, wake: flush }),
     automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
+    // RFC-0008 §11.1: the built-in jobs read analytics' 404 rows and the site's own feed.
+    builtinInputs: ({ counted }) => adminBuiltinInputs(env, o.analytics(counted, o.now)),
     // RFC-0008 §10.6: the approver may still approve it, an auto release's key still holds.
     checkApproval: releaseApprovalCheck({ sql, graph: new SiteGraphStore({ sql, blobs }) }),
   });

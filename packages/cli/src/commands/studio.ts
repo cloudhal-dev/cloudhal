@@ -66,7 +66,13 @@ export async function studio(
   const ticker =
     options.scheduler === false || options.commentsJob === false
       ? undefined
-      : startLocalScheduler({ sql: local.sql, blobs: local.blobs, graph: local.store });
+      : startLocalScheduler({
+          sql: local.sql,
+          blobs: local.blobs,
+          graph: local.store,
+          // RFC-0008 §11.1: the broken-link sweep's 404 rows
+          ...(analytics.feature().enabled ? { analytics } : {}),
+        });
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,

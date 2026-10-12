@@ -24,6 +24,8 @@ export async function prepareAdminWorker(options: {
   projectDir: string;
   dataDir: string;
   names: DeploymentNames;
+  /** The site the site Worker serves (`CLOUDHAL_SITE_ID`; the feed check fetches only its feed). */
+  siteId?: string | undefined;
   /** Built Studio (`apps/studio/dist`). */
   studioDir: string;
   skillsDir?: string | undefined;
@@ -54,6 +56,7 @@ export async function prepareAdminWorker(options: {
     adminWorkerConfig({
       ...existing,
       ...options.names,
+      ...(options.siteId ? { siteId: options.siteId } : {}),
       main: "./worker.ts",
       studioDir: path.relative(dir, options.studioDir) || ".",
       ...(options.domain ? { domain: options.domain } : {}),
