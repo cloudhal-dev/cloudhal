@@ -6,7 +6,11 @@
  *   (`agents:manage`, RFC-0005)
  * - `POST   /`            {name, mode?, scopes?} → summary + `key` (shown once). Scopes must fit
  *   the caller's role (400 `scope_above_role`), the mode its cap (400 `mode_above_role`)
- * - `PATCH  /:id`         {mode} → summary (own keys; audited)
+ * - `PATCH  /:id`         {mode} → summary (own keys; audited `agent-key.mode`), or
+ *   {addScopes: ["analytics:read"]} → summary: adds a read-only scope older keys lack (RFC-0006
+ *   §9.1 "Allow analytics"; own keys, or any with `agents:manage`; it must fit the caller's and the
+ *   creator's role, 400 `scope_above_role`; anything but `ADDABLE_KEY_SCOPES` is 400
+ *   `scope_not_addable`; audited `agent-key.scopes` when something was added)
  * - `POST   /:id/elevation` {mode, minutes, reason?} → summary: a more autonomous mode until the
  *   time is up, then the key's own mode again (ADR-0016; only the key's creator; audited)
  * - `DELETE /:id/elevation` → summary: ends it early (own keys, or any with `agents:manage`; audited)
@@ -16,7 +20,7 @@
  */
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
 import { Hono } from "hono";
-import type { AgentKeyService } from "../auth.ts";
+import { ADDABLE_KEY_SCOPES, type AgentKeyService } from "../auth.ts";
 import type { Env } from "../context.ts";
 import { badRequest, unauthorized } from "../errors.ts";
 import { param } from "../params.ts";
@@ -55,7 +59,38 @@ export function agentKeys(service: AgentKeyService): Hono<Env> {
     .patch("/:id", async (c) => {
       const actor = c.get("actor");
       if (!actor) throw unauthorized();
-      const body = ((await c.req.json().catch(() => ({}))) ?? {}) as { mode?: unknown };
+      const body = ((await c.req.json().catch(() => ({}))) ?? {}) as {
+        mode?: unknown;
+        addScopes?: unknown;
+      };
+      if (body.addScopes !== undefined) {
+        if (body.mode !== undefined) throw badRequest("send either mode or addScopes, not both");
+        if (
+          !Array.isArray(body.addScopes) ||
+          !body.addScopes.length ||
+          !body.addScopes.every((s) => typeof s === "string")
+        )
+          throw badRequest(
+            `addScopes must be a non-empty list (of ${ADDABLE_KEY_SCOPES.join(", ")})`,
+          );
+        const { key, added } = await service.addScopes({
+          headers: c.req.raw.headers,
+          id: param(c, "id"),
+          scopes: body.addScopes as Scope[],
+        });
+        if (added.length)
+          await c.get("audit")?.record({
+            at: new Date().toISOString(),
+            actor,
+            tool: "agent-key.scopes",
+            decision: "allow",
+            outcome: "ok",
+            reason: `${key.name ?? key.id}: + ${added.join(", ")}`,
+            input: { keyId: key.id, agentId: key.agentId, added },
+            mode: key.mode,
+          });
+        return c.json(key);
+      }
       if (!isAgentMode(body.mode)) throw badRequest("mode is required (plan, manual, edits, auto)");
       const before = (await service.list({ headers: c.req.raw.headers })).find(
         (k) => k.id === param(c, "id"),

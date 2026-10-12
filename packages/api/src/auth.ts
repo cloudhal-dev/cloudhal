@@ -148,6 +148,17 @@ export interface AgentKeyService {
   }): Promise<AgentKeySummary>;
   /** Ends an elevation early: the creator's own key, or any key with `agents:manage`. */
   endElevation(input: { headers: Headers; id: string }): Promise<AgentKeySummary>;
+  /**
+   * Adds read-only scopes that did not exist when the key was made (`ADDABLE_KEY_SCOPES`, RFC-0006
+   * §9.1 "Allow analytics"): the creator's own key, or any key with `agents:manage`. The scope must
+   * fit both the caller's and the key creator's role (`scope_above_role`): keys stay narrowed to
+   * their creator (RFC-0005 I5). `added` is empty when the key already held every scope.
+   */
+  addScopes(input: {
+    headers: Headers;
+    id: string;
+    scopes: Scope[];
+  }): Promise<{ key: AgentKeySummary; added: Scope[] }>;
   /** The caller's keys; `all` lists every key (`agents:manage`). */
   list(input: { headers: Headers; all?: boolean }): Promise<AgentKeySummary[]>;
   /** Revokes a key: the caller's own, or any key with `agents:manage`. */
@@ -353,6 +364,13 @@ export class AuthError extends Error {
     this.code = options.code ?? "auth";
   }
 }
+
+/**
+ * Scopes a person may add to an existing key (`PATCH /api/agent-keys/:id {addScopes}`). Only
+ * read-only scopes without personal data that new keys get by default but older keys lack:
+ * everything else stays fixed at creation (RFC-0005: promotions never silently empower agents).
+ */
+export const ADDABLE_KEY_SCOPES: readonly Scope[] = ["analytics:read"];
 
 /** Scopes an API key may carry live under the `cloudhal` permission resource. */
 export const API_KEY_PERMISSION_RESOURCE = "cloudhal";
@@ -663,6 +681,41 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
         body: { keyId: id, userId: creator, metadata: { mode: modeOf(key) } },
       });
       return toSummary(row, now(), (await staffStore.member(creator))?.role ?? null);
+    },
+    async addScopes({ headers, id, scopes: requested }) {
+      const bad = requested.filter((s) => !ADDABLE_KEY_SCOPES.includes(s));
+      if (bad.length || !requested.length)
+        throw new AuthError(
+          `only ${ADDABLE_KEY_SCOPES.join(", ")} can be added to an existing key${bad.length ? ` (not ${bad.join(", ")})` : ""}`,
+          { code: "scope_not_addable" },
+        );
+      const { who, key } = await keyFor(headers, id, true);
+      const creator = key.referenceId as string;
+      const creatorRole = (await staffStore.member(creator))?.role ?? null;
+      // The key is narrowed to its creator's role on every call anyway; refusing here keeps the
+      // stored scopes honest (a Contributor's key cannot hold analytics:read, RFC-0006 §9.1).
+      const above = [
+        ...scopesAboveRole(requested, who.member.role),
+        ...(creatorRole ? scopesAboveRole(requested, creatorRole) : requested),
+      ];
+      if (above.length)
+        throw new AuthError(
+          `${creatorRole === who.member.role ? "your role" : "the key creator's role"} cannot give a key ${[...new Set(above)].join(", ")}`,
+          { code: "scope_above_role" },
+        );
+      const stored = storedScopes(key);
+      const added = [...new Set(requested)].filter((s) => !holds(stored, s));
+      if (!added.length) return { key: toSummary(key, now(), creatorRole), added };
+      const elevation = elevationOf(key, now());
+      const row = await api.updateApiKey({
+        body: {
+          keyId: id,
+          userId: creator,
+          permissions: { [API_KEY_PERMISSION_RESOURCE]: [...stored, ...added] },
+          metadata: { mode: modeOf(key), ...(elevation ? { elevation } : {}) },
+        },
+      });
+      return { key: toSummary(row, now(), creatorRole), added };
     },
     async list({ headers, all }) {
       const who = await caller(headers, "sign in to list agent keys");
