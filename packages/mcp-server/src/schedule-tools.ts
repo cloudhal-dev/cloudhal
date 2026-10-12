@@ -33,7 +33,7 @@ import type {
   ScheduleRun,
   Site,
 } from "@cloudhal/core-contracts";
-import { gateChanges } from "@cloudhal/core-ts";
+import { canonicalJson, gateChanges } from "@cloudhal/core-ts";
 import {
   budgetLeft,
   canonicalInstant,
@@ -470,7 +470,7 @@ async function gateOnly(ctx: ToolContext, site: Site, node: ContentEntry | Page)
   if (!live) return false;
   const strip = (n: ContentEntry | Page) => {
     const { availability: _a, rev: _r, updatedAt: _u, ...rest } = n;
-    return JSON.stringify(rest, Object.keys(rest).sort());
+    return canonicalJson(rest);
   };
   return strip(live) === strip(node);
 }
