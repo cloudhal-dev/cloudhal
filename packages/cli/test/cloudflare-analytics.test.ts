@@ -54,6 +54,31 @@ export default {
 };
 `;
 
+/**
+ * Stands in for the Workers Rate Limiting binding (`ANALYTICS_RL`, RFC-0006 §5.5): records the keys
+ * it is asked about; `POST /deny` refuses every key, `POST /throw` makes `limit` fail, `POST /allow`
+ * resets; GET lists the keys, DELETE clears them.
+ */
+const FAKE_RL = `import { WorkerEntrypoint } from "cloudflare:workers";
+const keys = [];
+let mode = "allow";
+export class Limiter extends WorkerEntrypoint {
+  limit(options) {
+    keys.push(options.key);
+    if (mode === "throw") throw new Error("rate limiter unavailable");
+    return { success: mode === "allow" };
+  }
+}
+export default {
+  fetch(request) {
+    const url = new URL(request.url);
+    if (request.method === "POST") mode = url.pathname.slice(1);
+    if (request.method === "DELETE") keys.length = 0;
+    return Response.json(keys);
+  },
+};
+`;
+
 describe("Site Worker analytics on workerd (RFC-0006)", () => {
   let tmp: string;
   let projectDir: string;
@@ -85,13 +110,20 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
           CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify({ enabled: true, vitalsOneIn: 5 }),
           CLOUDHAL_SITE_HOSTS: "edge.example",
         },
-        services: [{ binding: "ANALYTICS", service: "fake-wae", entrypoint: "Dataset" }],
+        services: [
+          { binding: "ANALYTICS", service: "fake-wae", entrypoint: "Dataset" },
+          // `analytics.rateLimit` (§5.5): Miniflare's own limiter cannot be told to refuse, so the
+          // binding is a fake with the same `limit({ key })` shape.
+          { binding: "ANALYTICS_RL", service: "fake-rl", entrypoint: "Limiter" },
+        ],
       },
       "test",
     );
     const config = await buildSiteWorker(projectDir);
     const fake = path.join(tmp, "fake-wae.mjs");
     await writeFile(fake, FAKE_WAE);
+    const fakeRl = path.join(tmp, "fake-rl.mjs");
+    await writeFile(fakeRl, FAKE_RL);
 
     harness = createTestHarness({
       root: projectDir,
@@ -101,6 +133,7 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
           secrets: { CLOUDHAL_PREVIEW_SECRET: PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN: PURGE_TOKEN },
         },
         { config: { name: "fake-wae", main: fake, compatibility_date: COMPATIBILITY_DATE } },
+        { config: { name: "fake-rl", main: fakeRl, compatibility_date: COMPATIBILITY_DATE } },
       ],
     });
     await harness.listen();
@@ -292,6 +325,38 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
     const [withGpc] = await events(1);
     expect(withGpc).toMatchObject({ kind: "pageview", path: "/about" });
     expect(withGpc).not.toHaveProperty("visitor");
+  });
+
+  it("asks the Rate Limiting binding per client by an HMAC (never the IP), and falls back when it fails", async () => {
+    const rl = (method = "GET", p = "/") =>
+      harness
+        .getWorker("fake-rl")
+        .fetch(`http://fake${p}`, { method }) as unknown as Promise<Response>;
+    const keys = async () => (await (await rl()).json()) as string[];
+    await rl("DELETE");
+    await clear();
+    const ip = (n: number) => ({ "cf-connecting-ip": `203.0.113.${n}` });
+    await beacon(view("/about"), ip(41));
+    await beacon(view("/about"), ip(41));
+    await beacon(view("/about"), ip(42));
+    expect(await events(3)).toHaveLength(3);
+    const [k1, k2, k3] = await keys();
+    expect(k1).toMatch(/^[0-9a-f]{32}$/);
+    expect(k2).toBe(k1); // the same client, the same key
+    expect(k3).not.toBe(k1);
+    expect((await keys()).join()).not.toContain("203.0.113");
+
+    // over the shared limit: dropped, still 204
+    await rl("POST", "/deny");
+    await clear();
+    expect((await beacon(view("/about"), ip(43))).status).toBe(204);
+    // a binding that fails: the per-isolate limit alone decides, the view is counted
+    await rl("POST", "/throw");
+    await beacon(view("/about"), ip(44));
+    const after = await events(1);
+    await rl("POST", "/allow");
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ kind: "pageview", path: "/about" });
   });
 
   it("with analytics off for the site: no tag and no writes", async () => {

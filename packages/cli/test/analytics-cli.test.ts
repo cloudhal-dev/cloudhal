@@ -11,8 +11,14 @@ import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import { createApi } from "@cloudhal/api";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ANALYTICS_CRON, adminWorkerConfig, siteWorkerConfig } from "../src/cloudflare/config.ts";
+import {
+  ANALYTICS_CRON,
+  adminWorkerConfig,
+  rateLimitNamespaceId,
+  siteWorkerConfig,
+} from "../src/cloudflare/config.ts";
 import { isCronLimitError, versionAtLeast } from "../src/cloudflare/wrangler.ts";
+import { rateLimitDeployment } from "../src/commands/deploy.ts";
 import { analyticsEnabled, parseAnalyticsConfig } from "../src/config.ts";
 import {
   analyticsExport,
@@ -42,6 +48,25 @@ describe("cloudhal.json analytics and the generated configs", () => {
         extra: 1,
       }),
     ).toEqual({ uniqueVisitors: true, queryBudget: 500, dev: true });
+    // the Rate Limiting binding (§5.5): true, or { limit, namespaceId }, checked leniently
+    expect(parseAnalyticsConfig({ rateLimit: true })).toEqual({ rateLimit: true });
+    expect(
+      parseAnalyticsConfig({ rateLimit: { limit: 60, namespaceId: 1001, extra: "x" } }),
+    ).toEqual({ rateLimit: { limit: 60, namespaceId: "1001" } });
+    expect(parseAnalyticsConfig({ rateLimit: { limit: 0, namespaceId: "abc" } })).toEqual({
+      rateLimit: {},
+    });
+    expect(parseAnalyticsConfig({ rateLimit: "yes" })).toEqual({});
+    expect(rateLimitDeployment({ analytics: { rateLimit: false } }, "newsroom_events")).toEqual({});
+    expect(rateLimitDeployment({ analytics: { rateLimit: {} } }, "newsroom_events")).toEqual({
+      rateLimit: { namespaceId: rateLimitNamespaceId("newsroom_events"), limit: 120 },
+    });
+    expect(
+      rateLimitDeployment(
+        { analytics: { rateLimit: { namespaceId: "4242", limit: 30 } } },
+        "newsroom_events",
+      ),
+    ).toEqual({ rateLimit: { namespaceId: "4242", limit: 30 } });
     expect(analyticsEnabled({})).toBe(false);
     expect(analyticsEnabled({ analytics: {} })).toBe(true);
     expect(analyticsEnabled({ analytics: { enabled: false } })).toBe(false);
@@ -68,6 +93,16 @@ describe("cloudhal.json analytics and the generated configs", () => {
         CLOUDHAL_SITE_HOSTS: "news.example.com",
       },
     });
+    expect(siteWorkerConfig({ ...names, siteId: "site_abcdefgh", analytics })).not.toHaveProperty(
+      "ratelimits",
+    );
+    expect(
+      siteWorkerConfig({
+        ...names,
+        siteId: "site_abcdefgh",
+        analytics: { ...analytics, rateLimit: { namespaceId: "4242", limit: 120 } },
+      }).ratelimits,
+    ).toEqual([{ name: "ANALYTICS_RL", namespace_id: "4242", simple: { limit: 120, period: 60 } }]);
     const admin = { ...names, studioDir: "studio", main: "./worker.ts" };
     expect(adminWorkerConfig(admin)).toMatchObject({ triggers: { crons: [] } });
     expect(adminWorkerConfig(admin)).not.toHaveProperty("analytics");

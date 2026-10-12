@@ -41,11 +41,14 @@ Semantics every store shares (checked by the conformance suite): a visit is an e
 ## Site Worker: beacons and render events
 
 ```ts
-import { BeaconRateLimiter, buildRenderEvent, handleBeacon, RenderEventSampler } from "@cloudhal/analytics";
+import { BeaconRateLimiter, buildRenderEvent, handleBeacon, RenderEventSampler, SharedBeaconRateLimiter } from "@cloudhal/analytics";
 import { createSaltProvider, getEffectiveSettings } from "@cloudhal/analytics/sql";
 import { WaeWriter } from "@cloudhal/analytics/wae";
 
 const limiter = new BeaconRateLimiter();          // per isolate
+// optional, across isolates (`analytics.rateLimit`): a Workers Rate Limiting binding keyed by an
+// HMAC under a deployment secret; fails open, so the per-isolate limit always applies
+const shared = env.ANALYTICS_RL ? new SharedBeaconRateLimiter(env.ANALYTICS_RL, { secret }) : undefined;
 const salt = createSaltProvider(sql);             // memoised per UTC day
 return handleBeacon(request, {                    // 204 for every outcome, 405 for other methods
   siteId,
@@ -54,7 +57,7 @@ return handleBeacon(request, {                    // 204 for every outcome, 405 
   resolvePath: (path) => publishedNode(path),     // { nodeId, nodeKind, locale? } or undefined
   writer: new WaeWriter(env.ANALYTICS),
   salt,
-  rateLimit: (ip, kind) => limiter.allow(ip, kind),
+  rateLimit: async (ip, kind) => (await limiter.allow(ip, kind)) && (await (shared?.allow(ip) ?? true)),
   onError: (m, e) => console.error(m, e),
 });
 ```

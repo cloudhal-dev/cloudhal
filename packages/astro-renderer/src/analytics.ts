@@ -9,7 +9,7 @@
  * - **The tag** (`<script type="module" src="/_cloudhal/p.<hash>.js" data-v="N">`) goes into the
  *   `<head>` of `200` `text/html` **published** responses only, while the setting is on.
  * - **`POST /__cloudhal/e`** runs `@cloudhal/analytics`' beacon handler: same origin, size, agent,
- *   rate, schema, then the path is resolved against the **published** snapshot with the
+ *   rate (per isolate, then the optional Rate Limiting binding across isolates), schema, then the path is resolved against the **published** snapshot with the
  *   renderer's own `resolveRoute` (the browser never names a node), and one event is written.
  * - **Render events** (§5.4) for published HTML `200`s (cache misses by definition), redirects,
  *   `404`, `410`, `451` and `5xx`, never for previews, `/__cloudhal/*`, `/_cloudhal/*` or `HEAD`;
@@ -25,8 +25,10 @@ import {
   handleBeacon,
   normaliseBeaconPath,
   parseAnalyticsDefaults,
+  type RateLimitBinding,
   RenderEventSampler,
   type ResolvedNode,
+  SharedBeaconRateLimiter,
 } from "@cloudhal/analytics";
 import { createSaltProvider, getAnalyticsSettings } from "@cloudhal/analytics/sql";
 import type { Site } from "@cloudhal/core-contracts";
@@ -124,6 +126,12 @@ export interface SiteAnalyticsOptions {
   readonly hosts?: readonly string[];
   /** Also accept the request's own host (`*.workers.dev` on Cloudflare; every host in dev). */
   readonly acceptRequestHost?: (host: string) => boolean;
+  /**
+   * The optional Workers Rate Limiting binding (`analytics.rateLimit`, RFC-0006 §5.5), checked
+   * after the per-isolate limit and keyed by an HMAC under `secret` (a deployment secret every
+   * isolate has). Absent: the per-isolate limits alone apply.
+   */
+  readonly rateLimit?: { readonly binding: RateLimitBinding; readonly secret: string } | undefined;
   readonly now?: () => number;
   readonly onError?: (message: string, error?: unknown) => void;
 }
@@ -147,6 +155,7 @@ export class SiteAnalytics {
   readonly #o: SiteAnalyticsOptions;
   readonly #now: () => number;
   readonly #limiter: BeaconRateLimiter;
+  readonly #shared: SharedBeaconRateLimiter | undefined;
   readonly #sampler: RenderEventSampler;
   readonly #salt: (day: string) => Promise<string>;
   #settings: Memo<EffectiveAnalyticsSettings | undefined> | undefined;
@@ -156,6 +165,12 @@ export class SiteAnalytics {
     this.#o = options;
     this.#now = options.now ?? Date.now;
     this.#limiter = new BeaconRateLimiter({ now: this.#now });
+    this.#shared = options.rateLimit
+      ? new SharedBeaconRateLimiter(options.rateLimit.binding, {
+          secret: options.rateLimit.secret,
+          ...(options.onError ? { onError: options.onError } : {}),
+        })
+      : undefined;
     this.#sampler = new RenderEventSampler({ now: this.#now });
     let salt: ((day: string) => Promise<string>) | undefined;
     this.#salt = (day) => {
@@ -254,7 +269,8 @@ export class SiteAnalytics {
       resolvePath: (path) => publishedNode(source, path),
       writer,
       salt: this.#salt,
-      rateLimit: (ip, kind) => this.#limiter.allow(ip, kind),
+      rateLimit: async (ip, kind) =>
+        (await this.#limiter.allow(ip, kind)) && (await (this.#shared?.allow(ip) ?? true)),
       now: () => new Date(this.#now()),
       ...(extra.clientIp ? { clientIp: extra.clientIp } : {}),
       ...(extra.country ? { country: extra.country } : {}),
