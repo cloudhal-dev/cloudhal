@@ -100,7 +100,14 @@ Every submission passes these checks **before anything is written** to the datab
 
 Add the Turnstile paragraph to your privacy notice (below). Whether Turnstile accepts a `*.workers.dev` hostname is not verified yet (RFC-0007 V2); use a custom domain if it does not.
 
-**Readers without JavaScript** can post through the plain form ("Accept comments from browsers without JavaScript", on by default). These posts carry no proof of work **and no Turnstile token**, so they get stricter limits instead: one per reader every 10 minutes and 20 per site a day. If you turn on Turnstile so that every post is verified, turn this switch off too; readers without JavaScript then see "Comments on this site need JavaScript."
+**Readers without JavaScript** can post through the plain form ("Accept comments from browsers without JavaScript", on by default). These posts carry no proof of work **and no Turnstile token**, so they get stricter limits instead: one per reader every 10 minutes and 20 per site a day.
+
+**With Turnstile on, posts without JavaScript are off** unless you also turn on "Also accept them while Turnstile is on" (`allowWithoutScriptWithTurnstile`). The trade-off:
+
+- **Off (the default with Turnstile):** every stored guest comment passed Turnstile. Readers whose browser runs no JavaScript (some privacy setups, text browsers, some assistive set-ups) see "Comments on this site need JavaScript." and cannot comment.
+- **On:** those readers can comment again, but their posts are not verified by Turnstile or by proof of work. Bots can use the same form, held back only by the limits above (20 such posts a day for the whole site) and by moderation, since every guest comment waits for approval anyway.
+
+Under proof of work the first switch alone decides; the second has no effect.
 
 **Limits** (defaults):
 

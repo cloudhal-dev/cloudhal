@@ -277,6 +277,7 @@ const SETTINGS_KEYS = new Set([
   "protection",
   "turnstileSiteKey",
   "allowWithoutScript",
+  "allowWithoutScriptWithTurnstile",
   "linkLimit",
   "watchWords",
   "blockedWords",
@@ -294,6 +295,7 @@ const RENDERING = [
   "protection",
   "turnstileSiteKey",
   "allowWithoutScript",
+  "allowWithoutScriptWithTurnstile",
 ];
 const SECRET_NAMES = new Set(["turnstile-secret"]);
 const MODERATE_ACTIONS = new Set(["approve", "restore", "hide", "spam", "hold"]);

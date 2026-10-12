@@ -1606,5 +1606,55 @@ export function describeCommentPipelineSuite(label: string, factory: CommentStor
         ),
       ).toMatchObject({ status: 403, error: "proof_failed" });
     });
+
+    it("Turnstile turns posts without JavaScript off unless the owner allows them there too", async () => {
+      const t = await pipeSetup(factory, {
+        turnstile: async () => ({ success: true, hostname: HOST, action: "comment" }),
+      });
+      await t.store.putSettings(
+        SITE,
+        { protection: "turnstile", turnstileSiteKey: "0x4AAAAAAAtest" },
+        1,
+        EDITOR.id,
+      );
+      expect(await t.store.settings(SITE)).toMatchObject({
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: false,
+      });
+      const form = { nodeId: ENTRY, name: "Ali", email: "", website: "", body: "No script here" };
+      const before = t.sql.writes.length;
+      const refused = await handleCommentSubmission(post(form, { form: true }), t.deps);
+      expect(refused).toMatchObject({ status: 403, error: "script_required" });
+      expect(t.sql.writes.length).toBe(before); // nothing written (C2)
+      // the owner's explicit choice: stored alongside, read back, and the post goes through
+      await t.store.putSettings(SITE, { allowWithoutScriptWithTurnstile: true }, 2, EDITOR.id);
+      expect(await t.store.settings(SITE)).toMatchObject({
+        protection: "turnstile",
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: true,
+      });
+      expect(await handleCommentSubmission(post(form, { form: true }), t.deps)).toMatchObject({
+        stored: true,
+      });
+      // the master switch still wins
+      await t.store.putSettings(SITE, { allowWithoutScript: false }, 3, EDITOR.id);
+      expect(
+        await handleCommentSubmission(
+          post({ ...form, body: "Again, no script" }, { form: true }),
+          t.deps,
+        ),
+      ).toMatchObject({ status: 403, error: "script_required" });
+      // back to proof of work: the ordinary switch alone decides
+      await t.store.putSettings(
+        SITE,
+        { protection: "pow", allowWithoutScript: true, allowWithoutScriptWithTurnstile: false },
+        4,
+        EDITOR.id,
+      );
+      expect(await t.store.settings(SITE)).toMatchObject({
+        allowWithoutScript: true,
+        allowWithoutScriptWithTurnstile: false,
+      });
+    });
   });
 }

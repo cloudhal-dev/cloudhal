@@ -32,6 +32,7 @@ import {
   type Protection,
   type RenderPage,
   threadState,
+  withoutScriptAllowed,
 } from "@cloudhal/comments";
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { addCacheTags, commentsCacheTag } from "./cache-tags.ts";
@@ -167,7 +168,7 @@ export async function loadComments(
     page,
     protection: settings.protection,
     turnstileSiteKey: settings.turnstileSiteKey,
-    allowWithoutScript: settings.allowWithoutScript,
+    allowWithoutScript: withoutScriptAllowed(settings),
     notFound,
   };
 }

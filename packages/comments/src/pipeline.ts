@@ -75,7 +75,7 @@ import {
   verifyChallenge,
 } from "./pow.ts";
 import { type CompiledWordList, compileWordList, evaluateContent, ruleLabels } from "./rules.ts";
-import type { CommentSettings } from "./settings.ts";
+import { type CommentSettings, withoutScriptAllowed } from "./settings.ts";
 import { threadState } from "./thread.ts";
 
 export const MAX_BODY_BYTES = 32 * 1024;
@@ -407,7 +407,7 @@ async function checkProof(
   const token = typeof sub.turnstileToken === "string" ? sub.turnstileToken : undefined;
   const anyProof = challenge !== undefined || solution !== undefined || token !== undefined;
   if (!anyProof && form) {
-    if (!settings.allowWithoutScript)
+    if (!withoutScriptAllowed(settings))
       return { ok: false, outcome: err(403, "script_required", form, { returnTo }) };
     return { ok: true, proof: "none", challengeId: null };
   }

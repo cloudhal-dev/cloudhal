@@ -50,8 +50,18 @@ export interface CommentSettings {
   readonly protection: Protection;
   /** Public Turnstile widget key (the secret is in `comment_secrets`). */
   readonly turnstileSiteKey: string | null;
-  /** Accept JavaScript-less posts under the stricter limits (§6.5). */
+  /**
+   * Accept JavaScript-less posts under the stricter limits (§6.5). They carry no proof of work and
+   * no Turnstile token, so with Turnstile on they are accepted only when
+   * `allowWithoutScriptWithTurnstile` is also true (see `withoutScriptAllowed`).
+   */
   readonly allowWithoutScript: boolean;
+  /**
+   * Keep accepting JavaScript-less posts while Turnstile protects the form (default false). An
+   * owner who turns on Turnstile expects every post to be verified; these posts are not, so the
+   * owner must opt in explicitly (threat-model review of 2026-10-12, item 5).
+   */
+  readonly allowWithoutScriptWithTurnstile: boolean;
   /** Links above this add the `links` label; above 10 the comment is refused. */
   readonly linkLimit: number;
   /** Add the `watch-word` label. */
@@ -82,7 +92,10 @@ export const DEFAULT_RETENTION: RetentionSettings = {
   resolvedReportDays: 183,
 };
 
-/** The defaults: comments off (§0.2 D4), 90-day close, proof of work, JavaScript-less posts on. */
+/**
+ * The defaults: comments off (§0.2 D4), 90-day close, proof of work, JavaScript-less posts on
+ * (under proof of work only: off while Turnstile is on unless the owner allows them there too).
+ */
 export function defaultCommentSettings(siteId: string): CommentSettings {
   return {
     siteId,
@@ -93,6 +106,7 @@ export function defaultCommentSettings(siteId: string): CommentSettings {
     protection: "pow",
     turnstileSiteKey: null,
     allowWithoutScript: true,
+    allowWithoutScriptWithTurnstile: false,
     linkLimit: 2,
     watchWords: [],
     blockedWords: [],
@@ -180,6 +194,7 @@ export function applySettingsInput(
     "protection",
     "turnstileSiteKey",
     "allowWithoutScript",
+    "allowWithoutScriptWithTurnstile",
     "linkLimit",
     "watchWords",
     "blockedWords",
@@ -283,6 +298,10 @@ export function applySettingsInput(
     protection,
     turnstileSiteKey,
     allowWithoutScript: bool("allowWithoutScript", current.allowWithoutScript),
+    allowWithoutScriptWithTurnstile: bool(
+      "allowWithoutScriptWithTurnstile",
+      current.allowWithoutScriptWithTurnstile,
+    ),
     linkLimit,
     watchWords:
       input.watchWords === undefined
@@ -297,6 +316,23 @@ export function applySettingsInput(
     retention,
     planHint,
   };
+}
+
+/**
+ * Whether posts without JavaScript (no proof of work, no Turnstile token) are accepted (§6.2 step
+ * 7, D11): when the owner allows them, and, while Turnstile is on, only when the owner allowed them
+ * under Turnstile as well.
+ */
+export function withoutScriptAllowed(
+  settings: Pick<
+    CommentSettings,
+    "allowWithoutScript" | "allowWithoutScriptWithTurnstile" | "protection"
+  >,
+): boolean {
+  return (
+    settings.allowWithoutScript &&
+    (settings.protection !== "turnstile" || settings.allowWithoutScriptWithTurnstile)
+  );
 }
 
 /** Whether new comments are accepted in a collection (site and collection both on). */

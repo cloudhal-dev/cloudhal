@@ -29,6 +29,7 @@ import { commentRecordHash, emailHmac, ID_PREFIX, newCommentsId, sealEmail } fro
 import { type CommentCounts, num } from "../model.ts";
 import { checkEmail, normalizeEmail } from "../normalize.ts";
 import { commentsCacheTag, PURGE_LIMITS } from "../purge.ts";
+import { withoutScriptAllowed } from "../settings.ts";
 import type { SqlCommentStore } from "./store.ts";
 
 /** The first line of an export file. */
@@ -491,7 +492,7 @@ export async function commentsStatus(
         .filter(([, c]) => c.enabled)
         .map(([name]) => name),
       protection: settings.protection,
-      allowWithoutScript: settings.allowWithoutScript,
+      allowWithoutScript: withoutScriptAllowed(settings),
       closeAfterDays: settings.closeAfterDays,
       stored: settings.rev > 0,
     },

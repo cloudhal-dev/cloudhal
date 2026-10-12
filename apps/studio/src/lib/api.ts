@@ -1265,6 +1265,11 @@ export interface CommentSettings {
   protection: "pow" | "turnstile";
   turnstileSiteKey: string | null;
   allowWithoutScript: boolean;
+  /**
+   * Also accept posts without JavaScript while Turnstile is on (default false): they carry no
+   * Turnstile token. Without it, turning on Turnstile turns these posts off.
+   */
+  allowWithoutScriptWithTurnstile: boolean;
   linkLimit: number;
   watchWords: string[];
   blockedWords: string[];

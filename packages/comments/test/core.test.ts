@@ -34,6 +34,7 @@ import {
   threadState,
   UNKNOWN_CLIENT_KEY,
   verifyChallenge,
+  withoutScriptAllowed,
 } from "../src/index.ts";
 
 const SECRET = "test-only-comments-key-0123456789abcdef";
@@ -299,6 +300,29 @@ describe("settings and threadState (§4.5)", () => {
       applySettingsInput(d, { retention: { clientDataDays: 7 } }).retention.clientDataDays,
     ).toBe(7);
     expect(MAX_CLIENT_DATA_DAYS).toBe(30);
+  });
+
+  it("posts without JavaScript: on under proof of work, off under Turnstile unless allowed there", () => {
+    const d = defaultCommentSettings("site_abcdef");
+    expect(d).toMatchObject({ allowWithoutScript: true, allowWithoutScriptWithTurnstile: false });
+    expect(withoutScriptAllowed(d)).toBe(true);
+    const ts = applySettingsInput(d, { protection: "turnstile", turnstileSiteKey: "0x4AAAAAAA" });
+    expect(withoutScriptAllowed(ts)).toBe(false);
+    expect(
+      withoutScriptAllowed(applySettingsInput(ts, { allowWithoutScriptWithTurnstile: true })),
+    ).toBe(true);
+    expect(
+      withoutScriptAllowed(
+        applySettingsInput(ts, {
+          allowWithoutScriptWithTurnstile: true,
+          allowWithoutScript: false,
+        }),
+      ),
+    ).toBe(false);
+    expect(withoutScriptAllowed(applySettingsInput(d, { allowWithoutScript: false }))).toBe(false);
+    expect(() =>
+      applySettingsInput(d, { allowWithoutScriptWithTurnstile: "yes" } as never),
+    ).toThrow(CommentSettingsError);
   });
 
   it("open until first publication + closeAfterDays (collection, else site)", () => {

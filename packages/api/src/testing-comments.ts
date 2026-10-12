@@ -454,6 +454,23 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       });
       expect(tooLong.status).toBe(400);
       expect(String(tooLong.body.message)).toMatch(/clientDataDays.*1 to 30/);
+      // Turnstile turns posts without JavaScript off until the owner allows them there too
+      const ts = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 2, protection: "turnstile", turnstileSiteKey: "1x00000000publickey" },
+      });
+      expect(ts.body).toMatchObject({
+        settings: { rev: 3, allowWithoutScript: true, allowWithoutScriptWithTurnstile: false },
+        purge: "tags",
+      });
+      const optIn = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 3, allowWithoutScriptWithTurnstile: true },
+      });
+      expect(optIn.body).toMatchObject({
+        settings: { rev: 4, allowWithoutScriptWithTurnstile: true },
+        purge: "tags",
+      });
       const secret = await call(`${CM()}/settings/secrets/turnstile-secret`, "administrator", {
         method: "PUT",
         body: { value: "0x4AAAAAAA-secret-value" },
