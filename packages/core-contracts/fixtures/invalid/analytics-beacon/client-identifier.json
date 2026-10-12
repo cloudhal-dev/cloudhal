@@ -1,0 +1,9 @@
+{
+  "reason": "The script sends no identifier of any kind; only the server may derive a daily hash",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "path": "/",
+    "visitorId": "c0ffee"
+  }
+}

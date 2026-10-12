@@ -1,0 +1,9 @@
+{
+  "reason": "A vitals beacon states the sampling it was served with",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "vitals",
+    "path": "/",
+    "lcp": 1200
+  }
+}

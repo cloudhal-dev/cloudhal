@@ -1,0 +1,335 @@
+{
+  "description": "Shared fixture for the comment link rule (RFC-0007 §6.4, §8.1, §14): parseCommentText(text) must equal paragraphs. Used by @cloudhal/comments and, once reconciled, by @cloudhal/ui's comment blocks.",
+  "cases": [
+    {
+      "name": "paragraphs and lines",
+      "text": "First line\r\nsecond line\n\n\n\nNext paragraph",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "First line"
+            }
+          ],
+          [
+            {
+              "kind": "text",
+              "text": "second line"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "kind": "text",
+              "text": "Next paragraph"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "blank line with spaces splits paragraphs",
+      "text": "one\n  \t\ntwo",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "one"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "kind": "text",
+              "text": "two"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "empty",
+      "text": "  \n\n ",
+      "paragraphs": []
+    },
+    {
+      "name": "https with query",
+      "text": "https://example.com/a?b=1",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "link",
+              "text": "https://example.com/a?b=1",
+              "href": "https://example.com/a?b=1"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "http, www and javascript stay text",
+      "text": "http://example.com www.example.com javascript:alert(1)",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "http://example.com www.example.com javascript:alert(1)"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "credentials stay text",
+      "text": "https://bank.example@evil.example/login",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "https://bank.example@evil.example/login"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "dotless host stays text",
+      "text": "https://localhost/x",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "https://localhost/x"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "trailing-dot host stays text",
+      "text": "https://example.com./x",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "https://example.com./x"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "glued to a word",
+      "text": "foohttps://example.com",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "foohttps://example.com"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "glued to an underscore",
+      "text": "_https://example.com",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "_https://example.com"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "punctuation and brackets",
+      "text": "See https://example.com/x, or (https://en.wikipedia.org/wiki/Ferry_(boat)) or http://old.example and www.example.com",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "See "
+            },
+            {
+              "kind": "link",
+              "text": "https://example.com/x",
+              "href": "https://example.com/x"
+            },
+            {
+              "kind": "text",
+              "text": ", or ("
+            },
+            {
+              "kind": "link",
+              "text": "https://en.wikipedia.org/wiki/Ferry_(boat)",
+              "href": "https://en.wikipedia.org/wiki/Ferry_(boat)"
+            },
+            {
+              "kind": "text",
+              "text": ") or http://old.example and www.example.com"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "trailing quote marks",
+      "text": "“https://example.com/q” and «https://example.org»",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "“"
+            },
+            {
+              "kind": "link",
+              "text": "https://example.com/q",
+              "href": "https://example.com/q"
+            },
+            {
+              "kind": "text",
+              "text": "” and «"
+            },
+            {
+              "kind": "link",
+              "text": "https://example.org",
+              "href": "https://example.org/"
+            },
+            {
+              "kind": "text",
+              "text": "»"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "https inside an http candidate stays text",
+      "text": "http://a.example/?u=https://b.example",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "http://a.example/?u=https://b.example"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "markup stays text",
+      "text": "<script>alert(1)</script> <a href=\"https://x.example\">x</a>",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "text",
+              "text": "<script>alert(1)</script> <a href=\""
+            },
+            {
+              "kind": "link",
+              "text": "https://x.example",
+              "href": "https://x.example/"
+            },
+            {
+              "kind": "text",
+              "text": "\">x</a>"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "quote ends the candidate",
+      "text": "https://a.example/\"onmouseover=alert(1)",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "link",
+              "text": "https://a.example/",
+              "href": "https://a.example/"
+            },
+            {
+              "kind": "text",
+              "text": "\"onmouseover=alert(1)"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "upper-case scheme",
+      "text": "HTTPS://Example.COM/Path",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "link",
+              "text": "HTTPS://Example.COM/Path",
+              "href": "https://example.com/Path"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "international host in punycode",
+      "text": "https://bücher.example/kitap",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "link",
+              "text": "https://bücher.example/kitap",
+              "href": "https://xn--bcher-kva.example/kitap"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "two links on two lines",
+      "text": "https://a.example\nhttps://b.example.",
+      "paragraphs": [
+        [
+          [
+            {
+              "kind": "link",
+              "text": "https://a.example",
+              "href": "https://a.example/"
+            }
+          ],
+          [
+            {
+              "kind": "link",
+              "text": "https://b.example",
+              "href": "https://b.example/"
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ]
+        ]
+      ]
+    }
+  ]
+}

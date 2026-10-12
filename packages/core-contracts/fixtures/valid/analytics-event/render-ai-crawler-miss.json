@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "render",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T03:41:27Z",
+  "path": "/posts/ferry-timetables",
+  "status": 200,
+  "nodeId": "entry_01HZX8K3Q9FT",
+  "nodeKind": "entry",
+  "device": "bot",
+  "crawler": "gptbot",
+  "renderMs": 61
+}

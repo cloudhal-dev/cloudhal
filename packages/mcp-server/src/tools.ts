@@ -23,7 +23,7 @@ import {
   ownOnlyChangeSet,
 } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
-import type { ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
+import type { Asset, ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
   PageSchema,
@@ -33,6 +33,10 @@ import {
 } from "@cloudhal/core-contracts";
 import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
+import { assetRefsOf } from "@cloudhal/core-ts/media";
+import { analyticsTools } from "./analytics-tools.ts";
+import { assetTools, describeAsset } from "./asset-tools.ts";
+import { commentTools } from "./comment-tools.ts";
 import {
   ACTOR_OWNERSHIP,
   autoSnapshot,
@@ -74,6 +78,7 @@ import {
 
 export {
   type JsonSchema,
+  type MediaToolOptions,
   type ToolContext,
   type ToolDefinition,
   ToolError,
@@ -87,6 +92,37 @@ const ENTRY = strip(ContentEntrySchema);
 const SNAPSHOT = strip(SnapshotSchema);
 const SECTION = strip(SectionSchema);
 type Seo = NonNullable<Page["seo"]>;
+
+/** An article's cover image by asset (RFC-0004): `{ assetId, alt? }`; the store fills in the rest. */
+const COVER_INPUT: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["assetId"],
+  description:
+    "Cover image from the media library (list_assets, upload_asset). alt overrides the file's own alt text for this article.",
+  properties: { assetId: id, alt: str("Alt text for this use", { maxLength: 500 }) },
+};
+
+/** The media-library assets a page or article refers to, by id, so previews render them (RFC-0004). */
+async function assetsOf(
+  ctx: ToolContext,
+  kind: "page" | "contentEntry",
+  node: Page | ContentEntry,
+): Promise<Map<string, Asset>> {
+  const ids = [...new Set(assetRefsOf(kind, node).map((r) => r.assetId))];
+  const found = await Promise.all(ids.map((id) => ctx.store.getAsset(id)));
+  return new Map(
+    found
+      .filter((a): a is Asset => a !== undefined && a.siteId === node.siteId)
+      .map((a) => [a.id, a]),
+  );
+}
+
+function coverImage(input: unknown): NonNullable<ContentEntry["coverImage"]> {
+  const c = input as { assetId: string; alt?: string };
+  // `src` is written by the store from the asset (invariant 8).
+  return { assetId: c.assetId, alt: c.alt ?? "", src: `asset:${c.assetId}` };
+}
 
 /** Agents write markdown only; raw HTML sections are for people in Studio (security review H3). */
 function assertNoHtmlSections(sections: unknown): void {
@@ -107,6 +143,7 @@ const KIND_LABEL: Record<string, string> = {
   term: "term",
   redirect: "redirect",
   menu: "menu",
+  asset: "media",
 };
 
 /**
@@ -146,6 +183,19 @@ async function describeChanges(
         return undefined;
     }
   };
+  /** Media lines name the file, its type, size and the articles or pages using it (§6.2). */
+  const assetLine = async (sign: string, ref: { id: string; kind: string }) => {
+    const asset = await ctx.store.getAsset(ref.id);
+    if (!asset) return undefined;
+    const usage = (await ctx.store.assetUsage(asset.siteId, [asset.id])).get(asset.id);
+    const first = usage?.refs[0];
+    let user: string | undefined;
+    if (first?.nodeKind === "contentEntry")
+      user = (await ctx.store.getContentEntry(first.nodeId))?.title;
+    else if (first?.nodeKind === "page") user = (await ctx.store.getPage(first.nodeId))?.title;
+    const more = usage && usage.total > 1 ? ` and ${usage.total - 1} more` : "";
+    return `${sign} ${describeAsset(asset, locale)}${user ? `, used by "${quote(user)}"${more}` : ""}${asset.status === "retired" ? " (retired)" : ""}`;
+  };
   const deltas = async (
     ref: { id: string; kind: string },
     before?: SnapshotDiff["added"][number],
@@ -173,6 +223,13 @@ async function describeChanges(
       if (out.length >= 8) {
         out.push(`… and ${diff.added.length + diff.changed.length + diff.removed.length - 8} more`);
         return out;
+      }
+      if (ref.kind === "asset" && sign !== "−") {
+        const line = await assetLine(sign, ref);
+        if (line) {
+          out.push(line);
+          continue;
+        }
       }
       const t = sign === "−" ? undefined : await title(ref);
       const d = sign === "−" ? "" : await deltas(ref, before);
@@ -249,21 +306,45 @@ export function hoistDefs(schema: JsonSchema): JsonSchema {
     : root;
 }
 
+/**
+ * Inputs may name an image by asset alone (`{ assetId, alt? }`, RFC-0004 §2.2): the store writes
+ * `src`, `width` and `height`. So an input ImageRef needs `src` or `assetId`, and `alt` may be left
+ * out; stored documents keep the contract's strict shape.
+ */
+export function relaxImageRefs(schema: JsonSchema): JsonSchema {
+  const defs = schema.$defs as Record<string, JsonSchema> | undefined;
+  const ref = defs?.ImageRef;
+  if (!ref) return schema;
+  const { required: _r, ...rest } = ref;
+  return {
+    ...schema,
+    $defs: {
+      ...defs,
+      ImageRef: { ...rest, anyOf: [{ required: ["src"] }, { required: ["assetId"] }] },
+    },
+  };
+}
+
 /** All tools, in the deterministic order `tools/list` exposes them. */
 export function defineTools(): ToolDefinition[] {
   const raw = rawTools();
-  // Taxonomy, term and redirect tools (RFC-0002 §6.2), then menu tools (RFC-0003 §6.1), follow
-  // the article tools.
+  // Taxonomy, term and redirect tools (RFC-0002 §6.2), then menu tools (RFC-0003 §6.1) and
+  // media tools (RFC-0004 §6.2), follow the article tools.
   const at = raw.findIndex((t) => t.name === "delete_entry") + 1;
   return [
     ...raw.slice(0, at),
     ...taxonomyTools(),
     ...menuTools(),
+    ...assetTools(),
     ...raw.slice(at),
+    // RFC-0006 §9.3: read-only analytics (`analytics:read`).
+    ...analyticsTools(),
+    // RFC-0007 §11: reader comments (read, advisory labels, reductions; approvals for the rest).
+    ...commentTools(),
     ...elevationTools(),
   ].map((t) => ({
     ...t,
-    inputSchema: hoistDefs(t.inputSchema),
+    inputSchema: relaxImageRefs(hoistDefs(t.inputSchema)),
     outputSchema: hoistDefs(t.outputSchema),
   }));
 }
@@ -576,9 +657,12 @@ function rawTools(): ToolDefinition[] {
           locale: str("BCP 47 locale; defaults to the site's default locale"),
           title: str("Title"),
           summary: str("One or two sentences"),
-          body: str("Markdown body"),
+          body: str(
+            "Markdown body. Media from the library: ![alt](asset:<assetId>) for images, [label](asset:<assetId>) for downloads.",
+          ),
           terms: TERMS_INPUT,
           tags: TAGS_INPUT,
+          coverImage: COVER_INPUT,
           fields: { type: "object", description: "Collection-specific fields" },
         },
         ["siteId", "slug", "title", "body"],
@@ -615,6 +699,7 @@ function rawTools(): ToolDefinition[] {
             fields: (a.fields as Record<string, unknown> | undefined) ?? {},
             tags,
             ...(terms ? { terms } : {}),
+            ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
             author: ctx.principal.actor,
           });
           await reportDeltas(ctx, undefined, entry);
@@ -642,6 +727,11 @@ function rawTools(): ToolDefinition[] {
           slug: str("Slug", { pattern: SLUG_PATTERN, maxLength: 128 }),
           terms: TERMS_INPUT,
           tags: TAGS_INPUT,
+          coverImage: {
+            ...COVER_INPUT,
+            type: ["object", "null"],
+            description: "Cover image; null removes it",
+          },
           status: { type: "string", enum: ["draft", "review", "published", "archived"] },
         },
         ["siteId", "entryId", "rev"],
@@ -677,6 +767,11 @@ function rawTools(): ToolDefinition[] {
             ? `slug ${entry.slug} → ${a.slug as string}${entry.status === "published" || entry.publishedAt ? " (leaves a redirect)" : ""}`
             : "",
           a.status && a.status !== entry.status ? `status → ${a.status as string}` : "",
+          a.coverImage !== undefined
+            ? a.coverImage === null
+              ? "remove cover image"
+              : "cover image"
+            : "",
         ].filter(Boolean);
         if (a.terms || a.tags) {
           try {
@@ -713,9 +808,16 @@ function rawTools(): ToolDefinition[] {
           status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
         });
         const { terms, tags } = await entryTerms(ctx, site, entry, a);
-        const { terms: _old, ...rest } = entry;
+        const { terms: _old, coverImage: oldCover, ...rest } = entry;
+        const cover =
+          a.coverImage === undefined
+            ? oldCover
+            : a.coverImage === null
+              ? undefined
+              : coverImage(a.coverImage);
         const next: ContentEntry = {
           ...rest,
+          ...(cover ? { coverImage: cover } : {}),
           ...(a.title ? { title: a.title as string } : {}),
           ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
           ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
@@ -903,7 +1005,9 @@ function rawTools(): ToolDefinition[] {
           const entry = await ctx.store.getContentEntry(a.entryId as string);
           if (!entry || entry.siteId !== site.id)
             throw new ToolError("not_found", `entry ${a.entryId} not found`);
-          doc = renderEntryPreview(site, entry);
+          doc = renderEntryPreview(site, entry, {
+            assets: await assetsOf(ctx, "contentEntry", entry),
+          });
         } else if (a.pageId) {
           const page = await ctx.store.getPage(a.pageId as string);
           if (!page || page.siteId !== site.id)
@@ -920,7 +1024,9 @@ function rawTools(): ToolDefinition[] {
               collections.map(async (c) => [c, await ctx.store.listContentEntries(site.id, c)]),
             ),
           );
-          doc = renderPagePreview(site, page, entries);
+          doc = renderPagePreview(site, page, entries, {
+            assets: await assetsOf(ctx, "page", page),
+          });
         } else {
           throw new ToolError("invalid", "pass pageId or entryId");
         }
@@ -1018,6 +1124,7 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
     annotations: t.annotations,
     ...(t.requiresApproval ? { requiresApproval: true } : {}),
     ...(t.own ? { own: t.own } : {}),
+    ...(t.classify ? { classify: t.classify } : {}),
   }));
 }
 
@@ -1074,10 +1181,11 @@ export async function runTool(
   const started = Date.now();
   let decision = deps.policy.evaluate(ctx.principal, def.name, {
     confirmed: deps.confirmed ?? false,
+    args,
   });
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
   const limit = decision.kind === "deny" ? undefined : decision.limit;
-  ctx = { ...ctx, limit };
+  ctx = { ...ctx, limit, confirmed: deps.confirmed === true };
   // Own-only publish (I10): an Author's (or their agent's) publish that carries someone else's
   // work, or structure, waits for someone whose role allows it (cause `role`).
   if (limit?.target === "changeset" && !deps.approved && siteId && decision.kind !== "deny") {
@@ -1092,13 +1200,14 @@ export async function runTool(
       };
     }
   }
+  const audited = def.auditArgs ? def.auditArgs(args) : args;
   const base = {
     at: new Date().toISOString(),
     actor: ctx.principal.actor,
     siteId,
     tool: def.name,
     skill: ctx.principal.skill?.name,
-    input: args,
+    input: audited,
     mode: effectiveMode(ctx.principal),
     ...(ctx.principal.actor.kind === "agent" && ctx.principal.elevation
       ? { elevation: ctx.principal.elevation }
@@ -1135,7 +1244,11 @@ export async function runTool(
     decision.autoApprove === "low-risk-publish" &&
     siteId
   ) {
-    autoCheck = checkAutoPublish(await ctx.store.pendingChanges(siteId));
+    const pending = await ctx.store.pendingChanges(siteId);
+    // New raster images used only by the articles in this publish ride along (RFC-0004 §6.3).
+    autoCheck = checkAutoPublish(pending, {
+      ridingAssets: await ctx.store.ridingAssets(siteId, pending),
+    });
     if (autoCheck.lowRisk)
       autoNote = `auto mode: published without approval (${describeAutoCheck(autoCheck)})`;
     else
@@ -1173,7 +1286,7 @@ export async function runTool(
     const snapshotId = (result as { snapshot?: { id?: string } } | undefined)?.snapshot?.id;
     await deps.audit?.record({
       ...base,
-      ...(effect ? { input: { ...args, effect } } : {}),
+      ...(effect ? { input: { ...audited, effect } } : {}),
       decision: "allow",
       outcome: "ok",
       snapshotId,

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/comment-submission.schema.json",
+  "title": "CommentSubmission",
+  "description": "What a browser may send to the site Worker's comment endpoints (RFC-0007): `POST /__cloudhal/comments` (a comment) and `POST /__cloudhal/comments/report` (a report). Forms post application/x-www-form-urlencoded and the comments module posts JSON; the server builds this object from either (the endpoint sets `kind`, the server sets `schemaVersion`) and checks it with the precompiled validator before anything else reads it. Everything in it is untrusted. It is loose where the server normalises (it trims, NFC-normalises and re-checks text against the stored Comment contract) and strict where a browser has no business sending something: there is no field for a status, a site, an author kind, a label, an IP address or anything the server derives itself.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "CommentPostSubmission",
+      "description": "A new comment or a reply.",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "nodeId", "name", "body"],
+      "properties": {
+        "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "kind": { "type": "string", "enum": ["comment"] },
+        "nodeId": {
+          "$ref": "common.schema.json#/$defs/Id",
+          "description": "The entry commented on. The server accepts it only for a published entry with an open thread, and works out the page to return to itself."
+        },
+        "parentId": {
+          "$ref": "#/$defs/SubmissionCommentId",
+          "description": "The comment replied to; it must be approved and in the same thread. The server decides `parentId`/`inReplyToId` of the stored comment."
+        },
+        "name": {
+          "type": "string",
+          "description": "The display name as typed (the form says it is shown publicly).",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional and never shown. Kept only for moderation, erasure and export requests (v1.1: reply notifications after double opt-in).",
+          "maxLength": 254,
+          "pattern": "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"
+        },
+        "body": {
+          "type": "string",
+          "description": "The comment as typed; the server trims and normalises it, then requires 2 to 5,000 characters.",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "challenge": { "$ref": "#/$defs/SubmissionChallenge" },
+        "solution": { "$ref": "#/$defs/SubmissionSolution" },
+        "turnstileToken": { "$ref": "#/$defs/SubmissionTurnstileToken" },
+        "website": { "$ref": "#/$defs/SubmissionHoneypot" }
+      }
+    },
+    {
+      "type": "object",
+      "title": "CommentReportSubmission",
+      "description": "A reader's notice that a comment breaks the site's rules or the law (EU DSA Art. 16). A report never hides anything by itself: it puts the comment in front of a person.",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "commentId", "reason"],
+      "properties": {
+        "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+        "kind": { "type": "string", "enum": ["report"] },
+        "commentId": { "$ref": "#/$defs/SubmissionCommentId" },
+        "reason": {
+          "type": "string",
+          "enum": ["spam", "abuse", "personal-data", "illegal-content", "other"]
+        },
+        "details": {
+          "type": "string",
+          "description": "Why, as typed; at most 1,000 characters after normalising.",
+          "maxLength": 4000
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional, never shown: where the site may answer the notice.",
+          "maxLength": 254,
+          "pattern": "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"
+        },
+        "challenge": { "$ref": "#/$defs/SubmissionChallenge" },
+        "solution": { "$ref": "#/$defs/SubmissionSolution" },
+        "turnstileToken": { "$ref": "#/$defs/SubmissionTurnstileToken" },
+        "website": { "$ref": "#/$defs/SubmissionHoneypot" }
+      }
+    }
+  ],
+  "$defs": {
+    "SubmissionCommentId": {
+      "type": "string",
+      "pattern": "^cmt_[A-Za-z0-9]{6,32}$"
+    },
+    "SubmissionChallenge": {
+      "type": "string",
+      "description": "The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).",
+      "minLength": 16,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"
+    },
+    "SubmissionSolution": {
+      "type": "string",
+      "description": "The counter that solves the challenge, in decimal.",
+      "pattern": "^(?:0|[1-9][0-9]{0,15})$"
+    },
+    "SubmissionTurnstileToken": {
+      "type": "string",
+      "description": "Cloudflare Turnstile's response token, when the site turned Turnstile on.",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "SubmissionHoneypot": {
+      "type": "string",
+      "description": "A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.",
+      "maxLength": 2048
+    }
+  }
+}

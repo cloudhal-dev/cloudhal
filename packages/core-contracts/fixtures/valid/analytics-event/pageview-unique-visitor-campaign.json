@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "pageview",
+  "siteId": "site_01HZX8K3Q9ST",
+  "timestamp": "2026-10-09T09:02:11Z",
+  "path": "/category/transport",
+  "nodeId": "term_01HZX8K3Q9TR",
+  "nodeKind": "archive",
+  "channel": "email",
+  "entrance": true,
+  "utmSource": "newsletter",
+  "utmMedium": "email",
+  "utmCampaign": "2026-10-weekly",
+  "country": "DE",
+  "device": "desktop",
+  "browser": "chrome",
+  "os": "windows",
+  "visitor": "9f2c4e81a07b3d55",
+  "navType": "navigate",
+  "locale": "en"
+}

@@ -1,6 +1,7 @@
 import config from "virtual:cloudhal/config";
 import { addCacheTags, listCacheTag } from "@cloudhal/astro-renderer/cache-tags";
 import { rssXml } from "@cloudhal/astro-renderer/feeds";
+import { loadAssetIndex } from "@cloudhal/astro-renderer/media";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
 import { loadTaxonomyIndex } from "@cloudhal/astro-renderer/taxonomy";
@@ -21,6 +22,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     origin: siteOrigin(site, url),
     entries: await source.allEntries(),
     taxonomy: await loadTaxonomyIndex(source),
+    assets: await loadAssetIndex(source),
     ...(home?.seo?.description ? { description: home.seo.description } : {}),
   });
   return new Response(body, { headers });

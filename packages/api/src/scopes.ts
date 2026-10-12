@@ -24,6 +24,10 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
 
 const S = "/api/sites/:siteId";
 const T = `${S}/terms/:termId`;
+const M = `${S}/menus`;
+const A = `${S}/assets`;
+const AN = `${S}/analytics`;
+const CM = `${S}/comments`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -37,7 +41,18 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites/:siteId/bundle", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/bundle", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/domains", "deploy-token"],
+  // RFC-0004 §4.7: media bytes move before a bundle (GET also answers HEAD)
+  ["GET", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
+  ["PUT", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["POST", "/api/admin/owner", "deploy-token"],
+  // RFC-0006 §7.5: analytics backfill and the operator's status and export
+  ["POST", "/api/admin/sites/:siteId/analytics/rollup", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/analytics/status", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/analytics/export", "deploy-token"],
+  // RFC-0007 §12, §15.4: `cloudhal comments status|export|import --remote`
+  ["GET", "/api/admin/sites/:siteId/comments/status", "deploy-token"],
+  ["GET", "/api/admin/sites/:siteId/comments/export", "deploy-token"],
+  ["POST", "/api/admin/sites/:siteId/comments/import", "deploy-token"],
 
   // deployment
   ["GET", "/api/instance", "member"],
@@ -115,6 +130,74 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/redirects/:redirectId`, "site:read"],
   ["PUT", `${S}/redirects/:redirectId`, "site:write"],
   ["DELETE", `${S}/redirects/:redirectId`, "site:write"],
+  // navigation menus (RFC-0003 §5): reads site:read, writes site:write (Editor and above, ADR-0019)
+  ["GET", M, "site:read"],
+  ["POST", M, "site:write"],
+  ["POST", `${M}/from-pages`, "site:write"],
+  ["POST", `${M}/preview`, "site:read"],
+  ["GET", `${M}/references`, "site:read"],
+  ["GET", `${M}/:menuId`, "site:read"],
+  ["PUT", `${M}/:menuId`, "site:write"],
+  ["DELETE", `${M}/:menuId`, "site:write"],
+  ["GET", `${M}/:menuId/resolve`, "site:read"],
+  ["POST", `${M}/:menuId/ops`, "site:write"],
+  // media library (RFC-0004 §6.1, ADR-0020): reads site:read; uploads and edits of one's own
+  // uploads asset:upload (the handler checks "own"); status changes and deletes asset:manage;
+  // takedown and lifting it the Owner (§4.6), audited
+  ["GET", A, "site:read"],
+  ["POST", `${A}/uploads`, "asset:upload"],
+  ["PUT", `${A}/uploads/:uploadId`, "asset:upload"],
+  ["GET", `${A}/:assetId`, "site:read"],
+  ["GET", `${A}/:assetId/content`, "site:read"],
+  ["PUT", `${A}/:assetId`, "asset:upload"],
+  ["POST", `${A}/:assetId/retire`, "asset:manage"],
+  ["POST", `${A}/:assetId/restore`, "asset:manage"],
+  ["DELETE", `${A}/:assetId`, "asset:manage"],
+  ["POST", `${A}/:assetId/purge`, "owner"],
+  ["POST", `${S}/media/:sha256/lift-purge`, "owner"],
+  // site analytics (RFC-0006 §9.2): aggregates without personal data for Authors and above;
+  // settings (privacy decisions, outside the graph) for Administrators, audited
+  ["GET", `${AN}/status`, "analytics:read"],
+  ["GET", `${AN}/summary`, "analytics:read"],
+  ["GET", `${AN}/bots`, "analytics:read"],
+  ["GET", `${AN}/series`, "analytics:read"],
+  ["GET", `${AN}/top/:dimension`, "analytics:read"],
+  ["GET", `${AN}/vitals`, "analytics:read"],
+  ["GET", `${AN}/renders/:report`, "analytics:read"],
+  ["GET", `${AN}/nodes/:nodeId`, "analytics:read"],
+  ["GET", `${AN}/export`, "analytics:read"],
+  ["GET", `${AN}/settings`, "analytics:read"],
+  ["PUT", `${AN}/settings`, "site:settings"],
+  // reader comments (RFC-0007 §12): the queue for Authors and above, moderation and replies on
+  // one's own entries (the handler checks "own"), deletes, exports, bans and the last-resort purge
+  // for Editors and above, commenter emails and erasure person-only (commenters:data), settings
+  // for Administrators
+  ["GET", CM, "comments:read"],
+  ["GET", `${CM}/summary`, "comments:read"],
+  ["GET", `${CM}/reports`, "comments:moderate:own"],
+  ["POST", `${CM}/reports/:reportId/resolve`, "comments:moderate:own"],
+  ["GET", `${CM}/export`, "comments:moderate"],
+  ["GET", `${CM}/settings`, "comments:read"],
+  ["PUT", `${CM}/settings`, "site:settings"],
+  ["PUT", `${CM}/settings/secrets/:name`, "site:settings"],
+  ["DELETE", `${CM}/settings/secrets/:name`, "site:settings"],
+  ["POST", `${CM}/moderate`, "comments:moderate:own"],
+  ["POST", `${CM}/erase`, "commenters:data"],
+  ["POST", `${CM}/purge-site-cache`, "comments:moderate"],
+  ["GET", `${CM}/:commentId`, "comments:read"],
+  ["PATCH", `${CM}/:commentId/labels`, "comments:moderate:own"],
+  ["POST", `${CM}/:commentId/replies`, "comments:reply:own"],
+  ["PATCH", `${CM}/:commentId`, "comments:reply:own"],
+  ["DELETE", `${CM}/:commentId`, "comments:moderate"],
+  ["GET", `${S}/comment-threads/:nodeId`, "comments:read"],
+  ["PUT", `${S}/comment-threads/:nodeId`, "comments:moderate:own"],
+  ["POST", `${S}/commenters/lookup`, "commenters:data"], // {email} | {commentId}: no email in URLs
+  ["GET", `${S}/commenters/:commenterId`, "commenters:data"],
+  ["POST", `${S}/commenters/:commenterId/export`, "commenters:data"],
+  ["POST", `${S}/commenters/:commenterId/erase`, "commenters:data"],
+  ["GET", `${S}/comment-bans`, "comments:moderate"],
+  ["POST", `${S}/comment-bans`, "comments:moderate"],
+  ["DELETE", `${S}/comment-bans/:banId`, "comments:moderate"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

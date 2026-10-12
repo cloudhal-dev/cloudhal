@@ -155,33 +155,59 @@ export function DetailsCard({ rows }: { rows: DetailRow[] }) {
   );
 }
 
-/** The editor's danger zone (DESIGN.md §2b, §2d): one destructive action that opens `DeleteResource`. */
-export function DangerZoneCard({
-  title,
-  description,
-  actionLabel,
-  onAction,
-}: {
+/** One row of the danger zone: what happens, and the button that starts it. */
+export interface DangerAction {
   title: string;
   description: string;
   actionLabel: string;
   onAction: () => void;
-}) {
+  /** The person's role cannot do this here: the action stays, disabled, with the reason (§2s). */
+  disabledReason?: string | undefined;
+  /** `secondary` for reversible steps (retire), destructive otherwise. */
+  variant?: "secondary" | "secondary-destructive";
+  icon?: ReactNode;
+  "data-testid"?: string;
+}
+
+function DangerRow({ action }: { action: DangerAction }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3 first:pt-0 last:pb-0">
+      <div className="grid min-w-0 flex-[1_1_14rem] gap-1.5">
+        <Text bold as="span">
+          {action.title}
+        </Text>
+        <Text variant="secondary" size="sm" as="span">
+          {action.description}
+        </Text>
+      </div>
+      <Button
+        variant={action.variant ?? "secondary-destructive"}
+        icon={action.icon ?? <Trash />}
+        onClick={action.onAction}
+        disabled={action.disabledReason !== undefined}
+        title={action.disabledReason}
+        data-testid={action["data-testid"]}
+      >
+        {action.actionLabel}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The editor's danger zone (DESIGN.md §2b, §2d): one destructive action that opens
+ * `DeleteResource` — or, with `items`, several in a divided list (the media file: retire, delete,
+ * take down; §2u).
+ */
+export function DangerZoneCard(props: DangerAction | { items: DangerAction[] }) {
   const t = useT();
+  const items = "items" in props ? props.items : [props];
   return (
     <SectionCard title={t("editor.dangerZone")}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="grid min-w-0 flex-[1_1_14rem] gap-1.5">
-          <Text bold as="span">
-            {title}
-          </Text>
-          <Text variant="secondary" size="sm" as="span">
-            {description}
-          </Text>
-        </div>
-        <Button variant="secondary-destructive" icon={<Trash />} onClick={onAction}>
-          {actionLabel}
-        </Button>
+      <div className="grid divide-y divide-kumo-hairline">
+        {items.map((action) => (
+          <DangerRow key={action.title} action={action} />
+        ))}
       </div>
     </SectionCard>
   );

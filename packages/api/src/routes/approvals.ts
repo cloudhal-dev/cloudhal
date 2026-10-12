@@ -15,6 +15,10 @@
  *   (it is denied; publish the current state yourself)
  *
  * An agent's `request_elevation` (ADR-0016) is carried out here when its key's creator approves it.
+ * Comment tools (RFC-0007 §10.3) are carried out here too: approving recomputes the request's
+ * `cm1:` binding (a mismatch denies it and answers 409 `state_changed`), then runs the call as the
+ * approving person — `requestedBy` the agent, the approval id on the comment events — and marks
+ * the request used. The agent sees the outcome through `list_comments`.
  * A person's `role` request is carried out here too: approving it publishes with the approver's
  * rights at the approved state, and the request is marked used.
  */
@@ -28,10 +32,18 @@ import {
   isAgentMode,
   isMoreAutonomous,
   modeCap,
+  type OwnLimit,
   OwnLimitError,
   type Principal,
 } from "@cloudhal/agent-runtime";
 import type { Site } from "@cloudhal/core-contracts";
+import { commentEntries, isBoundState, ownedNodeIds } from "@cloudhal/mcp-server/comments";
+import {
+  defineTools,
+  type ToolContext,
+  type ToolDefinition,
+  toToolError,
+} from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -40,6 +52,52 @@ import { ownOnlyPending, ownOnlySnapshot, snapshotPublishState } from "../own.ts
 import { param } from "../params.ts";
 
 const REQUEST_ELEVATION = "request_elevation";
+
+let toolDefs: Map<string, ToolDefinition> | undefined;
+/** A tool that Studio carries out on approval (RFC-0007 §10.3), or undefined. */
+function carriedOut(tool: string): ToolDefinition | undefined {
+  toolDefs ??= new Map(defineTools().map((t) => [t.name, t]));
+  const def = toolDefs.get(tool);
+  return def?.carryOutOnApproval ? def : undefined;
+}
+
+/** The entries a comment request touches: its comments' entries, or the thread's entry. */
+async function commentTargets(c: Context<Env>, siteId: string, input: Record<string, unknown>) {
+  const deps = c.get("comments");
+  const ids = Array.isArray(input.ids)
+    ? (input.ids as string[])
+    : Array.isArray(input.items)
+      ? (input.items as { commentId: string }[]).map((i) => i.commentId)
+      : typeof input.commentId === "string"
+        ? [input.commentId]
+        : [];
+  const nodeIds =
+    typeof input.nodeId === "string"
+      ? [input.nodeId]
+      : deps
+        ? (await deps.store.getMany(siteId, ids.slice(0, 50))).map((x) => x.nodeId)
+        : [];
+  return [...(await commentEntries(c.get("store"), siteId, nodeIds)).values()];
+}
+
+/** The context a carried-out comment request runs in: the approving person, confirmed. */
+function carryContext(
+  c: Context<Env>,
+  request: Approval,
+  limit: OwnLimit | undefined,
+): ToolContext {
+  const principal = c.get("principal") as Principal;
+  return {
+    store: c.get("store"),
+    principal: { actor: principal.actor, scopes: principal.scopes, person: principal.person },
+    ownership: c.get("ownership"),
+    comments: c.get("comments"),
+    now: c.get("now"),
+    confirmed: true,
+    approval: { id: request.id, requestedBy: request.actor },
+    ...(limit ? { limit } : {}),
+  };
+}
 
 interface ElevationInput {
   keyId: string;
@@ -135,13 +193,23 @@ export async function canDecide(
   }
 
   const asPerson: Principal = { actor: principal.actor, scopes: principal.scopes, person };
-  const verdict = c.get("policy")().evaluate(asPerson, request.tool, { confirmed: true });
+  const input = (request.input ?? {}) as Record<string, unknown>;
+  const verdict = c
+    .get("policy")()
+    .evaluate(asPerson, request.tool, { confirmed: true, args: input });
   if (verdict.kind === "deny")
     return NO("missing_scope", `your role cannot ${request.tool}: ${verdict.reason}`);
   const limit = verdict.limit;
   if (!limit) return { ok: true };
-  const input = (request.input ?? {}) as Record<string, unknown>;
   const store = c.get("store");
+  if (limit.target === "comment") {
+    // RFC-0007 §10.3: an Author decides comment requests on their own entries only.
+    const entries = request.siteId ? await commentTargets(c, request.siteId, input) : [];
+    const own = await ownedNodeIds(c.get("ownership"), person.id, entries);
+    return entries.every((e) => own.includes(e.nodeId))
+      ? { ok: true }
+      : NO("not_own", "these comments are on articles that are not yours; an Editor decides them");
+  }
   if (limit.target === "changeset") {
     const site = request.siteId ? await store.getSite(request.siteId) : undefined;
     if (!site) return NO("not_found", "the site no longer exists");
@@ -263,6 +331,54 @@ export const approvals: Hono<Env> = new Hono<Env>()
         ? await checkElevation(c, existing)
         : undefined;
     if (elevation instanceof Response) return elevation;
+    // A comment tool runs now, as the approving person, if the comments are as the agent saw them.
+    const carry =
+      decision === "approve" && existing.status === "pending"
+        ? carriedOut(existing.tool)
+        : undefined;
+    let carryCtx: ToolContext | undefined;
+    if (carry) {
+      const principal = c.get("principal") as Principal;
+      const input = (existing.input ?? {}) as Record<string, unknown>;
+      const verdict = c
+        .get("policy")()
+        .evaluate(
+          { actor: principal.actor, scopes: principal.scopes, person: principal.person },
+          existing.tool,
+          { confirmed: true, args: input },
+        );
+      carryCtx = carryContext(c, existing, verdict.kind === "allow" ? verdict.limit : undefined);
+      // Fail closed (threat-model review of 2026-10-12, item 3): a request filed without a
+      // computed binding, or a binding that cannot be computed now, is never carried out — two
+      // failures must not compare equal.
+      if (!isBoundState(existing.stateHash)) {
+        await store?.decide(id, "denied", actor, "the request is not bound to the comments' state");
+        throw apiError(
+          409,
+          "state_changed",
+          "This request is not tied to the comments as the agent saw them, so it cannot be carried out; it was closed. Ask the agent again.",
+        );
+      }
+      const binding = carry.bindState
+        ? await carry.bindState(input, carryCtx).catch(() => null)
+        : null;
+      if (!isBoundState(binding)) {
+        await store?.decide(id, "denied", actor, "the comments' current state could not be read");
+        throw apiError(
+          409,
+          "state_changed",
+          "The comments' current state could not be read, so the request cannot be checked; it was closed. Look at them again.",
+        );
+      }
+      if (binding !== existing.stateHash) {
+        await store?.decide(id, "denied", actor, "the comments changed after the agent asked");
+        throw apiError(
+          409,
+          "state_changed",
+          "These comments changed after the agent asked; the request was closed. Look at them again.",
+        );
+      }
+    }
     // A person's own request (cause `role`) runs now, at the state it was filed against.
     const personRequest =
       decision === "approve" &&
@@ -297,6 +413,41 @@ export const approvals: Hono<Env> = new Hono<Env>()
       reason: `${decision === "approve" ? "approved" : "denied"} request ${id} from ${existing.actor.name ?? existing.actor.id}`,
       outcome: "ok",
     });
+    if (carry && carryCtx && decided) {
+      const input = (existing.input ?? {}) as Record<string, unknown>;
+      const audited = carry.auditArgs ? carry.auditArgs(input) : input;
+      let result: unknown;
+      try {
+        result = await carry.handler(input, carryCtx);
+      } catch (raw) {
+        const e = toToolError(raw);
+        const message = e instanceof Error ? e.message : String(e);
+        decided = (await store?.complete(id)) ?? decided;
+        await c.get("audit")?.record({
+          at: new Date().toISOString(),
+          actor,
+          siteId: existing.siteId,
+          tool: existing.tool,
+          decision: "allow",
+          outcome: "error",
+          reason: `carrying out request ${id} failed: ${message}`,
+          input: audited,
+        });
+        return c.json({ error: "carry_out_failed", message, approval: decided }, 409);
+      }
+      decided = (await store?.complete(id)) ?? decided;
+      await c.get("audit")?.record({
+        at: new Date().toISOString(),
+        actor,
+        siteId: existing.siteId,
+        tool: existing.tool,
+        decision: "allow",
+        outcome: "ok",
+        reason: `carried out request ${id} from ${existing.actor.name ?? existing.actor.id}`,
+        input: { ...audited, requestId: id },
+      });
+      return c.json({ ...decided, result });
+    }
     if (personRequest && site) {
       const published = await publishFor(c, existing, site);
       decided = (await store?.complete(id)) ?? decided;

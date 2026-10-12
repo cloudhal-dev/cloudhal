@@ -16,6 +16,11 @@ import { TRANSITIONS } from "../lib/workflow.ts";
  * labelled button (send to review → publish → …) and the other transitions in a labelled "More
  * actions" menu, which also carries the editor's own items (`menu`: duplicate, delete).
  * Publishing never changes the status directly — it calls `onPublish`, which opens the approval.
+ *
+ * Roles (DESIGN.md §2s, RFC-0005 §2.2): `allowed` limits the statuses the person may set (a
+ * Contributor: draft and review, so "Submit for review" and no Publish — the Publish step stays,
+ * disabled, with `publishReason`); `readOnlyReason` disables the whole lifecycle (someone else's
+ * article) with the reason as the tooltip.
  */
 export function StatusActions({
   status,
@@ -23,6 +28,9 @@ export function StatusActions({
   onChange,
   onPublish,
   menu,
+  allowed,
+  publishReason,
+  readOnlyReason,
 }: {
   status: PublishStatus;
   busy?: boolean | undefined;
@@ -30,40 +38,53 @@ export function StatusActions({
   onPublish: () => void;
   /** Extra `DropdownMenu.Item`s below the lifecycle group. */
   menu?: ReactNode;
+  /** Statuses this person may set; all when omitted. */
+  allowed?: readonly PublishStatus[] | undefined;
+  /** Publishing is not this person's to do: the reason, shown on the disabled button. */
+  publishReason?: string | undefined;
+  /** Nothing here is this person's to change: the reason. */
+  readOnlyReason?: string | undefined;
 }) {
   const t = useT();
-  const allowed = TRANSITIONS[status];
+  const may = (s: PublishStatus) => !allowed || allowed.includes(s);
+  const draftOnly = !may("published");
+  const transitions = TRANSITIONS[status].filter(may);
+  const locked = readOnlyReason !== undefined;
   const next =
-    status === "draft" ? (
+    status === "draft" && may("review") ? (
       <Button
         variant="secondary"
         icon={<PaperPlaneTilt />}
         onClick={() => onChange("review")}
-        disabled={busy}
+        disabled={busy || locked}
+        title={readOnlyReason}
+        data-testid="send-to-review"
       >
-        {t("editor.sendToReview")}
+        {draftOnly ? t("editor.submitForReview") : t("editor.sendToReview")}
       </Button>
     ) : status === "review" ? (
       <Button
         variant="secondary"
         icon={<RocketLaunch />}
         onClick={onPublish}
-        disabled={busy}
+        disabled={busy || locked || draftOnly}
+        title={readOnlyReason ?? (draftOnly ? publishReason : undefined)}
         data-testid="publish"
       >
         {t("common.publish")}
       </Button>
-    ) : status === "archived" ? (
+    ) : status === "archived" && may("draft") ? (
       <Button
         variant="secondary"
         icon={<ArrowCounterClockwise />}
         onClick={() => onChange("draft")}
-        disabled={busy}
+        disabled={busy || locked}
+        title={readOnlyReason}
       >
         {t("editor.restore")}
       </Button>
     ) : null;
-  const others = allowed.filter(
+  const others = transitions.filter(
     (s) =>
       s !== "published" &&
       !(status === "draft" && s === "review") &&
@@ -106,7 +127,12 @@ export function StatusActions({
               <DropdownMenu.Group>
                 <DropdownMenu.Label>{t("editor.status")}</DropdownMenu.Label>
                 {others.map((s) => (
-                  <DropdownMenu.Item key={s} icon={icon(s)} onClick={() => onChange(s)}>
+                  <DropdownMenu.Item
+                    key={s}
+                    icon={icon(s)}
+                    onClick={() => onChange(s)}
+                    disabled={locked}
+                  >
                     {label(s)}
                   </DropdownMenu.Item>
                 ))}

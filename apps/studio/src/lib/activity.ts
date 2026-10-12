@@ -23,6 +23,29 @@ export const KNOWN_TOOLS = [
   "rollback",
   "request_elevation",
   "get_mode",
+  // RFC-0003 navigation menus
+  "list_menus",
+  "get_menu",
+  "update_menu",
+  "set_menu",
+  "delete_menu",
+  // RFC-0004 media
+  "list_assets",
+  "get_asset",
+  "upload_asset",
+  "fetch_asset_url",
+  "update_asset",
+  "retire_asset",
+  "restore_asset",
+  "delete_asset",
+  // RFC-0007 reader comments
+  "list_comments",
+  "get_comment_thread",
+  "comments_summary",
+  "label_comments",
+  "moderate_comments",
+  "draft_comment_reply",
+  "set_comment_thread",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 
@@ -39,11 +62,52 @@ export const KEY_EVENTS = {
   "agent-key.mode": "agentKeyMode",
   "agent-key.elevate": "agentKeyElevate",
   "agent-key.elevation-end": "agentKeyElevationEnd",
+  "agent-key.narrow": "agentKeyNarrow",
+  "agent-key.revoke": "agentKeyRevoke",
 } as const;
 export type KeyEvent = keyof typeof KEY_EVENTS;
 
 export function isKeyEvent(tool: string): tool is KeyEvent {
   return Object.hasOwn(KEY_EVENTS, tool);
+}
+
+/**
+ * Membership events (RFC-0005 §10.1, `site_id` NULL): the deployment's own activity feed on the
+ * Team page lists them, with their label key under `tools`.
+ */
+export const MEMBER_EVENTS = {
+  "member.invite": "memberInvite",
+  "member.invite-revoke": "memberInviteRevoke",
+  "member.invite-accept": "memberInviteAccept",
+  "member.role": "memberRole",
+  "member.remove": "memberRemove",
+  "member.transfer-ownership": "memberTransferOwnership",
+  "member.password-reset": "memberPasswordReset",
+  "member.password-reset-complete": "memberPasswordResetComplete",
+} as const;
+export type MemberEvent = keyof typeof MEMBER_EVENTS;
+
+export function isMemberEvent(tool: string): tool is MemberEvent {
+  return Object.hasOwn(MEMBER_EVENTS, tool);
+}
+
+/**
+ * People's changes to media files over REST (RFC-0004 §6.3, `routes/assets.ts`), with their label
+ * key under `tools`; the site's Activity lists them next to the agents' asset tools.
+ */
+export const ASSET_EVENTS = {
+  "asset.upload": "assetUpload",
+  "asset.update": "assetUpdate",
+  "asset.retire": "assetRetire",
+  "asset.restore": "assetRestore",
+  "asset.delete": "assetDelete",
+  "asset.purge": "assetPurge",
+  "asset.lift-purge": "assetLiftPurge",
+} as const;
+export type AssetEvent = keyof typeof ASSET_EVENTS;
+
+export function isAssetEvent(tool: string): tool is AssetEvent {
+  return Object.hasOwn(ASSET_EVENTS, tool);
 }
 
 /** An elevation grant's audit reason ends with `requested by the agent (appr_…)` (ADR-0016). */

@@ -18,6 +18,8 @@
     "packages/core-contracts/scripts",
     "packages/storage/src",
     "packages/storage/migrations",
+    "packages/analytics/src",
+    "packages/comments/src",
     "packages/core-ts/src",
     "packages/astro-renderer/src",
     "packages/agent-runtime/src",

@@ -48,7 +48,7 @@ export function ElevateAgentKeyDialog({
   if (currentKey) last.current = currentKey;
   const agentKey = currentKey ?? last.current;
   const own = ownModeOf(agentKey);
-  const targets = modesAbove(own, rules.modes);
+  const targets = modesAbove(own, rules.keyModes);
   const name = agentKey?.name ?? t("agents.unnamed");
   const inForce = agentKey
     ? activeElevation({ mode: own, elevation: agentKey.elevation }, now)
@@ -91,7 +91,7 @@ export function ElevateAgentKeyDialog({
   // Each opening starts afresh: the next mode up, one hour, no reason.
   useEffect(() => {
     if (currentKey) {
-      setMode(modesAbove(ownModeOf(currentKey), rules.modes)[0] ?? "auto");
+      setMode(modesAbove(ownModeOf(currentKey), rules.keyModes)[0] ?? "auto");
       setPreset(DEFAULT_PRESET);
       setCustomValue("");
       setCustomUnit("minutes");

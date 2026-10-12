@@ -1,0 +1,15 @@
+{
+  "reason": "Stored milliseconds are whole numbers (the server rounds)",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "vitals",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T08:14:41Z",
+    "path": "/",
+    "nodeId": "page_01HZX8K3Q9HM",
+    "nodeKind": "page",
+    "device": "desktop",
+    "lcp": 1200.5,
+    "sampleOneIn": 1
+  }
+}

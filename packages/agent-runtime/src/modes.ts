@@ -22,9 +22,18 @@ export function isAgentMode(value: unknown): value is AgentMode {
 
 /** The scopes a key needs to be useful in a mode (offered by default when creating one). */
 export function scopesForMode(mode: AgentMode): Scope[] {
-  const read: Scope[] = ["site:read", "content:read", "preview:create"];
+  // `analytics:read` is read-only and carries no personal data: every mode, plan included (RFC-0006).
+  // `comments:read` likewise: reader text, never an email or IP hash (RFC-0007 D2).
+  const read: Scope[] = [
+    "site:read",
+    "content:read",
+    "preview:create",
+    "analytics:read",
+    "comments:read",
+  ];
   if (mode === "plan") return read;
-  return [...read, "content:write", "site:publish", "site:rollback"];
+  // `asset:upload` is part of the default agent-key scopes outside plan (RFC-0004, ADR-0018).
+  return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];
 }
 
 /** Limits for an `auto`-mode publish that goes live without a person (see `isLowRiskPublish`). */
@@ -36,7 +45,14 @@ export interface PendingChange {
 }
 
 /** Why `auto` mode did or did not let a publish through, as data (Studio words it itself). */
-export type AutoCheckCode = "low-risk" | "removes-content" | "nothing" | "structure" | "too-many";
+export type AutoCheckCode =
+  | "low-risk"
+  | "removes-content"
+  | "nothing"
+  | "structure"
+  | "too-many"
+  /** RFC-0004 §6.3: media that does not ride along with an article change. */
+  | "media";
 
 /** The `auto`-mode check behind a publish (stored on audit rows and approvals, ADR-0015). */
 export interface AutoCheck {
@@ -55,6 +71,7 @@ const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
   nothing: () => "nothing to publish",
   structure: () => "it changes pages, menus, site settings, taxonomies or redirects",
   "too-many": (c) => `it changes more than ${c.limit} articles`,
+  media: () => "it adds or changes media that is not part of an article change",
 };
 
 /** English wording of a check, for agents and audit reasons. */
@@ -66,28 +83,41 @@ export function describeAutoCheck(check: AutoCheck): string {
  * Low risk = only articles added or edited, nothing removed, no pages, menus, site settings,
  * taxonomies, terms or redirects touched (RFC-0002 §6.4, RFC-0003 §6.4), and at most `AUTO_PUBLISH_LIMIT` changes. Anything
  * else waits for a person even in `auto`.
+ *
+ * Media (RFC-0004 §6.3, answer 1): an added asset whose id is in `ridingAssets` (a new raster
+ * image used only by articles in the same publish; the store decides) goes out with them and does
+ * not count toward the limit. Any other asset change is `media` and waits for a person.
  */
-export function checkAutoPublish(diff: {
-  added: PendingChange[];
-  changed: { after: PendingChange }[];
-  removed: PendingChange[];
-}): AutoCheck {
-  const touched = [...diff.added, ...diff.changed.map((c) => c.after)];
+export function checkAutoPublish(
+  diff: {
+    added: PendingChange[];
+    changed: { after: PendingChange }[];
+    removed: PendingChange[];
+  },
+  options: { ridingAssets?: ReadonlySet<string> } = {},
+): AutoCheck {
+  const riding = options.ridingAssets ?? new Set<string>();
+  const rides = (n: PendingChange) => n.kind === "asset" && riding.has(n.id);
+  const added = diff.added.filter((n) => !rides(n));
+  const touched = [...added, ...diff.changed.map((c) => c.after)];
   const base = {
     rule: "low-risk-publish" as const,
     changes: touched.length + diff.removed.length,
     limit: AUTO_PUBLISH_LIMIT,
   };
+  const media = touched.some((n) => n.kind === "asset");
   const code: AutoCheckCode =
     diff.removed.length > 0
       ? "removes-content"
       : touched.length === 0
         ? "nothing"
-        : touched.some((n) => n.kind !== "contentEntry")
+        : touched.some((n) => n.kind !== "contentEntry" && n.kind !== "asset")
           ? "structure"
-          : touched.length > AUTO_PUBLISH_LIMIT
-            ? "too-many"
-            : "low-risk";
+          : media
+            ? "media"
+            : touched.length > AUTO_PUBLISH_LIMIT
+              ? "too-many"
+              : "low-risk";
   return { ...base, code, lowRisk: code === "low-risk" };
 }
 

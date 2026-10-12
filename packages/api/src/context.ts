@@ -6,11 +6,15 @@ import type {
   PolicyEngine,
   Principal,
 } from "@cloudhal/agent-runtime";
+import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
+import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
+import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { MailSender } from "./mail.ts";
+import type { UploadSecret } from "./uploads.ts";
 
 /** Resolves who is calling: a session cookie, an API key, … Returns undefined for anonymous. */
 export type ActorResolver = (c: Context) => Promise<Actor | undefined>;
@@ -29,6 +33,8 @@ export interface McpMountOptions {
   readonly legacy?: "stateless" | "reject" | undefined;
   /** Same secret as `ApiDeps.preview`: lets `preview_page` return signed links to the deployed site. */
   readonly previewSecret?: string | undefined;
+  /** Media settings for the asset tools (fetch transport, host lists; RFC-0004). */
+  readonly media?: MediaToolOptions | undefined;
 }
 
 export interface ApiDeps {
@@ -75,6 +81,16 @@ export interface ApiDeps {
   readonly mail?: MailSender;
   /** Origin of the Studio that serves `/invite` and `/reset-password` (default: the request's). */
   readonly studioOrigin?: string;
+  /**
+   * Site analytics (RFC-0006): mounts `/api/sites/:id/analytics/*`, the deploy-token rollup routes
+   * and the MCP analytics tools, and fills `/api/instance` → `features.analytics`.
+   */
+  readonly analytics?: AnalyticsService;
+  /**
+   * Reader comments (RFC-0007): mounts `/api/sites/:id/comments/*`, comment threads, commenters
+   * and bans, the MCP comment tools, the comment notifications and `features.comments`.
+   */
+  readonly comments?: CommentsDeps;
 }
 
 export type Env = {
@@ -96,5 +112,11 @@ export type Env = {
     policy: () => PolicyEngine;
     mail: MailSender | undefined;
     now: () => Date;
+    /** Signs upload tickets (RFC-0004 §5.5): the preview secret, the MCP state key, or random. */
+    uploadSecret: UploadSecret;
+    /** Site analytics (RFC-0006); undefined on servers without it. */
+    analytics: AnalyticsService | undefined;
+    /** Reader comments (RFC-0007); undefined on servers without them. */
+    comments: CommentsDeps | undefined;
   };
 };

@@ -84,13 +84,23 @@ describe("agent modes (ADR-0015)", () => {
   });
 
   it("prefills scopes like the server's scopesForMode", () => {
-    expect(scopesForMode("plan")).toEqual(["site:read", "content:read", "preview:create"]);
+    // RFC-0006: analytics:read is read-only and in every mode's defaults, plan included.
+    expect(scopesForMode("plan")).toEqual([
+      "site:read",
+      "content:read",
+      "preview:create",
+      "analytics:read",
+      "comments:read",
+    ]);
     for (const mode of ["manual", "edits", "auto"] as const) {
       expect(scopesForMode(mode)).toEqual([
         "site:read",
         "content:read",
         "preview:create",
+        "analytics:read",
+        "comments:read",
         "content:write",
+        "asset:upload",
         "site:publish",
         "site:rollback",
       ]);

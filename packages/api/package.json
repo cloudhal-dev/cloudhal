@@ -25,6 +25,8 @@
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
+    "@cloudhal/analytics": "workspace:*",
+    "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",

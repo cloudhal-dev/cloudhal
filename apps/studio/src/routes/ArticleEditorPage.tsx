@@ -15,11 +15,13 @@ import {
   SectionCard,
   SkeletonLine,
   Text,
+  Tooltip,
 } from "@cloudhal/ui";
 import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
@@ -32,6 +34,9 @@ import {
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
+import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
+import { ReadersCard } from "../components/Readers.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -39,8 +44,10 @@ import { StatusActions } from "../components/StatusActions.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
+import { entryAccess } from "../lib/roles.ts";
 import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { missingPrimaries } from "../lib/taxonomy.ts";
@@ -93,11 +100,19 @@ export function ArticleEditorPage() {
   const [coverStatus, setCoverStatus] = useState<ImagePreviewStatus>("empty");
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Menus linking here (RFC-0003): named in the delete dialog, listed in the "In menus" card.
+  const menuRefs = useMenuReferences(siteId, { kind: "contentEntry", id: entryId });
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
   const dirty = isDirty(draft, query.data);
+  // Own work (RFC-0005 §4, I9): Editors change any article, Authors their own, Contributors their
+  // own until it is published. Cosmetic — the server answers 403 `not_own` either way.
+  const editAny = useCan("entries.editAny");
+  const editOwnPublished = useCan("entries.editOwnPublished");
+  const publishGate = useGate("entries.editOwnPublished");
+  const self = useSelf();
 
   const save = useMutation({
     mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry)),
@@ -192,6 +207,17 @@ export function ArticleEditorPage() {
     if (valid(next)) save.mutate({ ...draft, status: next });
   };
   const migrated = (taxonomy.taxonomies.data?.length ?? 0) > 0;
+  const access = entryAccess(draft, { editAny, editOwnPublished }, self);
+  const readOnlyReason =
+    access === "notOwn"
+      ? t("gating.entryNotOwn")
+      : access === "published"
+        ? t("gating.entryPublished")
+        : undefined;
+  // Contributors move their drafts to review; Authors and above set every status.
+  const allowedStatuses: PublishStatus[] | undefined = editOwnPublished
+    ? undefined
+    : ["draft", "review"];
   const title = draft.title || t("articles.untitled");
   const words = wordCount(draft.body.value);
   const details: DetailRow[] = [
@@ -255,18 +281,30 @@ export function ArticleEditorPage() {
             onPublish={() => {
               if (valid("published")) setPublishOpen(true);
             }}
+            allowed={allowedStatuses}
+            publishReason={publishGate.reason}
+            readOnlyReason={readOnlyReason}
             menu={
               <>
                 <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
                   {t("editor.duplicate")}
                 </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  icon={Trash}
-                  variant="danger"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  {t("editor.deleteArticle")}
-                </DropdownMenu.Item>
+                {readOnlyReason ? (
+                  // A disabled item takes no pointer events, so the tooltip hangs on a wrapper.
+                  <Tooltip content={readOnlyReason} side="left" render={<div />}>
+                    <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                      {t("editor.deleteArticle")}
+                    </DropdownMenu.Item>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenu.Item
+                    icon={Trash}
+                    variant="danger"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    {t("editor.deleteArticle")}
+                  </DropdownMenu.Item>
+                )}
               </>
             }
           />
@@ -276,7 +314,8 @@ export function ArticleEditorPage() {
               if (valid()) save.mutate(draft);
             }}
             loading={save.isPending}
-            disabled={!dirty}
+            disabled={!dirty || readOnlyReason !== undefined}
+            title={readOnlyReason}
             data-testid="save"
           >
             {t("common.save")}
@@ -286,6 +325,7 @@ export function ArticleEditorPage() {
     >
       <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
       {taxonomy.taxonomies.isSuccess && !migrated && <TagsMigrationBanner siteId={siteId} />}
+      <ViewOnlyBanner reason={readOnlyReason} />
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -297,7 +337,13 @@ export function ArticleEditorPage() {
           />
         }
         main={
-          <>
+          // Someone else's article (or a Contributor's published one) is read-only: one disabled
+          // fieldset turns every field off at once; the banner above says why (§2s).
+          <fieldset
+            disabled={readOnlyReason !== undefined}
+            className="grid min-w-0 content-start gap-6"
+            data-read-only={readOnlyReason ? "true" : undefined}
+          >
             <SectionCard title={t("editor.article")}>
               <Input
                 label={t("editor.title")}
@@ -354,6 +400,8 @@ export function ArticleEditorPage() {
               missing={missing}
             />
             <CoverImageCard
+              siteId={siteId}
+              defaultLocale={site.data?.defaultLocale ?? draft.locale}
               image={draft.coverImage}
               savedSrc={query.data?.coverImage?.src}
               host={host}
@@ -381,7 +429,7 @@ export function ArticleEditorPage() {
                 className="w-full font-mono"
               />
             </SectionCard>
-          </>
+          </fieldset>
         }
         aside={
           <>
@@ -391,12 +439,16 @@ export function ArticleEditorPage() {
               host={host}
               coverStatus={coverStatus}
             />
+            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="article" />
+            <ArticleCommentsCard siteId={siteId} entry={query.data ?? draft} />
+            <UsedInMenusCard siteId={siteId} kind="contentEntry" id={draft.id} />
             <DetailsCard rows={details} />
             <DangerZoneCard
               title={t("editor.deleteArticleTitle")}
               description={t("editor.deleteArticleHint")}
               actionLabel={t("editor.deleteArticle")}
               onAction={() => setDeleteOpen(true)}
+              disabledReason={readOnlyReason}
             />
           </>
         }
@@ -419,6 +471,7 @@ export function ArticleEditorPage() {
         onOpenChange={setDeleteOpen}
         resourceType={t("editor.article")}
         resourceName={draft.slug}
+        notice={<MenuDeleteNotice refs={menuRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           await remove.mutateAsync(draft);

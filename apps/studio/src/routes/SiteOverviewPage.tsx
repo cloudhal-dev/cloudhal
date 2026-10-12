@@ -17,9 +17,11 @@ import { Article, FileText, Plus, TerminalWindow } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { CommentsWaitingBanner } from "../components/CommentsWaitingBanner.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx";
+import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -104,6 +106,7 @@ export function SiteOverviewPage() {
       }
     >
       <PendingApprovalsBanner siteId={siteId} />
+      <CommentsWaitingBanner siteId={siteId} />
       <ErrorBanner error={site.error ?? pages.error ?? entries.error ?? createPage.error} />
       <Columns variant="2-1">
         <div className="grid min-w-0 content-start gap-6">
@@ -210,6 +213,7 @@ export function SiteOverviewPage() {
           </SectionCard>
         </div>
         <div className="grid min-w-0 content-start gap-6">
+          <OverviewAnalyticsCard siteId={siteId} />
           <SectionCard
             title={t("overview.status")}
             actions={

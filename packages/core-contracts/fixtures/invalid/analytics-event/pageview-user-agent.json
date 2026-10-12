@@ -1,0 +1,22 @@
+{
+  "reason": "The user agent is reduced to device, browser and OS families and never stored",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "pageview",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T08:14:03Z",
+    "path": "/posts/ferry-timetables",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "nodeKind": "entry",
+    "refHost": "news.ycombinator.com",
+    "channel": "social",
+    "entrance": true,
+    "country": "TR",
+    "device": "mobile",
+    "browser": "safari",
+    "os": "ios",
+    "navType": "navigate",
+    "locale": "en",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X)"
+  }
+}

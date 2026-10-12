@@ -9,17 +9,25 @@
  * - `cloudhal-term-<id>` — the term an archive is about, its ancestors in the breadcrumb, the terms
  *   an entry shows and the header categories;
  * - `cloudhal-list-<termId>` — a term's archive pages and feed; `cloudhal-list-<siteId>` — the site
- *   feed, the sitemap and pages with a `ContentList` section.
+ *   feed, the sitemap and pages with a `ContentList` section;
+ * - `cloudhal-comments-<nodeId>` — an entry's page and its comment pages, which show that entry's
+ *   approved comments (RFC-0007 §8.1); moderation purges only this tag.
  *
  * The names live in `@cloudhal/core-ts/cache-tags`, shared with the purge planner. Tags are only
  * added where the runtime already set `cache-tag` (published responses on Cloudflare); previews and
  * Node builds have no edge cache and stay untouched.
  */
 export {
+  ASSET_TAG_PREFIX,
+  assetCacheTag,
   CACHE_TAG_PREFIX,
+  COMMENTS_TAG_PREFIX,
+  commentsCacheTag,
   isCloudhalCacheTag,
   LIST_TAG_PREFIX,
   listCacheTag,
+  MEDIA_TAG_PREFIX,
+  mediaCacheTag,
   NODE_TAG_PREFIX,
   nodeCacheTag,
   siteCacheTag,

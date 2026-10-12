@@ -38,6 +38,7 @@ catalog:
   zod: 4.6.5
   "@better-auth/cli": ^1.4.21
   "@cloudflare/kumo": ^2.14.0
+  echarts: ^6.1.0
   "@base-ui/react": ^1.8.0
   "@phosphor-icons/react": ^2.1.10
   react: ^19.3.0
@@ -53,6 +54,7 @@ catalog:
   "@testing-library/jest-dom": ^7.0.1
   "@testing-library/user-event": ^14.6.7
   happy-dom: ^20.14.5
+  web-vitals: 6.2.2
 
 # Native build scripts must be explicitly approved (pnpm 12 `allowBuilds`).
 allowBuilds:
@@ -62,3 +64,6 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - "@cloudflare/workers-types@5.20261007.1"
+
+patchedDependencies:
+  '@cloudflare/kumo@2.14.0': patches/@cloudflare__kumo@2.14.0.patch

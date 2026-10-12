@@ -32,6 +32,8 @@ import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import { ListViewsCell, ListViewsHead, useListViews } from "../components/ListViews.tsx";
+import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
@@ -39,10 +41,12 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { type TaxonomyData, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { treeOptions } from "../components/TermPickers.tsx";
+import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { previewImageUrl } from "../lib/seo.ts";
+import { imageRefPreviewUrl } from "../lib/media.ts";
+import { entryAccess } from "../lib/roles.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { facetFilter, needsTagsMigration } from "../lib/taxonomy.ts";
 
@@ -97,7 +101,16 @@ export function ArticlesPage() {
     queryKey: ["entries", siteId, "posts"],
     queryFn: () => api.entries.list(siteId, "posts"),
   });
+  const viewsColumn = useListViews(siteId);
   const [toDelete, setToDelete] = useState<ContentEntry | undefined>();
+  // Others' articles (and a Contributor's published ones) cannot be deleted (RFC-0005 I9).
+  const editAny = useCan("entries.editAny");
+  const editOwnPublished = useCan("entries.editOwnPublished");
+  const self = useSelf();
+  const deleteRefs = useMenuReferences(
+    siteId,
+    toDelete ? { kind: "contentEntry", id: toDelete.id } : undefined,
+  );
   const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const paging = usePaging(
     sorted,
@@ -163,7 +176,7 @@ export function ArticlesPage() {
             b.usage.total - a.usage.total || data.name(a.term).localeCompare(data.name(b.term)),
         )
     : [];
-  const columns = 5 + (catTax ? 1 : 0) + 1;
+  const columns = 5 + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + 1;
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.articles.title") }]} />}
@@ -267,6 +280,7 @@ export function ArticlesPage() {
                 <Table.Head>{t("articles.columns.author")}</Table.Head>
                 <Table.Head>{t("articles.columns.status")}</Table.Head>
                 <Table.Head>{t("articles.columns.updated")}</Table.Head>
+                {viewsColumn && <ListViewsHead />}
                 <Table.Head sticky="right" className="w-0">
                   <span className="sr-only">{t("site.rowMenu")}</span>
                 </Table.Head>
@@ -290,7 +304,11 @@ export function ArticlesPage() {
                         <div className="flex min-w-56 items-center gap-3">
                           <ImagePreview
                             size="thumb"
-                            src={e.coverImage ? previewImageUrl(e.coverImage.src, host) : undefined}
+                            src={
+                              e.coverImage
+                                ? imageRefPreviewUrl(siteId, e.coverImage, host)
+                                : undefined
+                            }
                             alt=""
                             labels={{
                               empty: t("seo.noCover"),
@@ -381,6 +399,7 @@ export function ArticlesPage() {
                       <Table.Cell className="whitespace-nowrap">
                         <RelativeTime iso={e.updatedAt} />
                       </Table.Cell>
+                      {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={e.id} />}
                       <Table.Cell sticky="right" className="w-0 text-right">
                         <RowMenu
                           onOpen={() =>
@@ -390,6 +409,11 @@ export function ArticlesPage() {
                             })
                           }
                           onDelete={() => setToDelete(e)}
+                          deleteDisabledReason={
+                            entryAccess(e, { editAny, editOwnPublished }, self) === "edit"
+                              ? undefined
+                              : t("gating.entryDelete")
+                          }
                         />
                       </Table.Cell>
                     </Table.Row>
@@ -413,6 +437,7 @@ export function ArticlesPage() {
         onOpenChange={(o) => !o && setToDelete(undefined)}
         resourceType={t("editor.article")}
         resourceName={toDelete?.slug ?? ""}
+        notice={<MenuDeleteNotice refs={deleteRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}
         onDelete={async () => {
           if (toDelete) await remove.mutateAsync(toDelete);

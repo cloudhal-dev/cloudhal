@@ -12,7 +12,15 @@ import {
   Text,
   Toolbar,
 } from "@cloudhal/ui";
-import { CaretRight, ClockCounterClockwise, Funnel, Info, Key } from "@phosphor-icons/react";
+import {
+  CaretRight,
+  ClockCounterClockwise,
+  Funnel,
+  Info,
+  Key,
+  UserFocus,
+  UsersThree,
+} from "@phosphor-icons/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -23,6 +31,7 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
+import { useCan, useMemberRoles } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import {
   type ActivityFilter,
@@ -37,11 +46,18 @@ import { type AuditRow, api, isNotEnabled } from "../lib/api.ts";
 const PAGE_SIZE = 50;
 const COLUMNS = 8;
 
-/** Infinite, newest-first audit trail for one site (cursor = `nextBefore`). */
-export function useActivity(siteId: string, pageSize = PAGE_SIZE) {
+/** Whose trail: one site's, or the deployment's own events (members, invites; `audit:read`). */
+export type ActivitySource = { kind: "site"; siteId: string } | { kind: "deployment" };
+
+/** Infinite, newest-first audit trail (cursor = `nextBefore`). */
+export function useActivity(source: ActivitySource | string, pageSize = PAGE_SIZE) {
+  const s: ActivitySource = typeof source === "string" ? { kind: "site", siteId: source } : source;
   return useInfiniteQuery({
-    queryKey: ["activity", siteId, pageSize],
-    queryFn: ({ pageParam }) => api.activity.list(siteId, { limit: pageSize, before: pageParam }),
+    queryKey: ["activity", s.kind === "site" ? s.siteId : "deployment", pageSize],
+    queryFn: ({ pageParam }) =>
+      s.kind === "site"
+        ? api.activity.list(s.siteId, { limit: pageSize, before: pageParam })
+        : api.activity.deployment({ limit: pageSize, before: pageParam }),
     initialPageParam: null as number | null,
     getNextPageParam: (last) => last.nextBefore ?? undefined,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
@@ -54,6 +70,8 @@ export function ActivityPage() {
   const { siteId } = useParams({ from: "/sites/$siteId" });
   // The list below shares this query (same key); a 404 means the server keeps no audit trail.
   const notEnabled = isNotEnabled(useActivity(siteId).error);
+  // Without `audit:read` the server lists only the person's own rows and their agents' (RFC-0005).
+  const seesAll = useCan("activity.all");
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.activity.title") }]} />}
@@ -68,17 +86,29 @@ export function ActivityPage() {
           description={t("activity.notEnabledDescription")}
         />
       ) : (
-        <ActivityList siteId={siteId} />
+        <>
+          {!seesAll && (
+            <Banner
+              variant="secondary"
+              icon={<UserFocus weight="fill" />}
+              title={t("activity.ownOnlyTitle")}
+              description={t("activity.ownOnly")}
+            />
+          )}
+          <ActivityList source={{ kind: "site", siteId }} />
+        </>
       )}
     </PageLayout>
   );
 }
 
 /** Toolbar, table and paging of the audit trail (the server keeps one). */
-function ActivityList({ siteId }: { siteId: string }) {
+export function ActivityList({ source }: { source: ActivitySource }) {
   const t = useT();
   const label = useToolLabel();
-  const activity = useActivity(siteId);
+  const activity = useActivity(source);
+  const roles = useMemberRoles();
+  const siteId = source.kind === "site" ? source.siteId : undefined;
   const [filter, setFilter] = useState<ActivityFilter>(NO_FILTER);
   const [selected, setSelected] = useState<AuditRow | undefined>();
   const loaded = useMemo(() => activity.data?.pages.flatMap((p) => p.items) ?? [], [activity.data]);
@@ -143,7 +173,13 @@ function ActivityList({ siteId }: { siteId: string }) {
         }
       />
       {/* Kumo Empty is framed itself: it takes the table's place, never inside the LayerCard. */}
-      {nothingYet ? (
+      {nothingYet && source.kind === "deployment" ? (
+        <Empty
+          icon={<UsersThree size={48} className="text-kumo-inactive" />}
+          title={t("members.activity.empty")}
+          description={t("members.activity.emptyDescription")}
+        />
+      ) : nothingYet ? (
         <Empty
           icon={<ClockCounterClockwise size={48} className="text-kumo-inactive" />}
           title={t("activity.empty")}
@@ -177,13 +213,14 @@ function ActivityList({ siteId }: { siteId: string }) {
                 <Table.Head>{t("activity.columns.actor")}</Table.Head>
                 <Table.Head>{t("activity.columns.when")}</Table.Head>
                 <Table.Head>{t("activity.columns.outcome")}</Table.Head>
-                <Table.Head>{t("activity.columns.skill")}</Table.Head>
-                <Table.Head>{t("activity.columns.snapshot")}</Table.Head>
+                {/* Deployment events (members, invites) run no skill and take no snapshot. */}
+                {siteId && <Table.Head>{t("activity.columns.skill")}</Table.Head>}
+                {siteId && <Table.Head>{t("activity.columns.snapshot")}</Table.Head>}
                 <Table.Head sticky="right" />
               </Table.Row>
             </Table.Header>
             {activity.isPending ? (
-              <TableSkeleton columns={COLUMNS} rows={6} />
+              <TableSkeleton columns={siteId ? COLUMNS : COLUMNS - 2} rows={6} />
             ) : (
               <Table.Body>
                 {rows.map((r) => (
@@ -203,7 +240,12 @@ function ActivityList({ siteId }: { siteId: string }) {
                       <DecisionCell row={r} />
                     </Table.Cell>
                     <Table.Cell className="min-w-56 max-w-80">
-                      <ActorCell actor={r.actor} mode={r.mode} elevation={r.elevation} />
+                      <ActorCell
+                        actor={r.actor}
+                        mode={r.mode}
+                        elevation={r.elevation}
+                        role={roles.get(r.actor.id)}
+                      />
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       <RelativeTime iso={r.at} />
@@ -211,35 +253,39 @@ function ActivityList({ siteId }: { siteId: string }) {
                     <Table.Cell className="whitespace-nowrap">
                       <Outcome outcome={r.outcome} />
                     </Table.Cell>
-                    <Table.Cell className="whitespace-nowrap">
-                      {r.skill ? (
-                        <Text variant="mono-secondary" as="span">
-                          {r.skill}
-                        </Text>
-                      ) : (
-                        <Text variant="secondary" as="span">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell className="whitespace-nowrap">
-                      {r.snapshotId ? (
-                        // biome-ignore lint/a11y/noStaticElementInteractions: only stops the row click
-                        // biome-ignore lint/a11y/useKeyWithClickEvents: the link handles keys itself
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <Link
-                            href={`/sites/${siteId}/snapshots?diff=${r.snapshotId}`}
-                            variant="inline"
-                          >
-                            <span className="font-mono text-[0.9em]">{r.snapshotId}</span>
-                          </Link>
-                        </span>
-                      ) : (
-                        <Text variant="secondary" as="span">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
+                    {siteId && (
+                      <Table.Cell className="whitespace-nowrap">
+                        {r.skill ? (
+                          <Text variant="mono-secondary" as="span">
+                            {r.skill}
+                          </Text>
+                        ) : (
+                          <Text variant="secondary" as="span">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                    )}
+                    {siteId && (
+                      <Table.Cell className="whitespace-nowrap">
+                        {r.snapshotId ? (
+                          // biome-ignore lint/a11y/noStaticElementInteractions: only stops the row click
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: the link handles keys itself
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <Link
+                              href={`/sites/${siteId}/snapshots?diff=${r.snapshotId}`}
+                              variant="inline"
+                            >
+                              <span className="font-mono text-[0.9em]">{r.snapshotId}</span>
+                            </Link>
+                          </span>
+                        ) : (
+                          <Text variant="secondary" as="span">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                    )}
                     <Table.Cell sticky="right" className="text-right">
                       <Button
                         variant="ghost"

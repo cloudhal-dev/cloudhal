@@ -80,12 +80,15 @@ export function NotificationBell({
   );
 }
 
-export type NotificationTone = "warning" | "info";
+export type NotificationTone = "warning" | "info" | "success";
 
 export interface NotificationItemProps {
   /** 16px Phosphor icon, aligned with the first line of the title. */
   icon: ReactNode;
-  /** Icon colour: `warning` for something ending, `info` for something asked. */
+  /**
+   * Icon colour: `warning` for something ending, `info` for something asked or changed,
+   * `success` for something that went well (someone joined).
+   */
   tone?: NotificationTone;
   /** One line: who and what ("Planner asks for Edits · 30 min"). */
   title: ReactNode;
@@ -101,6 +104,7 @@ export interface NotificationItemProps {
 const TONE: Record<NotificationTone, string> = {
   warning: "text-kumo-warning",
   info: "text-kumo-info",
+  success: "text-kumo-success",
 };
 
 /** One row of the notification panel: tone icon, title + meta, body, actions. */

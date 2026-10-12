@@ -1,0 +1,12 @@
+{
+  "reason": "Challenges are base64url segments",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "comment",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "name": "Ayşe Yılmaz",
+    "body": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?",
+    "challenge": "not a challenge at all",
+    "solution": "183427"
+  }
+}

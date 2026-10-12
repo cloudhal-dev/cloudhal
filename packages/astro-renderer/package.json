@@ -29,7 +29,14 @@
     "./preview": "./src/preview.ts",
     "./resolver": "./src/resolver.ts",
     "./markdown": "./src/markdown.ts",
-    "./cloudflare-entry": "./src/cloudflare-entry.ts"
+    "./cloudflare-entry": "./src/cloudflare-entry.ts",
+    "./media": "./src/media.ts",
+    "./media-route": "./src/media-route.ts",
+    "./media-middleware": "./src/media-middleware.ts",
+    "./analytics": "./src/analytics.ts",
+    "./analytics-middleware": "./src/analytics-middleware.ts",
+    "./comments": "./src/comments-view.ts",
+    "./comments-middleware": "./src/comments-middleware.ts"
   },
   "files": [
     "dist",
@@ -44,7 +51,10 @@
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
-    "marked": "catalog:"
+    "marked": "catalog:",
+    "@cloudhal/analytics": "workspace:*",
+    "vite": "catalog:",
+    "@cloudhal/comments": "workspace:*"
   },
   "peerDependencies": {
     "astro": "^7.3.0",
@@ -141,6 +151,34 @@
       "./cloudflare-entry": {
         "types": "./dist/src/cloudflare-entry.d.ts",
         "default": "./dist/src/cloudflare-entry.js"
+      },
+      "./media": {
+        "types": "./dist/src/media.d.ts",
+        "default": "./dist/src/media.js"
+      },
+      "./media-route": {
+        "types": "./dist/src/media-route.d.ts",
+        "default": "./dist/src/media-route.js"
+      },
+      "./media-middleware": {
+        "types": "./dist/src/media-middleware.d.ts",
+        "default": "./dist/src/media-middleware.js"
+      },
+      "./analytics": {
+        "types": "./dist/src/analytics.d.ts",
+        "default": "./dist/src/analytics.js"
+      },
+      "./analytics-middleware": {
+        "types": "./dist/src/analytics-middleware.d.ts",
+        "default": "./dist/src/analytics-middleware.js"
+      },
+      "./comments": {
+        "types": "./dist/src/comments-view.d.ts",
+        "default": "./dist/src/comments-view.js"
+      },
+      "./comments-middleware": {
+        "types": "./dist/src/comments-middleware.d.ts",
+        "default": "./dist/src/comments-middleware.js"
       }
     }
   }

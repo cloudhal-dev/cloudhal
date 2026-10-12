@@ -25,3 +25,6 @@ ADR-0004/0011 approved gated calls (publish, rollback, delete) through MCP elici
 - Positive: "publish stops for a person" holds even against a compromised or careless agent client; every decision is audited with who decided.
 - Negative: a remote agent must wait (and poll) for the decision; Studio needs an Approvals screen.
 - Follow-up: notifications for pending approvals; per-site approver roles.
+
+## Addendum (2026-10-09): one waiting request per call
+An agent that repeats a call needing approval (same actor, tool, arguments and site state) gets the request that is already pending instead of a new one (`ApprovalStore.request`). Retries and lost answers no longer leave copies in Approvals for a person to deny. A call with other arguments, or after the site changed, still files its own request; a request voided by a site change ("the site changed after the approval was requested") is never reused.

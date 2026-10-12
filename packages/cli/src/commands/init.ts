@@ -85,7 +85,15 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
   const local = await openLocalStore(path.join(projectDir, dataDir));
   try {
     const site = await seedStarterSite(local.store, { name, slug });
-    await writeProjectConfig(projectDir, { siteId: site.id, dataDir });
+    // RFC-0006 owner decision 4: new projects record cookie-less analytics by default.
+    // RFC-0007 §15.4: reader comments are available to the deployment, but stay off for the site
+    // until someone turns them on in Studio (D4).
+    await writeProjectConfig(projectDir, {
+      siteId: site.id,
+      dataDir,
+      analytics: { enabled: true },
+      comments: { available: true },
+    });
     log(`seeded site ${site.id} (${name}) in ${dataDir}/`);
     return { projectDir, siteId: site.id };
   } finally {
