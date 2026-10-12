@@ -4,21 +4,24 @@ import { SqlAnalytics } from "../src/sql/index.ts";
 import {
   describeAnalyticsConformance,
   describeAnalyticsStateSuite,
+  describeBotTrafficConformance,
   describeRollupSuite,
 } from "../src/testing.ts";
 
-describeAnalyticsConformance("SqlAnalytics on better-sqlite3", {
+const sqlite = {
   async create() {
     const sql = await BetterSqlite3Driver.open(":memory:");
     await migrate(sql, migrations);
     const store = new SqlAnalytics(sql);
     return {
       reader: store,
-      load: (events) => store.insertMany(events),
+      load: (events: Parameters<SqlAnalytics["insertMany"]>[0]) => store.insertMany(events),
       close: () => sql.close(),
     };
   },
-});
+};
+describeAnalyticsConformance("SqlAnalytics on better-sqlite3", sqlite);
+describeBotTrafficConformance("SqlAnalytics on better-sqlite3", sqlite);
 
 describeAnalyticsStateSuite("better-sqlite3", {
   create: () => BetterSqlite3Driver.open(":memory:"),

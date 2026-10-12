@@ -1,18 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { MemoryAnalytics } from "../src/index.ts";
-import { describeAnalyticsConformance, FIXTURE_EVENTS, FIXTURE_SITE } from "../src/testing.ts";
+import {
+  describeAnalyticsConformance,
+  describeBotTrafficConformance,
+  FIXTURE_EVENTS,
+  FIXTURE_SITE,
+} from "../src/testing.ts";
 
-describeAnalyticsConformance("MemoryAnalytics (reference)", {
+const memory = {
   async create() {
     const store = new MemoryAnalytics();
     return {
       reader: store,
-      async load(events) {
+      async load(events: readonly import("@cloudhal/core-contracts").AnalyticsEvent[]) {
         for (const e of events) store.write(e);
       },
     };
   },
-});
+};
+describeAnalyticsConformance("MemoryAnalytics (reference)", memory);
+describeBotTrafficConformance("MemoryAnalytics (reference)", memory);
 
 describe("MemoryAnalytics", () => {
   it("is a live store that is never estimated", async () => {

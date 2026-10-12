@@ -6,6 +6,7 @@ import { SqlAnalytics } from "../src/sql/index.ts";
 import {
   describeAnalyticsConformance,
   describeAnalyticsStateSuite,
+  describeBotTrafficConformance,
   describeRollupSuite,
 } from "../src/testing.ts";
 
@@ -20,6 +21,16 @@ afterAll(async () => {
 });
 
 describeAnalyticsConformance("SqlAnalytics on Cloudflare D1 (Miniflare)", {
+  async create() {
+    const sql = await driver();
+    await dropAllTables(sql);
+    await migrate(sql, migrations);
+    const store = new SqlAnalytics(sql);
+    return { reader: store, load: (events) => store.insertMany(events) };
+  },
+});
+
+describeBotTrafficConformance("SqlAnalytics on Cloudflare D1 (Miniflare)", {
   async create() {
     const sql = await driver();
     await dropAllTables(sql);

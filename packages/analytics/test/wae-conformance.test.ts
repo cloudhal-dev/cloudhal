@@ -4,11 +4,28 @@
  * must give the same answer as SQLite, D1 and the in-memory reference (invariant A10).
  */
 import { describe, expect, it } from "vitest";
-import { describeAnalyticsConformance, FIXTURE_EVENTS, FIXTURE_SITE } from "../src/testing.ts";
+import {
+  describeAnalyticsConformance,
+  describeBotTrafficConformance,
+  FIXTURE_EVENTS,
+  FIXTURE_SITE,
+} from "../src/testing.ts";
 import { WaeReader, WaeWriter } from "../src/wae/index.ts";
 import { FakeWae } from "./helpers/fake-wae.ts";
 
 describeAnalyticsConformance("WaeReader over the WAE layout (fake Analytics SQL API)", {
+  async create() {
+    const wae = new FakeWae("newsroom_events");
+    return {
+      reader: new WaeReader(wae, { dataset: "newsroom_events", cacheTtlMs: 0 }),
+      async load(events) {
+        wae.load(events);
+      },
+    };
+  },
+});
+
+describeBotTrafficConformance("WaeReader over the WAE layout (fake Analytics SQL API)", {
   async create() {
     const wae = new FakeWae("newsroom_events");
     return {

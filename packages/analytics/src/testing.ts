@@ -23,6 +23,7 @@ import { answerQuery } from "./memory.ts";
 import { type AnalyticsQuery, type AnalyticsReader, assertAnalyticsQuery } from "./model.ts";
 
 export * from "./fixtures.ts";
+export * from "./testing-bots.ts";
 export * from "./testing-rollups.ts";
 
 export interface ConformanceFactory {
