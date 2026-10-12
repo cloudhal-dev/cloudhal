@@ -632,6 +632,20 @@ export class SqlCommentStore implements SubmissionStore {
     return r ? toComment(r) : null;
   }
 
+  /** Several comments of a site in one read (≤ 50 ids; unknown ids are left out). */
+  async getMany(siteId: string, ids: readonly string[]): Promise<Comment[]> {
+    if (ids.length === 0) return [];
+    if (ids.length > MAX_BULK) throw new CommentInputError(`at most ${MAX_BULK} comment ids`);
+    const rows = await this.#rows(
+      siteId,
+      ids.filter((id) => COMMENT_ID.test(id)),
+    );
+    return ids.flatMap((id) => {
+      const r = rows.get(id);
+      return r ? [toComment(r)] : [];
+    });
+  }
+
   async #rows(siteId: string, ids: readonly string[]): Promise<Map<string, CommentRow>> {
     const rows = await this.sql.all<CommentRow>(
       "SELECT * FROM comments WHERE site_id = ? AND id IN (SELECT value FROM json_each(?))",

@@ -86,6 +86,13 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "top_content",
       "content_stats",
       "broken_links",
+      "list_comments",
+      "get_comment_thread",
+      "comments_summary",
+      "label_comments",
+      "moderate_comments",
+      "draft_comment_reply",
+      "set_comment_thread",
       "get_mode",
       "request_elevation",
     ]);

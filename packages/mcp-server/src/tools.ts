@@ -36,6 +36,7 @@ import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal
 import { assetRefsOf } from "@cloudhal/core-ts/media";
 import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
+import { commentTools } from "./comment-tools.ts";
 import {
   ACTOR_OWNERSHIP,
   autoSnapshot,
@@ -338,6 +339,8 @@ export function defineTools(): ToolDefinition[] {
     ...raw.slice(at),
     // RFC-0006 §9.3: read-only analytics (`analytics:read`).
     ...analyticsTools(),
+    // RFC-0007 §11: reader comments (read, advisory labels, reductions; approvals for the rest).
+    ...commentTools(),
     ...elevationTools(),
   ].map((t) => ({
     ...t,
@@ -1121,6 +1124,7 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
     annotations: t.annotations,
     ...(t.requiresApproval ? { requiresApproval: true } : {}),
     ...(t.own ? { own: t.own } : {}),
+    ...(t.classify ? { classify: t.classify } : {}),
   }));
 }
 
@@ -1177,10 +1181,11 @@ export async function runTool(
   const started = Date.now();
   let decision = deps.policy.evaluate(ctx.principal, def.name, {
     confirmed: deps.confirmed ?? false,
+    args,
   });
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
   const limit = decision.kind === "deny" ? undefined : decision.limit;
-  ctx = { ...ctx, limit };
+  ctx = { ...ctx, limit, confirmed: deps.confirmed === true };
   // Own-only publish (I10): an Author's (or their agent's) publish that carries someone else's
   // work, or structure, waits for someone whose role allows it (cause `role`).
   if (limit?.target === "changeset" && !deps.approved && siteId && decision.kind !== "deny") {

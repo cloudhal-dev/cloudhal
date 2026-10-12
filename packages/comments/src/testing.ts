@@ -773,6 +773,9 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       expect(own.newComments).toBe(2);
       expect(own.pending.count).toBe(2);
       expect(await ctx.store.nodeIds(SITE)).toEqual([ENTRY, ENTRY2].sort());
+      const many = await ctx.store.getMany(SITE, [a.id, "cmt_missing000", "not-an-id"]);
+      expect(many.map((c) => c.id)).toEqual([a.id]);
+      for (const c of many) expectContractComment(c);
       await ctx.store.putThread(SITE, ENTRY2, { mode: "closed" }, 0, EDITOR.id);
       expect((await ctx.store.threads(SITE)).map((t) => [t.nodeId, t.mode, t.rev])).toEqual([
         [ENTRY2, "closed", 1],
