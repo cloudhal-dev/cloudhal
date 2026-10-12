@@ -736,6 +736,49 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       for (const c of thread) expectContractComment(c);
     });
 
+    it("summary, node ids and thread rows: counts without reader text", async () => {
+      const a = await stored(ctx, {
+        labels: [{ label: "question", source: "rule", at: T0.toISOString() }],
+      });
+      ctx.clock.now = new Date(T0.getTime() + 60_000);
+      await stored(ctx, { nodeId: ENTRY2 });
+      ctx.clock.now = new Date(T0.getTime() + 120_000);
+      await stored(ctx, { nodeId: ENTRY2 });
+      const since = new Date(T0.getTime() - 1000).toISOString();
+      const s = await ctx.store.summary(SITE, since);
+      expect(s).toEqual({
+        newComments: 3,
+        busiest: [
+          { nodeId: ENTRY2, comments: 2 },
+          { nodeId: ENTRY, comments: 1 },
+        ],
+        labels: { question: 1 },
+        pending: {
+          count: 3,
+          oldestAt: T0.toISOString(),
+          medianAt: new Date(T0.getTime() + 60_000).toISOString(),
+        },
+        unansweredQuestions: 1,
+      });
+      // a staff reply answers the question
+      const approved = await approve(ctx, a);
+      await ctx.store.reply(SITE, {
+        commentId: approved.id,
+        text: "Here is the answer",
+        person: { id: EDITOR.id, name: "Ayşe" },
+        badge: "team",
+      });
+      expect((await ctx.store.summary(SITE, since)).unansweredQuestions).toBe(0);
+      const own = await ctx.store.summary(SITE, since, { nodeIds: [ENTRY2] });
+      expect(own.newComments).toBe(2);
+      expect(own.pending.count).toBe(2);
+      expect(await ctx.store.nodeIds(SITE)).toEqual([ENTRY, ENTRY2].sort());
+      await ctx.store.putThread(SITE, ENTRY2, { mode: "closed" }, 0, EDITOR.id);
+      expect((await ctx.store.threads(SITE)).map((t) => [t.nodeId, t.mode, t.rev])).toEqual([
+        [ENTRY2, "closed", 1],
+      ]);
+    });
+
     it("cm1: hashes see moderation, labels and thread changes (C4)", async () => {
       const c = await stored(ctx);
       const threads = [{ nodeId: ENTRY, state: "open" as const }];

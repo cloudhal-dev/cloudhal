@@ -5,6 +5,7 @@
 export { type CommentRow, toComment, toSettings } from "./rows.ts";
 export {
   type BanInput,
+  type CommentSummaryStats,
   type PutThreadOptions,
   SqlCommentStore,
   type SqlCommentStoreOptions,
