@@ -4,6 +4,7 @@ import type {
   AnalyticsBeacon,
   AnalyticsEvent,
   Asset,
+  Automation,
   Comment,
   CommentSubmission,
   ContentEntry,
@@ -11,6 +12,8 @@ import type {
   Page,
   Project,
   Redirect,
+  Release,
+  ScheduleRun,
   Section,
   Site,
   SkillManifest,
@@ -38,6 +41,9 @@ export interface ContractTypes {
   "analytics-beacon": AnalyticsBeacon;
   comment: Comment;
   "comment-submission": CommentSubmission;
+  release: Release;
+  automation: Automation;
+  "schedule-run": ScheduleRun;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -57,6 +63,9 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   "analytics-beacon": v.validateAnalyticsBeacon,
   comment: v.validateComment,
   "comment-submission": v.validateCommentSubmission,
+  release: v.validateRelease,
+  automation: v.validateAutomation,
+  "schedule-run": v.validateScheduleRun,
 };
 
 export class ContractValidationError extends Error {

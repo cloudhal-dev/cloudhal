@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "rel_01HZXA7Q2K4S",
+  "siteId": "site_01HZX8K3Q9EF",
+  "items": [
+    {
+      "kind": "set",
+      "nodeId": "entry_01HZX8K3Q9WX",
+      "nodeKind": "contentEntry",
+      "target": {
+        "rev": 7,
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "when": {
+    "kind": "at",
+    "at": "2026-10-12T16:00:00Z",
+    "timeZone": "UTC"
+  },
+  "state": "scheduled",
+  "hash": "rl1:1111111111111111111111111111111111111111111111111111111111111111",
+  "approval": {
+    "kind": "auto",
+    "by": {
+      "kind": "agent",
+      "id": "agent_01HZX8K3Q9DK",
+      "name": "Desk"
+    },
+    "keyId": "key_9fQx2LmB",
+    "at": "2026-10-12T14:00:00Z",
+    "windowEnds": "2026-10-12T17:00:00Z"
+  },
+  "createdBy": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9DK",
+    "name": "Desk"
+  },
+  "createdAt": "2026-10-30T14:10:00Z",
+  "updatedAt": "2026-10-30T14:12:00Z",
+  "rev": 2
+}

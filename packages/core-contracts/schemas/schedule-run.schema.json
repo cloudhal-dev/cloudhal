@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/schedule-run.schema.json",
+  "title": "ScheduleRun",
+  "description": "One occurrence of something scheduled (RFC-0008): a release's execution or an automation's run. Its id is derived from the subject and `occurrenceAt`, so a second scheduler tick that reaches the same occurrence finds the same row and the effect happens at most once. `state` says whether the run itself completed; `outcome` says whether it did any work, because a run that ended cleanly may still have done nothing. Runs live in D1 and are kept 90 days; the audit log keeps what each call did.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "subject",
+    "occurrenceAt",
+    "state",
+    "attempt",
+    "createdAt",
+    "updatedAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "#/$defs/ScheduleRunId" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "subject": { "$ref": "#/$defs/ScheduleRunSubject" },
+    "occurrenceAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "state": { "$ref": "#/$defs/ScheduleRunState" },
+    "outcome": {
+      "type": "string",
+      "description": "What the run achieved, separately from whether it completed: `did-work` changed something or produced findings; `nothing-to-do`; `proposed` left drafts or proposals for people; `waiting-approval` filed requests a person must decide.",
+      "enum": ["did-work", "nothing-to-do", "proposed", "waiting-approval"]
+    },
+    "trigger": {
+      "type": "string",
+      "description": "What woke the scheduler: the every-minute cron trigger, the Durable Object clock's alarm, an admin request (backstop), the Node timer, or a person (\"Run now\", \"Publish now\").",
+      "enum": ["cron", "alarm", "request", "node", "manual"]
+    },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "startedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "endedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "latenessSeconds": { "type": "integer", "minimum": 0 },
+    "adjusted": {
+      "type": "string",
+      "description": "The occurrence was moved: `dst-gap` (the wall-clock time did not exist that day, so it ran at the next valid minute) or `tzdata` (the zone's rules changed after it was planned).",
+      "enum": ["dst-gap", "tzdata"]
+    },
+    "window": { "$ref": "#/$defs/ScheduleRunWindow" },
+    "usage": { "$ref": "#/$defs/ScheduleRunUsage" },
+    "taint": { "$ref": "#/$defs/ScheduleRunTaint" },
+    "summary": {
+      "type": "string",
+      "description": "The agent's own account of the run (`end_run`) or the built-in job's report line. Plain text written by an agent: Studio renders it as text and never as an instruction.",
+      "maxLength": 2000,
+      "pattern": "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+    },
+    "counts": {
+      "type": "object",
+      "description": "Findings by name (e.g. `broken-links`, `stale-entries`, `proposals`).",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+      "maxProperties": 20,
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "approvalIds": {
+      "type": "array",
+      "description": "Approval requests the run filed.",
+      "items": { "$ref": "common.schema.json#/$defs/Id" },
+      "uniqueItems": true,
+      "maxItems": 50
+    },
+    "error": { "$ref": "#/$defs/ScheduleRunError" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" }
+  },
+  "$defs": {
+    "ScheduleRunId": {
+      "type": "string",
+      "description": "A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).",
+      "pattern": "^run_[A-Za-z0-9]{6,32}$"
+    },
+    "ScheduleRunState": {
+      "type": "string",
+      "description": "`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.",
+      "enum": [
+        "due",
+        "ready",
+        "running",
+        "succeeded",
+        "failed",
+        "missed",
+        "skipped",
+        "budget-exceeded",
+        "killed"
+      ]
+    },
+    "ScheduleRunSubject": {
+      "description": "What ran, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseRunSubject",
+          "additionalProperties": false,
+          "required": ["kind", "releaseId"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["release"] },
+            "releaseId": {
+              "type": "string",
+              "pattern": "^rel_[A-Za-z0-9]{6,32}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "AutomationRunSubject",
+          "additionalProperties": false,
+          "required": ["kind", "automationId", "job"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["automation"] },
+            "automationId": {
+              "type": "string",
+              "pattern": "^aut_[A-Za-z0-9]{6,32}$"
+            },
+            "job": {
+              "type": "string",
+              "enum": ["builtin", "agent-task"]
+            }
+          }
+        }
+      ]
+    },
+    "ScheduleRunWindow": {
+      "type": "object",
+      "description": "An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.",
+      "additionalProperties": false,
+      "required": ["opensAt", "closesAt"],
+      "properties": {
+        "opensAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "closesAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "ScheduleRunUsage": {
+      "type": "object",
+      "description": "What the run used against its budget, counted by the server.",
+      "additionalProperties": false,
+      "required": ["toolCalls", "writes", "approvalRequests"],
+      "properties": {
+        "toolCalls": { "type": "integer", "minimum": 0 },
+        "writes": { "type": "integer", "minimum": 0 },
+        "approvalRequests": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ScheduleRunTaint": {
+      "type": "object",
+      "description": "The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.",
+      "additionalProperties": false,
+      "required": ["at", "tool"],
+      "properties": {
+        "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      }
+    },
+    "ScheduleRunError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+        }
+      }
+    }
+  }
+}

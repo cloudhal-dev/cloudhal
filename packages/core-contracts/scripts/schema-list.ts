@@ -19,6 +19,9 @@ export const ROOT_SCHEMAS = [
   "analytics-beacon",
   "comment",
   "comment-submission",
+  "release",
+  "automation",
+  "schedule-run",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];

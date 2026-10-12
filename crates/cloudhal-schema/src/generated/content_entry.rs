@@ -119,6 +119,15 @@ impl<'de> ::serde::Deserialize<'de> for ActorName {
             })
     }
 }
+#[doc = "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Availability {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub from: ::std::option::Option<Timestamp>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub until: ::std::option::Option<Timestamp>,
+}
 #[doc = "`Body`"]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -232,6 +241,8 @@ impl<'de> ::serde::Deserialize<'de> for BodyValue {
 #[serde(deny_unknown_fields)]
 pub struct ContentEntry {
     pub author: Actor,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub availability: ::std::option::Option<Availability>,
     pub body: Body,
     pub collection: Slug,
     #[serde(

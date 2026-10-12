@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "entry_01HZX8K3Q9WX",
+  "siteId": "site_01HZX8K3Q9EF",
+  "collection": "posts",
+  "slug": "first-agent-written-article",
+  "locale": "en",
+  "status": "published",
+  "title": "The first agent-written article",
+  "summary": "How the newsroom agent researched and drafted this piece.",
+  "body": {
+    "format": "markdown",
+    "value": "# Hello\n\nBody text."
+  },
+  "fields": {
+    "readingMinutes": 4,
+    "category": "product",
+    "featured": true
+  },
+  "tags": ["agents", "launch"],
+  "author": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9YZ",
+    "name": "Newsroom Agent"
+  },
+  "coverImage": {
+    "src": "/assets/cover.jpg",
+    "alt": "Cover"
+  },
+  "rev": 2,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z",
+  "publishedAt": "2026-10-01T06:00:00Z",
+  "availability": {
+    "from": "2026-10-01T06:00:00Z",
+    "until": "2026-12-31T21:00:00Z"
+  }
+}

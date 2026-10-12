@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "aut_01HZXD4F6H8K",
+  "siteId": "site_01HZX8K3Q9EF",
+  "name": "Hourly comment triage",
+  "job": {
+    "kind": "agent-task",
+    "keyId": "key_7Tq3VbN1",
+    "instructions": "Label new comments and hide obvious spam. Do not reply.",
+    "skill": "comment-triage",
+    "modeCap": "edits",
+    "readsUntrustedText": true,
+    "windowMinutes": 15,
+    "budget": {
+      "maxToolCalls": 100,
+      "maxWrites": 50,
+      "maxApprovalRequests": 0,
+      "maxMinutes": 15
+    }
+  },
+  "recurrence": {
+    "start": "2026-10-12T11:23",
+    "timeZone": "UTC",
+    "rule": "FREQ=DAILY;BYHOUR=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23;BYMINUTE=23",
+    "preset": "hourly"
+  },
+  "state": "active",
+  "consecutiveFailures": 0,
+  "owner": {
+    "id": "user_01HZX8K3Q9AY",
+    "name": "Ayşe Demir"
+  },
+  "nextRunAt": "2026-10-12T11:23:00Z",
+  "createdAt": "2026-10-12T10:00:00Z",
+  "updatedAt": "2026-10-12T10:00:00Z",
+  "rev": 0
+}

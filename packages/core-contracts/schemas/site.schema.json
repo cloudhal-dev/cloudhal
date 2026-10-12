@@ -45,6 +45,10 @@
     },
     "homePageId": { "$ref": "common.schema.json#/$defs/Id" },
     "theme": { "$ref": "#/$defs/ThemeRef" },
+    "timeZone": {
+      "$ref": "common.schema.json#/$defs/TimeZone",
+      "description": "The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."
+    },
     "publishedSnapshotId": {
       "$ref": "common.schema.json#/$defs/Id",
       "description": "Snapshot currently serving production. Rollback = pointing this at an older snapshot."

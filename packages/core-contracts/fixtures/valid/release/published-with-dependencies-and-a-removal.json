@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "rel_01HZXA7Q2K4Q",
+  "siteId": "site_01HZX8K3Q9EF",
+  "items": [
+    {
+      "kind": "set",
+      "nodeId": "entry_01HZX8K3Q9WX",
+      "nodeKind": "contentEntry",
+      "target": {
+        "rev": 7,
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "kind": "set",
+      "nodeId": "asset_01HZX8K3Q9IM",
+      "nodeKind": "asset",
+      "target": {
+        "rev": 0,
+        "hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "kind": "set",
+      "nodeId": "term_01HZX8K3Q9EL",
+      "nodeKind": "term",
+      "target": {
+        "rev": 1,
+        "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "kind": "remove",
+      "nodeId": "page_01HZX8K3Q9OL",
+      "nodeKind": "page",
+      "base": {
+        "rev": 5,
+        "hash": "9999999999999999999999999999999999999999999999999999999999999999"
+      }
+    }
+  ],
+  "when": {
+    "kind": "at",
+    "at": "2026-11-02T06:00:00Z",
+    "timeZone": "Europe/Istanbul",
+    "localTime": "2026-11-02T09:00"
+  },
+  "state": "published",
+  "hash": "rl1:1111111111111111111111111111111111111111111111111111111111111111",
+  "approval": {
+    "kind": "person",
+    "by": {
+      "id": "user_01HZX8K3Q9AY",
+      "name": "Ayşe Demir"
+    },
+    "at": "2026-10-30T14:12:00Z",
+    "executeAt": "2026-11-02T06:00:00Z",
+    "approvalId": "appr_01HZXB2M4N6P8Q"
+  },
+  "createdBy": {
+    "kind": "human",
+    "id": "user_01HZX8K3Q9AY",
+    "name": "Ayşe Demir"
+  },
+  "createdAt": "2026-10-30T14:10:00Z",
+  "updatedAt": "2026-11-02T06:00:41Z",
+  "rev": 4,
+  "title": "Election night",
+  "outcome": {
+    "kind": "published",
+    "runId": "run_01HZXC9R3T5V",
+    "at": "2026-11-02T06:00:41Z",
+    "snapshotId": "snap_01HZXC9R3T5W",
+    "baseSnapshotId": "snap_01HZX9Z1Y2X3",
+    "latenessSeconds": 41,
+    "purge": "tags"
+  }
+}

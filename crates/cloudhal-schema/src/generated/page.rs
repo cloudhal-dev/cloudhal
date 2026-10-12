@@ -5,6 +5,15 @@
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::clone_on_copy)]
 
+#[doc = "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Availability {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub from: ::std::option::Option<Timestamp>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub until: ::std::option::Option<Timestamp>,
+}
 #[doc = "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
@@ -384,6 +393,8 @@ impl ::std::convert::From<::std::collections::HashMap<::std::string::String, ::s
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Page {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub availability: ::std::option::Option<Availability>,
     #[serde(rename = "createdAt")]
     pub created_at: Timestamp,
     pub id: Id,

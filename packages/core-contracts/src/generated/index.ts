@@ -6,8 +6,8 @@
  */
 
 export type { SchemaVersion, Id, Slug, Revision, Timestamp, Project, Metadata } from "./project.ts";
-export type { Locale, Site, Domain, ThemeRef } from "./site.ts";
-export type { PublishStatus, Section, Page, HeroSection, ImageRef, Link, RichTextSection, ImageSection, ContentListSection, Seo } from "./page.ts";
+export type { Locale, TimeZone, Site, Domain, ThemeRef } from "./site.ts";
+export type { PublishStatus, Section, Page, HeroSection, ImageRef, Link, RichTextSection, ImageSection, ContentListSection, Seo, Availability } from "./page.ts";
 export type { ActorKind, ContentEntry, Body, TermAssignment, Actor } from "./content-entry.ts";
 export type { Snapshot, NodeRef, ChangeSummary } from "./snapshot.ts";
 export type { SkillManifest } from "./skill-manifest.ts";
@@ -20,3 +20,6 @@ export type { AnalyticsEvent, AnalyticsNodeKind, AnalyticsHostname, AnalyticsCha
 export type { AnalyticsBeacon, BeaconPath, BeaconUtm, BeaconMillis, AnalyticsPageviewBeacon, AnalyticsVitalsBeacon } from "./analytics-beacon.ts";
 export type { CommentId, CommentAuthor, CommentDisplayName, CommentStatus, Comment, CommentOrigin, GuestCommentAuthor, ReaderCommentAuthor, StaffCommentAuthor, ErasedCommentAuthor, CommentBody, CommentLabel, CommentModeration } from "./comment.ts";
 export type { CommentSubmission, SubmissionChallenge, SubmissionSolution, SubmissionTurnstileToken, SubmissionHoneypot, SubmissionCommentId, CommentPostSubmission, CommentReportSubmission } from "./comment-submission.ts";
+export type { ReleaseId, ReleaseItem, ReleaseNodeKind, ReleaseWhen, LocalDateTime, ReleaseState, ReleaseHash, ReleaseApproval, ReleaseOutcome, Release, ReleaseSetItem, ReleaseNodeVersion, ReleaseRemoveItem, ReleaseAt, ReleaseOnApproval, ReleasePersonApproval, ReleasePerson, ReleaseAutoApproval, ReleasePublishedOutcome, ReleaseConflictOutcome, ReleaseConflict, ReleaseFailedOutcome, ReleaseMissedOutcome, ReleaseExpiredOutcome, ReleaseCanceledOutcome } from "./release.ts";
+export type { AutomationId, AutomationJob, AutomationRule, AutomationState, Automation, BuiltinAutomationJob, AgentTaskAutomationJob, AutomationBudget, AutomationRecurrence, AutomationOwner } from "./automation.ts";
+export type { ScheduleRunId, ScheduleRunSubject, ScheduleRunState, ScheduleRun, ReleaseRunSubject, AutomationRunSubject, ScheduleRunWindow, ScheduleRunUsage, ScheduleRunTaint, ScheduleRunError } from "./schedule-run.ts";

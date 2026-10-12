@@ -98,6 +98,7 @@ export interface ContentEntry {
   author: Actor;
   coverImage?: ImageRef;
   publishedAt?: Timestamp;
+  availability?: Availability;
   rev: Revision;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -152,6 +153,16 @@ export interface ImageRef {
   alt: string;
   width?: number;
   height?: number;
+}
+/**
+ * Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "Availability".
+ */
+export interface Availability {
+  from?: Timestamp;
+  until?: Timestamp;
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

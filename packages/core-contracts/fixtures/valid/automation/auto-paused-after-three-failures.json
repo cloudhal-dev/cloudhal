@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "aut_01HZXD4F6H8N",
+  "siteId": "site_01HZX8K3Q9EF",
+  "name": "Stale docs review",
+  "job": {
+    "kind": "builtin",
+    "builtin": "stale-content",
+    "staleAfterDays": 180
+  },
+  "recurrence": {
+    "start": "2026-10-19T09:07",
+    "timeZone": "Europe/Istanbul",
+    "rule": "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=7",
+    "preset": "weekly"
+  },
+  "state": "auto-paused",
+  "consecutiveFailures": 3,
+  "owner": {
+    "id": "user_01HZX8K3Q9AY",
+    "name": "Ayşe Demir"
+  },
+  "createdAt": "2026-10-12T10:00:00Z",
+  "updatedAt": "2026-10-12T10:00:00Z",
+  "rev": 0,
+  "pausedReason": "failures"
+}

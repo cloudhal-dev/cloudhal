@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release.schema.json",
+  "title": "Release",
+  "description": "A scheduled content change set (RFC-0008): node versions pinned by id, rev and content hash, applied on top of whatever is live at the release's time. A single scheduled publish is a one-item release. Each item records the version that was live when the release was pinned (`base`); if a pinned node or its live base changed before the release runs, the release is held as a conflict instead of overwriting anything. A person's approval is bound to `hash` (`rl1:`), which digests the items only, so a person may move an approved release without re-approving it while an agent's move or any content change voids the approval. Releases live in D1 next to the graph; they are not graph nodes, never enter a snapshot and are not part of site bundles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "items",
+    "state",
+    "hash",
+    "createdBy",
+    "createdAt",
+    "updatedAt",
+    "rev"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "#/$defs/ReleaseId" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "title": {
+      "type": "string",
+      "description": "Optional name shown in Studio (\"Election night\"). A one-item release without a title is shown under its entry's or page's title.",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"
+    },
+    "items": {
+      "type": "array",
+      "description": "The pinned changes, at most one per node. A release never contains the site node: site settings, domains and structure are published the ordinary way.",
+      "items": { "$ref": "#/$defs/ReleaseItem" },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "when": { "$ref": "#/$defs/ReleaseWhen" },
+    "state": { "$ref": "#/$defs/ReleaseState" },
+    "hash": { "$ref": "#/$defs/ReleaseHash" },
+    "approval": { "$ref": "#/$defs/ReleaseApproval" },
+    "outcome": { "$ref": "#/$defs/ReleaseOutcome" },
+    "createdBy": { "$ref": "common.schema.json#/$defs/Actor" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "ReleaseId": {
+      "type": "string",
+      "description": "A release id: `rel_` and 6 to 32 letters or digits.",
+      "pattern": "^rel_[A-Za-z0-9]{6,32}$"
+    },
+    "ReleaseHash": {
+      "type": "string",
+      "description": "`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.",
+      "pattern": "^rl1:[0-9a-f]{64}$"
+    },
+    "ReleaseState": {
+      "type": "string",
+      "description": "Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.",
+      "enum": [
+        "draft",
+        "awaiting_approval",
+        "scheduled",
+        "running",
+        "published",
+        "conflict",
+        "missed",
+        "expired",
+        "failed",
+        "canceled"
+      ]
+    },
+    "ReleaseNodeKind": {
+      "type": "string",
+      "description": "Kinds of graph node a release may carry. The site node is never one of them.",
+      "enum": ["page", "contentEntry", "taxonomy", "term", "redirect", "menu", "asset"]
+    },
+    "ReleaseNodeVersion": {
+      "type": "object",
+      "description": "One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.",
+      "additionalProperties": false,
+      "required": ["rev", "hash"],
+      "properties": {
+        "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ReleaseItem": {
+      "description": "One pinned change, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseSetItem",
+          "description": "Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId", "nodeKind", "target"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["set"] },
+            "nodeId": { "$ref": "common.schema.json#/$defs/Id" },
+            "nodeKind": { "$ref": "#/$defs/ReleaseNodeKind" },
+            "target": { "$ref": "#/$defs/ReleaseNodeVersion" },
+            "base": { "$ref": "#/$defs/ReleaseNodeVersion" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseRemoveItem",
+          "description": "Take the node out of the live snapshot. `base` is the live version that is removed.",
+          "additionalProperties": false,
+          "required": ["kind", "nodeId", "nodeKind", "base"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["remove"] },
+            "nodeId": { "$ref": "common.schema.json#/$defs/Id" },
+            "nodeKind": { "$ref": "#/$defs/ReleaseNodeKind" },
+            "base": { "$ref": "#/$defs/ReleaseNodeVersion" }
+          }
+        }
+      ]
+    },
+    "ReleaseWhen": {
+      "description": "When the release runs, discriminated by `kind`. Absent while a draft has no time yet.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleaseAt",
+          "description": "At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "timeZone"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["at"] },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "timeZone": { "$ref": "common.schema.json#/$defs/TimeZone" },
+            "localTime": { "$ref": "common.schema.json#/$defs/LocalDateTime" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseOnApproval",
+          "description": "As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["on-approval"] }
+          }
+        }
+      ]
+    },
+    "ReleasePerson": {
+      "type": "object",
+      "description": "A staff person (`user_…`). Agents never appear here.",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^user_[A-Za-z0-9]{6,32}$"
+        },
+        "name": { "type": "string", "maxLength": 200 }
+      }
+    },
+    "ReleaseApproval": {
+      "description": "Why the release may run, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleasePersonApproval",
+          "description": "A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.",
+          "additionalProperties": false,
+          "required": ["kind", "by", "at"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["person"] },
+            "by": { "$ref": "#/$defs/ReleasePerson" },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "executeAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "approvalId": { "$ref": "common.schema.json#/$defs/Id" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseAutoApproval",
+          "description": "An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.",
+          "additionalProperties": false,
+          "required": ["kind", "by", "keyId", "at", "windowEnds"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["auto"] },
+            "by": { "$ref": "common.schema.json#/$defs/Actor" },
+            "keyId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{6,64}$"
+            },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "windowEnds": { "$ref": "common.schema.json#/$defs/Timestamp" }
+          }
+        }
+      ]
+    },
+    "ReleaseConflict": {
+      "type": "object",
+      "description": "A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.",
+      "additionalProperties": false,
+      "required": ["nodeId"],
+      "properties": {
+        "nodeId": { "$ref": "common.schema.json#/$defs/Id" },
+        "expected": { "$ref": "#/$defs/ReleaseNodeVersion" },
+        "found": { "$ref": "#/$defs/ReleaseNodeVersion" }
+      }
+    },
+    "ReleaseOutcome": {
+      "description": "What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "ReleasePublishedOutcome",
+          "description": "Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "runId",
+            "at",
+            "snapshotId",
+            "baseSnapshotId",
+            "latenessSeconds",
+            "purge"
+          ],
+          "properties": {
+            "kind": { "type": "string", "enum": ["published"] },
+            "runId": { "$ref": "common.schema.json#/$defs/Id" },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "snapshotId": { "$ref": "common.schema.json#/$defs/Id" },
+            "baseSnapshotId": { "$ref": "common.schema.json#/$defs/Id" },
+            "latenessSeconds": { "type": "integer", "minimum": 0 },
+            "purge": {
+              "type": "string",
+              "enum": ["tags", "everything", "deferred", "failed", "none"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseConflictOutcome",
+          "description": "Held: these nodes changed since the release was pinned. Nothing was published.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "conflicts"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["conflict"] },
+            "runId": { "$ref": "common.schema.json#/$defs/Id" },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "conflicts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ReleaseConflict" },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseFailedOutcome",
+          "description": "Refused at run time; nothing was published.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "code"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["failed"] },
+            "runId": { "$ref": "common.schema.json#/$defs/Id" },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "code": {
+              "type": "string",
+              "enum": [
+                "dependency_missing",
+                "invalid_snapshot",
+                "site_missing",
+                "node_body_missing",
+                "store_error"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 500,
+              "pattern": "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseMissedOutcome",
+          "description": "The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "latenessSeconds"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["missed"] },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "latenessSeconds": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseExpiredOutcome",
+          "description": "No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "reason"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["expired"] },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "reason": {
+              "type": "string",
+              "enum": ["unapproved", "approval_lost", "auto_window_ended", "creator_removed"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ReleaseCanceledOutcome",
+          "description": "Withdrawn by a person or an agent; its nodes are unlocked.",
+          "additionalProperties": false,
+          "required": ["kind", "at", "by"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["canceled"] },
+            "at": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "by": { "$ref": "common.schema.json#/$defs/Actor" }
+          }
+        }
+      ]
+    }
+  }
+}

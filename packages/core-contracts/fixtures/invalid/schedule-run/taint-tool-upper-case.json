@@ -1,0 +1,27 @@
+{
+  "reason": "tool names are lower-case MCP names",
+  "data": {
+    "schemaVersion": 1,
+    "id": "run_01HZXC9R3T5V",
+    "siteId": "site_01HZX8K3Q9EF",
+    "subject": {
+      "kind": "release",
+      "releaseId": "rel_01HZXA7Q2K4Q"
+    },
+    "occurrenceAt": "2026-11-02T06:00:00Z",
+    "state": "succeeded",
+    "outcome": "did-work",
+    "trigger": "cron",
+    "attempt": 1,
+    "startedAt": "2026-11-02T06:00:38Z",
+    "endedAt": "2026-11-02T06:00:41Z",
+    "latenessSeconds": 41,
+    "createdAt": "2026-11-02T06:00:38Z",
+    "updatedAt": "2026-11-02T06:00:41Z",
+    "rev": 2,
+    "taint": {
+      "at": "2026-10-12T12:24:15Z",
+      "tool": "ListComments"
+    }
+  }
+}

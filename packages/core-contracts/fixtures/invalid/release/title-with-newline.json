@@ -1,0 +1,45 @@
+{
+  "reason": "titles are one line",
+  "data": {
+    "schemaVersion": 1,
+    "id": "rel_01HZXA7Q2K4M",
+    "siteId": "site_01HZX8K3Q9EF",
+    "items": [
+      {
+        "kind": "set",
+        "nodeId": "entry_01HZX8K3Q9WX",
+        "nodeKind": "contentEntry",
+        "target": {
+          "rev": 7,
+          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "when": {
+      "kind": "at",
+      "at": "2026-11-02T06:00:00Z",
+      "timeZone": "Europe/Istanbul",
+      "localTime": "2026-11-02T09:00"
+    },
+    "state": "scheduled",
+    "hash": "rl1:1111111111111111111111111111111111111111111111111111111111111111",
+    "approval": {
+      "kind": "person",
+      "by": {
+        "id": "user_01HZX8K3Q9AY",
+        "name": "Ayşe Demir"
+      },
+      "at": "2026-10-30T14:12:00Z",
+      "executeAt": "2026-11-02T06:00:00Z"
+    },
+    "createdBy": {
+      "kind": "human",
+      "id": "user_01HZX8K3Q9AY",
+      "name": "Ayşe Demir"
+    },
+    "createdAt": "2026-10-30T14:10:00Z",
+    "updatedAt": "2026-10-30T14:12:00Z",
+    "rev": 2,
+    "title": "Election\nnight"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "run_01HZXE1G3J5N",
+  "siteId": "site_01HZX8K3Q9EF",
+  "subject": {
+    "kind": "automation",
+    "automationId": "aut_01HZXD4F6H8J",
+    "job": "builtin"
+  },
+  "occurrenceAt": "2026-10-05T06:07:00Z",
+  "state": "skipped",
+  "trigger": "node",
+  "attempt": 1,
+  "createdAt": "2026-10-12T06:07:01Z",
+  "updatedAt": "2026-10-12T06:07:01Z",
+  "rev": 0,
+  "error": {
+    "code": "coalesced",
+    "message": "a later occurrence ran instead"
+  }
+}
