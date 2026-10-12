@@ -19,6 +19,10 @@ import { messages as analyticsEn } from "../src/i18n/lazy/analytics.en.ts";
 import { messages as analyticsTr } from "../src/i18n/lazy/analytics.tr.ts";
 import { messages as analyticsSettingsEn } from "../src/i18n/lazy/analyticsSettings.en.ts";
 import { messages as analyticsSettingsTr } from "../src/i18n/lazy/analyticsSettings.tr.ts";
+import { messages as commentsEn } from "../src/i18n/lazy/comments.en.ts";
+import { messages as commentsTr } from "../src/i18n/lazy/comments.tr.ts";
+import { messages as commentsSettingsEn } from "../src/i18n/lazy/commentsSettings.en.ts";
+import { messages as commentsSettingsTr } from "../src/i18n/lazy/commentsSettings.tr.ts";
 import { messages as readersEn } from "../src/i18n/lazy/readers.en.ts";
 import { messages as readersTr } from "../src/i18n/lazy/readers.tr.ts";
 import { tr } from "../src/i18n/tr.ts";
@@ -60,6 +64,8 @@ describe("lazy message namespaces", () => {
   const modules = {
     analytics: [analyticsEn, analyticsTr],
     analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
+    comments: [commentsEn, commentsTr],
+    commentsSettings: [commentsSettingsEn, commentsSettingsTr],
     readers: [readersEn, readersTr],
   } as const;
 
@@ -77,6 +83,27 @@ describe("lazy message namespaces", () => {
       expect(en).not.toHaveProperty(ns);
       expect(tr).not.toHaveProperty(ns);
     }
+  });
+
+  it("speaks Turkish in the comment namespaces (no English left behind)", () => {
+    const flat = (o: object, prefix = ""): [string, string][] =>
+      Object.entries(o).flatMap(([k, v]) =>
+        typeof v === "string" ? [[`${prefix}${k}`, v]] : flat(v as object, `${prefix}${k}.`),
+      );
+    for (const [enModule, trModule] of [
+      [commentsEn, commentsTr],
+      [commentsSettingsEn, commentsSettingsTr],
+    ] as const) {
+      const english = new Map(flat(enModule));
+      // Placeholders, product names and codes may stay as they are; sentences may not.
+      const same = flat(trModule).filter(
+        ([k, v]) =>
+          english.get(k) === v && /[a-z]{4,} [a-z]{3,}/i.test(v) && !/^Cloudflare /.test(v),
+      );
+      expect(same).toEqual([]);
+    }
+    expect(commentsTr.comments.title).toBe("Yorumlar");
+    expect(commentsTr.comments.words.untrustedTitle).toBe("Güvenilmeyen okur metni");
   });
 
   it("loads a namespace when a component asks for it, without ever showing its keys", async () => {

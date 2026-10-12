@@ -34,7 +34,7 @@ pnpm kumo ls|doc <Name>|blocks|add <Block>|ai   # Kumo CLI: component list, API 
 - `packages/api` — Hono app (`createApi`), Better Auth (`src/auth.ts`), error mapping; shared suite `src/testing.ts` on sqlite + D1.
 - `packages/ui` — `export * from "@cloudflare/kumo"` + blocks; `styles.css` is the only Tailwind entry for admin UIs.
 - `patches/` — `pnpm patch` files (`patchedDependencies` in `pnpm-workspace.yaml`). `@cloudflare__kumo@2.14.0.patch` adds `TimeseriesChart`'s `tooltipTimestampFormat` (DESIGN.md §2v "Kumo locale"); when upgrading Kumo, re-check it and the gaps in `docs/design/kumo-upstream-notes.md` before re-creating or dropping it.
-- `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`, or to a lazy namespace `src/i18n/lazy/<ns>.{en,tr}.ts` — `analytics`, `analyticsSettings`, `readers`; DESIGN.md §1).
+- `apps/studio` — SPA; routes in `src/router.tsx`, screens in `src/routes`, typed API client `src/lib/api.ts`, i18n in `src/i18n` (add keys to `en.ts` and `tr.ts`, or to a lazy namespace `src/i18n/lazy/<ns>.{en,tr}.ts` — `analytics`, `analyticsSettings`, `readers`, `comments`, `commentsSettings`; DESIGN.md §1).
 - `docs/adr/` decisions (with sources) · `docs/rfcs/` proposals · `docs/design/DESIGN.md` the binding admin design system (Kumo).
 - `.agents/skills/` — skills for you: `contract-change`, `add-capability`, `write-rfc`, `studio-ui`, and Cloudflare's official **`kumo-design`** (installed from `cloudflare/kumo`, tracked in `skills-lock.json`; update with `npx skills update`). Any admin-UI change loads `kumo-design` + `studio-ui` and follows `docs/design/DESIGN.md`.
 

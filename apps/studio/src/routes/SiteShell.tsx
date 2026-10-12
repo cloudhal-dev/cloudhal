@@ -4,6 +4,7 @@ import {
   CalendarDots,
   Camera,
   ChartLine,
+  ChatsCircle,
   ClockCounterClockwise,
   FileText,
   GearSix,
@@ -24,9 +25,12 @@ import { usePublishMode, usePublishSite } from "../components/Publish.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useCan } from "../components/useMe.ts";
+import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { pendingCommentsCount } from "../lib/comments.ts";
 
 /** Site surface: sidebar scoped to one site, with the site switcher in the header. */
 export function SiteShell() {
@@ -53,6 +57,13 @@ export function SiteShell() {
   // Proposed terms wait for a person (RFC-0002 §8): their count rides on the sidebar item.
   const taxonomy = useTaxonomyData(siteId);
   const proposedTerms = taxonomy.items.filter((i) => i.term.status === "proposed").length;
+  // Reader comments (RFC-0007 §14): on deployments that have them, for people who may read them;
+  // the pending count rides on the bell's digest (own articles' count for Authors).
+  const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false });
+  const canReadComments = useCan("comments.read");
+  const comments = instance.data?.features.comments?.available === true && canReadComments;
+  const notifications = useNotifications();
+  const pendingComments = pendingCommentsCount(notifications.data?.items, siteId);
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -120,6 +131,15 @@ export function SiteShell() {
       label: t("commands.goMedia"),
       run: () => navigate({ to: "/sites/$siteId/media", params: { siteId } }),
     },
+    ...(comments
+      ? [
+          {
+            id: "comments",
+            label: t("commands.goComments"),
+            run: () => navigate({ to: "/sites/$siteId/comments", params: { siteId } }),
+          },
+        ]
+      : []),
     {
       id: "navigation",
       label: t("commands.goNavigation"),
@@ -253,6 +273,17 @@ export function SiteShell() {
               >
                 {t("nav.media")}
               </Sidebar.MenuButton>
+              {comments && (
+                <Sidebar.MenuButton
+                  icon={ChatsCircle}
+                  href={`${base}/comments`}
+                  active={is(`${base}/comments`) || is(`${base}/commenters`)}
+                  tooltip={t("nav.comments")}
+                >
+                  {t("nav.comments")}
+                  {pendingComments > 0 && <Sidebar.MenuBadge>{pendingComments}</Sidebar.MenuBadge>}
+                </Sidebar.MenuButton>
+              )}
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>

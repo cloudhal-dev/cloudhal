@@ -13,30 +13,38 @@ import {
   ArrowRight,
   BellSimple,
   CaretDown,
+  ChatsCircle,
   ClockClockwise,
   ClockCountdown,
+  Flag,
   GearSix,
+  PauseCircle,
   Robot,
   ShieldStar,
   Stop,
   UserPlus,
 } from "@phosphor-icons/react";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
-import type {
-  ElevationEndingNotification,
-  ElevationRequestNotification,
-  MemberJoinedNotification,
-  RoleChangedNotification,
+import {
+  api,
+  type CommentNotification,
+  type ElevationEndingNotification,
+  type ElevationRequestNotification,
+  type MemberJoinedNotification,
+  type RoleChangedNotification,
 } from "../lib/api.ts";
 import { formatUntil } from "../lib/elevation.ts";
 import {
+  commentNotice,
   DEFAULT_EXTEND_MINUTES,
   EXTEND_PRESETS,
   type ExtendTarget,
   endingParams,
   extendTargetOf,
+  isCommentNotification,
   liveNotifications,
   notificationHref,
   requestParams,
@@ -46,6 +54,7 @@ import { useEndElevation, useExtendElevation } from "./Elevation.tsx";
 import { AgentReason, useShortDuration } from "./ElevationRequest.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
 import { RoleBadge } from "./Roles.tsx";
+import { useToast } from "./Toast.ts";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 import { useNotificationAlerts, useNotifications } from "./useNotifications.ts";
 import { useNow } from "./useNow.ts";
@@ -297,6 +306,93 @@ function RoleChangedItem({
   );
 }
 
+const COMMENT_ICON = {
+  "comments-pending": ChatsCircle,
+  "comments-reported": Flag,
+  "comments-paused": PauseCircle,
+  "comments-purge-waiting": ClockCountdown,
+  "comments-approval": Robot,
+} as const;
+
+/**
+ * Reader comments (RFC-0007 §13, DESIGN.md §2w): "12 comments wait for moderation", reports,
+ * a paused day, a takedown still waiting for the live page, an agent's comment request — each
+ * with where to act on it. The words are counts and names, never reader text.
+ */
+function CommentItem({
+  item,
+  now,
+  onNavigate,
+}: {
+  item: CommentNotification;
+  now: number;
+  onNavigate: () => void;
+}) {
+  const { t, locale } = useI18n();
+  const toast = useToast();
+  const purge = useMutation({
+    mutationFn: () => api.comments.purgeSiteCache(item.siteId),
+    onSuccess: () => toast.success(t("notifications.comments.purgeWaiting.purged")),
+    onError: (e) => toast.error(t("notifications.comments.purgeWaiting.failed"), e.message),
+  });
+  const { title, body } = commentNotice(t, locale, item, now);
+  const Icon = COMMENT_ICON[item.kind];
+  const tone =
+    item.kind === "comments-reported" ||
+    item.kind === "comments-paused" ||
+    item.kind === "comments-purge-waiting"
+      ? "warning"
+      : "info";
+  const action =
+    item.kind === "comments-paused"
+      ? t("notifications.comments.settings")
+      : item.kind === "comments-purge-waiting"
+        ? t("notifications.comments.open")
+        : t("notifications.comments.review");
+  return (
+    <NotificationItem
+      icon={<Icon size={16} />}
+      tone={tone}
+      title={title}
+      meta={
+        <RelativeTime
+          iso={item.kind === "comments-approval" ? item.createdAt : item.at}
+          size="xs"
+        />
+      }
+      actions={
+        <>
+          {item.kind === "comments-purge-waiting" && (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={purge.isPending}
+              onClick={() => purge.mutate()}
+            >
+              {t("notifications.comments.purgeWaiting.purge")}
+            </Button>
+          )}
+          <LinkButton
+            href={notificationHref(item)}
+            variant={item.kind === "comments-purge-waiting" ? "ghost" : "secondary"}
+            size="sm"
+            icon={ArrowRight}
+            onClick={onNavigate}
+          >
+            {action}
+          </LinkButton>
+        </>
+      }
+    >
+      <div className="grid" data-notification={item.id} data-kind={item.kind}>
+        <Text variant="secondary" size="sm">
+          {body}
+        </Text>
+      </div>
+    </NotificationItem>
+  );
+}
+
 /**
  * The top bar's bell (DESIGN.md §1, §2n): a count of what needs the person — elevations about to
  * end, agents asking for one — and a panel to act on them right there. It also hosts the one-time
@@ -348,7 +444,9 @@ export function NotificationsBell() {
         />
       ) : (
         items.map((item) =>
-          item.kind === "elevation-ending" ? (
+          isCommentNotification(item) ? (
+            <CommentItem key={item.id} item={item} now={now} onNavigate={close} />
+          ) : item.kind === "elevation-ending" ? (
             <EndingItem key={item.id} item={item} now={now} onNavigate={close} />
           ) : item.kind === "elevation-request" ? (
             <RequestItem key={item.id} item={item} onNavigate={close} />

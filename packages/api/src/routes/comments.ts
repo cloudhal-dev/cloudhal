@@ -813,7 +813,11 @@ export const comments: Hono<Env> = new Hono<Env>()
   .get("/comment-bans", async (c) => {
     const d = deps(c);
     const site = await requireSite(c);
-    return c.json({ items: await d.store.listBans(site.id) });
+    // `?commentId=` narrows to that comment's author (the commenter page), by keyed hash only.
+    const commentId = c.req.query("commentId");
+    return c.json({
+      items: await d.store.listBans(site.id, commentId ? { commentId } : {}),
+    });
   })
   .post("/comment-bans", async (c) => {
     const d = deps(c);

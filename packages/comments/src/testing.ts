@@ -362,6 +362,11 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       });
       expect(bans.map((b) => b.subject).sort()).toEqual(["email", "ip"]);
       expect(JSON.stringify(await ctx.store.listBans(SITE))).not.toContain("ban@example.com");
+      // A commenter's bans, found from one of their comments (Studio's commenter page).
+      expect(
+        (await ctx.store.listBans(SITE, { commentId: c.id })).map((b) => b.subject).sort(),
+      ).toEqual(["email", "ip"]);
+      expect(await ctx.store.listBans(OTHER_SITE, { commentId: c.id })).toEqual([]);
       const h = await emailHmac(ctx.keys, "ban@example.com");
       expect(await ctx.store.isBanned(SITE, { emailHmac: h }, ctx.clock.now.toISOString())).toBe(
         true,

@@ -39,6 +39,10 @@ import {
   ANALYTICS_SETTINGS_SECTION,
   AnalyticsSettingsSection,
 } from "../components/AnalyticsSettings.tsx";
+import {
+  COMMENT_SETTINGS_SECTION,
+  CommentSettingsSection,
+} from "../components/CommentSettings.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -72,7 +76,13 @@ import {
   validateHostname,
 } from "../lib/site-settings.ts";
 
-const SECTIONS = ["general", "domains", ANALYTICS_SETTINGS_SECTION, "previews"] as const;
+const SECTIONS = [
+  "general",
+  "domains",
+  ANALYTICS_SETTINGS_SECTION,
+  COMMENT_SETTINGS_SECTION,
+  "previews",
+] as const;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 
@@ -801,7 +811,7 @@ function PreviewLinksSection({
 
 /** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
-  const t = useT("analyticsSettings");
+  const t = useT("analyticsSettings", "commentsSettings");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
@@ -824,7 +834,9 @@ export function SiteSettingsPage() {
           label:
             id === ANALYTICS_SETTINGS_SECTION
               ? t("analyticsSettings.title")
-              : t(`siteSettings.sections.${id}`),
+              : id === COMMENT_SETTINGS_SECTION
+                ? t("commentsSettings.title")
+                : t(`siteSettings.sections.${id}`),
         }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
@@ -833,6 +845,8 @@ export function SiteSettingsPage() {
         </ReadOnly>
         {/* Gated on its own abilities (analytics.read to see, analytics.settings to change). */}
         <AnalyticsSettingsSection siteId={siteId} />
+        {/* Reader comments (RFC-0007 §14): comments.read to see, comments.settings to change. */}
+        <CommentSettingsSection siteId={siteId} />
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>

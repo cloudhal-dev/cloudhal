@@ -37,6 +37,8 @@ const IMPLIES: Partial<Record<AnyScope, readonly AnyScope[]>> = {
   "site:publish": ["site:publish:own"],
   "asset:manage": ["asset:upload"],
   "members:manage": ["members:invite"],
+  "comments:moderate": ["comments:moderate:own"],
+  "comments:reply": ["comments:reply:own"],
 };
 
 /** `a` grants `b` (directly or through the lattice); `*` grants everything. */

@@ -8,6 +8,7 @@ import type { MessageKey } from "../i18n/index.tsx";
 import { isKeyMode } from "./agents.ts";
 import {
   type AgentKeySummary,
+  type CommentNotification,
   type ElevationEndingNotification,
   type ElevationInput,
   type ElevationRequestNotification,
@@ -52,9 +53,10 @@ export function liveNotifications(
   return (items ?? []).filter((i) =>
     i.kind === "elevation-ending"
       ? Date.parse(i.until) > now
-      : i.kind === "elevation-request"
+      : i.kind === "elevation-request" || i.kind === "comments-approval"
         ? Date.parse(i.expiresAt) > now
-        : // Member events do not expire here; the server lists the last seven days.
+        : // Member events do not expire here (the server lists the last seven days); comment
+          // digests are recomputed on every poll.
           true,
   );
 }
@@ -142,12 +144,93 @@ export function extensionInput(
 
 // ---- Where an item leads ---------------------------------------------------------------------
 
-/** Agents for an ending elevation; the site's Approvals for a request; Team for member events. */
+/**
+ * Agents for an ending elevation; the site's Approvals for a request; Team for member events; the
+ * comment queue (the Reported tab), comment settings or Approvals for the comment kinds.
+ */
 export function notificationHref(item: StudioNotification): string {
   if (item.kind === "elevation-ending") return "/agents";
-  if (item.kind === "elevation-request")
+  if (item.kind === "elevation-request" || item.kind === "comments-approval")
     return `/sites/${encodeURIComponent(item.siteId)}/approvals`;
+  if (item.kind === "comments-pending" || item.kind === "comments-purge-waiting")
+    return `/sites/${encodeURIComponent(item.siteId)}/comments`;
+  if (item.kind === "comments-reported")
+    return `/sites/${encodeURIComponent(item.siteId)}/comments?tab=reported`;
+  if (item.kind === "comments-paused")
+    return `/sites/${encodeURIComponent(item.siteId)}/settings#comments`;
   return "/team";
+}
+
+/** The reader-comment kinds (RFC-0007 §13). */
+export function isCommentNotification(item: { kind: string }): item is CommentNotification {
+  return item.kind.startsWith("comments-");
+}
+
+/** "3 hours", "2 days": how long the oldest pending comment has waited. */
+export function waitedFor(iso: string, locale: string, now: number = Date.now()): string {
+  const minutes = Math.max(1, Math.round((now - Date.parse(iso)) / 60_000));
+  if (!Number.isFinite(minutes)) return "";
+  if (minutes >= 1440) return formatDuration(Math.floor(minutes / 1440) * 1440, locale, "long");
+  if (minutes >= 60) return formatDuration(Math.floor(minutes / 60) * 60, locale, "long");
+  return formatDuration(minutes, locale, "long");
+}
+
+/** The comment tools' requests in a few words: what the agent wants. */
+const APPROVAL_TOOL: Record<string, "moderate" | "reply" | "thread" | "label"> = {
+  moderate_comments: "moderate",
+  draft_comment_reply: "reply",
+  set_comment_thread: "thread",
+  label_comments: "label",
+};
+
+/**
+ * A comment notification's title and sentence (bell, toast and browser notification): "12
+ * comments wait for moderation", "The oldest has waited 3 hours." …
+ */
+export function commentNotice(
+  t: Translate,
+  locale: string,
+  item: CommentNotification,
+  now: number = Date.now(),
+): { title: string; body: string } {
+  const n = (count: number) => count.toLocaleString(locale);
+  switch (item.kind) {
+    case "comments-pending":
+      return {
+        title:
+          item.count === 1
+            ? t("notifications.comments.pending.titleOne")
+            : t("notifications.comments.pending.title", { count: n(item.count) }),
+        body: item.oldestAt
+          ? t("notifications.comments.pending.body", { age: waitedFor(item.oldestAt, locale, now) })
+          : t("notifications.comments.pending.bodyNew"),
+      };
+    case "comments-reported":
+      return {
+        title:
+          item.count === 1
+            ? t("notifications.comments.reported.titleOne")
+            : t("notifications.comments.reported.title", { count: n(item.count) }),
+        body: t("notifications.comments.reported.body"),
+      };
+    case "comments-paused":
+      return {
+        title: t("notifications.comments.paused.title"),
+        body: t("notifications.comments.paused.body", { cap: n(item.cap) }),
+      };
+    case "comments-purge-waiting":
+      return {
+        title: t("notifications.comments.purgeWaiting.title"),
+        body: t("notifications.comments.purgeWaiting.body", { count: n(item.tags) }),
+      };
+    default:
+      return {
+        title: t("notifications.comments.approval.title", {
+          agent: item.agent.name ?? item.agent.id,
+        }),
+        body: t(`notifications.comments.approval.tools.${APPROVAL_TOOL[item.tool] ?? "moderate"}`),
+      };
+  }
 }
 
 // ---- Words -----------------------------------------------------------------------------------

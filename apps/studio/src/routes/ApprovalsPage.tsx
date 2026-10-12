@@ -30,6 +30,7 @@ import { ModeBadge } from "../components/AgentModes.tsx";
 import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
 import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import { ApproveCommentsDialog, CommentRequestDetails } from "../components/CommentApprovals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
   cannotTake,
@@ -66,6 +67,7 @@ import {
   STATUS_VARIANT,
   splitApprovals,
 } from "../lib/approvals.ts";
+import { commentRequestOf, commentsKey } from "../lib/comments.ts";
 
 type Decision = "approve" | "deny";
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -187,6 +189,8 @@ function PendingRequest({
   const heldBack = autoCheckHeldBack(request);
   const prompt = promptText(request);
   const byRole = request.cause === "role";
+  // Agents' comment requests (RFC-0007 §10.3): in words, the drafted reply quoted as plain text.
+  const comment = commentRequestOf(request) !== undefined;
   // Older servers omit `canDecide`: everyone could decide there.
   const blocked = request.canDecide === false;
   const reason = blocked ? decideReason(request, who) : undefined;
@@ -230,7 +234,9 @@ function PendingRequest({
           )}
         </div>
       </div>
-      {byRole ? (
+      {comment ? (
+        <CommentRequestDetails request={request} />
+      ) : byRole ? (
         // A person asked for more than their role does alone (RFC-0005 §6): say it in words.
         <div className="grid gap-1.5" data-role-request="true">
           <div className="flex flex-wrap items-center gap-2">
@@ -464,7 +470,7 @@ function HistoryTable({
 
 /** Site › Activity › Approvals: agents' gated calls waiting for a person (ADR-0014, DESIGN.md §2m). */
 export function ApprovalsPage() {
-  const { t } = useI18n();
+  const { t } = useI18n("comments");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const toast = useToast();
@@ -482,6 +488,7 @@ export function ApprovalsPage() {
   });
   const [confirming, setConfirming] = useState<Approval | undefined>();
   const [granting, setGranting] = useState<Approval | undefined>();
+  const [commenting, setCommenting] = useState<Approval | undefined>();
   const now = useNow();
   // Elevation requests show the key's own mode; the owner's key list knows it best.
   const hasElevationRequests = (all.data ?? []).some(
@@ -500,8 +507,25 @@ export function ApprovalsPage() {
       api.approvals.decide(siteId, request.id, decision),
     onSuccess: async (result, { request, decision }) => {
       setConfirming(undefined);
+      setCommenting(undefined);
       const agent = request.actor.name ?? request.actor.id;
-      if (decision === "approve" && result.published)
+      const commentRequest = commentRequestOf(request);
+      if (decision === "approve" && commentRequest) {
+        // Approving a comment request carried the call out, as this person (RFC-0007 §10.3).
+        const results = (result.result as { results?: { ok: boolean }[] } | undefined)?.results;
+        const done = results?.filter((r) => r.ok).length;
+        toast.success(
+          commentRequest.kind === "reply"
+            ? t("comments.approvals.carriedReply")
+            : commentRequest.kind === "thread"
+              ? t("comments.approvals.carriedThread")
+              : t("comments.approvals.carried"),
+          results && done !== results.length
+            ? t("comments.approvals.carriedDescription", { done: done ?? 0, total: results.length })
+            : undefined,
+        );
+        await qc.invalidateQueries({ queryKey: commentsKey(siteId) });
+      } else if (decision === "approve" && result.published)
         // A person's publish request runs on approval, with the approver's rights (RFC-0005 §6).
         toast.success(
           t("approvals.role.published"),
@@ -523,9 +547,27 @@ export function ApprovalsPage() {
           : []),
       ]);
     },
-    onError: async (error) => {
+    onError: async (error, { request }) => {
       const refusal = cannotDecideMessage(t, error);
-      if (errorCode(error) === "state_changed") {
+      if (commentRequestOf(request) && errorCode(error) === "state_changed") {
+        // The comments moved after the agent asked: the server closed the request, nothing changed.
+        setCommenting(undefined);
+        toast.error(
+          t("comments.approvals.stateChanged"),
+          t("comments.approvals.stateChangedDescription"),
+        );
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
+          qc.invalidateQueries({ queryKey: commentsKey(siteId) }),
+        ]);
+      } else if (errorCode(error) === "carry_out_failed") {
+        setCommenting(undefined);
+        toast.error(t("comments.approvals.carryFailed"), errorMessage(error));
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
+          qc.invalidateQueries({ queryKey: commentsKey(siteId) }),
+        ]);
+      } else if (errorCode(error) === "state_changed") {
         // The site moved on after a person's publish request: the server closed it.
         setConfirming(undefined);
         toast.error(t("approvals.role.stateChanged"), t("approvals.role.stateChangedDescription"));
@@ -541,15 +583,17 @@ export function ApprovalsPage() {
           qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
           qc.invalidateQueries({ queryKey: ["notifications"] }),
         ]);
-      } else if (!confirming) {
+      } else if (!confirming && !commenting) {
         toast.error(t("approvals.failed"), errorMessage(error));
       }
     },
   });
   const onDecide = (request: Approval, decision: Decision) => {
     decide.reset();
-    // Granting an elevation always goes through its dialog (mode, time, Auto consent).
+    // Granting an elevation always goes through its dialog (mode, time, Auto consent); comment
+    // requests show the comments themselves before they become public (RFC-0007 §14).
     if (decision === "approve" && elevationRequestOf(request)) setGranting(request);
+    else if (decision === "approve" && commentRequestOf(request)) setCommenting(request);
     else if (decision === "approve" && needsConfirmation(request.tool)) setConfirming(request);
     else decide.mutate({ request, decision });
   };
@@ -652,6 +696,23 @@ export function ApprovalsPage() {
         busy={decide.isPending}
         error={
           confirming && decide.error && !isNoLongerPending(decide.error)
+            ? errorMessage(decide.error)
+            : undefined
+        }
+        onConfirm={(request) => decide.mutate({ request, decision: "approve" })}
+      />
+      <ApproveCommentsDialog
+        siteId={siteId}
+        request={commenting}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCommenting(undefined);
+            decide.reset();
+          }
+        }}
+        busy={decide.isPending}
+        error={
+          commenting && decide.error && !isNoLongerPending(decide.error)
             ? errorMessage(decide.error)
             : undefined
         }
