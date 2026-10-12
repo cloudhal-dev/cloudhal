@@ -32,6 +32,9 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|AnalyticsBotBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|calendar-locale|charts|useChartFrame|useChartPalette)\.tsx?$/,
   // Reader comments (RFC-0007 §14): the blocks load with the comment screens and the editor card.
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](Comment[A-Za-z]*|ArticleCommentsSummary|comment-model)\.tsx?$/,
+  // Schedules (RFC-0008 §15.9): the calendar, agenda and schedule dialogs' blocks load with the
+  // lazy schedule routes and the lazily loaded "Schedule…" dialog, never with the shell.
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](Schedule[A-Za-z]*|Calendar(Month|Nav)|AgendaList|TimezoneNote|DateTimeField|RecurrenceEditor|NextRuns|RescheduleDialog|schedule-model|recurrence)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
   // Comment screens' own components and the settings model (the shell keeps `lib/comments.ts`,

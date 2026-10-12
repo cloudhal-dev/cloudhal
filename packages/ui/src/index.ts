@@ -10,6 +10,11 @@
  */
 export * from "@cloudflare/kumo";
 export {
+  AgendaList,
+  type AgendaListLabels,
+  type AgendaListProps,
+} from "./blocks/AgendaList.tsx";
+export {
   AnalyticsBotBanner,
   type AnalyticsBotBannerLabels,
   type AnalyticsBotBannerProps,
@@ -88,6 +93,21 @@ export {
   type BulkActionBarLabels,
   type BulkActionBarProps,
 } from "./blocks/BulkActionBar.tsx";
+export {
+  type CalendarDayContext,
+  type CalendarDensity,
+  CalendarMonth,
+  type CalendarMonthLabels,
+  type CalendarMonthProps,
+  type CalendarMove,
+} from "./blocks/CalendarMonth.tsx";
+export {
+  CALENDAR_VIEWS,
+  CalendarNav,
+  type CalendarNavLabels,
+  type CalendarNavProps,
+  type CalendarView,
+} from "./blocks/CalendarNav.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
 export {
   type CommentBanSubject,
@@ -185,6 +205,13 @@ export {
   type ThreadComment,
 } from "./blocks/comment-model.ts";
 export {
+  DateTimeField,
+  type DateTimeFieldLabels,
+  type DateTimeFieldProps,
+  type DateTimeValue,
+  useTimeOfDayDraft,
+} from "./blocks/DateTimeField.tsx";
+export {
   InsetPanel,
   type InsetPanelProps,
   type InsetPanelVariant,
@@ -225,6 +252,12 @@ export {
   type NavigationPreviewProps,
 } from "./blocks/NavigationPreview.tsx";
 export {
+  type NextRun,
+  NextRuns,
+  type NextRunsLabels,
+  type NextRunsProps,
+} from "./blocks/NextRuns.tsx";
+export {
   NotificationBell,
   type NotificationBellProps,
   NotificationItem,
@@ -247,6 +280,65 @@ export {
   type PreviewPanelLabels,
   type PreviewPanelProps,
 } from "./blocks/PreviewPanel.tsx";
+export {
+  RecurrenceEditor,
+  type RecurrenceEditorLabels,
+  type RecurrenceEditorProps,
+} from "./blocks/RecurrenceEditor.tsx";
+export {
+  type RescheduleApprovalEffect,
+  RescheduleDialog,
+  type RescheduleDialogLabels,
+  type RescheduleDialogProps,
+} from "./blocks/RescheduleDialog.tsx";
+export {
+  DEFAULT_RECURRENCE,
+  RECURRENCE_PRESETS,
+  type RecurrenceEnd,
+  type RecurrenceFrequency,
+  type RecurrenceMonthly,
+  type RecurrenceOrdinal,
+  type RecurrencePreset,
+  type RecurrenceProblem,
+  type RecurrenceValue,
+  type RecurrenceWeekday,
+  RRULE_WEEKDAYS,
+  recurrenceProblems,
+  recurrenceRule,
+} from "./blocks/recurrence.ts";
+export {
+  isScheduleFilterActive,
+  type ScheduleFacetDefinition,
+  type ScheduleFilterFacet,
+  type ScheduleFilterOption,
+  ScheduleFilters,
+  type ScheduleFiltersLabels,
+  type ScheduleFiltersProps,
+  type ScheduleFilterValue,
+  type ScheduleView,
+} from "./blocks/ScheduleFilters.tsx";
+export {
+  SCHEDULE_KIND_ICON,
+  ScheduleItem,
+  type ScheduleItemChipProps,
+  type ScheduleItemProps,
+  type ScheduleItemRowProps,
+  scheduleItemSentence,
+} from "./blocks/ScheduleItem.tsx";
+export {
+  SCHEDULE_RUN_COLUMNS,
+  type ScheduleRunColumn,
+  ScheduleRunHeader,
+  ScheduleRunRow,
+  type ScheduleRunRowData,
+  type ScheduleRunRowLabels,
+  type ScheduleRunRowProps,
+} from "./blocks/ScheduleRunRow.tsx";
+export {
+  ScheduleStatusBadge,
+  type ScheduleStatusBadgeProps,
+  scheduleStatusLook,
+} from "./blocks/ScheduleStatusBadge.tsx";
 export { SectionCard, type SectionCardProps } from "./blocks/SectionCard.tsx";
 export { SectionEmpty, type SectionEmptyProps } from "./blocks/SectionEmpty.tsx";
 export {
@@ -278,7 +370,54 @@ export {
   type StatTileProps,
 } from "./blocks/StatTile.tsx";
 export { StatusBadge, type StatusBadgeProps } from "./blocks/StatusBadge.tsx";
+export {
+  AUTOMATION_STATES,
+  dateToDay,
+  dayToDate,
+  entryDay,
+  formatDay,
+  formatMonth,
+  formatScheduleTime,
+  formatTimeOfDay,
+  groupByDay,
+  hourCycleOf,
+  isHiddenByDefault,
+  monthGrid,
+  monthOf,
+  parseTimeOfDay,
+  RELEASE_STATES,
+  relativeDay,
+  SCHEDULE_APPROVAL_STATES,
+  SCHEDULE_KINDS,
+  SCHEDULE_RUN_OUTCOMES,
+  SCHEDULE_RUN_STATES,
+  SCHEDULE_RUN_TRIGGERS,
+  type ScheduleApprovalState,
+  type ScheduleEntry,
+  type ScheduleKind,
+  type ScheduleLook,
+  type ScheduleOrigin,
+  type ScheduleRunOutcome,
+  type ScheduleRunTrigger,
+  type ScheduleStatus,
+  type ScheduleWords,
+  scheduleLook,
+  shiftDay,
+  shiftMonth,
+  sortEntries,
+  statusWord,
+  type WeekDay,
+  weekdayNames,
+  weekdayOf,
+  weekdayOrder,
+  zonedDay,
+  zonedParts,
+} from "./blocks/schedule-model.ts";
 export { TermChip, TermChipList, type TermChipProps } from "./blocks/TermChips.tsx";
+export {
+  TimezoneNote,
+  type TimezoneNoteProps,
+} from "./blocks/TimezoneNote.tsx";
 export {
   type ChartColors,
   mixHex,
