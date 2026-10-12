@@ -24,6 +24,7 @@ import {
   scopesForMode,
 } from "@cloudhal/agent-runtime";
 import type { AnalyticsFeature } from "@cloudhal/analytics/service";
+import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 
@@ -46,6 +47,8 @@ export interface InstanceInfo {
      * the daily live-query budget and how daily totals are made.
      */
     analytics: AnalyticsFeature;
+    /** Reader comments (RFC-0007 §12). */
+    comments: CommentsFeature;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;
@@ -53,6 +56,35 @@ export interface InstanceInfo {
   roles: RolesInfo;
   /** Invite rules (RFC-0005 §7). */
   invites: InvitesInfo;
+}
+
+export interface CommentsFeature {
+  /** The deployment serves comments (`comments.available`); sites still turn them on one by one. */
+  available: boolean;
+  /** Bot protections a site can choose. */
+  protection: ("pow" | "turnstile")[];
+  /** Optional AI labels (rollout step 9); not in this build. */
+  aiLabels: boolean;
+  /** Commenter emails and Turnstile secrets can be read and stored (`CLOUDHAL_COMMENTS_KEY`). */
+  keys: boolean;
+  /** Comment cache tags waiting for a purge, across sites. */
+  purge: { pending: number };
+}
+
+/** `features.comments`; `available: false` without comment storage. */
+export async function commentsFeature(deps: CommentsDeps | undefined): Promise<CommentsFeature> {
+  const on = commentsAvailable(deps);
+  let pending = 0;
+  if (on)
+    for (const siteId of await deps.store.purgeQueue.sites())
+      pending += (await deps.store.purgeQueue.queued(siteId)).length;
+  return {
+    available: on,
+    protection: on ? ["pow", "turnstile"] : [],
+    aiLabels: false,
+    keys: on && Boolean(deps.keys),
+    purge: { pending },
+  };
 }
 
 export interface RolesInfo {
@@ -131,9 +163,12 @@ export interface SkillSummary {
   resource: string;
 }
 
-export function instanceRoutes(info: () => InstanceInfo, skills: LoadedSkill[]): Hono<Env> {
+export function instanceRoutes(
+  info: () => InstanceInfo | Promise<InstanceInfo>,
+  skills: LoadedSkill[],
+): Hono<Env> {
   return new Hono<Env>()
-    .get("/instance", (c) => c.json(info()))
+    .get("/instance", async (c) => c.json(await info()))
     .get("/skills", async (c) =>
       c.json(
         await Promise.all(

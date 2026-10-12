@@ -18,8 +18,15 @@ import { agentKeys } from "./routes/agent-keys.ts";
 import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
+import { comments } from "./routes/comments.ts";
 import { entries } from "./routes/entries.ts";
-import { agentModesInfo, instanceRoutes, invitesInfo, rolesInfo } from "./routes/instance.ts";
+import {
+  agentModesInfo,
+  commentsFeature,
+  instanceRoutes,
+  invitesInfo,
+  rolesInfo,
+} from "./routes/instance.ts";
 import { inviteRoutes } from "./routes/invites.ts";
 import { memberRoutes } from "./routes/members.ts";
 import { menus } from "./routes/menus.ts";
@@ -109,6 +116,7 @@ export function createApi(deps: ApiDeps) {
     c.set("now", clock);
     c.set("uploadSecret", uploadSecret);
     c.set("analytics", deps.analytics);
+    c.set("comments", deps.comments);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -178,6 +186,7 @@ export function createApi(deps: ApiDeps) {
       now: deps.now,
       ownership,
       analytics: deps.analytics,
+      comments: deps.comments,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -204,7 +213,7 @@ export function createApi(deps: ApiDeps) {
   app.route(
     "/api",
     instanceRoutes(
-      () => ({
+      async () => ({
         signUp: deps.signUp ?? "unknown",
         features: {
           agentKeys: Boolean(deps.agentKeys),
@@ -217,6 +226,8 @@ export function createApi(deps: ApiDeps) {
           members: Boolean(deps.staff),
           // RFC-0006 §8: where events go, whether Studio can read them, the budget.
           analytics: deps.analytics?.feature() ?? ANALYTICS_OFF,
+          // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
+          comments: await commentsFeature(deps.comments),
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
@@ -253,6 +264,8 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/media", siteMedia);
   // RFC-0006 §9.2: site analytics (people; agents use the MCP analytics tools).
   if (deps.analytics) app.route("/api/sites/:siteId/analytics", analytics);
+  // RFC-0007 §12: reader comments (people; agents use the MCP comment tools).
+  if (deps.comments) app.route("/api/sites/:siteId", comments);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),

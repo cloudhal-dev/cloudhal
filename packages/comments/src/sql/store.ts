@@ -1664,6 +1664,26 @@ export class SqlCommentStore implements SubmissionStore {
     }));
   }
 
+  /** One report of a site, or `null`. */
+  async getReport(siteId: string, reportId: string): Promise<CommentReport | null> {
+    const r = await this.sql.get<Record<string, unknown>>(
+      "SELECT id, comment_id FROM comment_reports WHERE id = ? AND site_id = ?",
+      [reportId, siteId],
+    );
+    if (!r) return null;
+    const all = await this.listReports(siteId, { commentId: String(r.comment_id), limit: 200 });
+    return all.find((x) => x.id === reportId) ?? null;
+  }
+
+  /** Commenter ids of a site, oldest first (a personal-data export; people only). */
+  async commenterIds(siteId: string, limit = 1000): Promise<string[]> {
+    const rows = await this.sql.all<{ id: string }>(
+      "SELECT id FROM commenter_emails WHERE site_id = ? ORDER BY created_at, id LIMIT ?",
+      [siteId, limit],
+    );
+    return rows.map((r) => r.id);
+  }
+
   /** Records a person's decision on a report; a resolved report cannot be resolved again (409). */
   async resolveReport(
     siteId: string,

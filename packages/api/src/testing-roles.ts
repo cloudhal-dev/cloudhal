@@ -718,6 +718,8 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         "preview:create",
         // RFC-0006: Authors and above read analytics; new keys get it in every mode.
         "analytics:read",
+        // RFC-0007 D2: and comments.
+        "comments:read",
         "content:write:own",
         "asset:upload",
         "site:publish:own",
