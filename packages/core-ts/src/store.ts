@@ -33,6 +33,7 @@ import {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
+import { checkAvailability, type GateSupport, sameAvailability } from "./availability.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
@@ -109,6 +110,13 @@ export interface SiteGraphStoreOptions {
    * asset's media URLs (`cloudhal-asset-<id>`). Failures go to `onHookError`.
    */
   readonly onMediaPurged?: (siteId: string, assetIds: string[]) => Promise<void>;
+  /**
+   * RFC-0008 S15: whether the renderer serving a site enforces time gates. Writes that set or
+   * change `availability` are refused (`gates_unsupported`) until it says so; without this option
+   * they are always refused. Node stores pass `GATES_ENFORCED` (renderer and writer are one
+   * process); the admin Worker asks the site Worker's `/__cloudhal/features`.
+   */
+  readonly gates?: GateSupport;
 }
 
 /**
@@ -136,13 +144,17 @@ export interface SnapshotDiff {
 
 /**
  * The first time an entry is marked published it gets its publication date, whichever path made
- * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept.
+ * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept. An
+ * entry under embargo is dated at its `from` (RFC-0008 §7.5): its date, feed item and sitemap
+ * entry show the embargo time, not the moment someone pressed publish.
  */
 function firstPublication(
-  entry: Pick<ContentEntry, "status" | "publishedAt">,
+  entry: Pick<ContentEntry, "status" | "publishedAt" | "availability">,
   ts: string,
 ): { publishedAt?: string } {
-  return entry.status === "published" && !entry.publishedAt ? { publishedAt: ts } : {};
+  return entry.status === "published" && !entry.publishedAt
+    ? { publishedAt: entry.availability?.from ?? ts }
+    : {};
 }
 
 /**
@@ -164,6 +176,7 @@ export class SiteGraphStore {
     this.#blobs = options.blobs;
     this.#now = options.now ?? (() => new Date());
     this.#newId = options.idGen ?? newId;
+    this.#gates = options.gates;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.#assets = new AssetEngine({
@@ -191,6 +204,53 @@ export class SiteGraphStore {
 
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
   readonly #onHookError: (error: unknown) => void;
+  readonly #gates: GateSupport | undefined;
+
+  /**
+   * Whether `availability` may be written for this site (S15): the renderer serving it has
+   * confirmed it enforces gates. Imports ask it too (`importSite`'s `gates`).
+   */
+  async gatesEnforced(siteId: string): Promise<boolean> {
+    return (await this.#gates?.enforced(siteId)) === true;
+  }
+
+  /**
+   * The gate rules of a page or entry write (RFC-0008 §4.1, §7.7): gates that parse, `from` before
+   * `until`, and none set or changed until the site's renderer enforces them. Removing gates is
+   * always allowed here; who may lift an embargo is the policy layer's decision (D8).
+   */
+  async #checkGates(
+    siteId: string,
+    before: Page["availability"],
+    after: Page["availability"],
+  ): Promise<void> {
+    if (sameAvailability(before, after) || !after) return;
+    checkAvailability(after);
+    if (!(await this.gatesEnforced(siteId)))
+      throw new InvariantError(
+        "gates_unsupported",
+        "this site's renderer has not confirmed it enforces time gates (availability); deploy the current site Worker first",
+        { siteId },
+      );
+  }
+
+  /**
+   * Whether the live (published) version of an entry has been shown: it is published there and
+   * its embargo, if any, has passed. One snapshot row and one body read; only asked when a write
+   * moves an embargo.
+   */
+  async #shownLive(site: Site, id: string): Promise<boolean> {
+    if (!site.publishedSnapshotId) return false;
+    const live = await this.getSnapshot(site.publishedSnapshotId);
+    const ref = live?.nodes.find((n) => n.id === id);
+    if (!ref) return false;
+    const node = await this.readSnapshotNode<ContentEntry>(ref);
+    const from = node.availability?.from;
+    return (
+      node.status === "published" &&
+      (from === undefined || Date.parse(from) <= this.#now().getTime())
+    );
+  }
 
   /** Applies pending storage migrations. Safe to call on every start. */
   async init(): Promise<void> {
@@ -321,6 +381,7 @@ export class SiteGraphStore {
     assertValid("page", draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
+    await this.#checkGates(site.id, undefined, draft.availability);
     const refs = await this.#assets.planRefs("page", site.id, draft, undefined);
     const page = refs.node;
     const nextSite: Site = {
@@ -380,6 +441,7 @@ export class SiteGraphStore {
     const stored = await this.getPage(page.id);
     if (!stored || stored.rev !== page.rev)
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    await this.#checkGates(draft.siteId, stored.availability, draft.availability);
     const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
     const next = refs.node;
     await this.#tax.checkPagePath(next);
@@ -527,6 +589,20 @@ export class SiteGraphStore {
       if (!stored || stored.rev !== prev.rev)
         throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
     }
+    await this.#checkGates(site.id, stored?.availability, draft.availability);
+    // §7.5: an entry not shown yet keeps its date on its embargo. When a write moves `from` and
+    // the caller left `publishedAt` alone, the date follows, until the entry has been shown.
+    const from = draft.availability?.from;
+    if (
+      stored &&
+      from !== undefined &&
+      draft.status === "published" &&
+      from !== stored.availability?.from &&
+      draft.publishedAt === stored.publishedAt &&
+      draft.publishedAt !== from &&
+      !(await this.#shownLive(site, draft.id))
+    )
+      draft = { ...draft, publishedAt: from };
     const refs = await this.#assets.planRefs("contentEntry", site.id, draft, stored);
     const prepared = await this.#tax.prepareEntry(refs.node, site, ts);
     const { entry, newTerms } = prepared;

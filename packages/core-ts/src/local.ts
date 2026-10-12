@@ -3,6 +3,7 @@ import path from "node:path";
 import { type BlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { FsBlobStore } from "@cloudhal/storage/fs";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
+import { GATES_ENFORCED } from "./availability.ts";
 import { SiteGraphStore } from "./store.ts";
 
 export interface LocalStore {
@@ -25,6 +26,7 @@ export async function openLocalStore(dataDir: string): Promise<LocalStore> {
   const sql = await BetterSqlite3Driver.open(path.join(dir, "data.db"));
   await migrate(sql, migrations);
   const blobs = new FsBlobStore(path.join(dir, "blobs"));
-  const store = new SiteGraphStore({ sql, blobs });
+  // The renderer that serves this store runs in the same process and enforces gates (S15).
+  const store = new SiteGraphStore({ sql, blobs, gates: GATES_ENFORCED });
   return { store, sql, blobs, dataDir: dir, close: () => sql.close() };
 }

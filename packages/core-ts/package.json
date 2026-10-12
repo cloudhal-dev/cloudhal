@@ -17,6 +17,8 @@
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
     "./cache-tags": "./src/cache-tags.ts",
+    "./availability": "./src/availability.ts",
+    "./time": "./src/time.ts",
     "./media": "./src/media/index.ts",
     "./media-node": "./src/media-node.ts",
     "./media/fixtures": "./src/media/fixtures.ts"
@@ -33,7 +35,8 @@
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
-    "marked": "catalog:"
+    "marked": "catalog:",
+    "temporal-polyfill": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
@@ -84,6 +87,14 @@
       "./cache-tags": {
         "types": "./dist/src/cache-tags.d.ts",
         "default": "./dist/src/cache-tags.js"
+      },
+      "./availability": {
+        "types": "./dist/src/availability.d.ts",
+        "default": "./dist/src/availability.js"
+      },
+      "./time": {
+        "types": "./dist/src/time.d.ts",
+        "default": "./dist/src/time.js"
       },
       "./media": {
         "types": "./dist/src/media/index.d.ts",

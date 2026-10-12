@@ -44,6 +44,9 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   reserved_path: 409,
   missing_media: 409,
   invalid_asset: 400,
+  // RFC-0008 (time gates)
+  invalid_availability: 400,
+  gates_unsupported: 409,
   // RFC-0002
   too_large: 409,
   slug_taken: 409,

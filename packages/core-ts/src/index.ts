@@ -19,6 +19,7 @@ export {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
+export * from "./availability.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";
 export * from "./domains.ts";
