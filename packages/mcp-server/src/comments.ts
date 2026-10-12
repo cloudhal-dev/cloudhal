@@ -42,6 +42,15 @@ export interface CommentsDeps {
   readonly purgeSite?: ((siteId: string) => Promise<void>) | undefined;
 }
 
+/**
+ * Whether a tool's approval binding (`ToolDefinition.bindState`, RFC-0007 §10.3) was actually
+ * computed. An approval must never be filed or carried out against a binding that failed: two
+ * failures would otherwise compare equal (fail closed, threat-model review of 2026-10-12, item 3).
+ */
+export function isBoundState(state: unknown): state is string {
+  return typeof state === "string" && state.length > 0 && state !== "unbound";
+}
+
 /** True when the deployment serves comments. */
 export const commentsAvailable = (deps: CommentsDeps | undefined): deps is CommentsDeps =>
   deps !== undefined && deps.available !== false;

@@ -871,6 +871,61 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       expect(mine.id).toBeTruthy();
     });
 
+    it("approvals fail closed when the comment binding cannot be computed (C4)", async () => {
+      const input = (id: string) => ({
+        siteId,
+        ids: [id],
+        action: "approve",
+        expectedRevs: { [id]: 1 },
+      });
+      const fileWith = async (args: Json, stateHash: string) =>
+        approvals.request({
+          siteId,
+          tool: "moderate_comments",
+          argsHash: await sha256Hex(canonicalJson(args)),
+          input: args,
+          actor: agent,
+          prompt: "Approve?",
+          stateHash,
+          cause: "tool",
+        });
+      // a request filed with a placeholder (as before this fix) is never carried out
+      const c1 = await seed("Unbound request");
+      for (const placeholder of ["unbound", ""]) {
+        const req = await fileWith(input(c1.id), placeholder);
+        const r = await call(`${S()}/approvals/${req.id}/approve`, "editor", { method: "POST" });
+        expect(r.status, placeholder).toBe(409);
+        expect(r.body.error).toBe("state_changed");
+        expect((await approvals.get(req.id))?.status).toBe("denied");
+      }
+      expect((await comments.get(siteId, c1.id))?.status).toBe("pending");
+
+      // a binding that cannot be computed now: denied, never compared with anything
+      const c2 = await seed("Store fails at decision time");
+      const def = defineTools().find((t) => t.name === "moderate_comments");
+      const bound = await def?.bindState?.(input(c2.id), {
+        store,
+        principal: { actor: agent, scopes: ["comments:read"] },
+        comments: { store: comments },
+      });
+      expect(bound).toMatch(/^cm1:/);
+      const req = await fileWith(input(c2.id), bound as string);
+      const original = comments.stateHash.bind(comments);
+      comments.stateHash = async () => {
+        throw new Error("D1 unavailable");
+      };
+      try {
+        const r = await call(`${S()}/approvals/${req.id}/approve`, "editor", { method: "POST" });
+        expect(r.status).toBe(409);
+        expect(r.body).toMatchObject({ error: "state_changed" });
+        expect(String(r.body.message)).toMatch(/could not be read/);
+      } finally {
+        comments.stateHash = original;
+      }
+      expect((await approvals.get(req.id))?.status).toBe("denied");
+      expect((await comments.get(siteId, c2.id))?.status).toBe("pending");
+    });
+
     it("notifications and features.comments", async () => {
       await seed("Waiting");
       await seed("Waiting on the Author's post", { nodeId: authorEntry.id });

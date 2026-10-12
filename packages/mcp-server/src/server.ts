@@ -41,7 +41,7 @@ import {
   ResourceTemplate,
   type ServerContext,
 } from "@modelcontextprotocol/server";
-import type { CommentsDeps } from "./comments.ts";
+import { type CommentsDeps, isBoundState } from "./comments.ts";
 import type { MediaToolOptions } from "./common.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
 
@@ -314,20 +314,34 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
         };
         // Approvals are bound to the content the person saw, not just to the arguments: the site
         // graph, or what the tool binds itself to (comment tools: the comments' state, RFC-0007
-        // §10.3). Worked out only when an approval needs it.
-        let bound: Promise<string> | undefined;
+        // §10.3). Worked out only when an approval needs it. A tool binding that cannot be
+        // computed is `null`, never a placeholder: nothing is filed, minted or matched against it
+        // (fail closed — two failures must not compare equal).
+        let bound: Promise<string | null> | undefined;
         const stateHash = () => {
           bound ??= def.bindState
-            ? def.bindState(args, toolCtx).catch(() => "unbound")
+            ? def.bindState(args, toolCtx).then(
+                (h) => (isBoundState(h) ? h : null),
+                () => null,
+              )
             : def.annotations.readOnlyHint !== true && siteId
               ? options.store.stateHash(siteId)
               : Promise.resolve("");
           return bound;
         };
-        const matches = async (state: ApprovalState | undefined) =>
-          state?.tool === def.name &&
-          state.args === argsHash &&
-          state.state === (await stateHash());
+        const unbound = () =>
+          errorResult(
+            `state_unavailable: could not read the current state of what ${def.name} acts on, so no approval can be tied to it; nothing was filed or changed. Try again.`,
+          );
+        const matches = async (state: ApprovalState | undefined) => {
+          const current = await stateHash();
+          return (
+            current !== null &&
+            state?.tool === def.name &&
+            state.args === argsHash &&
+            state.state === current
+          );
+        };
 
         // Round 2 of an approval: the client echoed our elicitation answer + signed state.
         let confirmed = false;
@@ -372,11 +386,13 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
                 : `approval ${approvalId}: ${request?.status === "denied" ? REDEEM_MESSAGES.denied : `${def.name} is carried out in Cloudhal Studio when a person approves it; there is nothing to redeem`}`,
             );
           }
+          const current = await stateHash();
+          if (current === null) return unbound();
           const redeemed = await options.approvals.redeem(approvalId, {
             tool: def.name,
             argsHash,
             actorId: principal.actor.id,
-            stateHash: await stateHash(),
+            stateHash: current,
           });
           if (!redeemed.ok)
             return errorResult(`approval ${approvalId}: ${REDEEM_MESSAGES[redeemed.reason]}`);
@@ -423,6 +439,8 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
             );
           // Agents with their own credentials never answer for a person: the request waits in Studio.
           if (options.approvals && (principal.actor.kind === "agent" || role)) {
+            const current = await stateHash();
+            if (current === null) return unbound();
             const pending = await options.approvals.request({
               siteId,
               tool: def.name,
@@ -430,7 +448,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
               input: args,
               actor: principal.actor,
               prompt,
-              stateHash: await stateHash(),
+              stateHash: current,
               mode: effectiveMode(principal),
               cause: outcome.decision.cause,
               ...(outcome.autoCheck ? { autoCheck: outcome.autoCheck } : {}),
@@ -448,10 +466,9 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
               `approval pending: ${prompt}\nA person must approve request ${pending.id} in Cloudhal Studio (site → Activity → Approvals). After it is approved, call ${def.name} again with the same arguments plus approvalId "${pending.id}". It expires ${pending.expiresAt}.\napprovalId: ${pending.id}`,
             );
           }
-          const state = await codec.mint(
-            { tool: def.name, args: argsHash, state: await stateHash() },
-            ctx,
-          );
+          const current = await stateHash();
+          if (current === null) return unbound();
+          const state = await codec.mint({ tool: def.name, args: argsHash, state: current }, ctx);
           // 2026-07-28 requests carry the client's capabilities in their _meta envelope (stateless
           // HTTP); 2025-era connections declared them at initialize.
           const envelope = ctx.mcpReq.envelope as Record<string, unknown> | undefined;

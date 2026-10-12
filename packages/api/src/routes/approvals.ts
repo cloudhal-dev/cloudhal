@@ -37,7 +37,7 @@ import {
   type Principal,
 } from "@cloudhal/agent-runtime";
 import type { Site } from "@cloudhal/core-contracts";
-import { commentEntries, ownedNodeIds } from "@cloudhal/mcp-server/comments";
+import { commentEntries, isBoundState, ownedNodeIds } from "@cloudhal/mcp-server/comments";
 import {
   defineTools,
   type ToolContext,
@@ -348,7 +348,28 @@ export const approvals: Hono<Env> = new Hono<Env>()
           { confirmed: true, args: input },
         );
       carryCtx = carryContext(c, existing, verdict.kind === "allow" ? verdict.limit : undefined);
-      const binding = await carry.bindState?.(input, carryCtx).catch(() => "unbound");
+      // Fail closed (threat-model review of 2026-10-12, item 3): a request filed without a
+      // computed binding, or a binding that cannot be computed now, is never carried out — two
+      // failures must not compare equal.
+      if (!isBoundState(existing.stateHash)) {
+        await store?.decide(id, "denied", actor, "the request is not bound to the comments' state");
+        throw apiError(
+          409,
+          "state_changed",
+          "This request is not tied to the comments as the agent saw them, so it cannot be carried out; it was closed. Ask the agent again.",
+        );
+      }
+      const binding = carry.bindState
+        ? await carry.bindState(input, carryCtx).catch(() => null)
+        : null;
+      if (!isBoundState(binding)) {
+        await store?.decide(id, "denied", actor, "the comments' current state could not be read");
+        throw apiError(
+          409,
+          "state_changed",
+          "The comments' current state could not be read, so the request cannot be checked; it was closed. Look at them again.",
+        );
+      }
       if (binding !== existing.stateHash) {
         await store?.decide(id, "denied", actor, "the comments changed after the agent asked");
         throw apiError(

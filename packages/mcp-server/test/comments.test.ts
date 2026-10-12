@@ -420,6 +420,53 @@ describe("comment tools", () => {
     expect(redeem.text).toContain("carried out in Cloudhal Studio");
   });
 
+  it("fails closed when the cm1: binding cannot be computed: nothing is filed or minted", async () => {
+    const c = await seedComment("Bind me if you can");
+    const args = { siteId, ids: [c.id], action: "approve", expectedRevs: { [c.id]: 1 } };
+    const original = comments.stateHash.bind(comments);
+    const fail = () => {
+      comments.stateHash = async () => {
+        throw new Error("D1 unavailable");
+      };
+    };
+    fail();
+    try {
+      // an agent's request for Studio: refused, never filed with a placeholder
+      const agentCall = await connect({ scopes: ALL, mode: "auto" }, { approvals: true });
+      const r = await agentCall("moderate_comments", args);
+      expect(r.isError).toBe(true);
+      expect(r.text).toMatch(/^state_unavailable/);
+      expect(await approvals.list({})).toEqual([]);
+      // a local question: no confirm token is minted against a failed binding
+      const local = await connect(
+        { scopes: ALL, mode: "bypass", local: true },
+        { confirmTokenFallback: true },
+      );
+      const asked = await local("moderate_comments", args);
+      expect(asked.text).toMatch(/^state_unavailable/);
+      expect(asked.text).not.toContain("confirmToken");
+    } finally {
+      comments.stateHash = original;
+    }
+    // a token minted while the binding worked does not match once it fails
+    const local = await connect(
+      { scopes: ALL, mode: "bypass", local: true },
+      { confirmTokenFallback: true },
+    );
+    const asked = await local("moderate_comments", args);
+    const token = /confirmToken: "([^"]+)"/.exec(asked.text)?.[1] as string;
+    expect(token).toBeTruthy();
+    fail();
+    try {
+      const done = await local("moderate_comments", { ...args, confirmToken: token });
+      expect(done.isError).toBe(true);
+      expect(done.text).toMatch(/mismatched confirmToken/);
+    } finally {
+      comments.stateHash = original;
+    }
+    expect((await comments.get(siteId, c.id))?.status).toBe("pending");
+  });
+
   it("a person's answer in their own client runs the call as that person (local)", async () => {
     const c = await seedComment("Approve me");
     const call = await connect(
