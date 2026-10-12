@@ -108,17 +108,29 @@ const TOTALS = {
     description:
       "Daily unique visitors, summed (only when the site counts unique visitors; approximate)",
   },
+  renders: {
+    type: ["number", "null"],
+    description:
+      "Pages the site rendered for people (cache misses: HTML 200s, no crawlers); null when not known (channel filter, filtered or older daily totals)",
+  },
 };
 const SUMMARY: JsonSchema = obj(
   {
     ...TOTALS,
     viewsPerVisit: NUM_OR_NULL,
+    cacheHitRatio: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      description:
+        "ESTIMATED share of page views the edge cache answered: 1 − renders ÷ page views (0–1). Page views come from the site's script, so visitors without JavaScript are missed; only on Cloudflare; null when not known",
+    },
     previous: obj(
       {
         ...TOTALS,
         range: obj({ from: { type: "string" }, to: { type: "string" } }, ["from", "to"]),
       },
-      ["pageviews", "visits", "visitors", "range"],
+      ["pageviews", "visits", "visitors", "renders", "range"],
     ),
     change: obj(
       { pageviews: NUM_OR_NULL, visits: NUM_OR_NULL, visitors: NUM_OR_NULL },
@@ -126,7 +138,7 @@ const SUMMARY: JsonSchema = obj(
       { description: "Relative change against the previous period (0.12 = +12 %)" },
     ),
   },
-  ["pageviews", "visits", "visitors", "viewsPerVisit"],
+  ["pageviews", "visits", "visitors", "renders", "viewsPerVisit", "cacheHitRatio"],
 );
 const ROW: JsonSchema = obj({ key: { type: "string" }, pageviews: COUNT, visits: COUNT }, [
   "key",
@@ -272,7 +284,7 @@ export function analyticsTools(): ToolDefinition[] {
       name: "get_analytics",
       title: "Site analytics overview",
       description:
-        "How the site is doing over a range: page views, visits (entrances from other sites or typed in), unique visitors when the site counts them, the change against the previous period, a daily (or hourly) series, the top 5 pages and articles, channels, referrer hosts, countries and Core Web Vitals (75th percentile with ratings). Aggregates only, without personal data. Days are UTC.",
+        "How the site is doing over a range: page views, visits (entrances from other sites or typed in), unique visitors when the site counts them, the estimated cache-hit ratio (on Cloudflare), the change against the previous period, a daily (or hourly) series, the top 5 pages and articles, channels, referrer hosts, countries and Core Web Vitals (75th percentile with ratings). Aggregates only, without personal data. Days are UTC.",
       inputSchema: obj(
         {
           siteId: id,

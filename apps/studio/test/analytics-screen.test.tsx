@@ -169,6 +169,8 @@ function analyticsServer(
             visits: 8900,
             visitors: null,
             viewsPerVisit: 1.39,
+            renders: 1240,
+            cacheHitRatio: 0.9,
             previous: { pageviews: 11000, visits: 8800, visitors: null, range: {} },
           }))
         : undefined,
@@ -259,6 +261,10 @@ describe("AnalyticsPage", () => {
     expect(within(vitals).getByText("Poor")).toBeInTheDocument();
     expect(within(vitals).getByText("p75 2.1 sec · 80% good")).toBeInTheDocument();
     expect(screen.getByText("Cookie-less")).toBeInTheDocument();
+    // the estimated cache-hit ratio, labelled as an estimate
+    const about = screen.getByTestId("analytics-about");
+    expect(within(about).getByText("Cache hits (estimated)")).toBeInTheDocument();
+    expect(within(about).getByText("about 90%")).toBeInTheDocument();
     const csv = screen.getByRole("link", { name: /Export CSV/ });
     expect(csv.getAttribute("href")).toBe(`${A}/export?range=30d`);
     // The default range is sent by name, so the server's clock decides the days.

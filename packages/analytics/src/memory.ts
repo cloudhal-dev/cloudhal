@@ -63,6 +63,11 @@ function matches(e: AnalyticsEvent, filter: Filter | undefined): boolean {
 
 const str = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
+/** A render a person caused that the edge cache could have answered: HTML `200`, no crawler, no bot. */
+function isPeopleRender(e: AnalyticsEvent): boolean {
+  return e.kind === "render" && e.status === 200 && !e.crawler && e.device !== "bot";
+}
+
 /** Answers queries over a list of events with the model's reference semantics. */
 export function answerQuery<Q extends AnalyticsQuery>(
   events: readonly AnalyticsEvent[],
@@ -97,10 +102,18 @@ export function answerQuery<Q extends AnalyticsQuery>(
       }
       let visitors: number | null = null;
       for (const set of days.values()) visitors = (visitors ?? 0) + set.size;
+      const { channel, ...renderFilter } = q.filter ?? {};
+      const renders =
+        channel !== undefined
+          ? null
+          : of("render", renderFilter)
+              .filter((s) => isPeopleRender(s.event))
+              .reduce((n, s) => n + weight(s), 0);
       return {
         pageviews: views.length,
         visits: views.reduce((n, s) => n + entrance(s), 0),
         visitors,
+        renders,
       } as unknown as AnalyticsData<Q>;
     }
     case "series": {

@@ -216,10 +216,10 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         const fromRollups = await rollups.query(q);
         expect(fromRollups.source).toBe("rollups");
         const live = await raw.query(q);
-        // rollups keep visitors only on the total; filtered summaries report none
+        // rollups keep visitors and renders only on the total; filtered summaries report none
         const want =
           q.kind === "summary" && q.filter
-            ? { ...(live.data as object), visitors: null }
+            ? { ...(live.data as object), visitors: null, renders: null }
             : live.data;
         expect(fromRollups.data).toEqual(want);
       }
@@ -269,6 +269,24 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         [FIXTURE_SITE, "2026-10-07"],
       );
       expect(visitors?.visitors).toBe(3);
+      // people's HTML 200 renders (the estimated cache-hit ratio) sit beside the total
+      expect(rows.find((r) => r.dim === "renders")).toMatchObject({ key: "all" });
+      const renders = await sql.get<{ hits: number }>(
+        "SELECT hits FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'renders'",
+        [FIXTURE_SITE, "2026-10-07"],
+      );
+      expect(renders?.hits).toBe(2);
+      // a day rolled up before renders were kept has no row: the count is unknown, not 0
+      await sql.run(
+        "DELETE FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'renders'",
+        [FIXTURE_SITE, "2026-10-08"],
+      );
+      const partial = await new RollupReader(sql).query({
+        kind: "summary",
+        siteId: FIXTURE_SITE,
+        range: FULL,
+      });
+      expect(partial.data).toMatchObject({ pageviews: 10, renders: null });
     });
 
     it("is idempotent: a second run has nothing to do, a redo writes the same rows", async () => {
@@ -356,7 +374,7 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
       const dayOne = { from: "2026-10-07", to: "2026-10-08" };
       expect(
         (await rollups.query({ kind: "summary", siteId: FIXTURE_SITE, range: dayOne })).data,
-      ).toEqual({ pageviews: 0, visits: 0, visitors: null });
+      ).toEqual({ pageviews: 0, visits: 0, visitors: null, renders: 0 });
       // the next run picks the never-attempted day first, then retries the failed one
       const next = await runRollups({
         reader: raw,

@@ -21,7 +21,7 @@ The site side (`POST /__cloudhal/e`, the script tag, render events) lives in `@c
 
 ```ts
 type AnalyticsQuery =
-  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null }
+  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null, renders | null }
   | { kind: "series"; siteId; range; interval: "hour" | "day"; filter? } // { interval, points[{ t, pageviews, visits }] }
   | { kind: "top"; siteId; range; dimension; limit; filter? }      // { dimension, rows[{ key, pageviews, visits }] }
   | { kind: "vitals"; siteId; range; filter? }                     // { metrics[{ metric, p75, samples, good, needsImprovement, poor }] }
@@ -36,7 +36,7 @@ interface AnalyticsStore extends AnalyticsReader, AnalyticsWriter { kind: "wae" 
 
 `assertAnalyticsQuery(q, { maxDays })` checks a query (ids, enums, ISO instants, ≤ 92 days live, hourly ≤ 7 days, `limit` 1–1000) and throws `AnalyticsQueryError` (`code: "invalid_query"`). Errors carry a `code` for the API: `analytics_unavailable` (503, `retryable`), `analytics_query_failed` (502), `analytics_budget_exceeded`, `unsupported_query`, `conflict` (409), `invalid_settings`.
 
-Semantics every store shares (checked by the conformance suite): a visit is an entrance page view; `visitors` is the sum of daily distinct hashes (`null` when no view in the range carried one); vitals and renders weigh each event by its `sampleOneIn`; p75 is the weighted nearest rank; top lists order by page views, then key, and leave out views without a value.
+Semantics every store shares (checked by the conformance suite): a visit is an entrance page view; `visitors` is the sum of daily distinct hashes (`null` when no view in the range carried one); vitals and renders weigh each event by its `sampleOneIn`; `renders` counts people's HTML `200` renders (no crawler, not a bot) under the node/country/device filter and is `null` under a channel filter or where rollups do not keep it, and `estimatedCacheHitRatio(summary)` turns it into `1 − renders ÷ page views` (an estimate; `AnalyticsService.cacheHitRatio` reports it only for `store: "wae"`); p75 is the weighted nearest rank; top lists order by page views, then key, and leave out views without a value.
 
 ## Site Worker: beacons and render events
 

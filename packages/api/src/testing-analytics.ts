@@ -167,6 +167,9 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
           visits: 7,
           visitors: 5,
           viewsPerVisit: 1.43,
+          // people's HTML 200 renders; the ratio needs an edge cache (Cloudflare), none here
+          renders: 4,
+          cacheHitRatio: null,
           previous: {
             pageviews: 0,
             visits: 0,
@@ -376,7 +379,7 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
         settings: { enabled: true },
         lastRollup: null,
         budget: null,
-        quota: { day: "2026-10-08", pageviews: 4 },
+        quota: { day: "2026-10-08", pageviews: 4, renders: 2, cacheHitRatio: null },
       });
       await service.rollup({ siteIds: [siteId], maxSiteDays: 10 });
       const after = await call(`${base()}/status`);

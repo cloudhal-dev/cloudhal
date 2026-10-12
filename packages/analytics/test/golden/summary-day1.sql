@@ -11,3 +11,10 @@ WHERE index1 = 'site_01HZX8K3Q9ST' AND blob1 = 'pageview'
   AND blob15 != ''
 GROUP BY day
 ORDER BY day;
+
+-- renders (HTML 200s for people: the estimated cache-hit ratio)
+SELECT SUM(double9) AS renders
+FROM events.analyticsEngine."newsroom_events"
+WHERE index1 = 'site_01HZX8K3Q9ST' AND blob1 = 'render'
+  AND timestamp >= '2026-10-07T00:00:00Z' AND timestamp < '2026-10-08T00:00:00Z'
+  AND double2 = 200 AND blob18 = '' AND blob12 != 'bot';

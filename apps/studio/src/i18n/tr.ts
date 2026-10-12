@@ -3721,6 +3721,10 @@ export const tr: Messages = {
       requestsValue: "Workers Free'de günde {limit} istekten {used}",
       requestsHint:
         "Her sayfa görüntüleme ve her sayfa hızı örneği bir istek gönderir. Workers Paid'de günlük sınır yok.",
+      cacheHits: "Önbellekten sunulan (tahmini)",
+      cacheHitsValue: "yaklaşık {share}",
+      cacheHitsHint:
+        "1 − sitenin oluşturduğu sayfalar ÷ bu dönemdeki sayfa görüntülemeleri. Tahmindir: JavaScript'i kapalı ziyaretçiler sayfa görüntülemesi olarak sayılmaz.",
       budget: "Bugünkü canlı sorgular",
       budgetValue: "{limit} sorgudan {used}",
       updated: "Günlük toplamların güncellenmesi",

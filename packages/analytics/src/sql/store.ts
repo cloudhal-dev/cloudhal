@@ -202,10 +202,20 @@ export class SqlAnalytics implements AnalyticsStore {
       `SELECT COUNT(*) AS days, COALESCE(SUM(n), 0) AS visitors FROM (SELECT substr(ts, 1, 10) AS d, COUNT(DISTINCT visitor) AS n FROM analytics_events WHERE ${w.sql} AND visitor IS NOT NULL GROUP BY d)`,
       w.params,
     );
+    let renders: number | null = null;
+    if (q.filter?.channel === undefined) {
+      const rw = where(q.siteId, "render", range, q.filter);
+      const r = await this.#sql.get(
+        `SELECT COALESCE(SUM(sample_one_in), 0) AS renders FROM analytics_events WHERE ${rw.sql} AND status = 200 AND crawler IS NULL AND device != 'bot'`,
+        rw.params,
+      );
+      renders = num(r?.renders);
+    }
     return {
       pageviews: num(totals?.pageviews),
       visits: num(totals?.visits),
       visitors: num(v?.days) > 0 ? num(v?.visitors) : null,
+      renders,
     };
   }
 

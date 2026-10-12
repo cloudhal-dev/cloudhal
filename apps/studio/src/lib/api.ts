@@ -944,7 +944,16 @@ export interface AnalyticsStatus {
   lastRollup: { day: string; finishedAt: string | null; source: string } | null;
   budget: { day: string; used: number; limit: number; spent: boolean } | null;
   /** Yesterday's request estimate for the Workers Free warning; `null` when unreadable. */
-  quota: { day: string; pageviews: number; beacons: number; requests: number } | null;
+  quota: {
+    day: string;
+    pageviews: number;
+    beacons: number;
+    requests: number;
+    /** People's HTML 200 renders that day (cache misses); `null` when not known. */
+    renders?: number | null;
+    /** Estimated cache-hit ratio that day (0–1), Cloudflare only. */
+    cacheHitRatio?: number | null;
+  } | null;
 }
 
 export type AnalyticsRangePreset = "today" | "7d" | "30d" | "90d" | "12m";
@@ -988,10 +997,14 @@ export interface AnalyticsTotals {
   visits: number;
   /** Daily unique visitors, summed; `null` when the mode was off. */
   visitors: number | null;
+  /** Pages rendered for people (cache misses); `null` when not known. */
+  renders?: number | null;
 }
 
 export interface AnalyticsSummary extends AnalyticsTotals {
   viewsPerVisit: number | null;
+  /** **Estimated** cache-hit ratio, 1 − renders ÷ page views (0–1); Cloudflare only, else `null`. */
+  cacheHitRatio?: number | null;
   previous?: AnalyticsTotals & { range: { from: string; to: string } };
   /** Relative change (0.12 = +12 %); `null` where the previous value was 0. */
   change?: { pageviews: number | null; visits: number | null; visitors: number | null };
