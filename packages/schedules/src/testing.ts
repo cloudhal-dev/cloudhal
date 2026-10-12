@@ -20,6 +20,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { TICK_BUDGETS, type TickBudget, TickMeter } from "./budget-meter.ts";
 import { ScheduleConflictError, ScheduleError } from "./errors.ts";
 import { newLeaseToken, runId } from "./ids.ts";
+import type { ScheduleNotification, ScheduleNotifier } from "./notify.ts";
 import { presetRule } from "./recurrence.ts";
 import { type PinnedItem, releaseHash } from "./release.ts";
 import {
@@ -1178,6 +1179,126 @@ export function describeSchedulerConformance(label: string, factory: ScheduleSto
       )) as ScheduleRun;
       expectContractRun(failed);
       expect(failed.error).toEqual({ code: "job_error", message: "boom " });
+    });
+
+    it("built-in runs (step 9): taint marked as it happens, statements accounted, notifications after the end, Run now", async () => {
+      const notices: ScheduleNotification[] = [];
+      const notify: ScheduleNotifier = { notify: async (n) => void notices.push(n) };
+      let script: (BuiltinStepResult | Error)[] = [];
+      let metered: SqlDriver | undefined;
+      const builtins: BuiltinRunner = {
+        cost: 2,
+        costOf: () => 2,
+        async step() {
+          // a step's own statements count into the run's accounting
+          await metered?.get("SELECT 1");
+          await metered?.get("SELECT 1");
+          const next = script.shift() ?? { done: true };
+          if (next instanceof Error) throw next;
+          return next;
+        },
+      };
+      const go = (at: string) =>
+        tick(ctx, at, { builtins, notify, withDriver: (d) => (metered = d) });
+      const a = await ctx.store.createAutomation({
+        siteId: SITE,
+        name: "Feed check",
+        job: { kind: "builtin", builtin: "feed-check" },
+        recurrence: {
+          start: "2026-10-12T10:17",
+          timeZone: "UTC",
+          rule: presetRule("hourly", "2026-10-12T10:17"),
+        },
+        owner: { id: "user_editor01" },
+      });
+      const run = await runId(a.id, "2026-10-12T10:17:00.000Z");
+      script = [
+        {
+          done: false,
+          position: { phase: "sitemap" },
+          taint: { at: "2026-10-12T10:17:05.000Z", tool: "feed_check" },
+        },
+        {
+          done: true,
+          outcome: "did-work",
+          counts: { "feed-gated-node": 1 },
+          summary: "1 problem",
+          notify: [
+            {
+              id: `automation-findings:${run}`,
+              kind: "automation-findings",
+              siteId: SITE,
+              automationId: a.id,
+              automationName: a.name,
+              runId: run,
+              recipients: ["user_editor01"],
+              at: "2026-10-12T10:18:05.000Z",
+            },
+          ],
+        },
+      ];
+      const first = await go("2026-10-12T10:17:05.000Z");
+      expect(measure("built-in step that taints (more to do)", first)).toBe(10);
+      // the running run carries the taint at once (§11.4), the cursor the accounting
+      expect(await ctx.store.getRun(SITE, run)).toMatchObject({
+        state: "running",
+        taint: { at: "2026-10-12T10:17:05.000Z", tool: "feed_check" },
+      });
+      expect(notices).toHaveLength(0);
+      await go("2026-10-12T10:18:05.000Z");
+      const done = (await ctx.store.getRun(SITE, run)) as ScheduleRun;
+      expectContractRun(done);
+      expect(done).toMatchObject({
+        state: "succeeded",
+        taint: { tool: "feed_check" },
+        counts: { steps: 2, statements: 4, "feed-gated-node": 1 },
+      });
+      expect(notices.map((n) => n.id)).toEqual([`automation-findings:${run}`]);
+      // a failure notifies; the third in a row pauses and says so
+      script = [new Error("down"), new Error("down"), new Error("down")];
+      for (const at of [
+        "2026-10-12T11:17:01.000Z",
+        "2026-10-12T12:17:01.000Z",
+        "2026-10-12T13:17:01.000Z",
+      ])
+        await go(at);
+      expect(notices.map((n) => n.kind)).toEqual([
+        "automation-findings",
+        "automation-failed",
+        "automation-failed",
+        "automation-failed",
+        "automation-paused",
+      ]);
+      // Run now (§13): a manual run for this minute, stepped by the next tick; then back on schedule
+      const b = await ctx.store.createAutomation({
+        siteId: SITE,
+        name: "Digest",
+        job: { kind: "builtin", builtin: "weekly-digest" },
+        recurrence: {
+          start: "2026-10-12T20:07",
+          timeZone: "UTC",
+          rule: presetRule("daily", "2026-10-12T20:07"),
+        },
+        owner: { id: "user_editor01" },
+      });
+      const manual = await ctx.store.startBuiltinNow({
+        automation: b,
+        now: "2026-10-12T14:00:30.000Z",
+      });
+      expect(manual).toBe(await runId(b.id, "2026-10-12T14:00:00.000Z"));
+      expect(
+        await ctx.store.startBuiltinNow({ automation: b, now: "2026-10-12T14:00:40.000Z" }),
+      ).toBeUndefined();
+      script = [{ done: true, outcome: "did-work" }];
+      await go("2026-10-12T14:01:00.000Z");
+      expect(await ctx.store.getRun(SITE, manual as string)).toMatchObject({
+        state: "succeeded",
+        trigger: "manual",
+      });
+      expect(await ctx.store.getAutomation(SITE, b.id)).toMatchObject({
+        state: "active",
+        nextRunAt: "2026-10-12T20:07:00.000Z",
+      });
     });
 
     it("agent tasks: windows recorded at the occurrence, begun once, closed as missed or failed", async () => {

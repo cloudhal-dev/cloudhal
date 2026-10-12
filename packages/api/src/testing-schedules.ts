@@ -568,6 +568,20 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
         rev: (paused.body.automation as { rev: number }).rev,
       });
       expect(resumed.body).toMatchObject({ automation: { state: "active" } });
+      // "Run now" for a built-in: a manual run for this minute, stepped by the next tick (step 9)
+      const sweep = await post(`${S()}/automations`, {
+        name: "Feed check",
+        job: { kind: "builtin", builtin: "feed-check" },
+        recurrence: { start: "2026-10-12T11:07", rule: "FREQ=DAILY;BYHOUR=11;BYMINUTE=7" },
+      });
+      const sweepId = (sweep.body.automation as { id: string }).id;
+      const manual = await post(`${S()}/automations/${sweepId}/run-now`, {});
+      expect(manual.status, manual.text).toBe(200);
+      const manualRun = await call(`${S()}/runs/${String(manual.body.runId)}`);
+      expect(manualRun.body).toMatchObject({
+        run: { state: "running", trigger: "manual", subject: { automationId: sweepId } },
+      });
+      expect((await post(`${S()}/automations/${sweepId}/run-now`, {})).status).toBe(409);
       const t = task.body.automation as { id: string };
       const run = await post(`${S()}/automations/${t.id}/run-now`, {});
       expect(run.status, run.text).toBe(200);

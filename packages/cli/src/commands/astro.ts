@@ -46,7 +46,13 @@ export async function dev(
       ? undefined
       : await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   const ticker = local
-    ? startLocalScheduler({ sql: local.sql, blobs: local.blobs, graph: local.store })
+    ? startLocalScheduler({
+        sql: local.sql,
+        blobs: local.blobs,
+        graph: local.store,
+        // RFC-0008 §11.1: the feed check reads this dev server's feed and sitemap
+        ...(url ? { siteOrigin: url, siteId: cfg.siteId } : {}),
+      })
     : undefined;
   return {
     stop: async () => {

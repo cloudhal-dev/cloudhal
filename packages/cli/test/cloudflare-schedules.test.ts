@@ -15,10 +15,11 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Release } from "@cloudhal/core-contracts";
-import { copySite, SiteGraphStore } from "@cloudhal/core-ts";
+import type { Release, Site } from "@cloudhal/core-contracts";
+import { copySite, GATES_ENFORCED, SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { type PersonApproval, ReleaseService } from "@cloudhal/core-ts/releases";
+import { presetRule, runId } from "@cloudhal/schedules";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -73,7 +74,13 @@ describe("the scheduler on workerd (RFC-0008 step 6)", () => {
     const cfg = await readProjectConfig(projectDir);
     // What `cloudhal deploy` generates (the cron trigger, the clock and its migration); the
     // harness overrides the ticker to the alarm, as a deploy without a cron slot sets it.
-    const admin = await prepareAdminWorker({ projectDir, dataDir: cfg.dataDir, names, studioDir });
+    const admin = await prepareAdminWorker({
+      projectDir,
+      dataDir: cfg.dataDir,
+      names,
+      siteId,
+      studioDir,
+    });
     harness = createTestHarness({
       root: projectDir,
       workers: [
@@ -211,5 +218,64 @@ describe("the scheduler on workerd (RFC-0008 step 6)", () => {
       scheduler: { mode: "alarm" },
       sites: [{ siteId, openReleases: [], gatedNodes: 0 }],
     });
+  });
+
+  it("feed-check (step 9): the minute tick fetches the site's feed and sitemap through SITE; no gated node leaks", async () => {
+    // an embargoed article, live but gated: the site Worker must leave it out of both documents
+    const gated = new SiteGraphStore({
+      sql,
+      blobs: new R2BlobStore(
+        ((await harness.getWorker(W.admin).getEnv()) as { BLOBS: R2Bucket }).BLOBS,
+      ),
+      gates: GATES_ENFORCED,
+    });
+    const hello = (await gated.listContentEntries(siteId)).find((e) => e.slug === "hello-world");
+    if (!hello) throw new Error("no hello-world");
+    const { id: _id, rev: _rev, createdAt: _c, updatedAt: _u, schemaVersion: _s, ...rest } = hello;
+    const secret = await gated.createContentEntry({
+      ...rest,
+      slug: "embargoed-results",
+      title: "Embargoed results",
+      availability: { from: new Date(Date.now() + 30 * 86_400_000).toISOString() },
+    });
+    const snap = await gated.createSnapshot(siteId, { actor: human, reason: "publish" });
+    await gated.publish((await gated.getSite(siteId)) as Site, snap.id);
+    const start = new Date(Math.ceil(Date.now() / 60_000) * 60_000 + 60 * 60_000);
+    const local = start.toISOString().slice(0, 16);
+    const store = new SqlScheduleStore(sql);
+    const a = await store.createAutomation({
+      siteId,
+      name: "Feed check",
+      job: { kind: "builtin", builtin: "feed-check" },
+      recurrence: { start: local, timeZone: "UTC", rule: presetRule("hourly", local) },
+      owner: { id: human.id },
+    });
+    expect(a.nextRunAt).toBe(start.toISOString());
+    const scheduled = async (at: number) => {
+      const res = (await harness.fetch(
+        `http://admin.example/cdn-cgi/local/scheduled?cron=${encodeURIComponent("* * * * *")}&time=${at}`,
+      )) as unknown as Response;
+      expect(res.status, await res.clone().text()).toBe(200);
+    };
+    const id = await runId(a.id, start.toISOString());
+    await scheduled(start.getTime() + 1_000); // the feed
+    expect(await store.getRun(siteId, id)).toMatchObject({
+      state: "running",
+      taint: { tool: "feed_check" },
+    });
+    await scheduled(start.getTime() + 61_000); // the sitemap
+    const run = await store.getRun(siteId, id);
+    expect(run, JSON.stringify(await store.runFindings(siteId, id))).toMatchObject({
+      state: "succeeded",
+      outcome: "nothing-to-do",
+      trigger: "cron",
+      taint: { tool: "feed_check" },
+      counts: { "documents-checked": 2, steps: 2 },
+    });
+    expect(run?.counts?.["feed-gated-node"]).toBeUndefined();
+    // and the fetched documents really were the site's: the newest article is in the feed
+    const rss = await (await siteFetch("/rss.xml")).text();
+    expect(rss).toContain("/posts/hello-world");
+    expect(rss).not.toContain(secret.slug);
   });
 });

@@ -92,6 +92,9 @@ export type Notification =
       /** The pause reason, the run's error code, or nothing for a digest. */
       reason?: string;
       runId?: string;
+      /** `automation-digest`: the digest's plain-text report and its counts (published, scheduled, …). */
+      summary?: string;
+      counts?: Record<string, number>;
       at: string;
     }
   | {
@@ -459,6 +462,10 @@ async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notifi
             automationId: a.id,
             name: a.name,
             runId: run.id,
+            // The templated digest (RFC-0008 §11.1) as the run recorded it; the sections are the
+            // run's findings (`GET …/runs/:runId`).
+            ...(run.summary ? { summary: run.summary } : {}),
+            ...(run.counts ? { counts: run.counts as Record<string, number> } : {}),
             at: run.endedAt ?? run.updatedAt,
           });
       }

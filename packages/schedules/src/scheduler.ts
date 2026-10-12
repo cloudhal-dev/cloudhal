@@ -26,10 +26,17 @@ import type {
   ReleasePublishedOutcome,
   ScheduleRun,
 } from "@cloudhal/core-contracts";
-import { AUTOMATION_LEASE_MS, accountRunResult, dueOccurrences, runWindow } from "./automation.ts";
+import {
+  AUTOMATION_LEASE_MS,
+  accountRunResult,
+  dueOccurrences,
+  type FailureAccounting,
+  runWindow,
+} from "./automation.ts";
 import type { TickBudget, TickMeter, TickTrigger } from "./budget-meter.ts";
 import { TickBudgetExhaustedError } from "./errors.ts";
 import { newLeaseToken, runId } from "./ids.ts";
+import type { ScheduleNotification, ScheduleNotifier } from "./notify.ts";
 import type { Occurrence } from "./recurrence.ts";
 import {
   type ApprovalVerdict,
@@ -133,6 +140,24 @@ export interface BuiltinCursor {
   occurrenceAt: string;
   attempt: number;
   position?: unknown;
+  /** The run read untrusted text in an earlier step (§11.4); kept to its end. */
+  taint?: BuiltinTaint;
+  /** Run accounting so far: steps taken and the statements they executed (§11.5, S17). */
+  usage?: BuiltinUsage;
+  /** A person's "Run now" (§13): the scheduled `nextRunAt` the automation returns to afterwards. */
+  manual?: { nextRunAt?: string };
+}
+
+/** `ScheduleRun.taint` of a built-in run: when and through what it read untrusted text. */
+export interface BuiltinTaint {
+  at: string;
+  tool: string;
+}
+
+/** A built-in run's budget use across its steps, recorded as `counts.steps` / `counts.statements`. */
+export interface BuiltinUsage {
+  steps: number;
+  statements: number;
 }
 
 export type ReleaseFinish =
@@ -243,7 +268,7 @@ export interface SchedulerStore {
       | {
           done: true;
           run: Pick<ScheduleRun, "state"> &
-            Partial<Pick<ScheduleRun, "outcome" | "summary" | "counts" | "error">> & {
+            Partial<Pick<ScheduleRun, "outcome" | "summary" | "counts" | "error" | "taint">> & {
               findings?: unknown[];
             };
           nextRunAt?: string;
@@ -342,11 +367,18 @@ export interface BuiltinStepResult {
   summary?: string;
   /** Studio-only findings (≤ 200 per run). */
   findings?: unknown[];
+  /** The step read untrusted text (404 paths, a fetched document): the run is tainted (§11.4). */
+  taint?: BuiltinTaint;
+  /** Delivered through `RunDueDeps.notify` once the run's end is committed (done steps only). */
+  notify?: ScheduleNotification[];
 }
 
 /** Runs one bounded step of a built-in job (rollout step 9). */
 export interface BuiltinRunner {
+  /** Statements one step may take (the largest job's, when `costOf` is absent). */
   readonly cost: number;
+  /** Statements one step of this job may take. */
+  costOf?(job: BuiltinAutomationJob): number;
   step(input: BuiltinStepInput): Promise<BuiltinStepResult>;
 }
 
@@ -482,6 +514,8 @@ export interface RunDueDeps {
   /** Policy re-checks at run time (§10.6); `baseApprovalVerdict` is applied first either way. */
   checkApproval?: (release: Release, now: Date) => ApprovalVerdict | Promise<ApprovalVerdict>;
   builtins?: BuiltinRunner;
+  /** Notifications of finished, failed and paused automation runs (§14); default: none. */
+  notify?: ScheduleNotifier;
   systemJobs?: readonly SystemJobDefinition[];
   /** `CLOUDHAL_AUTOMATIONS=off` → false: automations stop, releases continue (§11.6). */
   automationsEnabled?: boolean;
@@ -1072,7 +1106,8 @@ async function runAutomation(
   const runner = deps.builtins;
   if (!runner) return "skipped";
   if (a.leaseUntil && instantMs(a.leaseUntil) > instantMs(now)) return "skipped"; // another tick is stepping it
-  if (!fits(PATH_COST.builtinClaim + runner.cost + PATH_COST.builtinFinish)) return "budget";
+  const cost = runner.costOf?.(job) ?? runner.cost;
+  if (!fits(PATH_COST.builtinClaim + cost + PATH_COST.builtinFinish)) return "budget";
   let occurrence: Occurrence;
   let run: string;
   let attempt = 1;
@@ -1084,7 +1119,13 @@ async function runAutomation(
     occurrence = { at: a.cursor.occurrenceAt, local: a.cursor.occurrenceAt };
     run = a.cursor.runId;
     attempt = a.cursor.attempt;
-    next = occ?.next;
+    // A person's "Run now" moved `nextRunAt` to now; the scheduled occurrence comes back after it.
+    const manual = a.cursor.manual;
+    next = manual
+      ? manual.nextRunAt
+        ? { at: manual.nextRunAt, local: manual.nextRunAt }
+        : undefined
+      : occ?.next;
   } else {
     if (!occ) return "skipped";
     occurrence = occ.latest;
@@ -1112,6 +1153,14 @@ async function runAutomation(
     latenessSeconds: latenessSeconds(occurrence.at, now),
   });
   if (!claimed) return "skipped";
+  // Run accounting (§11.5, S17): the statements each step executed, summed over the run.
+  const before = deps.meter?.used ?? 0;
+  const prior: BuiltinUsage = a.cursor?.usage ?? { steps: 0, statements: 0 };
+  const usageNow = (): BuiltinUsage => ({
+    steps: prior.steps + 1,
+    statements: prior.statements + Math.max(0, (deps.meter?.used ?? before) - before),
+  });
+  let taint = a.cursor?.taint;
   let result: BuiltinStepResult;
   try {
     result = await runner.step({
@@ -1126,7 +1175,12 @@ async function runAutomation(
     if (e instanceof TickBudgetExhaustedError) throw e;
     const acc = accountRunResult(aut.consecutiveFailures, "failed", "builtin");
     report.failed++;
-    await deps.store.finishBuiltinRun({
+    const error = {
+      code: "job_error",
+      message: plainLine(e instanceof Error ? e.message : String(e)),
+    };
+    const usage = usageNow();
+    const ended = await deps.store.finishBuiltinRun({
       automation: aut,
       runId: run,
       token: tok,
@@ -1135,18 +1189,25 @@ async function runAutomation(
         done: true,
         run: {
           state: "failed",
-          error: {
-            code: "job_error",
-            message: plainLine(e instanceof Error ? e.message : String(e)),
-          },
+          error,
+          counts: usageCounts(usage),
+          ...(taint ? { taint } : {}),
         },
         ...(next ? { nextRunAt: next.at } : {}),
         consecutiveFailures: acc.consecutiveFailures,
         ...(acc.pause ? { pause: acc.pause } : {}),
       },
     });
+    if (ended)
+      await deliver(deps, [
+        runNotice(aut, run, now, "automation-failed", { error }),
+        ...pauseNotice(aut, run, now, acc),
+      ]);
     return "ran";
   }
+  if (result.taint && !taint)
+    taint = { at: canonicalInstant(result.taint.at), tool: result.taint.tool };
+  const usage = usageNow();
   if (!result.done) {
     await deps.store.finishBuiltinRun({
       automation: aut,
@@ -1160,13 +1221,16 @@ async function runAutomation(
           occurrenceAt: occurrence.at,
           attempt,
           ...(result.position !== undefined ? { position: result.position } : {}),
+          ...(taint ? { taint } : {}),
+          usage,
+          ...(a.cursor?.manual ? { manual: a.cursor.manual } : {}),
         },
       },
     });
     return "ran";
   }
   report.ran++;
-  await deps.store.finishBuiltinRun({
+  const ended = await deps.store.finishBuiltinRun({
     automation: aut,
     runId: run,
     token: tok,
@@ -1177,14 +1241,72 @@ async function runAutomation(
         state: "succeeded",
         outcome: result.outcome ?? "nothing-to-do",
         ...(result.summary !== undefined ? { summary: plainText(result.summary) } : {}),
-        ...(result.counts ? { counts: cleanCounts(result.counts) } : {}),
-        ...(result.findings ? { findings: result.findings.slice(0, 200) } : {}),
+        counts: cleanCounts({ ...usageCounts(usage), ...(result.counts ?? {}) }),
+        ...(result.findings ? { findings: result.findings.slice(0, MAX_FINDINGS) } : {}),
+        ...(taint ? { taint } : {}),
       },
       ...(next ? { nextRunAt: next.at } : {}),
       consecutiveFailures: 0,
     },
   });
+  if (ended && result.notify) await deliver(deps, result.notify);
   return "ran";
+}
+
+/** Findings kept per run (§4.5). */
+const MAX_FINDINGS = 200;
+
+function usageCounts(u: BuiltinUsage): Record<string, number> {
+  return { steps: u.steps, statements: u.statements };
+}
+
+function runNotice(
+  a: Automation,
+  run: string,
+  now: string,
+  kind: ScheduleNotification["kind"],
+  extra: Partial<ScheduleNotification> = {},
+): ScheduleNotification {
+  return {
+    id: `${kind}:${run}`,
+    kind,
+    siteId: a.siteId,
+    automationId: a.id,
+    automationName: a.name,
+    runId: run,
+    recipients: [a.owner.id],
+    at: now,
+    ...extra,
+  };
+}
+
+function pauseNotice(
+  a: Automation,
+  run: string,
+  now: string,
+  acc: FailureAccounting,
+): ScheduleNotification[] {
+  if (!acc.pause) return [];
+  return [
+    {
+      ...runNotice(a, run, now, "automation-paused", { pausedReason: acc.pause.pausedReason }),
+      id: `automation-paused:${a.id}:${run}`,
+    },
+  ];
+}
+
+/** Sends notifications after a committed end; a notifier that fails never fails the tick. */
+async function deliver(deps: RunDueDeps, notices: readonly ScheduleNotification[]): Promise<void> {
+  if (!deps.notify) return;
+  for (const n of notices) {
+    try {
+      await deps.notify.notify(n);
+    } catch (e) {
+      deps.log?.(
+        `schedules: notification ${n.id} failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
 }
 
 /** Builds a `Scheduler` over a store factory: each tick gets a fresh meter (and so a fresh budget). */

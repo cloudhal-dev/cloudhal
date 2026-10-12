@@ -14,6 +14,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  adminBuiltinInputs,
   nextAlarm,
   releasePurger,
   type SchedulerEnv,
@@ -250,5 +251,45 @@ describe("a published release's purge (§6.3 after the batch)", () => {
     expect(woke).toEqual([site.id]);
     const done = await new ReleaseService({ graph }).get(site.id, release.id);
     expect(done.release.outcome).toMatchObject({ kind: "published", purge: "deferred" });
+  });
+});
+
+describe("the built-in jobs' inputs on the admin Worker (RFC-0008 §11.1)", () => {
+  const env = (o: Partial<SchedulerEnv> = {}) => o as SchedulerEnv;
+  it("fetches the served site's feed through SITE, nothing for other sites; 404 rows from analytics", async () => {
+    const seen: string[] = [];
+    const SITE = {
+      fetch: async (url: string) => {
+        seen.push(url);
+        return new Response("<rss/>", { headers: { "content-type": "application/rss+xml" } });
+      },
+    } as unknown as Fetcher;
+    const inputs = adminBuiltinInputs(env({ SITE, CLOUDHAL_SITE_ID: "site_served001" }), {
+      rollup: async () => ({ done: [], pending: 0, saltsDeleted: 0, retained: 0, failed: [] }),
+      feature: () => ({ reader: "sql", enabled: true }),
+      query: async () => ({
+        data: {
+          report: "errors",
+          rows: [
+            { path: "/gone", status: 404, refPath: null, hits: 3, lastSeen: null },
+            { path: "/error", status: 500, refPath: null, hits: 9, lastSeen: null },
+          ],
+        },
+      }),
+    });
+    expect(await inputs.fetchDocument?.({ siteId: "site_served001", path: "/rss.xml" })).toEqual({
+      status: 200,
+      contentType: "application/rss+xml",
+      body: "<rss/>",
+    });
+    expect(seen).toEqual(["https://site.internal/rss.xml"]);
+    expect(
+      await inputs.fetchDocument?.({ siteId: "site_another01", path: "/rss.xml" }),
+    ).toBeUndefined();
+    expect(
+      await inputs.notFound?.({ siteId: "site_served001", from: "a", to: "b", limit: 10 }),
+    ).toEqual([{ path: "/gone", status: 404, refPath: null, hits: 3, lastSeen: null }]);
+    // no SITE binding, no analytics query: neither input
+    expect(adminBuiltinInputs(env(), undefined)).toEqual({});
   });
 });

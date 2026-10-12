@@ -196,6 +196,8 @@ export function adminWorkerConfig(
   n: DeploymentNames & {
     studioDir: string;
     main: string;
+    /** The site the site Worker serves (`CLOUDHAL_SITE_ID`). */
+    siteId?: string;
     domain?: string;
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
@@ -208,6 +210,8 @@ export function adminWorkerConfig(
   const c = n.comments;
   const scheduler: SchedulerTicker = n.scheduler ?? "cron";
   const vars = {
+    // RFC-0008 §11.1: the feed check fetches this site's feed through `SITE` (it serves no other).
+    ...(n.siteId ? { CLOUDHAL_SITE_ID: n.siteId } : {}),
     ...(a
       ? {
           CLOUDHAL_ANALYTICS_DATASET: a.dataset,
