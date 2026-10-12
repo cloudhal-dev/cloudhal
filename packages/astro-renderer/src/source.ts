@@ -28,6 +28,11 @@ export interface GraphSource {
   entryBySlug(collection: string, slug: string, locale?: string): Promise<ContentEntry | undefined>;
   /** Every visible entry of a locale, newest first, across collections (feeds, sitemaps). */
   allEntries(locale?: string): Promise<ContentEntry[]>;
+  /**
+   * A visible entry by id, any locale (reader comments name the entry by id, RFC-0007 §6.2).
+   * Optional for sources that predate comments.
+   */
+  entryById?(id: string): Promise<ContentEntry | undefined>;
   /** The site's taxonomies (RFC-0002). */
   taxonomies(): Promise<Taxonomy[]>;
   /**
@@ -176,6 +181,13 @@ export class LiveSource implements GraphSource {
     return visible(await this.#store.listContentEntries(this.#siteId), this.#includeDrafts)
       .filter((e) => e.locale === loc)
       .sort(byNewest);
+  }
+
+  async entryById(id: string): Promise<ContentEntry | undefined> {
+    const entry = await this.#store.getContentEntry(id);
+    return entry && entry.siteId === this.#siteId && visible([entry], this.#includeDrafts).length
+      ? entry
+      : undefined;
   }
 
   taxonomies(): Promise<Taxonomy[]> {
@@ -401,6 +413,11 @@ export class SnapshotSource implements GraphSource {
     const { site, entries } = await this.#load();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  /** A published entry of this snapshot by id (any locale). */
+  async entryById(id: string): Promise<ContentEntry | undefined> {
+    return (await this.#load()).entries.find((e) => e.id === id);
   }
 
   async taxonomies(): Promise<Taxonomy[]> {

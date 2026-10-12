@@ -41,7 +41,10 @@ export const assetCacheTag = (assetId: string) => `${ASSET_TAG_PREFIX}${assetId}
 /** The comments tag of an entry (RFC-0007 §8.1). */
 export const commentsCacheTag = (nodeId: string) => `${COMMENTS_TAG_PREFIX}${nodeId}`;
 
-/** Whether a tag is one Cloudhal sets (the purge endpoint refuses anything else). */
+/**
+ * Whether a tag is one Cloudhal sets (the purge endpoint refuses anything else): the site, node,
+ * term, list, media, asset and comments (RFC-0007 §8.1) prefixes.
+ */
 export function isCloudhalCacheTag(tag: string): boolean {
-  return /^cloudhal-(?:site|node|term|list|media|asset)-[A-Za-z0-9_]{1,64}$/.test(tag);
+  return /^cloudhal-(?:site|node|term|list|media|asset|comments)-[A-Za-z0-9_]{1,64}$/.test(tag);
 }

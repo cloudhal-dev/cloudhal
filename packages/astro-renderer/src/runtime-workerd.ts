@@ -9,12 +9,14 @@
  * are never cached.
  */
 import { env } from "cloudflare:workers";
+import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { siteCacheTag } from "./cache-tags.ts";
+import { usableCommentsKey } from "./comments.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
@@ -27,6 +29,8 @@ export interface SiteWorkerEnv {
   CLOUDHAL_SITE_ID?: string;
   /** Shared with the admin Worker; enables signed preview links. */
   CLOUDHAL_PREVIEW_SECRET?: string;
+  /** Reader comments (RFC-0007 §15.4): without a usable key, comments are off. */
+  CLOUDHAL_COMMENTS_KEY?: string;
 }
 
 /** Minimal shape of the Astro global the page passes in. */
@@ -87,6 +91,22 @@ export function analyticsBackend(
 }
 
 export { CACHE_TAG_PREFIX } from "./cache-tags.ts";
+
+let commentStore: SqlCommentStore | undefined;
+
+/**
+ * The comment store for pages on the Site Worker (RFC-0007 §8.1): D1. `undefined` when the build
+ * has no comments module (`comments.available: false`) or the Worker has no usable
+ * `CLOUDHAL_COMMENTS_KEY` — comments are then off, and the entry answers their endpoints `404`.
+ */
+export async function commentsBackend(
+  config: Partial<CloudhalRendererConfig>,
+): Promise<{ store: SqlCommentStore } | undefined> {
+  const e = env as unknown as SiteWorkerEnv;
+  if (!config.commentsScript || !usableCommentsKey(e.CLOUDHAL_COMMENTS_KEY)) return undefined;
+  commentStore ??= new SqlCommentStore(new D1Driver(e.DB));
+  return { store: commentStore };
+}
 
 /**
  * Resolves the source for this request and sets caching/preview headers on the response.

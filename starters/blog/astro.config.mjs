@@ -4,7 +4,7 @@ import { cloudhal } from "@cloudhal/astro-renderer/integration";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
-/** @type {{ siteId: string; dataDir?: string; media?: { transform?: "cdn-cgi" | "none" }; analytics?: { enabled?: boolean; uniqueVisitors?: boolean; vitalsOneIn?: number; dev?: boolean } }} */
+/** @type {{ siteId: string; dataDir?: string; media?: { transform?: "cdn-cgi" | "none" }; analytics?: { enabled?: boolean; uniqueVisitors?: boolean; vitalsOneIn?: number; dev?: boolean }; comments?: { available?: boolean } }} */
 const project = JSON.parse(readFileSync(new URL("./cloudhal.json", import.meta.url), "utf8"));
 
 /**
@@ -32,6 +32,8 @@ export default defineConfig({
       ...(project.media ? { media: project.media } : {}),
       // Cookie-less analytics (RFC-0006) for `cloudhal dev`; the Site Worker reads its vars instead.
       ...(project.analytics ? { analytics: project.analytics } : {}),
+      // Reader comments (RFC-0007): `comments.available: false` removes them from the deployment.
+      ...(project.comments ? { comments: project.comments } : {}),
     }),
   ],
   vite: { plugins: [tailwindcss()] },

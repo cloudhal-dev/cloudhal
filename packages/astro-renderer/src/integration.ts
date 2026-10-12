@@ -1,5 +1,6 @@
 import type { AstroIntegration } from "astro";
 import type { AnalyticsClient } from "./analytics-client.ts";
+import type { CommentsClient } from "./comments-client.ts";
 
 /** Options for the `cloudhal()` integration; made available to pages via `virtual:cloudhal/config`. */
 export interface CloudhalRendererConfig {
@@ -38,6 +39,17 @@ export interface CloudhalRendererConfig {
   };
   /** Set by the integration: URL of the built page-view script (`/_cloudhal/p.<hash>.js`). */
   readonly analyticsScript?: string;
+  /**
+   * Reader comments (RFC-0007): `cloudhal.json`'s `comments` block. `available: false` removes
+   * the endpoints, the module and the section for the deployment; by default they exist and each
+   * site turns comments on in its settings (off until then). Static builds never have comments.
+   */
+  readonly comments?: { readonly available?: boolean };
+  /**
+   * Set by the integration when comments are available on this target: URL of the built comments
+   * module (`/_cloudhal/c.<hash>.js`, loaded only on pages with an open thread).
+   */
+  readonly commentsScript?: string;
 }
 
 const VIRTUAL_ID = "virtual:cloudhal/config";
@@ -45,10 +57,14 @@ const RESOLVED_ID = `\0${VIRTUAL_ID}`;
 /** Dev only: the built analytics scripts, served from memory by the analytics middleware. */
 const CLIENT_ID = "virtual:cloudhal/analytics-client";
 const RESOLVED_CLIENT_ID = `\0${CLIENT_ID}`;
+/** Dev only: the built comments module and worker, served from memory by the comments middleware. */
+const COMMENTS_CLIENT_ID = "virtual:cloudhal/comments-client";
+const RESOLVED_COMMENTS_CLIENT_ID = `\0${COMMENTS_CLIENT_ID}`;
 
 export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   let resolved: CloudhalRendererConfig = config;
   let client: AnalyticsClient | undefined;
+  let comments: CommentsClient | undefined;
   return {
     name: "@cloudhal/astro-renderer",
     hooks: {
@@ -81,6 +97,22 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             entrypoint: "@cloudhal/astro-renderer/analytics-middleware",
             order: "pre",
           });
+        // Reader comments (RFC-0007 §8.2, §15.2), on the same targets: the Site Worker build ships
+        // the module and its proof-of-work worker as hashed static assets and its entry answers the
+        // endpoints; `cloudhal dev` serves both and answers them from a middleware on SQLite.
+        if (
+          config.comments?.available !== false &&
+          ((cloudflare && command === "build") || (!cloudflare && command === "dev"))
+        ) {
+          const { buildCommentsClient } = await import("./comments-client.ts");
+          comments = await buildCommentsClient();
+          resolved = { ...resolved, commentsScript: comments.module.path };
+          if (!cloudflare)
+            addMiddleware({
+              entrypoint: "@cloudhal/astro-renderer/comments-middleware",
+              order: "pre",
+            });
+        }
         updateConfig({
           vite: {
             plugins: [
@@ -91,13 +123,17 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
                     ? RESOLVED_ID
                     : id === CLIENT_ID
                       ? RESOLVED_CLIENT_ID
-                      : undefined,
+                      : id === COMMENTS_CLIENT_ID
+                        ? RESOLVED_COMMENTS_CLIENT_ID
+                        : undefined,
                 load: (id: string) =>
                   id === RESOLVED_ID
                     ? `export default ${JSON.stringify(resolved)};`
                     : id === RESOLVED_CLIENT_ID
                       ? `export default ${JSON.stringify(cloudflare ? null : (client ?? null))};`
-                      : undefined,
+                      : id === RESOLVED_COMMENTS_CLIENT_ID
+                        ? `export default ${JSON.stringify(cloudflare ? null : (comments ?? null))};`
+                        : undefined,
               },
             ],
             // Native module must stay external in Node SSR; workerd never loads it.
@@ -117,6 +153,11 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             const { writeAnalyticsClient } = await import("./analytics-client.ts");
             await writeAnalyticsClient(client, dir);
             logger.info(`wrote ${client.script.path} and ${client.vitals.path}`);
+          }
+          if (comments) {
+            const { writeCommentsClient } = await import("./comments-client.ts");
+            await writeCommentsClient(comments, dir);
+            logger.info(`wrote ${comments.module.path} and ${comments.solver.path}`);
           }
           return;
         }
@@ -144,6 +185,8 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const onChange = (file: string) => {
           if (!file.startsWith(dir)) return;
+          // the local comments key (created on the first comment request) is not content
+          if (file.endsWith("/comments.key")) return;
           clearTimeout(timer);
           timer = setTimeout(() => {
             for (const env of Object.values(server.environments)) {

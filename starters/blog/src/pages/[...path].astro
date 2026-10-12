@@ -5,6 +5,7 @@
  * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
  * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
  * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
+ * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
  */
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
@@ -14,7 +15,8 @@ import {
   nodeCacheTag,
   termCacheTag,
 } from "@cloudhal/astro-renderer/cache-tags";
-import { Sections } from "@cloudhal/astro-renderer/components";
+import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
+import { Comments, Sections } from "@cloudhal/astro-renderer/components";
 import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
@@ -72,6 +74,11 @@ if (route.kind === "not-found" || route.kind === "feed") return new Response(nul
 
 const origin = siteOrigin(site, Astro.url);
 const locale = site.defaultLocale;
+// Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
+// `?comments=<n>` past the last page is a 404.
+const comments =
+  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
+if (comments?.notFound) return new Response(null, { status: 404 });
 // Media (RFC-0004): assets resolve `assetId` and `asset:<id>`; previews never use transformations.
 const media: MediaContext = {
   assets: await loadAssetIndex(source),
@@ -170,7 +177,7 @@ const meta =
   route.kind === "page"
     ? pageHead(site, route.page, origin, media)
     : route.kind === "entry"
-      ? entryHead(site, route.entry, origin, terms, media)
+      ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
       : archiveHead(site, route.archive, origin, media);
 ---
 <Base site={site} meta={meta} nav={nav} footer={footer}>
@@ -190,6 +197,7 @@ const meta =
       <Fragment set:html={renderEntryArticle(route.entry, locale, media)} />
       <PostTerms taxonomy={terms} locale={locale} />
       <RelatedPosts title={t.related} entries={related} locale={locale} />
+      <Comments view={comments} />
     </Fragment>
   )}
   {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}

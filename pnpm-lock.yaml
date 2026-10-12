@@ -644,6 +644,9 @@ importers:
       '@cloudhal/analytics':
         specifier: workspace:*
         version: link:../analytics
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -721,6 +724,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20261007.1
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.3.1

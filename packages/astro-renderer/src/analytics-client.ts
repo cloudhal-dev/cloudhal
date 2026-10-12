@@ -29,7 +29,8 @@ function hashed(prefix: "p" | "v", code: string): AnalyticsClientFile {
   return { path: `${CLIENT_DIR}${prefix}.${hash}.js`, code };
 }
 
-async function bundle(entry: string, define: Record<string, string> = {}): Promise<string> {
+/** Bundles one browser entry into a single minified ES module (also the comments client's). */
+export async function bundle(entry: string, define: Record<string, string> = {}): Promise<string> {
   const { build, minify } = await import("vite");
   const result = await build({
     configFile: false,
@@ -57,7 +58,7 @@ async function bundle(entry: string, define: Record<string, string> = {}): Promi
   }[];
   const chunks = outputs.flatMap((o) => o.output ?? []).filter((c) => c.type === "chunk");
   if (chunks.length !== 1 || typeof chunks[0]?.code !== "string")
-    throw new Error(`analytics script ${path.basename(entry)} must build to exactly one chunk`);
+    throw new Error(`browser script ${path.basename(entry)} must build to exactly one chunk`);
   // Library mode keeps whitespace in ES output (to keep pure annotations); the scripts are final
   // and tiny, so they are minified once more as whole modules.
   return (await minify("entry.mjs", chunks[0].code)).code;

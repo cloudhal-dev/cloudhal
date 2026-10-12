@@ -12,6 +12,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./sql": "./src/sql/index.ts",
+    "./client": "./src/client/index.ts",
     "./testing": "./src/testing.ts",
     "./fixtures/*": "./src/fixtures/*"
   },
@@ -51,6 +52,10 @@
       "./sql": {
         "types": "./dist/src/sql/index.d.ts",
         "default": "./dist/src/sql/index.js"
+      },
+      "./client": {
+        "types": "./dist/src/client/index.d.ts",
+        "default": "./dist/src/client/index.js"
       },
       "./testing": {
         "types": "./dist/src/testing.d.ts",
