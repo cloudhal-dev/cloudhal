@@ -8,6 +8,8 @@
 import type {
   AnalyticsResult,
   AnalyticsSource,
+  BotTrafficReason,
+  BotTrafficSignal,
   Dimension,
   Filter,
   Range,
@@ -241,6 +243,41 @@ export async function summaryReport(
       },
     },
     results: [current, previous],
+  };
+}
+
+// ───────────────────────────── possible bot traffic ─────────────────────────────
+
+/** A reason of the signal; `single_page` carries the page as the current graph knows it. */
+export type BotTrafficReportReason = BotTrafficReason & { readonly node?: AnalyticsNode };
+
+export interface BotTrafficReport extends Omit<BotTrafficSignal, "reasons"> {
+  readonly reasons: readonly BotTrafficReportReason[];
+}
+
+/**
+ * The "possible bot traffic" signal (RFC-0006 §5.5) for REST `…/analytics/bots` and
+ * `get_analytics`: the period's last 7 days by the hour; a `single_page` reason is joined to the
+ * graph (title and current path), so people and agents see which page drew the burst.
+ */
+export async function botTrafficReport(
+  analytics: AnalyticsService,
+  store: SiteGraphStore,
+  site: Site,
+  range: Range,
+): Promise<{ data: BotTrafficReport; results: AnalyticsResult[] }> {
+  const { signal, results } = await analytics.botTraffic(site.id, range);
+  const page = signal.reasons.find((r) => r.code === "single_page")?.key;
+  if (!page) return { data: signal, results };
+  const nodes = await analyticsNodes(store, site, [page]);
+  return {
+    data: {
+      ...signal,
+      reasons: signal.reasons.map((r) =>
+        r.code === "single_page" && r.key ? { ...r, node: nodes.get(r.key) as AnalyticsNode } : r,
+      ),
+    },
+    results,
   };
 }
 

@@ -19,6 +19,7 @@ import {
 import {
   type AnalyticsMeta,
   analyticsNodes,
+  botTrafficReport,
   combineMeta,
   nodeReport,
   seriesInterval,
@@ -107,6 +108,17 @@ export const analytics: Hono<Env> = new Hono<Env>()
       filter: parseFilterParam(c.req.query("filter")),
       compare: compare(c),
     });
+    return c.json(envelope(a, r, combineMeta(results), data));
+  })
+  /**
+   * "Possible bot traffic" (RFC-0006 §5.5): `{level: none | watch | likely, reasons, hour, …}` for
+   * the period's last 7 days by the hour. Live reads like the hourly series (no `filter`).
+   */
+  .get("/bots", async (c) => {
+    const a = service(c);
+    const site = await requireSite(c);
+    const r = range(c, a);
+    const { data, results } = await botTrafficReport(a, c.get("store"), site, r);
     return c.json(envelope(a, r, combineMeta(results), data));
   })
   .get("/series", async (c) => {
