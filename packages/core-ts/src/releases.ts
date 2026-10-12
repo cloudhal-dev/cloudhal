@@ -33,6 +33,7 @@ import type {
 import {
   type ApprovalVerdict,
   type BuiltinRunner,
+  type BuiltinRunnerOptions,
   canonicalInstant,
   composeRelease,
   DAY_MS,
@@ -55,6 +56,7 @@ import {
   runId,
   ScheduleConflictError,
   ScheduleError,
+  type ScheduleNotifier,
   type SchedulerHealthState,
   type SystemJobDefinition,
   schedulerHealth,
@@ -67,6 +69,7 @@ import {
 } from "@cloudhal/schedules";
 import { type ReleaseRecord, SqlScheduleStore } from "@cloudhal/schedules/sql";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
+import { type BuiltinInputs, graphBuiltinRunner } from "./automations.ts";
 import { type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
@@ -221,18 +224,6 @@ export async function recordPurgeOutcome(
 
 // ───────────────────────────── the tick ─────────────────────────────
 
-/** A built-in job runner until the job bodies arrive (rollout step 9): ends each run, did nothing. */
-export const NOOP_BUILTIN_RUNNER: BuiltinRunner = {
-  cost: 0,
-  async step() {
-    return {
-      done: true,
-      outcome: "nothing-to-do",
-      summary: "This built-in job has no steps in this version yet; nothing was checked.",
-    };
-  },
-};
-
 export interface ScheduledTickOptions {
   readonly sql: SqlDriver;
   readonly blobs: BlobStore;
@@ -250,8 +241,23 @@ export interface ScheduledTickOptions {
   readonly systemJobs?:
     | ((ctx: { counted: SqlDriver; graph: SiteGraphStore }) => readonly SystemJobDefinition[])
     | undefined;
-  /** Default `NOOP_BUILTIN_RUNNER` (the job bodies are rollout step 9). */
+  /**
+   * The built-in jobs (§11.1). Default: `graphBuiltinRunner` over the tick's metered driver, with
+   * `builtinInputs` for the 404 rows and the site's own feed.
+   */
   readonly builtins?: BuiltinRunner | undefined;
+  /**
+   * What the deployment adds for the built-in jobs: analytics' 404 rows and a fetcher for the
+   * site's `/rss.xml` and `/sitemap.xml`. `counted` is the tick's counting driver (analytics reads
+   * count against the tick without being refused).
+   */
+  readonly builtinInputs?: ((ctx: { counted: SqlDriver }) => BuiltinInputs) | undefined;
+  /** Notifications of automation runs (§14); default none (Studio derives them from the runs). */
+  readonly notify?: ScheduleNotifier | undefined;
+  /** Page sizes and the blob-read bound of the default runner (tests use small pages). */
+  readonly builtinOptions?:
+    | (BuiltinRunnerOptions & { readonly maxBlobReads?: number | undefined })
+    | undefined;
   /** The policy re-checks at run time (§10.6); rollout step 7 fills it. */
   readonly checkApproval?:
     | ((release: Release, now: Date) => ApprovalVerdict | Promise<ApprovalVerdict>)
@@ -287,7 +293,15 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       recordPurge: (id, p) => recordPurgeOutcome(counted, id, p),
       log: o.log,
     }),
-    builtins: o.builtins ?? NOOP_BUILTIN_RUNNER,
+    builtins:
+      o.builtins ??
+      graphBuiltinRunner({
+        ...o.builtinOptions,
+        sql: metered,
+        blobs: o.blobs,
+        inputs: o.builtinInputs?.({ counted }),
+      }),
+    ...(o.notify ? { notify: o.notify } : {}),
     ...(o.checkApproval ? { checkApproval: o.checkApproval } : {}),
     ...(o.systemJobs ? { systemJobs: o.systemJobs({ counted, graph }) } : {}),
     ...(o.automationsEnabled === false ? { automationsEnabled: false } : {}),
