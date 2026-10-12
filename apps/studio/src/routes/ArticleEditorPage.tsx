@@ -21,6 +21,7 @@ import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
@@ -439,6 +440,7 @@ export function ArticleEditorPage() {
               coverStatus={coverStatus}
             />
             <ReadersCard siteId={siteId} node={query.data ?? draft} kind="article" />
+            <ArticleCommentsCard siteId={siteId} entry={query.data ?? draft} />
             <UsedInMenusCard siteId={siteId} kind="contentEntry" id={draft.id} />
             <DetailsCard rows={details} />
             <DangerZoneCard
