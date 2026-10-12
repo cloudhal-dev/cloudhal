@@ -112,6 +112,12 @@ export const RELEASE_META = {
   note: "cloudhal.note",
   /** A gate-only reduction (set_embargo on a live node): re-checked without the mode rule. */
   reduce: "cloudhal.reduce",
+  /**
+   * The mode the agent worked in when it scheduled a gate-only reduction with its key's (`auto`)
+   * approval (`plan` … `auto`): such a release is not an `auto`-mode publish, so Studio labels it
+   * by this mode ("Hidden by an agent in EDITS mode"), not as "Automatic".
+   */
+  mode: "cloudhal.mode",
   /** The tool or route that made the release. */
   source: "cloudhal.source",
 } as const;

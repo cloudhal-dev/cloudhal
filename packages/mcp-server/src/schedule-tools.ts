@@ -500,11 +500,18 @@ async function gateRelease(
   approval: Release["approval"],
   reduce: boolean,
 ): Promise<Release> {
+  // An agent's reduction carries its key's approval (`kind: "auto"`) whatever its mode: record the
+  // mode it really worked in, so the release is not mistaken for an `auto`-mode publish.
+  const mode = reduce && approval?.kind === "auto" ? effectiveMode(ctx.principal) : undefined;
   const pinned = await releaseService(deps(ctx), ctx.store, ctx.now).create({
     siteId: site.id,
     set: [nodeId],
     createdBy: ctx.principal.actor,
-    metadata: { [RELEASE_META.source]: source, ...(reduce ? { [RELEASE_META.reduce]: "1" } : {}) },
+    metadata: {
+      [RELEASE_META.source]: source,
+      ...(reduce ? { [RELEASE_META.reduce]: "1" } : {}),
+      ...(mode ? { [RELEASE_META.mode]: mode } : {}),
+    },
   });
   const rec = await recordOf(ctx, site.id, pinned.release.id);
   return scheduleWith(ctx, rec, { kind: "on-approval" }, approval);

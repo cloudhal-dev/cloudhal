@@ -459,7 +459,8 @@ describe("gates over MCP (RFC-0008 §7.6, §10.8)", () => {
       state: "scheduled",
       when: { kind: "on-approval" },
       approval: { kind: "auto", keyId: "key_sched000001" },
-      metadata: { "cloudhal.reduce": "1" },
+      // the mode the agent really worked in: an EDITS reduction, not an AUTO-mode publish
+      metadata: { "cloudhal.reduce": "1", "cloudhal.mode": "edits" },
     });
     // moving it earlier is lifting: refused here, it is lift_embargo's
     const current = (await s.store.getContentEntry(draft.id)) as ContentEntry;
