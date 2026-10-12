@@ -28,7 +28,10 @@ export interface RetentionSettings {
   readonly deletedDays: number;
   /** `hidden` (default `null`: kept until a person deletes it). */
   readonly hiddenDays: number | null;
-  /** `ip_hmac` and `challenge_id` on comments and reports (default 30). */
+  /**
+   * `ip_hmac` and `challenge_id` on comments and reports: 1 to 30 days (default 30). The privacy
+   * notice promises "up to 30 days" (RFC-0007 §9.1, §9.6), so it is a ceiling, not just a default.
+   */
   readonly clientDataDays: number;
   /** Resolved reports and statements of reasons of removed comments (default 183, six months). */
   readonly resolvedReportDays: number;
@@ -110,6 +113,11 @@ export const MAX_WORDS = 200;
 export const MAX_WORD_LENGTH = 64;
 export const MAX_COLLECTIONS = 100;
 export const MAX_CLOSE_DAYS = 3650;
+/**
+ * The longest IP hashes and challenge ids are kept (§9.1, §9.3). The disclosure snippet says "up
+ * to 30 days", so settings refuse more and the retention job clamps a stored value to it.
+ */
+export const MAX_CLIENT_DATA_DAYS = 30;
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SITE_KEY = /^[A-Za-z0-9_-]{1,128}$/;
@@ -117,12 +125,18 @@ const SITE_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 const isInt = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
-function checkDays(name: string, v: unknown, nullable: boolean): void {
+function checkDays(name: string, v: unknown, nullable: boolean, max = MAX_CLOSE_DAYS): void {
   if (v === null && nullable) return;
-  if (!isInt(v, 1, MAX_CLOSE_DAYS))
+  if (!isInt(v, 1, max))
     throw new CommentSettingsError(
-      `${name} must be a whole number of days from 1 to ${MAX_CLOSE_DAYS}${nullable ? " or null" : ""}`,
+      `${name} must be a whole number of days from 1 to ${max}${nullable ? " or null" : ""}`,
     );
+}
+
+/** `clientDataDays` as the retention job applies it: never above `MAX_CLIENT_DATA_DAYS`. */
+export function clientDataDays(retention: Pick<RetentionSettings, "clientDataDays">): number {
+  const v = retention.clientDataDays;
+  return Number.isInteger(v) && v >= 1 ? Math.min(v, MAX_CLIENT_DATA_DAYS) : MAX_CLIENT_DATA_DAYS;
 }
 
 /** Word lists are stored trimmed, de-duplicated by their folded form, in the order given. */
@@ -256,7 +270,7 @@ export function applySettingsInput(
     checkDays("retention.spamDays", retention.spamDays, false);
     checkDays("retention.deletedDays", retention.deletedDays, false);
     checkDays("retention.hiddenDays", retention.hiddenDays, true);
-    checkDays("retention.clientDataDays", retention.clientDataDays, false);
+    checkDays("retention.clientDataDays", retention.clientDataDays, false, MAX_CLIENT_DATA_DAYS);
     checkDays("retention.resolvedReportDays", retention.resolvedReportDays, false);
   }
 

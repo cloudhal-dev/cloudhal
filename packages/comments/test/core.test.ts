@@ -13,6 +13,7 @@ import {
   ipHmac,
   issueChallenge,
   leadingZeroBits,
+  MAX_CLIENT_DATA_DAYS,
   oldestSaltMonthToKeep,
   openEmail,
   openSecret,
@@ -231,6 +232,10 @@ describe("settings and threadState (§4.5)", () => {
       { watchWords: Array(201).fill("w") },
       { retention: { pendingDays: 0 } },
       { retention: { forever: 1 } },
+      // the privacy notice says "up to 30 days" for hashed addresses (§9.1, §9.6)
+      { retention: { clientDataDays: 31 } },
+      { retention: { clientDataDays: 3650 } },
+      { retention: { clientDataDays: 0 } },
     ];
     for (const b of bad)
       expect(() => applySettingsInput(d, b as never), JSON.stringify(b)).toThrow(
@@ -247,6 +252,10 @@ describe("settings and threadState (§4.5)", () => {
     expect(ok.retention.hiddenDays).toBe(180);
     expect(ok.retention.pendingDays).toBe(30);
     expect(ok.closeAfterDays).toBeNull();
+    expect(
+      applySettingsInput(d, { retention: { clientDataDays: 7 } }).retention.clientDataDays,
+    ).toBe(7);
+    expect(MAX_CLIENT_DATA_DAYS).toBe(30);
   });
 
   it("open until first publication + closeAfterDays (collection, else site)", () => {
@@ -410,6 +419,21 @@ describe("retention plan (§9.3)", () => {
     const hidden = retentionPlan({ ...defaultCommentSettings("s").retention, hiddenDays: 180 }, T0);
     expect(hidden.steps.find((s) => s.kind === "hidden")?.cutoff).toBe(
       new Date(T0.getTime() - 180 * DAY_MS).toISOString(),
+    );
+    // a value stored before the ceiling is clamped: hashes never outlive 30 days
+    const legacy = retentionPlan(
+      { ...defaultCommentSettings("s").retention, clientDataDays: 365 },
+      T0,
+    );
+    expect(legacy.steps.find((s) => s.kind === "client-data")?.cutoff).toBe(
+      new Date(T0.getTime() - 30 * DAY_MS).toISOString(),
+    );
+    const shorter = retentionPlan(
+      { ...defaultCommentSettings("s").retention, clientDataDays: 7 },
+      T0,
+    );
+    expect(shorter.steps.find((s) => s.kind === "client-data")?.cutoff).toBe(
+      new Date(T0.getTime() - 7 * DAY_MS).toISOString(),
     );
     expect(oldestSaltMonthToKeep(new Date("2026-01-15T00:00:00Z"))).toBe("2025-12");
     expect(

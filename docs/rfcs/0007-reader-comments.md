@@ -524,7 +524,7 @@ Behaviour under real load is V1. If the bucket proves too tight, the alternative
 | `spam` | hard-deleted after **30 days** |
 | `deleted` | hard-deleted after **30 days**; a tombstone (no body, erased author) stays while approved replies need it |
 | `hidden` | kept until a person deletes it; optional "delete hidden comments after N days" |
-| `ip_hmac`, `challenge_id` | cleared after **30 days** on every comment and report |
+| `ip_hmac`, `challenge_id` | cleared after **30 days** on every comment and report (a ceiling: the setting takes 1–30) |
 | Commenter emails | deleted when no comment or report refers to them any longer, or on erasure |
 | Reports and statements of reasons | **6 months** after resolution |
 | Bans | removed when they expire |
@@ -965,7 +965,6 @@ The **daily cap is what keeps Free safe**: at the default 1,000 stored submissio
 - **Docs.** One owner's guide (`docs/guides/comments.md`) instead of the two planned in §15.4; privacy, retention, erasure, the DSA, KVKK and 5651 notes and the bilingual privacy paragraph are sections of it. The Turkish paragraph uses the formal register of the site's form strings.
 - **Security review.** The claims of the Security section and invariants C1–C14 were checked against the code; the threat model's review of 2026-10-12 lists the findings. Fixed here: a declined local approval audited the raw arguments (draft text, notes), and retention never ran without a cron or on Node. Still open:
   - the `"unbound"` binding comparison;
-  - `retention.clientDataDays` accepting up to 3,650 days against the "30 days" of §9.1 and §9.6;
   - posts without JavaScript bypass Turnstile;
   - `structuredContent` carries reader text undelimited;
   - Studio's REST export and some bulk routes exceed D1 Free's per-invocation queries;
@@ -973,6 +972,11 @@ The **daily cap is what keeps Free safe**: at the default 1,000 stored submissio
   - minor key and limiter details;
   - §11.2's "CSV and JSON exports" should read "CSV exports".
 - **Also open.** `ADDABLE_KEY_SCOPES` (`packages/api/src/auth.ts`) does not include `comments:read` yet, so Studio's one-click "Allow comments" (D2) has no route. The guide tells owners to create a new key meanwhile.
+
+## Implementation notes (security fixes of the 2026-10-12 review)
+The open items of the threat model's review of 2026-10-12 (reader comments), one commit each.
+
+- **IP-hash retention is capped at 30 days** (review item 4). `retention.clientDataDays` accepts 1–30 (`MAX_CLIENT_DATA_DAYS`; `applySettingsInput`, so the settings route answers 400 above it). The retention plan clamps the value (`clientDataDays()`), and so does reading a stored row, so a value saved before the cap never keeps hashes longer and Studio shows what applies. §9.1's "30 days" and the notice's "up to 30 days" (§9.6) are now always true. Tests: `core.test.ts` (validation, clamped plan), the store conformance suite (refused, clamped when read) and the API suite (400).
 
 ### Status of rollout
 | Step | What | Status |

@@ -446,6 +446,13 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
           })
         ).status,
       ).toBe(400);
+      // hashed addresses are kept at most 30 days, as the privacy notice says (§9.1, §9.6)
+      const tooLong = await call(`${CM()}/settings`, "administrator", {
+        method: "PUT",
+        body: { rev: 2, retention: { clientDataDays: 31 } },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(String(tooLong.body.message)).toMatch(/clientDataDays.*1 to 30/);
       const secret = await call(`${CM()}/settings/secrets/turnstile-secret`, "administrator", {
         method: "PUT",
         body: { value: "0x4AAAAAAA-secret-value" },

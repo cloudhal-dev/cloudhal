@@ -16,7 +16,12 @@ import { isValid } from "@cloudhal/core-contracts";
 import type { RunResult, SqlDriver, SqlStatement, SqlValue } from "@cloudhal/storage";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { type CommentKeys, deriveCommentKeys } from "./crypto.ts";
-import { CommentConflictError, CommentForbiddenError, CommentInputError } from "./errors.ts";
+import {
+  CommentConflictError,
+  CommentForbiddenError,
+  CommentInputError,
+  CommentSettingsError,
+} from "./errors.ts";
 import { emailHmac, ID_PREFIX, newCommentsId, randomSalt, sealEmail } from "./hashes.ts";
 import { CommentLimiter, DailyCount } from "./limits.ts";
 import { DAY_MS, type PreparedSubmission, utcMonth } from "./model.ts";
@@ -226,6 +231,15 @@ export function describeCommentStoreConformance(label: string, factory: CommentS
       expect(s).toMatchObject({ rev: 2, watchWords: ["kripto"], enabled: true });
       expect(s.retention.hiddenDays).toBe(90);
       expect((await ctx.store.settings(OTHER_SITE)).rev).toBe(0);
+      // hashed addresses: at most 30 days (§9.1, §9.6), refused above and clamped when read
+      await expect(
+        ctx.store.putSettings(SITE, { retention: { clientDataDays: 365 } }, 2, EDITOR.id),
+      ).rejects.toBeInstanceOf(CommentSettingsError);
+      await ctx.sql.run(
+        `UPDATE comment_settings SET retention = json_set(retention, '$.clientDataDays', 365) WHERE site_id = ?`,
+        [SITE],
+      );
+      expect((await ctx.store.settings(SITE)).retention.clientDataDays).toBe(30);
     });
 
     it("secrets are encrypted at rest and readable only with the keys", async () => {

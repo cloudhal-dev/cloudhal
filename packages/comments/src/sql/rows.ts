@@ -8,6 +8,7 @@ import { CommentSettingsError } from "../errors.ts";
 import { num } from "../model.ts";
 import {
   type CommentSettings,
+  clientDataDays,
   DEFAULT_RETENTION,
   defaultCommentSettings,
   type RetentionSettings,
@@ -85,6 +86,12 @@ export interface SettingsRow extends Record<string, unknown> {
   updated_by: string;
 }
 
+/** Stored retention over the defaults; `clientDataDays` never above the 30-day ceiling (§9.1). */
+function storedRetention(stored: Partial<RetentionSettings>): RetentionSettings {
+  const r = { ...DEFAULT_RETENTION, ...stored };
+  return { ...r, clientDataDays: clientDataDays(r) };
+}
+
 export function toSettings(r: SettingsRow): CommentSettings {
   const base = defaultCommentSettings(r.site_id);
   try {
@@ -102,10 +109,7 @@ export function toSettings(r: SettingsRow): CommentSettings {
       blockedWords: JSON.parse(r.blocked_words) as string[],
       dailyCap: num(r.daily_cap),
       aiLabels: r.ai_labels === "workers-ai" ? "workers-ai" : "off",
-      retention: {
-        ...DEFAULT_RETENTION,
-        ...(JSON.parse(r.retention) as Partial<RetentionSettings>),
-      },
+      retention: storedRetention(JSON.parse(r.retention) as Partial<RetentionSettings>),
       planHint: r.plan_hint === "free" || r.plan_hint === "paid" ? r.plan_hint : null,
       rev: num(r.rev),
       updatedAt: r.updated_at,

@@ -137,7 +137,7 @@ This is the notice-and-action mechanism of DSA Art. 16, which applies to every h
 | Comment text | Yes | public once approved; agents with `comments:read` |
 | Email | Only if given; encrypted (AES-GCM) with a keyed hash for lookups | only people with `commenters:data` (Editors and above); never agents; never in exports without `--with-personal-data` |
 | IP address | **Never** | read to limit abuse and hash, then dropped |
-| Hashed network address | 30 days by default | nobody: used only for rate limits and bans. It is an HMAC with a random salt per month; salts are deleted when two months old, after which old hashes cannot be recomputed |
+| Hashed network address | at most 30 days | nobody: used only for rate limits and bans. It is an HMAC with a random salt per month; salts are deleted when two months old, after which old hashes cannot be recomputed |
 | User agent, cookies, device storage | **Never** | |
 | Reports | reason, details, optional email (encrypted) | moderators |
 | Moderation history | who did what, with the reason; no text, no email | moderators and Activity |
@@ -150,12 +150,12 @@ This is the notice-and-action mechanism of DSA Art. 16, which applies to every h
 | Spam | deleted after 30 days |
 | Deleted comments | deleted after 30 days (a tombstone stays while approved replies need it) |
 | Hidden comments | kept until a person deletes them (optionally deleted after N days) |
-| Hashed network addresses and proof-of-work ids | cleared after 30 days |
+| Hashed network addresses and proof-of-work ids | cleared after 30 days (you can choose fewer, never more) |
 | Commenter emails | deleted when no comment or report refers to them any more, or on erasure |
 | Resolved reports and statements of reasons | 6 months |
 | Comments of a deleted article | deleted after 30 days |
 
-These can be changed in Site settings › Comments › Retention. **If you change how long hashed network addresses are kept, change your privacy notice too.** The notice below says "up to 30 days", and the setting accepts more.
+These can be changed in Site settings › Comments › Retention. Hashed network addresses and proof-of-work ids are kept **at most 30 days**: the setting accepts 1 to 30, and the hourly job never keeps them longer, even for a value saved before this limit existed. That keeps the notice below ("up to 30 days") true whatever you choose.
 
 On Cloudflare the hourly job is the admin Worker's cron trigger. If your account has no free trigger (Workers Free allows 5), `cloudhal deploy` goes without it and the job runs after Studio and API requests instead, at most once an hour. Locally, `cloudhal studio` and `cloudhal mcp` run it every hour while they are running.
 
