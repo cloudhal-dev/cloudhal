@@ -57,6 +57,7 @@ return handleBeacon(request, {                    // 204 for every outcome, 405 
   resolvePath: (path) => publishedNode(path),     // { nodeId, nodeKind, locale? } or undefined
   writer: new WaeWriter(env.ANALYTICS),
   salt,
+  clientIp: request.headers.get("cf-connecting-ip") ?? undefined, // trusted on Cloudflare only; Node: the socket address
   rateLimit: async (ip, kind) => (await limiter.allow(ip, kind)) && (await (shared?.allow(ip) ?? true)),
   onError: (m, e) => console.error(m, e),
 });

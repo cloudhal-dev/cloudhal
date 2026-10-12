@@ -84,6 +84,13 @@ function analytics(options: Partial<ConstructorParameters<typeof SiteAnalytics>[
     now: () => clock,
     ...options,
   });
+  // As the Site Worker entry does on Cloudflare, whose edge sets CF-Connecting-IP: the caller
+  // passes the trusted address; SiteAnalytics never reads it from the request.
+  const send = a.beacon.bind(a);
+  a.beacon = (request, extra = {}) => {
+    const clientIp = request.headers.get("cf-connecting-ip") ?? undefined;
+    return send(request, { ...(clientIp ? { clientIp } : {}), ...extra });
+  };
   return { a, writer };
 }
 
@@ -549,5 +556,37 @@ describe("Node handler (cloudhal dev)", () => {
       { kind: "pageview", path: "/about", channel: "direct" },
       { kind: "render", path: "/gone-page", channel: null },
     ]);
+  });
+
+  it("limits by the socket address: a client-sent CF-Connecting-IP picks nothing off Cloudflare", async () => {
+    const handler = createNodeAnalytics({
+      siteId: site.id,
+      backend: backend(),
+      client,
+      defaults: deploymentDefaults("on", undefined),
+      record: true,
+      now: () => clock,
+    });
+    for (let i = 0; i < 35; i++)
+      await handler(
+        new Request("http://localhost:4321/__cloudhal/e", {
+          method: "POST",
+          body: JSON.stringify(view("/about", { referrer: "" })),
+          headers: {
+            "sec-fetch-site": "same-origin",
+            "user-agent": CHROME,
+            // a new "address" on every request: ignored, the socket address is the key
+            "cf-connecting-ip": `192.0.2.${i}`,
+          },
+        }),
+        page,
+        "127.0.0.1",
+      );
+    await new SqlAnalytics(sql).flush();
+    await new Promise((r) => setTimeout(r, 20));
+    const views = await sql.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM analytics_events WHERE kind = 'pageview'",
+    );
+    expect(views?.n).toBe(30); // the per-client allowance of one minute
   });
 });

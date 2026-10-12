@@ -58,7 +58,12 @@ export interface BeaconContext {
   readonly salt?: (day: string) => Promise<string>;
   /** Per-client allowance (e.g. `BeaconRateLimiter.allow`); `false` drops the beacon. */
   readonly rateLimit?: (ip: string, kind: "pageview" | "vitals") => Promise<boolean> | boolean;
-  /** Client IP when `CF-Connecting-IP` is absent (Node self-host). */
+  /**
+   * The client's address as the **caller** knows it to be true; the handler never reads it from a
+   * request header. On Cloudflare the Site Worker passes `CF-Connecting-IP` (set by Cloudflare's
+   * edge, which overwrites what a client sends); on Node and in `cloudhal dev`, the socket
+   * address. Absent: no visitor hash and no per-client limit key (the IP is "").
+   */
   readonly clientIp?: string;
   /** Country when `request.cf.country` is absent. */
   readonly country?: string;
@@ -159,7 +164,9 @@ async function process(request: Request, ctx: BeaconContext): Promise<BeaconOutc
   const beacon = parsed;
 
   // 5. rate
-  const ip = h.get("cf-connecting-ip")?.trim() || ctx.clientIp || "";
+  // Only the caller's trusted address: a client-sent `CF-Connecting-IP` off Cloudflare must not
+  // pick the rate-limit key or the hashed IP.
+  const ip = ctx.clientIp?.trim() ?? "";
   if (ctx.rateLimit && !(await ctx.rateLimit(ip, beacon.kind))) return drop("rate-limited");
 
   // 7. route → published node

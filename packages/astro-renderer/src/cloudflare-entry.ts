@@ -317,7 +317,10 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
             status: request.method === "POST" ? 204 : 405,
             headers: { "cache-control": "no-store" },
           });
-        const answer = await a.beacon(request);
+        // On Cloudflare the edge sets CF-Connecting-IP (a client's own value is overwritten), so
+        // it is the trusted address here; the beacon handler never reads headers for it.
+        const clientIp = request.headers.get("cf-connecting-ip")?.trim();
+        const answer = await a.beacon(request, clientIp ? { clientIp } : {});
         pendingWrites.flush(ctx);
         return answer;
       }

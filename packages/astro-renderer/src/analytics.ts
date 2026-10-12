@@ -259,7 +259,9 @@ export class SiteAnalytics {
 
   /**
    * `POST /__cloudhal/e`: `204` for every outcome (`405` for another method), `no-store`.
-   * `clientIp` / `country` stand in for `CF-Connecting-IP` / `request.cf.country` off Cloudflare.
+   * `clientIp` is the client's address as the caller knows it (the Site Worker: Cloudflare's
+   * `CF-Connecting-IP`; Node: the socket address); request headers are never trusted for it.
+   * `country` stands in for `request.cf.country` off Cloudflare.
    */
   async beacon(
     request: Request,
