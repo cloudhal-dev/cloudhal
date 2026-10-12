@@ -354,7 +354,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
               reason:
                 answer.action === "accept" ? "approval refused" : `approval ${answer.action}d`,
               skill: principal.skill?.name,
-              input: args,
+              input: def.auditArgs ? def.auditArgs(args) : args,
               outcome: "error",
             });
             return errorResult(`${def.name} was not approved; nothing changed.`);
