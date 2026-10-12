@@ -71,7 +71,7 @@ Notifications tell moderators when comments are waiting, when a comment was repo
 
 Agents moderate through seven MCP tools: `list_comments`, `get_comment_thread`, `comments_summary`, `label_comments`, `moderate_comments`, `draft_comment_reply` and `set_comment_thread`. There is no tool to delete, erase, ban, export or change settings.
 
-- **Keys.** New agent keys get `comments:read`. Keys made before comments existed are not widened; give them comment access by creating a new key. A one-click "Allow comments" on Studio's Agents page is planned, as "Allow analytics" exists for analytics. For triage, make a narrow key: `comments:read` and `comments:moderate` only, in `edits` mode. Avoid giving one key both comment access and `content:write` or `site:publish`: comment text is written by strangers and reaches the agent.
+- **Keys.** New agent keys get `comments:read`. Keys made before comments existed are not widened. To give one read access, add `comments:read` to it with `PATCH /api/agent-keys/:id` and `{"addScopes": ["comments:read"]}` (Studio's "Allow comments" on the Agents page, like "Allow analytics"): your own keys, or any key with `agents:manage`, never beyond the key creator's role (a Contributor's key cannot hold it); audited as `agent-key.scopes`. Moderation and reply scopes are never added to an existing key: create a new one. For triage, make a narrow key: `comments:read` and `comments:moderate` only, in `edits` mode. Avoid giving one key both comment access and `content:write` or `site:publish`: comment text is written by strangers and reaches the agent.
 - **What an agent may do on its own**, by the key's mode:
 
   | Call | plan | manual | edits | auto | local `bypass` |

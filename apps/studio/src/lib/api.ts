@@ -1750,6 +1750,15 @@ export const api = {
         ...json({ addScopes: ["analytics:read"] }),
       }),
     /**
+     * "Allow comments" (RFC-0007 §10.1): adds `comments:read` to a key made before comments
+     * existed, with the same rules as `allowAnalytics` (Contributors' keys cannot hold it).
+     */
+    allowComments: (id: string) =>
+      request<AgentKeySummary>(`/api/agent-keys/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...json({ addScopes: ["comments:read"] }),
+      }),
+    /**
      * A more autonomous mode until the time is up, then the key's own mode again (ADR-0016; audited).
      * Replaces an elevation in force. 400 when the mode is not above the key's own, is bypass, or
      * `minutes` is out of bounds.
