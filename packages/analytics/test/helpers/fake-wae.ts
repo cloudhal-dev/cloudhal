@@ -85,6 +85,7 @@ export class FakeWae implements WaeSqlBinding {
       (t: unknown) => `${String(t).slice(0, 10)} ${String(t).slice(11, 13)}:00:00`,
     );
     this.db.function("toStartOfDay", (t: unknown) => `${String(t).slice(0, 10)} 00:00:00`);
+    this.db.function("toUInt32", (x: unknown) => Math.max(0, Math.trunc(Number(x))));
   }
 
   /** The site Worker's binding. */
@@ -129,6 +130,16 @@ export class FakeWae implements WaeSqlBinding {
     if (!/index1 = '/.test(q) || !/timestamp >= '/.test(q))
       throw new SqlApiError("query must be bounded by index1 and a lower time bound");
     if (/sampleInterval/i.test(q)) throw new Error("Cloudhal must never weight by sampleInterval");
+    // Seen live (2026-10-12): an aliased grouped column used in ORDER BY is "not found", and a
+    // Float64 weight beside the literal 0 in `quantileWeighted(…, if(…, w, 0))` is a type error.
+    if (/\bGROUP BY\b/.test(q)) {
+      const alias = q.match(/\b(?:blob|double)\d+ AS (\w+)/);
+      if (alias) throw new SqlApiError(`Input was invalid: column \`${alias[1]}\` not found`);
+    }
+    if (/quantileWeighted\([^;]*?if\([^,]+,\s*double\d+\s*,/.test(q))
+      throw new SqlApiError(
+        "Input was invalid: Your query could not be executed due to a type error",
+      );
     const sql = q.replace(`FROM ${table}`, "FROM points");
     const rows = this.db.prepare(sql).all() as Record<string, unknown>[];
     const data = rows.map((r) =>

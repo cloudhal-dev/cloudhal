@@ -28,7 +28,8 @@ import {
   vitalsMetric,
 } from "../model.ts";
 import { crawlerClass } from "../ua.ts";
-import { type CompiledWaeQuery, compileWae } from "./compile.ts";
+import { type CompiledWaeQuery, compileWae, DIM_SLOT } from "./compile.ts";
+import { BLOB, DOUBLE } from "./layout.ts";
 
 /** Structurally `AnalyticsSQLBinding` from `@cloudflare/workers-types` (the admin Worker's binding). */
 export interface WaeSqlBinding {
@@ -171,7 +172,7 @@ export class WaeReader implements AnalyticsReader {
           data: {
             dimension: q.dimension,
             rows: rows.map((r) => ({
-              key: String(r.key ?? ""),
+              key: String(r[DIM_SLOT[q.dimension]] ?? ""),
               pageviews: num(r.pageviews),
               visits: num(r.visits),
             })),
@@ -206,9 +207,9 @@ export class WaeReader implements AnalyticsReader {
             report: "errors",
             rows: rows.map(
               (r): RenderErrorRow => ({
-                path: s(r.path),
-                status: num(r.status),
-                refPath: orNull(r.refPath),
+                path: s(r[`blob${BLOB.path}`]),
+                status: num(r[`double${DOUBLE.status}`]),
+                refPath: orNull(r[`blob${BLOB.refPath}`]),
                 hits: num(r.hits),
                 lastSeen: parseBucket(r.lastSeen) ?? null,
               }),
@@ -219,10 +220,10 @@ export class WaeReader implements AnalyticsReader {
             report: "redirects",
             rows: rows.map(
               (r): RenderRedirectRow => ({
-                path: s(r.path),
-                status: num(r.status),
-                redirectTo: s(r.redirectTo),
-                nodeId: orNull(r.nodeId),
+                path: s(r[`blob${BLOB.path}`]),
+                status: num(r[`double${DOUBLE.status}`]),
+                redirectTo: s(r[`blob${BLOB.redirectTo}`]),
+                nodeId: orNull(r[`blob${BLOB.nodeId}`]),
                 hits: num(r.hits),
               }),
             ),
@@ -232,8 +233,8 @@ export class WaeReader implements AnalyticsReader {
             report: "crawlers",
             rows: rows.map(
               (r): RenderCrawlerRow => ({
-                crawler: s(r.crawler),
-                class: crawlerClass(s(r.crawler)),
+                crawler: s(r[`blob${BLOB.crawler}`]),
+                class: crawlerClass(s(r[`blob${BLOB.crawler}`])),
                 hits: num(r.hits),
               }),
             ),

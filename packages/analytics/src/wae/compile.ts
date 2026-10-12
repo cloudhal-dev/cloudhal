@@ -30,7 +30,12 @@ import { BLOB, DOUBLE } from "./layout.ts";
 
 export const DATASET_RE = /^[a-z0-9_]+$/;
 
-const DIM_SLOT: Record<Dimension, string> = {
+/**
+ * The column of each dimension. Dimension columns are selected **without an alias**: the Analytics
+ * SQL API answers "column `<alias>` not found" when a grouped column is aliased and then used in
+ * ORDER BY (verified live 2026-10-12), so rows come back keyed by the column name itself.
+ */
+export const DIM_SLOT: Record<Dimension, string> = {
   node: `blob${BLOB.nodeId}`,
   refHost: `blob${BLOB.refHost}`,
   channel: `blob${BLOB.channel}`,
@@ -142,7 +147,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
       return {
         range,
         query: [
-          `SELECT ${col} AS key, COUNT(*) AS pageviews, ${visits}`,
+          `SELECT ${col}, COUNT(*) AS pageviews, ${visits}`,
           from,
           ...where(q.siteId, "pageview", range, q.filter),
           `  AND ${col} != ''`,
@@ -157,7 +162,8 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
       const cols = VITALS_METRICS.flatMap((metric) => {
         const x = `double${VITALS_SLOT[metric]}`;
         return [
-          `  quantileWeighted(0.75, ${x}, if(${x} >= 0, ${w9}, 0)) AS ${metric}_p75`,
+          // The weight must be an integer: a Float64 weight next to the literal 0 is a type error there.
+          `  quantileWeighted(0.75, ${x}, if(${x} >= 0, toUInt32(${w9}), 0)) AS ${metric}_p75`,
           `  sumIf(${w9}, ${x} >= 0) AS ${metric}_samples`,
           `  sumIf(${w9}, ${x} >= 0 AND ${x} <= ${slotThreshold(metric, "good")}) AS ${metric}_good`,
           `  sumIf(${w9}, ${x} > ${slotThreshold(metric, "poor")}) AS ${metric}_poor`,
@@ -181,7 +187,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
         return {
           range,
           query: [
-            `SELECT blob${BLOB.path} AS path, ${status} AS status, blob${BLOB.refPath} AS refPath, ${hits}, APPROX_MAX(timestamp) AS lastSeen`,
+            `SELECT blob${BLOB.path}, ${status}, blob${BLOB.refPath}, ${hits}, APPROX_MAX(timestamp) AS lastSeen`,
             from,
             ...w,
             `  AND ${status} >= 400`,
@@ -194,7 +200,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
         return {
           range,
           query: [
-            `SELECT blob${BLOB.path} AS path, ${status} AS status, blob${BLOB.redirectTo} AS redirectTo, blob${BLOB.nodeId} AS nodeId, ${hits}`,
+            `SELECT blob${BLOB.path}, ${status}, blob${BLOB.redirectTo}, blob${BLOB.nodeId}, ${hits}`,
             from,
             ...w,
             `  AND ${status} >= 300 AND ${status} < 400 AND blob${BLOB.redirectTo} != ''`,
@@ -206,7 +212,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
       return {
         range,
         query: [
-          `SELECT blob${BLOB.crawler} AS crawler, ${hits}`,
+          `SELECT blob${BLOB.crawler}, ${hits}`,
           from,
           ...w,
           `  AND blob${BLOB.crawler} != ''`,
