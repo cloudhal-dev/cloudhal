@@ -151,6 +151,7 @@ export function RedirectsPage() {
           ]}
         />
       }
+      icon={<Signpost size={24} />}
       title={t("pageHeaders.redirects.title")}
       description={t("pageHeaders.redirects.description")}
       actions={newButton}

@@ -161,6 +161,7 @@ export function SnapshotsPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.snapshots.title") }]} />}
+      icon={<Camera size={24} />}
       title={t("pageHeaders.snapshots.title")}
       description={t("pageHeaders.snapshots.description")}
       actions={createButton}

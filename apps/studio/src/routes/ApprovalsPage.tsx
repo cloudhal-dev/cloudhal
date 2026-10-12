@@ -614,6 +614,7 @@ export function ApprovalsPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.approvals.title") }]} />}
+      icon={<HandPalm size={24} />}
       title={t("pageHeaders.approvals.title")}
       description={t("pageHeaders.approvals.description")}
       actions={

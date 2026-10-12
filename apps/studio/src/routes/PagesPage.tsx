@@ -99,6 +99,7 @@ export function PagesPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.pages.title") }]} />}
+      icon={<FileText size={24} />}
       title={t("pageHeaders.pages.title")}
       description={t("pageHeaders.pages.description")}
       actions={newButton}

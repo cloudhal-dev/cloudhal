@@ -237,6 +237,8 @@ export {
   PageLayout,
   type PageLayoutProps,
   type PageWidth,
+  usePageScrollRoot,
+  usePageScrollRootRef,
 } from "./blocks/PageLayout.tsx";
 export {
   PREVIEW_DEVICE_WIDTH,

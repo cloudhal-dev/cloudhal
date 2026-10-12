@@ -1050,6 +1050,7 @@ export function NavigationPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.navigation.title") }]} />}
+      icon={<TreeStructure size={24} />}
       title={t("pageHeaders.navigation.title")}
       description={t("pageHeaders.navigation.description")}
       actions={loading ? undefined : header}

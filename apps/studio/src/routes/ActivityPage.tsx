@@ -75,6 +75,7 @@ export function ActivityPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.activity.title") }]} />}
+      icon={<ClockCounterClockwise size={24} />}
       title={t("pageHeaders.activity.title")}
       description={t("pageHeaders.activity.description")}
     >

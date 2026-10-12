@@ -3,3 +3,8 @@
 @import "tailwindcss";
 @source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @source "./";
+
+/* Scrolling inside the sidebar never carries on into the page behind it (no jump at its end). */
+[data-sidebar="viewport"] {
+  overscroll-behavior: contain;
+}

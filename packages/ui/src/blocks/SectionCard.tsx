@@ -66,7 +66,9 @@ export function SectionCard({
           </div>
         ) : (
           children !== undefined && (
-            <div className="grid min-w-0 gap-5 px-5 pt-4 pb-5">{children}</div>
+            // `grid-cols-1` (minmax(0, 1fr)): a long unbreakable value (an id, a URL) wraps or
+            // truncates inside the card instead of widening it past a phone's screen.
+            <div className="grid min-w-0 grid-cols-1 gap-5 px-5 pt-4 pb-5">{children}</div>
           )
         )}
         {footer && (

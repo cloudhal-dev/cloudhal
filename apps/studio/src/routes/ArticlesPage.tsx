@@ -180,6 +180,7 @@ export function ArticlesPage() {
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.articles.title") }]} />}
+      icon={<Article size={24} />}
       title={t("pageHeaders.articles.title")}
       description={t("pageHeaders.articles.description")}
       actions={newButton}

@@ -1,19 +1,81 @@
-import {
-  Columns,
-  SectionCard,
-  TableOfContents,
-  Text,
-  useTableOfContentsActiveId,
-} from "@cloudhal/ui";
-import { type ReactNode, useEffect } from "react";
+import { Columns, SectionCard, TableOfContents, Text, usePageScrollRoot } from "@cloudhal/ui";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 export interface SettingsNavItem {
   id: string;
   label: string;
 }
 
-/** Sticky top bar (h-12) plus breathing room, so a section never hides under it. */
-const HEADER_OFFSET = 72;
+/**
+ * Where a section counts as "current", from the top of the scrolling column: below the sticky top
+ * bar (h-12) and below where a jump lands a card (`SectionCard` is `scroll-mt-20`).
+ */
+const ACTIVE_LINE = 96;
+
+/** Input that means the person is scrolling themselves (a jump's smooth scroll sends none). */
+const MANUAL_SCROLL_EVENTS = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+
+/**
+ * Scrollspy for the settings table of contents, on the shell's scrolling column (Kumo's
+ * `useTableOfContentsActiveId` watches the window, which never scrolls here). The current section
+ * is the last one whose top passed the line; at the end of the page — where short last sections
+ * can never reach it — the last section is current. A click pins its section until the person
+ * scrolls again, so a jump to a short section near the end doesn't snap back to its neighbour.
+ */
+function useSectionSpy(ids: string[]) {
+  const root = usePageScrollRoot();
+  const [activeId, setActiveId] = useState<string>();
+  const pinned = useRef(false);
+  const idsKey = ids.join("\0");
+  useEffect(() => {
+    const sectionIds = idsKey.split("\0");
+    const target: HTMLElement | Window = root ?? window;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      if (pinned.current) return;
+      const sections = sectionIds
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => el !== null);
+      const last = sections.at(-1);
+      if (!last) return;
+      const top = root ? root.getBoundingClientRect().top : 0;
+      const scrollTop = root ? root.scrollTop : window.scrollY;
+      const visible = root ? root.clientHeight : window.innerHeight;
+      const height = root ? root.scrollHeight : document.documentElement.scrollHeight;
+      if (scrollTop > 0 && scrollTop + visible >= height - 2) {
+        setActiveId(last.id);
+        return;
+      }
+      let current = sections[0]?.id;
+      for (const el of sections)
+        if (el.getBoundingClientRect().top - top <= ACTIVE_LINE) current = el.id;
+      setActiveId(current);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const release = () => {
+      pinned.current = false;
+    };
+    measure();
+    target.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    for (const type of MANUAL_SCROLL_EVENTS)
+      target.addEventListener(type, release, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      target.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      for (const type of MANUAL_SCROLL_EVENTS) target.removeEventListener(type, release);
+    };
+  }, [root, idsKey]);
+  const selectSection = useCallback((id: string) => {
+    pinned.current = true;
+    setActiveId(id);
+  }, []);
+  return { activeId, selectSection };
+}
 
 /**
  * Settings template (DESIGN.md §2c): `Columns variant="1-2"` — a fixed 13rem sticky
@@ -30,15 +92,13 @@ export function SettingsLayout({
   sections: SettingsNavItem[];
   children: ReactNode;
 }) {
-  const { activeId, selectSection } = useTableOfContentsActiveId({
-    ids: sections.map((s) => s.id),
-    offset: HEADER_OFFSET,
-  });
+  const { activeId, selectSection } = useSectionSpy(sections.map((s) => s.id));
   const current = activeId ?? sections[0]?.id;
   // A deep link (`…/settings#domains`) lands on its section once the cards have laid out.
   useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id || !sections.some((s) => s.id === id)) return;
+    selectSection(id);
     const timer = window.setTimeout(
       () => document.getElementById(id)?.scrollIntoView({ block: "start" }),
       150,
