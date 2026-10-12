@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useT } from "../i18n/index.tsx";
-import { type Ability, api, isNotEnabled, type Me, type Role } from "../lib/api.ts";
+import { type Ability, api, isNotEnabled, listOf, type Me, type Role } from "../lib/api.ts";
 import { inviteRules, minimumRole, type RoleRules, roleRules, type Self } from "../lib/roles.ts";
 
 export const ME_KEY = ["me"] as const;
@@ -96,7 +96,7 @@ export function useMembers(enabled = true) {
 export function useMemberRoles(): Map<string, Role> {
   const members = useMembers();
   return useMemo(
-    () => new Map((members.data ?? []).map((m) => [m.actorId, m.role])),
+    () => new Map(listOf(members.data).map((m) => [m.actorId, m.role])),
     [members.data],
   );
 }
@@ -113,7 +113,11 @@ export function useSelf(): Self {
   return useMemo(
     () => ({
       actorId: me?.actor.id,
-      agentIds: new Set((keys.data ?? []).map((k) => k.agentId).filter((id): id is string => !!id)),
+      agentIds: new Set(
+        listOf(keys.data)
+          .map((k) => k.agentId)
+          .filter((id): id is string => !!id),
+      ),
     }),
     [me?.actor.id, keys.data],
   );

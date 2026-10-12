@@ -56,6 +56,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+/**
+ * `value` when the server answered a list, else none. A misrouted server can answer 200 with
+ * something else (the Studio's HTML page, an error object), which must not crash every screen.
+ */
+export function listOf<T>(value: readonly T[] | null | undefined): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 const json = (data: unknown) => ({ body: JSON.stringify(data) });
 
 /** Builds `?a=1&b=2` from the values that are set (empty string when none are). */
@@ -1111,7 +1119,7 @@ export const api = {
   instance: () => request<InstanceInfo>("/api/instance"),
   members: {
     /** Everyone with a membership; `email` only for `members:manage`. 404 on servers without roles. */
-    list: () => request<{ items: Member[] }>("/api/members").then((r) => r.items),
+    list: () => request<{ items: Member[] }>("/api/members").then((r) => listOf<Member>(r?.items)),
     /** 403 `rank` (`details.problem`), 409 `conflict` when the member changed meanwhile. */
     setRole: (userId: string, role: Role) =>
       request<{ member: Member; keysNarrowed: KeyNarrowing[] }>(
@@ -1461,9 +1469,10 @@ export const api = {
       ),
   },
   agentKeys: {
-    list: () => request<AgentKeySummary[]>("/api/agent-keys"),
+    list: () => request<AgentKeySummary[]>("/api/agent-keys").then(listOf<AgentKeySummary>),
     /** Every key with its `owner` (`agents:manage`, Administrators). */
-    listAll: () => request<AgentKeySummary[]>("/api/agent-keys?all=1"),
+    listAll: () =>
+      request<AgentKeySummary[]>("/api/agent-keys?all=1").then(listOf<AgentKeySummary>),
     /** Without `scopes` the server grants what the mode needs (`scopesForMode`). */
     create: (input: { name: string; mode?: KeyMode; scopes?: AgentScope[] }) =>
       request<CreatedAgentKey>("/api/agent-keys", { method: "POST", ...json(input) }),
