@@ -1,6 +1,6 @@
 import { Button, cn, DateRangePicker, Popover, Switch, Tabs, Text } from "@cloudflare/kumo";
 import { CalendarBlank } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import {
   ANALYTICS_RANGE_PRESETS,
   type AnalyticsRange,
@@ -46,6 +46,8 @@ export interface AnalyticsRangePickerProps {
   /** Compare with the previous period of the same length. */
   compare?: boolean;
   onCompareChange?: (compare: boolean) => void;
+  /** Controls that belong with the range (the screen's refresh button); they wrap with it on phones. */
+  trailing?: ReactNode;
   className?: string;
 }
 
@@ -66,6 +68,7 @@ export function AnalyticsRangePicker({
   presets = ANALYTICS_RANGE_PRESETS,
   compare,
   onCompareChange,
+  trailing,
   className,
 }: AnalyticsRangePickerProps) {
   const fmt = useMemo(() => createAnalyticsFormatter(locale), [locale]);
@@ -133,6 +136,9 @@ export function AnalyticsRangePicker({
               key={round}
               size="sm"
               variant="subtle"
+              // Two months side by side need ~380 px: below `sm` they stack, so the popover fits a
+              // phone without scrolling sideways (the scroller above stays as a last resort).
+              className="max-sm:[&>div:first-child]:flex-col"
               timezone={labels.timezone}
               onStartDateChange={setStart}
               onEndDateChange={setEnd}
@@ -179,6 +185,7 @@ export function AnalyticsRangePicker({
           onCheckedChange={(checked: boolean) => onCompareChange(checked)}
         />
       )}
+      {trailing}
     </fieldset>
   );
 }

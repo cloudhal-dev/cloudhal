@@ -223,8 +223,8 @@ export interface StatTileGroupProps {
 
 /**
  * Lays out `StatTile`s as a description list in a container-query grid: two columns, then three
- * or four in one row once the container has room for them — never an orphan tile on a row of
- * its own at the widths Studio uses.
+ * or four in one row once the container has room for them. While three tiles share two columns
+ * the third spans both, so no tile is left alone on half a row.
  */
 export function StatTileGroup({
   label,
@@ -240,7 +240,9 @@ export function StatTileGroup({
         data-stat-count={count}
         className={cn(
           "grid min-w-0 grid-cols-2 gap-3",
-          density === "base" && count === 3 && "@lg:grid-cols-3",
+          density === "base" &&
+            count === 3 &&
+            "@lg:grid-cols-3 [&>:nth-child(3)]:col-span-2 @lg:[&>:nth-child(3)]:col-span-1",
           density === "base" && count >= 4 && "@2xl:grid-cols-4",
           className,
         )}

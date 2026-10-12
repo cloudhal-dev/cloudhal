@@ -13,7 +13,8 @@
       "!**/dist",
       "!**/target",
       "!**/.turbo",
-      "!**/node_modules"
+      "!**/node_modules",
+      "!apps/studio/src/assets/geo"
     ]
   },
   "formatter": {

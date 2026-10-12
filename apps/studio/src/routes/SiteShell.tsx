@@ -3,6 +3,7 @@ import {
   Article,
   CalendarDots,
   Camera,
+  ChartLine,
   ClockCounterClockwise,
   FileText,
   GearSix,
@@ -93,6 +94,11 @@ export function SiteShell() {
       id: "overview",
       label: t("commands.goOverview"),
       run: () => navigate({ to: "/sites/$siteId", params: { siteId } }),
+    },
+    {
+      id: "analytics",
+      label: t("analytics.nav.command"),
+      run: () => navigate({ to: "/sites/$siteId/analytics", params: { siteId } }),
     },
     {
       id: "pages",
@@ -198,6 +204,14 @@ export function SiteShell() {
                 tooltip={t("nav.home")}
               >
                 {t("nav.home")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
+                icon={ChartLine}
+                href={`${base}/analytics`}
+                active={is(`${base}/analytics`)}
+                tooltip={t("analytics.nav.label")}
+              >
+                {t("analytics.nav.label")}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
