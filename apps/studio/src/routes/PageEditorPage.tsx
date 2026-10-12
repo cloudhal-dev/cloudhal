@@ -49,6 +49,7 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { ImageRefField } from "../components/MediaPicker.tsx";
 import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
+import { ReadersCard } from "../components/Readers.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -537,6 +538,7 @@ export function PageEditorPage() {
         }
         aside={
           <>
+            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="page" />
             <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
             <DetailsCard
               rows={[
