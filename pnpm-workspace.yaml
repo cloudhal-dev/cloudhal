@@ -64,3 +64,6 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - "@cloudflare/workers-types@5.20261007.1"
+
+patchedDependencies:
+  '@cloudflare/kumo@2.14.0': patches/@cloudflare__kumo@2.14.0.patch

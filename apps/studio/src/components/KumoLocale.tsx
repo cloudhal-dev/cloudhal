@@ -6,8 +6,9 @@ import { useT } from "../i18n/index.tsx";
  * Kumo's own words in the Studio language (DESIGN.md §2v, "Kumo locale"). Kumo 2.14's
  * `KumoLocaleProvider` translates only `LayerDialog`'s close button and its dismiss action
  * ("Close", "Cancel"); explicit `closeLabel`/`dismissLabel` props still win. Calendars, chart
- * tooltips and the map legend have no locale hook yet — the analytics blocks pass `Intl`
- * formatters where Kumo takes them. Sits inside `I18nProvider`, so a language switch follows.
+ * tooltips and the map legend are localised per component instead (`calendarLocaleProps`, the
+ * analytics blocks' labels and `Intl` formatters, one Kumo patch). Sits inside `I18nProvider`, so
+ * a language switch follows.
  */
 export function KumoLocale({ children }: { children: ReactNode }) {
   const t = useT();

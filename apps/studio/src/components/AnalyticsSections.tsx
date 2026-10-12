@@ -914,6 +914,8 @@ export function CountriesCard({ scope, total }: { scope: AnalyticsScope; total?:
             value: t("analytics.metrics.pageviews"),
             share: t("analytics.columns.share"),
             other: t("analytics.countries.other"),
+            high: t("analytics.countries.high"),
+            low: t("analytics.countries.low"),
           }}
           empty={
             <SectionEmpty

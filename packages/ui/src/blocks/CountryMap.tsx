@@ -21,6 +21,9 @@ export interface CountryMapLabels extends CountryNameLabels {
   share: string;
   /** The folded remainder of the table ("Other countries"). */
   other: string;
+  /** The ends of the map's colour legend ("High", "Low"). */
+  high: string;
+  low: string;
 }
 
 export interface CountryMapProps {
@@ -76,7 +79,13 @@ export function CountryMap({
 }: CountryMapProps) {
   const fmt = useMemo(() => createAnalyticsFormatter(locale), [locale]);
   const palette = useChartPalette();
-  const frameRef = useChartFrame();
+  // Kumo 2.14 writes "High"/"Low" into the legend and has no prop for it; ECharts merges this
+  // after Kumo's own options on every render (useChartFrame), so the legend speaks the locale.
+  const legend = useMemo(
+    () => ({ visualMap: { text: [labels.high, labels.low] } }),
+    [labels.high, labels.low],
+  );
+  const frameRef = useChartFrame(legend);
   const names = useMemo<CountryNameLabels>(
     () => ({ unknown: labels.unknown, tor: labels.tor }),
     [labels.unknown, labels.tor],

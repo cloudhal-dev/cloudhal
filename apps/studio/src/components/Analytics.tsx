@@ -146,7 +146,16 @@ export function useAnalyticsText() {
       customTitle: t("analytics.range.customTitle"),
       apply: t("analytics.range.apply"),
       cancel: t("common.cancel"),
-      timezone: t("analytics.utc"),
+      timezone: t("analytics.range.timezone"),
+      calendar: {
+        previousMonth: t("analytics.range.previousMonth"),
+        nextMonth: t("analytics.range.nextMonth"),
+        navigation: t("analytics.range.months"),
+        day: (date, { today, selected }) => {
+          const named = selected ? t("analytics.range.daySelected", { date }) : date;
+          return today ? t("analytics.range.dayToday", { date: named }) : named;
+        },
+      },
       pickHint: t("analytics.range.pickHint"),
       tooLong: t("analytics.range.tooLong"),
       compare: t("analytics.range.compare"),
@@ -157,6 +166,7 @@ export function useAnalyticsText() {
       showTable: t("analytics.chart.showTable"),
       showChart: t("analytics.chart.showChart"),
       time: t("analytics.chart.time"),
+      loading: t("common.loading"),
     });
     const breakdown = (item: string, value: string, extra: Partial<BreakdownLabels> = {}) => ({
       item,

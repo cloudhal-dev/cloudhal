@@ -30,6 +30,8 @@ export interface AnalyticsTimeseriesLabels {
   showChart: string;
   /** The table's time column ("Time (UTC)"). */
   time: string;
+  /** Announced while the series load ("Loading…"); Kumo's own loader would say "Loading chart". */
+  loading: string;
 }
 
 export interface AnalyticsTimeseriesProps {
@@ -54,9 +56,10 @@ export interface AnalyticsTimeseriesProps {
 }
 
 /**
- * Kumo's tooltip prints times in the browser's zone, but buckets are UTC. Shifting each instant
- * by the local offset makes the chart's local wall clock read UTC, so the tooltip, the axis and
- * the day boundaries agree with the "Times in UTC" footer. Ticks are formatted back in UTC.
+ * Kumo's time axis works in the browser's zone, but buckets are UTC. Shifting each instant by the
+ * local offset makes the chart's local wall clock read UTC, so the axis and the day boundaries
+ * agree with the "Times in UTC" footer. Ticks and the tooltip's time are formatted back in UTC,
+ * in the Studio locale (`tooltipTimestampFormat` comes from Cloudhal's Kumo patch, DESIGN.md §2v).
  */
 const toChartTime = (ms: number) => ms + new Date(ms).getTimezoneOffset() * 60_000;
 const fromChartTime = (ms: number) => ms - new Date(ms).getTimezoneOffset() * 60_000;
@@ -146,27 +149,37 @@ export function AnalyticsTimeseries({
           {view === "chart" ? labels.showTable : labels.showChart}
         </Button>
       </div>
+      {view === "chart" && loading ? (
+        <span role="status" className="sr-only">
+          {labels.loading}
+        </span>
+      ) : null}
       {view === "chart" ? (
-        <TimeseriesChart
-          echarts={echarts}
-          type={type}
-          data={data}
-          gradient={type === "line"}
-          height={height}
-          isDarkMode={palette.isDarkMode}
-          loading={loading}
-          yAxisMinInterval={1}
-          {...(compact ? { yAxisTickCount: 2, xAxisTickCount: 3 } : {})}
-          xAxisTickFormat={(ms) => fmt.tick(fromChartTime(ms), granularity)}
-          yAxisTickFormat={(v) => fmt.compact(v)}
-          tooltipValueFormat={(v) => fmt.number(v)}
-          tooltipFooter={labels.timezone}
-          tooltipFollowCursor="x"
-          {...(partialFrom !== undefined
-            ? { incomplete: { after: toChartTime(partialFrom) } }
-            : {})}
-          ariaDescription={labels.description}
-        />
+        // While loading, Kumo's skeleton announces "Loading chart" in English: it is hidden from
+        // assistive technology and the status above speaks instead.
+        <div aria-hidden={loading || undefined} className="min-w-0">
+          <TimeseriesChart
+            echarts={echarts}
+            type={type}
+            data={data}
+            gradient={type === "line"}
+            height={height}
+            isDarkMode={palette.isDarkMode}
+            loading={loading}
+            yAxisMinInterval={1}
+            {...(compact ? { yAxisTickCount: 2, xAxisTickCount: 3 } : {})}
+            xAxisTickFormat={(ms) => fmt.tick(fromChartTime(ms), granularity)}
+            yAxisTickFormat={(v) => fmt.compact(v)}
+            tooltipValueFormat={(v) => fmt.number(v)}
+            tooltipTimestampFormat={(ms) => fmt.bucket(fromChartTime(ms), granularity)}
+            tooltipFooter={labels.timezone}
+            tooltipFollowCursor="x"
+            {...(partialFrom !== undefined
+              ? { incomplete: { after: toChartTime(partialFrom) } }
+              : {})}
+            ariaDescription={labels.description}
+          />
+        </div>
       ) : null}
       <section
         id={tableId}

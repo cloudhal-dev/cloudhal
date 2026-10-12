@@ -159,6 +159,7 @@ export function ReadersCard({ siteId, node, kind }: ReadersCardProps) {
                 showTable: t("readers.chart.showTable"),
                 showChart: t("readers.chart.showChart"),
                 time: t("readers.chart.time"),
+                loading: t("common.loading"),
               },
               channels: t("readers.channelsLabel"),
               other: t("readers.other"),
@@ -338,6 +339,7 @@ export function OverviewAnalyticsCard({ siteId }: { siteId: string }) {
               showTable: t("readers.chart.showTable"),
               showChart: t("readers.chart.showChart"),
               time: t("readers.chart.time"),
+              loading: t("common.loading"),
             }}
             loading={loading}
           />
