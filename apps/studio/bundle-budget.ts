@@ -1,0 +1,119 @@
+import { gzipSync } from "node:zlib";
+import type { Plugin } from "vite";
+
+/**
+ * The initial-load budget of Studio: the entry chunk and every chunk it imports statically (what
+ * `index.html` loads and modulepreloads before any screen). `vite build` fails when it is over
+ * budget or when analytics-only code ends up in it — analytics blocks, ECharts and its Kumo
+ * wrappers belong to the lazy Analytics route and the lazy Readers charts (RFC-0006 §10.4).
+ *
+ * Raise a budget only with a reason in the commit (a dependency every screen needs); first check
+ * whether the new code can load with the screen that uses it.
+ */
+export const BUNDLE_BUDGET = {
+  /** The entry chunk alone, minified bytes. */
+  entryBytes: 280_000,
+  /** Entry + its static imports, gzip bytes. */
+  initialGzipBytes: 480_000,
+};
+
+/** Modules that must never be in the initial load (analytics-only, loaded by lazy routes). */
+export const LAZY_ONLY: readonly RegExp[] = [
+  /[\\/]node_modules[\\/].*[\\/](echarts|zrender)[\\/]/,
+  /[\\/]@cloudflare[\\/]kumo[\\/]dist[\\/]chunks[\\/](chart|date-range-picker)-/,
+  /[\\/]packages[\\/]ui[\\/]src[\\/]charts\.ts$/,
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|charts|useChartFrame|useChartPalette)\.tsx?$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
+];
+
+/** The part of a Rollup/Rolldown output chunk the check reads. */
+export interface BudgetChunk {
+  type: "chunk" | "asset";
+  fileName: string;
+  isEntry?: boolean;
+  imports?: string[];
+  code?: string;
+  moduleIds?: readonly string[];
+}
+
+export interface BudgetReport {
+  entry: string;
+  entryBytes: number;
+  initial: { fileName: string; bytes: number; gzipBytes: number }[];
+  initialBytes: number;
+  initialGzipBytes: number;
+  problems: string[];
+}
+
+/** Measures the initial load of a bundle and lists what breaks the budget. */
+export function checkBundleBudget(
+  bundle: Record<string, BudgetChunk>,
+  budget = BUNDLE_BUDGET,
+  lazyOnly = LAZY_ONLY,
+): BudgetReport {
+  const entries = Object.values(bundle).filter((c) => c.type === "chunk" && c.isEntry);
+  if (entries.length !== 1) throw new Error(`expected one entry chunk, found ${entries.length}`);
+  const entry = entries[0] as BudgetChunk;
+  const seen = new Set<string>();
+  const visit = (fileName: string) => {
+    if (seen.has(fileName)) return;
+    seen.add(fileName);
+    for (const next of bundle[fileName]?.imports ?? []) visit(next);
+  };
+  visit(entry.fileName);
+
+  const problems: string[] = [];
+  const initial = [...seen].map((fileName) => {
+    const code = bundle[fileName]?.code ?? "";
+    for (const id of bundle[fileName]?.moduleIds ?? []) {
+      if (lazyOnly.some((re) => re.test(id))) problems.push(`${fileName} contains ${id}`);
+    }
+    return {
+      fileName,
+      bytes: Buffer.byteLength(code),
+      gzipBytes: gzipSync(code).length,
+    };
+  });
+  const entryBytes = Buffer.byteLength(entry.code ?? "");
+  const initialBytes = initial.reduce((n, c) => n + c.bytes, 0);
+  const initialGzipBytes = initial.reduce((n, c) => n + c.gzipBytes, 0);
+  if (entryBytes > budget.entryBytes)
+    problems.push(
+      `entry chunk ${entry.fileName} is ${entryBytes} B (budget ${budget.entryBytes} B)`,
+    );
+  if (initialGzipBytes > budget.initialGzipBytes)
+    problems.push(
+      `initial load is ${initialGzipBytes} B gzip (budget ${budget.initialGzipBytes} B) in ${initial.length} chunks`,
+    );
+  return {
+    entry: entry.fileName,
+    entryBytes,
+    initial,
+    initialBytes,
+    initialGzipBytes,
+    problems,
+  };
+}
+
+/** Fails `vite build` when the initial load breaks {@link BUNDLE_BUDGET} or {@link LAZY_ONLY}. */
+export function bundleBudget(): Plugin {
+  return {
+    name: "cloudhal:bundle-budget",
+    apply: "build",
+    enforce: "post",
+    // After Vite has filled in the preload lists: the chunks as they are written.
+    writeBundle(_options, bundle) {
+      const report = checkBundleBudget(bundle as unknown as Record<string, BudgetChunk>);
+      const kb = (n: number) => `${(n / 1000).toFixed(1)} kB`;
+      this.info(
+        `initial load: entry ${kb(report.entryBytes)}, ${report.initial.length} chunks, ` +
+          `${kb(report.initialBytes)} (gzip ${kb(report.initialGzipBytes)})`,
+      );
+      if (report.problems.length > 0)
+        this.error(
+          `Studio bundle budget (apps/studio/bundle-budget.ts):\n  ${report.problems.join("\n  ")}`,
+        );
+    },
+  };
+}

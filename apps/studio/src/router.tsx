@@ -8,7 +8,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { RouteError, RoutePending } from "./components/RouteStates.tsx";
-import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics.ts";
+import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
 import { authClient } from "./lib/auth.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";

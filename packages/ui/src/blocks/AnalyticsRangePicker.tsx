@@ -1,17 +1,17 @@
 import { Button, cn, DateRangePicker, Popover, Switch, Tabs, Text } from "@cloudflare/kumo";
 import { CalendarBlank } from "@phosphor-icons/react";
 import { type ReactNode, useMemo, useState } from "react";
+import { createAnalyticsFormatter } from "./analytics-format.ts";
 import {
   ANALYTICS_RANGE_PRESETS,
   type AnalyticsRange,
   type AnalyticsRangePreset,
   addDays,
-  createAnalyticsFormatter,
   isAnalyticsRangePreset,
   isValidCustomRange,
   MAX_RANGE_DAYS,
   pickedDay,
-} from "./analytics-format.ts";
+} from "./analytics-range.ts";
 
 export interface AnalyticsRangePickerLabels {
   /** Accessible name of the whole control ("Date range"). */

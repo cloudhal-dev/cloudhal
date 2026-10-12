@@ -1,11 +1,8 @@
 import { Button, ChartLegend, cn, Table, Text, TimeseriesChart } from "@cloudflare/kumo";
 import { ChartLine, Table as TableIcon } from "@phosphor-icons/react";
 import { useId, useMemo, useState } from "react";
-import {
-  type AnalyticsGranularity,
-  createAnalyticsFormatter,
-  currentBucketStart,
-} from "./analytics-format.ts";
+import { createAnalyticsFormatter } from "./analytics-format.ts";
+import { type AnalyticsGranularity, currentBucketStart } from "./analytics-range.ts";
 import { echarts } from "./charts.ts";
 import { useChartFrame } from "./useChartFrame.ts";
 import { useChartPalette } from "./useChartPalette.ts";

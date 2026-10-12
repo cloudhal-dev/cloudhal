@@ -9,6 +9,10 @@
     "directory": "packages/ui"
   },
   "type": "module",
+  "sideEffects": [
+    "./src/blocks/charts.ts",
+    "*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./code": "./src/code.ts",
