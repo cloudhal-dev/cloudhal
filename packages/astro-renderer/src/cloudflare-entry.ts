@@ -21,6 +21,12 @@
  *   pages get the `/_cloudhal/p.<hash>.js` tag while the site's setting is on (it sits in the cached
  *   HTML, so a settings change purges); responses the Worker renders become `render` events. All of
  *   it is off without `CLOUDHAL_ANALYTICS=on` and the binding (`analytics.ts`).
+ * - Reader comments (RFC-0007 §6, §15.2): `GET /__cloudhal/comments/challenge`,
+ *   `POST /__cloudhal/comments` and `POST /__cloudhal/comments/report` are answered here, before
+ *   Astro and never cached (`comments.ts`), with `CF-Connecting-IP` as the client address. Pages
+ *   render the section themselves (`loadComments`, `<Comments />`) and set their own CSP when an
+ *   open form uses Turnstile; `withSecurityHeaders` keeps it. All of it is off without a usable
+ *   `CLOUDHAL_COMMENTS_KEY` (or when the build has no comments module).
  */
 
 import { cache } from "cloudflare:workers";
@@ -33,6 +39,7 @@ import {
   resetSource,
   serveMedia,
 } from "@cloudhal/astro-renderer/runtime";
+import { SqlCommentStore } from "@cloudhal/comments/sql";
 import {
   ANALYTICS_BEACON_PATH,
   deploymentDefaults,
@@ -40,6 +47,8 @@ import {
   SiteAnalytics,
 } from "./analytics.ts";
 import { isCloudhalCacheTag } from "./cache-tags.ts";
+import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments.ts";
+import { SITE_CSP } from "./csp.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 
 interface Env {
@@ -66,6 +75,17 @@ interface Env {
    * host. Requests that arrive on a `*.workers.dev` host are always accepted as the site's own.
    */
   CLOUDHAL_SITE_HOSTS?: string;
+  /**
+   * Reader comments (RFC-0007 §15.4): the deployment secret the comment keys are derived from
+   * (proof-of-work MACs, email encryption and hashes, stored owner secrets). Without it — or with
+   * fewer than 32 characters — comments are off: the endpoints answer `404`, pages show none.
+   */
+  CLOUDHAL_COMMENTS_KEY?: string;
+  /**
+   * Optional Workers Rate Limiting binding (`comments.rateLimit` in cloudhal.json, RFC-0007 §6.5):
+   * submissions per client across isolates, keyed by an HMAC under `CLOUDHAL_COMMENTS_KEY`.
+   */
+  COMMENTS_RL?: CommentsRateLimit;
   [binding: string]: unknown;
 }
 
@@ -100,6 +120,31 @@ class PendingWrites {
 
 const pendingWrites = new PendingWrites();
 let analytics: SiteAnalytics | undefined;
+let comments: SiteComments | undefined;
+
+/** One per isolate: keys, limits, today's count, replay cache, settings and pointer. */
+function siteComments(env: Env, siteId: string): SiteComments {
+  if (comments) return comments;
+  const { sql, site, snapshot } = analyticsBackend(siteId);
+  let store: SqlCommentStore | undefined;
+  comments = new SiteComments({
+    siteId,
+    secret: env.CLOUDHAL_COMMENTS_KEY,
+    // the integration built the module only when `comments.available` is not false
+    available: Boolean(config.commentsScript),
+    store: async () => {
+      store ??= new SqlCommentStore(sql());
+      return store;
+    },
+    site,
+    snapshot,
+    hosts: parseHosts(env.CLOUDHAL_SITE_HOSTS),
+    acceptRequestHost: (host) => host.endsWith(".workers.dev"),
+    rateLimit: env.COMMENTS_RL,
+    onError: (m, e) => console.error(m, e),
+  });
+  return comments;
+}
 
 /** One per isolate: settings, pointer, rate limits and the render sampler live as long as it does. */
 function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
@@ -167,8 +212,10 @@ async function purge(
   if (!expected || !timingSafeEqual(given, expected))
     return Response.json({ error: "unauthorized" }, { status: 401 });
   resetSource();
-  // A settings change purges the cache (RFC-0006 §9.2): re-read settings on the next request.
+  // A settings change purges the cache (RFC-0006 §9.2, RFC-0007 §8.3): re-read settings on the
+  // next request.
   analytics?.reset();
+  comments?.reset();
   const siteId = env.CLOUDHAL_SITE_ID ?? siteIdFromBuild;
   const tag = `${CACHE_TAG_PREFIX}${siteId}`;
   // `cache.purge` exists on Cloudflare; local workerd has no edge cache to purge.
@@ -195,7 +242,10 @@ async function purge(
         !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
       )
         return Response.json(
-          { error: "tags must be 1–100 cloudhal-site-/node-/term-/list-/media-/asset- cache tags" },
+          {
+            error:
+              "tags must be 1–100 cloudhal-site-/node-/term-/list-/media-/asset-/comments- cache tags",
+          },
           { status: 400 },
         );
       tags = body.tags as string[];
@@ -264,16 +314,6 @@ function keepPreviewInLinks(response: Response, token: string): Response {
 }
 
 /**
- * Defence in depth for content written by agents: no inline or third-party scripts, no plugins,
- * no foreign framing. The only client script a site ships of its own is Cloudhal's first-party
- * analytics script (hashed, served from `/_cloudhal/`, switchable off; RFC-0006 §0), which loads
- * from 'self' and posts to 'self', as Astro islands do.
- */
-// Not exported: every named export of a Worker entry module must be a handler or entrypoint.
-const SITE_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
-
-/**
  * Only a 200 page may sit in the edge cache (tagged, until the next publish). Anything else — a
  * 404 for a page that does not exist *yet*, a 503 before the first publish — must not be cached,
  * or it would outlive the publish that fixes it.
@@ -323,6 +363,18 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
         const answer = await a.beacon(request, clientIp ? { clientIp } : {});
         pendingWrites.flush(ctx);
         return answer;
+      }
+      // Reader comments (RFC-0007 §6.1): before Astro, never cached; `404` while comments are off.
+      if (isCommentsPath(url.pathname)) {
+        if (!siteId)
+          return Response.json(
+            { error: "not_found" },
+            { status: 404, headers: { "cache-control": "no-store" } },
+          );
+        // CF-Connecting-IP is set by Cloudflare's edge (a client's own value is overwritten).
+        return (await siteComments(env, siteId).handle(request, {
+          clientAddress: request.headers.get("cf-connecting-ip") ?? undefined,
+        })) as Response;
       }
       const started = Date.now();
       const media = siteId ? await serveMedia(request, { siteId }) : undefined;

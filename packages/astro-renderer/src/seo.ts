@@ -212,7 +212,8 @@ function termCrumbs(trail: readonly ShownTerm[], origin: string) {
  * `<head>` for an article (content entry). The summary is the description until entries get SEO
  * fields. With the entry's terms (`entryTaxonomy`), the primary category becomes the section
  * (`article:section`, `articleSection`, `about`, breadcrumb) and public tags the keywords; without
- * them (or for an un-migrated entry) the deprecated `tags` are the keywords.
+ * them (or for an un-migrated entry) the deprecated `tags` are the keywords. With reader comments
+ * (`commentsJsonLd`, RFC-0007 §8.1) the `BlogPosting` gains `commentCount` and the first comments.
  */
 export function entryHead(
   site: Site,
@@ -220,6 +221,7 @@ export function entryHead(
   origin: string,
   taxonomy: EntryTaxonomy = entryTaxonomy(undefined, entry),
   media?: MediaContext,
+  comments?: { readonly commentCount: number; readonly comment?: readonly object[] },
 ): HeadMeta {
   const url = `${origin}${entryPath(entry)}`;
   const description = clip(entry.summary);
@@ -278,6 +280,7 @@ export function entryHead(
         ...(keywords ? { keywords } : {}),
         author,
         publisher,
+        ...(comments ?? {}),
       },
       breadcrumbs([
         { name: site.name, url: `${origin}/` },

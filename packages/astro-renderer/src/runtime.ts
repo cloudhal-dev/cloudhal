@@ -1,3 +1,4 @@
+import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { SqlDriver } from "@cloudhal/storage";
@@ -112,6 +113,20 @@ export function analyticsBackend(
     site: async () => (await pending).store.getSite(siteId),
     snapshot: async (id) => (await pending).snapshot(id),
   };
+}
+
+/**
+ * The comment store for pages on Node (`cloudhal dev`; RFC-0007 §8.5): the local SQLite store.
+ * `undefined` when the integration did not build the comments module (static builds have no
+ * endpoint, or `comments.available: false`). Same name and shape as the `workerd` build, which
+ * reads D1 and also needs a usable `CLOUDHAL_COMMENTS_KEY`.
+ */
+export async function commentsBackend(
+  config: Partial<CloudhalRendererConfig>,
+): Promise<{ store: SqlCommentStore } | undefined> {
+  if (!config.commentsScript || !config.dataDir || config.comments?.available === false)
+    return undefined;
+  return { store: new SqlCommentStore((await localStore(config.dataDir)).sql) };
 }
 
 /** Shared with the `workerd` runtime so code importing either build sees the same names. */

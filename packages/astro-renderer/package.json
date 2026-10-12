@@ -34,7 +34,9 @@
     "./media-route": "./src/media-route.ts",
     "./media-middleware": "./src/media-middleware.ts",
     "./analytics": "./src/analytics.ts",
-    "./analytics-middleware": "./src/analytics-middleware.ts"
+    "./analytics-middleware": "./src/analytics-middleware.ts",
+    "./comments": "./src/comments-view.ts",
+    "./comments-middleware": "./src/comments-middleware.ts"
   },
   "files": [
     "dist",
@@ -51,7 +53,8 @@
     "@cloudhal/storage": "workspace:*",
     "marked": "catalog:",
     "@cloudhal/analytics": "workspace:*",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "@cloudhal/comments": "workspace:*"
   },
   "peerDependencies": {
     "astro": "^7.3.0",
@@ -168,6 +171,14 @@
       "./analytics-middleware": {
         "types": "./dist/src/analytics-middleware.d.ts",
         "default": "./dist/src/analytics-middleware.js"
+      },
+      "./comments": {
+        "types": "./dist/src/comments-view.d.ts",
+        "default": "./dist/src/comments-view.js"
+      },
+      "./comments-middleware": {
+        "types": "./dist/src/comments-middleware.d.ts",
+        "default": "./dist/src/comments-middleware.js"
       }
     }
   }
