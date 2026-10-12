@@ -193,6 +193,31 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
     expect((await asset(vitals as string)).status).toBe(200);
   });
 
+  it("serves the starter's favicon as a static asset: no render, no analytics event", async () => {
+    const html = await (await get("/about")).text();
+    expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="32x32">');
+    expect(html).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">');
+    await clear();
+    const server = (p: string) =>
+      harness.fetch(`https://edge.example${p}`, {
+        headers: { "user-agent": CHROME },
+      }) as unknown as Promise<Response>;
+    const ico = await server("/favicon.ico");
+    expect(ico.status).toBe(200);
+    expect(ico.headers.get("content-type")).toMatch(/icon/);
+    expect(new Uint8Array(await ico.arrayBuffer()).subarray(0, 4)).toEqual(
+      new Uint8Array([0, 0, 1, 0]),
+    );
+    const svg = await server("/favicon.svg");
+    expect(svg.status).toBe(200);
+    expect(svg.headers.get("content-type")).toContain("image/svg+xml");
+    expect(await svg.text()).toContain("<svg");
+    // A missing file does reach the Worker: its 404 is the only render event.
+    expect((await server("/favicon.png")).status).toBe(404);
+    const recorded = await events(1);
+    expect(recorded.map((e) => [e.kind, e.path])).toEqual([["render", "/favicon.png"]]);
+  });
+
   it("never tags previews or error pages", async () => {
     const token = await mintPreviewToken(PREVIEW_SECRET, { site: siteId, target: "live" });
     const preview = await get(`/about?cloudhal-preview=${token}`);

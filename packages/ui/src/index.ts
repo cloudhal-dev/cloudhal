@@ -3,6 +3,10 @@
  * Kumo components are re-exported as-is; Kumo *blocks* (copied via `kumo add`, owned here) and
  * Cloudhal blocks live in ./blocks. Blocks that draw with ECharts (analytics charts and the
  * country map) live in the separate `@cloudhal/ui/charts` entry so only lazy routes load ECharts.
+ *
+ * `package.json` declares `sideEffects` (the CSS and the ECharts registration in blocks/charts.ts
+ * only), so a bundler keeps just the blocks a chunk uses: a block every screen does not need stays
+ * out of Studio's initial load. Keep blocks free of top-level side effects, or list them there.
  */
 export * from "@cloudflare/kumo";
 export {
@@ -34,18 +38,21 @@ export {
 export { AuthLayout, type AuthLayoutProps } from "./blocks/AuthLayout.tsx";
 export { Avatar, type AvatarProps, type AvatarSize } from "./blocks/Avatar.tsx";
 export {
-  ANALYTICS_RANGE_PRESETS,
   type AnalyticsFormatter,
+  type CountryNameLabels,
+  compareValues,
+  createAnalyticsFormatter,
+  type DeltaTone,
+  FLAT_WITHIN,
+  type StatDelta,
+} from "./blocks/analytics-format.ts";
+export {
+  ANALYTICS_RANGE_PRESETS,
   type AnalyticsGranularity,
   type AnalyticsRange,
   type AnalyticsRangePreset,
   addDays,
-  type CountryNameLabels,
-  compareValues,
-  createAnalyticsFormatter,
   currentBucketStart,
-  type DeltaTone,
-  FLAT_WITHIN,
   isAnalyticsRangePreset,
   isoDay,
   isValidCustomRange,
@@ -54,8 +61,7 @@ export {
   previousAnalyticsRange,
   type ResolvedAnalyticsRange,
   resolveAnalyticsRange,
-  type StatDelta,
-} from "./blocks/analytics-format.ts";
+} from "./blocks/analytics-range.ts";
 export {
   type BreakdownLabels,
   BreakdownMeters,

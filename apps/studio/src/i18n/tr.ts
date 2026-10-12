@@ -515,6 +515,10 @@ export const tr: Messages = {
       untitled: "Başlıksız",
       gone: "Artık yok",
     },
+    listColumn: {
+      title: "Görüntülenme · 30 gün",
+      notTop: "Son 30 günde en çok okunan {count} içerik arasında değil",
+    },
   },
   status: { draft: "Taslak", review: "İncelemede", published: "Yayında", archived: "Arşiv" },
   site: {

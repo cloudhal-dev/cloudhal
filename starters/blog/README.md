@@ -1,6 +1,6 @@
 # Cloudhal blog starter
 
-Created by `cloudhal init`. Pages, posts, categories, tags and redirects live in `.cloudhal/` (SQLite + blobs); this project only holds the theme: `src/layouts`, `src/components`, `src/styles`, `src/theme.ts` (component overrides and theme settings) and the routes under `src/pages`.
+Created by `cloudhal init`. Pages, posts, categories, tags and redirects live in `.cloudhal/` (SQLite + blobs); this project only holds the theme: `src/layouts`, `src/components`, `src/styles`, `src/theme.ts` (component overrides and theme settings), the routes under `src/pages` and static files in `public/` (the favicon: `favicon.svg` plus a 16/32 px `favicon.ico` for older browsers and `/favicon.ico` requests; replace both with your own). Deployed, `public/` files are Workers static assets, answered before the Site Worker runs, so they never count as renders in analytics.
 
 ```bash
 cloudhal dev      # live preview of the current graph (drafts visible)

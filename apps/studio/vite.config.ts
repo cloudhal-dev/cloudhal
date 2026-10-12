@@ -1,6 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { bundleBudget } from "./bundle-budget.ts";
 
 /**
  * Long-lived vendor chunks: they change only when dependencies do, so a Studio deploy re-downloads
@@ -14,7 +15,7 @@ const vendor = (pkgs: string) =>
   );
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), bundleBudget()],
   server: {
     port: 5173,
     proxy: {
@@ -24,10 +25,11 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
-    // Two chunks are above 500 kB: Kumo's lazily loaded WASM highlighting engine (~620 kB, fetched
-    // only when a code block renders) and the shared UI chunk (Kumo components and the Cloudhal
-    // blocks, ~670 kB with the media library's). The initial load is ~230 kB of app code + vendor.
-    chunkSizeWarningLimit: 700,
+    // Two chunks are above 500 kB, both lazy: Kumo's WASM highlighting engine (~620 kB, fetched
+    // only when a code block renders) and `@cloudhal/ui/charts` (ECharts and Kumo's chart
+    // components, ~775 kB, only on the Analytics route and the editors' Readers charts). Every
+    // screen's initial load is guarded by `bundleBudget()` (bundle-budget.ts).
+    chunkSizeWarningLimit: 800,
     rolldownOptions: {
       output: {
         codeSplitting: {
