@@ -122,8 +122,8 @@ export function CommentRow({
         </span>
       )}
       <div className="grid min-w-0 flex-1 gap-2">
-        <header className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <header className="flex min-w-0 items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
             <CommentAuthor author={comment.author} words={words} id={nameId} />
             <CommentTime at={comment.createdAt} locale={locale} {...(now ? { now } : {})} />
             {comment.editedAt && (

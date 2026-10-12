@@ -142,7 +142,11 @@ export function CommentFilters({
           {labels.clear}
         </Button>
       )}
-      <Toolbar aria-label={labels.toolbar} className="max-w-full">
+      {/* Phones: the joined selects scroll sideways inside the toolbar, never the page. */}
+      <Toolbar
+        aria-label={labels.toolbar}
+        className="min-w-0 max-w-full overflow-x-auto [scrollbar-width:none]"
+      >
         {facets.map((f) => (
           <Select
             key={f}

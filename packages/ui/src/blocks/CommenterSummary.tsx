@@ -64,7 +64,7 @@ export interface CommenterSummaryProps {
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 py-3">
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 py-3 first:pt-0">
       <dt className="min-w-0 flex-[1_1_10rem]">
         <Text bold as="span">
           {label}

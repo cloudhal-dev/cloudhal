@@ -61,7 +61,12 @@ export function CommentReports({
     (reason) => [reason, reports.filter((r) => r.reason === reason).length] as const,
   ).filter(([, n]) => n > 0);
   const number = new Intl.NumberFormat(locale);
-  const sorted = [...reports].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Open reports first, newest first within each group.
+  const sorted = [...reports].sort(
+    (a, b) =>
+      Number(Boolean(a.resolvedAt)) - Number(Boolean(b.resolvedAt)) ||
+      b.createdAt.localeCompare(a.createdAt),
+  );
   return (
     <section aria-label={labels.title} className="grid min-w-0 gap-3" data-testid="comment-reports">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
