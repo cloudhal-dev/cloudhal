@@ -1,5 +1,5 @@
 # RFC-0007: Reader comments
-- Status: Draft
+- Status: Accepted (2026-10-12, PR #13 merged by Halil; ADR-0022)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-12
 - Related: ADR-0002 (storage, batch-only), ADR-0008 (precompiled validators), ADR-0011 (agent layer, policy engine), ADR-0012 (Cloudflare deployment: Workers Cache, cache tags, purge through the site Worker's own `/__cloudhal/purge`, no Cloudflare API token), ADR-0014 (approvals bound to a state hash), ADR-0015 (agent modes), ADR-0016 (elevation), ADR-0018 / RFC-0005 (roles and scopes), ADR-0021 / RFC-0006 (site analytics: the pattern for visitor-facing, privacy-sensitive features outside the graph), RFC-0002 (slug changes keep ids), `docs/security/threat-model.md`, `docs/design/DESIGN.md`
 - Owner decisions: Halil, 2026-10-12 (§0.1). This RFC adopts them and does not reopen them. §0.2 lists the defaults this draft chose for the remaining questions; each is marked **[default]** and can change at review.
