@@ -28,6 +28,11 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
+/** Paths the API owns; never answered with the Studio SPA. */
+export function isApiPath(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
 /**
  * Runs the Cloudhal API (and, when built, the Studio UI) for the project on Node.
  * Authentication is wired by `createAuthFor()` from `@cloudhal/api/auth` when available.
@@ -90,7 +95,11 @@ export async function studio(
     const { serveStatic } = await import("@hono/node-server/serve-static");
     const root = path.relative(process.cwd(), studioDist) || ".";
     app.use("/assets/*", serveStatic({ root }));
-    app.get("*", serveStatic({ root, path: "index.html" }));
+    // The SPA fallback is for Studio's own routes only: an /api path the API did not answer (a
+    // route that is not mounted, e.g. agent keys without auth) falls through to the API's JSON 404
+    // rather than receiving index.html with a 200.
+    const spa = serveStatic({ root, path: "index.html" });
+    app.get("*", (c, next) => (isApiPath(c.req.path) ? next() : spa(c, next)));
   }
 
   const { server, port } = await serveNode(app, { port: options.port ?? 8787 });
