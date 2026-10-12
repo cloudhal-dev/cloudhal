@@ -13,6 +13,18 @@ export {
 } from "./commands/analytics.ts";
 export { type BuildOptions, build, type DevOptions, dev } from "./commands/astro.ts";
 export {
+  type CommentsCliOptions,
+  type CommentsExportCliOptions,
+  type CommentsImportCliOptions,
+  type CommentsImportResult,
+  type CommentsStatusResult,
+  commentsExportCli,
+  commentsImportCli,
+  commentsStatusCli,
+  describeCommentsStatus,
+} from "./commands/comments.ts";
+export { runLocalCommentsJob, startLocalCommentsJob } from "./commands/comments-local.ts";
+export {
   type DeployOptions,
   type DeployResult,
   deploy,

@@ -9,6 +9,12 @@ import {
   describeStatus,
 } from "./commands/analytics.ts";
 import { build, dev } from "./commands/astro.ts";
+import {
+  commentsExportCli,
+  commentsImportCli,
+  commentsStatusCli,
+  describeCommentsStatus,
+} from "./commands/comments.ts";
 import { deploy } from "./commands/deploy.ts";
 import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
@@ -56,6 +62,10 @@ Usage:
   cloudhal analytics seed [--days <n>] [--views <n>]      demo traffic in the local SQLite only
   cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
                                                           daily totals as CSV (default: 30 days)
+  cloudhal comments status [--remote]                     reader comments: counts, pending, daily cap, purges
+  cloudhal comments export [--remote] [--with-personal-data --out <file>]
+                                                          comments as JSON lines (stdout or --out)
+  cloudhal comments import --in <file> [--remote]         JSON lines back in; idempotent, safe to rerun
   cloudhal --help
 `;
 
@@ -346,6 +356,54 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       throw new Error("usage: cloudhal analytics status|rollup|seed|export");
+    }
+    case "comments": {
+      const [what] = rest;
+      const remote = values.remote ? { remote: true } : {};
+      const adminUrl = values["admin-url"] ? { adminUrl: values["admin-url"] } : {};
+      if (what === "status") {
+        const s = await commentsStatusCli({ projectDir, ...remote, ...adminUrl });
+        for (const line of describeCommentsStatus(s)) console.log(line);
+        return 0;
+      }
+      if (what === "export") {
+        const personal = values["with-personal-data"] === true;
+        if (personal && !values.out)
+          throw new Error(
+            "--with-personal-data needs --out <file> (the file holds email addresses; it is written owner-only)",
+          );
+        const r = await commentsExportCli({
+          projectDir,
+          ...remote,
+          ...adminUrl,
+          ...(personal ? { personal: true } : {}),
+          ...(values.out ? { out: values.out } : {}),
+          log: (l) => process.stderr.write(`${l}\n`),
+        });
+        if (values.out)
+          console.log(
+            `wrote ${values.out}: ${r.comments} comment(s)${personal ? `, ${r.commenters} commenter(s) with their email` : ""}`,
+          );
+        else process.stdout.write(r.text);
+        return 0;
+      }
+      if (what === "import") {
+        if (!values.in) throw new Error("usage: cloudhal comments import --in <file> [--remote]");
+        const r = await commentsImportCli({
+          projectDir,
+          ...remote,
+          ...adminUrl,
+          file: values.in,
+          log: (l) => console.log(l),
+        });
+        console.log(
+          `${r.imported} imported, ${r.skipped} already there${r.commenters ? `, ${r.commenters} commenter email(s) stored` : ""}${r.invalid.length ? `, ${r.invalid.length} refused` : ""}`,
+        );
+        for (const p of r.invalid)
+          console.log(`  line ${p.line}${p.id ? ` (${p.id})` : ""}: ${p.error}`);
+        return r.invalid.length ? 1 : 0;
+      }
+      throw new Error("usage: cloudhal comments status|export|import");
     }
     case "mcp": {
       const server = await mcp({
