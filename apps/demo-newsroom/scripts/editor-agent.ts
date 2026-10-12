@@ -7,9 +7,17 @@
  *   node scripts/editor-agent.ts ... --no-publish                # write + preview only
  *   node scripts/editor-agent.ts ... --yes                       # a person already approved this
  *                                                                # publish elsewhere; answer "yes"
+ *   node scripts/editor-agent.ts ... --at 2026-11-02T09:00       # schedule instead of publishing now:
+ *                                                                # a release at that wall-clock time
+ *                                                                # in the site's zone (RFC-0008)
  *
  * Publishing stops for a person: the server asks for approval and this script relays the question
  * to your terminal. Without a terminal (CI) the answer is "decline".
+ *
+ * `--at` schedules what this run changed as one release (`schedule_release`): a local time
+ * (`2026-11-02T09:00`, in the site's time zone), an instant (`2026-11-02T06:00:00Z`) or
+ * `on-approval`. The release pins exactly the versions written now; a person approves them once in
+ * Studio and Cloudhal publishes them at that time. The script does not wait or poll for it.
  */
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -61,6 +69,20 @@ function parseFrontmatterOnly(markdown: string): Record<string, string> {
     if (kv) out[kv[1] as string] = (kv[2] as string).replace(/^"(.*)"$/, "$1");
   }
   return out;
+}
+
+/** `--at`: a wall-clock time in the site's zone, an instant, or `on-approval` (RFC-0008 §12). */
+export type ScheduleWhen = "on-approval" | { localTime: string } | { at: string };
+
+export function parseWhen(value: string): ScheduleWhen {
+  const v = value.trim();
+  if (v === "on-approval") return "on-approval";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return { localTime: v };
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(v))
+    return { at: v };
+  throw new Error(
+    `--at takes a local time (2026-11-02T09:00, in the site's time zone), an instant (2026-11-02T06:00:00Z) or on-approval; got "${value}"`,
+  );
 }
 
 async function loadPosts(dir: string): Promise<Post[]> {
@@ -179,6 +201,11 @@ export async function runEditorAgent(options: {
   /** `content/site.md`: frontmatter `name` + `tagline` go on the home page hero. */
   siteFile?: string;
   publish: boolean;
+  /**
+   * Schedule what this run changed as one release instead of publishing now (`--at`). Needs a
+   * server with schedules and a key with `schedules:write`.
+   */
+  scheduleAt?: ScheduleWhen;
   log?: (line: string) => void;
   /**
    * When the server asks a person in Studio (agent keys), poll this long for the decision.
@@ -192,6 +219,8 @@ export async function runEditorAgent(options: {
   archived: string[];
   homeUpdated: boolean;
   published: boolean;
+  /** With `scheduleAt`: the release and whether it is scheduled or waits for a person. */
+  scheduled?: { releaseId: string; status: string; approvalId?: string };
 }> {
   const log = options.log ?? console.log;
   const call: Call = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
@@ -207,6 +236,8 @@ export async function runEditorAgent(options: {
   log(`site ${site.name} (${siteId})`);
 
   let homeUpdated = false;
+  /** Every node this run changed: what a scheduled release pins. */
+  const changedIds: string[] = [];
   if (options.siteFile) {
     const fm = parseFrontmatterOnly(await readFile(options.siteFile, "utf8"));
     const { pages } = await call<{
@@ -246,6 +277,7 @@ export async function runEditorAgent(options: {
           ...(fm.tagline ? { description: fm.tagline } : {}),
         },
       });
+      changedIds.push(home.id);
       log(`  home page set to "${fm.name}"`);
     }
   }
@@ -342,6 +374,7 @@ export async function runEditorAgent(options: {
         rev: current.rev,
         status: "published",
       });
+    changedIds.push(entry.id);
     const preview = await call<{ url: string | null }>("preview_page", {
       siteId,
       entryId: entry.id,
@@ -358,6 +391,7 @@ export async function runEditorAgent(options: {
     (x) => !wanted.has(x.slug) && x.status !== "archived" && isStarterSample(x),
   )) {
     await call("update_entry", { siteId, entryId: e.id, rev: e.rev, status: "archived" });
+    changedIds.push(e.id);
     archived.push(e.slug);
     log(`  archived ${e.slug}`);
   }
@@ -367,6 +401,50 @@ export async function runEditorAgent(options: {
   if (!created.length && !updated.length && !archived.length && !homeUpdated) {
     log("  nothing changed; not asking to publish");
     return { ...summary, published: false };
+  }
+  if (options.scheduleAt) {
+    // RFC-0008: one release pinning exactly these versions. A person approves it once in Studio
+    // (agent keys never approve their own); Cloudhal publishes it at its time. Nothing to poll.
+    const r = (await options.client.callTool({
+      name: "schedule_release",
+      arguments: {
+        siteId,
+        nodeIds: [...new Set(changedIds)],
+        title: `Newsroom: ${posts.length} articles`,
+        when: options.scheduleAt,
+      },
+    })) as ToolResult;
+    if (r.isError) {
+      log(`  not scheduled: ${r.content.map((c) => c.text ?? "").join(" ")}`);
+      return { ...summary, published: false };
+    }
+    const out = r.structuredContent as {
+      release: {
+        id: string;
+        when?: { kind: string; at?: string; localTime?: string; timeZone?: string };
+      };
+      status: string;
+      approvalId?: string;
+    };
+    const w = out.release.when;
+    const at =
+      w?.kind === "at"
+        ? `at ${w.localTime ? `${w.localTime} (${w.timeZone})` : w.at}`
+        : "as soon as it is approved";
+    log(
+      out.status === "scheduled"
+        ? `  scheduled release ${out.release.id}: publishes ${at}`
+        : `  release ${out.release.id} (publishes ${at}) waits for a person: approve request ${out.approvalId} in Studio (site → Activity → Approvals); Cloudhal publishes it then — no need to keep this running`,
+    );
+    return {
+      ...summary,
+      published: false,
+      scheduled: {
+        releaseId: out.release.id,
+        status: out.status,
+        ...(out.approvalId ? { approvalId: out.approvalId } : {}),
+      },
+    };
   }
   const publishArgs = { siteId, label: `Newsroom: ${posts.length} articles` };
   let r = (await options.client.callTool({
@@ -405,10 +483,14 @@ async function main() {
       project: { type: "string" },
       content: { type: "string" },
       "no-publish": { type: "boolean" },
+      at: { type: "string" },
       yes: { type: "boolean" },
       "key-file": { type: "string" },
     },
   });
+  if (values.at !== undefined && values["no-publish"])
+    throw new Error("--at schedules a publish; it cannot be combined with --no-publish");
+  const scheduleAt = values.at !== undefined ? parseWhen(values.at) : undefined;
   const client = new Client(
     { name: "cloudhal-newsroom-editor", version: "0.0.1" },
     { capabilities: { elicitation: { form: {} } }, versionNegotiation: { mode: "auto" } },
@@ -425,7 +507,7 @@ async function main() {
       (values["key-file"] ? (await readFile(values["key-file"], "utf8")).trim() : undefined);
     if (!key)
       throw new Error(
-        "set CLOUDHAL_API_KEY or pass --key-file: an agent key with content:write (and site:publish to publish)",
+        "set CLOUDHAL_API_KEY or pass --key-file: an agent key with content:write (and site:publish to publish, or schedules:write for --at)",
       );
     await client.connect(
       new StreamableHTTPClientTransport(new URL(values.url), {
@@ -450,6 +532,7 @@ async function main() {
       postsDir: path.join(values.content ?? path.join(APP, "content"), "posts"),
       siteFile: path.join(values.content ?? path.join(APP, "content"), "site.md"),
       publish: !values["no-publish"],
+      ...(scheduleAt ? { scheduleAt } : {}),
     });
   } finally {
     await client.close();

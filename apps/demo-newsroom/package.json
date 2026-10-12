@@ -16,6 +16,7 @@
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "@types/node": "catalog:",
     "better-sqlite3": "catalog:",
