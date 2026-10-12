@@ -3721,6 +3721,10 @@ export const tr: Messages = {
       requestsValue: "Workers Free'de günde {limit} istekten {used}",
       requestsHint:
         "Her sayfa görüntüleme ve her sayfa hızı örneği bir istek gönderir. Workers Paid'de günlük sınır yok.",
+      signals: "Gizlilik sinyalleri",
+      signalsValue: "Sayfa görüntülemelerinin {share} kadarı",
+      signalsHint:
+        "Global Privacy Control ya da Do Not Track gönderen tarayıcıların sayfa görüntülemeleri sayılır ama hiç özetlenmez; bu yüzden tekil ziyaretçi sayısı bir alt sınırdır.",
       cacheHits: "Önbellekten sunulan (tahmini)",
       cacheHitsValue: "yaklaşık {share}",
       cacheHitsHint:

@@ -1266,6 +1266,15 @@ export function AboutCard({
             </LinkButton>
           )}
         </SettingRow>
+        {unique && typeof summary?.data.privacySignalShare === "number" && (
+          <SettingRow label={t("analytics.about.signals")} hint={t("analytics.about.signalsHint")}>
+            <Text>
+              {t("analytics.about.signalsValue", {
+                share: fmt.percent(summary.data.privacySignalShare),
+              })}
+            </Text>
+          </SettingRow>
+        )}
         {source && (
           <SettingRow
             label={t("analytics.about.source")}

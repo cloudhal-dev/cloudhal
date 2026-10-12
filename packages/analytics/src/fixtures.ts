@@ -72,6 +72,7 @@ export const FIXTURE_EVENTS: readonly AnalyticsEvent[] = [
     os: "windows",
     visitor: "00000000000000b2",
   }),
+  // GPC or DNT: counted, never hashed
   pv(`${D1}T09:45:00Z`, NODE_HOME, "/", "page", {
     channel: "direct",
     entrance: true,
@@ -79,6 +80,7 @@ export const FIXTURE_EVENTS: readonly AnalyticsEvent[] = [
     device: "desktop",
     browser: "firefox",
     os: "linux",
+    privacySignal: true,
   }),
   pv(`${D1}T10:00:00Z`, NODE_A, "/posts/a", "entry", {
     refHost: "chatgpt.com",
@@ -429,42 +431,42 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
   c(
     "summary",
     { kind: "summary", siteId: S, range: FULL },
-    { pageviews: 10, visits: 7, visitors: 5, renders: 4 },
+    { pageviews: 10, visits: 7, visitors: 5, renders: 4, signals: 1 },
   ),
   c(
     "summary-day1",
     { kind: "summary", siteId: S, range: { from: D1, to: D2 } },
-    { pageviews: 6, visits: 5, visitors: 3, renders: 2 },
+    { pageviews: 6, visits: 5, visitors: 3, renders: 2, signals: 1 },
   ),
   c(
     "summary-no-visitors",
     { kind: "summary", siteId: S, range: { from: `${D1}T09:40:00Z`, to: `${D1}T09:50:00Z` } },
-    { pageviews: 1, visits: 1, visitors: null, renders: 1 },
+    { pageviews: 1, visits: 1, visitors: null, renders: 1, signals: 1 },
   ),
   c(
     "summary-node",
     { kind: "summary", siteId: S, range: FULL, filter: { node: NODE_A } },
-    { pageviews: 5, visits: 3, visitors: 3, renders: 1 },
+    { pageviews: 5, visits: 3, visitors: 3, renders: 1, signals: 0 },
   ),
   c(
     "summary-channel",
     { kind: "summary", siteId: S, range: FULL, filter: { channel: "social" } },
-    { pageviews: 2, visits: 2, visitors: 2, renders: null },
+    { pageviews: 2, visits: 2, visitors: 2, renders: null, signals: 0 },
   ),
   c(
     "summary-country",
     { kind: "summary", siteId: S, range: FULL, filter: { country: "DE" } },
-    { pageviews: 2, visits: 2, visitors: 1, renders: 0 },
+    { pageviews: 2, visits: 2, visitors: 1, renders: 0, signals: 0 },
   ),
   c(
     "summary-device",
     { kind: "summary", siteId: S, range: FULL, filter: { device: "desktop" } },
-    { pageviews: 4, visits: 4, visitors: 2, renders: 1 },
+    { pageviews: 4, visits: 4, visitors: 2, renders: 1, signals: 1 },
   ),
   c(
     "summary-empty-site",
     { kind: "summary", siteId: "site_01HZXNOTHING", range: FULL },
-    { pageviews: 0, visits: 0, visitors: null, renders: 0 },
+    { pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 },
   ),
   c(
     "series-day",

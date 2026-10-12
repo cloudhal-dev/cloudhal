@@ -81,7 +81,7 @@ export function describeAnalyticsConformance(label: string, factory: Conformance
         siteId: FIXTURE_OTHER_SITE,
         range: { from: "2026-10-07", to: "2026-10-09" },
       });
-      expect(r.data).toEqual({ pageviews: 1, visits: 1, visitors: null, renders: 0 });
+      expect(r.data).toEqual({ pageviews: 1, visits: 1, visitors: null, renders: 0, signals: 0 });
     });
   });
 }

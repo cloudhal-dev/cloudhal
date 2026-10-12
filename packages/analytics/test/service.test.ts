@@ -135,7 +135,7 @@ describe("AnalyticsService", () => {
       siteId: FIXTURE_SITE,
       range: { from: "2026-10-07", to: "2026-10-09" },
     });
-    expect(r.data).toEqual({ pageviews: 10, visits: 7, visitors: 5, renders: 4 });
+    expect(r.data).toEqual({ pageviews: 10, visits: 7, visitors: 5, renders: 4, signals: 1 });
     expect(r.source).toBe("live");
   });
 

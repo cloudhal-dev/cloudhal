@@ -136,6 +136,9 @@ describe("analytics tools", () => {
         renders: 4,
         // no edge cache in front of SQLite: no ratio
         cacheHitRatio: null,
+        // one view in ten carried GPC/DNT
+        signals: 1,
+        privacySignalShare: 0.1,
         previous: { pageviews: 0, range: { from: "2026-10-05", to: "2026-10-07" } },
         change: { pageviews: null },
       },

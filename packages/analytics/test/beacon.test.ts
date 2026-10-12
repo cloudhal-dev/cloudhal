@@ -309,11 +309,23 @@ describe("POST /__cloudhal/e", () => {
     expect(gpc).not.toHaveProperty("visitor");
     expect(dnt).not.toHaveProperty("visitor");
     expect(on.salts).toEqual(["2026-10-09"]);
+    // the signal itself is kept as a flag per view (Studio shows the share), nothing else
+    expect(hashed).not.toHaveProperty("privacySignal");
+    expect(gpc?.privacySignal).toBe(true);
+    expect(dnt?.privacySignal).toBe(true);
 
     const off = setup();
     await processBeacon(beacon(view()), off.ctx);
     expect(off.store.events[0]).not.toHaveProperty("visitor");
     expect(off.salts).toEqual([]);
+    // also without unique visitors, and never for a signal other than "1"
+    await processBeacon(beacon(view(), { "sec-gpc": "1" }), off.ctx);
+    await processBeacon(beacon(view(), { dnt: "0" }), off.ctx);
+    expect(off.store.events.map((e) => (e as { privacySignal?: boolean }).privacySignal)).toEqual([
+      undefined,
+      true,
+      undefined,
+    ]);
   });
 
   it("records vitals only at the site's sampling, rounded, with at least one metric", async () => {

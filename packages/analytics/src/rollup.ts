@@ -100,6 +100,7 @@ export async function collectDailyRows(
   );
   // Written for every day (also 0), so a missing row means "rolled up before it was kept".
   if (total.renders !== null) rows.push(row("renders", "all", { hits: total.renders }));
+  if (total.signals !== null) rows.push(row("signals", "all", { pageviews: total.signals }));
   for (const dimension of DIMENSIONS) {
     const limit = dimension === "node" ? ROLLUP_TOP_NODES : ROLLUP_TOP;
     const top = (await reader.query({ kind: "top", siteId, range, dimension, limit })).data;
@@ -445,6 +446,9 @@ export class RollupReader implements AnalyticsReader {
             renders: f
               ? null
               : await this.#companion(q.siteId, days, "renders", "hits", num(r?.days)),
+            signals: f
+              ? null
+              : await this.#companion(q.siteId, days, "signals", "pageviews", num(r?.days)),
           };
         }
         const rows = await this.#sql.all(
@@ -511,7 +515,7 @@ export class RollupReader implements AnalyticsReader {
   }
 
   /**
-   * A per-day companion of the `total` row (`renders`), summed over the days; `null` unless every
+   * A per-day companion of the `total` row (`renders`, `signals`), summed over the days; `null` unless every
    * rolled-up day (`days` total rows) has one — days rolled up before it was kept do not.
    */
   async #companion(

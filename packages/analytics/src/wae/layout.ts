@@ -61,6 +61,8 @@ export const DOUBLE = {
   fcp: 7,
   renderMs: 8,
   sampleOneIn: 9,
+  /** Page views: 1 when the beacon carried GPC or DNT (written only then; unwritten reads 0). */
+  privacySignal: 10,
 } as const;
 
 /** Written for absent metrics (and `renderMs`). */
@@ -93,6 +95,11 @@ export function toDataPoint(e: AnalyticsEvent): {
   switch (e.kind) {
     case "pageview":
       doubles = [e.entrance ? 1 : 0];
+      if (e.privacySignal) {
+        doubles.length = DOUBLE.privacySignal;
+        doubles.fill(0, 1);
+        doubles[DOUBLE.privacySignal - 1] = 1;
+      }
       break;
     case "vitals":
       doubles = [0, 0, m(e.lcp), m(e.inp), clsSlot(e.cls), m(e.ttfb), m(e.fcp), 0, e.sampleOneIn];
@@ -146,6 +153,7 @@ export function fromDataPoint(
     base.navType = b(BLOB.navType);
     setIf(base, "locale", b(BLOB.locale));
     base.entrance = d(DOUBLE.entrance) === 1;
+    if (d(DOUBLE.privacySignal) === 1) base.privacySignal = true;
     return base as unknown as AnalyticsPageviewEvent;
   }
   if (kind === "vitals") {

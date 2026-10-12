@@ -70,6 +70,8 @@ export interface PageviewInput {
   readonly ua: UaClass;
   readonly country?: string | null | undefined;
   readonly visitor?: string | undefined;
+  /** The request carried GPC or DNT (`hasPrivacySignal`): stored as a flag, nothing else. */
+  readonly privacySignal?: boolean | undefined;
 }
 
 export function buildPageviewEvent(input: PageviewInput): AnalyticsPageviewEvent | undefined {
@@ -104,6 +106,7 @@ export function buildPageviewEvent(input: PageviewInput): AnalyticsPageviewEvent
     navType,
     ...opt("locale", node.locale),
     entrance: channel !== "internal" && (navType === "navigate" || navType === "prerender"),
+    ...(input.privacySignal ? { privacySignal: true } : {}),
   };
   return isValid("analytics-event", event) ? event : undefined;
 }

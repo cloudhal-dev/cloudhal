@@ -92,6 +92,21 @@ export interface SummaryData {
    * (filtered summaries, and days rolled up before it was kept). Feeds `estimatedCacheHitRatio`.
    */
   readonly renders: number | null;
+  /**
+   * Page views whose beacon carried GPC or DNT (`privacySignal`), under the same filter: counted,
+   * never hashed, so `visitors` is a lower bound. `null` from rollups that do not keep it (filtered
+   * summaries, and days rolled up before it was kept). Views recorded before the field existed
+   * count as without a signal.
+   */
+  readonly signals: number | null;
+}
+
+/** Share of page views that carried a privacy signal (0–1, three decimals); `null` when unknown. */
+export function privacySignalShare(
+  summary: Pick<SummaryData, "pageviews" | "signals">,
+): number | null {
+  if (summary.signals === null || summary.pageviews <= 0) return null;
+  return Math.round(Math.min(1, summary.signals / summary.pageviews) * 1000) / 1000;
 }
 
 /**

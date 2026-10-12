@@ -148,7 +148,13 @@ export class WaeReader implements AnalyticsReader {
         let renders: number | null = null;
         if (c.renders) renders = num((await this.#run(c.renders))[0]?.renders);
         return {
-          data: { pageviews: num(r.pageviews), visits: num(r.visits), visitors, renders },
+          data: {
+            pageviews: num(r.pageviews),
+            visits: num(r.visits),
+            visitors,
+            renders,
+            signals: num(r.signals),
+          },
           source: "live",
           estimated: visitors !== null,
         };

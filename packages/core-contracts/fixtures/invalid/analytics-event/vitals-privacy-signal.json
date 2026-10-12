@@ -1,0 +1,16 @@
+{
+  "reason": "Only page views carry the privacy signal (they are the views a hash could have been formed for)",
+  "data": {
+    "schemaVersion": 1,
+    "kind": "vitals",
+    "siteId": "site_01HZX8K3Q9ST",
+    "timestamp": "2026-10-09T08:22:40Z",
+    "path": "/posts/ferry-timetables",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "nodeKind": "entry",
+    "device": "desktop",
+    "lcp": 1800,
+    "sampleOneIn": 5,
+    "privacySignal": true
+  }
+}

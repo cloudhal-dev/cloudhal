@@ -144,7 +144,7 @@ export function mergeResults(
       const ds = datas as SummaryData[];
       const withVisitors = ds.filter((d) => d.visitors !== null);
       // unknown in any part = unknown for the range (unlike visitors, where null means "none")
-      const known = (k: "renders") =>
+      const known = (k: "renders" | "signals") =>
         ds.some((d) => d[k] === null) ? null : ds.reduce((n, d) => n + (d[k] ?? 0), 0);
       return {
         data: {
@@ -155,6 +155,7 @@ export function mergeResults(
               ? null
               : withVisitors.reduce((n, d) => n + (d.visitors ?? 0), 0),
           renders: known("renders"),
+          signals: known("signals"),
         },
         estimated,
       };

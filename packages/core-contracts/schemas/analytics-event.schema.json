@@ -56,6 +56,10 @@
         "entrance": {
           "type": "boolean",
           "description": "WAE double1 (1 or 0). The view starts a visit: the referrer is empty or another site, and the navigation is not a reload, back/forward or restore."
+        },
+        "privacySignal": {
+          "type": "boolean",
+          "description": "WAE double10 (1 or 0). The beacon request carried Global Privacy Control (Sec-GPC: 1) or Do Not Track (DNT: 1), so no visitor hash was formed. Only this flag is kept, never which signal or any header. Absent means no signal (and on events written before the field existed)."
         }
       }
     },

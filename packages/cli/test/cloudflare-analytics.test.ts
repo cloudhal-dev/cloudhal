@@ -323,8 +323,10 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
     await clear();
     await beacon(view("/about"), { "sec-gpc": "1" });
     const [withGpc] = await events(1);
-    expect(withGpc).toMatchObject({ kind: "pageview", path: "/about" });
+    // counted, flagged (WAE double10), never hashed
+    expect(withGpc).toMatchObject({ kind: "pageview", path: "/about", privacySignal: true });
     expect(withGpc).not.toHaveProperty("visitor");
+    expect(hashed).not.toHaveProperty("privacySignal");
   });
 
   it("asks the Rate Limiting binding per client by an HMAC (never the IP), and falls back when it fails", async () => {

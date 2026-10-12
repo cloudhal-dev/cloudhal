@@ -21,7 +21,7 @@ The site side (`POST /__cloudhal/e`, the script tag, render events) lives in `@c
 
 ```ts
 type AnalyticsQuery =
-  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null, renders | null }
+  | { kind: "summary"; siteId; range; filter? }                    // { pageviews, visits, visitors | null, renders | null, signals | null }
   | { kind: "series"; siteId; range; interval: "hour" | "day"; filter? } // { interval, points[{ t, pageviews, visits }] }
   | { kind: "top"; siteId; range; dimension; limit; filter? }      // { dimension, rows[{ key, pageviews, visits }] }
   | { kind: "vitals"; siteId; range; filter? }                     // { metrics[{ metric, p75, samples, good, needsImprovement, poor }] }

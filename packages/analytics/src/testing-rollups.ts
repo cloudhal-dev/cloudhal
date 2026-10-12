@@ -252,7 +252,7 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         // rollups keep visitors and renders only on the total; filtered summaries report none
         const want =
           q.kind === "summary" && q.filter
-            ? { ...(live.data as object), visitors: null, renders: null }
+            ? { ...(live.data as object), visitors: null, renders: null, signals: null }
             : live.data;
         expect(fromRollups.data).toEqual(want);
       }
@@ -319,7 +319,13 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
         siteId: FIXTURE_SITE,
         range: FULL,
       });
-      expect(partial.data).toMatchObject({ pageviews: 10, renders: null });
+      expect(partial.data).toMatchObject({ pageviews: 10, renders: null, signals: 1 });
+      // page views with a privacy signal sit beside the total too
+      const signals = await sql.get<{ pageviews: number }>(
+        "SELECT pageviews FROM analytics_daily WHERE site_id = ? AND day = ? AND dim = 'signals'",
+        [FIXTURE_SITE, "2026-10-07"],
+      );
+      expect(signals?.pageviews).toBe(1);
     });
 
     it("is idempotent: a second run has nothing to do, a redo writes the same rows", async () => {
@@ -407,7 +413,7 @@ export function describeRollupSuite(label: string, factory: SqlFactory): void {
       const dayOne = { from: "2026-10-07", to: "2026-10-08" };
       expect(
         (await rollups.query({ kind: "summary", siteId: FIXTURE_SITE, range: dayOne })).data,
-      ).toEqual({ pageviews: 0, visits: 0, visitors: null, renders: 0 });
+      ).toEqual({ pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 });
       // the next run picks the never-attempted day first, then retries the failed one
       const next = await runRollups({
         reader: raw,

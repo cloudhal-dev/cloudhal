@@ -17,7 +17,7 @@ import type {
   TopRow,
   VitalsData,
 } from "@cloudhal/analytics";
-import { ID_RE, parseRange } from "@cloudhal/analytics";
+import { ID_RE, parseRange, privacySignalShare } from "@cloudhal/analytics";
 import { type AnalyticsService, previousRange } from "@cloudhal/analytics/service";
 import { entryPath } from "@cloudhal/astro-renderer/routing";
 import { archivePath } from "@cloudhal/astro-renderer/taxonomy";
@@ -191,6 +191,11 @@ export interface SummaryReport extends SummaryData {
    * the script (no-JS visitors are missed) and only a zone sees real cache statistics.
    */
   readonly cacheHitRatio: number | null;
+  /**
+   * Share of page views whose request carried GPC or DNT (0–1): counted but never hashed, so
+   * unique visitors are a lower bound. `null` when unknown or without page views.
+   */
+  readonly privacySignalShare: number | null;
   /** The period of the same length just before, when asked for. */
   readonly previous?: SummaryData & { readonly range: Range };
   /** Relative change against `previous` (0.12 = +12 %); `null` where the previous value was 0. */
@@ -219,6 +224,7 @@ export async function summaryReport(
     ...cur,
     viewsPerVisit: cur.visits > 0 ? Math.round((cur.pageviews / cur.visits) * 100) / 100 : null,
     cacheHitRatio: analytics.cacheHitRatio(cur),
+    privacySignalShare: privacySignalShare(cur),
   };
   if (!options.compare) return { data: base, results: [current] };
   const prevRange = previousRange(range);

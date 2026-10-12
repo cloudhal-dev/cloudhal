@@ -75,7 +75,7 @@ describe("WaeReader", () => {
     const wae = new FakeWae(dataset);
     const r = await new WaeReader(wae, { dataset, cacheTtlMs: 0 }).query(q);
     expect(r).toEqual({
-      data: { pageviews: 0, visits: 0, visitors: null, renders: 0 },
+      data: { pageviews: 0, visits: 0, visitors: null, renders: 0, signals: 0 },
       source: "live",
       estimated: false,
     });
@@ -109,6 +109,7 @@ describe("WaeReader", () => {
       visits: 2,
       visitors: null,
       renders: 0,
+      signals: 0,
     });
     expect(waits).toEqual([250]);
   });

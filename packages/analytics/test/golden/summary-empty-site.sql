@@ -1,4 +1,4 @@
-SELECT COUNT(*) AS pageviews, SUM(double1) AS visits, countIf(blob15 != '') AS hashed
+SELECT COUNT(*) AS pageviews, SUM(double1) AS visits, countIf(blob15 != '') AS hashed, SUM(double10) AS signals
 FROM events.analyticsEngine."newsroom_events"
 WHERE index1 = 'site_01HZXNOTHING' AND blob1 = 'pageview'
   AND timestamp >= '2026-10-07T00:00:00Z' AND timestamp < '2026-10-09T00:00:00Z';

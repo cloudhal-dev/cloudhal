@@ -999,12 +999,16 @@ export interface AnalyticsTotals {
   visitors: number | null;
   /** Pages rendered for people (cache misses); `null` when not known. */
   renders?: number | null;
+  /** Page views that carried GPC or DNT (counted, never hashed); `null` when not known. */
+  signals?: number | null;
 }
 
 export interface AnalyticsSummary extends AnalyticsTotals {
   viewsPerVisit: number | null;
   /** **Estimated** cache-hit ratio, 1 − renders ÷ page views (0–1); Cloudflare only, else `null`. */
   cacheHitRatio?: number | null;
+  /** Share of page views with GPC or DNT (0–1): unique visitors are a lower bound. */
+  privacySignalShare?: number | null;
   previous?: AnalyticsTotals & { range: { from: string; to: string } };
   /** Relative change (0.12 = +12 %); `null` where the previous value was 0. */
   change?: { pageviews: number | null; visits: number | null; visitors: number | null };

@@ -3645,6 +3645,10 @@ export const en = {
       requestsValue: "{used} of {limit} a day on Workers Free",
       requestsHint:
         "Page views and page speed samples each send one request. Workers Paid has no daily limit.",
+      signals: "Privacy signals",
+      signalsValue: "{share} of page views",
+      signalsHint:
+        "Page views from browsers sending Global Privacy Control or Do Not Track are counted but never hashed, so unique visitors are a lower bound.",
       cacheHits: "Cache hits (estimated)",
       cacheHitsValue: "about {share}",
       cacheHitsHint:

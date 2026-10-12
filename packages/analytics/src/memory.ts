@@ -114,6 +114,7 @@ export function answerQuery<Q extends AnalyticsQuery>(
         visits: views.reduce((n, s) => n + entrance(s), 0),
         visitors,
         renders,
+        signals: views.filter((s) => s.event.kind === "pageview" && s.event.privacySignal).length,
       } as unknown as AnalyticsData<Q>;
     }
     case "series": {

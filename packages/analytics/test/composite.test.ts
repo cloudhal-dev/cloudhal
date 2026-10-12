@@ -98,6 +98,7 @@ describe("CompositeReader", () => {
           visitors: (got.data as { visitors: unknown }).visitors,
           // rollups keep the render count on the total only
           renders: null,
+          signals: null,
         });
       else expect(got.data, kase.name).toEqual(want);
     }

@@ -120,7 +120,7 @@ export function compileWae(q: AnalyticsQuery, options: WaeCompileOptions): Compi
       return {
         range,
         query: [
-          `SELECT COUNT(*) AS pageviews, ${visits}, countIf(blob${BLOB.visitor} != '') AS hashed`,
+          `SELECT COUNT(*) AS pageviews, ${visits}, countIf(blob${BLOB.visitor} != '') AS hashed, SUM(double${DOUBLE.privacySignal}) AS signals`,
           from,
           ...w,
         ].join("\n"),

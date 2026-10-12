@@ -113,6 +113,12 @@ const TOTALS = {
     description:
       "Pages the site rendered for people (cache misses: HTML 200s, no crawlers); null when not known (channel filter, filtered or older daily totals)",
   },
+  signals: {
+    type: ["integer", "null"],
+    minimum: 0,
+    description:
+      "Page views whose request carried Global Privacy Control or Do Not Track: counted, never hashed; null when not known (filtered or older daily totals)",
+  },
 };
 const SUMMARY: JsonSchema = obj(
   {
@@ -125,12 +131,19 @@ const SUMMARY: JsonSchema = obj(
       description:
         "ESTIMATED share of page views the edge cache answered: 1 − renders ÷ page views (0–1). Page views come from the site's script, so visitors without JavaScript are missed; only on Cloudflare; null when not known",
     },
+    privacySignalShare: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      description:
+        "Share of page views that carried GPC or DNT (0–1); unique visitors are a lower bound by about this share",
+    },
     previous: obj(
       {
         ...TOTALS,
         range: obj({ from: { type: "string" }, to: { type: "string" } }, ["from", "to"]),
       },
-      ["pageviews", "visits", "visitors", "renders", "range"],
+      ["pageviews", "visits", "visitors", "renders", "signals", "range"],
     ),
     change: obj(
       { pageviews: NUM_OR_NULL, visits: NUM_OR_NULL, visitors: NUM_OR_NULL },
@@ -138,7 +151,16 @@ const SUMMARY: JsonSchema = obj(
       { description: "Relative change against the previous period (0.12 = +12 %)" },
     ),
   },
-  ["pageviews", "visits", "visitors", "renders", "viewsPerVisit", "cacheHitRatio"],
+  [
+    "pageviews",
+    "visits",
+    "visitors",
+    "renders",
+    "signals",
+    "viewsPerVisit",
+    "cacheHitRatio",
+    "privacySignalShare",
+  ],
 );
 const ROW: JsonSchema = obj({ key: { type: "string" }, pageviews: COUNT, visits: COUNT }, [
   "key",

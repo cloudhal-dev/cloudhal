@@ -37,7 +37,7 @@ Studio, agents (MCP tools) and the CSV export only ever see totals. Nobody sees 
   - The random value is deleted by the admin Worker's hourly job. A deployment without that job (see "Turning analytics off" and the [CLI notes](../../packages/cli/README.md#site-analytics-rfc-0006)) deletes it only when someone opens Analytics. Known gap, being fixed.
 
 ## Global Privacy Control and Do Not Track
-When a browser sends Global Privacy Control (`Sec-GPC: 1`) or Do Not Track (`DNT: 1`), the page view and the visit are still counted, because they contain nothing personal, but **no hash is ever formed**, even in the unique-visitors mode. The unique-visitor figure is therefore a lower bound.
+When a browser sends Global Privacy Control (`Sec-GPC: 1`) or Do Not Track (`DNT: 1`), the page view and the visit are still counted, because they contain nothing personal, but **no hash is ever formed**, even in the unique-visitors mode. The unique-visitor figure is therefore a lower bound. Each page view keeps only a yes/no flag that a signal was present (not which one, and no header), so Studio's "About this data" can say what share of page views carried one.
 
 ## How long data is kept
 

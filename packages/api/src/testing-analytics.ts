@@ -170,6 +170,8 @@ export function describeAnalyticsApi(label: string, factory: AnalyticsApiFactory
           // people's HTML 200 renders; the ratio needs an edge cache (Cloudflare), none here
           renders: 4,
           cacheHitRatio: null,
+          signals: 1,
+          privacySignalShare: 0.1,
           previous: {
             pageviews: 0,
             visits: 0,

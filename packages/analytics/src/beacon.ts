@@ -188,7 +188,8 @@ async function process(request: Request, ctx: BeaconContext): Promise<BeaconOutc
     if (!event) return drop("no-metrics");
   } else {
     let visitor: string | undefined;
-    if (settings.uniqueVisitors && ctx.salt && ip && !hasPrivacySignal(h)) {
+    const privacySignal = hasPrivacySignal(h);
+    if (settings.uniqueVisitors && ctx.salt && ip && !privacySignal) {
       const salt = await ctx.salt(now.toISOString().slice(0, 10));
       visitor = await visitorHash(salt, ctx.siteId, ip, userAgent);
     }
@@ -202,6 +203,7 @@ async function process(request: Request, ctx: BeaconContext): Promise<BeaconOutc
       ua,
       country,
       visitor,
+      privacySignal,
     });
     if (!event) {
       ctx.onError?.("analytics: built page view does not match the contract");

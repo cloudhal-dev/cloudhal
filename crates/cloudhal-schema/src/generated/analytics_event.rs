@@ -347,6 +347,12 @@ pub enum AnalyticsEvent {
         os: AnalyticsOs,
         #[doc = "WAE blob3. The published route the view resolved to; never a query string."]
         path: Path,
+        #[doc = "WAE double10 (1 or 0). The beacon request carried Global Privacy Control (Sec-GPC: 1) or Do Not Track (DNT: 1), so no visitor hash was formed. Only this flag is kept, never which signal or any header. Absent means no signal (and on events written before the field existed)."]
+        #[serde(
+            rename = "privacySignal",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        privacy_signal: ::std::option::Option<bool>,
         #[serde(
             rename = "refHost",
             skip_serializing_if = "::std::option::Option::is_none"
