@@ -22,12 +22,12 @@ import {
   newCommentsId,
   sealEmail,
 } from "@cloudhal/comments";
-import { SqlCommentStore } from "@cloudhal/comments/sql";
+import { exportPage, SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Actor, Comment, ContentEntry } from "@cloudhal/core-contracts";
 import { canonicalJson, type SiteGraphStore, seedStarterSite, sha256Hex } from "@cloudhal/core-ts";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import { defineTools } from "@cloudhal/mcp-server/tools";
-import type { SqlDriver } from "@cloudhal/storage";
+import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "./app.ts";
 import type { StaffService } from "./auth.ts";
@@ -573,6 +573,187 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       expect(ex.text).not.toContain("spam@example.com");
       const personal = await call(`${CM()}/export?personal=1`, "editor");
       expect(personal.text).toContain("spam@example.com");
+    });
+
+    it("operator (deployment token): status, paged export with personal data, idempotent import", async () => {
+      const TOKEN = "comments-operator-deploy-token-0123456789";
+      const a = await approved("First, with an email", { email: "reader@example.com" });
+      await seed("Still waiting");
+      const reply = await comments.reply(siteId, {
+        commentId: a.id,
+        text: "Thanks for reading",
+        person: { id: "user_editor000000", name: "Editor" },
+        badge: "team",
+      });
+      const operator = createApi({
+        store,
+        now: () => NOW,
+        audit,
+        comments: { store: comments, keys, onQueued: (_s, p) => queued.push(p) },
+        admin: { deployToken: TOKEN, storage: { sql, blobs: new MemoryBlobStore() } },
+      });
+      const op = async (path: string, init: { method?: string; body?: string } = {}) => {
+        const res = await operator.request(`/api/admin/sites/${siteId}/comments${path}`, {
+          method: init.method ?? "GET",
+          headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/x-ndjson" },
+          ...(init.body !== undefined ? { body: init.body } : {}),
+        });
+        return {
+          status: res.status,
+          text: await res.text(),
+          next: res.headers.get("cloudhal-next-cursor"),
+        };
+      };
+      // the deployment token, nothing else
+      expect((await operator.request(`/api/admin/sites/${siteId}/comments/status`)).status).toBe(
+        401,
+      );
+      expect(
+        (
+          await operator.request(`/api/admin/sites/site_doesnotexist1/comments/status`, {
+            headers: { authorization: `Bearer ${TOKEN}` },
+          })
+        ).status,
+      ).toBe(404);
+
+      const status = JSON.parse((await op("/status")).text) as Json;
+      expect(status).toMatchObject({
+        siteId,
+        key: true,
+        settings: { enabled: true, collections: ["posts"], protection: "pow", stored: true },
+        counts: { approved: 2, pending: 1 },
+        pending: { count: 1 },
+        today: { stored: 2, cap: 1000, paused: false },
+      });
+      expect((status.purge as Json).queued).toBeGreaterThanOrEqual(1);
+
+      // one page here (500 per page); without personal data no email anywhere
+      const plain = await op("/export");
+      expect(plain.next).toBeNull();
+      const lines = plain.text.trim().split("\n");
+      expect(JSON.parse(lines[0] as string)).toMatchObject({
+        cloudhal: "comments",
+        version: 1,
+        siteId,
+      });
+      expect(lines).toHaveLength(4);
+      expect(plain.text).not.toContain("reader@example.com");
+      expect(plain.text).not.toMatch(/ip_hmac|ipHmac|challenge|"proof"/);
+      const personal = await op("/export?personal=1");
+      const commenter = JSON.parse(personal.text.trim().split("\n").at(-1) as string) as Json;
+      expect(commenter).toMatchObject({
+        commenter: { email: "reader@example.com", commentIds: [a.id] },
+      });
+
+      // paging, as the CLI follows it: one comment per page, then one commenter per page
+      const paged: string[] = [];
+      let cursor: string | undefined;
+      for (let i = 0; i < 10; i++) {
+        const page = await exportPage(comments, siteId, {
+          ...(cursor ? { cursor } : {}),
+          personal: true,
+          keys,
+          maxComments: 1,
+          maxCommenters: 1,
+        });
+        paged.push(...page.lines);
+        cursor = page.next;
+        if (!cursor) break;
+      }
+      expect(paged).toHaveLength(5);
+      expect(paged.slice(1, 4).map((l) => (JSON.parse(l) as Json).id)).toEqual(
+        lines.slice(1).map((l) => (JSON.parse(l) as Json).id),
+      );
+
+      // moving: the rows go away, the file brings them back with their email link
+      await sql.batch([
+        { sql: "DELETE FROM comments WHERE site_id = ?", params: [siteId] },
+        { sql: "DELETE FROM commenter_emails WHERE site_id = ?", params: [siteId] },
+      ]);
+      queued.length = 0;
+      const forged = JSON.stringify({
+        ...(JSON.parse(lines[2] as string) as Json),
+        siteId: "site_elsewhere01",
+      });
+      const file = [
+        lines[0],
+        lines[1],
+        forged,
+        lines[3],
+        "not json",
+        personal.text.trim().split("\n").at(-1),
+      ];
+      const first = await op("/import", { method: "POST", body: file.join("\n") });
+      expect(first.status).toBe(200);
+      const report = JSON.parse(first.text) as Json;
+      expect(report).toMatchObject({ imported: 3, skipped: 0, commenters: 1 });
+      expect(report.invalid).toEqual([{ line: 5, error: "not JSON" }]);
+      expect(report.purged).toEqual([`cloudhal-comments-${entry.id}`]);
+      expect(queued).toEqual(["normal"]);
+      // the site comes from the route (C14); the record is the same; the email is linked again
+      expect(await comments.get(siteId, reply.id)).toEqual(reply);
+      expect((await comments.get(siteId, a.id))?.status).toBe("approved");
+      const who = await comments.findCommenter(siteId, { commentId: a.id });
+      expect(who && (await comments.commenter(siteId, who, keys))?.email).toBe(
+        "reader@example.com",
+      );
+      // again: nothing changes
+      const again = JSON.parse(
+        (await op("/import", { method: "POST", body: file.join("\n") })).text,
+      ) as Json;
+      expect(again).toMatchObject({ imported: 0, skipped: 3 });
+
+      // importers' origin is the key too; foreign entries and orphans are refused
+      const imported = (id: string, extra: Json = {}) =>
+        JSON.stringify({
+          schemaVersion: 1,
+          id,
+          siteId,
+          nodeId: entry.id,
+          source: "import",
+          origin: { system: "disqus", id: "123" },
+          author: { kind: "guest", name: "Ayşe" },
+          body: { format: "text", text: "From Disqus" },
+          status: "approved",
+          createdAt: "2020-01-01T00:00:00.000Z",
+          rev: 1,
+          ...extra,
+        });
+      const disqus = JSON.parse(
+        (
+          await op("/import", {
+            method: "POST",
+            body: [
+              imported("cmt_disqus000001"),
+              imported("cmt_disqus000002"),
+              imported("cmt_disqus000003", {
+                origin: { system: "disqus", id: "124" },
+                nodeId: "ent_notanentry01",
+              }),
+              imported("cmt_disqus000004", {
+                origin: { system: "disqus", id: "125" },
+                parentId: "cmt_missing0000001",
+              }),
+              imported("cmt_disqus000005", {
+                origin: { system: "disqus", id: "126" },
+                source: "webmention",
+              }),
+            ].join("\n"),
+          })
+        ).text,
+      ) as Json;
+      expect(disqus).toMatchObject({ imported: 1, skipped: 0 });
+      expect((disqus.invalid as Json[]).map((p) => p.line)).toEqual([3, 4, 5]);
+      const second = JSON.parse(
+        (await op("/import", { method: "POST", body: imported("cmt_disqus000009") })).text,
+      ) as Json;
+      expect(second).toMatchObject({ imported: 0, skipped: 1 });
+      expect(await comments.get(siteId, "cmt_disqus000009")).toBeNull();
+      // not an export at all
+      expect(
+        (await op("/import", { method: "POST", body: '{"cloudhal":"analytics","version":1}' }))
+          .status,
+      ).toBe(400);
     });
 
     it("approvals: carried out as the approving person, bound to the comments' state (C4)", async () => {
