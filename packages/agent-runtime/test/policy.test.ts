@@ -87,6 +87,92 @@ describe("PolicyEngine", () => {
     ).toMatchObject({ kind: "deny", reason: "missing scope analytics:read" });
   });
 
+  describe("call classes (RFC-0007 §10.2)", () => {
+    const comments = new PolicyEngine([
+      {
+        name: "list_comments",
+        scopes: ["comments:read"],
+        annotations: { readOnlyHint: true },
+      },
+      {
+        name: "label_comments",
+        scopes: ["comments:moderate"],
+        annotations: { readOnlyHint: false },
+        own: "comment",
+        classify: () => "advisory",
+      },
+      {
+        name: "moderate_comments",
+        scopes: ["comments:moderate"],
+        annotations: { readOnlyHint: false, destructiveHint: false },
+        own: "comment",
+        classify: (a) => (a.action === "approve" ? "person" : "reduce"),
+      },
+    ]);
+    const key = (mode: "plan" | "manual" | "edits" | "auto" | "bypass", local = false) => ({
+      actor: agent,
+      scopes: ["comments:read", "comments:moderate"] as ("comments:read" | "comments:moderate")[],
+      mode,
+      local,
+    });
+    const hide = { args: { action: "hide" } };
+    const approve = { args: { action: "approve" } };
+
+    it("read is free everywhere; plan refuses every other class", () => {
+      for (const mode of ["plan", "manual", "edits", "auto"] as const)
+        expect(comments.evaluate(key(mode), "list_comments")).toEqual({ kind: "allow" });
+      for (const tool of ["label_comments", "moderate_comments"])
+        expect(comments.evaluate(key("plan"), tool, hide)).toMatchObject({
+          kind: "deny",
+          code: "mode",
+        });
+    });
+
+    it("advisory is free from manual up; reduce waits only in manual", () => {
+      for (const mode of ["manual", "edits", "auto"] as const)
+        expect(comments.evaluate(key(mode), "label_comments")).toEqual({ kind: "allow" });
+      expect(comments.evaluate(key("manual"), "moderate_comments", hide)).toMatchObject({
+        kind: "approval-required",
+        cause: "manual-mode",
+      });
+      for (const mode of ["edits", "auto"] as const)
+        expect(comments.evaluate(key(mode), "moderate_comments", hide)).toEqual({ kind: "allow" });
+      expect(comments.evaluate(key("bypass", true), "moderate_comments", hide)).toEqual({
+        kind: "allow",
+      });
+    });
+
+    it("person waits in every mode, bypass included, and for people over MCP", () => {
+      for (const p of [key("manual"), key("edits"), key("auto"), key("bypass", true)])
+        expect(comments.evaluate(p, "moderate_comments", approve)).toMatchObject({
+          kind: "approval-required",
+          cause: "tool",
+        });
+      expect(
+        comments.evaluate({ actor: human, scopes: ["*"] }, "moderate_comments", approve),
+      ).toMatchObject({ kind: "approval-required", cause: "tool" });
+      // the person's own answer (or a decided approval) lets it run
+      expect(
+        comments.evaluate(key("edits"), "moderate_comments", { ...approve, confirmed: true }),
+      ).toEqual({ kind: "allow" });
+    });
+
+    it("own variants satisfy the tool with a comment limit", () => {
+      const author = {
+        actor: agent,
+        scopes: ["comments:moderate:own" as const],
+        mode: "edits" as const,
+      };
+      expect(comments.evaluate(author, "moderate_comments", hide)).toEqual({
+        kind: "allow",
+        limit: { level: "own", target: "comment" },
+      });
+      expect(
+        comments.evaluate({ actor: agent, scopes: ["comments:read"] }, "label_comments"),
+      ).toMatchObject({ kind: "deny", code: "missing_scope" });
+    });
+  });
+
   it("unknown tools are denied", () => {
     expect(engine.evaluate({ actor: human, scopes: ["*"] }, "nope")).toMatchObject({
       kind: "deny",

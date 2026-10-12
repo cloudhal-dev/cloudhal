@@ -77,6 +77,11 @@ export const KEY_SCOPES: readonly Exclude<AgentScope, "*">[] = [
   "asset:upload",
   "asset:manage",
   "analytics:read",
+  "comments:read",
+  "comments:moderate",
+  "comments:moderate:own",
+  "comments:reply",
+  "comments:reply:own",
 ];
 
 /**
@@ -126,12 +131,25 @@ const EDITOR: AnyScope[] = [
   "audit:read",
   "members:invite",
   "analytics:read",
+  "comments:read",
+  "comments:moderate",
+  "comments:reply",
+  "commenters:data",
 ];
 
 /** Role → scopes (`ROLE_SCOPES`, RFC-0005 §2.1), for servers that do not report them. */
 export const FALLBACK_ROLE_SCOPES: Record<Role, AnyScope[]> = {
   contributor: [...READ, "content:draft:own", "asset:upload"],
-  author: [...READ, "content:write:own", "site:publish:own", "asset:upload", "analytics:read"],
+  author: [
+    ...READ,
+    "content:write:own",
+    "site:publish:own",
+    "asset:upload",
+    "analytics:read",
+    "comments:read",
+    "comments:moderate:own",
+    "comments:reply:own",
+  ],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
   owner: ["*"],
@@ -156,6 +174,13 @@ export const FALLBACK_ABILITIES: Record<Ability, AnyScope | "owner"> = {
   "agents.manage": "agents:manage",
   "analytics.read": "analytics:read",
   "analytics.settings": "site:settings",
+  "comments.read": "comments:read",
+  "comments.moderate": "comments:moderate:own",
+  "comments.moderateAny": "comments:moderate",
+  "comments.reply": "comments:reply:own",
+  "comments.replyAny": "comments:reply",
+  "commenters.data": "commenters:data",
+  "comments.settings": "site:settings",
   "ownership.transfer": "owner",
 };
 

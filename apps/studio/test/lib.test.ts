@@ -90,6 +90,7 @@ describe("agent modes (ADR-0015)", () => {
       "content:read",
       "preview:create",
       "analytics:read",
+      "comments:read",
     ]);
     for (const mode of ["manual", "edits", "auto"] as const) {
       expect(scopesForMode(mode)).toEqual([
@@ -97,6 +98,7 @@ describe("agent modes (ADR-0015)", () => {
         "content:read",
         "preview:create",
         "analytics:read",
+        "comments:read",
         "content:write",
         "asset:upload",
         "site:publish",

@@ -190,6 +190,14 @@ describe("instance and skills", () => {
         approvals: false,
         elevationRequests: false,
         members: false,
+        // RFC-0007 §12: a server without comment storage says so
+        comments: {
+          available: false,
+          protection: [],
+          aiLabels: false,
+          keys: false,
+          purge: { pending: 0 },
+        },
         // RFC-0006 §8: a server without analytics says so
         analytics: {
           enabled: false,
@@ -210,12 +218,13 @@ describe("instance and skills", () => {
         modes: ["plan", "manual", "edits", "auto"],
         default: "edits",
         scopes: {
-          plan: ["site:read", "content:read", "preview:create", "analytics:read"],
+          plan: ["site:read", "content:read", "preview:create", "analytics:read", "comments:read"],
           manual: [
             "site:read",
             "content:read",
             "preview:create",
             "analytics:read",
+            "comments:read",
             "content:write",
             "asset:upload",
             "site:publish",
@@ -226,6 +235,7 @@ describe("instance and skills", () => {
             "content:read",
             "preview:create",
             "analytics:read",
+            "comments:read",
             "content:write",
             "asset:upload",
             "site:publish",
@@ -236,6 +246,7 @@ describe("instance and skills", () => {
             "content:read",
             "preview:create",
             "analytics:read",
+            "comments:read",
             "content:write",
             "asset:upload",
             "site:publish",

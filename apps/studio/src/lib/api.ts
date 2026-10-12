@@ -3,6 +3,8 @@ import type {
   AnalyticsChannel,
   AnalyticsDevice,
   Asset,
+  Comment,
+  CommentLabel,
   ContentEntry,
   Menu,
   NodeRef,
@@ -169,6 +171,11 @@ export type AgentScope =
   | "asset:upload"
   | "asset:manage"
   | "analytics:read"
+  | "comments:read"
+  | "comments:moderate"
+  | "comments:moderate:own"
+  | "comments:reply"
+  | "comments:reply:own"
   | "*";
 
 /** Scopes only a person holds through their role: never on a key (RFC-0005 I7). */
@@ -177,7 +184,8 @@ export type PersonScope =
   | "site:settings"
   | "members:invite"
   | "members:manage"
-  | "agents:manage";
+  | "agents:manage"
+  | "commenters:data";
 export type AnyScope = AgentScope | PersonScope;
 
 /**
@@ -468,6 +476,8 @@ export interface InstanceInfo {
     members?: boolean;
     /** Site analytics (RFC-0006 §8). Older servers omit it: read as not running. */
     analytics?: AnalyticsFeature;
+    /** Reader comments (RFC-0007 §12). Older servers omit it: read as not available. */
+    comments?: CommentsFeature;
   };
   /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
   agentModes?: AgentModesInfo;
@@ -501,6 +511,13 @@ export type Ability =
   | "agents.manage"
   | "analytics.read"
   | "analytics.settings"
+  | "comments.read"
+  | "comments.moderate"
+  | "comments.moderateAny"
+  | "comments.reply"
+  | "comments.replyAny"
+  | "commenters.data"
+  | "comments.settings"
   | "ownership.transfer";
 
 export interface RolesInfo {
@@ -718,7 +735,7 @@ export interface NotificationsPage {
   noticeMinutes: number;
 }
 /** The on/off features (`analytics` is an object of its own). */
-export type InstanceFeature = Exclude<keyof InstanceInfo["features"], "analytics">;
+export type InstanceFeature = Exclude<keyof InstanceInfo["features"], "analytics" | "comments">;
 
 /** A skill agents can read over MCP (`GET /api/skills`). */
 export interface SkillSummary {
@@ -1141,6 +1158,199 @@ function analyticsQuery(
 
 const analyticsPath = (siteId: string) => `/api/sites/${encodeURIComponent(siteId)}/analytics`;
 
+// ---- reader comments (RFC-0007 §12–§13, packages/api/src/routes/comments.ts) ----------------
+
+export type ReaderCommentStatus = Comment["status"];
+export type CommentLabelName = CommentLabel["label"];
+export type CommentReasonCode = NonNullable<NonNullable<Comment["moderation"]>["reasonCode"]>;
+export type CommentModerateAction = "approve" | "restore" | "hide" | "spam" | "hold";
+export type CommentThreadMode = "default" | "open" | "closed" | "hidden";
+export type CommentThreadState = "open" | "closed" | "hidden" | "off";
+export type CommentReportReason = "spam" | "abuse" | "personal-data" | "illegal-content" | "other";
+
+/** A comment as Studio sees it: the contract plus its entry and open reports (never an email). */
+export interface CommentView extends Comment {
+  entry: { title: string; path: string } | null;
+  reports: { count: number; reasons: CommentReportReason[] };
+}
+
+export type CommentCounts = Record<ReaderCommentStatus | "reported", number>;
+
+export interface CommentListQuery {
+  status?: ReaderCommentStatus | "reported";
+  node?: string;
+  label?: CommentLabelName;
+  since?: string;
+  cursor?: string;
+  limit?: number;
+  order?: "newest" | "oldest";
+}
+
+export interface CommentModerationResult {
+  id: string;
+  ok: boolean;
+  status?: ReaderCommentStatus;
+  rev?: number;
+  error?: "conflict" | "not_found" | "not_own" | "invalid_transition";
+}
+
+export interface CommentModerationResponse {
+  results: CommentModerationResult[];
+  /** `queued`: the live page updates within a minute (§8.4). */
+  purge: "queued" | "none";
+}
+
+/** One row of a comment's moderation history (a statement of reasons, DSA Art. 17). */
+export interface CommentEventRow {
+  id: string;
+  commentId: string;
+  action: string;
+  actor: Actor;
+  reasonCode: CommentReasonCode | null;
+  note: string | null;
+  automated: boolean;
+  approvalId: string | null;
+  at: string;
+}
+
+export interface CommentReportRow {
+  id: string;
+  commentId: string;
+  reason: CommentReportReason;
+  /** Untrusted reader text: render as plain text. */
+  details: string | null;
+  hasEmail: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolution: string | null;
+}
+
+export interface CommentThreadView {
+  nodeId: string;
+  mode: CommentThreadMode;
+  rev: number;
+  closesAt: string | null;
+  state: CommentThreadState;
+}
+
+export interface CommentSummary {
+  range: "today" | "7d" | "30d";
+  since: string;
+  counts: CommentCounts;
+  pending: { count: number; oldestAt: string | null; medianAt: string | null };
+  busiestThreads: { nodeId: string; comments: number; title: string | null }[];
+  labels: Partial<Record<CommentLabelName, number>>;
+  unansweredQuestions: number;
+  dailyCap: { used: number; cap: number; paused: boolean };
+  purge: { pending: number; takedowns: number };
+}
+
+export interface CommentRetention {
+  pendingDays: number;
+  spamDays: number;
+  deletedDays: number;
+  hiddenDays: number | null;
+  clientDataDays: number;
+  resolvedReportDays: number;
+}
+
+/** A site's comment settings (`@cloudhal/comments` `CommentSettings`); `rev` 0 = the defaults. */
+export interface CommentSettings {
+  siteId: string;
+  enabled: boolean;
+  showWhenOff: boolean;
+  collections: Record<string, { enabled: boolean; closeAfterDays?: number | null }>;
+  closeAfterDays: number | null;
+  protection: "pow" | "turnstile";
+  turnstileSiteKey: string | null;
+  allowWithoutScript: boolean;
+  linkLimit: number;
+  watchWords: string[];
+  blockedWords: string[];
+  dailyCap: number;
+  aiLabels: "off" | "workers-ai";
+  retention: CommentRetention;
+  planHint: "free" | "paid" | null;
+  rev: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export type CommentSettingsPatch = Partial<
+  Omit<CommentSettings, "siteId" | "rev" | "updatedAt" | "updatedBy" | "retention">
+> & { retention?: Partial<CommentRetention> };
+
+/** A commenter with their email: `commenters:data` (Editors and above) only. */
+export interface Commenter {
+  id: string;
+  email: string;
+  firstSeen: string;
+  commentIds: string[];
+  reportIds: string[];
+}
+
+export interface CommentEraseResult {
+  comments: number;
+  reports: number;
+  emailDeleted: boolean;
+  nodeIds: string[];
+}
+
+export interface CommentBan {
+  id: string;
+  subject: "email" | "ip";
+  until: string | null;
+  reasonCode: CommentReasonCode;
+  note: string | null;
+  by: Actor;
+  at: string;
+}
+
+/** `features.comments` of `/api/instance`. */
+export interface CommentsFeature {
+  available: boolean;
+  protection: ("pow" | "turnstile")[];
+  aiLabels: boolean;
+  /** Emails and secrets can be read and stored (`CLOUDHAL_COMMENTS_KEY`). */
+  keys: boolean;
+  purge: { pending: number };
+}
+
+/** The comment notifications (RFC-0007 §13). */
+export type CommentNotification =
+  | {
+      id: string;
+      kind: "comments-pending";
+      siteId: string;
+      count: number;
+      oldestAt: string | null;
+      at: string;
+    }
+  | { id: string; kind: "comments-reported"; siteId: string; count: number; at: string }
+  | { id: string; kind: "comments-paused"; siteId: string; cap: number; day: string; at: string }
+  | {
+      id: string;
+      kind: "comments-purge-waiting";
+      siteId: string;
+      tags: number;
+      since: string;
+      at: string;
+    }
+  | {
+      id: string;
+      kind: "comments-approval";
+      siteId: string;
+      approvalId: string;
+      tool: string;
+      agent: Actor;
+      createdAt: string;
+      expiresAt: string;
+      at: string;
+    };
+
+const commentsPath = (siteId: string) => `/api/sites/${encodeURIComponent(siteId)}`;
+
 export const api = {
   me: () => request<Me>("/api/me"),
   instance: () => request<InstanceInfo>("/api/instance"),
@@ -1206,7 +1416,22 @@ export const api = {
   },
   notifications: {
     /** What needs the signed-in person's attention; 404 on servers without it (see `isNotEnabled`). */
-    list: () => request<NotificationsPage>("/api/notifications"),
+    /**
+     * The bell's items. Comment notifications (RFC-0007 §13) are left out until the bell renders
+     * them (rollout step 8); `withComments` returns them separately.
+     */
+    list: () =>
+      request<NotificationsPage>("/api/notifications").then((page) => ({
+        ...page,
+        items: (page?.items ?? []).filter(
+          (n) => !String((n as { kind: string }).kind).startsWith("comments-"),
+        ),
+      })),
+    /** Every item, comment kinds included, for the comment screens. */
+    withComments: () =>
+      request<{ items: (StudioNotification | CommentNotification)[]; noticeMinutes: number }>(
+        "/api/notifications",
+      ),
   },
   skills: {
     list: () => request<SkillSummary[]>("/api/skills"),
@@ -1652,6 +1877,186 @@ export const api = {
       request<{ settings: AnalyticsSettings; purged: boolean; saltDeleted: boolean }>(
         `${analyticsPath(siteId)}/settings`,
         { method: "PUT", ...json({ rev, ...patch }) },
+      ),
+  },
+  /**
+   * Reader comments (RFC-0007 §12): the queue for Authors and above (moderation and replies on
+   * their own articles), everything for Editors, commenter data for `commenters:data`, settings
+   * for Administrators. Render every name, text and report as plain text.
+   */
+  comments: {
+    list: (siteId: string, q: CommentListQuery = {}) =>
+      request<{ items: CommentView[]; nextCursor?: string; counts: CommentCounts }>(
+        `${commentsPath(siteId)}/comments${query({ ...q })}`,
+      ),
+    summary: (siteId: string, range: CommentSummary["range"] = "7d") =>
+      request<CommentSummary>(`${commentsPath(siteId)}/comments/summary${query({ range })}`),
+    get: (siteId: string, commentId: string) =>
+      request<{
+        comment: CommentView;
+        history: CommentEventRow[];
+        reports: CommentReportRow[];
+        thread: CommentThreadView;
+      }>(`${commentsPath(siteId)}/comments/${encodeURIComponent(commentId)}`),
+    /** ≤ 50 ids; per-comment results (`conflict`, `not_own`, …). hide and spam need a reasonCode. */
+    moderate: (
+      siteId: string,
+      input: {
+        ids: string[];
+        action: CommentModerateAction;
+        revs: Record<string, number>;
+        reasonCode?: CommentReasonCode;
+        note?: string;
+      },
+    ) =>
+      request<CommentModerationResponse>(`${commentsPath(siteId)}/comments/moderate`, {
+        method: "POST",
+        ...json(input),
+      }),
+    /** Soft delete (Editors and above): the text is removed at once; a reason is required. */
+    remove: (
+      siteId: string,
+      commentId: string,
+      rev: number,
+      reasonCode: CommentReasonCode,
+      note?: string,
+    ) =>
+      request<CommentModerationResponse>(
+        `${commentsPath(siteId)}/comments/${encodeURIComponent(commentId)}`,
+        { method: "DELETE", ...json({ rev, reasonCode, ...(note ? { note } : {}) }) },
+      ),
+    label: (
+      siteId: string,
+      commentId: string,
+      change: { add?: CommentLabelName[]; remove?: CommentLabelName[]; rev?: number },
+    ) =>
+      request<CommentModerationResult>(
+        `${commentsPath(siteId)}/comments/${encodeURIComponent(commentId)}/labels`,
+        { method: "PATCH", ...json(change) },
+      ),
+    /** A person's reply on the site's behalf, approved at once ("Author" badge on one's own articles). */
+    reply: (siteId: string, commentId: string, text: string) =>
+      request<{ comment: CommentView }>(
+        `${commentsPath(siteId)}/comments/${encodeURIComponent(commentId)}/replies`,
+        { method: "POST", ...json({ text }) },
+      ),
+    editReply: (siteId: string, commentId: string, text: string, rev: number) =>
+      request<{ comment: CommentView }>(
+        `${commentsPath(siteId)}/comments/${encodeURIComponent(commentId)}`,
+        { method: "PATCH", ...json({ text, rev }) },
+      ),
+    reports: (siteId: string, q: { open?: "true" | "false" | "all"; commentId?: string } = {}) =>
+      request<{ items: CommentReportRow[] }>(
+        `${commentsPath(siteId)}/comments/reports${query({ ...q })}`,
+      ),
+    resolveReport: (siteId: string, reportId: string, resolution: string) =>
+      request<CommentReportRow>(
+        `${commentsPath(siteId)}/comments/reports/${encodeURIComponent(reportId)}/resolve`,
+        { method: "POST", ...json({ resolution }) },
+      ),
+    /** A download link (JSON lines); `personal` also needs `commenters:data`. */
+    exportUrl: (siteId: string, personal = false) =>
+      `${commentsPath(siteId)}/comments/export${personal ? "?personal=1" : ""}`,
+    settings: (siteId: string) =>
+      request<{
+        settings: CommentSettings;
+        secrets: Record<"turnstile-secret", { updatedAt: string; updatedBy: string } | null>;
+        canStoreSecrets: boolean;
+      }>(`${commentsPath(siteId)}/comments/settings`),
+    /** CAS on `rev` (0 before the first save): 409 `conflict` when it changed meanwhile. */
+    updateSettings: (siteId: string, rev: number, patch: CommentSettingsPatch) =>
+      request<{ settings: CommentSettings; purge: "none" | "tags" | "everything" }>(
+        `${commentsPath(siteId)}/comments/settings`,
+        { method: "PUT", ...json({ rev, ...patch }) },
+      ),
+    /** Write-only (503 `comments_key_missing` without `CLOUDHAL_COMMENTS_KEY`). */
+    setSecret: (siteId: string, name: "turnstile-secret", value: string) =>
+      request<{ name: string; updatedAt: string; updatedBy: string }>(
+        `${commentsPath(siteId)}/comments/settings/secrets/${name}`,
+        { method: "PUT", ...json({ value }) },
+      ),
+    deleteSecret: (siteId: string, name: "turnstile-secret") =>
+      request<{ name: string; deleted: boolean }>(
+        `${commentsPath(siteId)}/comments/settings/secrets/${name}`,
+        { method: "DELETE" },
+      ),
+    /** The last resort when a takedown waits (§8.4 step 5). */
+    purgeSiteCache: (siteId: string) =>
+      request<{ purged: boolean }>(`${commentsPath(siteId)}/comments/purge-site-cache`, {
+        method: "POST",
+      }),
+    thread: (siteId: string, nodeId: string) =>
+      request<{ thread: CommentThreadView; counts: CommentCounts }>(
+        `${commentsPath(siteId)}/comment-threads/${encodeURIComponent(nodeId)}`,
+      ),
+    /** CAS on the thread's `rev` (0 before the first change). */
+    setThread: (
+      siteId: string,
+      nodeId: string,
+      rev: number,
+      change: { mode: CommentThreadMode; closesAt?: string | null },
+    ) =>
+      request<{ thread: CommentThreadView }>(
+        `${commentsPath(siteId)}/comment-threads/${encodeURIComponent(nodeId)}`,
+        { method: "PUT", ...json({ rev, ...change }) },
+      ),
+    findCommenter: (siteId: string, by: { email: string } | { commentId: string }) =>
+      request<{ commenter: Commenter | null }>(
+        `${commentsPath(siteId)}/commenters${query({ ...by })}`,
+      ),
+    commenter: (siteId: string, commenterId: string) =>
+      request<{ commenter: Commenter; comments: CommentView[] }>(
+        `${commentsPath(siteId)}/commenters/${encodeURIComponent(commenterId)}`,
+      ),
+    exportCommenter: (siteId: string, commenterId: string) =>
+      request<{ commenter: Commenter; comments: Comment[] }>(
+        `${commentsPath(siteId)}/commenters/${encodeURIComponent(commenterId)}/export`,
+        { method: "POST" },
+      ),
+    /** `anonymise` (default) or `delete-text`; a reason is required. Audited, purged. */
+    eraseCommenter: (
+      siteId: string,
+      commenterId: string,
+      mode: "anonymise" | "delete-text",
+      reason: string,
+    ) =>
+      request<CommentEraseResult>(
+        `${commentsPath(siteId)}/commenters/${encodeURIComponent(commenterId)}/erase`,
+        { method: "POST", ...json({ mode, reason }) },
+      ),
+    /** A guest who left no email: erase these comments' author (and text). */
+    eraseComments: (
+      siteId: string,
+      commentIds: string[],
+      mode: "anonymise" | "delete-text",
+      reason: string,
+    ) =>
+      request<CommentEraseResult>(`${commentsPath(siteId)}/comments/erase`, {
+        method: "POST",
+        ...json({ commentIds, mode, reason }),
+      }),
+    bans: (siteId: string) =>
+      request<{ items: CommentBan[] }>(`${commentsPath(siteId)}/comment-bans`),
+    /** Bans the author of a comment by email and/or this month's IP hash; nobody sees an address. */
+    ban: (
+      siteId: string,
+      input: {
+        commentId: string;
+        subjects: ("email" | "ip")[];
+        until?: string | null;
+        reasonCode: CommentReasonCode;
+        note?: string;
+        hidePast?: boolean;
+      },
+    ) =>
+      request<{ bans: CommentBan[]; hidden: number }>(`${commentsPath(siteId)}/comment-bans`, {
+        method: "POST",
+        ...json(input),
+      }),
+    liftBan: (siteId: string, banId: string) =>
+      request<{ lifted: boolean }>(
+        `${commentsPath(siteId)}/comment-bans/${encodeURIComponent(banId)}`,
+        { method: "DELETE" },
       ),
   },
   /** Draft previews are whole HTML documents for a sandboxed `<iframe>`, not JSON. */

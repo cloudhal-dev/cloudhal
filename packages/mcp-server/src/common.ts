@@ -4,6 +4,7 @@
  */
 import {
   type ApprovalStore,
+  type CallClass,
   checkEntryLimit,
   type OwnershipResolver,
   type OwnLimit,
@@ -13,7 +14,8 @@ import {
   type ToolAnnotations,
 } from "@cloudhal/agent-runtime";
 import type { AnalyticsService } from "@cloudhal/analytics/service";
-import type { ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
+import { CommentsError } from "@cloudhal/comments";
+import type { Actor, ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { InvariantCode, SiteGraphStore } from "@cloudhal/core-ts";
 import {
   ConflictError,
@@ -23,6 +25,7 @@ import {
   UniqueConstraintError,
 } from "@cloudhal/core-ts";
 import type { FetchTransport } from "@cloudhal/core-ts/media";
+import type { CommentsDeps } from "./comments.ts";
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -48,7 +51,27 @@ export interface ToolDefinition {
    * handler (and `precheck`) check the target with `entryLimitCheck`; `changeset` — `runTool`
    * checks that a publish is own-only.
    */
-  own?: "entry" | "changeset";
+  own?: "entry" | "changeset" | "comment";
+  /**
+   * Per-argument policy (RFC-0007 §10.2): `read`, `advisory`, `reduce` or `person`. `person`
+   * calls wait for a person in every mode, `bypass` included.
+   */
+  classify?: (args: Record<string, unknown>) => CallClass;
+  /**
+   * What an approval of this call is bound to, instead of the site graph's `stateHash` (RFC-0007
+   * §10.3): comment tools bind to the `cm1:` hash of the comments and threads they name.
+   */
+  bindState?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
+  /**
+   * Approving a request for this tool in Studio runs it at once as the approving person
+   * (RFC-0007 §10.3); the agent never redeems it.
+   */
+  carryOutOnApproval?: boolean;
+  /**
+   * The text content of a result (default: the result as JSON). Comment tools write reader text
+   * inside labelled untrusted blocks (RFC-0007 §11.2).
+   */
+  renderText?: (result: unknown) => string;
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
   /**
    * What the audit log keeps of the arguments (default: all of them, truncated). `upload_asset`
@@ -97,6 +120,18 @@ export interface ToolContext {
   media?: MediaToolOptions | undefined;
   /** Site analytics (RFC-0006): the analytics tools answer `analytics_disabled` without it. */
   analytics?: AnalyticsService | undefined;
+  /** Reader comments (RFC-0007): the comment tools answer `comments_disabled` without them. */
+  comments?: CommentsDeps | undefined;
+  /**
+   * Set by `runTool`: a person said yes to this call in their own client (or a decided approval
+   * is being carried out), so a `person`-class call may run.
+   */
+  confirmed?: boolean | undefined;
+  /**
+   * Set when Studio carries out an approved request (RFC-0007 §10.3): `principal` is the approving
+   * person, `requestedBy` the agent that asked.
+   */
+  approval?: { readonly id: string; readonly requestedBy: Actor } | undefined;
 }
 
 /**
@@ -149,7 +184,8 @@ export type ToolErrorCode =
   | "ambiguous_term"
   | "invalid_filter"
   | "analytics_disabled"
-  | "analytics_unavailable";
+  | "analytics_unavailable"
+  | "comments_disabled";
 
 export class ToolError extends Error {
   override readonly name = "ToolError";
@@ -252,6 +288,18 @@ function invariantHint(e: InvariantError): string | undefined {
 /** Store errors as `ToolError`s with stable codes; anything else is returned unchanged. */
 export function toToolError(e: unknown): unknown {
   if (e instanceof ToolError) return e;
+  // Comment store errors (RFC-0007): stable codes, the store's message says what to fix.
+  if (e instanceof CommentsError)
+    return new ToolError(
+      e.code === "not_found"
+        ? "not_found"
+        : e.code === "conflict"
+          ? "conflict"
+          : e.code === "forbidden"
+            ? "denied"
+            : "invalid",
+      e.message,
+    );
   if (e instanceof ConflictError) return new ToolError("conflict", e.message);
   if (e instanceof NotFoundError) return new ToolError("not_found", e.message);
   if (e instanceof UniqueConstraintError)

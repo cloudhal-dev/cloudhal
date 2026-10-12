@@ -34,7 +34,8 @@
     "@hono/node-server": "catalog:",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/mcp-server": "workspace:*",
-    "@cloudhal/cloudflare": "workspace:*"
+    "@cloudhal/cloudflare": "workspace:*",
+    "@cloudhal/comments": "workspace:*"
   },
   "peerDependencies": {
     "astro": "^7.3.0"
@@ -46,8 +47,7 @@
     "vitest": "catalog:",
     "@modelcontextprotocol/client": "catalog:",
     "wrangler": "catalog:",
-    "@cloudflare/workers-types": "catalog:",
-    "@cloudhal/comments": "workspace:*"
+    "@cloudflare/workers-types": "catalog:"
   },
   "engines": {
     "node": ">=24"

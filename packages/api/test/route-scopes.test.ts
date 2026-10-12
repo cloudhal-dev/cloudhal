@@ -4,6 +4,7 @@
  */
 import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlAnalytics } from "@cloudhal/analytics/sql";
+import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -36,6 +37,7 @@ async function fullApp() {
     preview: { secret: "route-scopes-preview-secret-0123456789ab" },
     admin: { deployToken: "route-scopes-deploy-token-0123456789abc", storage: { sql, blobs } },
     analytics: new AnalyticsService({ sql, store: "sql", live: new SqlAnalytics(sql) }),
+    comments: { store: new SqlCommentStore(sql) },
   });
 }
 
@@ -126,5 +128,48 @@ describe("ROUTE_SCOPES (I15)", () => {
     expect(requirementFor("POST", "/api/admin/sites/site_x/analytics/rollup")).toBe("deploy-token");
     expect(requirementFor("GET", "/api/admin/sites/site_x/analytics/status")).toBe("deploy-token");
     expect(requirementFor("GET", "/api/admin/sites/site_x/analytics/export")).toBe("deploy-token");
+  });
+
+  it("reader comments (RFC-0007 §12): reads, own moderation, person-only commenter data", () => {
+    const s = "/api/sites/site_x";
+    const cm = `${s}/comments`;
+    const cases: [string, string, string][] = [
+      ["GET", cm, "comments:read"],
+      ["GET", `${cm}/summary`, "comments:read"],
+      ["GET", `${cm}/cmt_abcdef123456`, "comments:read"],
+      ["GET", `${cm}/settings`, "comments:read"],
+      ["GET", `${s}/comment-threads/entry_y00001`, "comments:read"],
+      // literal segments win over :commentId
+      ["GET", `${cm}/reports`, "comments:moderate:own"],
+      ["GET", `${cm}/export`, "comments:moderate"],
+      ["POST", `${cm}/moderate`, "comments:moderate:own"],
+      ["POST", `${cm}/reports/rep_x/resolve`, "comments:moderate:own"],
+      ["PATCH", `${cm}/cmt_abcdef123456/labels`, "comments:moderate:own"],
+      ["PUT", `${s}/comment-threads/entry_y00001`, "comments:moderate:own"],
+      ["POST", `${cm}/cmt_abcdef123456/replies`, "comments:reply:own"],
+      ["PATCH", `${cm}/cmt_abcdef123456`, "comments:reply:own"],
+      ["DELETE", `${cm}/cmt_abcdef123456`, "comments:moderate"],
+      ["POST", `${cm}/purge-site-cache`, "comments:moderate"],
+      ["GET", `${s}/comment-bans`, "comments:moderate"],
+      ["POST", `${s}/comment-bans`, "comments:moderate"],
+      ["DELETE", `${s}/comment-bans/ban_x`, "comments:moderate"],
+      ["POST", `${cm}/erase`, "commenters:data"],
+      ["GET", `${s}/commenters`, "commenters:data"],
+      ["GET", `${s}/commenters/cmr_x`, "commenters:data"],
+      ["POST", `${s}/commenters/cmr_x/export`, "commenters:data"],
+      ["POST", `${s}/commenters/cmr_x/erase`, "commenters:data"],
+      ["PUT", `${cm}/settings`, "site:settings"],
+      ["PUT", `${cm}/settings/secrets/turnstile-secret`, "site:settings"],
+      ["DELETE", `${cm}/settings/secrets/turnstile-secret`, "site:settings"],
+    ];
+    for (const [m, p, req] of cases) expect(requirementFor(m, p), `${m} ${p}`).toBe(req);
+    for (const [m, p] of [
+      ["POST", cm],
+      ["PUT", `${cm}/cmt_abcdef123456`],
+      ["DELETE", `${s}/commenters/cmr_x`],
+      ["POST", `${cm}/settings`],
+      ["GET", `${cm}/cmt_abcdef123456/history`],
+    ] as const)
+      expect(requirementFor(m, p), `${m} ${p}`).toBeUndefined();
   });
 });

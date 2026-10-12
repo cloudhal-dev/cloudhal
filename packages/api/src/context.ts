@@ -9,6 +9,7 @@ import type {
 import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
+import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
@@ -85,6 +86,11 @@ export interface ApiDeps {
    * and the MCP analytics tools, and fills `/api/instance` → `features.analytics`.
    */
   readonly analytics?: AnalyticsService;
+  /**
+   * Reader comments (RFC-0007): mounts `/api/sites/:id/comments/*`, comment threads, commenters
+   * and bans, the MCP comment tools, the comment notifications and `features.comments`.
+   */
+  readonly comments?: CommentsDeps;
 }
 
 export type Env = {
@@ -110,5 +116,7 @@ export type Env = {
     uploadSecret: UploadSecret;
     /** Site analytics (RFC-0006); undefined on servers without it. */
     analytics: AnalyticsService | undefined;
+    /** Reader comments (RFC-0007); undefined on servers without them. */
+    comments: CommentsDeps | undefined;
   };
 };

@@ -38,6 +38,11 @@ export interface PurgeSiteCacheOptions {
   };
   readonly change: PublishChange;
   readonly log?: (line: string) => void;
+  /**
+   * Called once per purge request sent, whatever its answer (RFC-0007 §8.4: publishes and comment
+   * purges share one budget, recorded in `cache_purge_log`).
+   */
+  readonly onRequest?: () => Promise<void> | void;
 }
 
 export interface PurgeSiteCacheResult {
@@ -59,8 +64,12 @@ export async function purgeSiteCache(o: PurgeSiteCacheOptions): Promise<PurgeSit
   const log = o.log ?? (() => {});
   const auth = { authorization: `Bearer ${o.token}` };
   let requests = 0;
-  const everything = async (reason: string): Promise<PurgeSiteCacheResult> => {
+  const sentOne = async () => {
     requests++;
+    await o.onRequest?.();
+  };
+  const everything = async (reason: string): Promise<PurgeSiteCacheResult> => {
+    await sentOne();
     const res = await o.fetch(PURGE_URL, { method: "POST", headers: auth });
     log(`purge everything (${reason}): ${res.status} ${await res.text()}`);
     if (!res.ok) throw new Error(`purge everything failed: ${res.status}`);
@@ -77,7 +86,7 @@ export async function purgeSiteCache(o: PurgeSiteCacheOptions): Promise<PurgeSit
   }
   for (let i = 0; i < plan.tags.length; i += PURGE_TAGS_PER_REQUEST) {
     const batch = plan.tags.slice(i, i + PURGE_TAGS_PER_REQUEST);
-    requests++;
+    await sentOne();
     const res = await o.fetch(PURGE_URL, {
       method: "POST",
       headers: { ...auth, "content-type": "application/json" },

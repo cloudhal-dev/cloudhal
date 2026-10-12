@@ -27,6 +27,7 @@
     "@cloudhal/analytics": "workspace:*",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/api": "workspace:*",
+    "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "zod": "catalog:"

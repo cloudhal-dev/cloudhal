@@ -415,113 +415,6 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@24.19.1)(happy-dom@20.14.5)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  examples/newsroom:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@24.19.1)(astro@7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1)
-
-  examples/smoke:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/studio-demo:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/ui-audit:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@24.19.1)(astro@7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@24.19.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@24.19.1)
-
   packages/agent-runtime:
     dependencies:
       '@cloudhal/core-contracts':
@@ -592,6 +485,9 @@ importers:
       '@cloudhal/astro-renderer':
         specifier: workspace:*
         version: link:../astro-renderer
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -702,6 +598,9 @@ importers:
       '@cloudhal/cloudflare':
         specifier: workspace:*
         version: link:../cloudflare
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -724,9 +623,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20261007.1
-      '@cloudhal/comments':
-        specifier: workspace:*
-        version: link:../comments
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.3.1
@@ -757,6 +653,9 @@ importers:
       '@cloudhal/api':
         specifier: workspace:*
         version: link:../api
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@cloudhal/core-ts':
         specifier: workspace:*
         version: link:../core-ts
@@ -897,6 +796,9 @@ importers:
       '@cloudhal/astro-renderer':
         specifier: workspace:*
         version: link:../astro-renderer
+      '@cloudhal/comments':
+        specifier: workspace:*
+        version: link:../comments
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts

@@ -31,6 +31,11 @@ const EDITOR: Scope[] = [
   "audit:read",
   "members:invite",
   "analytics:read",
+  // RFC-0007 §10.1 (D6): every comment; commenter emails through the person-only scope.
+  "comments:read",
+  "comments:moderate",
+  "comments:reply",
+  "commenters:data",
 ];
 
 /**
@@ -40,7 +45,18 @@ const EDITOR: Scope[] = [
 export const ROLE_SCOPES: Readonly<Record<Role, readonly Scope[]>> = {
   contributor: [...READ, "content:draft:own", "asset:upload"],
   // RFC-0006 §9.1: Authors and above read analytics; Contributors do not in v1.
-  author: [...READ, "content:write:own", "site:publish:own", "asset:upload", "analytics:read"],
+  // RFC-0007 §10.1 (D6): Authors read comments and moderate and reply on their own entries;
+  // Contributors get no comment scopes in v1.
+  author: [
+    ...READ,
+    "content:write:own",
+    "site:publish:own",
+    "asset:upload",
+    "analytics:read",
+    "comments:read",
+    "comments:moderate:own",
+    "comments:reply:own",
+  ],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
   owner: ["*"],
@@ -192,6 +208,15 @@ export const ABILITIES = {
   // RFC-0006 §9.1: reading analytics; changing the site's analytics settings (Administrator).
   "analytics.read": "analytics:read",
   "analytics.settings": "site:settings",
+  // RFC-0007 §10.1: the comment queue; moderating and replying (`:own` on one's own entries is
+  // enough for the first of each pair); commenter emails and erasure; the site's comment settings.
+  "comments.read": "comments:read",
+  "comments.moderate": "comments:moderate:own",
+  "comments.moderateAny": "comments:moderate",
+  "comments.reply": "comments:reply:own",
+  "comments.replyAny": "comments:reply",
+  "commenters.data": "commenters:data",
+  "comments.settings": "site:settings",
   "ownership.transfer": "owner",
 } as const satisfies Record<string, Scope | "owner">;
 

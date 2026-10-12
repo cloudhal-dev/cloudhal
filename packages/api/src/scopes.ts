@@ -27,6 +27,7 @@ const T = `${S}/terms/:termId`;
 const M = `${S}/menus`;
 const A = `${S}/assets`;
 const AN = `${S}/analytics`;
+const CM = `${S}/comments`;
 
 /** Every route of `createApi`, with what it requires. */
 export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement])[] = [
@@ -163,6 +164,36 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${AN}/export`, "analytics:read"],
   ["GET", `${AN}/settings`, "analytics:read"],
   ["PUT", `${AN}/settings`, "site:settings"],
+  // reader comments (RFC-0007 §12): the queue for Authors and above, moderation and replies on
+  // one's own entries (the handler checks "own"), deletes, exports, bans and the last-resort purge
+  // for Editors and above, commenter emails and erasure person-only (commenters:data), settings
+  // for Administrators
+  ["GET", CM, "comments:read"],
+  ["GET", `${CM}/summary`, "comments:read"],
+  ["GET", `${CM}/reports`, "comments:moderate:own"],
+  ["POST", `${CM}/reports/:reportId/resolve`, "comments:moderate:own"],
+  ["GET", `${CM}/export`, "comments:moderate"],
+  ["GET", `${CM}/settings`, "comments:read"],
+  ["PUT", `${CM}/settings`, "site:settings"],
+  ["PUT", `${CM}/settings/secrets/:name`, "site:settings"],
+  ["DELETE", `${CM}/settings/secrets/:name`, "site:settings"],
+  ["POST", `${CM}/moderate`, "comments:moderate:own"],
+  ["POST", `${CM}/erase`, "commenters:data"],
+  ["POST", `${CM}/purge-site-cache`, "comments:moderate"],
+  ["GET", `${CM}/:commentId`, "comments:read"],
+  ["PATCH", `${CM}/:commentId/labels`, "comments:moderate:own"],
+  ["POST", `${CM}/:commentId/replies`, "comments:reply:own"],
+  ["PATCH", `${CM}/:commentId`, "comments:reply:own"],
+  ["DELETE", `${CM}/:commentId`, "comments:moderate"],
+  ["GET", `${S}/comment-threads/:nodeId`, "comments:read"],
+  ["PUT", `${S}/comment-threads/:nodeId`, "comments:moderate:own"],
+  ["GET", `${S}/commenters`, "commenters:data"],
+  ["GET", `${S}/commenters/:commenterId`, "commenters:data"],
+  ["POST", `${S}/commenters/:commenterId/export`, "commenters:data"],
+  ["POST", `${S}/commenters/:commenterId/erase`, "commenters:data"],
+  ["GET", `${S}/comment-bans`, "comments:moderate"],
+  ["POST", `${S}/comment-bans`, "comments:moderate"],
+  ["DELETE", `${S}/comment-bans/:banId`, "comments:moderate"],
   ["POST", `${S}/migrations/tags-to-terms`, "site:settings"],
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];

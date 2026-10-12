@@ -1,5 +1,6 @@
 import { OwnLimitError } from "@cloudhal/agent-runtime";
 import { AnalyticsError } from "@cloudhal/analytics";
+import { CommentsError } from "@cloudhal/comments";
 import { ContractValidationError } from "@cloudhal/core-contracts";
 import {
   ConflictError,
@@ -130,6 +131,18 @@ export function errorHandler(err: Error, c: Context): Response {
     return c.json<ApiErrorBody>({ error: "not_found", message: err.message }, 404);
   }
   if (err instanceof AnalyticsError) return analyticsError(err, c);
+  // RFC-0007: comment store errors carry stable codes.
+  if (err instanceof CommentsError)
+    return c.json<ApiErrorBody>(
+      { error: err.code, message: err.message },
+      err.code === "not_found"
+        ? 404
+        : err.code === "conflict"
+          ? 409
+          : err.code === "forbidden"
+            ? 403
+            : 400,
+    );
   console.error(err);
   return c.json<ApiErrorBody>({ error: "internal", message: "internal error" }, 500);
 }

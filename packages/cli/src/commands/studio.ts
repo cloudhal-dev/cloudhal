@@ -8,6 +8,7 @@ import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
+import { localComments } from "./comments-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
 export interface StudioOptions {
@@ -55,6 +56,8 @@ export async function studio(
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,
+    // RFC-0007 §12: the comment routes on the project's SQLite.
+    comments: await localComments(local.sql, local.dataDir),
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [

@@ -13,6 +13,7 @@ import type {
 import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
+import type { CommentsDeps } from "./comments.ts";
 import type { MediaToolOptions } from "./common.ts";
 import { createCloudhalMcpServer } from "./server.ts";
 
@@ -28,6 +29,8 @@ export interface HttpOptions {
   media?: MediaToolOptions | undefined;
   /** Site analytics for the read-only analytics tools (RFC-0006 §9.3). */
   analytics?: AnalyticsService | undefined;
+  /** Reader comments for the comment tools (RFC-0007 §11). */
+  comments?: CommentsDeps | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
   confirmTokenFallback?: boolean | undefined;
@@ -60,6 +63,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         previewSecret: options.previewSecret,
         media: options.media,
         analytics: options.analytics,
+        comments: options.comments,
         now: options.now,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,

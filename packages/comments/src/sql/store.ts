@@ -141,6 +141,27 @@ export interface PutThreadOptions {
   readonly audit?: readonly AuditStatement[];
 }
 
+/** What `comments_summary` and Studio's "Today" read (RFC-0007 §11.1): counts, never reader text. */
+export interface CommentSummaryStats {
+  /** Guest comments created since `since`. */
+  readonly newComments: number;
+  /** Entries with the most new guest comments since `since`, at most 10. */
+  readonly busiest: readonly { readonly nodeId: string; readonly comments: number }[];
+  /** Labels on comments created since `since`. */
+  readonly labels: Readonly<Partial<Record<LabelName, number>>>;
+  /** Pending comments of any age: how many, the oldest and the median creation time. */
+  readonly pending: {
+    readonly count: number;
+    readonly oldestAt: string | null;
+    readonly medianAt: string | null;
+  };
+  /**
+   * Pending or approved comments since `since` labelled `question` or `needs-reply` that no staff
+   * reply answers yet.
+   */
+  readonly unansweredQuestions: number;
+}
+
 export interface BanInput {
   /** The comment whose author is banned; the store resolves its hashes. */
   readonly commentId: CommentId;
@@ -611,6 +632,20 @@ export class SqlCommentStore implements SubmissionStore {
     return r ? toComment(r) : null;
   }
 
+  /** Several comments of a site in one read (≤ 50 ids; unknown ids are left out). */
+  async getMany(siteId: string, ids: readonly string[]): Promise<Comment[]> {
+    if (ids.length === 0) return [];
+    if (ids.length > MAX_BULK) throw new CommentInputError(`at most ${MAX_BULK} comment ids`);
+    const rows = await this.#rows(
+      siteId,
+      ids.filter((id) => COMMENT_ID.test(id)),
+    );
+    return ids.flatMap((id) => {
+      const r = rows.get(id);
+      return r ? [toComment(r)] : [];
+    });
+  }
+
   async #rows(siteId: string, ids: readonly string[]): Promise<Map<string, CommentRow>> {
     const rows = await this.sql.all<CommentRow>(
       "SELECT * FROM comments WHERE site_id = ? AND id IN (SELECT value FROM json_each(?))",
@@ -783,6 +818,95 @@ export class SqlCommentStore implements SubmissionStore {
     };
     for (const r of rows) if (r.status in out) out[r.status as CommentStatus] = num(r.n);
     return out;
+  }
+
+  /** Entries of a site that have comments (the hourly job looks for deleted entries among them). */
+  async nodeIds(siteId: string): Promise<string[]> {
+    const rows = await this.sql.all<{ node_id: string }>(
+      "SELECT DISTINCT node_id FROM comments WHERE site_id = ? ORDER BY node_id",
+      [siteId],
+    );
+    return rows.map((r) => r.node_id);
+  }
+
+  /** Every thread override of a site (the hourly job computes closing times from them). */
+  async threads(siteId: string): Promise<ThreadRow[]> {
+    const rows = await this.sql.all<Record<string, unknown>>(
+      "SELECT * FROM comment_threads WHERE site_id = ? ORDER BY node_id",
+      [siteId],
+    );
+    return rows.map((r) => ({
+      siteId,
+      nodeId: String(r.node_id),
+      mode: String(r.mode) as ThreadRow["mode"],
+      closesAt: r.closes_at === null ? null : String(r.closes_at),
+      rev: num(r.rev),
+      updatedAt: String(r.updated_at),
+      updatedBy: String(r.updated_by),
+    }));
+  }
+
+  /**
+   * Activity since `since` for summaries (RFC-0007 §11.1 `comments_summary`): five indexed reads,
+   * counts only. `nodeIds` limits it to some entries (an Author's own).
+   */
+  async summary(
+    siteId: string,
+    since: string,
+    q: { readonly nodeIds?: readonly string[] } = {},
+  ): Promise<CommentSummaryStats> {
+    const scope = q.nodeIds ? " AND c.node_id IN (SELECT value FROM json_each(?))" : "";
+    const scopeParams: SqlValue[] = q.nodeIds ? [json(q.nodeIds)] : [];
+    const guest = "c.proof IN ('pow', 'turnstile', 'none', 'import')";
+    const busiest = await this.sql.all<{ node_id: string; n: number }>(
+      `SELECT c.node_id, COUNT(*) AS n FROM comments c WHERE c.site_id = ? AND c.created_at >= ? AND ${guest}${scope}
+       GROUP BY c.node_id ORDER BY n DESC, c.node_id LIMIT 10`,
+      [siteId, since, ...scopeParams],
+    );
+    const total = await this.sql.get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM comments c WHERE c.site_id = ? AND c.created_at >= ? AND ${guest}${scope}`,
+      [siteId, since, ...scopeParams],
+    );
+    const labels = await this.sql.all<{ label: string; n: number }>(
+      `SELECT json_extract(l.value, '$.label') AS label, COUNT(*) AS n FROM comments c, json_each(c.labels) l
+       WHERE c.site_id = ? AND c.created_at >= ?${scope} GROUP BY label ORDER BY label`,
+      [siteId, since, ...scopeParams],
+    );
+    const pending = await this.sql.get<{ n: number; oldest: string | null }>(
+      `SELECT COUNT(*) AS n, MIN(c.created_at) AS oldest FROM comments c WHERE c.site_id = ? AND c.status = 'pending'${scope}`,
+      [siteId, ...scopeParams],
+    );
+    const n = num(pending?.n);
+    const median =
+      n === 0
+        ? undefined
+        : await this.sql.get<{ created_at: string }>(
+            `SELECT c.created_at FROM comments c WHERE c.site_id = ? AND c.status = 'pending'${scope}
+             ORDER BY c.created_at LIMIT 1 OFFSET ?`,
+            [siteId, ...scopeParams, Math.floor((n - 1) / 2)],
+          );
+    const unanswered = await this.sql.get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM comments c WHERE c.site_id = ? AND c.created_at >= ? AND c.status IN ('pending', 'approved')${scope}
+         AND EXISTS (SELECT 1 FROM json_each(c.labels) l WHERE json_extract(l.value, '$.label') IN ('question', 'needs-reply'))
+         AND NOT EXISTS (SELECT 1 FROM comments r WHERE r.site_id = c.site_id AND r.proof = 'staff'
+           AND (r.in_reply_to_id = c.id OR (r.parent_id = c.id AND r.in_reply_to_id IS NULL)))`,
+      [siteId, since, ...scopeParams],
+    );
+    const labelCounts: Partial<Record<LabelName, number>> = {};
+    for (const l of labels)
+      if ((LABELS as readonly string[]).includes(l.label))
+        labelCounts[l.label as LabelName] = num(l.n);
+    return {
+      newComments: num(total?.n),
+      busiest: busiest.map((b) => ({ nodeId: b.node_id, comments: num(b.n) })),
+      labels: labelCounts,
+      pending: {
+        count: n,
+        oldestAt: pending?.oldest ?? null,
+        medianAt: median?.created_at ?? null,
+      },
+      unansweredQuestions: num(unanswered?.n),
+    };
   }
 
   /** The `cm1:` binding of an approval to these comments and threads (§10.3). */
@@ -1538,6 +1662,26 @@ export class SqlCommentStore implements SubmissionStore {
       resolvedBy: r.resolved_by === null ? null : String(r.resolved_by),
       resolution: r.resolution === null ? null : String(r.resolution),
     }));
+  }
+
+  /** One report of a site, or `null`. */
+  async getReport(siteId: string, reportId: string): Promise<CommentReport | null> {
+    const r = await this.sql.get<Record<string, unknown>>(
+      "SELECT id, comment_id FROM comment_reports WHERE id = ? AND site_id = ?",
+      [reportId, siteId],
+    );
+    if (!r) return null;
+    const all = await this.listReports(siteId, { commentId: String(r.comment_id), limit: 200 });
+    return all.find((x) => x.id === reportId) ?? null;
+  }
+
+  /** Commenter ids of a site, oldest first (a personal-data export; people only). */
+  async commenterIds(siteId: string, limit = 1000): Promise<string[]> {
+    const rows = await this.sql.all<{ id: string }>(
+      "SELECT id FROM commenter_emails WHERE site_id = ? ORDER BY created_at, id LIMIT ?",
+      [siteId, limit],
+    );
+    return rows.map((r) => r.id);
   }
 
   /** Records a person's decision on a report; a resolved report cannot be resolved again (409). */

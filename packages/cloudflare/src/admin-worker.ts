@@ -12,8 +12,15 @@
  * token), and the hourly `scheduled` handler rolls finished days into D1 and deletes old salts. A
  * missing binding means the "can't read yet" state (`reader: "none"`), never a crash.
  *
+ * Reader comments (RFC-0007 step 5, `comments.ts`): with `CLOUDHAL_COMMENTS_KEY` (the site Worker's
+ * secret) the API and MCP serve comments; moderation queues comment cache tags, which the flusher
+ * sends through `SITE` within the purge budget publishes share (every purge request is logged in
+ * `cache_purge_log`): takedowns 2 s after the write, normal tags 20 s later, and on any later
+ * admin request whose queue is due; the hourly job applies retention, purges threads that closed by
+ * time and deletes old salts.
+ *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
- * CLOUDHAL_DEPLOY_TOKEN (all ≥ 32 chars; `cloudhal deploy` generates them).
+ * CLOUDHAL_DEPLOY_TOKEN, CLOUDHAL_COMMENTS_KEY (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
 import {
   ApprovalStore,
@@ -28,13 +35,22 @@ import { SqlQueryBudget } from "@cloudhal/analytics/sql";
 import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
 import { createApi } from "@cloudhal/api";
 import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
+import { PURGE_LIMITS } from "@cloudhal/comments";
+import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import {
+  adminComments,
+  type CommentsEnv,
+  commentsOn,
+  flushCommentPurges,
+  runCommentsHourly,
+} from "./comments.ts";
 import { purgeSiteCache } from "./purge.ts";
 
-export interface AdminEnv {
+export interface AdminEnv extends CommentsEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   ASSETS?: Fetcher;
@@ -126,6 +142,7 @@ export function adminAnalytics(
               method: "POST",
               headers: { authorization: `Bearer ${token}` },
             });
+            await logPurge(sql, "analytics");
             log(`purge everything after analytics settings of ${siteId}: ${res.status}`);
             if (!res.ok) throw new Error(`purge failed: ${res.status}`);
           },
@@ -134,6 +151,17 @@ export function adminAnalytics(
     onError,
   });
 }
+
+/** Records one purge request in the budget comments share with publishing (RFC-0007 §8.4). */
+async function logPurge(sql: SqlDriver, source: string): Promise<void> {
+  try {
+    await new SqlCommentStore(sql).purgeQueue.log(source);
+  } catch {
+    // the log is a budget hint: never fail a purge over it
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface AdminWorkerOptions {
   /** Skills exposed over MCP (bundled at deploy time). */
@@ -200,8 +228,51 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           },
           body: JSON.stringify({ tags }),
         });
+        await logPurge(sql, "media");
         log(`purge after ${what}: ${res.status} ${await res.text()}`);
       };
+      // RFC-0007 §8.4: comment purges go through the queue; the flusher shares the budget.
+      const siteBinding = env.SITE;
+      const purgeToken = env.CLOUDHAL_PURGE_TOKEN;
+      const flush = (siteId?: string) =>
+        siteBinding && purgeToken
+          ? flushCommentPurges({
+              store: new SqlCommentStore(sql),
+              fetch: (u, init) =>
+                siteBinding.fetch(u, init as never) as unknown as Promise<Response>,
+              token: purgeToken,
+              siteId,
+              log,
+            }).catch((e) => {
+              log(`comments purge flush failed: ${e instanceof Error ? e.message : String(e)}`);
+            })
+          : Promise.resolve();
+      const comments = await adminComments(env, sql, {
+        // takedowns after a 2 s micro-batch, normal changes after 20 s (V5: waitUntil keeps it alive)
+        wake: (siteId, priority) =>
+          ctx.waitUntil(
+            sleep(
+              priority === "takedown"
+                ? PURGE_LIMITS.takedownMicrobatchMs
+                : PURGE_LIMITS.normalDelayMs,
+            ).then(() => flush(siteId)),
+          ),
+        ...(siteBinding && purgeToken
+          ? {
+              purgeSite: async (siteId: string) => {
+                const res = await siteBinding.fetch(PURGE_URL, {
+                  method: "POST",
+                  headers: { authorization: `Bearer ${purgeToken}` },
+                });
+                await logPurge(sql, "comments");
+                log(`purge everything for comments of ${siteId}: ${res.status}`);
+                if (!res.ok) throw new Error(`purge failed: ${res.status}`);
+              },
+            }
+          : {}),
+      });
+      // Every admin request also flushes what is due (Studio polls every 15–60 s).
+      if (comments) ctx.waitUntil(flush());
       const store: SiteGraphStore = new SiteGraphStore({
         sql,
         blobs,
@@ -215,6 +286,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             store,
             change,
             log: (line) => log(`${site.id}: ${line}`),
+            onRequest: () => logPurge(sql, "publish"),
           });
           log(
             `purge after publishing ${site.id} (${change.from ?? "nothing"} → ${change.to ?? "nothing"}): ${result.mode}, ${result.tags.length} tag(s), ${result.requests} request(s)`,
@@ -272,6 +344,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           ? { admin: { deployToken: env.CLOUDHAL_DEPLOY_TOKEN, storage: { sql, blobs } } }
           : {}),
         analytics: adminAnalytics(env, sql, { log }),
+        ...(comments ? { comments } : {}),
       });
       return app.fetch(request, env, ctx);
     },
@@ -279,7 +352,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
     /**
      * The hourly job (RFC-0006 §7.5, cron `17 * * * *`): migrations as on the fetch path, salts
      * before today deleted, at most one finished site-day rolled up from WAE into D1, retention.
-     * Bounded work per invocation; a missed run is caught up by the next ones.
+     * Then reader comments (RFC-0007 §8.5, §9.3): retention, threads closed by time, old monthly
+     * salts, and a purge flush as the backstop. Bounded work per invocation; a missed run is
+     * caught up by the next ones.
      */
     async scheduled(
       controller: ScheduledController,
@@ -297,6 +372,30 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       log(
         `analytics rollup (${analytics.feature().reader}): ${report.done.length} site-day(s) done, ${report.pending} pending, ${report.saltsDeleted} salt(s) deleted, ${report.retained} row(s) past retention${failed.length ? `; failed: ${failed.join("; ")}` : ""}`,
       );
+      if (commentsOn(env)) {
+        try {
+          const comments = new SqlCommentStore(sql);
+          const c = await runCommentsHourly({ graph: store, store: comments, now });
+          log(
+            `comments hourly: ${c.sites} site(s), ${c.retained} row(s) past retention${c.more ? " (more next run)" : ""}, ${c.deletedEntries} of deleted entries, ${c.closed} thread(s) closed, ${c.salts} salt(s) deleted`,
+          );
+          const site = env.SITE;
+          if (site && env.CLOUDHAL_PURGE_TOKEN) {
+            const f = await flushCommentPurges({
+              store: comments,
+              fetch: (u, init) => site.fetch(u, init as never) as unknown as Promise<Response>,
+              token: env.CLOUDHAL_PURGE_TOKEN,
+              now: () => now,
+              log,
+            });
+            log(
+              `comments purge backstop: ${f.sent.length} request(s), ${f.failed} failed${f.takedownWaiting ? ", a takedown is waiting" : ""}`,
+            );
+          }
+        } catch (e) {
+          log(`comments hourly failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     },
   };
 }
