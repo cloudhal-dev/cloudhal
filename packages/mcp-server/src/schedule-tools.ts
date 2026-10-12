@@ -73,9 +73,10 @@ import {
   nodeBinding,
   notOwnRelease,
   personApproval,
-  pinRelease,
+  poke,
   RELEASE_META,
   type ReleaseRequestInput,
+  releaseService,
   releaseView,
   removesContent,
   requestRelease,
@@ -239,7 +240,7 @@ async function scheduleWith(
     requestId: ctx.approval ? (record.requestId ?? null) : null,
   });
   const at = executeAtOf(when, nowOf(ctx).toISOString());
-  if (at) d.poke?.(new Date(at));
+  poke(d, at);
   ctx.report?.({ releaseId: r.id, approval: approval?.kind, executeAt: at });
   return release;
 }
@@ -362,13 +363,31 @@ async function fileRequest(
   return { release, status: "approval-pending", approvalId: request.id };
 }
 
-/** The release a tool names (`releaseId`) or pins (`nodeIds`, `removeIds`). */
+/** Own-limited callers name only their own articles (§10.1); the closure may add what they need. */
+async function assertOwnNodes(ctx: ToolContext, ids: readonly string[]): Promise<void> {
+  if (ctx.limit?.target !== "release") return;
+  const owner = ctx.ownership ?? ACTOR_OWNERSHIP;
+  for (const id of ids) {
+    const entry = await ctx.store.getContentEntry(id);
+    if (!entry || (await owner.personOf(entry.author)) !== callerPerson(ctx))
+      throw new ToolError(
+        "denied",
+        `your role schedules only your own work, but ${id} is not your article`,
+      );
+  }
+}
+
+/**
+ * The release a tool names (`releaseId`), or a new draft pinning `nodeIds` and `removeIds` through
+ * core-ts's `ReleaseService` (§6.1: working-copy versions, the dependency closure, bodies written
+ * now, the purge plan).
+ */
 async function releaseFor(
   ctx: ToolContext,
   site: Site,
   a: Record<string, unknown>,
   source: string,
-  when?: ReleaseWhen,
+  when?: WhenInput,
 ): Promise<{ record: ReleaseRecord; closureAdded: string[] }> {
   const d = deps(ctx);
   if (typeof a.releaseId === "string") {
@@ -388,29 +407,26 @@ async function releaseFor(
       "invalid",
       "name the release (releaseId) or its nodes (nodeIds, removeIds)",
     );
-  const pinned = await pinRelease(ctx.store, site, { set, remove });
-  if (pinned.missing.length > 0)
-    throw new ToolError(
-      "invalid",
-      `dependency_missing: ${pinned.missing.join(", ")} would not be live and does not exist; fix the references first`,
-      { missing: pinned.missing },
-    );
-  await assertOwn(ctx, pinned);
-  const release = await d.store.createRelease({
+  await assertOwnNodes(ctx, [...set, ...remove]);
+  const pinned = await releaseService(d, ctx.store, ctx.now).create({
     siteId: site.id,
-    items: pinned.items,
+    set,
+    remove,
     createdBy: ctx.principal.actor,
     ...(typeof a.title === "string" ? { title: plainLine(a.title, 200) } : {}),
     ...(when ? { when } : {}),
     metadata: {
       [RELEASE_META.source]: source,
-      ...(pinned.added.length > 0 ? { [RELEASE_META.closure]: pinned.added.join(",") } : {}),
       ...(typeof a.note === "string" ? { [RELEASE_META.note]: plainLine(a.note, 500) } : {}),
     },
   });
-  const record = await recordOf(ctx, site.id, release.id);
-  ctx.report?.({ releaseId: release.id, closureAdded: pinned.added });
-  return { record, closureAdded: pinned.added };
+  const record = await recordOf(ctx, site.id, pinned.release.id);
+  ctx.report?.({
+    releaseId: pinned.release.id,
+    closureAdded: pinned.closureAdded,
+    ...(pinned.missing.length > 0 ? { missing: pinned.missing } : {}),
+  });
+  return { record, closureAdded: pinned.closureAdded };
 }
 
 // ───────────────────────────── gates (§7.6, §10.8) ─────────────────────────────
@@ -484,15 +500,13 @@ async function gateRelease(
   approval: Release["approval"],
   reduce: boolean,
 ): Promise<Release> {
-  const d = deps(ctx);
-  const pinned = await pinRelease(ctx.store, site, { set: [nodeId] });
-  const draft = await d.store.createRelease({
+  const pinned = await releaseService(deps(ctx), ctx.store, ctx.now).create({
     siteId: site.id,
-    items: pinned.items,
+    set: [nodeId],
     createdBy: ctx.principal.actor,
     metadata: { [RELEASE_META.source]: source, ...(reduce ? { [RELEASE_META.reduce]: "1" } : {}) },
   });
-  const rec = await recordOf(ctx, site.id, draft.id);
+  const rec = await recordOf(ctx, site.id, pinned.release.id);
   return scheduleWith(ctx, rec, { kind: "on-approval" }, approval);
 }
 
@@ -760,9 +774,7 @@ export function scheduleTools(): ToolDefinition[] {
         const site = await siteOf(ctx, a.siteId as string);
         const when =
           a.localTime || a.at
-            ? resolveWhen(
-                ctx,
-                site,
+            ? whenInputOf(
                 a.localTime
                   ? { localTime: a.localTime, timeZone: a.timeZone }
                   : { at: a.at, timeZone: a.timeZone },
@@ -913,7 +925,7 @@ export function scheduleTools(): ToolDefinition[] {
             when,
             approval,
           });
-          if (at) d.poke?.(new Date(at));
+          poke(d, at);
           ctx.report?.({ releaseId: r.id, from: record.executeAt ?? null, to: at ?? null });
           return { release: moved, status: "scheduled" };
         }

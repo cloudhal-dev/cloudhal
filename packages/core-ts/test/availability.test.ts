@@ -145,19 +145,23 @@ describe("wall-clock times in the site's zone (§9.1–§9.2)", () => {
   it("resolves a wall-clock time to its instant; absent zone means UTC", () => {
     expect(siteZone({})).toBe("UTC");
     expect(siteZone({ timeZone: "Europe/Istanbul" })).toBe("Europe/Istanbul");
-    expect(resolveWallClock("2026-11-02T09:00", "Europe/Istanbul")).toBe("2026-11-02T06:00:00Z");
-    expect(resolveWallClock("2026-11-02T09:00", "UTC")).toBe("2026-11-02T09:00:00Z");
+    expect(resolveWallClock("2026-11-02T09:00", "Europe/Istanbul")).toBe(
+      "2026-11-02T06:00:00.000Z",
+    );
+    expect(resolveWallClock("2026-11-02T09:00", "UTC")).toBe("2026-11-02T09:00:00.000Z");
     expect(wallClockOf("2026-11-02T06:00:00Z", "Europe/Istanbul")).toBe("2026-11-02T09:00");
   });
 
   it("moves a time in a spring-forward gap forward and takes the first of a repeated time", () => {
     // Berlin, 29 March 2026: 02:00 → 03:00 (02:30 does not exist) → 03:30 +02:00
-    expect(resolveWallClock("2026-03-29T02:30", "Europe/Berlin")).toBe("2026-03-29T01:30:00Z");
+    expect(resolveWallClock("2026-03-29T02:30", "Europe/Berlin")).toBe("2026-03-29T01:30:00.000Z");
     // Berlin, 25 October 2026: 03:00 → 02:00 (02:30 twice) → the first, +02:00
-    expect(resolveWallClock("2026-10-25T02:30", "Europe/Berlin")).toBe("2026-10-25T00:30:00Z");
+    expect(resolveWallClock("2026-10-25T02:30", "Europe/Berlin")).toBe("2026-10-25T00:30:00.000Z");
   });
 
-  it("refuses unknown zones", () => {
-    expect(() => resolveWallClock("2026-11-02T09:00", "Mars/Olympus_Mons")).toThrow(RangeError);
+  it("refuses unknown zones (the schedules time model: one implementation)", () => {
+    expect(() => resolveWallClock("2026-11-02T09:00", "Mars/Olympus_Mons")).toThrow(
+      /unknown time zone/,
+    );
   });
 });

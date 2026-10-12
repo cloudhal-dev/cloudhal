@@ -78,7 +78,7 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         audit,
         now: clock,
         mcp: { stateKey: "roles-test-state-key-0123456789abcdefgh", audit, approvals },
-        schedules: { store: new SqlScheduleStore(b.sql, { now: clock }), ticker: "node" },
+        schedules: { store: new SqlScheduleStore(b.sql, { now: clock }), maxNewBodies: Infinity },
         admin: { deployToken: DEPLOY_TOKEN, storage: { sql: b.sql, blobs: b.blobs } },
         ...(withMail ? { mail: { id: "test", send: async (m) => void mailbox.push(m) } } : {}),
       });

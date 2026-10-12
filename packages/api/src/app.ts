@@ -69,6 +69,12 @@ export function createApi(deps: ApiDeps) {
         s !== undefined &&
         (typeof s === "string" ? new TextEncoder().encode(s) : s).byteLength >= 32,
     ) ?? randomUploadSecret();
+  // RFC-0008: the schedule routes and tools use the deployment's ticker (`ApiDeps.scheduler`)
+  // unless `schedules.scheduler` names another.
+  const schedules =
+    deps.schedules && !deps.schedules.scheduler && deps.scheduler
+      ? { ...deps.schedules, scheduler: deps.scheduler }
+      : deps.schedules;
   let engine: PolicyEngine | undefined;
   const policy = () => {
     engine ??= new PolicyEngine(toolPolicies(defineTools()));
@@ -119,7 +125,8 @@ export function createApi(deps: ApiDeps) {
     c.set("uploadSecret", uploadSecret);
     c.set("analytics", deps.analytics);
     c.set("comments", deps.comments);
-    c.set("schedules", deps.schedules);
+    c.set("schedules", schedules);
+    c.set("scheduler", deps.scheduler);
     // The fenced Better Auth endpoints never reach credential resolution.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
       return c.json({ error: "not_found", message: "not found" }, 404);
@@ -198,7 +205,7 @@ export function createApi(deps: ApiDeps) {
       ownership,
       analytics: deps.analytics,
       comments: deps.comments,
-      schedules: deps.schedules,
+      schedules,
     });
     app.all("/mcp", async (c) => {
       // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
@@ -241,7 +248,7 @@ export function createApi(deps: ApiDeps) {
           // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
           comments: await commentsFeature(deps.comments),
           // RFC-0008 §13: whether schedules are served, the ticker, gates, the limits.
-          schedules: schedulesFeature(deps.schedules),
+          schedules: schedulesFeature(schedules),
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
@@ -281,7 +288,7 @@ export function createApi(deps: ApiDeps) {
   // RFC-0007 §12: reader comments (people; agents use the MCP comment tools).
   if (deps.comments) app.route("/api/sites/:siteId", comments);
   // RFC-0008 §13: schedules (people; agents use the MCP schedule tools).
-  if (deps.schedules) {
+  if (schedules) {
     app.route("/api/sites/:siteId", scheduleRoutes);
     app.route("/api/scheduler", schedulerRoute);
   }

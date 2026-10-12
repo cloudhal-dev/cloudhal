@@ -4,8 +4,13 @@
  * and the rights source the scheduler's run-time re-check uses (§10.6).
  */
 import type { AgentMode, OwnLimit, Principal, Role } from "@cloudhal/agent-runtime";
-import type { Actor } from "@cloudhal/core-contracts";
-import { type ReleaseRightsSource, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import type { Actor, Release } from "@cloudhal/core-contracts";
+import type { SiteGraphStore } from "@cloudhal/core-ts";
+import {
+  createReleaseApprovalCheck,
+  type ReleaseRightsSource,
+  schedulesAvailable,
+} from "@cloudhal/mcp-server/schedules";
 import {
   defineTools,
   type ToolContext,
@@ -13,11 +18,15 @@ import {
   ToolError,
   toToolError,
 } from "@cloudhal/mcp-server/tools";
+import type { ApprovalVerdict } from "@cloudhal/schedules";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
+import type { SqlDriver } from "@cloudhal/storage";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
-import { actorIdForUser } from "./auth.ts";
+import { actorIdForUser, agentKeyStateFromSql } from "./auth.ts";
 import type { Env } from "./context.ts";
 import { apiError, missingScope, notFound } from "./errors.ts";
+import { StaffStore } from "./staff.ts";
 
 let defs: Map<string, ToolDefinition> | undefined;
 function tool(name: string): ToolDefinition {
@@ -170,5 +179,47 @@ export function releaseRights(
           },
         }
       : {}),
+  };
+}
+
+/**
+ * The scheduler's `checkApproval` (RFC-0008 §10.6) over the deployment's database, for a tick that
+ * runs outside any request (the admin Worker's cron and alarm, the Node ticker): members and agent
+ * keys are read as they are now. A deployment without members (auth-less local use) has nobody
+ * whose rights could lapse, so every approval holds there.
+ */
+export function releaseApprovalCheck(o: {
+  sql: SqlDriver;
+  graph: SiteGraphStore;
+}): (release: Release, now: Date) => Promise<ApprovalVerdict> {
+  const staff = new StaffStore(o.sql);
+  const store = new SqlScheduleStore(o.sql);
+  return async (release, now) => {
+    const members = await staff.list();
+    if (members.length === 0) return { ok: true };
+    const rights: ReleaseRightsSource = {
+      async role(personId) {
+        return members.find((m) => actorIdForUser(m.userId) === personId)?.role;
+      },
+      async key(keyId) {
+        const state = await agentKeyStateFromSql(o.sql, keyId, now);
+        return state?.enabled && state.creatorRole
+          ? { mode: state.effectiveMode, creatorRole: state.creatorRole }
+          : undefined;
+      },
+    };
+    return createReleaseApprovalCheck({
+      graph: o.graph,
+      store,
+      ownership: {
+        async personOf(actor) {
+          if (actor.kind === "human") return actor.id;
+          if (actor.kind !== "agent") return undefined;
+          const userId = await staff.userOfAgent(actor.id);
+          return userId ? actorIdForUser(userId) : undefined;
+        },
+      },
+      rights,
+    })(release, now);
   };
 }

@@ -90,8 +90,11 @@ export async function runLocalCommentsJob(
 }
 
 /**
- * Starts the hourly comments job for `cloudhal studio` / `cloudhal mcp` (Node has no cron): once
- * now, then every hour; errors are logged, never thrown. Returns a stop function.
+ * Starts the hourly comments job on its own timer: once now, then every hour; errors are logged,
+ * never thrown. Returns a stop function.
+ *
+ * @deprecated `cloudhal studio`, `mcp` and `dev` run the job as the `comments.hourly` system job
+ * of the scheduler's Node ticker (RFC-0008 §8.4, `scheduler-local.ts`).
  */
 export function startLocalCommentsJob(
   graph: SiteGraphStore,

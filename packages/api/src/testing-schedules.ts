@@ -17,15 +17,14 @@ import {
 } from "@cloudhal/agent-runtime";
 import type { Actor, ContentEntry, Release, Site } from "@cloudhal/core-contracts";
 import { GATES_ENFORCED, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import type { SchedulerControl } from "@cloudhal/core-ts/releases";
 import {
   createReleaseApprovalCheck,
-  pinRelease,
+  releaseService,
   requestRelease,
   type SchedulesDeps,
 } from "@cloudhal/mcp-server/schedules";
-import type { Scheduler } from "@cloudhal/schedules";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
-import { type FakeReleaseExecutor, fakeReleaseExecutor } from "@cloudhal/schedules/testing";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "./app.ts";
@@ -65,7 +64,6 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
     let schedules: SqlScheduleStore;
     let approvals: ApprovalStore;
     let audit: AuditLog;
-    let exec: FakeReleaseExecutor;
     let deps: SchedulesDeps;
     let pokes: string[];
     let minted: { name: string; scopes: string[]; automationId?: string }[];
@@ -94,27 +92,24 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       },
     } as unknown as AgentKeyService;
 
-    const build = (o: { executor?: boolean } = {}) => {
-      deps = {
-        store: schedules,
-        ...(o.executor === false ? {} : { executor: exec }),
-        ticker: "cron",
-        poke: (at) => pokes.push(at.toISOString()),
-        scheduler: {
-          async runDue() {
-            ticks++;
-            return { ran: 0, late: 0, failed: 0, more: false };
-          },
-          async nextWakeAt() {
-            return undefined;
-          },
-        } satisfies Scheduler,
+    const build = () => {
+      deps = { store: schedules, maxNewBodies: Number.POSITIVE_INFINITY };
+      const scheduler: SchedulerControl = {
+        mode: "cron",
+        poke: async (at) => {
+          pokes.push(at);
+        },
+        async runDue() {
+          ticks++;
+          return { ran: 0, late: 0, failed: 0, more: false };
+        },
       };
       app = createApi({
         store,
         now: () => clock.now,
         audit,
         schedules: deps,
+        scheduler,
         agentKeys: keys,
         admin: { deployToken: DEPLOY_TOKEN, storage: { sql, blobs: new MemoryBlobStore() } },
         mcp: { stateKey: "schedules-api-state-key-0123456789abcdef", approvals, audit },
@@ -159,7 +154,7 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       slug: string,
       author: Actor = person("author").actor,
     ): Promise<ContentEntry> {
-      const first = (await store.listContentEntries(site.id))[0] as ContentEntry;
+      const first = (await store.listContentEntries(site.id)).find((e) => e.terms) as ContentEntry;
       return store.createContentEntry({
         siteId: site.id,
         collection: "posts",
@@ -178,10 +173,9 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
 
     /** An agent's request for a release of `nodeIds`, as `schedule_release` files it. */
     async function agentRequest(nodeIds: string[], at = plus(3 * HOUR)) {
-      const pinned = await pinRelease(store, site, { set: nodeIds });
-      const draft = await schedules.createRelease({
+      const { release: draft } = await releaseService(deps, store, () => clock.now).create({
         siteId: site.id,
-        items: pinned.items,
+        set: nodeIds,
         createdBy: agent,
         title: "Agent's release",
       });
@@ -215,7 +209,6 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       schedules = new SqlScheduleStore(sql, { now: () => clock.now });
       approvals = new ApprovalStore(sql, { now: () => clock.now });
       audit = new AuditLog(sql);
-      exec = fakeReleaseExecutor();
       pokes = [];
       minted = [];
       ticks = 0;
@@ -405,11 +398,14 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       // a changed release voids the request: 409 state_changed, and it is closed
       const second = await article("agent-changed");
       const asked = await agentRequest([second.id]);
-      await store.updateContentEntry({ ...second, title: "Changed after asking" });
-      const pinned = await pinRelease(store, site, { set: [second.id] });
-      await schedules.repinRelease(site.id, asked.release.id, {
-        expectedRev: asked.release.rev,
-        items: pinned.items,
+      // an agent's edit is refused while the release holds the node (§6.2, 409 scheduled_locked)
+      await expect(
+        store.updateContentEntry({ ...second, title: "Changed after asking" }),
+      ).rejects.toMatchObject({ code: "scheduled_locked" });
+      // a person's "edit and send for approval" re-pins it: a new rl1: hash
+      await releaseService(deps, store, () => clock.now).editHeldEntry(site.id, asked.release.id, {
+        ...second,
+        title: "Changed after asking",
       });
       const stale = await post(`${S()}/approvals/${asked.request.id}/approve`, {});
       expect(stale.status).toBe(409);
@@ -432,7 +428,7 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       expect((await approvals.get(asked.request.id))?.status).toBe("expired");
     });
 
-    it("Publish now runs through the injected executor; 503 without one; rights apply", async () => {
+    it("Publish now runs through ReleaseService.publishNow; rights apply", async () => {
       const entry = await article("publish-now", person("editor").actor);
       const created = (await post(`${S()}/releases`, { nodeIds: [entry.id] })).body
         .release as Release;
@@ -458,16 +454,15 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       ).toMatchObject({
         error: "cannot_approve",
       });
-      build({ executor: false });
-      expect(
-        (await post(`${S()}/releases/${created.id}/publish-now`, { rev: scheduled.rev })).status,
-      ).toBe(503);
-      build();
       const now = await post(`${S()}/releases/${created.id}/publish-now`, { rev: scheduled.rev });
       expect(now.status, now.text).toBe(200);
-      expect(now.body).toMatchObject({ kind: "published", release: { state: "published" } });
-      expect(exec.calls).toHaveLength(1);
-      expect(exec.calls[0]?.trigger).toBe("manual");
+      expect(now.body).toMatchObject({
+        release: { state: "published", outcome: { kind: "published" } },
+      });
+      const live = (await store.getSite(site.id)) as Site;
+      const snap = await store.getSnapshot(live.publishedSnapshotId as string);
+      expect(snap?.reason).toBe("scheduled");
+      expect(snap?.nodes.some((n) => n.id === entry.id)).toBe(true);
       const [row] = await audit.list({ siteId: site.id, tool: "release.publish-now" });
       expect(row).toMatchObject({ releaseId: created.id, runId: now.body.runId });
       const runs = await call(`${S()}/runs?releaseId=${created.id}`);
@@ -608,7 +603,7 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
         writesToday: 0,
       });
       const health = await call("/api/scheduler");
-      expect(health.body).toMatchObject({ ticker: "cron", healthy: false, state: "unknown" });
+      expect(health.body).toMatchObject({ mode: "cron", healthy: false, state: "unknown" });
       await schedules.writeHeartbeat({
         at: NOW.toISOString(),
         trigger: "cron",
@@ -635,7 +630,7 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       expect(
         (await call("/api/admin/schedules/status", null, { headers: auth })).body,
       ).toMatchObject({
-        healthy: true,
+        scheduler: { healthy: true, mode: "cron" },
       });
       const tick = await call("/api/admin/schedules/run-due", null, {
         method: "POST",

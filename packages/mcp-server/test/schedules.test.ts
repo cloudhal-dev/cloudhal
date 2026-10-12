@@ -15,7 +15,6 @@ import type { ContentEntry, Release, Site } from "@cloudhal/core-contracts";
 import { isValid } from "@cloudhal/core-contracts";
 import { GATES_ENFORCED, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
-import { fakeReleaseExecutor } from "@cloudhal/schedules/testing";
 import { MemoryBlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -73,7 +72,7 @@ async function base(): Promise<Setup> {
   const entry = (await store.listContentEntries(site.id))[0] as ContentEntry;
   const clock = { now: NOW };
   const schedules = new SqlScheduleStore(sql, { now: () => clock.now });
-  const deps: SchedulesDeps = { store: schedules, executor: fakeReleaseExecutor() };
+  const deps: SchedulesDeps = { store: schedules, maxNewBodies: Number.POSITIVE_INFINITY };
   return {
     sql,
     store,

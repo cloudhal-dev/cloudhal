@@ -1,6 +1,6 @@
 /**
- * Schedules for agents and the REST API (RFC-0008 §10–§14): the deployment's schedule store and
- * the injected release executor, pinning releases from the site graph, "own" for releases, who may
+ * Schedules for agents and the REST API (RFC-0008 §10–§14): the deployment's schedule store, its
+ * ticker and core-ts's `ReleaseService` (pinning, scheduling, "Publish now"), "own" for releases, who may
  * approve one, the views and the calendar, release requests and their carry-out, automation runs
  * (the open run of an automation key, taint and budgets) and the scheduler's run-time re-check of
  * approvals (`createReleaseApprovalCheck`). Shared by the MCP schedule tools (`schedule-tools.ts`)
@@ -38,23 +38,22 @@ import type {
   ScheduleRun,
   Site,
 } from "@cloudhal/core-contracts";
-import { canonicalJson, nodeHash, type SiteGraphStore, sha256Hex } from "@cloudhal/core-ts";
+import { nodeHash, type SiteGraphStore, sha256Hex } from "@cloudhal/core-ts";
+import {
+  type ReleasePurger,
+  ReleaseService,
+  type SchedulerControl,
+} from "@cloudhal/core-ts/releases";
 import {
   type ApprovalVerdict,
   approvalArgs,
   canonicalInstant,
-  dependencyClosure,
   type ExpiredReason,
   isTerminalRelease,
   occurrences,
-  type PinnedItem,
-  pinItems,
   REQUEST_HORIZON_DAYS,
-  type ReleaseExecutor,
   type RunTaintState,
-  referencedNodeIds,
   releaseHash,
-  type Scheduler,
   type StoredReleaseItem,
   untrustedEffectiveScopes,
 } from "@cloudhal/schedules";
@@ -68,33 +67,47 @@ export interface SchedulesDeps {
   /** `CLOUDHAL_AUTOMATIONS=off` → false: automations stop, releases and gates go on (§11.6). */
   readonly automationsEnabled?: boolean | undefined;
   /**
-   * Applies a release now: `publishRelease` in core-ts behind the `ReleaseExecutor` seam (rollout
-   * step 5). "Publish now" answers 503 without it.
+   * The deployment's ticker (`ApiDeps.scheduler`): its mode for `/api/instance` and
+   * `/api/scheduler`, and `poke` when something becomes due sooner (a release scheduled, approved or
+   * moved, a window opened; §8.3).
    */
-  readonly executor?: ReleaseExecutor | undefined;
-  /** The deployment's scheduler, for the operator's manual tick and `/api/scheduler`'s next wake. */
-  readonly scheduler?: Scheduler | undefined;
-  /** Which ticker wakes the scheduler (`/api/instance`, `/api/scheduler`). */
-  readonly ticker?: "cron" | "alarm" | "node" | "request" | undefined;
-  /**
-   * Called when something becomes due earlier than the scheduler may expect (a release scheduled,
-   * approved or moved, a window opened): the Durable Object clock moves its alarm, the Node ticker
-   * re-arms (§8.3). Never awaited.
-   */
-  readonly poke?: ((at: Date) => void) | undefined;
+  readonly scheduler?: SchedulerControl | undefined;
+  /** "Publish now" purges the live site's cache like a tick does (absent: nothing is cached). */
+  readonly purge?: ReleasePurger | undefined;
+  /** New versions one call may pin (§6.1 step 4; Workers Free: 20, the default). */
+  readonly maxNewBodies?: number | undefined;
 }
 
 /** True when the deployment serves schedules. */
 export const schedulesAvailable = (deps: SchedulesDeps | undefined): deps is SchedulesDeps =>
   deps !== undefined && deps.available !== false;
 
+/** core-ts's `ReleaseService` over this graph, with the deployment's ticker and purge. */
+export function releaseService(
+  deps: SchedulesDeps,
+  graph: SiteGraphStore,
+  now?: () => Date,
+): ReleaseService {
+  return new ReleaseService({
+    graph,
+    ...(now ? { now } : {}),
+    ...(deps.scheduler ? { scheduler: deps.scheduler } : {}),
+    ...(deps.purge ? { purge: deps.purge } : {}),
+    ...(deps.maxNewBodies !== undefined ? { maxNewBodies: deps.maxNewBodies } : {}),
+  });
+}
+
+/** Tells the ticker something is due at `at` (never throws, never awaited by callers' answers). */
+export function poke(deps: SchedulesDeps, at: string | undefined): void {
+  if (!at || !deps.scheduler) return;
+  deps.scheduler.poke(at).catch(() => undefined);
+}
+
 /** The person approving on a local server without people (stdio, `bypass`, a confirmed elicitation). */
 export const LOCAL_PERSON = Object.freeze({ id: "user_localdev01", name: "Local developer" });
 
 /** Metadata keys on releases (Release.metadata, strings only). */
 export const RELEASE_META = {
-  /** The ids the dependency closure added, comma-separated (§6.1 step 2). */
-  closure: "cloudhal.closure",
   /** The agent's note on a proposal (≤ 500, plain). */
   note: "cloudhal.note",
   /** A gate-only reduction (set_embargo on a live node): re-checked without the mode rule. */
@@ -151,63 +164,6 @@ export async function nodeVersion<T = unknown>(
   } catch {
     return undefined;
   }
-}
-
-export interface PinResult {
-  items: PinnedItem[];
-  /** Ids the dependency closure added (§6.1 step 2). */
-  added: string[];
-  /** Referenced ids that exist nowhere: the release would fail with `dependency_missing`. */
-  missing: string[];
-}
-
-/**
- * Pins items against the working copy and the live snapshot (§6.1): targets, bases, the dependency
- * closure; target bodies are written to the blob store now (`nodes/<hash>.json`, as
- * `createSnapshot` does), so running the release reads no node rows.
- */
-export async function pinRelease(
-  graph: SiteGraphStore,
-  site: Site,
-  input: { set?: readonly string[]; remove?: readonly string[] },
-): Promise<PinResult> {
-  const working = await graph.currentNodeRefs(site.id);
-  const live = await liveRefs(graph, site);
-  const items = pinItems({
-    siteId: site.id,
-    set: input.set ?? [],
-    remove: input.remove ?? [],
-    working,
-    live,
-  });
-  const bodies = new Map<string, unknown>();
-  const body = async (ref: Pick<NodeRef, "id" | "kind" | "rev" | "hash">) => {
-    const key = `${ref.id}@${ref.hash}`;
-    if (!bodies.has(key)) bodies.set(key, await nodeVersion(graph, ref));
-    return bodies.get(key);
-  };
-  const closure = await dependencyClosure({
-    items,
-    working,
-    live,
-    depsOf: async (ref) => referencedNodeIds(await body(ref)),
-    blobOf: async (ref) => {
-      const asset = (await body(ref)) as { sha256?: string; storage?: { kind?: string } };
-      return asset?.storage?.kind === "external" ? undefined : asset?.sha256;
-    },
-  });
-  for (const p of closure.items) {
-    if (p.item.kind !== "set") continue;
-    const ref = { id: p.item.nodeId, kind: p.item.nodeKind, ...p.item.target };
-    const key = `nodes/${ref.hash}.json`;
-    if (await graph.blobs.head(key)) continue;
-    const b = await body(ref);
-    if (b === undefined || (await nodeHash(b)) !== ref.hash) continue;
-    await graph.blobs.put(key, new TextEncoder().encode(canonicalJson(b)), {
-      contentType: "application/json",
-    });
-  }
-  return closure;
 }
 
 /**
@@ -568,8 +524,12 @@ export async function releaseView(
 ): Promise<ReleaseView> {
   const r = record.release;
   const overlaps = await deps.store.overlaps(r.siteId);
+  // What the dependency closure added (§6.1 step 2): new nodes another item's target references.
+  const referenced = new Set(record.items.flatMap((p) => (p.item.kind === "set" ? p.deps : [])));
   const closure = new Set(
-    (r.metadata?.[RELEASE_META.closure] ?? "").split(",").filter((x) => x.length > 0),
+    record.items
+      .filter((p) => p.item.kind === "set" && !p.item.base && referenced.has(p.item.nodeId))
+      .map((p) => p.item.nodeId),
   );
   const items: ReleaseItemView[] = [];
   for (const p of record.items) {

@@ -3,6 +3,7 @@
  * The caller is the local developer, so the default scopes are unrestricted; the approval gate
  * (publish / rollback / delete) still applies and is answered inside the client.
  */
+
 import { access } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -16,10 +17,12 @@ import {
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { serveCloudhalStdio } from "@cloudhal/mcp-server/stdio";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics } from "./analytics.ts";
-import { localComments, startLocalCommentsJob } from "./comments-local.ts";
+import { localComments } from "./comments-local.ts";
+import { startLocalScheduler } from "./scheduler-local.ts";
 
 export interface McpOptions {
   readonly projectDir: string;
@@ -54,12 +57,16 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   const skillsDir = options.skillsDir ?? (await resolveSkillsDir(options.projectDir));
   const skills: LoadedSkill[] = skillsDir ? await loadSkills(skillsDir) : [];
-  // The comment tools read and moderate the project's comments (RFC-0007 §11); the process owns
-  // the store while a client runs it, so it also runs the hourly comments job (no cron on Node).
+  // The comment tools read and moderate the project's comments (RFC-0007 §11). The process owns
+  // the store while a client runs it, so it also runs the scheduler's Node ticker (RFC-0008 §8.4):
+  // releases, automations and the hourly comments job behind its watermark.
   const comments = await localComments(local.sql, local.dataDir);
-  const stopCommentsJob = startLocalCommentsJob(local.store, comments.store, (l) =>
-    process.stderr.write(`cloudhal mcp: ${l}\n`),
-  );
+  const ticker = startLocalScheduler({
+    sql: local.sql,
+    blobs: local.blobs,
+    graph: local.store,
+    log: (l) => process.stderr.write(`cloudhal mcp: ${l}\n`),
+  });
   const handle = serveCloudhalStdio({
     store: local.store,
     principal: {
@@ -76,11 +83,17 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
     // The analytics tools read the project's SQLite (RFC-0006 L3).
     analytics: localAnalytics(local.sql, cfg),
     comments,
+    // RFC-0008 §12: the schedule tools on the project's SQLite, poking this process's ticker.
+    schedules: {
+      store: new SqlScheduleStore(local.sql),
+      scheduler: ticker,
+      maxNewBodies: Number.POSITIVE_INFINITY,
+    },
     onerror: (e) => process.stderr.write(`cloudhal mcp: ${e.message}\n`),
   });
   return {
     stop: async () => {
-      stopCommentsJob();
+      ticker.stop();
       await handle.close();
       await local.close();
     },

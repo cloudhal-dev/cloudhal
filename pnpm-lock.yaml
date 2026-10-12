@@ -726,6 +726,9 @@ importers:
       '@cloudhal/mcp-server':
         specifier: workspace:*
         version: link:../mcp-server
+      '@cloudhal/schedules':
+        specifier: workspace:*
+        version: link:../schedules
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage
@@ -775,6 +778,9 @@ importers:
       '@cloudhal/core-ts':
         specifier: workspace:*
         version: link:../core-ts
+      '@cloudhal/schedules':
+        specifier: workspace:*
+        version: link:../schedules
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage
@@ -862,6 +868,9 @@ importers:
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
+      '@cloudhal/schedules':
+        specifier: workspace:*
+        version: link:../schedules
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage

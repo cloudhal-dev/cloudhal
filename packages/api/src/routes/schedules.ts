@@ -32,6 +32,7 @@ import type {
   ScheduleRun,
   Site,
 } from "@cloudhal/core-contracts";
+import { type PersonApproval, schedulerHealthReport } from "@cloudhal/core-ts/releases";
 import type { SchedulesDeps } from "@cloudhal/mcp-server/schedules";
 import {
   type ApprovalState,
@@ -42,7 +43,8 @@ import {
   nodeVersion,
   notOwnRelease,
   personApproval,
-  pinRelease,
+  poke,
+  releaseService,
   releaseView,
 } from "@cloudhal/mcp-server/schedules";
 import {
@@ -51,19 +53,15 @@ import {
   forbiddenUntrustedScopes,
   newAutomationId,
   occurrences,
-  overviewNextWake,
-  publishReleaseNow,
   type RecurrenceLocale,
   renderRecurrence,
   runWindow,
   ScheduleConflictError,
   ScheduleError,
-  schedulerHealth,
   untrustedEffectiveScopes,
   validateRecurrence,
 } from "@cloudhal/schedules";
 import { type Context, Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { agentIdForKey } from "../auth.ts";
 import type { Env } from "../context.ts";
 import { apiError, badRequest, notFound } from "../errors.ts";
@@ -309,45 +307,41 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     const s = await site(c);
     const b = await body(c);
     let rec = await record(c, s.id, param(c, "releaseId"));
-    const expected = rev(b);
+    let expected = rev(b);
     await assertOwnRelease(c, rec);
     if (Array.isArray(b.nodeIds) || Array.isArray(b.removeIds)) {
       if (rec.release.state !== "draft")
         throw apiError(409, "invalid_transition", "items change while the release is a draft");
-      const pinned = await pinRelease(c.get("store"), s, {
-        set: (b.nodeIds as string[] | undefined) ?? [],
-        remove: (b.removeIds as string[] | undefined) ?? [],
-      });
-      await guard(() =>
-        deps.store.repinRelease(s.id, rec.release.id, {
+      // The items become exactly these (current versions), through ReleaseService.repin.
+      const pinned = await guard(() =>
+        releaseService(deps, c.get("store"), c.get("now")).repin(s.id, rec.release.id, {
           expectedRev: expected,
-          items: pinned.items,
+          drop: rec.release.items.map((i) => i.nodeId),
+          add: {
+            set: (b.nodeIds as string[] | undefined) ?? [],
+            remove: (b.removeIds as string[] | undefined) ?? [],
+          },
         }),
       );
+      expected = pinned.release.rev;
       rec = await record(c, s.id, rec.release.id);
     }
     if ("title" in b) {
       const title = typeof b.title === "string" && b.title.trim() ? b.title : null;
       await guard(() =>
-        deps.store.retitleRelease(s.id, rec.release.id, {
-          expectedRev:
-            Array.isArray(b.nodeIds) || Array.isArray(b.removeIds) ? rec.release.rev : expected,
-          title,
-        }),
+        deps.store.retitleRelease(s.id, rec.release.id, { expectedRev: expected, title }),
       );
     }
     await auditPerson(
       c,
       "release.update",
       { releaseId: rec.release.id, title: b.title ?? null },
-      {
-        siteId: s.id,
-        releaseId: rec.release.id,
-      },
+      { siteId: s.id, releaseId: rec.release.id },
     );
     return c.json(await releaseView(deps, c.get("store"), await record(c, s.id, rec.release.id)));
   })
   .post("/releases/:releaseId/items", async (c) => {
+    // Adds items in chunks (§6.1 step 4: at most 20 new versions per call on Workers Free).
     const deps = schedulesOf(c);
     const s = await site(c);
     const b = await body(c);
@@ -357,21 +351,14 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
       throw apiError(409, "invalid_transition", "items are added while the release is a draft");
     const add = (b.nodeIds as string[] | undefined) ?? [];
     const remove = (b.removeIds as string[] | undefined) ?? [];
-    if (add.length + remove.length === 0 || add.length > 20)
-      throw badRequest("add 1–20 nodes per request (nodeIds, removeIds)");
-    const set = [
-      ...rec.items.filter((p) => p.item.kind === "set").map((p) => p.item.nodeId),
-      ...add,
-    ];
-    const removes = [
-      ...rec.items.filter((p) => p.item.kind === "remove").map((p) => p.item.nodeId),
-      ...remove,
-    ];
+    if (add.length + remove.length === 0)
+      throw badRequest("name nodes to add (nodeIds, removeIds)");
     const pinned = await guard(() =>
-      pinRelease(c.get("store"), s, { set: [...new Set(set)], remove: [...new Set(removes)] }),
-    );
-    await guard(() =>
-      deps.store.repinRelease(s.id, rec.release.id, { expectedRev: rev(b), items: pinned.items }),
+      releaseService(deps, c.get("store"), c.get("now")).addItems(s.id, rec.release.id, {
+        expectedRev: rev(b),
+        set: add,
+        remove,
+      }),
     );
     await auditPerson(
       c,
@@ -381,7 +368,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     );
     return c.json({
       release: await releaseView(deps, c.get("store"), await record(c, s.id, rec.release.id)),
-      closureAdded: pinned.added,
+      closureAdded: pinned.closureAdded,
     });
   })
   .post("/releases/:releaseId/schedule", async (c) => {
@@ -420,29 +407,32 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
         "invalid_transition",
         `a ${rec.release.state} release cannot be re-pinned`,
       );
+    const p = principalOf(c);
+    const mayApprove =
+      b.approve === true &&
+      (await approvalProblem(c.get("store"), c.get("ownership"), p, rec.items)) === undefined;
+    await c.get("approvals")?.closeForRelease(s.id, rec.release.id, p.actor, "re-pinned");
+    const at = now(c).toISOString();
+    const approval = personApproval(p, at) as PersonApproval;
     const pinned = await guard(() =>
-      pinRelease(c.get("store"), s, {
-        set: rec.items.filter((p) => p.item.kind === "set").map((p) => p.item.nodeId),
-        remove: rec.items.filter((p) => p.item.kind === "remove").map((p) => p.item.nodeId),
+      releaseService(deps, c.get("store"), c.get("now")).repin(s.id, rec.release.id, {
+        expectedRev: rev(b),
+        ...(mayApprove ? { approval } : {}),
       }),
     );
-    await c
-      .get("approvals")
-      ?.closeForRelease(s.id, rec.release.id, c.get("actor") as never, "re-pinned");
-    const repinned = await guard(() =>
-      deps.store.repinRelease(s.id, rec.release.id, { expectedRev: rev(b), items: pinned.items }),
-    );
+    const repinned = pinned.release;
     await auditPerson(
       c,
       "release.repin",
-      { releaseId: repinned.id, hash: repinned.hash },
-      {
-        siteId: s.id,
-        releaseId: repinned.id,
-      },
+      { releaseId: repinned.id, hash: repinned.hash, approved: repinned.state === "scheduled" },
+      { siteId: s.id, releaseId: repinned.id },
     );
+    // Still waiting: ask someone who may approve it (or schedule it, when the caller may).
     const when = rec.release.when;
-    if (when && (b.approve === true || repinned.state === "awaiting_approval")) {
+    if (
+      when &&
+      (repinned.state === "awaiting_approval" || (b.approve === true && repinned.state === "draft"))
+    ) {
       const out = await runAsPerson(
         c,
         "schedule_release",
@@ -462,11 +452,8 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
       throw apiError(409, "invalid_transition", `a ${rec.release.state} release is not scheduled`);
     await assertOwnRelease(c, rec);
     const draft = await guard(() =>
-      deps.store.transitionRelease(s.id, rec.release.id, {
+      releaseService(deps, c.get("store"), c.get("now")).unschedule(s.id, rec.release.id, {
         expectedRev: rev(b),
-        to: "draft",
-        approval: null,
-        requestId: null,
       }),
     );
     await c
@@ -492,8 +479,8 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     return c.json(out);
   })
   .post("/releases/:releaseId/publish-now", async (c) => {
-    // A manual run now (missed, expired or scheduled): the conflict check and the person's
-    // rights apply; the snapshot records the real time (§8.6).
+    // A manual run now (missed, expired or scheduled) through ReleaseService.publishNow: the
+    // conflict check and the person's rights apply; the snapshot records the real time (§8.6).
     const deps = schedulesOf(c);
     const s = await site(c);
     const b = await body(c);
@@ -507,37 +494,23 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     const p = principalOf(c);
     const problem = await approvalProblem(c.get("store"), c.get("ownership"), p, rec.items);
     if (problem) throw apiError(403, "cannot_approve", problem);
-    if (!deps.executor)
-      throw new HTTPException(503, {
-        res: Response.json(
-          { error: "publish_unavailable", message: "this server cannot run releases yet" },
-          { status: 503 },
-        ),
-      });
-    const at = now(c);
+    const by = (personApproval(p, now(c).toISOString()) as PersonApproval).by;
     const result = await guard(() =>
-      publishReleaseNow({
-        store: deps.store,
-        executor: deps.executor as NonNullable<typeof deps.executor>,
-        siteId: s.id,
-        releaseId: rec.release.id,
+      releaseService(deps, c.get("store"), c.get("now")).publishNow(s.id, rec.release.id, {
         expectedRev: rev(b),
-        approval: personApproval(p, at.toISOString()),
-        now: at,
+        by,
       }),
     );
     await c.get("approvals")?.closeForRelease(s.id, rec.release.id, p.actor, "published now");
+    const outcome = result.release.outcome;
+    const runId = outcome && "runId" in outcome ? outcome.runId : undefined;
     await auditPerson(
       c,
       "release.publish-now",
-      { releaseId: rec.release.id, outcome: result.kind },
-      {
-        siteId: s.id,
-        releaseId: rec.release.id,
-        runId: result.runId,
-      },
+      { releaseId: rec.release.id, state: result.release.state },
+      { siteId: s.id, releaseId: rec.release.id, ...(runId ? { runId } : {}) },
     );
-    return c.json(result);
+    return c.json({ release: result.release, report: result.report, ...(runId ? { runId } : {}) });
   })
 
   // ───────────────────────────── gates ─────────────────────────────
@@ -676,7 +649,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
         { name, job: created.job },
         { siteId: s.id, automationId: created.id },
       );
-      if (created.nextRunAt) deps.poke?.(new Date(created.nextRunAt));
+      poke(deps, created.nextRunAt);
       return c.json({ automation: created }, 201);
     }
     if (job.kind !== "agent-task") throw badRequest("job.kind is builtin or agent-task");
@@ -719,7 +692,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
           automationId: id,
         },
       );
-      if (created.nextRunAt) deps.poke?.(new Date(created.nextRunAt));
+      poke(deps, created.nextRunAt);
       return c.json(
         { automation: created, key: { id: key.id, secret: key.key, scopes: key.scopes } },
         201,
@@ -810,7 +783,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
     const resumed = await guard(() =>
       deps.store.transitionAutomation(s.id, a.id, { expectedRev: rev(b), to: "active" }),
     );
-    if (resumed.nextRunAt) deps.poke?.(new Date(resumed.nextRunAt));
+    poke(deps, resumed.nextRunAt);
     await auditPerson(c, "automation.resume", {}, { siteId: s.id, automationId: a.id });
     return c.json({ automation: resumed });
   })
@@ -833,7 +806,7 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
         window,
       });
       if (!runId) throw apiError(409, "conflict", "a run for this minute already exists");
-      deps.poke?.(new Date(window.closesAt));
+      poke(deps, window.opensAt);
       await auditPerson(
         c,
         "automation.run-now",
@@ -937,32 +910,26 @@ export const scheduleRoutes: Hono<Env> = new Hono<Env>()
       { paused: next.paused, dailyWriteCap: next.dailyWriteCap, reason: b.reason ?? null },
       { siteId: s.id },
     );
-    if (!next.paused) deps.poke?.(now(c));
+    if (!next.paused) poke(deps, now(c).toISOString());
     return c.json(next);
   });
 
-/** The scheduler as people and the operator see it (§8.7, §13 `GET /api/scheduler`). */
-export async function schedulerStatus(deps: SchedulesDeps, at: Date) {
-  const overview = await deps.store.overview(at.toISOString());
+/** The scheduler as people see it (§8.7, §13 `GET /api/scheduler`): health, mode and 7-day lag. */
+export async function schedulerStatus(c: Context<Env>, deps: SchedulesDeps, at: Date) {
+  const report = await schedulerHealthReport(c.get("store").sql, {
+    now: at,
+    mode: deps.scheduler?.mode ?? "request",
+  });
   const day = 86_400_000;
-  const dueWithin24h =
-    overview.nextReleaseAt !== undefined &&
-    Date.parse(overview.nextReleaseAt) <= at.getTime() + day;
-  const health = schedulerHealth(overview.heartbeat, at, { dueWithin24h });
   const lateness = await deps.store.releaseLateness(new Date(at.getTime() - 7 * day).toISOString());
   const pct = (q: number) =>
     lateness.length > 0
       ? (lateness[Math.min(lateness.length - 1, Math.ceil(q * lateness.length) - 1)] ?? null)
       : null;
   return {
-    ticker: deps.ticker ?? null,
+    ...report,
+    mode: deps.scheduler?.mode ?? null,
     automations: deps.automationsEnabled !== false,
-    state: health.state,
-    healthy: health.healthy,
-    lastTickAt: health.lastTickAt ?? null,
-    nextWakeAt: health.nextWakeAt ?? null,
-    nextDueAt: overviewNextWake(overview) ?? null,
-    dueWithin24h,
     lag: { p50: pct(0.5), p95: pct(0.95), runs: lateness.length },
   };
 }
@@ -970,7 +937,7 @@ export async function schedulerStatus(deps: SchedulesDeps, at: Date) {
 /** `GET /api/scheduler` (signed-in): is scheduled work running? */
 export const schedulerRoute: Hono<Env> = new Hono<Env>().get("/", async (c) => {
   c.header("cache-control", "no-store");
-  return c.json(await schedulerStatus(schedulesOf(c), now(c)));
+  return c.json(await schedulerStatus(c, schedulesOf(c), now(c)));
 });
 
 /** `when` as the tools take it, from a stored `ReleaseWhen`. */

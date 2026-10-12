@@ -28,18 +28,16 @@ import type {
 } from "@cloudhal/core-contracts";
 import { ScheduleError } from "./errors.ts";
 import { sha256Hex } from "./ids.ts";
-import {
-  assertTimeZone,
-  canonicalInstant,
-  DAY_MS,
-  instantMs,
-  latenessSeconds,
-  MINUTE_MS,
-  resolveLocalTime,
-  UTC,
-} from "./time.ts";
+import { canonicalInstant, instantMs, latenessSeconds, MINUTE_MS } from "./instant.ts";
 
 export const RELEASE_HASH_PREFIX = "rl1:";
+
+/** The system actor scheduled work runs as (on behalf of a person, §6.3 step 6, S14). */
+export const SCHEDULER_ACTOR = Object.freeze({
+  kind: "system",
+  id: "sys_scheduler",
+  name: "Scheduler",
+} as const);
 export const MAX_RELEASE_ITEMS = 100;
 export const MAX_OPEN_RELEASES_PER_SITE = 200;
 /** A release runs late at most once and only within this many seconds of its time (owner decision 2). */
@@ -463,45 +461,6 @@ export function planRelease(
 }
 
 // ───────────────────────────── time, approval and lateness at run time ─────────────────────────────
-
-export type WhenInput =
-  | { at: string | Date | number; timeZone?: string }
-  | { localTime: string; timeZone?: string }
-  | "on-approval";
-
-/**
- * Builds a `ReleaseWhen` (§9.1): a wall-clock time is kept with its zone (the site's, D1: UTC when
- * absent) and resolved to `at`; an instant is a machine's absolute intent, kept with the zone for
- * display. Checks the lead time (≥ 1 minute) and horizon (≤ 366 days, or `horizonDays`).
- */
-export function releaseWhen(
-  input: WhenInput,
-  options: { siteTimeZone?: string; now: string | Date | number; horizonDays?: number },
-): ReleaseWhen {
-  if (input === "on-approval") return { kind: "on-approval" };
-  const timeZone = input.timeZone ?? options.siteTimeZone ?? UTC;
-  assertTimeZone(timeZone);
-  const when: ReleaseWhen =
-    "localTime" in input
-      ? {
-          kind: "at",
-          at: resolveLocalTime(input.localTime, timeZone).at,
-          timeZone,
-          localTime: input.localTime,
-        }
-      : { kind: "at", at: canonicalInstant(input.at), timeZone };
-  const at = instantMs(when.at);
-  const now = instantMs(options.now);
-  if (at < now + MIN_LEAD_MS)
-    throw new ScheduleError(
-      "too_soon",
-      "a release time must be at least a minute ahead (use Publish now or on-approval)",
-    );
-  const horizon = options.horizonDays ?? MAX_HORIZON_DAYS;
-  if (at > now + horizon * DAY_MS)
-    throw new ScheduleError("too_far", `a release time must be within ${horizon} days`);
-  return when;
-}
 
 export type ExpiredReason =
   | "unapproved"

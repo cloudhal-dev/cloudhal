@@ -7,6 +7,8 @@ Everything here is **Worker-safe**: no Node-only import at any entry. The only T
 | Entry | What |
 |---|---|
 | `@cloudhal/schedules` | Time model, recurrence, release model, automation/run state machines, taint, budgets, `TickMeter`, the `Scheduler` interface, `runDue`, `createScheduler`. No storage dependency beyond the `SqlDriver` type. |
+| `@cloudhal/schedules/engine` | The Temporal-free part: the release model, run ids, instant helpers, `TickMeter`, `releaseFinishStatements`, the scheduler's types. `@cloudhal/core-ts` applies releases through it, so the site Worker never bundles the time-zone library. |
+| `@cloudhal/schedules/time` | The time model alone; `@cloudhal/core-ts/time` re-exports it (one implementation). |
 | `@cloudhal/schedules/recurrence` | The RRULE subset alone (parse, validate, expand, presets, sentences). |
 | `@cloudhal/schedules/sql` | `SqlScheduleStore` over `SqlDriver` for migration `0017_schedules`. |
 | `@cloudhal/schedules/testing` | `describeScheduleStoreConformance`, `describeSchedulerConformance`, `fakeReleaseExecutor`, `countingDriver`, `expectContract*` (vitest). |
@@ -53,15 +55,15 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 const scheduler = createScheduler({
   openStore: (meter) => new SqlScheduleStore(meter.wrap(d1Driver)),
   newMeter: (budget) => new TickMeter(budget),
-  releases: publishReleaseExecutor, // ReleaseExecutor: publishRelease in core-ts (rollout step 5)
+  releases: releaseExecutor({ graph, schedules }), // `@cloudhal/core-ts/releases`
   builtins, systemJobs, checkApproval, wake: "minute",
 });
 await scheduler.runDue(new Date(controller.scheduledTime), TICK_BUDGETS.free, "cron");
 ```
 
-`runDue` claims each occurrence with a compare-and-swap and a fresh lease token and guards every later write on that token, so concurrent ticks produce one effect (S3). Releases run one at a time per site in time order (D15), at most an hour late (S8), with back-off retries and lease recovery. `SqlScheduleStore.releaseFinishStatements(…, guard)` gives `publishRelease` the statements that end a release to append to its own guarded batch.
+In practice every ticker calls `runScheduledTick` from `@cloudhal/core-ts/releases`, which builds the graph, this store, the executor and the system jobs over one `TickMeter`. `runClaimedRelease` ends a run a caller claimed itself (a person's "Publish now", `SqlScheduleStore.claimManualRun`).
 
-A person's "Publish now" (`POST …/releases/:id/publish-now`) is `publishReleaseNow({ store, executor, … })`: the same `ReleaseExecutor`, claimed with `claimManualRelease` (trigger `manual`, the release becomes `on-approval` approved now) and ended with `finishRelease`, so a tick and a person never both publish it.
+`runDue` claims each occurrence with a compare-and-swap and a fresh lease token and guards every later write on that token, so concurrent ticks produce one effect (S3). Releases run one at a time per site in time order (D15), at most an hour late (S8), with back-off retries and lease recovery. `SqlScheduleStore.releaseFinishStatements(…, guard)` gives `publishRelease` the statements that end a release to append to its own guarded batch.
 
 For the API and MCP (rollout steps 7–8) the store also has `automationByKey`, `openAgentRun`, `readyAgentRun`, `openManualWindow`, `recordRunCall`, `endAgentRunAs`, `updateAutomation`, `deleteAutomation`, `retitleRelease` and `releaseLateness`. The scheduler's `checkApproval` is `createReleaseApprovalCheck` from `@cloudhal/mcp-server/schedules` (re-exported by `@cloudhal/api` with `releaseRights`).
 
@@ -72,6 +74,7 @@ Statements per path (counted by `TickMeter`, Workers Free budget 40):
 | Idle tick | 1 (2 when the heartbeat is due, every fifth minute) |
 | Release published, executor not committing | 9 |
 | Release published, `publishRelease` shape (4 reads + 8-statement batch) | 18 |
+| Release published by `runScheduledTick` with the real `publishRelease` (core-ts suite, no asset blobs) | 17 |
 | Release missed | 7 |
 | Release recovered (expired lease or transient error) | 13 |
 | Built-in step | 8 |

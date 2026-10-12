@@ -104,7 +104,7 @@ export interface SchedulesFeature {
   gates: boolean;
   /** Automations run (`CLOUDHAL_AUTOMATIONS` is not `off`). */
   automations: boolean;
-  /** "Publish now" can run here (a release executor is wired). */
+  /** "Publish now" runs here (core-ts's `ReleaseService`). */
   publishNow: boolean;
   limits: {
     maxItems: number;
@@ -119,10 +119,10 @@ export function schedulesFeature(deps: SchedulesDeps | undefined): SchedulesFeat
   const on = schedulesAvailable(deps);
   return {
     available: on,
-    scheduler: on ? (deps.ticker ?? null) : null,
+    scheduler: on ? (deps.scheduler?.mode ?? null) : null,
     gates: on,
     automations: on && deps.automationsEnabled !== false,
-    publishNow: on && deps.executor !== undefined,
+    publishNow: on,
     limits: {
       maxItems: MAX_RELEASE_ITEMS,
       horizonDays: MAX_HORIZON_DAYS,

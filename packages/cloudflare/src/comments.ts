@@ -10,7 +10,8 @@
  *   502 from the site Worker) keeps the rows and backs off 30 s × 2^attempts, at most 5 minutes.
  * - **The hourly job** (§8.5, §9.2, §9.3): retention per site in bounded runs, comments of
  *   entries deleted 30 days ago, purges for threads that closed by time in the last hour, salts
- *   older than the previous month, then a flush as the backstop.
+ *   older than the previous month, then a flush as the backstop. Since RFC-0008 it is the
+ *   `comments.hourly` system job of the minute tick (`scheduler.ts`), behind a watermark.
  * - **`adminComments`**: the deployment's `CommentsDeps` from its secrets. Without a valid
  *   `CLOUDHAL_COMMENTS_KEY` (the same secret the site Worker uses) comments are unavailable, never
  *   a crash; `CLOUDHAL_COMMENTS_AVAILABLE=false` turns them off for the deployment.
@@ -241,8 +242,8 @@ export interface CommentsEnv {
   /** `false` turns comments off for the deployment (`cloudhal.json` `comments.available`). */
   CLOUDHAL_COMMENTS_AVAILABLE?: string;
   /**
-   * `off` when `cloudhal deploy` had to go without the hourly cron trigger (Workers Free allows 5
-   * per account): the hourly job then runs after admin requests, at most once an hour.
+   * Legacy (before RFC-0008): `off` meant the deploy went without the hourly cron trigger. It now
+   * reads as `CLOUDHAL_SCHEDULER=alarm` (`scheduler.ts`) until the next deploy removes it.
    */
   CLOUDHAL_COMMENTS_CRON?: string;
 }
@@ -254,16 +255,6 @@ export function commentsOn(env: CommentsEnv): boolean {
     typeof key === "string" &&
     key.length >= MIN_SECRET_LENGTH &&
     env.CLOUDHAL_COMMENTS_AVAILABLE !== "false"
-  );
-}
-
-/** One hour between on-request runs of the comments job (no cron trigger). */
-export const ON_REQUEST_HOURLY_MS = 3_600_000;
-
-/** Whether an admin request should run the hourly comments job (no cron trigger, an hour since). */
-export function commentsHourlyDue(env: CommentsEnv, now: number, last: number): boolean {
-  return (
-    commentsOn(env) && env.CLOUDHAL_COMMENTS_CRON === "off" && now - last >= ON_REQUEST_HOURLY_MS
   );
 }
 

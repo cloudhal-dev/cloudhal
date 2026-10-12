@@ -46,6 +46,20 @@ export {
   type OwnerTransferResult,
   transferOwner,
 } from "./commands/owner.ts";
+export {
+  type LocalScheduler,
+  type LocalSchedulerOptions,
+  runLocalTick,
+  startLocalScheduler,
+} from "./commands/scheduler-local.ts";
+export {
+  describeSchedulesStatus,
+  type SchedulesCliOptions,
+  type SchedulesStatusReport,
+  schedulesList,
+  schedulesRunDue,
+  schedulesStatus,
+} from "./commands/schedules.ts";
 export { resolveBuildSnapshot, type SnapshotOptions, snapshot } from "./commands/snapshot.ts";
 export { type StudioOptions, studio } from "./commands/studio.ts";
 export { pullSite, pushSite, type SyncOptions } from "./commands/sync.ts";

@@ -19,6 +19,11 @@
  * admin request whose queue is due; the hourly job applies retention, purges threads that closed by
  * time and deletes old salts.
  *
+ * Schedules (RFC-0008 §8, `scheduler.ts`): one tick a minute runs due releases, automation
+ * occurrences and the hourly jobs behind `system_jobs` watermarks — from the `* * * * *` cron
+ * trigger (`scheduled`), or, with `CLOUDHAL_SCHEDULER=alarm`, from the `SchedulerClock` Durable
+ * Object this module exports; admin requests are the backstop when the heartbeat is stale.
+ *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN, CLOUDHAL_COMMENTS_KEY (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
@@ -38,21 +43,24 @@ import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
-import {
-  adminComments,
-  type CommentsEnv,
-  commentsHourlyDue,
-  commentsOn,
-  flushCommentPurges,
-  runCommentsHourly,
-} from "./comments.ts";
+import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
 import { siteGateSupport } from "./features.ts";
 import { purgeSiteCache } from "./purge.ts";
+import {
+  type BackstopState,
+  releasePurger,
+  requestBackstop,
+  runAdminTick,
+  type SchedulerEnv,
+  schedulerClockClass,
+  schedulerRuntime,
+} from "./scheduler.ts";
 
-export interface AdminEnv extends CommentsEnv {
+export interface AdminEnv extends CommentsEnv, SchedulerEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   ASSETS?: Fetcher;
@@ -74,8 +82,6 @@ export interface AdminEnv extends CommentsEnv {
   CLOUDHAL_ANALYTICS_BUDGET?: string;
   /** Deployment defaults for sites without a settings row (compact JSON from cloudhal.json). */
   CLOUDHAL_ANALYTICS_DEFAULTS?: string;
-  /** `off` when the deploy had to go without the hourly cron trigger: daily totals roll up on read. */
-  CLOUDHAL_ANALYTICS_CRON?: string;
 }
 
 /** Default daily budget of uncached live queries: 80 % of WAE Free's 10,000 (§7.7, A2). */
@@ -134,7 +140,8 @@ export function adminAnalytics(
       : {}),
     defaults: analyticsDefaults(env.CLOUDHAL_ANALYTICS_DEFAULTS),
     budget: on ? budget : null,
-    rollups: env.CLOUDHAL_ANALYTICS_CRON === "off" ? "on-read" : "scheduled",
+    // Every deployment has a ticker now (cron or the clock, RFC-0008 §8.3): rollups are scheduled.
+    rollups: "scheduled",
     ...(options.now ? { now: options.now } : {}),
     // The script tag lives in cached HTML: a settings change purges the site's whole cache (§5.1).
     ...(site && token
@@ -186,8 +193,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   // Only plain values survive between requests. Workers do not let one request await I/O started
   // by another (it hangs), so no promise, auth instance or binding wrapper is cached here.
   let migrated = false;
-  /** When this isolate last ran the comments job on a request (no cron trigger); a plain number. */
-  let lastCommentsHourly = 0;
+  /** The request backstop's isolate state (RFC-0008 §8.6); plain numbers. */
+  const backstop: BackstopState = { lastCheck: 0, lastRun: 0 };
   /** The site Worker confirmed it enforces time gates (RFC-0008 §7.7); a plain boolean. */
   let gatesConfirmed = false;
   const ensureMigrated = async (sql: SqlDriver) => {
@@ -317,24 +324,14 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           ),
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });
-      // No cron trigger (the account had no free slot, `CLOUDHAL_COMMENTS_CRON=off`): the hourly
-      // comments job runs after an admin request instead, at most once an hour per isolate
-      // (RFC-0007 §8.5, as analytics roll up on read). Bounded and idempotent like the cron run.
-      if (comments && commentsHourlyDue(env, Date.now(), lastCommentsHourly)) {
-        lastCommentsHourly = Date.now();
-        const now = new Date(lastCommentsHourly);
-        ctx.waitUntil(
-          runCommentsHourly({ graph: store, store: comments.store, now })
-            .then((c) =>
-              log(
-                `comments hourly (on request): ${c.sites} site(s), ${c.retained} row(s) past retention${c.more ? " (more next run)" : ""}, ${c.closed} thread(s) closed`,
-              ),
-            )
-            .catch((e) =>
-              log(`comments hourly failed: ${e instanceof Error ? e.message : String(e)}`),
-            ),
-        );
-      }
+      // RFC-0008 §8.6: a stale heartbeat makes this request run a tick (at most once a minute).
+      const due = requestBackstop(env, backstop, {
+        log,
+        analytics: (s, now) => adminAnalytics(env, s, { now: () => now, log }),
+        commentsOn: commentsOn(env),
+        waitUntil: (p) => ctx.waitUntil(p),
+      });
+      if (due) ctx.waitUntil(due);
 
       // Per request: Better Auth keeps request-scoped state (background tasks, plugin promises),
       // and its construction does no I/O.
@@ -381,57 +378,83 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           : {}),
         analytics: adminAnalytics(env, sql, { log }),
         ...(comments ? { comments } : {}),
+        // RFC-0008 §12–§13: the schedule routes and tools; "Publish now" purges like a tick.
+        schedules: {
+          store: new SqlScheduleStore(sql),
+          purge: releasePurger(env, sql, { log }),
+          automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
+        },
+        scheduler: {
+          ...schedulerRuntime(env, log),
+          runDue: (trigger) =>
+            runAdminTick(env, {
+              trigger,
+              now: new Date(),
+              log,
+              analytics: (s, now) => adminAnalytics(env, s, { now: () => now, log }),
+              commentsOn: commentsOn(env),
+              waitUntil: (p) => ctx.waitUntil(p),
+            }),
+        },
       });
       return app.fetch(request, env, ctx);
     },
 
     /**
-     * The hourly job (RFC-0006 §7.5, cron `17 * * * *`): migrations as on the fetch path, salts
-     * before today deleted, at most one finished site-day rolled up from WAE into D1, retention.
-     * Then reader comments (RFC-0007 §8.5, §9.3): retention, threads closed by time, old monthly
-     * salts, and a purge flush as the backstop. Bounded work per invocation; a missed run is
-     * caught up by the next ones.
+     * The minute tick (RFC-0008 §8.2, cron `* * * * *`): due releases, automation occurrences, and
+     * the hourly jobs behind their watermarks — the analytics rollup (RFC-0006 §7.5) and the
+     * comments job (RFC-0007 §8.5) at :17, unchanged and with their log lines. Bounded work per
+     * invocation (`TickBudget`); a missed minute is caught up by the next tick.
      */
     async scheduled(
       controller: ScheduledController,
       env: AdminEnv,
-      _ctx: ExecutionContext,
+      ctx: ExecutionContext,
     ): Promise<void> {
       const sql = new D1Driver(env.DB);
       await ensureMigrated(sql);
-      const now = new Date(controller.scheduledTime || Date.now());
-      const analytics = adminAnalytics(env, sql, { now: () => now, log });
-      const store = new SiteGraphStore({ sql, blobs: new R2BlobStore(env.BLOBS) });
-      const siteIds = (await store.listSites()).map((s) => s.id);
-      const report = await analytics.rollup({ siteIds });
-      const failed = report.failed.map((f) => `${f.siteId} ${f.day}: ${f.error}`);
-      log(
-        `analytics rollup (${analytics.feature().reader}): ${report.done.length} site-day(s) done, ${report.pending} pending, ${report.saltsDeleted} salt(s) deleted, ${report.retained} row(s) past retention${failed.length ? `; failed: ${failed.join("; ")}` : ""}`,
-      );
-      if (commentsOn(env)) {
-        try {
-          const comments = new SqlCommentStore(sql);
-          const c = await runCommentsHourly({ graph: store, store: comments, now });
-          log(
-            `comments hourly: ${c.sites} site(s), ${c.retained} row(s) past retention${c.more ? " (more next run)" : ""}, ${c.deletedEntries} of deleted entries, ${c.closed} thread(s) closed, ${c.salts} salt(s) deleted`,
-          );
-          const site = env.SITE;
-          if (site && env.CLOUDHAL_PURGE_TOKEN) {
-            const f = await flushCommentPurges({
-              store: comments,
-              fetch: (u, init) => site.fetch(u, init as never) as unknown as Promise<Response>,
-              token: env.CLOUDHAL_PURGE_TOKEN,
-              now: () => now,
-              log,
-            });
-            log(
-              `comments purge backstop: ${f.sent.length} request(s), ${f.failed} failed${f.takedownWaiting ? ", a takedown is waiting" : ""}`,
-            );
-          }
-        } catch (e) {
-          log(`comments hourly failed: ${e instanceof Error ? e.message : String(e)}`);
-        }
+      try {
+        await runAdminTick(env, {
+          trigger: "cron",
+          now: new Date(controller.scheduledTime || Date.now()),
+          log,
+          analytics: (s, now) => adminAnalytics(env, s, { now: () => now, log }),
+          commentsOn: commentsOn(env),
+          waitUntil: (p) => ctx.waitUntil(p),
+        });
+      } catch (e) {
+        log(`schedules tick (cron) failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   };
 }
+
+/** Migrations applied by this isolate's clock (a plain value, like the Worker's own flag). */
+let clockMigrated = false;
+
+/**
+ * The scheduler's Durable Object clock (RFC-0008 §8.3), declared by every deploy
+ * (`SCHEDULER_CLOCK`, SQLite-backed) and woken only with `CLOUDHAL_SCHEDULER=alarm`. The generated
+ * admin entry re-exports it.
+ */
+export const SchedulerClock = schedulerClockClass(async (env, o) => {
+  const e = env as AdminEnv;
+  const sql = new D1Driver(e.DB);
+  if (!clockMigrated) {
+    try {
+      await migrate(sql, migrations);
+    } catch {
+      await migrate(sql, migrations);
+    }
+    clockMigrated = true;
+  }
+  const log = (line: string) => console.log(line);
+  return runAdminTick(e, {
+    trigger: "alarm",
+    now: o.now,
+    log,
+    analytics: (s, now) => adminAnalytics(e, s, { now: () => now, log }),
+    commentsOn: commentsOn(e),
+    waitUntil: o.waitUntil,
+  });
+});

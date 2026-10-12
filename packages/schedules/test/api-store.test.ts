@@ -11,9 +11,10 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runWindow } from "../src/automation.ts";
+import { TICK_BUDGETS } from "../src/budget-meter.ts";
 import { ScheduleConflictError } from "../src/errors.ts";
-import { publishReleaseNow } from "../src/manual.ts";
 import type { PinnedItem } from "../src/release.ts";
+import { runDue } from "../src/scheduler.ts";
 import { SqlScheduleStore } from "../src/sql/store.ts";
 import { fakeReleaseExecutor } from "../src/testing.ts";
 
@@ -62,89 +63,6 @@ function suite(label: string, open: () => Promise<SqlDriver>) {
         approval,
       });
     }
-
-    it("publish now runs a scheduled release once through the executor", async () => {
-      const r = await scheduled();
-      const exec = fakeReleaseExecutor();
-      const now = new Date("2026-10-12T11:00:00.000Z");
-      const out = await publishReleaseNow({
-        store,
-        executor: exec,
-        siteId: SITE,
-        releaseId: r.id,
-        expectedRev: r.rev,
-        approval: { ...approval, at: now.toISOString() },
-        now,
-      });
-      expect(out.kind).toBe("published");
-      expect(out.release).toMatchObject({
-        state: "published",
-        when: { kind: "on-approval" },
-        outcome: { kind: "published", latenessSeconds: 0 },
-      });
-      expect(isValid("release", out.release)).toBe(true);
-      expect(exec.calls).toHaveLength(1);
-      expect(exec.calls[0]?.trigger).toBe("manual");
-      const run = (await store.getRun(SITE, out.runId)) as ScheduleRun;
-      expect(run).toMatchObject({ state: "succeeded", trigger: "manual" });
-      expect((await store.heldNodes(SITE)).size).toBe(0);
-      // a second press finds a published release: refused, nothing runs again
-      await expect(
-        publishReleaseNow({
-          store,
-          executor: exec,
-          siteId: SITE,
-          releaseId: r.id,
-          expectedRev: out.release.rev,
-          approval,
-          now,
-        }),
-      ).rejects.toBeInstanceOf(ScheduleConflictError);
-      expect(exec.calls).toHaveLength(1);
-    });
-
-    it("publish now takes missed releases; conflicts and retries end as the tick would", async () => {
-      const r = await scheduled();
-      const conflictExec = fakeReleaseExecutor(() => ({
-        kind: "conflict",
-        conflicts: [{ nodeId: "entry_apistore1", expected: { rev: 1, hash: h("a") } }],
-      }));
-      const out = await publishReleaseNow({
-        store,
-        executor: conflictExec,
-        siteId: SITE,
-        releaseId: r.id,
-        expectedRev: r.rev,
-        approval,
-        now: new Date(T0),
-      });
-      expect(out.release).toMatchObject({ state: "conflict", outcome: { kind: "conflict" } });
-
-      const again = await scheduled();
-      const retry = await publishReleaseNow({
-        store,
-        executor: fakeReleaseExecutor(() => ({ kind: "retry", error: "D1 busy" })),
-        siteId: SITE,
-        releaseId: again.id,
-        expectedRev: again.rev,
-        approval,
-        now: new Date(T0),
-      });
-      expect(retry.kind).toBe("retry");
-      expect(retry.release.state).toBe("running");
-      // a stale rev is a conflict, not a second run
-      await expect(
-        publishReleaseNow({
-          store,
-          executor: fakeReleaseExecutor(),
-          siteId: SITE,
-          releaseId: again.id,
-          expectedRev: again.rev,
-          approval,
-          now: new Date(T0),
-        }),
-      ).rejects.toBeInstanceOf(ScheduleConflictError);
-    });
 
     it("automation keys, manual windows, open runs and run bookkeeping", async () => {
       const a = await store.createAutomation({
@@ -242,16 +160,15 @@ function suite(label: string, open: () => Promise<SqlDriver>) {
 
     it("reports release lateness for the scheduler's health", async () => {
       const r = await scheduled();
-      await publishReleaseNow({
+      const report = await runDue(new Date(Date.parse(T) + 5_000), {
         store,
-        executor: fakeReleaseExecutor(),
-        siteId: SITE,
-        releaseId: r.id,
-        expectedRev: r.rev,
-        approval,
-        now: new Date(T0),
+        trigger: "cron",
+        budget: TICK_BUDGETS.paid,
+        releases: fakeReleaseExecutor(),
       });
-      expect(await store.releaseLateness("2026-10-01T00:00:00.000Z")).toEqual([0]);
+      expect(report.ran).toBe(1);
+      expect((await store.getRelease(SITE, r.id))?.state).toBe("published");
+      expect(await store.releaseLateness("2026-10-01T00:00:00.000Z")).toEqual([5]);
     });
   });
 }

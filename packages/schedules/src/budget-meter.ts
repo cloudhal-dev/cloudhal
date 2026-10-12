@@ -64,6 +64,44 @@ export class TickMeter {
     this.#used += n;
   }
 
+  /**
+   * Counts `n` statements that already ran outside the limit (a system job's own driver): later
+   * units see less room, and nothing is refused.
+   */
+  note(n: number): void {
+    this.#used += n;
+  }
+
+  /**
+   * A driver that counts every statement into this meter without refusing any — for work whose
+   * own bounds hold (the analytics rollup, the comments job) but whose statements share the
+   * invocation's platform limit with the tick.
+   */
+  wrapCounting(inner: SqlDriver): SqlDriver {
+    const note = (n: number) => this.note(n);
+    return {
+      name: `counted(${inner.name})`,
+      get: async (sql, params) => {
+        note(1);
+        return inner.get(sql, params);
+      },
+      all: async (sql, params) => {
+        note(1);
+        return inner.all(sql, params);
+      },
+      run: async (sql, params) => {
+        note(1);
+        return inner.run(sql, params);
+      },
+      batch: async (statements) => {
+        note(statements.length);
+        return inner.batch(statements);
+      },
+      exec: (sql) => inner.exec(sql),
+      close: () => inner.close(),
+    };
+  }
+
   /** A driver that counts (and limits) every statement it executes through `inner`. */
   wrap(inner: SqlDriver): SqlDriver {
     const take = (n: number) => this.take(n);

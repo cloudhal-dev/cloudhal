@@ -518,6 +518,26 @@ function toSummary(row: ApiKeyRow, now: Date, role: Role | null | undefined): Ag
   };
 }
 
+/**
+ * An agent key's state read straight from the database, outside any request (RFC-0008 §10.6: the
+ * scheduler re-checks an `auto` release's key when it runs): enabled, its creator's role (`null`
+ * once they left) and the mode its next call would run in.
+ */
+export async function agentKeyStateFromSql(
+  sql: SqlDriver,
+  keyId: string,
+  now: Date,
+): Promise<{ enabled: boolean; creatorRole: Role | null; effectiveMode: AgentMode } | undefined> {
+  const row = await sql.get<ApiKeyRow & Record<string, unknown>>(
+    'SELECT * FROM "apikey" WHERE "id" = ?',
+    [keyId],
+  );
+  if (!row) return undefined;
+  const role = (await new StaffStore(sql, () => now).member(row.referenceId ?? ""))?.role ?? null;
+  const summary = toSummary(row, now, role);
+  return { enabled: summary.enabled, creatorRole: role, effectiveMode: summary.effectiveMode };
+}
+
 /** Better Auth ids are base62; prefix them so they match the contracts' `Id` pattern. */
 export function actorIdForUser(userId: string): string {
   const safe = userId.replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
