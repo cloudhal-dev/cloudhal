@@ -1078,6 +1078,44 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       );
     });
 
+    it('RFC-0007 §10.1: "Allow comments" adds comments:read to older keys — never to a Contributor\'s, audited', async () => {
+      const t = await team();
+      const older = ["site:read", "content:read", "preview:create"];
+      const authorKey = await newKey(t.author, { name: "a-old", mode: "plan", scopes: older });
+      const contributorKey = await newKey(t.contributor, {
+        name: "c-old",
+        mode: "plan",
+        scopes: older,
+      });
+      const add = (p: Person, id: string) =>
+        call("PATCH", `/api/agent-keys/${id}`, {
+          cookie: p.cookie,
+          body: { addScopes: ["comments:read"] },
+        });
+      // Contributors do not read comments, so their keys cannot either
+      expect((await add(t.contributor, contributorKey.id)).body.error).toBe("scope_above_role");
+      const added = await add(t.author, authorKey.id);
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body.scopes).toEqual([...older, "comments:read"]);
+      // still only read scopes: moderation stays fixed at creation
+      expect(
+        (
+          await call("PATCH", `/api/agent-keys/${authorKey.id}`, {
+            cookie: t.author.cookie,
+            body: { addScopes: ["comments:moderate:own"] },
+          })
+        ).body.error,
+      ).toBe("scope_not_addable");
+      const rows = (await audit.list({ deployment: true, limit: 100 })).filter(
+        (r) => r.tool === "agent-key.scopes",
+      );
+      expect(rows.map((r) => r.input)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyId: authorKey.id, added: ["comments:read"] }),
+        ]),
+      );
+    });
+
     // ───────────────────────────── I13: removal ─────────────────────────────
 
     it("I13: removal deletes the membership, revokes sessions, disables keys, cancels invites and denies pending requests", async () => {

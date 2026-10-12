@@ -523,6 +523,9 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       const list = await call(`${S()}/comment-bans`);
       expect(list.body.items).toHaveLength(2);
       expect(list.text).not.toContain("spam@example.com");
+      // The commenter page asks for one author's bans by one of their comments.
+      const mine = await call(`${S()}/comment-bans?commentId=${a.id}`);
+      expect((mine.body.items as Json[]).map((b) => b.subject).sort()).toEqual(["email", "ip"]);
       const banId = (list.body.items as Json[])[0]?.id as string;
       expect(
         (await call(`${S()}/comment-bans/${banId}`, "author", { method: "DELETE" })).status,

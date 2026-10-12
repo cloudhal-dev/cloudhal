@@ -1610,11 +1610,24 @@ export class SqlCommentStore implements SubmissionStore {
     return out;
   }
 
-  async listBans(siteId: string): Promise<CommentBan[]> {
-    const rows = await this.sql.all<Record<string, unknown>>(
-      "SELECT * FROM comment_bans WHERE site_id = ? ORDER BY at DESC, id",
-      [siteId],
-    );
+  /**
+   * The site's bans, newest first; with `commentId`, only those that match that comment's author
+   * (its email's keyed hash or its network hash), so Studio can show and lift a commenter's ban
+   * without anyone seeing an address.
+   */
+  async listBans(siteId: string, q: { commentId?: string } = {}): Promise<CommentBan[]> {
+    const rows = q.commentId
+      ? await this.sql.all<Record<string, unknown>>(
+          `SELECT b.* FROM comment_bans b, comments c LEFT JOIN commenter_emails e ON e.id = c.email_id
+            WHERE b.site_id = ? AND c.site_id = b.site_id AND c.id = ?
+              AND ((b.subject = 'email' AND b.value = e.email_hmac) OR (b.subject = 'ip' AND b.value = c.ip_hmac))
+            ORDER BY b.at DESC, b.id`,
+          [siteId, q.commentId],
+        )
+      : await this.sql.all<Record<string, unknown>>(
+          "SELECT * FROM comment_bans WHERE site_id = ? ORDER BY at DESC, id",
+          [siteId],
+        );
     return rows.map((r) => ({
       id: String(r.id),
       subject: String(r.subject) as BanSubject,
