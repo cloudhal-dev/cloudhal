@@ -55,6 +55,8 @@ catalog:
   "@testing-library/user-event": ^14.6.7
   happy-dom: ^20.14.5
   web-vitals: 6.2.2
+  temporal-polyfill: 1.0.5
+  rrule-temporal: 2.2.8
 
 # Native build scripts must be explicitly approved (pnpm 12 `allowBuilds`).
 allowBuilds:

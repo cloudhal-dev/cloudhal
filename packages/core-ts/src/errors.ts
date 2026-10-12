@@ -128,7 +128,17 @@ export type InvariantCode =
   /** A site bundle references media bytes the target does not have. */
   | "missing_media"
   /** Invariants 4 and 5: the asset's fields break a kind, storage or immutability rule. */
-  | "invalid_asset";
+  | "invalid_asset"
+  // ── RFC-0008 (time gates) ──
+  /** `availability` without a gate, with a gate that does not parse, or `from` not before `until`. */
+  | "invalid_availability"
+  /** S15: the site's renderer has not confirmed it enforces gates; `availability` is refused. */
+  | "gates_unsupported"
+  /** §4.1: `Site.timeZone` is not a zone the writing runtime knows (`Intl.supportedValuesOf`, `UTC`). */
+  | "invalid_time_zone"
+  // ── RFC-0008 (releases) ──
+  /** §6.2: the node is held by a release awaiting approval, scheduled or running; unschedule it first. */
+  | "scheduled_locked";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";
@@ -138,6 +148,38 @@ export class InvariantError extends Error {
     super(message);
     this.code = code;
     this.details = details;
+  }
+}
+
+/**
+ * RFC-0008 §6.2: a node held by a release (awaiting approval, scheduled or running) is locked — an
+ * update or delete is refused (`409 scheduled_locked`), as is publishing a snapshot that would move
+ * its live version. `details` names the node, the release, its state and its time; people may
+ * "Unschedule and edit" or "Edit and re-approve", agents ask a person.
+ */
+export class ScheduledLockedError extends InvariantError {
+  readonly nodeId: string;
+  readonly releaseId: string;
+  constructor(hold: {
+    nodeId: string;
+    releaseId: string;
+    state: string;
+    executeAt?: string | undefined;
+    title?: string | undefined;
+  }) {
+    super(
+      "scheduled_locked",
+      `${hold.nodeId} is scheduled in release ${hold.releaseId}${hold.executeAt ? ` for ${hold.executeAt}` : ""} (${hold.state}); it is locked until the release is unscheduled, edited and re-approved, or finished`,
+      {
+        nodeId: hold.nodeId,
+        releaseId: hold.releaseId,
+        state: hold.state,
+        ...(hold.executeAt ? { executeAt: hold.executeAt } : {}),
+        ...(hold.title ? { title: hold.title } : {}),
+      },
+    );
+    this.nodeId = hold.nodeId;
+    this.releaseId = hold.releaseId;
   }
 }
 

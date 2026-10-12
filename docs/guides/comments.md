@@ -165,7 +165,7 @@ This is the notice-and-action mechanism of DSA Art. 16, which applies to every h
 
 These can be changed in Site settings › Comments › Retention. Hashed network addresses and proof-of-work ids are kept **at most 30 days**: the setting accepts 1 to 30, and the hourly job never keeps them longer, even for a value saved before this limit existed. That keeps the notice below ("up to 30 days") true whatever you choose.
 
-On Cloudflare the hourly job is the admin Worker's cron trigger. If your account has no free trigger (Workers Free allows 5), `cloudhal deploy` goes without it and the job runs after Studio and API requests instead, at most once an hour. Locally, `cloudhal studio` and `cloudhal mcp` run it every hour while they are running.
+On Cloudflare the hourly job runs on the scheduler's minute tick, behind an hourly watermark: the admin Worker's cron trigger, or, if your account has no free trigger (Workers Free allows 5), a Durable Object alarm that `cloudhal deploy` sets up instead (see [Schedules](schedules.md#the-scheduler)). Locally, `cloudhal studio`, `cloudhal mcp` and `cloudhal dev` run the same tick while they are running.
 
 ### Requests from commenters (access, erasure)
 
@@ -241,7 +241,7 @@ If your site serves Türkiye, also publish a KVKK disclosure (*aydınlatma metni
 `cloudhal deploy`:
 - generates **`CLOUDHAL_COMMENTS_KEY`** once (256 random bits), keeps it with the other deployment secrets in `.cloudhal/deploy/secrets.json` (mode 0600; never commit it), and gives the same value to **both** Workers as a secret. It is never printed and never written into a wrangler config. The key signs proof-of-work puzzles and encrypts emails and stored secrets. **If you lose it, stored emails and the Turnstile secret cannot be read again.** Without a key, comments are simply unavailable; nothing crashes.
 - sets `CLOUDHAL_COMMENTS_AVAILABLE` on the admin Worker;
-- adds the hourly cron trigger (`17 * * * *`, shared with analytics) even when analytics are off. If Cloudflare refuses it because the account's triggers are used up, the deploy goes on without it and says so (`CLOUDHAL_COMMENTS_CRON=off`).
+- gives the admin Worker the scheduler's every-minute cron trigger, which runs the hourly comments job behind a watermark, even when analytics are off. If Cloudflare refuses it because the account's triggers are used up, the deploy goes on with a Durable Object alarm instead and says so (`CLOUDHAL_SCHEDULER=alarm`; see [Schedules](schedules.md#the-scheduler)).
 - sets `CLOUDHAL_SITE_HOSTS` for a custom domain, so the same-origin check accepts it;
 - with `comments.rateLimit`, adds `COMMENTS_RL`;
 - purges the site's cache once when comments become available or unavailable, so cached pages pick up the change.

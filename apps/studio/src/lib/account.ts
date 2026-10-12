@@ -9,18 +9,8 @@ export const PASSWORD_MAX = 128;
 /** Site and user names share the contract limit (`site.schema.json` → `name.maxLength`). */
 export const NAME_MAX = 200;
 
-/** Up to two letters for the avatar: "Ada Lovelace" → "AL", "ada@x.dev" → "A". */
-export function initials(name: string | null | undefined, email?: string | null): string {
-  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  const letters =
-    words.length > 1
-      ? [words[0], words[words.length - 1]].map((w) => Array.from(w as string)[0])
-      : words.length === 1
-        ? [Array.from(words[0] as string)[0]]
-        : [Array.from((email ?? "").trim())[0]];
-  const text = letters.filter(Boolean).join("");
-  return text ? text.toLocaleUpperCase() : "?";
-}
+// The avatar's letters live with the shell's user menu (`initials.ts`).
+export { initials } from "./initials.ts";
 
 export type NameError = "required" | "tooLong";
 

@@ -16,7 +16,7 @@ export async function snapshot(options: SnapshotOptions): Promise<Snapshot> {
   try {
     const snap = await local.store.createSnapshot(cfg.siteId, {
       actor: { kind: "human", id: "user_localcli0001", name: "cloudhal CLI" },
-      reason: "manual",
+      reason: options.publish ? "publish" : "manual",
       ...(options.label ? { label: options.label } : {}),
     });
     if (options.publish) {

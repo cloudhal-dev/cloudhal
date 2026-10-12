@@ -34,7 +34,11 @@ export function rank(role: Role): number {
 const IMPLIES: Partial<Record<AnyScope, readonly AnyScope[]>> = {
   "content:write": ["content:write:own"],
   "content:write:own": ["content:draft:own"],
-  "site:publish": ["site:publish:own"],
+  // RFC-0008 §10.1: publishing later is no more power than publishing now.
+  "site:publish": ["site:publish:own", "releases:publish"],
+  "site:publish:own": ["releases:publish:own"],
+  "releases:publish": ["releases:publish:own"],
+  "schedules:write": ["schedules:write:own"],
   "asset:manage": ["asset:upload"],
   "members:manage": ["members:invite"],
   "comments:moderate": ["comments:moderate:own"],
@@ -137,11 +141,20 @@ const EDITOR: AnyScope[] = [
   "comments:moderate",
   "comments:reply",
   "commenters:data",
+  "schedules:read",
+  "schedules:write",
+  "automations:manage",
 ];
 
 /** Role → scopes (`ROLE_SCOPES`, RFC-0005 §2.1), for servers that do not report them. */
 export const FALLBACK_ROLE_SCOPES: Record<Role, AnyScope[]> = {
-  contributor: [...READ, "content:draft:own", "asset:upload"],
+  contributor: [
+    ...READ,
+    "content:draft:own",
+    "asset:upload",
+    "schedules:read",
+    "schedules:write:own",
+  ],
   author: [
     ...READ,
     "content:write:own",
@@ -151,6 +164,8 @@ export const FALLBACK_ROLE_SCOPES: Record<Role, AnyScope[]> = {
     "comments:read",
     "comments:moderate:own",
     "comments:reply:own",
+    "schedules:read",
+    "schedules:write:own",
   ],
   editor: EDITOR,
   administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
@@ -183,6 +198,13 @@ export const FALLBACK_ABILITIES: Record<Ability, AnyScope | "owner"> = {
   "comments.replyAny": "comments:reply",
   "commenters.data": "commenters:data",
   "comments.settings": "site:settings",
+  "schedules.read": "schedules:read",
+  "schedules.write": "schedules:write:own",
+  "schedules.writeAny": "schedules:write",
+  "releases.approve": "releases:publish:own",
+  "releases.approveAny": "releases:publish",
+  "automations.manage": "automations:manage",
+  "schedules.settings": "site:settings",
   "ownership.transfer": "owner",
 };
 

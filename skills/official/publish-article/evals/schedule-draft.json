@@ -1,0 +1,10 @@
+{
+  "task": "Publish the draft 'Written in Studio' on Monday at 09:00.",
+  "expect": {
+    "statusAfter": "published",
+    "scheduleTool": "schedule_release",
+    "whenIsLocalTimeInSiteZone": true,
+    "publishCalled": false,
+    "pollsAfterApprovalRequest": false
+  }
+}

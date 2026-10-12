@@ -34,4 +34,12 @@ Or keep the key in a file git ignores and pass `--key-file examples/newsroom/.cl
 
 With an agent key the publish is never approved by the agent: the request appears in Studio under the site's **Activity → Approvals**, and the agent waits (up to 15 minutes) until you approve or deny it there. Every change it makes is a snapshot you can diff and roll back in Studio; the Activity tab shows each call it made and your approval.
 
-`pnpm --filter @cloudhal/demo-newsroom test` runs the agent against an in-memory Cloudhal MCP server (approval, decline, idempotent re-runs).
+To publish later instead, pass `--at` with a time in the site's time zone (or an instant such as `2026-11-02T06:00:00Z`, or `on-approval`). The key then needs `schedules:write` instead of `site:publish`:
+
+```bash
+CLOUDHAL_API_KEY=<key> node apps/demo-newsroom/scripts/editor-agent.ts --url https://<studio-host>/mcp --at 2026-11-02T09:00
+```
+
+The agent writes the articles, pins exactly what it wrote as one release (`schedule_release`) and exits. Approve the request in Studio once; Cloudhal publishes those versions at 09:00, and the articles stay locked against edits until then. There is nothing to keep running ([schedules guide](../../docs/guides/schedules.md)).
+
+`pnpm --filter @cloudhal/demo-newsroom test` runs the agent against an in-memory Cloudhal MCP server (approval, decline, idempotent re-runs, `--at`).

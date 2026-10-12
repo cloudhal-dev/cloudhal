@@ -33,6 +33,13 @@ import {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
+import {
+  checkAvailability,
+  checkTimeZone,
+  type GateSupport,
+  isTimeZone,
+  sameAvailability,
+} from "./availability.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import {
   ConflictError,
@@ -42,6 +49,13 @@ import {
   UniqueConstraintError,
 } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
+import {
+  assertHoldsKept,
+  assertUnlocked,
+  composeWithHolds,
+  type NodeHold,
+  readHolds,
+} from "./holds.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
 import { fillMissingSrc } from "./media/refs.ts";
 import { isReservedMediaPath, MEDIA_LIMITS } from "./media/types.ts";
@@ -59,6 +73,11 @@ import {
 } from "./node-sql.ts";
 import { type Creatable, type NodeKind, type SiteNode, uniquenessKey } from "./nodes.ts";
 import type { RedirectMatch } from "./redirects.ts";
+import {
+  type PublishReleaseInput,
+  type PublishReleaseResult,
+  publishRelease,
+} from "./release-apply.ts";
 import {
   migrateTagsToTerms,
   revertTagsToTerms,
@@ -109,6 +128,13 @@ export interface SiteGraphStoreOptions {
    * asset's media URLs (`cloudhal-asset-<id>`). Failures go to `onHookError`.
    */
   readonly onMediaPurged?: (siteId: string, assetIds: string[]) => Promise<void>;
+  /**
+   * RFC-0008 S15: whether the renderer serving a site enforces time gates. Writes that set or
+   * change `availability` are refused (`gates_unsupported`) until it says so; without this option
+   * they are always refused. Node stores pass `GATES_ENFORCED` (renderer and writer are one
+   * process); the admin Worker asks the site Worker's `/__cloudhal/features`.
+   */
+  readonly gates?: GateSupport;
 }
 
 /**
@@ -118,6 +144,15 @@ export interface SiteGraphStoreOptions {
 export interface PublishChange {
   readonly from?: string;
   readonly to?: string;
+}
+
+/**
+ * Options of a page or entry update (RFC-0008 §6.2). `releaseEdit` is a person's "Edit and
+ * re-approve": the node may change while held by that release (and only that one, not running);
+ * the caller re-pins the item right after (`ReleaseService.editHeld…`). Agents never pass it.
+ */
+export interface NodeWriteOptions {
+  readonly releaseEdit?: string;
 }
 
 export interface SnapshotInput {
@@ -136,13 +171,17 @@ export interface SnapshotDiff {
 
 /**
  * The first time an entry is marked published it gets its publication date, whichever path made
- * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept.
+ * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept. An
+ * entry under embargo is dated at its `from` (RFC-0008 §7.5): its date, feed item and sitemap
+ * entry show the embargo time, not the moment someone pressed publish.
  */
 function firstPublication(
-  entry: Pick<ContentEntry, "status" | "publishedAt">,
+  entry: Pick<ContentEntry, "status" | "publishedAt" | "availability">,
   ts: string,
 ): { publishedAt?: string } {
-  return entry.status === "published" && !entry.publishedAt ? { publishedAt: ts } : {};
+  return entry.status === "published" && !entry.publishedAt
+    ? { publishedAt: entry.availability?.from ?? ts }
+    : {};
 }
 
 /**
@@ -164,6 +203,7 @@ export class SiteGraphStore {
     this.#blobs = options.blobs;
     this.#now = options.now ?? (() => new Date());
     this.#newId = options.idGen ?? newId;
+    this.#gates = options.gates;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.#assets = new AssetEngine({
@@ -191,6 +231,53 @@ export class SiteGraphStore {
 
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
   readonly #onHookError: (error: unknown) => void;
+  readonly #gates: GateSupport | undefined;
+
+  /**
+   * Whether `availability` may be written for this site (S15): the renderer serving it has
+   * confirmed it enforces gates. Imports ask it too (`importSite`'s `gates`).
+   */
+  async gatesEnforced(siteId: string): Promise<boolean> {
+    return (await this.#gates?.enforced(siteId)) === true;
+  }
+
+  /**
+   * The gate rules of a page or entry write (RFC-0008 §4.1, §7.7): gates that parse, `from` before
+   * `until`, and none set or changed until the site's renderer enforces them. Removing gates is
+   * always allowed here; who may lift an embargo is the policy layer's decision (D8).
+   */
+  async #checkGates(
+    siteId: string,
+    before: Page["availability"],
+    after: Page["availability"],
+  ): Promise<void> {
+    if (sameAvailability(before, after) || !after) return;
+    checkAvailability(after);
+    if (!(await this.gatesEnforced(siteId)))
+      throw new InvariantError(
+        "gates_unsupported",
+        "this site's renderer has not confirmed it enforces time gates (availability); deploy the current site Worker first",
+        { siteId },
+      );
+  }
+
+  /**
+   * Whether the live (published) version of an entry has been shown: it is published there and
+   * its embargo, if any, has passed. One snapshot row and one body read; only asked when a write
+   * moves an embargo.
+   */
+  async #shownLive(site: Site, id: string): Promise<boolean> {
+    if (!site.publishedSnapshotId) return false;
+    const live = await this.getSnapshot(site.publishedSnapshotId);
+    const ref = live?.nodes.find((n) => n.id === id);
+    if (!ref) return false;
+    const node = await this.readSnapshotNode<ContentEntry>(ref);
+    const from = node.availability?.from;
+    return (
+      node.status === "published" &&
+      (from === undefined || Date.parse(from) <= this.#now().getTime())
+    );
+  }
 
   /** Applies pending storage migrations. Safe to call on every start. */
   async init(): Promise<void> {
@@ -271,6 +358,7 @@ export class SiteGraphStore {
       updatedAt: ts,
     };
     assertValid("site", site);
+    checkTimeZone(site.timeZone);
     await this.#runUnique(
       await insertNodeStatement("site", site, ts),
       "site",
@@ -295,6 +383,9 @@ export class SiteGraphStore {
   async updateSite(site: Site): Promise<Site> {
     const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
     assertValid("site", next);
+    // §4.1: a known zone needs no read; an unknown one is refused unless it is the stored one.
+    if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
+      checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
     const s = await casUpdateStatement("site", next, site.rev);
     const r = await this.#sql.run(s.sql, s.params ?? []);
     if (r.changes !== 1)
@@ -321,6 +412,7 @@ export class SiteGraphStore {
     assertValid("page", draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
+    await this.#checkGates(site.id, undefined, draft.availability);
     const refs = await this.#assets.planRefs("page", site.id, draft, undefined);
     const page = refs.node;
     const nextSite: Site = {
@@ -371,7 +463,7 @@ export class SiteGraphStore {
    * CAS update. The path may not enter an archive base path (invariant 13); a published page in the
    * default locale whose path changes leaves a 301 redirect (RFC-0002 accepted answer 5).
    */
-  async updatePage(page: Page): Promise<Page> {
+  async updatePage(page: Page, options: NodeWriteOptions = {}): Promise<Page> {
     const ts = this.#stamp();
     const draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
     fillMissingSrc("page", draft);
@@ -380,6 +472,8 @@ export class SiteGraphStore {
     const stored = await this.getPage(page.id);
     if (!stored || stored.rev !== page.rev)
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    await assertUnlocked(this.#sql, stored.siteId, [page.id], options.releaseEdit);
+    await this.#checkGates(draft.siteId, stored.availability, draft.availability);
     const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
     const next = refs.node;
     await this.#tax.checkPagePath(next);
@@ -435,6 +529,7 @@ export class SiteGraphStore {
 
   /** Deletes a page and removes it from `Site.pageIds` atomically (CAS on both). */
   async deletePage(site: Site, page: Page): Promise<Site> {
+    await assertUnlocked(this.#sql, site.id, [page.id]);
     const ts = this.#stamp();
     const nextSite: Site = {
       ...site,
@@ -501,7 +596,10 @@ export class SiteGraphStore {
    * whose slug (or collection) changes leaves a 301 redirect, with older redirects re-pointed
    * (RFC-0002 §4.5).
    */
-  async updateContentEntry(entry: ContentEntry): Promise<ContentEntry> {
+  async updateContentEntry(
+    entry: ContentEntry,
+    options: NodeWriteOptions = {},
+  ): Promise<ContentEntry> {
     const ts = this.#stamp();
     const next: ContentEntry = {
       ...entry,
@@ -509,13 +607,14 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(entry, ts),
     };
-    return this.#writeEntry(entry, next, ts);
+    return this.#writeEntry(entry, next, ts, options);
   }
 
   async #writeEntry(
     prev: ContentEntry | undefined,
     draft: ContentEntry,
     ts: string,
+    options: NodeWriteOptions = {},
   ): Promise<ContentEntry> {
     fillMissingSrc("contentEntry", draft);
     assertValid("content-entry", canonicalTerms(draft));
@@ -526,7 +625,22 @@ export class SiteGraphStore {
       stored = await this.getContentEntry(prev.id);
       if (!stored || stored.rev !== prev.rev)
         throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
+      await assertUnlocked(this.#sql, stored.siteId, [prev.id], options.releaseEdit);
     }
+    await this.#checkGates(site.id, stored?.availability, draft.availability);
+    // §7.5: an entry not shown yet keeps its date on its embargo. When a write moves `from` and
+    // the caller left `publishedAt` alone, the date follows, until the entry has been shown.
+    const from = draft.availability?.from;
+    if (
+      stored &&
+      from !== undefined &&
+      draft.status === "published" &&
+      from !== stored.availability?.from &&
+      draft.publishedAt === stored.publishedAt &&
+      draft.publishedAt !== from &&
+      !(await this.#shownLive(site, draft.id))
+    )
+      draft = { ...draft, publishedAt: from };
     const refs = await this.#assets.planRefs("contentEntry", site.id, draft, stored);
     const prepared = await this.#tax.prepareEntry(refs.node, site, ts);
     const { entry, newTerms } = prepared;
@@ -576,6 +690,7 @@ export class SiteGraphStore {
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
+    await assertUnlocked(this.#sql, entry.siteId, [entry.id]);
     const [r] = await this.#sql.batch([
       {
         sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
@@ -614,6 +729,7 @@ export class SiteGraphStore {
 
   /** CAS. The key is immutable; moving an enabled archive base path leaves a prefix redirect. */
   async updateTaxonomy(taxonomy: Taxonomy): Promise<Taxonomy> {
+    await assertUnlocked(this.#sql, taxonomy.siteId, [taxonomy.id]);
     checkReservedPath(`${taxonomy.archive?.basePath ?? ""}/`);
     return this.#tax.updateTaxonomy(taxonomy);
   }
@@ -642,6 +758,7 @@ export class SiteGraphStore {
 
   /** Labels, image, position and metadata; never slug, status, parent, visibility or merge state. */
   async updateTerm(term: Term): Promise<Term> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     const draft = structuredClone(term);
     fillMissingSrc("term", draft);
     return this.#tax.updateTerm(draft);
@@ -657,27 +774,37 @@ export class SiteGraphStore {
 
   // ───────────────────────────── governance (one batch each; the caller snapshots once) ─────────────────────────────
 
-  renameTerm(term: Term, slug: string, options?: { reclaim?: boolean }): Promise<GovernanceResult> {
+  async renameTerm(
+    term: Term,
+    slug: string,
+    options?: { reclaim?: boolean },
+  ): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     return this.#tax.renameTerm(term, slug, options);
   }
 
-  mergeTerms(sources: readonly Term[], target: Term): Promise<GovernanceResult> {
+  async mergeTerms(sources: readonly Term[], target: Term): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, target.siteId, [...sources.map((t) => t.id), target.id]);
     return this.#tax.mergeTerms(sources, target);
   }
 
-  retireTerm(term: Term, options?: { redirectTo?: Term }): Promise<GovernanceResult> {
+  async retireTerm(term: Term, options?: { redirectTo?: Term }): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     return this.#tax.retireTerm(term, options);
   }
 
-  setTermParent(term: Term, parentId: string | null): Promise<GovernanceResult> {
+  async setTermParent(term: Term, parentId: string | null): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     return this.#tax.setTermParent(term, parentId);
   }
 
-  setTermVisibility(term: Term, visibility: Term["visibility"]): Promise<GovernanceResult> {
+  async setTermVisibility(term: Term, visibility: Term["visibility"]): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     return this.#tax.setTermVisibility(term, visibility);
   }
 
-  reviewTerm(term: Term, decision: ReviewDecision): Promise<GovernanceResult> {
+  async reviewTerm(term: Term, decision: ReviewDecision): Promise<GovernanceResult> {
+    await assertUnlocked(this.#sql, term.siteId, [term.id]);
     return this.#tax.reviewTerm(term, decision);
   }
 
@@ -694,10 +821,12 @@ export class SiteGraphStore {
 
   async updateRedirect(redirect: Redirect): Promise<Redirect> {
     checkReservedPath(redirect.from);
+    await assertUnlocked(this.#sql, redirect.siteId, [redirect.id]);
     return this.#tax.updateRedirect(redirect);
   }
 
-  deleteRedirect(redirect: Redirect): Promise<void> {
+  async deleteRedirect(redirect: Redirect): Promise<void> {
+    await assertUnlocked(this.#sql, redirect.siteId, [redirect.id]);
     return this.#tax.deleteRedirect(redirect);
   }
 
@@ -736,12 +865,14 @@ export class SiteGraphStore {
   }
 
   /** Whole tree, CAS on `rev`, key immutable; targets the write adds are guarded (invariant 9). */
-  updateMenu(menu: Menu): Promise<Menu> {
+  async updateMenu(menu: Menu): Promise<Menu> {
+    await assertUnlocked(this.#sql, menu.siteId, [menu.id]);
     return this.#menus.updateMenu(menu);
   }
 
   /** CAS delete; the site falls back to its derived default for that key. */
-  deleteMenu(menu: Menu): Promise<void> {
+  async deleteMenu(menu: Menu): Promise<void> {
+    await assertUnlocked(this.#sql, menu.siteId, [menu.id]);
     return this.#menus.deleteMenu(menu);
   }
 
@@ -832,21 +963,25 @@ export class SiteGraphStore {
   }
 
   /** Title, alt, caption, credit, license, slug, decorative, placeholders, metadata (CAS). */
-  updateAsset(asset: Asset): Promise<Asset> {
+  async updateAsset(asset: Asset): Promise<Asset> {
+    await assertUnlocked(this.#sql, asset.siteId, [asset.id]);
     return this.#assets.updateAsset(asset);
   }
 
   /** Hidden from pickers and not newly referable; existing uses keep rendering (invariant 6). */
-  retireAsset(asset: Asset): Promise<Asset> {
+  async retireAsset(asset: Asset): Promise<Asset> {
+    await assertUnlocked(this.#sql, asset.siteId, [asset.id]);
     return this.#assets.retireAsset(asset);
   }
 
-  restoreAsset(asset: Asset): Promise<Asset> {
+  async restoreAsset(asset: Asset): Promise<Asset> {
+    await assertUnlocked(this.#sql, asset.siteId, [asset.id]);
     return this.#assets.restoreAsset(asset);
   }
 
   /** Invariant 9: refused while referenced (`in_use`); never deletes bytes. */
-  deleteAsset(asset: Asset): Promise<void> {
+  async deleteAsset(asset: Asset): Promise<void> {
+    await assertUnlocked(this.#sql, asset.siteId, [asset.id]);
     return this.#assets.deleteAsset(asset);
   }
 
@@ -955,6 +1090,14 @@ export class SiteGraphStore {
     return this.#blobs;
   }
 
+  /**
+   * The SQL driver, for packages that keep their own tables in the same database and must write
+   * in step with the graph (`@cloudhal/core-ts/releases` over `@cloudhal/schedules`).
+   */
+  get sql(): SqlDriver {
+    return this.#sql;
+  }
+
   // ───────────────────────────── migration (RFC-0002 Compatibility) ─────────────────────────────
 
   /** `tags` → `terms.tag`, resumable and idempotent; snapshots before and after. */
@@ -1003,9 +1146,22 @@ export class SiteGraphStore {
   async createSnapshot(siteId: string, input: SnapshotInput): Promise<Snapshot> {
     const site = await this.getSite(siteId);
     if (!site) throw new NotFoundError("site", siteId);
-    const rows = await this.#sql.all<Row>("SELECT * FROM nodes WHERE site_id = ? ORDER BY id", [
+    let rows = await this.#sql.all<Row>("SELECT * FROM nodes WHERE site_id = ? ORDER BY id", [
       siteId,
     ]);
+    // RFC-0008 §6.2 (S5): an ordinary publish keeps nodes held by a release at their live version
+    // (or leaves them out when they are not live). History snapshots capture the whole working copy.
+    let heldRefs: NodeRef[] = [];
+    if (input.reason === "publish") {
+      const held = new Set((await readHolds(this.#sql, siteId)).keys());
+      if (held.size > 0) {
+        const live = site.publishedSnapshotId
+          ? await this.getSnapshot(site.publishedSnapshotId)
+          : undefined;
+        rows = rows.filter((r) => !held.has(r.id));
+        heldRefs = (live?.nodes ?? []).filter((n) => held.has(n.id));
+      }
+    }
     for (const row of rows) {
       const key = `nodes/${row.hash}.json`;
       if (!(await this.#blobs.head(key))) {
@@ -1014,12 +1170,11 @@ export class SiteGraphStore {
         });
       }
     }
-    const nodes: NodeRef[] = rows.map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      rev: r.rev,
-      hash: r.hash,
-    }));
+    const nodes: NodeRef[] = composeWithHolds(
+      rows.map((r) => ({ id: r.id, kind: r.kind, rev: r.rev, hash: r.hash })),
+      heldRefs,
+      new Set(heldRefs.map((n) => n.id)),
+    );
     const parent = await this.latestSnapshot(siteId);
     const diff = diffNodeRefs(parent?.nodes ?? [], nodes);
     const snapshot: Snapshot = {
@@ -1042,11 +1197,15 @@ export class SiteGraphStore {
     };
     assertValid("snapshot", snapshot);
     // Snapshots record the content their blob assets need, in the same batch (RFC-0004 §4.4).
-    const blobs = this.#assets.snapshotBlobsStatement(
-      snapshot.id,
-      siteId,
-      rows.filter((r) => r.kind === "asset").map((r) => r.body),
+    const heldAssets = await Promise.all(
+      heldRefs
+        .filter((r) => r.kind === "asset")
+        .map(async (r) => canonicalJson(await this.readSnapshotNode(r))),
     );
+    const blobs = this.#assets.snapshotBlobsStatement(snapshot.id, siteId, [
+      ...rows.filter((r) => r.kind === "asset").map((r) => r.body),
+      ...heldAssets,
+    ]);
     await this.#sql.batch([
       {
         sql: "INSERT INTO snapshots (id, site_id, parent_id, site_rev, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1101,17 +1260,38 @@ export class SiteGraphStore {
    */
   async stateHash(siteId: string): Promise<string> {
     const refs = await this.currentNodeRefs(siteId);
-    return sha256Hex(refs.map((r) => `${r.id}@${r.rev}:${r.hash}`).join("\n"));
+    const lines = refs.map((r) => `${r.id}@${r.rev}:${r.hash}`);
+    // RFC-0008 §6.2: what a publish would take changes when a node is held or released, so the
+    // holds are part of the state an approval is bound to (no holds: the digest is unchanged).
+    const held = [...(await readHolds(this.#sql, siteId)).keys()].sort();
+    for (const id of held) lines.push(`held ${id}`);
+    return sha256Hex(lines.join("\n"));
   }
 
-  /** What would change if the current state were published, against the live snapshot. */
+  /**
+   * Nodes held by releases awaiting approval, scheduled or running (RFC-0008 §6.2): node id → the
+   * releases holding it, in time order. Locked against edits, kept live-as-is by publishes.
+   */
+  heldNodes(siteId: string, nodeIds?: readonly string[]): Promise<Map<string, NodeHold[]>> {
+    return readHolds(this.#sql, siteId, nodeIds);
+  }
+
+  /**
+   * What would change if the current state were published, against the live snapshot. Nodes held
+   * by a release stay at their live version (RFC-0008 §6.2), exactly as `createSnapshot` with
+   * reason `publish` composes them, so what a person approves is what goes live.
+   */
   async pendingChanges(siteId: string): Promise<SnapshotDiff> {
     const site = await this.getSite(siteId);
     if (!site) throw new NotFoundError("site", siteId);
     const live = site.publishedSnapshotId
       ? await this.getSnapshot(site.publishedSnapshotId)
       : undefined;
-    const diff = diffNodeRefs(live?.nodes ?? [], await this.currentNodeRefs(siteId));
+    const held = new Set((await readHolds(this.#sql, siteId)).keys());
+    const diff = diffNodeRefs(
+      live?.nodes ?? [],
+      composeWithHolds(await this.currentNodeRefs(siteId), live?.nodes, held),
+    );
     // Publishing itself rewrites the site node (its pointer, rev and timestamp). That is not a
     // change a person needs to approve, so a site node that differs only there is left out.
     const siteChange = diff.changed.find((c) => c.after.kind === "site");
@@ -1152,10 +1332,25 @@ export class SiteGraphStore {
     return planCachePurge(this, change.from, change.to, options);
   }
 
-  /** Points production at a snapshot (CAS on the site). */
+  /**
+   * Points production at a snapshot (CAS on the site). A snapshot that would move a node held by a
+   * release away from its live version is refused (`scheduled_locked`, RFC-0008 S5): publish one
+   * made with reason `publish`, which keeps held nodes live-as-is.
+   */
   async publish(site: Site, snapshotId: string): Promise<Site> {
     const snap = await this.getSnapshot(snapshotId);
     if (!snap || snap.siteId !== site.id) throw new NotFoundError("snapshot", snapshotId);
+    const holds = await readHolds(this.#sql, site.id);
+    if (holds.size > 0) {
+      const live = site.publishedSnapshotId
+        ? await this.getSnapshot(site.publishedSnapshotId)
+        : undefined;
+      assertHoldsKept(snap.nodes, live?.nodes, holds);
+    }
+    return this.#publishPointer(site, snapshotId);
+  }
+
+  async #publishPointer(site: Site, snapshotId: string): Promise<Site> {
     const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
     await this.#runOnPublished(updated, {
       ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),
@@ -1189,13 +1384,37 @@ export class SiteGraphStore {
         `snapshot ${targetSnapshotId} is not an ancestor of the published snapshot ${site.publishedSnapshotId}`,
       );
     }
-    const updated = await this.publish(site, targetSnapshotId);
+    // A rollback may move held nodes: their releases become conflicts when they run (§6.2).
+    const target = await this.getSnapshot(targetSnapshotId);
+    if (!target || target.siteId !== site.id) throw new NotFoundError("snapshot", targetSnapshotId);
+    const updated = await this.#publishPointer(site, targetSnapshotId);
     const snapshot = await this.createSnapshot(site.id, {
       actor,
       reason: "rollback",
       label: `rollback to ${targetSnapshotId}`,
     });
     return { site: updated, snapshot };
+  }
+
+  /**
+   * Applies a claimed release on top of whatever is live (RFC-0008 §6.3; `release-apply.ts`):
+   * conflicts checked before the batch and the site CAS inside it (S4), `nodes(S) = nodes(L) − ids
+   * + targets` (S1), a `scheduled` snapshot, the pointer flip and the release, run and audit rows in
+   * one guarded batch of at most eight statements. Reads: the site row, the live snapshot and the
+   * latest one (a recovered run: one more). It does not call `onPublished`: the release's purge plan
+   * was computed when it was pinned, and the caller (`releaseExecutor`) sends it.
+   */
+  publishRelease(input: PublishReleaseInput): Promise<PublishReleaseResult> {
+    return publishRelease(
+      {
+        sql: this.#sql,
+        blobs: this.#blobs,
+        newId: (prefix) => this.#newId(prefix),
+        getSnapshot: (id) => this.getSnapshot(id),
+        latestSnapshot: (id) => this.latestSnapshot(id),
+      },
+      input,
+    );
   }
 
   async #isAncestor(ancestorId: string, descendantId: string): Promise<boolean> {

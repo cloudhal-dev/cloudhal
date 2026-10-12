@@ -12,8 +12,8 @@ import { createApi } from "@cloudhal/api";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  ANALYTICS_CRON,
   adminWorkerConfig,
+  MINUTE_CRON,
   rateLimitNamespaceId,
   siteWorkerConfig,
 } from "../src/cloudflare/config.ts";
@@ -78,7 +78,6 @@ describe("cloudhal.json analytics and the generated configs", () => {
       dataset: "newsroom_events",
       defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 10 },
       budget: 8000,
-      cron: true,
       siteHosts: ["news.example.com"],
     };
     expect(siteWorkerConfig({ ...names, siteId: "site_abcdefgh" })).not.toHaveProperty(
@@ -104,19 +103,21 @@ describe("cloudhal.json analytics and the generated configs", () => {
       }).ratelimits,
     ).toEqual([{ name: "ANALYTICS_RL", namespace_id: "4242", simple: { limit: 120, period: 60 } }]);
     const admin = { ...names, studioDir: "studio", main: "./worker.ts" };
-    expect(adminWorkerConfig(admin)).toMatchObject({ triggers: { crons: [] } });
+    // RFC-0008: the scheduler's minute trigger is there whatever analytics say
+    expect(adminWorkerConfig(admin)).toMatchObject({ triggers: { crons: [MINUTE_CRON] } });
     expect(adminWorkerConfig(admin)).not.toHaveProperty("analytics");
     expect(adminWorkerConfig({ ...admin, analytics })).toMatchObject({
       analytics: { binding: "ANALYTICS_SQL" },
       vars: { CLOUDHAL_ANALYTICS_DATASET: "newsroom_events", CLOUDHAL_ANALYTICS_BUDGET: "8000" },
-      triggers: { crons: [ANALYTICS_CRON] },
+      triggers: { crons: [MINUTE_CRON] },
     });
-    expect(adminWorkerConfig({ ...admin, analytics: { ...analytics, cron: false } })).toMatchObject(
-      {
-        vars: { CLOUDHAL_ANALYTICS_CRON: "off" },
-        triggers: { crons: [] },
-      },
-    );
+    // no cron slot: the clock ticks and the rollups stay scheduled (no `*_CRON=off` any more)
+    const alarm = adminWorkerConfig({ ...admin, analytics, scheduler: "alarm" });
+    expect(alarm).toMatchObject({
+      vars: { CLOUDHAL_SCHEDULER: "alarm" },
+      triggers: { crons: [] },
+    });
+    expect(alarm.vars).not.toHaveProperty("CLOUDHAL_ANALYTICS_CRON");
   });
 
   it("compares wrangler versions and recognises the cron-limit refusal", () => {

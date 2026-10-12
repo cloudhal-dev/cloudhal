@@ -17,9 +17,13 @@
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
     "./cache-tags": "./src/cache-tags.ts",
+    "./availability": "./src/availability.ts",
+    "./time": "./src/time.ts",
     "./media": "./src/media/index.ts",
     "./media-node": "./src/media-node.ts",
-    "./media/fixtures": "./src/media/fixtures.ts"
+    "./media/fixtures": "./src/media/fixtures.ts",
+    "./releases": "./src/releases.ts",
+    "./automations": "./src/automations.ts"
   },
   "files": [
     "dist",
@@ -32,8 +36,10 @@
   },
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
+    "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
-    "marked": "catalog:"
+    "marked": "catalog:",
+    "temporal-polyfill": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
@@ -85,6 +91,14 @@
         "types": "./dist/src/cache-tags.d.ts",
         "default": "./dist/src/cache-tags.js"
       },
+      "./availability": {
+        "types": "./dist/src/availability.d.ts",
+        "default": "./dist/src/availability.js"
+      },
+      "./time": {
+        "types": "./dist/src/time.d.ts",
+        "default": "./dist/src/time.js"
+      },
       "./media": {
         "types": "./dist/src/media/index.d.ts",
         "default": "./dist/src/media/index.js"
@@ -96,7 +110,18 @@
       "./media/fixtures": {
         "types": "./dist/src/media/fixtures.d.ts",
         "default": "./dist/src/media/fixtures.js"
+      },
+      "./releases": {
+        "types": "./dist/src/releases.d.ts",
+        "default": "./dist/src/releases.js"
+      },
+      "./automations": {
+        "types": "./dist/src/automations.d.ts",
+        "default": "./dist/src/automations.js"
       }
     }
+  },
+  "cloudhal": {
+    "schedulesLevel": 1
   }
 }

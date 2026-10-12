@@ -14,8 +14,10 @@ interface Props {
   nav: ActiveNavItem[];
   /** The `footer` menu; undefined keeps the default footer links. */
   footer?: ActiveNavItem[] | undefined;
+  /** A preview of an embargoed or expired page or entry says so above it (RFC-0008 §7.3). */
+  notice?: { state: string; at: string; text: string } | undefined;
 }
-const { site, meta, nav, footer } = Astro.props;
+const { site, meta, nav, footer, notice } = Astro.props;
 const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
@@ -46,6 +48,14 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
       )}
     </header>
     <main class="mx-auto max-w-3xl px-4 pb-16">
+      {notice && (
+        <p
+          class="ch-gate-notice mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+          data-gate={notice.state}
+          data-gate-at={notice.at}
+        >{notice.text}</p>
+      )}
       <slot />
     </main>
     <footer class="mx-auto flex max-w-3xl justify-between gap-4 px-4 py-8 text-xs text-zinc-500">

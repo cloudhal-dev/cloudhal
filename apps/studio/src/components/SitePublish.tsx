@@ -1,6 +1,13 @@
 import { ApprovalDialog, Button, ButtonGroup, DropdownMenu } from "@cloudhal/ui";
-import { Camera, CaretDown, PaperPlaneTilt, RocketLaunch } from "@phosphor-icons/react";
+import {
+  CalendarDots,
+  Camera,
+  CaretDown,
+  PaperPlaneTilt,
+  RocketLaunch,
+} from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -18,6 +25,7 @@ export function SitePublish({ siteId }: { siteId: string }) {
   const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const { mode, reason } = usePublishMode(siteId);
   const publish = usePublishSite(siteId, { onDone: () => setOpen(false) });
@@ -60,6 +68,19 @@ export function SitePublish({ siteId }: { siteId: string }) {
           <DropdownMenu.Content align="end">
             <DropdownMenu.Item icon={Camera} onClick={() => snapshot.mutate()}>
               {t("commands.createSnapshot")}
+            </DropdownMenu.Item>
+            {/* RFC-0008 §15.1: "Schedule…" opens the calendar's lazily loaded dialog. */}
+            <DropdownMenu.Item
+              icon={CalendarDots}
+              onClick={() =>
+                void navigate({
+                  to: "/sites/$siteId/schedules",
+                  params: { siteId },
+                  search: { new: "publish" },
+                })
+              }
+            >
+              {t("commands.newSchedule")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu>

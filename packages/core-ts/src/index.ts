@@ -19,12 +19,14 @@ export {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
+export * from "./availability.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";
 export * from "./domains.ts";
 export * from "./errors.ts";
 export * from "./filter.ts";
 export * from "./hash.ts";
+export type { NodeHold } from "./holds.ts";
 export * from "./ids.ts";
 export {
   importMediaUrls,
@@ -46,6 +48,11 @@ export {
   type RedirectMatch,
   splitTarget,
 } from "./redirects.ts";
+export type {
+  PublishReleaseInput,
+  PublishReleaseResult,
+  ReleasePurge,
+} from "./release-apply.ts";
 export * from "./seed.ts";
 export * from "./store.ts";
 export * from "./sync.ts";

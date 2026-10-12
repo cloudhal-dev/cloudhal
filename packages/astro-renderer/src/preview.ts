@@ -15,6 +15,7 @@ import {
   pageCount,
   viewPagePath,
 } from "./archive.ts";
+import { gateNotice } from "./gates.ts";
 import { renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { entryPath } from "./routing.ts";
@@ -126,15 +127,55 @@ export interface PreviewDocument {
   path: string;
 }
 
-/** Full HTML document for a page preview. */
+/** Words of the preview's gate notice (RFC-0008 §7.3), as the blog starter says them. */
+const GATE_WORDS: Record<
+  string,
+  { embargoed: (when: string) => string; expired: (when: string) => string }
+> = {
+  en: {
+    embargoed: (when) => `Embargoed until ${when}. Only previews show it until then.`,
+    expired: (when) => `Expired on ${when}. Only previews show it now.`,
+  },
+  tr: {
+    embargoed: (when) =>
+      `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
+    expired: (when) => `${when} tarihinde yayından kalktı. Artık yalnızca önizlemede görünür.`,
+  },
+};
+
+/**
+ * The notice a preview shows above a page or entry the public cannot see at `now` (embargoed or
+ * expired, RFC-0008 §7.3); empty when its gates are open.
+ */
+export function gateNoticeHtml(
+  site: Site,
+  node: Pick<Page, "availability">,
+  now: number,
+  locale = site.defaultLocale,
+): string {
+  const notice = gateNotice(node, site, locale, now);
+  if (!notice) return "";
+  const words =
+    GATE_WORDS[locale.split("-")[0] ?? locale] ??
+    (GATE_WORDS.en as NonNullable<typeof GATE_WORDS.en>);
+  return `<p class="ch-gate-notice" role="status" data-gate="${notice.state}" data-gate-at="${esc(notice.at)}">${esc(words[notice.state](notice.when))}</p>`;
+}
+
+/**
+ * Full HTML document for a page preview. `now` (default: the caller's clock) decides whether the
+ * page's gates are closed, which adds a notice.
+ */
 export function renderPagePreview(
   site: Site,
   page: Page,
   entries: Record<string, ContentEntry[]> = {},
   media?: MediaContext,
+  now: number = Date.now(),
 ): PreviewDocument {
   const ctx = previewMedia(site, media);
-  const body = page.sections.map((s) => renderSectionHtml(s, entries, ctx)).join("\n");
+  const body =
+    gateNoticeHtml(site, page, now) +
+    page.sections.map((s) => renderSectionHtml(s, entries, ctx)).join("\n");
   const title = page.seo?.title ?? page.title;
   return { title, path: page.path, html: document(site, title, page.seo?.description, body) };
 }
@@ -144,13 +185,19 @@ function previewMedia(site: Site, media: MediaContext | undefined): MediaContext
   return { locale: site.defaultLocale, defaultLocale: site.defaultLocale, ...media, preview: true };
 }
 
-/** Full HTML document for an article preview (`media.assets`: the assets it refers to). */
+/**
+ * Full HTML document for an article preview (`media.assets`: the assets it refers to), with the
+ * gate notice when the entry is embargoed or expired at `now`.
+ */
 export function renderEntryPreview(
   site: Site,
   entry: ContentEntry,
   media?: MediaContext,
+  now: number = Date.now(),
 ): PreviewDocument {
-  const body = renderEntryArticle(entry, site.defaultLocale, previewMedia(site, media));
+  const body =
+    gateNoticeHtml(site, entry, now) +
+    renderEntryArticle(entry, site.defaultLocale, previewMedia(site, media));
   return {
     title: entry.title,
     path: `/${entry.collection}/${entry.slug}`,
@@ -384,7 +431,8 @@ const PREVIEW_CSS =
   ".ch-breadcrumbs li+li::before{content:'›';margin-right:.4em}.ch-archive-kind{margin:0;font-size:.9rem}" +
   ".ch-archive-header h1{margin:.1em 0 .3em}.ch-archive-meta{margin-bottom:1.5rem}.ch-archive-image{margin-bottom:1.5rem}" +
   ".ch-entrylist{list-style:none;padding:0}.ch-entrylist li{padding:1rem 0;border-top:1px solid var(--line)}" +
-  ".ch-entrylist li a{font-weight:600}.ch-entrylist p{margin:.3em 0}.ch-pagination{display:flex;justify-content:space-between;padding-top:1rem}";
+  ".ch-entrylist li a{font-weight:600}.ch-entrylist p{margin:.3em 0}.ch-pagination{display:flex;justify-content:space-between;padding-top:1rem}" +
+  ".ch-gate-notice{margin:0 0 1.5rem;padding:.6rem .9rem;border:1px solid var(--line);border-left:4px solid #bf8700;border-radius:6px}";
 
 /**
  * The same policy `previewResponse` (packages/api) sends as a header, repeated in the document so

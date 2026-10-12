@@ -1001,3 +1001,92 @@ Assumptions: Workers Free 100,000 requests a day, 10 ms CPU per invocation; cron
 10. **Notification delivery** by email and webhooks waits for a mail sender; is Studio-only acceptable for newsroom launches?
 11. **iCal feed** (read-only, signed) for editorial calendars: v2 or never?
 12. **The `g d` chord** and a saved-view picker in the command palette: confirm against the shortcut list when Studio's keyboard map is reviewed.
+
+## Implementation notes (rollout steps 1–10 and 12; 2026-10-13)
+The integration branch `feat/schedules` carries steps 1–10 and 12; this section, the guide, the threat-model edits, the skills and `editor-agent.ts --at` complete steps 10 and 12, and step 9 (the built-in jobs) landed on `feat/schedules-builtins`. The Studio screens of step 11 are being built on a separate branch. The owner's guide is [`docs/guides/schedules.md`](../guides/schedules.md); the security analysis is the threat model's [Schedules](../security/threat-model.md#schedules-rfc-0008) section.
+
+### What was built and where
+| Step | What | Where |
+|---|---|---|
+| 1 | Contracts: `Site.timeZone`, `availability`, roots `release`, `automation`, `schedule-run` | `packages/core-contracts/schemas/{common,site,content-entry,page,release,automation,schedule-run}.schema.json`, fixtures, generated TS and Rust |
+| 2 | Time model, RRULE subset and sentences, release model (`rl1:`, compose, conflicts, closure), state machines, taint, budgets, `runDue` | `packages/schedules` (`@cloudhal/schedules`; entries `.`, `./engine` without Temporal, `./time`, `./recurrence`, `./sql`, `./testing`); `temporal-polyfill` 1.0.5 pinned, property tests against `rrule-temporal` 2.2.8 |
+| 3 | Migration and store | `packages/storage/migrations/0017_schedules.ts`; `SqlScheduleStore` (`packages/schedules/src/sql`); conformance suites on better-sqlite3 and Miniflare D1 counting statements per path (table in the package README) |
+| 4 | Renderer gates | `@cloudhal/core-ts/availability` (`isAvailable`, `gateState`, `nextGate`, `edgeMaxAge`, `inheritedGate`, `gateChanges`); `packages/astro-renderer` (`SnapshotSource.at(now)` / `ungated()`, gate index, cache cap, asset inheritance, preview notice, `GET /__cloudhal/features`); `packages/cloudflare/src/features.ts` (the writer handshake); route sweep in the renderer and on workerd (`packages/cli/test/cloudflare-gates.test.ts`) |
+| 5 | Release engine | `packages/core-ts/src/release-apply.ts` (`publishRelease`), `holds.ts` (holds and locks), `releases.ts` (`ReleaseService`, `releaseExecutor`, `runScheduledTick`, `schedulerHealthReport`), gate writes and `publishedAt = from` in `store.ts`; a published-release tick measures 17 statements (budget 40) |
+| 6 | Scheduler | `packages/cloudflare/src/scheduler.ts` (`scheduled` → `runDue`, `SchedulerClock`, request backstop, `system_jobs` for `analytics.rollup`, `comments.hourly`, `schedules.retention`); `packages/cli/src/commands/scheduler-local.ts` (Node ticker); workerd tests with `/cdn-cgi/local/scheduled` and alarms (`packages/cli/test/cloudflare-schedules.test.ts`) |
+| 7 | Policy and REST | `packages/agent-runtime` (scopes, roles, abilities, the `publish` class, `checkAutoRelease`, `autoReleaseWindowEnds`, approvals with `release_id`, `run_id` and an explicit expiry); `packages/api/src/routes/schedules.ts`, `approvals.ts` (carry-out), `notifications.ts`, `instance.ts`, `scopes.ts`; shared suite `packages/api/src/testing-schedules.ts` on SQLite and D1 |
+| 8 | MCP | `packages/mcp-server/src/schedule-tools.ts` (the 17 tools), `schedules.ts` (deps, pinning, views, run resolution, `createReleaseApprovalCheck`), `server.ts` (outside-run gate, instructions), `tools.ts` (`runTool`: taint, no egress, budgets, daily cap, anomaly pause), `elevation-tools.ts` (`get_mode` run info) |
+| 9 | Built-in jobs | `packages/schedules/src/builtins.ts` (`createBuiltinRunner`: `broken-links`, `stale-content`, `feed-check`, `weekly-digest`, `cleanup` in bounded, resumable steps with declared statement costs), `feed-check.ts`, `findings.ts` (finding codes, at most 200 per run), `notify.ts`; `packages/core-ts/src/automations.ts` (`graphBuiltinSources` over the graph's tables, `notFoundFromAnalytics`); the admin tick (404 rows from analytics, the feed through `SITE`, `CLOUDHAL_SITE_ID`) and the Node ticker (local analytics, the dev server's feed); `POST …/run-now` for built-ins (`SqlScheduleStore.startBuiltinNow`); finding codes and statement counts per job in the package README |
+| 10 | Agent tasks | automation keys (`packages/api/src/auth.ts`, metadata `purpose: "automation"`), run windows, `begin_run`/`end_run`, budgets, taint and kill switches (in the step 7–8 code); recipes in the guide; skills `skills/official/comment-triage` and `skills/official/stale-review`; `publish-article` schedules with `schedule_release` |
+| 11 | Studio | blocks in `packages/ui/src/blocks` (`CalendarMonth`, `AgendaList`, `ScheduleItem`, `ScheduleStatusBadge`, `ScheduleFilters`, `CalendarNav`, `TimezoneNote`, `DateTimeField`, `RecurrenceEditor`, `NextRuns`, `RescheduleDialog`, `ScheduleRunRow`) and DESIGN.md §2x; screens in progress |
+| 12 | CLI, deployment, docs | `packages/cli/src/commands/deploy.ts` (`MINUTE_CRON`, the `SchedulerClock` binding and migration, `CLOUDHAL_SCHEDULER`, the cron-limit fallback, the downgrade guard), `schedules.ts` (`cloudhal schedules status|list|run-due`), `sync.ts` (push guard); `docs/guides/schedules.md`, the threat model, `apps/demo-newsroom/scripts/editor-agent.ts --at`, changesets |
+
+### Step 0: live results
+Measured on the maintainer's **Workers Paid** account on 2026-10-12. The Free-plan runs are still open.
+
+| # | Result | Status |
+|---|---|---|
+| L1 | Every-minute cron: **0 of 106** ticks missed; delay after the scheduled minute p50 **4.3 s**, p99 **24.6 s**, max **27.2 s** | done on Paid; **open on Free** |
+| L2 | The same slot when the expression changes from hourly to every minute; the cron-limit error text | **open on Free** (the deploy matches the error text `isCronLimitError` already knew) |
+| L3 | Durable Object alarm: **0 of 113** missed; delay p50 **13 ms**, max **92 ms**; alarms work in `createTestHarness` (workerd test) | done on Paid; **open on Free** (SQLite-backed class, retries) |
+| L4 | `cloudflare-cdn-cache-control: max-age=30` was honoured: over 60 requests the oldest copy served was **27.8 s** old | **verified**; §7.4's gate-purge fallback is not needed |
+| L5 | CPU and queries of a release run on 500- and 2,000-node sites on Free | **open on Free** (the suites count 17 statements per published release) |
+| L6 | Cron triggers and alarms after a Free account's daily request limit | **open on Free** |
+| L7 | How statements in one `batch()` count toward D1 Free's 50 queries | **open on Free** |
+| L8 | Workflow `schedules` and the cron limit | not run (optional; only for the alternative) |
+| L9 | After a deploy the every-minute cron first fired after about **7 minutes**; the request backstop covers the gap | verified on Paid |
+| — | **Workers Cache cached GET responses that carried no caching header.** Every API GET without its own header now answers `cache-control: no-store` (a middleware on `/api/*`), and so do `/__cloudhal/features` and the operator routes | fixed in step 7 |
+
+### Deviations from the text above
+Known and accepted:
+1. **`rl1:` excludes `when`.** The hash covers exactly the pinned versions (§10.4); the time is bound through the request's arguments hash over `{ releaseId, when }`, and carry-out compares both. ADR-0023's "approval binds to … the time" is met this way.
+2. **A claimed run starts as `running`**, not `due` (§8.5, §5.3): the claim's `UPDATE releases … state = 'running'` comes first and the run row is inserted (or re-armed on conflict) as `running` in the same batch.
+3. **Dependent batch writes are guarded on the claim's CAS.** In the claim batch the run row is written only `WHERE EXISTS` the release holds the new lease token (§8.5 listed the run insert first); the effect batch guards every statement after the pointer flip on the new site hash, as §6.3 says.
+4. **Unapproved releases expire lazily on read.** A release still `awaiting_approval` at its time becomes `expired` (D5) when releases, the calendar, one release or notifications are next read (`expireOverdueApprovals`), not by the tick; the approval request itself expires at the release's time. Its nodes stay held and locked until that read; Studio's notification poll normally does it within a minute.
+5. **`@cloudhal/core-ts` depends on `@cloudhal/schedules` for time.** `@cloudhal/core-ts/time` re-exports `@cloudhal/schedules/time` (one implementation), and core-ts applies releases through the Temporal-free `@cloudhal/schedules/engine`, so the site Worker never bundles the time-zone library (a test walks its imports). §16 described the two packages without this direction.
+6. **Downgrade detection uses `cloudhal.schedulesLevel`** in `@cloudhal/core-ts`'s `package.json` (mirroring `SCHEDULES_ENGINE_LEVEL`, now 1), compared with the level the deployment reports at `/api/admin/schedules/status`.
+7. **The first tick only registers the system jobs' watermarks**; the analytics rollup and the comments job run from the next :17.
+8. **`set_embargo` refuses to move an embargo earlier** (`denied`: that is `lift_embargo`, a person) and refuses a `from` in the past. §12 classed it "publish" when it widens visibility; the tool is `reduce` only, because widening is never allowed through it.
+9. ~~**"Run now" on a built-in job answers `409 not_available`** until step 9 lands.~~ Resolved by step 9: "Run now" starts a `manual` run for the current minute that the next tick steps (`startBuiltinNow`), and occurrences run the real jobs.
+10. **§11.8's `broken` states are not set.** An owner's demotion or removal, or a revoked key, leaves the automation `active`; its calls fail because the key is narrowed, disabled or revoked. Notifications already show `broken` automations once something sets the state.
+11. **Native drag and drop** in `CalendarMonth` (with Alt+arrow as the keyboard equivalent and "Move to…" everywhere) instead of dnd-kit (§15.6): no new dependency.
+12. **`DropdownMenu` filters** in `ScheduleFilters` instead of `Combobox multiple` in a `Popover` (§15.4).
+
+Found while writing the guide (13–15 and 18 fixed on 2026-10-13, 19 in part; 16 and 17 are deliberate):
+13. **Fixed (2026-10-13): `cloudhal deploy` writes `CLOUDHAL_TICK_BUDGET` and `CLOUDHAL_AUTOMATIONS` on every deploy.** Before, the admin Worker read them but nothing wrote them, so the kill switch of §11.6 needed a dashboard variable the next deploy removed, Workers Paid deployments ticked on the Free budget, and Node ignored `CLOUDHAL_AUTOMATIONS`. Now `cloudhal.json` `schedules.automations: false` writes `off` (else `on`), and the tick budget is `--plan free|paid` or `schedules.plan`, remembered in `state.json` as `plan` (default `free`; the deploy says how to change it). Wrangler's login offers no cheap, reliable way to read the account's Workers plan, so the owner states it once. On Node, `cloudhal dev`, `studio`, `mcp` and `schedules run-due` read `CLOUDHAL_AUTOMATIONS=off` from the environment (`automationsEnabled()`): no occurrences, no windows, automation keys refused. Tests: `packages/cli/test/deploy.test.ts` (generated vars, `--plan` remembered), `schedules-cli.test.ts` (config keys, the Node switch).
+14. **Fixed (2026-10-13): `features.schedules.gates` is the renderer's answer.** It was `true` whenever schedules were available. `/api/instance` now asks the store's gate support for every site (`gatesEnforcedEverywhere`): on Cloudflare the site Worker's `GET /__cloudhal/features` handshake over `SITE`, memoised once confirmed; on Node always true. Writers still check per write. Test: `packages/api/test/schedules-gaps.test.ts`.
+15. **Fixed (2026-10-13): `Site.timeZone` is checked on write** against the writing runtime's zones (`isTimeZone` of `@cloudhal/core-ts/availability`: `Intl.supportedValuesOf("timeZone")`, aliases Intl resolves, and `UTC`). `createSite`, `updateSite` (REST `PUT /api/sites/:siteId`) and `importSite` (push, pull and the deploy-token import) refuse an unknown zone with `invalid_time_zone` (`400`, `details.timeZone`). A zone the site already stores is accepted unchanged, so a site written under other time-zone data stays editable; an update with a known zone costs no extra read. No MCP tool sets the site's zone. Tests: `packages/core-ts/test/site-time-zone.test.ts`, `packages/api/test/schedules-gaps.test.ts`.
+16. **Outside a run, an automation key also reaches `pause_automation`** (besides `begin_run` and `get_mode`, §11.2), because stopping must never wait (§11.6). Deliberate; the threat model lists it.
+17. **`propose_release` takes `at`, `localTime` and `timeZone` as separate fields** and accepts `removeIds` (§12 sketched `at? | { localTime; timeZone? }` and node ids only); `schedule_release` also takes `removeIds` and `title`.
+18. **Fixed (2026-10-13): an agent task's `modeCap` applies per call.** The key was minted with the cap as its mode, so a raise had no effect. Following §11.2 (the key narrowed to its owner's role on every call) the key is now minted at its owner's role cap (`auto` for Editors and above), and every call works in min(the key's mode, the automation's current `modeCap`, the owner's current role cap): a raise or a lower applies on the next call without a new key, `get_mode` outside a run shows the capped mode, and the run-time re-check of an `auto` release (§10.6) caps the key by the automation's current `modeCap` too, so lowering the cap ends `auto` releases its runs scheduled. Raising does not add scopes (a key minted under `plan` keeps read scopes). A raise above what the key itself may do — keys minted before this fix, keys lowered on the Agents page, keys narrowed by a demotion — answers `409 mode_cap_above_key` (a person creates the automation again); `PATCH` also refuses a cap outside `plan`…`auto`. Tests: `packages/api/test/schedules-gaps.test.ts` (minted mode, raise, lower, refused raise), `packages/mcp-server/test/schedules.test.ts` (per-call mode and the re-check).
+19. **Fixed in part (2026-10-13): an agent's gate-only embargo records its real mode.** The release still carries the key's approval as `kind: "auto"` (the contract's only agent approval; a new kind would be a contract change for a label) with `windowEnds` = now + 24 h and `cloudhal.reduce`, which the run-time check uses to skip the mode rule. It now also records `metadata["cloudhal.mode"]`, the mode the agent worked in (`RELEASE_META.mode`), so Studio can label it "hidden by an agent in EDITS mode" instead of "Automatic". Test: `packages/mcp-server/test/schedules.test.ts`.
+
+Built-in jobs (step 9), accepted limits of this version:
+20. **`feed-check` reads RSS and the sitemap only**; JSON-LD and Open Graph (§11.1) are not checked. On Cloudflare it fetches through `SITE` for the site that Worker serves (`CLOUDHAL_SITE_ID`); on Node only while `cloudhal dev` serves the site. Elsewhere the run records `nothing-to-do` ("not served from here").
+21. **`cleanup` does not propose retiring unused media** (§11.1's RFC-0004 retire proposals); it deletes old runs and terminal releases, trims finding lists, clears leftover leases, closes stale open runs and reminds about drafts untouched for 90 days.
+22. **`weekly-digest` reports the schedule only** (published, due next week, needing attention, the other built-ins' latest findings): no analytics or comment figures yet, and Studio only (no mail).
+23. **The 404 phase of `broken-links` needs analytics**: the admin Worker's rollups, or `cloudhal studio` with analytics on; under `cloudhal dev` or `mcp` alone it checks links only.
+
+### Status of rollout (2026-10-13)
+| Step | What | Status |
+|---|---|---|
+| 0 | Live verification | Paid: L1, L3, L4, L9 done; **Free: L1–L3, L5–L7 open** |
+| 1–8 | Contracts, core, storage, gates, release engine, scheduler, policy and API, MCP | done |
+| 9 | Built-in job bodies | done (`feat/schedules-builtins`; limits in notes 20–23) |
+| 10 | Agent tasks; recipes and skills | done (this section) |
+| 11 | Studio | blocks and DESIGN.md §2x done; screens in progress (separate branch) |
+| 12 | CLI, deployment, docs | done (this section); items 13–15, 18 and 19 fixed on 2026-10-13 |
+| — | ADR | ADR-0023 accepted |
+
+## Live acceptance on a deployed site
+> **To be filled in** after the v1 acceptance run (Compatibility & migration › Acceptance), on a Workers Free account and on Paid. Record the date, the plan, the deployment, and for each check the observed times and ids.
+
+- [ ] An article scheduled for T is live within a minute of T and not before.
+- [ ] An ordinary publish before T does not release it.
+- [ ] An edit after approval is refused; "Edit and re-approve" re-binds.
+- [ ] A publish of the same node between approval and T turns the release into a conflict with a diff.
+- [ ] A release reached 90 minutes late is `missed`, with "Publish now".
+- [ ] An embargoed article is absent from every route, feed and sitemap until `from` and appears at `from` without a purge.
+- [ ] An hourly agent task's key is refused outside its window; after `list_comments` the run cannot create a draft.
+- [ ] Removing the cron trigger moves the deployment to the Durable Object clock and everything still runs.
+- [ ] The conformance suite passes on SQLite and D1.

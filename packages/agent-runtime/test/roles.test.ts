@@ -86,6 +86,14 @@ describe("roles", () => {
       ["comments:reply:own", ["author", "editor", "administrator", "owner"]],
       ["comments:reply", ["editor", "administrator", "owner"]],
       ["commenters:data", ["editor", "administrator", "owner"]],
+      // RFC-0008 §10.2: everyone reads the schedule; Contributors and Authors schedule their own
+      // nodes; Authors approve their own releases; Editors and above everything, automations too.
+      ["schedules:read", ["contributor", "author", "editor", "administrator", "owner"]],
+      ["schedules:write:own", ["contributor", "author", "editor", "administrator", "owner"]],
+      ["schedules:write", ["editor", "administrator", "owner"]],
+      ["releases:publish:own", ["author", "editor", "administrator", "owner"]],
+      ["releases:publish", ["editor", "administrator", "owner"]],
+      ["automations:manage", ["editor", "administrator", "owner"]],
     ];
     for (const [scope, roles] of table)
       for (const role of ROLES)
@@ -184,6 +192,8 @@ describe("narrow (I5)", () => {
       "content:draft:own",
       "preview:create",
       "asset:upload",
+      "schedules:read",
+      "schedules:write:own",
     ]);
   });
 

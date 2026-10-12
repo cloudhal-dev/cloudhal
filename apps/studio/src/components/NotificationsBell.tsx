@@ -7,11 +7,13 @@ import {
   NotificationBell,
   NotificationItem,
   SectionEmpty,
+  SkeletonLine,
   Text,
 } from "@cloudhal/ui";
 import {
   ArrowRight,
   BellSimple,
+  CalendarDots,
   CaretDown,
   ChatsCircle,
   ClockClockwise,
@@ -23,10 +25,11 @@ import {
   ShieldStar,
   Stop,
   UserPlus,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { Suspense, use, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import {
   api,
@@ -35,6 +38,7 @@ import {
   type ElevationRequestNotification,
   type MemberJoinedNotification,
   type RoleChangedNotification,
+  type ScheduleNotification,
 } from "../lib/api.ts";
 import { formatUntil } from "../lib/elevation.ts";
 import {
@@ -45,6 +49,7 @@ import {
   endingParams,
   extendTargetOf,
   isCommentNotification,
+  isScheduleNotification,
   liveNotifications,
   notificationHref,
   requestParams,
@@ -393,6 +398,77 @@ function CommentItem({
   );
 }
 
+/** The schedule notices' words load with the first one (`lib/schedule-notices.ts`), never with the shell. */
+let noticesModule: Promise<typeof import("../lib/schedule-notices.ts")> | undefined;
+const loadNotices = () => {
+  noticesModule ??= import("../lib/schedule-notices.ts");
+  return noticesModule;
+};
+
+const SCHEDULE_ICON = {
+  "schedule-upcoming": CalendarDots,
+  "schedule-published": CalendarDots,
+  "automation-digest": CalendarDots,
+  "automation-paused": PauseCircle,
+} as const;
+
+/**
+ * A release or automation notice (RFC-0008 §14, DESIGN.md §2n): what happened in the person's
+ * words and the one place to act on it. Suspends until the `schedules` words are there.
+ */
+function ScheduleNoticeItem({
+  item,
+  onNavigate,
+}: {
+  item: ScheduleNotification;
+  onNavigate: () => void;
+}) {
+  const { t, locale } = useI18n("schedules");
+  const { scheduleNotice } = use(loadNotices());
+  const notice = scheduleNotice(t, locale, item);
+  const Icon = SCHEDULE_ICON[item.kind as keyof typeof SCHEDULE_ICON] ?? WarningCircle;
+  // The scheduler is the deployment's: from a site, its settings say how it runs.
+  const params = useParams({ strict: false }) as { siteId?: string };
+  const href =
+    item.kind === "scheduler-stalled" && params.siteId
+      ? `/sites/${params.siteId}/settings#schedules`
+      : notificationHref(item);
+  return (
+    <NotificationItem
+      icon={<Icon size={16} />}
+      tone={notice.tone}
+      title={notice.title}
+      meta={<RelativeTime iso={item.at} size="xs" />}
+      actions={
+        <LinkButton
+          href={href}
+          variant="secondary"
+          size="sm"
+          icon={ArrowRight}
+          onClick={onNavigate}
+        >
+          {notice.action}
+        </LinkButton>
+      }
+    >
+      <div className="grid" data-notification={item.id} data-kind={item.kind}>
+        <Text variant="secondary" size="sm">
+          {notice.body}
+        </Text>
+      </div>
+    </NotificationItem>
+  );
+}
+
+function NoticeLoading() {
+  return (
+    <div className="grid gap-2 px-4 py-3">
+      <SkeletonLine minWidth={40} maxWidth={70} />
+      <SkeletonLine minWidth={60} maxWidth={90} />
+    </div>
+  );
+}
+
 /**
  * The top bar's bell (DESIGN.md §1, §2n): a count of what needs the person — elevations about to
  * end, agents asking for one — and a panel to act on them right there. It also hosts the one-time
@@ -444,7 +520,11 @@ export function NotificationsBell() {
         />
       ) : (
         items.map((item) =>
-          isCommentNotification(item) ? (
+          isScheduleNotification(item) ? (
+            <Suspense key={item.id} fallback={<NoticeLoading />}>
+              <ScheduleNoticeItem item={item} onNavigate={close} />
+            </Suspense>
+          ) : isCommentNotification(item) ? (
             <CommentItem key={item.id} item={item} now={now} onNavigate={close} />
           ) : item.kind === "elevation-ending" ? (
             <EndingItem key={item.id} item={item} now={now} onNavigate={close} />

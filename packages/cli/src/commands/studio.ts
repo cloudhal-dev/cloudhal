@@ -5,11 +5,13 @@ import { createApi } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
-import { localComments, startLocalCommentsJob } from "./comments-local.ts";
+import { localComments } from "./comments-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
+import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
 
 export interface StudioOptions {
   readonly projectDir: string;
@@ -18,7 +20,9 @@ export interface StudioOptions {
   readonly studioDist?: string;
   /** Skip authentication (local scripts only). */
   readonly noAuth?: boolean;
-  /** `false` skips the hourly comments job (tests). */
+  /** `false` skips the scheduler's Node ticker (tests). */
+  readonly scheduler?: boolean;
+  /** @deprecated the comments job runs on the scheduler's tick; `false` skips the ticker. */
   readonly commentsJob?: boolean;
 }
 
@@ -55,15 +59,32 @@ export async function studio(
   const stopRollups = analytics.feature().enabled
     ? startLocalRollups(analytics, local, cfg.analytics)
     : () => {};
-  // RFC-0007 §12: the comment routes on the project's SQLite; Node has no cron, so the hourly
-  // comments job (retention, threads closed by time, old salts) runs on a timer while Studio runs.
+  // RFC-0007 §12: the comment routes on the project's SQLite.
   const comments = await localComments(local.sql, local.dataDir);
-  const stopCommentsJob =
-    options.commentsJob === false ? () => {} : startLocalCommentsJob(local.store, comments.store);
+  // RFC-0008 §8.4: the scheduler's Node ticker (releases, automations, and the hourly comments
+  // job behind its watermark) while Studio runs, with a catch-up tick now.
+  const ticker =
+    options.scheduler === false || options.commentsJob === false
+      ? undefined
+      : startLocalScheduler({
+          sql: local.sql,
+          blobs: local.blobs,
+          graph: local.store,
+          // RFC-0008 §11.1: the broken-link sweep's 404 rows
+          ...(analytics.feature().enabled ? { analytics } : {}),
+        });
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,
     comments,
+    ...(ticker ? { scheduler: ticker } : {}),
+    // RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite.
+    schedules: {
+      store: new SqlScheduleStore(local.sql),
+      maxNewBodies: Number.POSITIVE_INFINITY,
+      // §11.6: `CLOUDHAL_AUTOMATIONS=off` refuses automation keys and stops occurrences.
+      automationsEnabled: automationsEnabled(),
+    },
     requireAuth: !options.noAuth,
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [
@@ -116,7 +137,7 @@ export async function studio(
     url: `http://localhost:${port}/`,
     stop: async () => {
       stopRollups();
-      stopCommentsJob();
+      ticker?.stop();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await local.close();
     },

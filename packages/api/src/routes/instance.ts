@@ -25,6 +25,13 @@ import {
 } from "@cloudhal/agent-runtime";
 import type { AnalyticsFeature } from "@cloudhal/analytics/service";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
+import { type SchedulesDeps, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import {
+  LATE_LIMIT_SECONDS,
+  MAX_HORIZON_DAYS,
+  MAX_RELEASE_ITEMS,
+  REQUEST_HORIZON_DAYS,
+} from "@cloudhal/schedules";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 
@@ -49,6 +56,8 @@ export interface InstanceInfo {
     analytics: AnalyticsFeature;
     /** Reader comments (RFC-0007 §12). */
     comments: CommentsFeature;
+    /** Schedules (RFC-0008 §13). */
+    schedules: SchedulesFeature;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;
@@ -84,6 +93,67 @@ export async function commentsFeature(deps: CommentsDeps | undefined): Promise<C
     aiLabels: false,
     keys: on && Boolean(deps.keys),
     purge: { pending },
+  };
+}
+
+export interface SchedulesFeature {
+  available: boolean;
+  /** What wakes the scheduler (`null` when this server does not know). */
+  scheduler: "cron" | "alarm" | "node" | "request" | null;
+  /**
+   * The renderer of every site confirmed it enforces time gates (§7.7): on Cloudflare the site
+   * Worker's `GET /__cloudhal/features` handshake over `SITE`; on Node always. `false` means writers
+   * answer `gates_unsupported` (deploy the current site Worker).
+   */
+  gates: boolean;
+  /** Automations run (`CLOUDHAL_AUTOMATIONS` is not `off`). */
+  automations: boolean;
+  /** "Publish now" runs here (core-ts's `ReleaseService`). */
+  publishNow: boolean;
+  limits: {
+    maxItems: number;
+    horizonDays: number;
+    requestHorizonDays: number;
+    lateMinutes: number;
+  };
+}
+
+/**
+ * Whether the renderer of every site enforces time gates (RFC-0008 §7.7): the same check the
+ * writers make (`SiteGraphStore.gatesEnforced`, the site Worker's handshake on Cloudflare,
+ * memoised per isolate once confirmed). A deployment without sites asks its renderer once.
+ */
+export async function gatesEnforcedEverywhere(store: {
+  listSites(): Promise<readonly { id: string }[]>;
+  gatesEnforced(siteId: string): Promise<boolean>;
+}): Promise<boolean> {
+  const sites = await store.listSites();
+  if (sites.length === 0) return store.gatesEnforced("");
+  for (const site of sites) if (!(await store.gatesEnforced(site.id))) return false;
+  return true;
+}
+
+/**
+ * `features.schedules`; `available: false` without schedule storage. `gates` is the renderer's
+ * answer (`gatesEnforcedEverywhere`), reported only where schedules are served.
+ */
+export function schedulesFeature(
+  deps: SchedulesDeps | undefined,
+  gates: boolean,
+): SchedulesFeature {
+  const on = schedulesAvailable(deps);
+  return {
+    available: on,
+    scheduler: on ? (deps.scheduler?.mode ?? null) : null,
+    gates: on && gates,
+    automations: on && deps.automationsEnabled !== false,
+    publishNow: on,
+    limits: {
+      maxItems: MAX_RELEASE_ITEMS,
+      horizonDays: MAX_HORIZON_DAYS,
+      requestHorizonDays: REQUEST_HORIZON_DAYS,
+      lateMinutes: LATE_LIMIT_SECONDS / 60,
+    },
   };
 }
 

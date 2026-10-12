@@ -21,6 +21,11 @@
  * the request used. The agent sees the outcome through `list_comments`.
  * A person's `role` request is carried out here too: approving it publishes with the approver's
  * rights at the approved state, and the request is marked used.
+ * Release tools (RFC-0008 §10.4) are carried out the same way: approving recomputes the request's
+ * `rl1:` binding (and checks the release's time is the one asked about), then schedules the
+ * release with the approver's own approval; only someone who may approve it now decides
+ * (`releases:publish`, or `:own` with own-only items; lifting an embargo: Editors and above, D8).
+ * Denying a release request returns the release to a draft.
  */
 import {
   type AgentMode,
@@ -36,8 +41,9 @@ import {
   OwnLimitError,
   type Principal,
 } from "@cloudhal/agent-runtime";
-import type { Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { commentEntries, isBoundState, ownedNodeIds } from "@cloudhal/mcp-server/comments";
+import { approvalProblem, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import {
   defineTools,
   type ToolContext,
@@ -92,6 +98,8 @@ function carryContext(
     principal: { actor: principal.actor, scopes: principal.scopes, person: principal.person },
     ownership: c.get("ownership"),
     comments: c.get("comments"),
+    schedules: c.get("schedules"),
+    approvals: c.get("approvals"),
     now: c.get("now"),
     confirmed: true,
     approval: { id: request.id, requestedBy: request.actor },
@@ -152,6 +160,48 @@ type DecideCheck = { ok: true } | { ok: false; code: string; reason: string };
 
 const NO = (code: string, reason: string): DecideCheck => ({ ok: false, code, reason });
 
+/** Release tools whose requests are carried out on approval (RFC-0008 §10.4). */
+const RELEASE_TOOLS = new Set([
+  "schedule_release",
+  "reschedule",
+  "cancel_schedule",
+  "lift_embargo",
+  "schedule_unpublish",
+]);
+
+/** Who may decide a release request (§10.4, §10.6, D8): someone who may approve it now. */
+async function releaseDecideCheck(
+  c: Context<Env>,
+  request: Approval,
+  person: Principal,
+): Promise<DecideCheck> {
+  const deps = c.get("schedules");
+  if (!schedulesAvailable(deps)) return NO("not_found", "schedules are not enabled on this server");
+  const input = (request.input ?? {}) as { releaseId?: unknown; nodeId?: unknown };
+  if (request.tool === "lift_embargo")
+    return holds(person.scopes, "releases:publish") && holds(person.scopes, "schedules:write")
+      ? { ok: true }
+      : NO("missing_scope", "lifting an embargo is for Editors and above");
+  if (request.tool === "schedule_unpublish") {
+    if (holds(person.scopes, "releases:publish")) return { ok: true };
+    const entry =
+      typeof input.nodeId === "string"
+        ? await c.get("store").getContentEntry(input.nodeId)
+        : undefined;
+    const own =
+      entry !== undefined &&
+      holds(person.scopes, "releases:publish:own") &&
+      (await c.get("ownership").personOf((entry as ContentEntry).author)) === person.person?.id;
+    return own ? { ok: true } : NO("not_own", "taking this content down is for an Editor");
+  }
+  if (typeof input.releaseId !== "string" || !request.siteId)
+    return NO("not_found", "the release no longer exists");
+  const rec = await deps.store.getReleaseRecord(request.siteId, input.releaseId);
+  if (!rec) return NO("not_found", "the release no longer exists");
+  const problem = await approvalProblem(c.get("store"), c.get("ownership"), person, rec.items);
+  return problem ? NO("cannot_approve", problem) : { ok: true };
+}
+
 /** Who the person behind a request is (an agent's key creator, or the person themselves). */
 async function requesterPerson(c: Context<Env>, request: Approval): Promise<string | undefined> {
   return c.get("ownership").personOf(request.actor);
@@ -199,6 +249,7 @@ export async function canDecide(
     .evaluate(asPerson, request.tool, { confirmed: true, args: input });
   if (verdict.kind === "deny")
     return NO("missing_scope", `your role cannot ${request.tool}: ${verdict.reason}`);
+  if (RELEASE_TOOLS.has(request.tool)) return releaseDecideCheck(c, request, asPerson);
   const limit = verdict.limit;
   if (!limit) return { ok: true };
   const store = c.get("store");
@@ -371,11 +422,21 @@ export const approvals: Hono<Env> = new Hono<Env>()
         );
       }
       if (binding !== existing.stateHash) {
-        await store?.decide(id, "denied", actor, "the comments changed after the agent asked");
+        const release = RELEASE_TOOLS.has(existing.tool);
+        await store?.decide(
+          id,
+          "denied",
+          actor,
+          release
+            ? "the release changed after the agent asked"
+            : "the comments changed after the agent asked",
+        );
         throw apiError(
           409,
           "state_changed",
-          "These comments changed after the agent asked; the request was closed. Look at them again.",
+          release
+            ? "The release changed after the agent asked (its items or their versions); the request was closed. Look at it again."
+            : "These comments changed after the agent asked; the request was closed. Look at them again.",
         );
       }
     }
@@ -396,6 +457,21 @@ export const approvals: Hono<Env> = new Hono<Env>()
       );
     }
     let decided = await store?.decide(id, decision === "approve" ? "approved" : "denied", actor);
+    // A denied release request leaves the release a draft (§5.2: awaiting_approval → draft).
+    if (decided && decision === "deny" && existing.releaseId && existing.siteId) {
+      const deps = c.get("schedules");
+      const rec = schedulesAvailable(deps)
+        ? await deps.store.getReleaseRecord(existing.siteId, existing.releaseId)
+        : undefined;
+      if (deps && rec?.release.state === "awaiting_approval" && rec.requestId === id)
+        await deps.store
+          .transitionRelease(existing.siteId, existing.releaseId, {
+            expectedRev: rec.release.rev,
+            to: "draft",
+            requestId: null,
+          })
+          .catch(() => undefined);
+    }
     if (!decided)
       return c.json(
         {

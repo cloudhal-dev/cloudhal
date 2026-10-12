@@ -1,11 +1,13 @@
 /**
  * The admin Worker's analytics (RFC-0006 rollout step 6): `features.analytics` from bindings and
- * vars, and the hourly `scheduled` handler (salts, one site-day rolled up from WAE, never a crash
- * without the binding). D1 is Miniflare's; the Analytics SQL binding is a recording fake.
+ * vars, and the hourly rollup (salts, one site-day rolled up from WAE, never a crash without the
+ * binding) — since RFC-0008 the `analytics.rollup` system job of the minute tick, run here at its
+ * :17 watermark. D1 is Miniflare's; the Analytics SQL binding is a recording fake.
  */
 import { getOrCreateSalt, putAnalyticsSettings } from "@cloudhal/analytics/sql";
 import { clearWaeCache } from "@cloudhal/analytics/wae";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
@@ -45,6 +47,10 @@ beforeEach(async () => {
   const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
   await store.init();
   siteId = (await seedStarterSite(store, { name: "Analytics", slug: "analytics" })).id;
+  // The rollup's watermark is due at NOW (05:17): the minute tick at NOW runs it.
+  await new SqlScheduleStore(sql).ensureSystemJobs([
+    { name: "analytics.rollup", nextRunAt: new Date(NOW).toISOString() },
+  ]);
 });
 
 const baseEnv = (extra: Partial<AdminEnv> = {}): AdminEnv =>
@@ -75,6 +81,7 @@ describe("admin Worker analytics", () => {
         CLOUDHAL_ANALYTICS_DATASET: "newsroom_events",
         CLOUDHAL_ANALYTICS_BUDGET: "1200",
         CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify({ enabled: true, vitalsOneIn: 10 }),
+        // legacy (no cron slot before RFC-0008): the clock ticks now, so rollups stay scheduled
         CLOUDHAL_ANALYTICS_CRON: "off",
         ANALYTICS_SQL: new FakeSql() as unknown as AnalyticsSQLBinding,
       }),
@@ -85,7 +92,7 @@ describe("admin Worker analytics", () => {
       store: "wae",
       reader: "binding",
       budget: 1200,
-      rollups: "on-read",
+      rollups: "scheduled",
       defaults: { enabled: true, uniqueVisitors: false, vitalsOneIn: 10 },
     });
 
@@ -106,7 +113,7 @@ describe("admin Worker analytics", () => {
       ANALYTICS_SQL: binding as unknown as AnalyticsSQLBinding,
     });
     await worker.scheduled(
-      { scheduledTime: NOW, cron: "17 * * * *" } as ScheduledController,
+      { scheduledTime: NOW, cron: "* * * * *" } as ScheduledController,
       env,
       ctx,
     );
@@ -125,7 +132,9 @@ describe("admin Worker analytics", () => {
     }
     // the cron's reads are exempt from the budget
     expect(await sql.all("SELECT * FROM analytics_query_budget")).toEqual([]);
-    expect(lines.at(-1)).toMatch(/analytics rollup \(binding\): 1 site-day\(s\) done, 6 pending/);
+    expect(lines.find((l) => l.startsWith("analytics rollup"))).toMatch(
+      /analytics rollup \(binding\): 1 site-day\(s\) done, 6 pending/,
+    );
   });
 
   it("scheduled: sites whose analytics are off are skipped", async () => {
@@ -139,7 +148,7 @@ describe("admin Worker analytics", () => {
     const binding = new FakeSql();
     const worker = createAdminWorker({ log: () => {} });
     await worker.scheduled(
-      { scheduledTime: NOW, cron: "17 * * * *" } as ScheduledController,
+      { scheduledTime: NOW, cron: "* * * * *" } as ScheduledController,
       baseEnv({
         CLOUDHAL_ANALYTICS_DATASET: "newsroom_events",
         CLOUDHAL_ANALYTICS_DEFAULTS: JSON.stringify({ enabled: true }),
@@ -156,15 +165,17 @@ describe("admin Worker analytics", () => {
     const lines: string[] = [];
     const worker = createAdminWorker({ log: (l) => lines.push(l) });
     await worker.scheduled(
-      { scheduledTime: NOW, cron: "17 * * * *" } as ScheduledController,
+      { scheduledTime: NOW, cron: "* * * * *" } as ScheduledController,
       baseEnv({ CLOUDHAL_ANALYTICS_DATASET: "newsroom_events" }),
       ctx,
     );
     expect(await sql.all("SELECT * FROM analytics_salts")).toEqual([]);
     expect(await sql.all("SELECT * FROM analytics_rollup_runs")).toEqual([]);
-    expect(lines.at(-1)).toMatch(/analytics rollup \(none\): 0 site-day\(s\) done/);
+    expect(lines.find((l) => l.startsWith("analytics rollup"))).toMatch(
+      /analytics rollup \(none\): 0 site-day\(s\) done/,
+    );
     await worker.scheduled(
-      { scheduledTime: NOW, cron: "17 * * * *" } as ScheduledController,
+      { scheduledTime: NOW, cron: "* * * * *" } as ScheduledController,
       baseEnv(),
       ctx,
     );

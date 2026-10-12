@@ -13,7 +13,8 @@
     "./admin": "./src/admin-worker.ts",
     "./workerd-prelude": "./src/workerd-prelude.ts",
     "./purge": "./src/purge.ts",
-    "./comments": "./src/comments.ts"
+    "./comments": "./src/comments.ts",
+    "./scheduler": "./src/scheduler.ts"
   },
   "files": [
     "dist",
@@ -25,11 +26,12 @@
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
-    "@cloudhal/analytics": "workspace:*",
     "@cloudhal/agent-runtime": "workspace:*",
+    "@cloudhal/analytics": "workspace:*",
     "@cloudhal/api": "workspace:*",
     "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "zod": "catalog:"
   },
@@ -61,6 +63,10 @@
       "./comments": {
         "types": "./dist/src/comments.d.ts",
         "default": "./dist/src/comments.js"
+      },
+      "./scheduler": {
+        "types": "./dist/src/scheduler.d.ts",
+        "default": "./dist/src/scheduler.js"
       }
     }
   }

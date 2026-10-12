@@ -26,6 +26,12 @@ export interface AuditEntry {
   autoCheck?: AutoCheck | undefined;
   /** The call ran under a time-boxed elevation (ADR-0016): the key's own mode and the end. */
   elevation?: { from: string; until: string } | undefined;
+  /** RFC-0008 §5.1, §11.7: the automation run a call belongs to (`audit.run_id`). */
+  runId?: string | undefined;
+  /** RFC-0008 §5.1: the release a row is about (`audit.release_id`). */
+  releaseId?: string | undefined;
+  /** RFC-0008 §11.5: the automation whose key made the call (`audit.automation_id`). */
+  automationId?: string | undefined;
 }
 
 export interface AuditRow extends AuditEntry {
@@ -77,7 +83,7 @@ export class AuditLog {
    */
   static statement(entry: AuditEntry): { sql: string; params: (string | number | null)[] } {
     return {
-      sql: "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check, elevation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO audit (at, actor_kind, actor_id, actor_name, site_id, tool, decision, reason, skill, input, outcome, snapshot_id, duration_ms, mode, cause, auto_check, elevation, run_id, release_id, automation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       params: [
         entry.at,
         entry.actor.kind,
@@ -96,6 +102,9 @@ export class AuditLog {
         entry.cause ?? null,
         entry.autoCheck ? JSON.stringify(entry.autoCheck) : null,
         entry.elevation ? JSON.stringify(entry.elevation) : null,
+        entry.runId ?? null,
+        entry.releaseId ?? null,
+        entry.automationId ?? null,
       ],
     };
   }
@@ -120,6 +129,10 @@ export class AuditLog {
       since?: string | undefined;
       /** Only rows older than this id (cursor pagination, newest first). */
       before?: number | undefined;
+      /** RFC-0008 §11.7: only the rows of one automation run. */
+      runId?: string | undefined;
+      /** RFC-0008: only the rows about one release. */
+      releaseId?: string | undefined;
       limit?: number | undefined;
     } = {},
   ): Promise<AuditRow[]> {
@@ -152,6 +165,14 @@ export class AuditLog {
       where.push("at >= ?");
       params.push(filter.since);
     }
+    if (filter.runId) {
+      where.push("run_id = ?");
+      params.push(filter.runId);
+    }
+    if (filter.releaseId) {
+      where.push("release_id = ?");
+      params.push(filter.releaseId);
+    }
     params.push(filter.limit ?? 100);
     const rows = await this.#sql.all<Record<string, unknown>>(
       `SELECT * FROM audit ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY id DESC LIMIT ?`,
@@ -180,6 +201,9 @@ export class AuditLog {
       ...(r.elevation
         ? { elevation: parseJson<{ from: string; until: string }>(r.elevation as string) }
         : {}),
+      ...(r.run_id ? { runId: r.run_id as string } : {}),
+      ...(r.release_id ? { releaseId: r.release_id as string } : {}),
+      ...(r.automation_id ? { automationId: r.automation_id as string } : {}),
     }));
   }
 }

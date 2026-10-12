@@ -22,6 +22,14 @@ import { mcp } from "./commands/mcp.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "./commands/media.ts";
 import { describeMigration, migrateTags } from "./commands/migrate.ts";
 import { transferOwner } from "./commands/owner.ts";
+import {
+  describeRelease,
+  describeSchedulesStatus,
+  describeTick,
+  schedulesList,
+  schedulesRunDue,
+  schedulesStatus,
+} from "./commands/schedules.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 import { pullSite, pushSite } from "./commands/sync.ts";
@@ -36,13 +44,21 @@ Usage:
   cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
-  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu]
+  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
+                  [--force-downgrade]
                                                           site + admin Workers on Cloudflare (uses wrangler login);
                                                           --jurisdiction eu keeps a newly created D1 database
-                                                          in the EU (cannot be changed later)
+                                                          in the EU (cannot be changed later); --scheduler picks
+                                                          the minute cron trigger or the Durable Object alarm;
+                                                          --plan sizes scheduler ticks for the account's Workers
+                                                          plan (default free; remembered);
+                                                          --force-downgrade deploys older schedules code over
+                                                          open releases and time gates
   cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
                                                           custom domains for the next deploy
-  cloudhal push [--replace] [--admin-url <url>]           local site → deployment
+  cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
+                                                          local site → deployment (refused while releases are
+                                                          open unless --cancel-schedules cancels them)
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
   cloudhal owner transfer --to <email> [--admin-url <url>]
                                                           make a member the deployment's Owner
@@ -66,6 +82,10 @@ Usage:
   cloudhal comments export [--remote] [--with-personal-data --out <file>]
                                                           comments as JSON lines (stdout or --out)
   cloudhal comments import --in <file> [--remote]         JSON lines back in; idempotent, safe to rerun
+  cloudhal schedules status [--remote]                    the scheduler's health, open releases, gated pages
+  cloudhal schedules list [--remote] [--limit <n>]        the site's releases
+  cloudhal schedules run-due [--remote]                   one scheduler tick now (self-hosting: run it from
+                                                          the system's cron every minute)
   cloudhal --help
 `;
 
@@ -104,6 +124,11 @@ export async function main(argv: string[]): Promise<number> {
       jurisdiction: { type: "string" },
       in: { type: "string" },
       "with-personal-data": { type: "boolean" },
+      scheduler: { type: "string" },
+      plan: { type: "string" },
+      "force-downgrade": { type: "boolean" },
+      "cancel-schedules": { type: "boolean" },
+      limit: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -174,12 +199,21 @@ export async function main(argv: string[]): Promise<number> {
       const where = values.jurisdiction;
       if (where !== undefined && where !== "eu")
         throw new Error(`--jurisdiction must be eu (got "${where}")`);
+      const ticker = values.scheduler;
+      if (ticker !== undefined && ticker !== "cron" && ticker !== "alarm")
+        throw new Error(`--scheduler must be cron or alarm (got "${ticker}")`);
+      const plan = values.plan;
+      if (plan !== undefined && plan !== "free" && plan !== "paid")
+        throw new Error(`--plan must be free or paid (got "${plan}")`);
       const tty = process.stdin.isTTY && process.stdout.isTTY;
       const r = await deploy({
         projectDir,
         ...(values.name ? { name: values.name } : {}),
         ...(values["dry-run"] ? { dryRun: true } : {}),
         ...(where ? { jurisdiction: where } : {}),
+        ...(ticker ? { scheduler: ticker } : {}),
+        ...(plan ? { plan } : {}),
+        ...(values["force-downgrade"] ? { forceDowngrade: true } : {}),
         log: (l) => console.log(l),
         // The analytics and data-location questions need a person at a terminal.
         ...(tty ? { prompt: askYesNo, askJurisdiction } : {}),
@@ -241,6 +275,7 @@ export async function main(argv: string[]): Promise<number> {
       const opts = {
         projectDir,
         ...(values.replace ? { replace: true } : {}),
+        ...(values["cancel-schedules"] ? { cancelSchedules: true } : {}),
         ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
         log: (l: string) => console.log(l),
       };
@@ -356,6 +391,33 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       throw new Error("usage: cloudhal analytics status|rollup|seed|export");
+    }
+    case "schedules": {
+      const [what] = rest;
+      const opts = {
+        projectDir,
+        ...(values.remote ? { remote: true } : {}),
+        ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+      };
+      if (what === "status") {
+        for (const line of describeSchedulesStatus(await schedulesStatus(opts))) console.log(line);
+        return 0;
+      }
+      if (what === "list") {
+        const limit = values.limit === undefined ? undefined : Number(values.limit);
+        if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 200))
+          throw new Error("--limit must be 1–200");
+        const list = await schedulesList({ ...opts, ...(limit ? { limit } : {}) });
+        if (list.length === 0) console.log("no releases");
+        for (const r of list) console.log(describeRelease(r));
+        return 0;
+      }
+      if (what === "run-due") {
+        const r = await schedulesRunDue(opts);
+        console.log(describeTick(r));
+        return r.failed > 0 ? 1 : 0;
+      }
+      throw new Error("usage: cloudhal schedules status|list|run-due [--remote]");
     }
     case "comments": {
       const [what] = rest;

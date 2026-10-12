@@ -17,6 +17,7 @@ import {
 } from "@cloudhal/astro-renderer/cache-tags";
 import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
 import { Comments, Sections } from "@cloudhal/astro-renderer/components";
+import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
@@ -173,6 +174,12 @@ tags.push(
 );
 addCacheTags(Astro.response.headers, tags);
 
+// Time gates (RFC-0008 §7.3): the published source never returns an embargoed or expired page or
+// entry (it is a 404), so a gate that is closed here means a preview or `cloudhal dev`: say so.
+const gated = route.kind === "page" ? route.page : route.kind === "entry" ? route.entry : undefined;
+const gate = gated ? gateNotice(gated, site, locale, Date.now()) : undefined;
+const notice = gate && { state: gate.state, at: gate.at, text: t[gate.state](gate.when) };
+
 const meta =
   route.kind === "page"
     ? pageHead(site, route.page, origin, media)
@@ -180,7 +187,7 @@ const meta =
       ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
       : archiveHead(site, route.archive, origin, media);
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice}>
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} media={media} />
   )}

@@ -72,7 +72,7 @@ describe("MCP client ↔ Cloudhal server", () => {
     const { client } = await connect({ store, audit, elicitation: true });
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).slice(0, 3)).toEqual(["list_sites", "get_site", "list_pages"]);
-    expect(tools).toHaveLength(61);
+    expect(tools).toHaveLength(78);
     const publish = tools.find((t) => t.name === "publish");
     expect(publish?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });
     expect(publish?.inputSchema).toMatchObject({ type: "object" });
@@ -87,10 +87,12 @@ describe("MCP client ↔ Cloudhal server", () => {
     const uris = resources.map((r) => r.uri).sort();
     expect(uris).toEqual(
       expect.arrayContaining([
+        "skill://comment-triage/SKILL.md",
         "skill://publish-article/SKILL.md",
         "skill://rollback/SKILL.md",
         "skill://safe-edit/SKILL.md",
         "skill://site-bootstrap/SKILL.md",
+        "skill://stale-review/SKILL.md",
       ]),
     );
     expect(uris).toContain("skill://publish-article/references/editorial-checklist.md");

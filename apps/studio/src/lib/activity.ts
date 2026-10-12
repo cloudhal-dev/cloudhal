@@ -46,6 +46,24 @@ export const KNOWN_TOOLS = [
   "moderate_comments",
   "draft_comment_reply",
   "set_comment_thread",
+  // RFC-0008 schedules
+  "list_schedule",
+  "get_schedule",
+  "list_releases",
+  "get_release",
+  "propose_release",
+  "schedule_release",
+  "reschedule",
+  "cancel_schedule",
+  "set_embargo",
+  "lift_embargo",
+  "schedule_unpublish",
+  "list_automations",
+  "list_runs",
+  "get_run",
+  "begin_run",
+  "end_run",
+  "pause_automation",
 ] as const;
 export type KnownTool = (typeof KNOWN_TOOLS)[number];
 

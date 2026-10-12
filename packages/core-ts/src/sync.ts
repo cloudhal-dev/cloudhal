@@ -12,10 +12,52 @@
 import { type Asset, assertValid } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { mediaBlobKey, refsRebuild } from "./assets.ts";
+import { checkAvailability, checkTimeZone, type GateSupport, isTimeZone } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
+
+/** Gates in a bundle follow the write rules (§4.1) and the writer guard (S15). */
+async function assertGates(
+  siteId: string,
+  bundle: SiteBundle,
+  gates: GateSupport | undefined,
+): Promise<void> {
+  let gated = false;
+  for (const row of bundle.nodes) {
+    if (row.kind !== "page" && row.kind !== "contentEntry") continue;
+    const availability = (JSON.parse(row.body) as { availability?: { from?: string } })
+      .availability;
+    if (!availability) continue;
+    checkAvailability(availability);
+    gated = true;
+  }
+  if (gated && gates && !(await gates.enforced(siteId)))
+    throw new InvariantError(
+      "gates_unsupported",
+      "the bundle has time gates (availability) and this site's renderer has not confirmed it enforces them",
+      { siteId },
+    );
+}
+
+/**
+ * `Site.timeZone` must be a zone this runtime knows (RFC-0008 §4.1), as on every other write; the
+ * zone the target already stores for the site is accepted unchanged.
+ */
+async function assertTimeZone(to: StoragePair, siteId: string, bundle: SiteBundle): Promise<void> {
+  const row = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId);
+  const zone = row ? (JSON.parse(row.body) as { timeZone?: string }).timeZone : undefined;
+  if (zone === undefined || isTimeZone(zone)) return;
+  const stored = await to.sql.get<{ body: string }>(
+    "SELECT body FROM nodes WHERE id = ? AND kind = 'site'",
+    [siteId],
+  );
+  checkTimeZone(
+    zone,
+    stored ? (JSON.parse(stored.body) as { timeZone?: string }).timeZone : undefined,
+  );
+}
 
 /**
  * A bundle is untrusted input (whoever holds the deployment token): every row must be a valid
@@ -97,6 +139,12 @@ export interface CopySiteOptions {
    */
   mode?: "bootstrap" | "replace";
   log?: (line: string) => void;
+  /**
+   * RFC-0008 S15: when given, a bundle whose pages or entries carry `availability` is refused
+   * (`gates_unsupported`) unless the target's renderer enforces gates. The admin Worker passes its
+   * store's check; local targets have the renderer in the same process.
+   */
+  gates?: GateSupport;
 }
 
 export interface CopySiteResult {
@@ -319,6 +367,8 @@ export async function importSite(
   )
     throw new Error("bundle contains rows of another site");
   await assertValidRows(siteId, bundle);
+  await assertGates(siteId, bundle, options.gates);
+  await assertTimeZone(to, siteId, bundle);
   await assertMedia(to, bundle);
 
   // 1. Blobs: verify content addressing so a bundle cannot plant mismatched bodies.

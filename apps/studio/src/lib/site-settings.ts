@@ -98,8 +98,14 @@ export function normalizePreviewPath(input: string): { path: string } | { error:
 export interface GeneralSettings {
   name: string;
   defaultLocale: string;
+  /** The site's clock for schedules (IANA, RFC-0008 §9.1); empty keeps UTC (the field is dropped). */
+  timeZone?: string | undefined;
 }
 
 export function applyGeneral(site: Site, general: GeneralSettings): Site {
-  return { ...site, name: general.name.trim(), defaultLocale: general.defaultLocale };
+  const next: Site = { ...site, name: general.name.trim(), defaultLocale: general.defaultLocale };
+  if (general.timeZone === undefined) return next;
+  if (general.timeZone) next.timeZone = general.timeZone;
+  else delete next.timeZone;
+  return next;
 }

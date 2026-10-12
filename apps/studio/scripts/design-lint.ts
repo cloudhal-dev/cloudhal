@@ -70,11 +70,17 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/MembersPage.tsx": "list",
   "routes/InvitePage.tsx": "token",
   "routes/ResetPasswordPage.tsx": "token",
+  // Schedules (RFC-0008 §15.1, DESIGN.md §2x): the calendar, its two list tabs and a release.
+  "routes/SchedulesPage.tsx": "calendar",
+  "routes/AutomationsPage.tsx": "list",
+  "routes/ScheduleHistoryPage.tsx": "list",
+  "routes/ReleasePage.tsx": "editor",
   "routes/SiteShell.tsx": "shell",
   "routes/AccountShell.tsx": "shell",
 };
 
 export type Template =
+  | "calendar"
   | "list"
   | "moderation"
   | "queue"
@@ -87,6 +93,18 @@ export type Template =
 
 /** What each template must be composed from (names must appear in the file). DESIGN.md §2a–2f. */
 export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
+  // Schedules (RFC-0008 §15.1, DESIGN.md §2x): the toolbar with the schedule filters over a
+  // `LayerCard` holding the agenda or the month grid; `Empty` when the server has no schedules.
+  calendar: [
+    "PageLayout",
+    "crumbs=",
+    "title=",
+    "ListToolbar",
+    "ScheduleFilters",
+    "LayerCard",
+    "Empty",
+    "CalendarMonth|AgendaList",
+  ],
   list: ["PageLayout", "crumbs=", "title=", "Table", "Empty", "LayerCard"],
   queue: ["PageLayout", "crumbs=", "title=", "SectionCard", "SectionEmpty", "Table"],
   // Reader comments (DESIGN.md §2w): a list whose rows are `CommentRow`s (not table cells, so the

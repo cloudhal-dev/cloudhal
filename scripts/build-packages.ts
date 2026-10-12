@@ -29,6 +29,7 @@ export const PACKAGES = [
   "analytics",
   "core-ts",
   "comments",
+  "schedules",
   "astro-renderer",
   "agent-runtime",
   "mcp-server",

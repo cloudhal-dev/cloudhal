@@ -33,6 +33,12 @@ import {
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
+import {
+  isScheduleError,
+  ScheduleAction,
+  ScheduleAside,
+  ScheduleLock,
+} from "../components/EditorSchedule.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
@@ -103,6 +109,8 @@ export function ArticleEditorPage() {
   // Menus linking here (RFC-0003): named in the delete dialog, listed in the "In menus" card.
   const menuRefs = useMenuReferences(siteId, { kind: "contentEntry", id: entryId });
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
+  // A release holds this article (RFC-0008 §6.2): it publishes as pinned, so the form is locked.
+  const [locked, setLocked] = useState(false);
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
@@ -214,6 +222,7 @@ export function ArticleEditorPage() {
       : access === "published"
         ? t("gating.entryPublished")
         : undefined;
+  const lockedReason = locked ? t("editor.locked") : undefined;
   // Contributors move their drafts to review; Authors and above set every status.
   const allowedStatuses: PublishStatus[] | undefined = editOwnPublished
     ? undefined
@@ -283,7 +292,7 @@ export function ArticleEditorPage() {
             }}
             allowed={allowedStatuses}
             publishReason={publishGate.reason}
-            readOnlyReason={readOnlyReason}
+            readOnlyReason={readOnlyReason ?? lockedReason}
             menu={
               <>
                 <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
@@ -308,14 +317,28 @@ export function ArticleEditorPage() {
               </>
             }
           />
+          <ScheduleAction
+            siteId={siteId}
+            node={{ id: draft.id, kind: "contentEntry", title, status: draft.status }}
+            dirty={dirty}
+            prepare={() =>
+              // Scheduling publishes it at that time: mark it Published (Authors and above) and
+              // save what is unsaved, first.
+              dirty || (editOwnPublished && draft.status !== "published")
+                ? save.mutateAsync(editOwnPublished ? { ...draft, status: "published" } : draft)
+                : undefined
+            }
+            disabled={readOnlyReason !== undefined || locked}
+            reason={readOnlyReason ?? lockedReason}
+          />
           <Button
             variant="primary"
             onClick={() => {
               if (valid()) save.mutate(draft);
             }}
             loading={save.isPending}
-            disabled={!dirty || readOnlyReason !== undefined}
-            title={readOnlyReason}
+            disabled={!dirty || readOnlyReason !== undefined || locked}
+            title={readOnlyReason ?? lockedReason}
             data-testid="save"
           >
             {t("common.save")}
@@ -323,9 +346,14 @@ export function ArticleEditorPage() {
         </>
       }
     >
-      <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
+      <ErrorBanner
+        error={
+          (isScheduleError(save.error) ? undefined : save.error) ?? remove.error ?? duplicate.error
+        }
+      />
       {taxonomy.taxonomies.isSuccess && !migrated && <TagsMigrationBanner siteId={siteId} />}
       <ViewOnlyBanner reason={readOnlyReason} />
+      <ScheduleLock siteId={siteId} nodeId={draft.id} dirty={dirty} onLockChange={setLocked} />
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -340,9 +368,9 @@ export function ArticleEditorPage() {
           // Someone else's article (or a Contributor's published one) is read-only: one disabled
           // fieldset turns every field off at once; the banner above says why (§2s).
           <fieldset
-            disabled={readOnlyReason !== undefined}
+            disabled={readOnlyReason !== undefined || locked}
             className="grid min-w-0 content-start gap-6"
-            data-read-only={readOnlyReason ? "true" : undefined}
+            data-read-only={readOnlyReason || locked ? "true" : undefined}
           >
             <SectionCard title={t("editor.article")}>
               <Input
@@ -433,6 +461,17 @@ export function ArticleEditorPage() {
         }
         aside={
           <>
+            <ScheduleAside
+              siteId={siteId}
+              nodeId={draft.id}
+              kind="contentEntry"
+              availability={draft.availability}
+              onChange={(availability) =>
+                setDraft(setOptional(draft, "availability", availability))
+              }
+              saveError={save.error}
+              disabled={readOnlyReason !== undefined || locked}
+            />
             <ArticleSeoPreviewCard
               entry={draft}
               siteName={site.data?.name ?? ""}

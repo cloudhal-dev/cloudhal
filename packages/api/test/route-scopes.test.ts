@@ -6,6 +6,7 @@ import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlAnalytics } from "@cloudhal/analytics/sql";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import Database from "better-sqlite3";
@@ -38,6 +39,7 @@ async function fullApp() {
     admin: { deployToken: "route-scopes-deploy-token-0123456789abc", storage: { sql, blobs } },
     analytics: new AnalyticsService({ sql, store: "sql", live: new SqlAnalytics(sql) }),
     comments: { store: new SqlCommentStore(sql) },
+    schedules: { store: new SqlScheduleStore(sql) },
   });
 }
 

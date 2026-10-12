@@ -11,7 +11,7 @@ import { RouteError, RoutePending } from "./components/RouteStates.tsx";
 import { LOCALE_LIST, withMessages } from "./i18n/index.tsx";
 import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
 import { authClient } from "./lib/auth.ts";
-import { isQueueTab, type QueueTab } from "./lib/comments.ts";
+import { isQueueTab, type QueueTab } from "./lib/comments-shell.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
 
@@ -77,7 +77,7 @@ const SiteSettingsPage = lazyRouteComponent(
   () =>
     withMessages(
       import("./routes/SiteSettingsPage.tsx"),
-      ["analyticsSettings", "commentsSettings"],
+      ["analyticsSettings", "commentsSettings", "scheduleSettings"],
       LOCALE_LIST,
     ),
   "SiteSettingsPage",
@@ -301,6 +301,37 @@ const redirectsRoute = createRoute({
   path: "/redirects",
   component: RedirectsPage,
 });
+/**
+ * Site › Automation › Schedules (RFC-0008 §15.1): Calendar · Automations · History, a release —
+ * lazy screens with their words. They check their own URL (`schedules-search.ts`), so the entry
+ * carries none of it.
+ */
+const scheduleRoute = <P extends string>(path: P, load: () => Promise<object>, name: string) =>
+  createRoute({
+    getParentRoute: () => siteRoute,
+    path,
+    component: lazyRouteComponent(() => withMessages(load(), ["schedules"]), name as never),
+  });
+const schedulesRoute = scheduleRoute(
+  "/schedules",
+  () => import("./routes/SchedulesPage.tsx"),
+  "SchedulesPage",
+);
+const automationsRoute = scheduleRoute(
+  "/schedules/automations",
+  () => import("./routes/AutomationsPage.tsx"),
+  "AutomationsPage",
+);
+const scheduleHistoryRoute = scheduleRoute(
+  "/schedules/history",
+  () => import("./routes/ScheduleHistoryPage.tsx"),
+  "ScheduleHistoryPage",
+);
+const releaseRoute = scheduleRoute(
+  "/schedules/releases/$releaseId",
+  () => import("./routes/ReleasePage.tsx"),
+  "ReleasePage",
+);
 const snapshotsRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/snapshots",
@@ -362,6 +393,10 @@ const routeTree = rootRoute.addChildren([
     commentsRoute,
     commentThreadRoute,
     commenterRoute,
+    schedulesRoute,
+    automationsRoute,
+    scheduleHistoryRoute,
+    releaseRoute,
   ]),
 ]);
 

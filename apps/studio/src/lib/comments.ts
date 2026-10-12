@@ -9,7 +9,6 @@ import type {
   Approval,
   CommentModerateAction,
   CommentModerationResult,
-  CommentNotification,
   CommentReasonCode,
   CommentThreadMode,
   CommentView,
@@ -28,13 +27,15 @@ export const commenterKey = (siteId: string, commenterId: string) =>
 
 // ---- the queue ---------------------------------------------------------------------------------
 
-/** The queue's page tabs, in order (RFC-0007 §14): Pending · Reported · Approved · Spam · Hidden. */
-export const QUEUE_TABS = ["pending", "reported", "approved", "spam", "hidden"] as const;
-export type QueueTab = (typeof QUEUE_TABS)[number];
+// The tabs and the sidebar count live with the shell (`comments-shell.ts`).
+export {
+  isQueueTab,
+  pendingCommentsCount,
+  QUEUE_TABS,
+  type QueueTab,
+} from "./comments-shell.ts";
 
-export function isQueueTab(value: unknown): value is QueueTab {
-  return typeof value === "string" && (QUEUE_TABS as readonly string[]).includes(value);
-}
+import type { QueueTab } from "./comments-shell.ts";
 
 /** Comments per page (DESIGN.md §2w: `Pagination` over 25). */
 export const QUEUE_PAGE_SIZE = 25;
@@ -158,18 +159,6 @@ export function matchesSearch(
   const name = comment.author.kind === "erased" ? "" : comment.author.name;
   const hay = `${name}\n${comment.body?.text ?? ""}`.toLocaleLowerCase(locale);
   return words.every((w) => hay.includes(w));
-}
-
-/** The sidebar's pending count for a site, from the bell's `comments-pending` item (own entries for Authors). */
-export function pendingCommentsCount(
-  items: readonly { kind: string }[] | undefined,
-  siteId: string,
-): number {
-  const item = (items ?? []).find(
-    (i): i is Extract<CommentNotification, { kind: "comments-pending" }> =>
-      i.kind === "comments-pending" && (i as { siteId?: string }).siteId === siteId,
-  );
-  return item?.count ?? 0;
 }
 
 // ---- replies -----------------------------------------------------------------------------------

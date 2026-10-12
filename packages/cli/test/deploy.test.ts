@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createApi } from "@cloudhal/api";
 import { SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { ReleaseService } from "@cloudhal/core-ts/releases";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -132,9 +133,18 @@ describe("cloudhal deploy", () => {
           vitalsOneIn: 5,
         }),
         CLOUDHAL_COMMENTS_AVAILABLE: "true",
+        CLOUDHAL_SCHEDULER: "cron",
       },
-      triggers: { crons: ["17 * * * *"] },
+      // RFC-0008 §8.2–§8.3: the scheduler's minute tick in the old slot, and the clock declared
+      triggers: { crons: ["* * * * *"] },
+      durable_objects: { bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }] },
+      migrations: [{ tag: "v1", new_sqlite_classes: ["SchedulerClock"] }],
     });
+    expect(r.scheduler).toBe("cron");
+    // the generated entry exports the Durable Object class next to the Worker
+    expect(await readFile(path.join(deployDir, "admin/worker.ts"), "utf8")).toContain(
+      'export { SchedulerClock } from "@cloudhal/cloudflare/admin";',
+    );
     expect(JSON.stringify(admin)).not.toContain("CLOUDHAL_COMMENTS_KEY");
     const secretsFile = path.join(deployDir, "secrets.json");
     expect((await stat(secretsFile)).mode & 0o777).toBe(0o600);
@@ -153,8 +163,8 @@ describe("cloudhal deploy", () => {
     await deploy({ projectDir, studioDir, dryRun: true });
     expect(JSON.parse(await readFile(secretsFile, "utf8"))).toEqual(secrets);
 
-    // RFC-0007 §15.3: comments keep the hourly trigger when analytics are off; with comments
-    // unavailable too, the admin Worker has no trigger. Wrangler accepts both configs.
+    // RFC-0008: the scheduler keeps its trigger whatever analytics and comments say. Wrangler
+    // accepts both configs.
     await writeFile(
       cfgFile,
       JSON.stringify({
@@ -172,8 +182,16 @@ describe("cloudhal deploy", () => {
     expect(siteC.ratelimits).toBeUndefined();
     const adminC = await jsonc(commentsOnly.adminConfig);
     expect(adminC.analytics).toBeUndefined();
-    expect(adminC.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "true" });
-    expect(adminC.triggers).toEqual({ crons: ["17 * * * *"] });
+    // RFC-0008 §8.2, §11.6: the tick budget and the automations switch are always written
+    expect(adminC.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
+      CLOUDHAL_COMMENTS_AVAILABLE: "true",
+      CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "free",
+      CLOUDHAL_AUTOMATIONS: "on",
+    });
+    expect(commentsOnly.schedules).toEqual({ automations: true, plan: "free" });
+    expect(adminC.triggers).toEqual({ crons: ["* * * * *"] });
     expect(commentsOnly.comments).toEqual({ available: true, cron: true });
     await writeFile(
       cfgFile,
@@ -181,12 +199,21 @@ describe("cloudhal deploy", () => {
         ...withLimit,
         analytics: { enabled: false },
         comments: { available: false },
+        // the deployment's automations kill switch and a Workers Paid account (§8.2, §11.6)
+        schedules: { automations: false, plan: "paid" },
       }),
     );
     const none = await deploy({ projectDir, studioDir, dryRun: true });
     const adminN = await jsonc(none.adminConfig);
-    expect(adminN.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "false" });
-    expect(adminN.triggers).toEqual({ crons: [] });
+    expect(adminN.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
+      CLOUDHAL_COMMENTS_AVAILABLE: "false",
+      CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "paid",
+      CLOUDHAL_AUTOMATIONS: "off",
+    });
+    expect(none.schedules).toEqual({ automations: false, plan: "paid" });
+    expect(adminN.triggers).toEqual({ crons: ["* * * * *"] });
     expect(none.comments).toEqual({ available: false });
     await writeFile(cfgFile, initial);
   });
@@ -542,9 +569,16 @@ describe("cloudhal deploy", () => {
     expect(siteOff.vars).toEqual({ CLOUDHAL_SITE_ID: cfg.siteId });
     const adminOff = await jsonc(off.adminConfig);
     expect(adminOff.analytics).toBeUndefined();
-    // reader comments keep the hourly trigger (RFC-0007 §15.3)
-    expect(adminOff.vars).toEqual({ CLOUDHAL_COMMENTS_AVAILABLE: "true" });
-    expect(adminOff.triggers).toEqual({ crons: ["17 * * * *"] });
+    // the scheduler keeps its minute trigger (RFC-0008 §8.2)
+    expect(adminOff.vars).toEqual({
+      CLOUDHAL_SITE_ID: cfg.siteId,
+      CLOUDHAL_COMMENTS_AVAILABLE: "true",
+      CLOUDHAL_SCHEDULER: "cron",
+      CLOUDHAL_TICK_BUDGET: "free",
+      CLOUDHAL_AUTOMATIONS: "on",
+    });
+    expect(lines.join("\n")).toMatch(/Workers Free tick budget .* `--plan paid` \(remembered\)/);
+    expect(adminOff.triggers).toEqual({ crons: ["* * * * *"] });
     expect(JSON.parse(await readFile(file, "utf8")).analytics).toBeUndefined();
     expect(purges).toHaveLength(1);
 
@@ -567,29 +601,76 @@ describe("cloudhal deploy", () => {
     expect(saved.analytics).toEqual({ enabled: true });
     expect(saved.media).toEqual({ transform: "none" });
 
-    // The account has no free cron slot: the admin Worker goes without the trigger and says so.
+    // The account has no free cron slot: the admin Worker goes without the trigger, the
+    // Durable Object clock ticks instead, and the deploy says so in the RFC's words (§16).
     cronRefusals = 1;
     adminDeploys.length = 0;
     const on = await run({ prompt: async () => false, wranglerVersion: "4.148.0" });
-    expect(adminDeploys).toEqual(['["17 * * * *"]', "[]"]);
+    expect(adminDeploys).toEqual(['["* * * * *"]', "[]"]);
+    expect(on.scheduler).toBe("alarm");
     expect(on.analytics).toEqual({
       enabled: true,
       dataset: "deploy_me_events",
       cron: false,
       purged: true,
     });
-    expect(lines.join("\n")).toMatch(
-      /Cloudflare refused the hourly trigger: .*daily totals are then computed when someone opens Analytics in Studio; comment retention and threads closing by time run on Studio's requests/,
+    expect(lines).toContain(
+      "Cloudflare refused the cron trigger: this account uses all its cron triggers (Workers Free allows 5). The scheduler runs on a Durable Object alarm instead.",
     );
     expect(on.comments).toEqual({ available: true, cron: false });
     const adminOn = await jsonc(on.adminConfig);
     expect(adminOn.triggers).toEqual({ crons: [] });
     expect(adminOn.vars).toMatchObject({
-      CLOUDHAL_ANALYTICS_CRON: "off",
       CLOUDHAL_COMMENTS_AVAILABLE: "true",
-      CLOUDHAL_COMMENTS_CRON: "off",
+      CLOUDHAL_SCHEDULER: "alarm",
+    });
+    expect(adminOn.vars).not.toHaveProperty("CLOUDHAL_ANALYTICS_CRON");
+    expect(adminOn.vars).not.toHaveProperty("CLOUDHAL_COMMENTS_CRON");
+    expect(adminOn.durable_objects).toEqual({
+      bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }],
     });
     expect(purges).toHaveLength(2);
+    expect(
+      JSON.parse(await readFile(path.join(projectDir, cfg.dataDir, "deploy/state.json"), "utf8"))
+        .scheduler,
+    ).toBe("alarm");
+
+    // The next deploy stays on the clock (no refused attempt), and says how to try cron again.
+    adminDeploys.length = 0;
+    lines.length = 0;
+    const again = await run({ prompt: async () => false, wranglerVersion: "4.148.0" });
+    expect(again.scheduler).toBe("alarm");
+    expect(adminDeploys).toEqual(["[]"]);
+    expect(lines.join("\n")).toMatch(/`cloudhal deploy --scheduler cron` tries the cron trigger/);
+    // `--scheduler cron` tries the trigger again; the slot is free now.
+    adminDeploys.length = 0;
+    const back = await run({
+      prompt: async () => false,
+      wranglerVersion: "4.148.0",
+      scheduler: "cron",
+    });
+    expect(back.scheduler).toBe("cron");
+    expect(adminDeploys).toEqual(['["* * * * *"]']);
+
+    // RFC-0008 §8.2: `--plan paid` sizes ticks for Workers Paid and is remembered in state.json,
+    // so the next deploy without the flag keeps it; `--plan free` goes back.
+    const stateFile = path.join(projectDir, cfg.dataDir, "deploy/state.json");
+    const paid = await run({ prompt: async () => false, wranglerVersion: "4.148.0", plan: "paid" });
+    expect(paid.schedules).toEqual({ automations: true, plan: "paid" });
+    expect((await jsonc(paid.adminConfig)).vars).toMatchObject({ CLOUDHAL_TICK_BUDGET: "paid" });
+    expect(JSON.parse(await readFile(stateFile, "utf8")).plan).toBe("paid");
+    lines.length = 0;
+    const kept = await run({ prompt: async () => false, wranglerVersion: "4.148.0" });
+    expect(kept.schedules.plan).toBe("paid");
+    expect((await jsonc(kept.adminConfig)).vars).toMatchObject({
+      CLOUDHAL_TICK_BUDGET: "paid",
+      CLOUDHAL_AUTOMATIONS: "on",
+    });
+    expect(lines.join("\n")).not.toMatch(/Workers Free tick budget/);
+    const free = await run({ prompt: async () => false, wranglerVersion: "4.148.0", plan: "free" });
+    expect((await jsonc(free.adminConfig)).vars).toMatchObject({ CLOUDHAL_TICK_BUDGET: "free" });
+    expect(JSON.parse(await readFile(stateFile, "utf8")).plan).toBe("free");
+    await expect(run({ plan: "pro" as never })).rejects.toThrow("--plan must be free or paid");
   });
 
   it("comments and data location: --jurisdiction eu only when the database is created, availability switches purge once", async () => {
@@ -706,5 +787,132 @@ describe("cloudhal deploy", () => {
       CLOUDHAL_COMMENTS_AVAILABLE: "false",
     });
     expect(purges).toHaveLength(1);
+  });
+
+  it("schedules (RFC-0008 §16): legacy no-cron deployments start on the clock, the downgrade guard, the push guard", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const blobs = new MemoryBlobStore();
+    const remote = new SiteGraphStore({ sql, blobs });
+    await remote.init();
+    const cfg = await readProjectConfig(projectDir);
+    const dir = path.join(projectDir, cfg.dataDir, "deploy");
+    const secrets = JSON.parse(await readFile(path.join(dir, "secrets.json"), "utf8")) as Record<
+      string,
+      string
+    >;
+    const app = createApi({
+      store: remote,
+      admin: { deployToken: secrets.CLOUDHAL_DEPLOY_TOKEN as string, storage: { sql, blobs } },
+    });
+    let status: unknown;
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const p = new URL(req.url).pathname;
+      if (p === "/__cloudhal/purge") return new Response("ok");
+      if (p === "/api/admin/schedules/status" && status !== undefined) return Response.json(status);
+      return app.fetch(req);
+    }) as typeof fetch;
+    const adminDeploys: string[] = [];
+    const wrangler: WranglerRunner = async (args) => {
+      const ok = (records: Record<string, unknown>[] = []) => ({
+        code: 0,
+        stdout: "",
+        stderr: "",
+        records,
+      });
+      if (args[0] === "d1" && args[1] === "info")
+        return {
+          ...ok(),
+          stdout: JSON.stringify({ uuid: "11111111-2222-3333-4444-555555555555" }),
+        };
+      if (args[0] === "deploy" && args.includes("-c")) {
+        const config = await jsonc(args[args.indexOf("-c") + 1] as string);
+        adminDeploys.push(String((config.vars as Record<string, string>).CLOUDHAL_SCHEDULER));
+        return ok([{ type: "deploy", targets: ["deploy-me-admin.acme.workers.dev"] }]);
+      }
+      if (args[0] === "deploy")
+        return ok([{ type: "deploy", targets: ["https://deploy-me-site.acme.workers.dev"] }]);
+      return ok();
+    };
+    const lines: string[] = [];
+    const run = (extra: Partial<Parameters<typeof deploy>[0]> = {}) =>
+      deploy({
+        projectDir,
+        studioDir,
+        wrangler,
+        fetch: fakeFetch,
+        healthTimeoutMs: 5000,
+        name: "deploy-me",
+        prompt: async () => false,
+        wranglerVersion: "4.148.0",
+        log: (l) => lines.push(l),
+        ...extra,
+      });
+    // A deployment configured before RFC-0008 without a cron slot (`CLOUDHAL_*_CRON=off`, no
+    // scheduler in its state): read once as `alarm`, and the vars are not written again.
+    const stateFile = path.join(dir, "state.json");
+    const state = JSON.parse(await readFile(stateFile, "utf8")) as Record<string, unknown>;
+    const { scheduler: _s, ...before } = state;
+    await writeFile(
+      stateFile,
+      JSON.stringify({ ...before, adminUrl: "https://deploy-me-admin.acme.workers.dev" }),
+    );
+    const adminFile = path.join(dir, "admin", "wrangler.jsonc");
+    const old = await jsonc(adminFile);
+    await writeFile(
+      adminFile,
+      JSON.stringify({
+        ...old,
+        vars: { CLOUDHAL_COMMENTS_AVAILABLE: "true", CLOUDHAL_COMMENTS_CRON: "off" },
+      }),
+    );
+    const legacy = await run();
+    expect(legacy.scheduler).toBe("alarm");
+    expect(adminDeploys).toEqual(["alarm"]);
+    expect((await jsonc(adminFile)).vars).not.toHaveProperty("CLOUDHAL_COMMENTS_CRON");
+
+    // The downgrade guard: a deployment running a higher schedules level with open releases or
+    // gates refuses older code unless --force-downgrade; with nothing to protect it deploys.
+    status = {
+      engine: { schedulesLevel: 99 },
+      sites: [{ siteId: cfg.siteId, openReleases: [{ id: "rel_x" }], gatedNodes: 2 }],
+    };
+    adminDeploys.length = 0;
+    await expect(run({ scheduler: "cron" })).rejects.toThrow(
+      /downgrade the deployment's schedules \(level 99 → 1\) while it has 1 open release\(s\) and 2 page\(s\)/,
+    );
+    expect(adminDeploys).toEqual([]);
+    lines.length = 0;
+    await run({ scheduler: "cron", forceDowngrade: true });
+    expect(lines.join("\n")).toMatch(
+      /--force-downgrade: deploying schedules level 1 over level 99/,
+    );
+    status = {
+      engine: { schedulesLevel: 99 },
+      sites: [{ siteId: cfg.siteId, openReleases: [], gatedNodes: 0 }],
+    };
+    await expect(run({ scheduler: "cron" })).resolves.toMatchObject({ scheduler: "cron" });
+    status = undefined; // the in-process deployment answers itself (level 1): no guard
+
+    // The push guard: open releases on the deployment refuse a push unless --cancel-schedules.
+    await pushSite({ projectDir, fetch: fakeFetch, replace: true });
+    const entry = (await remote.listContentEntries(cfg.siteId))[0];
+    if (!entry) throw new Error("no entry");
+    await remote.updateContentEntry({ ...entry, title: "Scheduled retitle" });
+    const releases = new ReleaseService({ graph: remote });
+    const { release } = await releases.create({
+      siteId: cfg.siteId,
+      set: [entry.id],
+      createdBy: { kind: "human", id: "user_deployer01", name: "Op" },
+      when: { at: new Date(Date.now() + 3_600_000).toISOString() },
+    });
+    await expect(pushSite({ projectDir, fetch: fakeFetch, replace: true })).rejects.toThrow(
+      new RegExp(`open releases[\\s\\S]*${release.id} draft[\\s\\S]*--cancel-schedules`),
+    );
+    await pushSite({ projectDir, fetch: fakeFetch, replace: true, cancelSchedules: true });
+    expect((await releases.get(cfg.siteId, release.id)).release).toMatchObject({
+      state: "canceled",
+      outcome: { kind: "canceled", by: { id: "sys_operator01" } },
+    });
   });
 });

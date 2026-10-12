@@ -47,6 +47,11 @@ import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
+import {
+  SCHEDULE_SETTINGS_SECTION,
+  ScheduleSettingsSection,
+  TimeZoneField,
+} from "../components/ScheduleSettings.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
@@ -56,6 +61,7 @@ import { absoluteTime } from "../lib/activity.ts";
 import {
   ApiRequestError,
   api,
+  errorCode,
   isNotEnabled,
   type PreviewLink,
   type PreviewLinkInput,
@@ -81,6 +87,7 @@ const SECTIONS = [
   "domains",
   ANALYTICS_SETTINGS_SECTION,
   COMMENT_SETTINGS_SECTION,
+  SCHEDULE_SETTINGS_SECTION,
   "previews",
 ] as const;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -187,22 +194,32 @@ function GeneralSection({
   const save = useSaveSite(site?.id ?? "");
   const [name, setName] = useState(site?.name ?? "");
   const [locale, setLocale] = useState(site?.defaultLocale ?? "");
+  // The site's clock for schedules (RFC-0008 §9.1); only on servers with schedules.
+  const schedules = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false }).data
+    ?.features.schedules?.available;
+  const [timeZone, setTimeZone] = useState(site?.timeZone ?? "");
   const [attempted, setAttempted] = useState(false);
   // When the saved values change (our save, or "Load latest" after a conflict), the form follows.
   // A domain save bumps `rev` without touching these, so it keeps unsaved edits here.
   const savedName = site?.name;
   const savedLocale = site?.defaultLocale;
+  const savedZone = site?.timeZone ?? "";
   useEffect(() => {
     if (savedName !== undefined) setName(savedName);
     if (savedLocale !== undefined) setLocale(savedLocale);
-  }, [savedName, savedLocale]);
-  const dirty = !!site && (name.trim() !== site.name || locale !== site.defaultLocale);
+    setTimeZone(savedZone);
+  }, [savedName, savedLocale, savedZone]);
+  const dirty =
+    !!site &&
+    (name.trim() !== site.name ||
+      locale !== site.defaultLocale ||
+      timeZone !== (site.timeZone ?? ""));
   const nameError = attempted ? validateName(name) : undefined;
   const submit = () => {
     if (!site) return;
     setAttempted(true);
     if (!dirty || validateName(name)) return;
-    save.mutate(applyGeneral(site, { name, defaultLocale: locale }), {
+    save.mutate(applyGeneral(site, { name, defaultLocale: locale, timeZone }), {
       onSuccess: (saved) => {
         setAttempted(false);
         toast.success(t("siteSettings.general.saved"), t("common.rev", { rev: saved.rev }));
@@ -213,6 +230,7 @@ function GeneralSection({
     if (!site) return;
     setName(site.name);
     setLocale(site.defaultLocale);
+    setTimeZone(site.timeZone ?? "");
     setAttempted(false);
     save.reset();
   };
@@ -241,7 +259,7 @@ function GeneralSection({
       ) : (
         <>
           <SaveError
-            error={save.error}
+            error={errorCode(save.error) === "invalid_time_zone" ? undefined : save.error}
             title={t("siteSettings.general.failed")}
             onReload={() => {
               save.reset();
@@ -286,6 +304,13 @@ function GeneralSection({
               />
             </div>
           </div>
+          {schedules && (
+            <TimeZoneField
+              value={timeZone}
+              onChange={setTimeZone}
+              invalid={errorCode(save.error) === "invalid_time_zone"}
+            />
+          )}
           <dl className="-mb-3 divide-y divide-kumo-hairline border-kumo-hairline border-t">
             <SettingRow
               label={t("siteSettings.general.locales")}
@@ -811,7 +836,7 @@ function PreviewLinksSection({
 
 /** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
-  const t = useT("analyticsSettings", "commentsSettings");
+  const t = useT("analyticsSettings", "commentsSettings", "scheduleSettings");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
@@ -836,7 +861,9 @@ export function SiteSettingsPage() {
               ? t("analyticsSettings.title")
               : id === COMMENT_SETTINGS_SECTION
                 ? t("commentsSettings.title")
-                : t(`siteSettings.sections.${id}`),
+                : id === SCHEDULE_SETTINGS_SECTION
+                  ? t("scheduleSettings.title")
+                  : t(`siteSettings.sections.${id}`),
         }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
@@ -847,6 +874,8 @@ export function SiteSettingsPage() {
         <AnalyticsSettingsSection siteId={siteId} />
         {/* Reader comments (RFC-0007 §14): comments.read to see, comments.settings to change. */}
         <CommentSettingsSection siteId={siteId} />
+        {/* Schedules (RFC-0008 §15.1): scheduler health, kill switch, daily cap. */}
+        <ScheduleSettingsSection siteId={siteId} />
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>

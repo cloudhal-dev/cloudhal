@@ -27,13 +27,15 @@ export function useToast() {
       description?: string;
       tone: "warning" | "info";
       actions?: ToastAction[];
+      /** How long it stays (ms): 15 s by default; "Undo" offers 10 s. */
+      timeout?: number;
     }) =>
       manager.add({
         id: options.id,
         title: options.title,
         description: options.description,
         variant: options.tone,
-        timeout: NOTICE_TIMEOUT_MS,
+        timeout: options.timeout ?? NOTICE_TIMEOUT_MS,
         actions: options.actions?.map((action) => ({
           children: action.label,
           variant: "secondary",

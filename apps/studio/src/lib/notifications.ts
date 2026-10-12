@@ -15,6 +15,8 @@ import {
   isNotEnabled,
   type KeyMode,
   type NotificationsPage,
+  SCHEDULE_NOTIFICATION_KINDS,
+  type ScheduleNotification,
   type StudioNotification,
 } from "./api.ts";
 import { activeElevation, formatDuration, formatUntil, remainingMinutes } from "./elevation.ts";
@@ -149,6 +151,15 @@ export function extensionInput(
  * comment queue (the Reported tab), comment settings or Approvals for the comment kinds.
  */
 export function notificationHref(item: StudioNotification): string {
+  if (isScheduleNotification(item)) {
+    // The scheduler is the deployment's, not a site's: the bell's item links the site on screen.
+    if (item.kind === "scheduler-stalled") return "/sites";
+    const base = `/sites/${encodeURIComponent(item.siteId)}/schedules`;
+    if ("releaseId" in item) return `${base}/releases/${encodeURIComponent(item.releaseId)}`;
+    return item.kind === "automation-paused"
+      ? `${base}/automations`
+      : `${base}/history?automation=${encodeURIComponent(item.automationId)}`;
+  }
   if (item.kind === "elevation-ending") return "/agents";
   if (item.kind === "elevation-request" || item.kind === "comments-approval")
     return `/sites/${encodeURIComponent(item.siteId)}/approvals`;
@@ -159,6 +170,11 @@ export function notificationHref(item: StudioNotification): string {
   if (item.kind === "comments-paused")
     return `/sites/${encodeURIComponent(item.siteId)}/settings#comments`;
   return "/team";
+}
+
+/** The schedule kinds (RFC-0008 §14): worded by the lazily loaded schedule notices. */
+export function isScheduleNotification(item: { kind: string }): item is ScheduleNotification {
+  return (SCHEDULE_NOTIFICATION_KINDS as readonly string[]).includes(item.kind);
 }
 
 /** The reader-comment kinds (RFC-0007 §13). */
