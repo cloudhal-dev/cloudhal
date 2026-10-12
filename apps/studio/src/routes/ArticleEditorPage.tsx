@@ -35,6 +35,7 @@ import { EditorPreview } from "../components/EditorPreview.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
+import { ReadersCard } from "../components/Readers.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -437,6 +438,7 @@ export function ArticleEditorPage() {
               host={host}
               coverStatus={coverStatus}
             />
+            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="article" />
             <UsedInMenusCard siteId={siteId} kind="contentEntry" id={draft.id} />
             <DetailsCard rows={details} />
             <DangerZoneCard
