@@ -12,6 +12,8 @@ import { SqlCommentStore } from "@cloudhal/comments/sql";
 type ContentEntry = Awaited<ReturnType<SiteGraphStore["listContentEntries"]>>[number];
 
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { hourlyAt } from "@cloudhal/schedules";
+import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
@@ -19,7 +21,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type AdminEnv, createAdminWorker } from "../src/admin-worker.ts";
 import {
   adminComments,
-  commentsHourlyDue,
   commentsOn,
   flushCommentPurges,
   runCommentsHourly,
@@ -296,7 +297,7 @@ describe("availability and the Worker", () => {
     expect(deps?.keys).toBeDefined();
   });
 
-  it("scheduled runs the comments job and flushes through SITE", async () => {
+  it("the minute tick runs the comments job behind its :17 watermark and flushes through SITE", async () => {
     const id = newCommentsId(ID_PREFIX.comment);
     await store.submit(siteId, {
       id,
@@ -314,62 +315,68 @@ describe("availability and the Worker", () => {
     const s = site();
     const lines: string[] = [];
     const worker = createAdminWorker({ log: (l) => lines.push(l) });
-    await worker.scheduled(
-      { scheduledTime: Date.now(), cron: "17 * * * *" } as ScheduledController,
-      env({
-        CLOUDHAL_COMMENTS_KEY: KEY,
-        CLOUDHAL_PURGE_TOKEN: "p".repeat(32),
-        SITE: { fetch: s.fetch } as unknown as Fetcher,
-      }),
-      ctx,
+    const e = env({
+      CLOUDHAL_COMMENTS_KEY: KEY,
+      CLOUDHAL_PURGE_TOKEN: "p".repeat(32),
+      SITE: { fetch: s.fetch } as unknown as Fetcher,
+    });
+    const tick = (scheduledTime: number) =>
+      worker.scheduled({ scheduledTime, cron: "* * * * *" } as ScheduledController, e, ctx);
+    // The first tick registers the hourly jobs' watermarks (RFC-0008 §8.2): nothing runs yet.
+    const first = Date.now();
+    await tick(first);
+    expect(await store.get(siteId, id)).not.toBeNull();
+    const jobs = await new SqlScheduleStore(sql).systemJobs();
+    const at17 = hourlyAt(17)(new Date(first)).toISOString();
+    expect(jobs.map((j) => [j.name, j.nextRunAt])).toEqual(
+      expect.arrayContaining([
+        ["analytics.rollup", at17],
+        ["comments.hourly", at17],
+      ]),
     );
+    // At :17 the minute tick runs today's job, with today's log lines.
+    await tick(Date.parse(at17) + 4_100);
     expect(await store.get(siteId, id)).toBeNull();
     expect(s.calls).toEqual([[tag(entry.id)]]);
     expect(lines.some((l) => /^comments hourly: 1 site\(s\)/.test(l))).toBe(true);
-    expect(lines.at(-1)).toMatch(/comments purge backstop: 1 request\(s\), 0 failed/);
+    expect(lines.some((l) => /^comments purge backstop: 1 request\(s\), 0 failed/.test(l))).toBe(
+      true,
+    );
+    expect(lines.some((l) => /^analytics rollup \(none\)/.test(l))).toBe(true);
+    expect(lines.some((l) => /^schedules tick \(cron\): 2 ran/.test(l))).toBe(true);
+    // The watermark moved to the next hour: the next minute does not run it again.
+    const n = lines.length;
+    await tick(Date.parse(at17) + 64_100);
+    expect(lines.slice(n).some((l) => l.startsWith("comments hourly"))).toBe(false);
+    expect((await new SqlScheduleStore(sql).heartbeat())?.trigger).toBe("cron");
   });
 
-  it("without a cron trigger the hourly job runs after an admin request, at most hourly", async () => {
-    const id = newCommentsId(ID_PREFIX.comment);
-    await store.submit(siteId, {
-      id,
-      nodeId: entry.id,
-      name: "Old",
-      text: "Old pending comment",
-      status: "pending",
-      labels: [],
-      ipHmac: null,
-      challengeId: null,
-      proof: "pow",
-      createdAt: new Date(Date.now() - 40 * 86_400_000).toISOString(),
-    });
+  it("the request backstop ticks when the heartbeat is stale, at most once a minute per isolate", async () => {
     const lines: string[] = [];
     const worker = createAdminWorker({ log: (l) => lines.push(l) });
     const waits: Promise<unknown>[] = [];
     const waiting = { ...ctx, waitUntil: (p: Promise<unknown>) => waits.push(p) };
-    const health = () =>
-      worker.fetch(
+    // A deployment from before RFC-0008 without a cron slot: its legacy var reads as `alarm`.
+    const e = env({ CLOUDHAL_COMMENTS_KEY: KEY, CLOUDHAL_COMMENTS_CRON: "off" });
+    const health = (w = worker) =>
+      w.fetch(
         new Request("https://admin.example/api/health"),
-        env({ CLOUDHAL_COMMENTS_KEY: KEY, CLOUDHAL_COMMENTS_CRON: "off" }),
+        e,
         waiting as unknown as ExecutionContext,
       );
     expect((await health()).status).toBe(200);
     await Promise.all(waits);
-    expect(await store.get(siteId, id)).toBeNull();
-    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
-    // the same isolate within the hour: not again
+    expect(lines.filter((l) => l.startsWith("schedules backstop:"))).toHaveLength(1);
+    expect(await new SqlScheduleStore(sql).heartbeat()).toMatchObject({ trigger: "request" });
+    // the same isolate within the minute: the heartbeat is not even read again
     await health();
     await Promise.all(waits);
-    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
-    // with a cron trigger (the default) requests never run it
-    const other = createAdminWorker({ log: (l) => lines.push(l) });
-    await other.fetch(
-      new Request("https://admin.example/api/health"),
-      env({ CLOUDHAL_COMMENTS_KEY: KEY }),
-      waiting as unknown as ExecutionContext,
-    );
+    expect(lines.filter((l) => l.startsWith("schedules backstop:"))).toHaveLength(1);
+    // another isolate sees a fresh heartbeat: nothing to do
+    await health(createAdminWorker({ log: (l) => lines.push(l) }));
     await Promise.all(waits);
-    expect(lines.filter((l) => l.startsWith("comments hourly (on request)"))).toHaveLength(1);
-    expect(commentsHourlyDue(env({ CLOUDHAL_COMMENTS_CRON: "off" }), 10 ** 13, 0)).toBe(false);
+    expect(lines.filter((l) => l.startsWith("schedules backstop:"))).toHaveLength(1);
+    // the comments job no longer runs on requests (it is a system job of the tick)
+    expect(lines.some((l) => l.startsWith("comments hourly (on request)"))).toBe(false);
   });
 });

@@ -96,6 +96,16 @@ export interface SchedulerRuntime {
   poke(at: string): Promise<void>;
 }
 
+/**
+ * What a deployment hands the API (`ApiDeps.scheduler`): the runtime, and for the operator's
+ * `cloudhal schedules run-due --remote` a tick on demand.
+ */
+export interface SchedulerControl extends SchedulerRuntime {
+  runDue?(trigger: TickTrigger): Promise<TickReport>;
+}
+
+export type { TickReport, TickTrigger } from "@cloudhal/schedules";
+
 /** A runtime whose ticker needs no pokes (cron), or none at all (tests). */
 export const CRON_RUNTIME: SchedulerRuntime = { mode: "cron", poke: async () => {} };
 
@@ -853,4 +863,57 @@ export class ReleaseService {
     );
     return { release: (await this.#record(siteId, id)).release, report };
   }
+}
+
+// ───────────────────────────── operator views ─────────────────────────────
+
+/**
+ * The deployment's schedules level: what this code enforces (holds, locks, gates through the
+ * renderer). `cloudhal deploy` refuses to deploy code with a lower level over a deployment that
+ * has open releases or gated nodes (RFC-0008 Compatibility: older code ignores holds and gates),
+ * unless `--force-downgrade`. Mirrored in this package's `package.json` (`cloudhal.schedulesLevel`)
+ * so the CLI can read the level of the code it is about to deploy without loading it.
+ */
+export const SCHEDULES_ENGINE_LEVEL = 1;
+
+/** A release in one line, for the operator (`cloudhal schedules status|list`, the push guard). */
+export interface ReleaseSummary {
+  readonly id: string;
+  readonly state: ReleaseState;
+  readonly title?: string;
+  readonly executeAt?: string;
+  readonly items: number;
+}
+
+export function releaseSummary(r: Release): ReleaseSummary {
+  return {
+    id: r.id,
+    state: r.state,
+    ...(r.title ? { title: r.title } : {}),
+    ...(r.when?.kind === "at" ? { executeAt: r.when.at } : {}),
+    items: r.items.length,
+  };
+}
+
+/**
+ * Pages and entries of a site (working copy) with a gate still ahead — an embargo or an expiry
+ * after `now`. Older code would ignore them, so they block a downgrade like open releases do.
+ */
+export async function gatedNodeCount(sql: SqlDriver, siteId: string, now: Date): Promise<number> {
+  const rows = await sql.all<{ a: string | null }>(
+    `SELECT json_extract(body, '$.availability') AS a FROM nodes
+     WHERE site_id = ? AND kind IN ('page', 'contentEntry') AND json_extract(body, '$.availability') IS NOT NULL`,
+    [siteId],
+  );
+  const t = now.getTime();
+  let n = 0;
+  for (const r of rows) {
+    try {
+      const a = JSON.parse(String(r.a)) as { from?: string; until?: string };
+      if ([a.from, a.until].some((x) => x !== undefined && !(Date.parse(x) <= t))) n++;
+    } catch {
+      n++; // an unreadable gate counts (fail closed)
+    }
+  }
+  return n;
 }

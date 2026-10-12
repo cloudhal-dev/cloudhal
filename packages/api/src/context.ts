@@ -9,6 +9,7 @@ import type {
 import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { Actor } from "@cloudhal/core-contracts";
 import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
+import type { SchedulerControl } from "@cloudhal/core-ts/releases";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
@@ -91,6 +92,12 @@ export interface ApiDeps {
    * and bans, the MCP comment tools, the comment notifications and `features.comments`.
    */
   readonly comments?: CommentsDeps;
+  /**
+   * The scheduler (RFC-0008 §8): its mode and a poke that wakes it earlier (alarm and Node
+   * tickers), and a tick on demand for `cloudhal schedules run-due --remote`. The release routes
+   * and tools (rollout steps 7–8) read it as `c.get("scheduler")`.
+   */
+  readonly scheduler?: SchedulerControl;
 }
 
 export type Env = {
@@ -118,5 +125,7 @@ export type Env = {
     analytics: AnalyticsService | undefined;
     /** Reader comments (RFC-0007); undefined on servers without them. */
     comments: CommentsDeps | undefined;
+    /** The scheduler (RFC-0008); undefined on servers without one. */
+    scheduler: SchedulerControl | undefined;
   };
 };

@@ -115,5 +115,8 @@
         "default": "./dist/src/releases.js"
       }
     }
+  },
+  "cloudhal": {
+    "schedulesLevel": 1
   }
 }
