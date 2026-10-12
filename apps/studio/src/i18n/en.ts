@@ -3692,6 +3692,26 @@ export const en = {
         description: "No new visits are counted. Earlier visits still show below.",
       },
     },
+    bots: {
+      titleLikely: "Possible bot traffic",
+      titleWatch: "Unusual spike in page views",
+      description:
+        "{pageviews} page views arrived in the hour from {hour} UTC, {multiple} times a usual hour. The numbers for this period may be inflated by scripts posing as visitors.",
+      advice:
+        "Check that day's top pages and referrers. If it happens again, set analytics.rateLimit in cloudhal.json and deploy again: Cloudflare's Rate Limiting binding then limits page views per visitor across your whole site.",
+      details: "Why this warning",
+      note: "This is an estimate from patterns, not proof. It compares the busiest hour of this period's last 7 days with a usual hour. A post shared in chat apps, which send no referrer, can look the same.",
+      showDay: "Show that day",
+      reasons: {
+        hourlySpike:
+          "{pageviews} page views in the hour from {hour} UTC: {multiple} times a usual hour ({baseline}). Warns from {threshold} times.",
+        directEntrances:
+          "{share} of that hour's visits came without a referrer (typed in, or sent by a script). Warns from {threshold}.",
+        singleBrowser:
+          "{share} of that hour's page views came from one browser, {browser}. Warns from {threshold}.",
+        singlePage: "{share} of that hour's page views were of one page: {page}.",
+      },
+    },
     filter: {
       title: "Showing {label} only",
       clear: "Show all traffic",

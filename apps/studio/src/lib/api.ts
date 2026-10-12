@@ -1083,6 +1083,33 @@ export type AnalyticsRenders =
       }[];
     };
 
+/** What raised the possible-bot-traffic level (RFC-0006 §5.5); Studio words it by `code`. */
+export interface AnalyticsBotReason {
+  code: "hourly_spike" | "direct_entrances" | "single_browser" | "single_page";
+  /** One English sentence (agents, logs); Studio shows its own words. */
+  detail: string;
+  /** `hourly_spike`: times the median hour; the others: a share (0–1). */
+  value: number;
+  threshold: number;
+  /** `single_page`: the node id; `single_browser`: the browser family. */
+  key?: string;
+  /** `single_page`: the page as the graph knows it now. */
+  node?: AnalyticsNode;
+}
+
+/** `…/analytics/bots`: the busiest hour of the period's last 7 days, and whether it looks forged. */
+export interface AnalyticsBotTraffic {
+  level: "none" | "watch" | "likely";
+  reasons: AnalyticsBotReason[];
+  /** Bucket start (UTC) of the busiest hour checked; `null` without page views. */
+  hour: string | null;
+  pageviews: number;
+  /** The median hour of the 7 days checked. */
+  baseline: number;
+  window: { from: string; to: string } | null;
+  partial?: boolean;
+}
+
 export interface AnalyticsNodeStats {
   node: AnalyticsNode;
   summary: AnalyticsSummary;
@@ -1563,6 +1590,11 @@ export const api = {
     summary: (siteId: string, q: AnalyticsRangeQuery = {}, compare = false) =>
       request<AnalyticsEnvelope<AnalyticsSummary>>(
         `${analyticsPath(siteId)}/summary${analyticsQuery(q, { compare: compare ? "previous" : undefined })}`,
+      ),
+    /** The possible-bot-traffic signal (no `filter`: it looks at the whole site). */
+    bots: (siteId: string, q: AnalyticsRangeQuery = {}) =>
+      request<AnalyticsEnvelope<AnalyticsBotTraffic>>(
+        `${analyticsPath(siteId)}/bots${analyticsQuery({ ...q, filter: undefined })}`,
       ),
     series: (siteId: string, q: AnalyticsRangeQuery = {}, interval?: "hour" | "day") =>
       request<AnalyticsEnvelope<AnalyticsSeries>>(

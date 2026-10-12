@@ -22,7 +22,7 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]node_modules[\\/].*[\\/](echarts|zrender)[\\/]/,
   /[\\/]@cloudflare[\\/]kumo[\\/]dist[\\/]chunks[\\/](chart|date-range-picker)-/,
   /[\\/]packages[\\/]ui[\\/]src[\\/]charts\.ts$/,
-  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|charts|useChartFrame|useChartPalette)\.tsx?$/,
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](AnalyticsTimeseries|AnalyticsRangePicker|AnalyticsQuotaBanner|AnalyticsBotBanner|Breakdown|CountryMap|ReadersSummary|StatTile|analytics-format|charts|useChartFrame|useChartPalette)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
 ];

@@ -3769,6 +3769,26 @@ export const tr: Messages = {
           "Yeni ziyaretler sayılmıyor. Önceki ziyaretler aşağıda görünmeye devam ediyor.",
       },
     },
+    bots: {
+      titleLikely: "Olası bot trafiği",
+      titleWatch: "Sayfa görüntülemelerinde olağan dışı artış",
+      description:
+        "UTC {hour} ile başlayan saatte {pageviews} sayfa görüntüleme geldi; olağan bir saatin {multiple} katı. Bu dönemin sayıları, ziyaretçi gibi davranan betikler yüzünden şişmiş olabilir.",
+      advice:
+        "O günün en çok okunan sayfalarına ve yönlendiren sitelerine bak. Yeniden olursa cloudhal.json dosyasında analytics.rateLimit ayarını aç ve yeniden yayına al: Cloudflare'in Rate Limiting bağlantısı o zaman ziyaretçi başına sayfa görüntülemeyi tüm sitede sınırlar.",
+      details: "Bu uyarı neden çıktı",
+      note: "Bu bir kanıt değil, örüntülerden yapılan bir tahmin. Bu dönemin son 7 gününün en yoğun saatini olağan bir saatle karşılaştırır. Yönlendiren göndermeyen sohbet uygulamalarında paylaşılan bir yazı da aynı görünebilir.",
+      showDay: "O günü göster",
+      reasons: {
+        hourlySpike:
+          "UTC {hour} ile başlayan saatte {pageviews} sayfa görüntüleme: olağan bir saatin ({baseline}) {multiple} katı. {threshold} kattan itibaren uyarır.",
+        directEntrances:
+          "O saatteki ziyaretlerin {share} kadarı yönlendiren olmadan geldi (adres yazılarak ya da bir betikle). {threshold} oranından itibaren uyarır.",
+        singleBrowser:
+          "O saatteki sayfa görüntülemelerin {share} kadarı tek bir tarayıcıdan geldi: {browser}. {threshold} oranından itibaren uyarır.",
+        singlePage: "O saatteki sayfa görüntülemelerin {share} kadarı tek bir sayfaya: {page}.",
+      },
+    },
     filter: {
       title: "Yalnızca {label} gösteriliyor",
       clear: "Tüm trafiği göster",

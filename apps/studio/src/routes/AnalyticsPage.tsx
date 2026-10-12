@@ -39,6 +39,7 @@ import {
   useAnalyticsStatus,
   useAnalyticsText,
 } from "../components/Analytics.tsx";
+import { BotTrafficBanner, useBotTraffic } from "../components/AnalyticsBots.tsx";
 import {
   AboutCard,
   type AnalyticsScope,
@@ -124,6 +125,16 @@ export function AnalyticsPage() {
     enabled: empty && key !== "12m",
     staleTime: 5 * 60_000,
   });
+  // Possible bot traffic (§5.5): live hourly reads, so not while live reads are off or spent.
+  const bots = useBotTraffic(
+    scope,
+    readable &&
+      pageviews !== undefined &&
+      pageviews > 0 &&
+      !situation.cantRead &&
+      !situation.budgetSpent &&
+      !situation.deploymentOff,
+  );
   const fetching = useIsFetching({ queryKey: analyticsKeys.all(siteId) }) > 0;
   const nodeTitle = useNodeTitle(siteId, filter?.kind === "node" ? filter.value : undefined);
   const settingsHref = settingsGate.allowed ? `/sites/${siteId}/settings#analytics` : undefined;
@@ -218,6 +229,15 @@ export function AnalyticsPage() {
             </Banner.Action>
           ) : undefined
         }
+      />,
+    );
+  if (bots.data && bots.data.data.level !== "none")
+    banners.push(
+      <BotTrafficBanner
+        key="bots"
+        scope={scope}
+        signal={bots.data.data}
+        onShowDay={(day) => setSearch({ range: undefined, ...searchForRange(day) })}
       />,
     );
   if (filter)

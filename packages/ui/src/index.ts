@@ -10,6 +10,11 @@
  */
 export * from "@cloudflare/kumo";
 export {
+  AnalyticsBotBanner,
+  type AnalyticsBotBannerLabels,
+  type AnalyticsBotBannerProps,
+} from "./blocks/AnalyticsBotBanner.tsx";
+export {
   type AnalyticsPlanHint,
   AnalyticsQuotaBanner,
   type AnalyticsQuotaBannerLabels,

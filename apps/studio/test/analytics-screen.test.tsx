@@ -5,7 +5,12 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnalyticsFeature, AnalyticsStatus, Role } from "../src/lib/api.ts";
+import type {
+  AnalyticsBotTraffic,
+  AnalyticsFeature,
+  AnalyticsStatus,
+  Role,
+} from "../src/lib/api.ts";
 import { AnalyticsPage } from "../src/routes/AnalyticsPage.tsx";
 import { INSTANCE, meFor, on, type Route, serve, wrap } from "./roles-fixtures.tsx";
 
@@ -88,6 +93,43 @@ const envelope = <T,>(data: T, extra: Record<string, unknown> = {}) => ({
 });
 
 const A = "/api/sites/site_1/analytics";
+
+const WINDOW = { from: "2026-10-05T10:00:00Z", to: "2026-10-12T10:00:00Z" };
+const QUIET: AnalyticsBotTraffic = {
+  level: "none",
+  reasons: [],
+  hour: "2026-10-11T14:00:00Z",
+  pageviews: 40,
+  baseline: 12,
+  window: WINDOW,
+};
+const FLOOD: AnalyticsBotTraffic = {
+  level: "likely",
+  hour: "2026-10-11T03:00:00Z",
+  pageviews: 4210,
+  baseline: 14,
+  window: WINDOW,
+  reasons: [
+    { code: "hourly_spike", detail: "…", value: 300.7, threshold: 10 },
+    { code: "direct_entrances", detail: "…", value: 0.97, threshold: 0.8 },
+    { code: "single_browser", detail: "…", value: 0.99, threshold: 0.95, key: "chrome" },
+    {
+      code: "single_page",
+      detail: "…",
+      value: 0.98,
+      threshold: 0.9,
+      key: "entry_AAAAAA01",
+      node: {
+        nodeId: "entry_AAAAAA01",
+        kind: "entry",
+        exists: true,
+        title: "Ferry timetables",
+        path: "/posts/ferries",
+        status: "published",
+      },
+    },
+  ],
+};
 const node = (id: string, kind: "entry" | "page", title: string, path: string) => ({
   nodeId: id,
   kind,
@@ -140,6 +182,7 @@ function analyticsServer(
     status?: { status: number; body?: unknown };
     summary?: (url: string) => { status: number; body?: unknown };
     feature?: AnalyticsFeature;
+    bots?: AnalyticsBotTraffic;
   } = {},
 ): Route[] {
   return [
@@ -187,6 +230,7 @@ function analyticsServer(
           })
         : undefined,
     (url) => (url.startsWith(`${A}/top/`) ? topReply(url) : undefined),
+    (url) => (url.startsWith(`${A}/bots`) ? envelope(opts.bots ?? QUIET) : undefined),
     (url) =>
       url.startsWith(`${A}/vitals`)
         ? envelope({
@@ -432,6 +476,76 @@ describe("AnalyticsPage", () => {
     expect(screen.queryByTestId("analytics-quota-banner")).toBeNull();
   });
 
+  it("warns about possible bot traffic: what, why, what to do, and the reasons", async () => {
+    const fetch = serve(...analyticsServer("owner", { bots: FLOOD }));
+    render(wrap(<AnalyticsPage />));
+    const banner = await screen.findByTestId("analytics-bot-banner");
+    expect(within(banner).getByText("Possible bot traffic")).toBeInTheDocument();
+    expect(banner).toHaveTextContent(
+      "4,210 page views arrived in the hour from Oct 11, 3:00 AM UTC, 300.7 times a usual hour.",
+    );
+    expect(banner).toHaveTextContent("may be inflated");
+    expect(banner).toHaveTextContent("set analytics.rateLimit in cloudhal.json");
+    // the reasons sit behind a disclosure
+    fireEvent.click(within(banner).getByRole("button", { name: "Why this warning" }));
+    expect(
+      await within(banner).findByText(
+        "97% of that hour's visits came without a referrer (typed in, or sent by a script). Warns from 80%.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(banner).getByText(
+        "99% of that hour's page views came from one browser, Chrome. Warns from 95%.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(banner).getByText("98% of that hour's page views were of one page: Ferry timetables."),
+    ).toBeInTheDocument();
+    expect(within(banner).getByText(/not proof/)).toBeInTheDocument();
+    // "Show that day" opens the burst's day (hourly, with its top pages and referrers)
+    fireEvent.click(within(banner).getByRole("button", { name: "Show that day" }));
+    const call = router.navigate.mock.calls.at(-1)?.[0] as { search: (p: object) => object };
+    expect(call.search({})).toMatchObject({ from: "2026-10-11", to: "2026-10-12" });
+    // the check is site-wide: sent with the range by name and no filter
+    expect(analyticsCalls(fetch).some(([u]) => String(u).endsWith("/bots?range=30d"))).toBe(true);
+  });
+
+  it("says 'unusual spike' for watch, nothing for none, and leaves out Show that day on that day", async () => {
+    router.search = { from: "2026-10-11", to: "2026-10-12" };
+    serve(
+      ...analyticsServer("owner", {
+        bots: { ...FLOOD, level: "watch", reasons: (FLOOD.reasons ?? []).slice(0, 3) },
+      }),
+    );
+    render(wrap(<AnalyticsPage />));
+    const banner = await screen.findByTestId("analytics-bot-banner");
+    expect(within(banner).getByText("Unusual spike in page views")).toBeInTheDocument();
+    expect(within(banner).queryByRole("button", { name: "Show that day" })).toBeNull();
+    cleanup();
+    router.search = {};
+    serve(...analyticsServer());
+    render(wrap(<AnalyticsPage />));
+    await screen.findByText("12,400");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId("analytics-bot-banner")).toBeNull();
+  });
+
+  it("does not ask for the bot check while live reads are unavailable", async () => {
+    const feature = { ...FEATURE, store: "wae" as const, reader: "none" as const };
+    const fetch = serve(
+      ...analyticsServer("owner", {
+        feature,
+        status: { status: 200, body: statusWith({ feature }) },
+        bots: FLOOD,
+      }),
+    );
+    render(wrap(<AnalyticsPage />));
+    await screen.findByText("12,400");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(analyticsCalls(fetch).some(([u]) => String(u).includes("/bots"))).toBe(false);
+    expect(screen.queryByTestId("analytics-bot-banner")).toBeNull();
+  });
+
   it("names a filter and clears it", async () => {
     router.search = { filter: "country:DE" };
     const fetch = serve(...analyticsServer());
@@ -454,5 +568,14 @@ describe("AnalyticsPage", () => {
     expect(await screen.findByText("12.400")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Trafik" })).toBeInTheDocument();
     expect((await screen.findAllByText("Yapay zekâ asistanları")).length).toBeGreaterThan(0);
+  });
+
+  it("warns about possible bot traffic in Turkish", async () => {
+    serve(...analyticsServer("owner", { bots: FLOOD }));
+    render(wrap(<AnalyticsPage />, "tr"));
+    const banner = await screen.findByTestId("analytics-bot-banner");
+    expect(within(banner).getByText("Olası bot trafiği")).toBeInTheDocument();
+    expect(banner).toHaveTextContent("4.210 sayfa görüntüleme");
+    expect(within(banner).getByRole("button", { name: "O günü göster" })).toBeInTheDocument();
   });
 });
