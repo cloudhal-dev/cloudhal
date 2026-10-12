@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx";
+import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -210,6 +211,7 @@ export function SiteOverviewPage() {
           </SectionCard>
         </div>
         <div className="grid min-w-0 content-start gap-6">
+          <OverviewAnalyticsCard siteId={siteId} />
           <SectionCard
             title={t("overview.status")}
             actions={
