@@ -19,7 +19,7 @@ import {
   HideThreadConfirm,
   useSetThread,
 } from "./CommentThreadControls.tsx";
-import { useGate, useSelf } from "./useMe.ts";
+import { useGate, useMe, useSelf } from "./useMe.ts";
 
 function summaryLabels(t: TFunction<"comments">): ArticleCommentsSummaryLabels {
   const c = "comments.editorCard" as const;
@@ -65,6 +65,7 @@ export function ArticleCommentsCard({
   const { t, locale } = useI18n("comments");
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false });
   const available = instance.data?.features.comments?.available === true;
+  const known = !useMe().isPending;
   const read = useGate("comments.read");
   const moderateOwn = useGate("comments.moderate");
   const moderateAny = useGate("comments.moderateAny");
@@ -74,7 +75,7 @@ export function ArticleCommentsCard({
   const thread = useQuery({
     queryKey: commentThreadKey(siteId, entry.id),
     queryFn: () => api.comments.thread(siteId, entry.id),
-    enabled: available && read.allowed && published,
+    enabled: known && available && read.allowed && published,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const setThread = useSetThread(siteId, entry.id);

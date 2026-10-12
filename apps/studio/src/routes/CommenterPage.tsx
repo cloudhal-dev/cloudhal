@@ -38,7 +38,7 @@ import { EditorLayout } from "../components/EditorLayout.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { useToast } from "../components/Toast.ts";
-import { useGate } from "../components/useMe.ts";
+import { useGate, useMe } from "../components/useMe.ts";
 import {
   ApiRequestError,
   api,
@@ -354,6 +354,8 @@ export function CommenterPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
+  // Gating is cosmetic, but commenter data is not even asked for before the role is known.
+  const known = !useMe().isPending;
   const data = useGate("commenters.data");
   const banGate = useGate("comments.moderateAny");
   const [banOpen, setBanOpen] = useState(false);
@@ -361,7 +363,7 @@ export function CommenterPage() {
   const who = useQuery({
     queryKey: commenterKey(siteId, commenterId),
     queryFn: () => api.comments.commenter(siteId, commenterId),
-    enabled: data.allowed,
+    enabled: known && data.allowed,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const comments: CommentView[] = [...(who.data?.comments ?? [])].sort((a, b) =>
@@ -371,7 +373,7 @@ export function CommenterPage() {
   const bans = useQuery({
     queryKey: [...commenterKey(siteId, commenterId), "bans", latest?.id ?? ""],
     queryFn: () => api.comments.bans(siteId, latest?.id),
-    enabled: data.allowed && banGate.allowed && latest !== undefined,
+    enabled: known && data.allowed && banGate.allowed && latest !== undefined,
   });
   const ban = activeBan(bans.data?.items ?? []);
   const refresh = () => qc.invalidateQueries({ queryKey: commentsKey(siteId) });

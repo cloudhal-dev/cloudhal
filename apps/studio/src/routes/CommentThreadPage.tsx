@@ -398,6 +398,7 @@ export function CommentThreadPage() {
   const toast = useToast();
   const qc = useQueryClient();
   const self = useSelf();
+  const known = !useMe().isPending;
   const read = useGate("comments.read");
   const moderateAny = useGate("comments.moderateAny");
   const moderateOwn = useGate("comments.moderate");
@@ -405,13 +406,13 @@ export function CommentThreadPage() {
   const entry = useQuery({
     queryKey: ["entry", siteId, nodeId],
     queryFn: () => api.entries.get(siteId, nodeId),
-    enabled: read.allowed,
+    enabled: known && read.allowed,
     retry: false,
   });
   const thread = useQuery({
     queryKey: commentThreadKey(siteId, nodeId),
     queryFn: () => api.comments.thread(siteId, nodeId),
-    enabled: read.allowed,
+    enabled: known && read.allowed,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const list = useInfiniteQuery({
@@ -425,7 +426,7 @@ export function CommentThreadPage() {
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor,
-    enabled: read.allowed,
+    enabled: known && read.allowed,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const comments = list.data?.pages.flatMap((p) => p.items) ?? [];

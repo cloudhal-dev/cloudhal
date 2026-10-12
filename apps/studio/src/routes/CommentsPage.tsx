@@ -57,7 +57,7 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { SettingRow } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
-import { useGate } from "../components/useMe.ts";
+import { useGate, useMe } from "../components/useMe.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import type { TFunction } from "../i18n/index.tsx";
 import {
@@ -302,6 +302,7 @@ export function CommentsPage() {
   const search = useSearch({ from: "/sites/$siteId/comments" });
   const navigate = useNavigate();
   const toast = useToast();
+  const known = !useMe().isPending;
   const read = useGate("comments.read");
   const moderateGate = useGate("comments.moderate");
   const tab: QueueTab = search.tab ?? "pending";
@@ -339,13 +340,13 @@ export function CommentsPage() {
         ...(cursor ? { cursor } : {}),
         limit: QUEUE_PAGE_SIZE,
       }),
-    enabled: read.allowed,
+    enabled: known && read.allowed,
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const entries = useQuery({
     queryKey: ["entries", siteId, "posts"],
     queryFn: () => api.entries.list(siteId, "posts"),
-    enabled: read.allowed,
+    enabled: known && read.allowed,
   });
   const approvals = usePendingApprovals(siteId);
   const requests = pendingCommentApprovals(approvals.data);
