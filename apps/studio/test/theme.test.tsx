@@ -1,4 +1,6 @@
+import { PageFrameProvider, usePageScrollRootRef } from "@cloudhal/ui";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsLayout, SettingsSection } from "../src/components/Settings.tsx";
 import { ThemeSwitch } from "../src/components/ThemeSwitch.tsx";
@@ -107,13 +109,71 @@ describe("SettingsLayout table of contents", () => {
     fireEvent.click(toc.getByRole("link", { name: "Domains" }));
     // The jump's own smooth scroll does not snap the selection back to "General".
     scroll();
-    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    await act(() => new Promise((r) => setTimeout(r, 100)));
     expect(toc.getByRole("link", { name: "Domains" })).toHaveAttribute("aria-current", "true");
     // A wheel turn hands the selection back to the scroll position.
     act(() => window.dispatchEvent(new Event("wheel")));
     scroll();
     await waitFor(() =>
       expect(toc.getByRole("link", { name: "General" })).toHaveAttribute("aria-current", "true"),
+    );
+  });
+
+  /** The app shell's content column: the page's scroll root (AppFrame registers it the same way). */
+  function Shell({ children }: { children: ReactNode }) {
+    return (
+      <div id="shell" ref={usePageScrollRootRef()}>
+        {children}
+      </div>
+    );
+  }
+
+  it("follows the shell's scrolling column, not the window", async () => {
+    // The column starts 100 px down; the line sits 96 px below its top.
+    tops = { shell: 100, general: 50, domains: 180, previews: 700 };
+    render(
+      <I18nProvider initialLocale="en">
+        <PageFrameProvider>
+          <Shell>
+            <SettingsLayout title="On this page" sections={SECTIONS}>
+              {SECTIONS.map((s) => (
+                <SettingsSection key={s.id} id={s.id} title={s.label} />
+              ))}
+            </SettingsLayout>
+          </Shell>
+        </PageFrameProvider>
+      </I18nProvider>,
+    );
+    const toc = within(screen.getByRole("navigation", { name: "On this page" }));
+    const shell = document.getElementById("shell") as HTMLElement;
+    const geometry = (scrollTop: number) => {
+      for (const [key, value] of Object.entries({
+        scrollTop,
+        clientHeight: 600,
+        scrollHeight: 2000,
+      }))
+        Object.defineProperty(shell, key, { value, configurable: true });
+    };
+    geometry(300);
+    await waitFor(() =>
+      expect(toc.getByRole("link", { name: "Domains" })).toHaveAttribute("aria-current", "true"),
+    );
+
+    // The window never scrolls in the shell: its events change nothing.
+    tops = { shell: 100, general: -900, domains: -500, previews: 150 };
+    act(() => window.dispatchEvent(new Event("scroll")));
+    await act(() => new Promise((r) => setTimeout(r, 100)));
+    expect(toc.getByRole("link", { name: "Domains" })).toHaveAttribute("aria-current", "true");
+
+    // The column's own scroll moves the selection; at its end the last section is current.
+    tops = { shell: 100, general: -1200, domains: -700, previews: 400 };
+    geometry(1400);
+    act(() => shell.dispatchEvent(new Event("scroll")));
+    await waitFor(() =>
+      expect(toc.getByRole("link", { name: "Preview links" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      ),
     );
   });
 });
