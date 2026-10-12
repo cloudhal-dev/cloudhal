@@ -87,10 +87,12 @@ describe("MCP client ↔ Cloudhal server", () => {
     const uris = resources.map((r) => r.uri).sort();
     expect(uris).toEqual(
       expect.arrayContaining([
+        "skill://comment-triage/SKILL.md",
         "skill://publish-article/SKILL.md",
         "skill://rollback/SKILL.md",
         "skill://safe-edit/SKILL.md",
         "skill://site-bootstrap/SKILL.md",
+        "skill://stale-review/SKILL.md",
       ]),
     );
     expect(uris).toContain("skill://publish-article/references/editorial-checklist.md");
