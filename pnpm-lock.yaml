@@ -859,6 +859,9 @@ importers:
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
+      '@cloudhal/schedules':
+        specifier: workspace:*
+        version: link:../schedules
       '@cloudhal/storage':
         specifier: workspace:*
         version: link:../storage
