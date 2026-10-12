@@ -3,6 +3,8 @@
 pub mod analytics_beacon;
 pub mod analytics_event;
 pub mod asset;
+pub mod comment;
+pub mod comment_submission;
 pub mod content_entry;
 pub mod menu;
 pub mod page;

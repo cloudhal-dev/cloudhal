@@ -1,0 +1,29 @@
+{
+  "reason": "Confidence is an integer percentage (round-trips exactly)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "cmt_01HZX8K3Q9AA",
+    "siteId": "site_01HZX8K3Q9ST",
+    "nodeId": "entry_01HZX8K3Q9FT",
+    "source": "native",
+    "author": {
+      "kind": "guest",
+      "name": "Ayşe Yılmaz"
+    },
+    "body": {
+      "format": "text",
+      "text": "Thanks for the ferry timetable. Does the 07:40 run on Sundays too?"
+    },
+    "status": "pending",
+    "createdAt": "2026-10-12T08:14:03Z",
+    "rev": 0,
+    "labels": [
+      {
+        "label": "toxic",
+        "source": "classifier",
+        "confidence": 0.93,
+        "at": "2026-10-12T08:14:03Z"
+      }
+    ]
+  }
+}

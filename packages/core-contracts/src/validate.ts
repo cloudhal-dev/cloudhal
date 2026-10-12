@@ -4,6 +4,8 @@ import type {
   AnalyticsBeacon,
   AnalyticsEvent,
   Asset,
+  Comment,
+  CommentSubmission,
   ContentEntry,
   Menu,
   Page,
@@ -34,6 +36,8 @@ export interface ContractTypes {
   menu: Menu;
   "analytics-event": AnalyticsEvent;
   "analytics-beacon": AnalyticsBeacon;
+  comment: Comment;
+  "comment-submission": CommentSubmission;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -51,6 +55,8 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   menu: v.validateMenu,
   "analytics-event": v.validateAnalyticsEvent,
   "analytics-beacon": v.validateAnalyticsBeacon,
+  comment: v.validateComment,
+  "comment-submission": v.validateCommentSubmission,
 };
 
 export class ContractValidationError extends Error {
