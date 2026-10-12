@@ -106,7 +106,7 @@ export function vitalsCostPercent(oneIn: AnalyticsVitalsOneIn): number {
 export type AnalyticsDeploymentState = "off" | "cantRead" | "ready";
 
 export function deploymentState(feature: AnalyticsFeature | undefined): AnalyticsDeploymentState {
-  if (!feature || !feature.enabled || feature.store === "none") return "off";
+  if (!feature?.enabled || feature.store === "none") return "off";
   return feature.reader === "none" ? "cantRead" : "ready";
 }
 
