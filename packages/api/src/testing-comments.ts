@@ -597,13 +597,20 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
         ).status,
       ).toBe(409);
 
+      // JSON lines are data to import again, not a spreadsheet: formula-like text is kept as is
+      // (only CSV exports prefix such cells with ', RFC-0007 §11.2 point 6)
+      const formula = await seed('=HYPERLINK("https://evil.example","Click")');
       const ex = await call(`${CM()}/export`, "editor");
       const lines = ex.text
         .trim()
         .split("\n")
         .map((l) => JSON.parse(l) as Json);
       expect(lines[0]).toMatchObject({ cloudhal: "comments", version: 1, siteId });
-      expect(lines.slice(1).map((l) => l.id)).toHaveLength(3);
+      expect(lines.slice(1).map((l) => l.id)).toHaveLength(4);
+      expect(lines.find((l) => l.id === formula.id)?.body).toEqual({
+        format: "text",
+        text: '=HYPERLINK("https://evil.example","Click")',
+      });
       expect(ex.text).not.toContain("spam@example.com");
       const personal = await call(`${CM()}/export?personal=1`, "editor");
       expect(personal.text).toContain("spam@example.com");
