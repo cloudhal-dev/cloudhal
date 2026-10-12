@@ -8,10 +8,11 @@ cloudhal build [--snapshot <id>]                        static HTML from the pub
 cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp) for this project
 cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                         MCP server over stdio for this project
-cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu]
+cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--force-downgrade]
                                                         site + admin Workers on Cloudflare
 cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
-cloudhal push [--replace] [--admin-url <url>]           local site → deployment
+cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
+                                                        local site → deployment
 cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
 cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
                                                         entry tags → tag terms (RFC-0002)
@@ -25,7 +26,35 @@ cloudhal comments status [--remote]                     reader comments (RFC-000
 cloudhal comments export [--remote] [--with-personal-data --out <file>]
                                                         comments as JSON lines
 cloudhal comments import --in <file> [--remote]         idempotent; safe to run again
+cloudhal schedules status [--remote]                    schedules (RFC-0008): scheduler health, open releases, gates
+cloudhal schedules list [--remote] [--limit <n>]        the site's releases
+cloudhal schedules run-due [--remote]                   one scheduler tick now
 ```
+
+### Schedules (RFC-0008)
+
+Releases, embargoes and expiries, time zones, automations, recipes for scheduled agents and the Free-plan notes: [schedules](../../docs/guides/schedules.md).
+
+**On Cloudflare.** `cloudhal deploy` gives the admin Worker one cron trigger, **every minute** (`* * * * *`): the scheduler's tick, which also runs the analytics rollup and the comments job behind hourly watermarks (at :17). It always declares the SQLite-backed `SchedulerClock` Durable Object (binding `SCHEDULER_CLOCK`, migration `v1`) and sets `CLOUDHAL_SCHEDULER`:
+- `cron` (default): the trigger ticks;
+- `alarm`: when Cloudflare refuses the trigger because the account's cron triggers are used up (Workers Free allows 5), the deploy goes on without it and the Durable Object's alarm ticks instead. The choice is kept in `.cloudhal/deploy/state.json`; `--scheduler cron` tries the trigger again, `--scheduler alarm` chooses the clock up front. Deployments that had `CLOUDHAL_ANALYTICS_CRON=off` or `CLOUDHAL_COMMENTS_CRON=off` move to `alarm` and lose those variables.
+
+Every admin request is also a backstop: when the heartbeat is more than two minutes behind, it runs a tick in the background. The migration `0017_schedules` runs on the admin Worker's first request.
+
+**Guards.**
+- `deploy` refuses to deploy code with a lower schedules level (`cloudhal.schedulesLevel` of `@cloudhal/core-ts`) over a deployment that has open releases or gated pages and entries: older code ignores holds and gates. `--force-downgrade` overrides it.
+- `push` refuses while the deployment has open releases (their pinned versions point into the graph a push replaces); `--cancel-schedules` cancels them first.
+
+**Variables `deploy` does not set (yet).** The admin Worker reads `CLOUDHAL_AUTOMATIONS=off` (automations stop; releases and gates go on) and `CLOUDHAL_TICK_BUDGET=paid` (Workers Paid's tick budget: 900 statements and up to 50 releases per tick instead of 40 and 1). Set them in the Cloudflare dashboard; a later deploy rewrites the Worker's variables.
+
+**Commands:**
+- `cloudhal schedules status [--remote]`: the scheduler's mode and state (`running`, `late`, `stopped`, `unknown`), the last tick and the next wake, the code's schedules level, and each site's open releases and gated pages and entries.
+- `cloudhal schedules list [--remote] [--limit <n>]`: the site's releases with their state, time and number of items.
+- `cloudhal schedules run-due [--remote]`: one tick now. A self-hosted server without a long-running Cloudhal process runs it from the system's cron every minute.
+
+`--remote` uses the deployment token and the operator routes `/api/admin/schedules/status|run-due` and `/api/admin/sites/:siteId/schedules/releases`.
+
+**Locally.** `cloudhal dev`, `cloudhal studio` and `cloudhal mcp` run the same tick on a timer of at most 60 seconds, with a catch-up tick at start; several of them on one project are safe.
 
 ### Reader comments (RFC-0007)
 
@@ -43,7 +72,7 @@ Comments are **available** on a deployment unless `cloudhal.json` says otherwise
 **On Cloudflare.** `cloudhal deploy`:
 - generates `CLOUDHAL_COMMENTS_KEY` once into `.cloudhal/deploy/secrets.json` (0600) and gives it to **both** Workers through `--secrets-file`; it is never printed or written into a config. Losing it makes stored emails and the Turnstile secret unreadable;
 - sets `CLOUDHAL_COMMENTS_AVAILABLE` on the admin Worker;
-- keeps the hourly cron trigger (`17 * * * *`) for comments even when analytics are off. Without a free cron slot the admin Worker goes without it (`CLOUDHAL_COMMENTS_CRON=off`) and runs the comments job after requests, at most hourly;
+- runs the hourly comments job on the scheduler's minute tick (behind an hourly watermark), even when analytics are off; without a free cron slot the tick is the `SchedulerClock` alarm ([Schedules](#schedules-rfc-0008));
 - sets `CLOUDHAL_SITE_HOSTS` for a custom domain and, with `comments.rateLimit`, adds `COMMENTS_RL`;
 - purges the site's cache once when availability changes.
 
@@ -67,7 +96,7 @@ The migration `0016_comments` runs on the admin Worker's first request. Existing
 
 `--remote` uses the deployment token and the operator routes `/api/admin/sites/:siteId/comments/status|export|import`; each call is audited as the operator.
 
-**Locally.** `cloudhal dev` takes comments on the project's SQLite. The key is `CLOUDHAL_COMMENTS_KEY` from the environment, or `.cloudhal/comments.key` (random, created on first use, 0600). `cloudhal studio` and `cloudhal mcp` use the same store. Node has no cron, so they run the hourly comments job (retention, comments of deleted articles, threads closed by time, old salts) at start and every hour, and empty the local purge queue (there is no edge cache).
+**Locally.** `cloudhal dev` takes comments on the project's SQLite. The key is `CLOUDHAL_COMMENTS_KEY` from the environment, or `.cloudhal/comments.key` (random, created on first use, 0600). `cloudhal studio` and `cloudhal mcp` use the same store. Node has no cron, so their scheduler tick runs the hourly comments job (retention, comments of deleted articles, threads closed by time, old salts) behind its watermark, and they empty the local purge queue (there is no edge cache).
 
 ### Site analytics (RFC-0006)
 
@@ -93,9 +122,9 @@ Each published page carries one first-party script (`/_cloudhal/p.<hash>.js`, un
 
 **On Cloudflare.** With analytics on, `cloudhal deploy` adds:
 - to the site Worker, the WAE dataset `<deployment>_events` (binding `ANALYTICS`; Cloudflare creates the dataset on the first write) and the vars `CLOUDHAL_ANALYTICS=on`, `CLOUDHAL_ANALYTICS_DEFAULTS` and, with a custom domain, `CLOUDHAL_SITE_HOSTS`;
-- to the admin Worker, the Analytics SQL binding (`ANALYTICS_SQL`), the vars `CLOUDHAL_ANALYTICS_DATASET`, `CLOUDHAL_ANALYTICS_BUDGET` and `CLOUDHAL_ANALYTICS_DEFAULTS`, and an hourly cron trigger (`17 * * * *`) that rolls finished days into D1, deletes old daily salts and applies retention.
+- to the admin Worker, the Analytics SQL binding (`ANALYTICS_SQL`), the vars `CLOUDHAL_ANALYTICS_DATASET`, `CLOUDHAL_ANALYTICS_BUDGET` and `CLOUDHAL_ANALYTICS_DEFAULTS`, and the hourly rollup on the scheduler's minute tick (behind a watermark at :17), which rolls finished days into D1, deletes old daily salts and applies retention.
 
-It needs **wrangler 4.145 or newer** (the `analytics` config key); the deploy stops and says so when the project's wrangler is older. The migration `0014_analytics` runs on the admin Worker's first request. When analytics switch on or off, the deploy purges the site's cache once so pages gain or lose the script tag. Workers Free allows 5 cron triggers per account: when none is free, the admin Worker is deployed without one (`CLOUDHAL_ANALYTICS_CRON=off`) and daily totals are computed when someone opens Analytics; every later deploy tries the trigger again.
+It needs **wrangler 4.145 or newer** (the `analytics` config key); the deploy stops and says so when the project's wrangler is older. The migration `0014_analytics` runs on the admin Worker's first request. When analytics switch on or off, the deploy purges the site's cache once so pages gain or lose the script tag. Workers Free allows 5 cron triggers per account: when none is free, the admin Worker is deployed without one and the `SchedulerClock` Durable Object's alarm runs the tick instead, so daily totals are still rolled up on schedule ([Schedules](#schedules-rfc-0008)).
 
 **Turning it on for an existing deployment.** Projects from before analytics have no `analytics` key. The next interactive `cloudhal deploy` asks once ("Turn on cookie-less analytics for <site>? (Y/n)") and writes the answer to `cloudhal.json`; a non-interactive deploy (CI) keeps analytics off and prints how to turn them on. To decide up front, add `"analytics": { "enabled": true }` (or `false`) and deploy. Adding a script to a live site changes what its privacy policy must say, so update it first ([guide](../../docs/guides/analytics-privacy.md#a-paragraph-for-your-privacy-policy)). Agent keys created before analytics do not get `analytics:read` automatically; allow it per key on Studio's Agents page.
 
@@ -107,7 +136,7 @@ It needs **wrangler 4.145 or newer** (the `analytics` config key); the deploy st
 | WAE writes | 100,000/day | 10 M/month included, then $0.25 per million |
 | WAE queries | 10,000/day | 1 M/month included, then $1.00 per million |
 | D1 rows written | 100,000/day (rollups use ≈ 200–2,200 a day) | see [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) |
-| Cron triggers | 5 per account | see [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
+| Cron triggers | 5 per account (Cloudhal uses one, or a Durable Object alarm) | see [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
 
 Each page view adds one Worker request (the beacon) plus one per sampled vitals view; the script itself is a free static asset. Rough sizes, assuming about 3 cached asset requests per page: a site with 1,000 views a day uses about 5 % of Free's requests; at 20,000 views a day a Free account is over its limit with or without analytics (Free carries about 25,000 views a day without analytics and 19,000 with, 21,000 with vitals off); 200,000 views a day needs Paid, about $11–12 a month in total, of which about $2.20 is analytics. On Free, Studio warns when yesterday's traffic approaches the limit (set "Cloudflare plan" in Site settings › Analytics). Whether the Analytics SQL binding works on Workers Free, and whether its queries count against the 10,000 a day, is not verified yet ([RFC-0006](../../docs/rfcs/0006-site-analytics.md) step 0): if it does not, visits are still recorded and Studio says it can't read them yet.
 
