@@ -1,7 +1,7 @@
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { useI18n } from "../i18n/index.tsx";
+import { loadNamespace, useI18n } from "../i18n/index.tsx";
 import { api, isNotEnabled, type NotificationsPage, type StudioNotification } from "../lib/api.ts";
 import {
   browserPermission,
@@ -11,6 +11,7 @@ import {
   extendTargetOf,
   freshNotifications,
   isCommentNotification,
+  isScheduleNotification,
   liveNotifications,
   notificationHref,
   notificationsPollInterval,
@@ -56,7 +57,9 @@ const baselined = new WeakSet<QueryClient>();
 function useDescribe() {
   const { t, locale } = useI18n();
   const shortDuration = useShortDuration();
-  return (item: StudioNotification) => {
+  return (item: StudioNotification): { title: string; body: string } | undefined => {
+    // Schedule notices are worded by a module that loads with them (`lib/schedule-notices.ts`).
+    if (isScheduleNotification(item)) return undefined;
     if (isCommentNotification(item)) return commentNotice(t, locale, item);
     if (item.kind === "elevation-ending") {
       const p = endingParams(t, locale, item);
@@ -94,14 +97,14 @@ function useDescribe() {
  */
 export function useNotificationAlerts(page: NotificationsPage | undefined) {
   const qc = useQueryClient();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const extend = useExtendElevation();
   const describe = useDescribe();
   // The latest callbacks, so the effect runs on new data only.
-  const latest = useRef({ toast, navigate, extend: extend.mutate, describe, t });
-  latest.current = { toast, navigate, extend: extend.mutate, describe, t };
+  const latest = useRef({ toast, navigate, extend: extend.mutate, describe, t, locale });
+  latest.current = { toast, navigate, extend: extend.mutate, describe, t, locale };
 
   useEffect(() => {
     if (!page) return;
@@ -134,7 +137,9 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
       void qc.invalidateQueries({ queryKey: ["me"] });
       void qc.invalidateQueries({ queryKey: ["agent-keys"] });
     }
-    const { toast, navigate, extend, describe, t } = latest.current;
+    // A release ran, moved or stopped (RFC-0008 §14): the calendar and the release are stale.
+    if (fresh.some(isScheduleNotification)) void qc.invalidateQueries({ queryKey: ["schedules"] });
+    const { toast, navigate, extend, describe, t, locale } = latest.current;
     const go = (href: string) => {
       const target = splitHref(href);
       return navigate({
@@ -148,8 +153,31 @@ export function useNotificationAlerts(page: NotificationsPage | undefined) {
       permission: browserPermission(),
       visibility: document.visibilityState,
     });
+    // Schedule notices bring their own words: the module and the namespace load first.
+    const schedules = fresh.filter(isScheduleNotification);
+    if (schedules.length > 0)
+      void Promise.all([
+        import("../lib/schedule-notices.ts"),
+        loadNamespace("schedules", locale),
+      ]).then(([{ scheduleNotice }]) => {
+        for (const item of schedules) {
+          const notice = scheduleNotice(t as never, locale, item);
+          const href = notificationHref(item);
+          toast.notice({
+            id: item.id,
+            title: notice.title,
+            description: notice.body,
+            tone: notice.tone,
+            actions: [{ label: notice.action, onClick: () => void go(href) }],
+          });
+          if (system)
+            raiseBrowserNotification(item.id, notice.title, notice.body, () => void go(href));
+        }
+      });
     for (const item of fresh) {
-      const { title, body } = describe(item);
+      const words = describe(item);
+      if (!words) continue;
+      const { title, body } = words;
       const href = notificationHref(item);
       const actions: ToastAction[] = [];
       if (item.kind === "elevation-ending") {

@@ -14,12 +14,15 @@ export const BUNDLE_BUDGET = {
   /**
    * The entry chunk alone, minified bytes. 287 kB on 2026-10-12 with the top bar's theme menu
    * (light / dark / system: its Sun, Moon and Desktop icons ship every Phosphor weight, ~8.5 kB),
-   * which every screen shows (was 276 kB under a 280 kB budget).
+   * which every screen shows (was 276 kB under a 280 kB budget). 283.5 kB on 2026-10-13 with the
+   * schedule routes, nav and bell: the command palette loads with its first opening and the
+   * shell's comment and avatar helpers moved out of their screens' modules.
    */
   entryBytes: 290_000,
   /**
    * Entry + its static imports, gzip bytes. 456 kB on 2026-10-12, once the analytics wording
-   * moved to lazy message namespaces (was 466 kB under a 480 kB budget).
+   * moved to lazy message namespaces (was 466 kB under a 480 kB budget). 466.5 kB on 2026-10-13
+   * with schedules (467.2 kB before them).
    */
   initialGzipBytes: 470_000,
 };
@@ -37,10 +40,14 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](Schedule[A-Za-z]*|Calendar(Month|Nav)|AgendaList|TimezoneNote|DateTimeField|RecurrenceEditor|NextRuns|RescheduleDialog|schedule-model|recurrence)\.tsx?$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]analytics\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Analytics[A-Za-z]*|Readers)\.tsx$/,
-  // Comment screens' own components and the settings model (the shell keeps `lib/comments.ts`,
+  // Comment screens' own components and the settings model (the shell keeps `lib/comments-shell.ts`,
   // the router's search helpers and the bell's words).
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Comment[A-Za-z]*|ArticleCommentsCard)\.tsx$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/]comment-settings\.ts$/,
+  // Schedule screens' own code: the client, the model, the notices' words, the dialogs and cards
+  // (the shell keeps `api.scheduler`, the router's `schedules-search.ts` and the nav entry).
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](schedules|schedules-api|schedule-notices)\.ts$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Schedule[A-Za-z]*|Schedules|Automation[A-Za-z]*|Release[A-Za-z]*)\.tsx$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
 ];

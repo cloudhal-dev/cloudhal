@@ -30,7 +30,7 @@ import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { pendingCommentsCount } from "../lib/comments.ts";
+import { pendingCommentsCount } from "../lib/comments-shell.ts";
 
 /** Site surface: sidebar scoped to one site, with the site switcher in the header. */
 export function SiteShell() {
@@ -64,6 +64,17 @@ export function SiteShell() {
   const comments = instance.data?.features.comments?.available === true && canReadComments;
   const notifications = useNotifications();
   const pendingComments = pendingCommentsCount(notifications.data?.items, siteId);
+  // Releases needing someone (RFC-0008 §15.1): conflict, missed, failed, approval due — from the
+  // bell's own poll, so the badge costs no request of its own.
+  const scheduleAttention = (notifications.data?.items ?? []).filter(
+    (i) =>
+      "releaseId" in i &&
+      i.siteId === siteId &&
+      (i.kind === "schedule-conflict" ||
+        i.kind === "schedule-missed" ||
+        i.kind === "schedule-failed" ||
+        i.kind === "schedule-approval-due"),
+  ).length;
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -140,6 +151,21 @@ export function SiteShell() {
           },
         ]
       : []),
+    {
+      id: "schedules",
+      label: t("commands.goSchedules"),
+      run: () => navigate({ to: "/sites/$siteId/schedules", params: { siteId } }),
+    },
+    {
+      id: "new-schedule",
+      label: t("commands.newSchedule"),
+      run: () =>
+        navigate({
+          to: "/sites/$siteId/schedules",
+          params: { siteId },
+          search: { new: "publish" },
+        }),
+    },
     {
       id: "navigation",
       label: t("commands.goNavigation"),
@@ -342,9 +368,16 @@ export function SiteShell() {
                   </Sidebar.CollapsibleContent>
                 </Sidebar.Collapsible>
               </Sidebar.MenuItem>
-              <Sidebar.MenuButton icon={CalendarDots} tooltip={t("nav.schedules")} disabled>
+              <Sidebar.MenuButton
+                icon={CalendarDots}
+                href={`${base}/schedules`}
+                active={is(`${base}/schedules`)}
+                tooltip={t("nav.schedules")}
+              >
                 {t("nav.schedules")}
-                <Sidebar.MenuBadge>{t("nav.soon")}</Sidebar.MenuBadge>
+                {scheduleAttention > 0 && (
+                  <Sidebar.MenuBadge>{scheduleAttention}</Sidebar.MenuBadge>
+                )}
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>

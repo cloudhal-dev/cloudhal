@@ -16,7 +16,7 @@ import {
 import { Article, FileText, Plus, TerminalWindow } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { CommentsWaitingBanner } from "../components/CommentsWaitingBanner.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -25,8 +25,13 @@ import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
-import { useT } from "../i18n/index.tsx";
+import { useT, withMessages } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+
+// "Scheduled work is not running" (RFC-0008 §8.7): its words load only when it shows.
+const SchedulerStalledBanner = lazy(() =>
+  withMessages(import("../components/SchedulerStalled.tsx"), ["schedules"]),
+);
 
 export function SiteOverviewPage() {
   const t = useT();
@@ -34,6 +39,9 @@ export function SiteOverviewPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  const scheduler = useQuery({ queryKey: ["scheduler"], queryFn: api.scheduler, retry: false });
+  const s = scheduler.data;
+  const stalled = !!s && !s.healthy && (s.state !== "unknown" || s.dueWithin24h);
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
   const entries = useQuery({
     queryKey: ["entries", siteId, "posts"],
@@ -106,6 +114,11 @@ export function SiteOverviewPage() {
       }
     >
       <PendingApprovalsBanner siteId={siteId} />
+      {stalled ? (
+        <Suspense fallback={null}>
+          <SchedulerStalledBanner siteId={siteId} status={s} />
+        </Suspense>
+      ) : null}
       <CommentsWaitingBanner siteId={siteId} />
       <ErrorBanner error={site.error ?? pages.error ?? entries.error ?? createPage.error} />
       <Columns variant="2-1">

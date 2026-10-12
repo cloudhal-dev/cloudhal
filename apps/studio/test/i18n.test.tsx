@@ -25,6 +25,10 @@ import { messages as commentsSettingsEn } from "../src/i18n/lazy/commentsSetting
 import { messages as commentsSettingsTr } from "../src/i18n/lazy/commentsSettings.tr.ts";
 import { messages as readersEn } from "../src/i18n/lazy/readers.en.ts";
 import { messages as readersTr } from "../src/i18n/lazy/readers.tr.ts";
+import { messages as scheduleSettingsEn } from "../src/i18n/lazy/scheduleSettings.en.ts";
+import { messages as scheduleSettingsTr } from "../src/i18n/lazy/scheduleSettings.tr.ts";
+import { messages as schedulesEn } from "../src/i18n/lazy/schedules.en.ts";
+import { messages as schedulesTr } from "../src/i18n/lazy/schedules.tr.ts";
 import { tr } from "../src/i18n/tr.ts";
 
 afterEach(cleanup);
@@ -67,6 +71,8 @@ describe("lazy message namespaces", () => {
     comments: [commentsEn, commentsTr],
     commentsSettings: [commentsSettingsEn, commentsSettingsTr],
     readers: [readersEn, readersTr],
+    scheduleSettings: [scheduleSettingsEn, scheduleSettingsTr],
+    schedules: [schedulesEn, schedulesTr],
   } as const;
 
   // The setup file loads every namespace; these tests start from nothing and restore it.
@@ -93,6 +99,8 @@ describe("lazy message namespaces", () => {
     for (const [enModule, trModule] of [
       [commentsEn, commentsTr],
       [commentsSettingsEn, commentsSettingsTr],
+      [schedulesEn, schedulesTr],
+      [scheduleSettingsEn, scheduleSettingsTr],
     ] as const) {
       const english = new Map(flat(enModule));
       // Placeholders, product names and codes may stay as they are; sentences may not.
@@ -104,6 +112,8 @@ describe("lazy message namespaces", () => {
     }
     expect(commentsTr.comments.title).toBe("Yorumlar");
     expect(commentsTr.comments.words.untrustedTitle).toBe("Güvenilmeyen okur metni");
+    expect(schedulesTr.schedules.title).toBe("Zamanlamalar");
+    expect(schedulesTr.schedules.calendar.nav.views.agenda).toBe("Ajanda");
   });
 
   it("loads a namespace when a component asks for it, without ever showing its keys", async () => {

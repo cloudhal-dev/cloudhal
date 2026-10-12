@@ -45,6 +45,12 @@ import {
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
 import { EditorPreview } from "../components/EditorPreview.tsx";
+import {
+  isScheduleError,
+  ScheduleAction,
+  ScheduleAside,
+  ScheduleLock,
+} from "../components/EditorSchedule.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { ImageRefField } from "../components/MediaPicker.tsx";
@@ -244,12 +250,15 @@ export function PageEditorPage() {
   const menuRefs = useMenuReferences(siteId, { kind: "page", id: pageId });
   const [removeIndex, setRemoveIndex] = useState<number | undefined>();
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
+  // A release holds this page (RFC-0008 §6.2): it publishes as pinned, so the form is locked.
+  const [locked, setLocked] = useState(false);
   useEffect(() => {
     if (query.data) setDraft(query.data);
   }, [query.data]);
   const dirty = isDirty(draft, query.data);
   // Pages are structure: Editors and above; others read them (RFC-0005 §2.2, DESIGN.md §2s).
   const readOnlyReason = useGate("pages.write").reason;
+  const lockedReason = locked ? t("editor.locked") : undefined;
   const save = useMutation({
     mutationFn: (page: Page) => api.pages.update(cleanSeo(page)),
     onSuccess: async (saved) => {
@@ -384,7 +393,7 @@ export function PageEditorPage() {
             onPublish={() => {
               if (valid()) setPublishOpen(true);
             }}
-            readOnlyReason={readOnlyReason}
+            readOnlyReason={readOnlyReason ?? lockedReason}
             menu={
               readOnlyReason ? (
                 // Disabled items take no pointer events, so the tooltip hangs on a wrapper.
@@ -412,14 +421,27 @@ export function PageEditorPage() {
               )
             }
           />
+          <ScheduleAction
+            siteId={siteId}
+            node={{ id: draft.id, kind: "page", title: draft.title, status: draft.status }}
+            dirty={dirty}
+            prepare={() =>
+              // Scheduling publishes it at that time: mark it Published and save what is unsaved.
+              dirty || draft.status !== "published"
+                ? save.mutateAsync({ ...draft, status: "published" })
+                : undefined
+            }
+            disabled={readOnlyReason !== undefined || locked}
+            reason={readOnlyReason ?? lockedReason}
+          />
           <Button
             variant="primary"
             onClick={() => {
               if (valid()) save.mutate(draft);
             }}
             loading={save.isPending}
-            disabled={!dirty || readOnlyReason !== undefined}
-            title={readOnlyReason}
+            disabled={!dirty || readOnlyReason !== undefined || locked}
+            title={readOnlyReason ?? lockedReason}
             data-testid="save"
           >
             {t("common.save")}
@@ -427,8 +449,13 @@ export function PageEditorPage() {
         </>
       }
     >
-      <ErrorBanner error={save.error ?? remove.error ?? duplicate.error} />
+      <ErrorBanner
+        error={
+          (isScheduleError(save.error) ? undefined : save.error) ?? remove.error ?? duplicate.error
+        }
+      />
       <ViewOnlyBanner reason={readOnlyReason} />
+      <ScheduleLock siteId={siteId} nodeId={draft.id} dirty={dirty} onLockChange={setLocked} />
       <EditorLayout
         previewVisible={previewVisible}
         preview={
@@ -442,9 +469,9 @@ export function PageEditorPage() {
         main={
           // Read-only for roles below Editor: one disabled fieldset turns every field off (§2s).
           <fieldset
-            disabled={readOnlyReason !== undefined}
+            disabled={readOnlyReason !== undefined || locked}
             className="grid min-w-0 content-start gap-6"
-            data-read-only={readOnlyReason ? "true" : undefined}
+            data-read-only={readOnlyReason || locked ? "true" : undefined}
           >
             <SectionCard title={t("editor.page")}>
               <Grid variant="2up" gap="none" className={FIELD_ROW}>
@@ -538,6 +565,17 @@ export function PageEditorPage() {
         }
         aside={
           <>
+            <ScheduleAside
+              siteId={siteId}
+              nodeId={draft.id}
+              kind="page"
+              availability={draft.availability}
+              onChange={(availability) =>
+                setDraft(setOptional(draft, "availability", availability))
+              }
+              saveError={save.error}
+              disabled={readOnlyReason !== undefined || locked}
+            />
             <ReadersCard siteId={siteId} node={query.data ?? draft} kind="page" />
             <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
             <DetailsCard

@@ -25,7 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ModeBadge } from "../components/AgentModes.tsx";
 import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
@@ -46,7 +46,7 @@ import { useToast } from "../components/Toast.ts";
 import { useMe, useMemberRoles, useRoleRules, useSelf } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
-import { type TFunction, useI18n, useT } from "../i18n/index.tsx";
+import { type TFunction, useI18n, useT, withMessages } from "../i18n/index.tsx";
 import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
 import {
   type Approval,
@@ -68,6 +68,13 @@ import {
   splitApprovals,
 } from "../lib/approvals.ts";
 import { commentRequestOf, commentsKey } from "../lib/comments.ts";
+
+// Release and embargo requests (RFC-0008 §10.4) bring the schedule words and parts with them.
+const ReleaseRequestDetails = lazy(() =>
+  withMessages(import("../components/ReleaseApproval.tsx"), ["schedules"]).then((m) => ({
+    default: m.ReleaseRequestDetails,
+  })),
+);
 
 type Decision = "approve" | "deny";
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -167,6 +174,7 @@ function PendingRequest({
   now,
   who,
   role,
+  siteId,
 }: {
   request: Approval;
   busy: Decision | undefined;
@@ -177,6 +185,7 @@ function PendingRequest({
   who: Requester;
   /** The requester's staff role, when a person asked. */
   role: Role | undefined;
+  siteId: string;
 }) {
   const t = useT();
   const promptText = usePromptText();
@@ -191,6 +200,7 @@ function PendingRequest({
   const byRole = request.cause === "role";
   // Agents' comment requests (RFC-0007 §10.3): in words, the drafted reply quoted as plain text.
   const comment = commentRequestOf(request) !== undefined;
+  const scheduleRequest = !!request.releaseId || request.tool === "lift_embargo";
   // Older servers omit `canDecide`: everyone could decide there.
   const blocked = request.canDecide === false;
   const reason = blocked ? decideReason(request, who) : undefined;
@@ -234,7 +244,12 @@ function PendingRequest({
           )}
         </div>
       </div>
-      {comment ? (
+      {scheduleRequest ? (
+        // A release or an embargo (RFC-0008 §10.4): the release itself, never the server's sentence.
+        <Suspense fallback={<SkeletonLine minWidth={30} maxWidth={60} />}>
+          <ReleaseRequestDetails siteId={request.siteId ?? siteId} request={request} />
+        </Suspense>
+      ) : comment ? (
         <CommentRequestDetails request={request} />
       ) : byRole ? (
         // A person asked for more than their role does alone (RFC-0005 §6): say it in words.
@@ -671,6 +686,7 @@ export function ApprovalsPage() {
                       now={now}
                       who={whoFor(r)}
                       role={roles.get(r.actor.id)}
+                      siteId={siteId}
                     />
                   ))}
                 </div>

@@ -17,6 +17,8 @@ import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.
 import type { messages as comments } from "./lazy/comments.en.ts";
 import type { messages as commentsSettings } from "./lazy/commentsSettings.en.ts";
 import type { messages as readers } from "./lazy/readers.en.ts";
+import type { messages as scheduleSettings } from "./lazy/scheduleSettings.en.ts";
+import type { messages as schedules } from "./lazy/schedules.en.ts";
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
@@ -27,6 +29,8 @@ export interface NamespaceCatalogs {
   comments: DeepString<(typeof comments)["comments"]>;
   commentsSettings: DeepString<(typeof commentsSettings)["commentsSettings"]>;
   readers: DeepString<(typeof readers)["readers"]>;
+  scheduleSettings: DeepString<(typeof scheduleSettings)["scheduleSettings"]>;
+  schedules: DeepString<(typeof schedules)["schedules"]>;
 }
 export type Namespace = keyof NamespaceCatalogs;
 /** What a namespace module exports as `messages`: `{ [namespace]: catalog }`. */
@@ -55,6 +59,14 @@ const LOADERS: { [N in Namespace]: Record<Locale, Loader<N>> } = {
   readers: {
     en: () => import("./lazy/readers.en.ts"),
     tr: () => import("./lazy/readers.tr.ts"),
+  },
+  scheduleSettings: {
+    en: () => import("./lazy/scheduleSettings.en.ts"),
+    tr: () => import("./lazy/scheduleSettings.tr.ts"),
+  },
+  schedules: {
+    en: () => import("./lazy/schedules.en.ts"),
+    tr: () => import("./lazy/schedules.tr.ts"),
   },
 };
 
