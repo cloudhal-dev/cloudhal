@@ -246,6 +246,7 @@ describe("cloudhal deploy", () => {
     const calls: string[] = [];
     const secretNames: string[][] = [];
     let databaseCreated = false;
+    const lifecycleAdds: string[][] = [];
     const wrangler: WranglerRunner = async (args) => {
       calls.push(args.filter((a) => !a.includes("/")).join(" "));
       if (args.includes("--secrets-file"))
@@ -270,6 +271,9 @@ describe("cloudhal deploy", () => {
         databaseCreated = true;
         return ok();
       }
+      if (args[2] === "lifecycle" && args[3] === "list")
+        return ok(lifecycleAdds.map((a) => `name: ${a[5]}\nprefix: ${a[6]}`).join("\n\n"));
+      if (args[2] === "lifecycle" && args[3] === "add") lifecycleAdds.push(args);
       if (args[0] === "deploy" && args.includes("-c"))
         return ok("", [{ type: "deploy", targets: ["deploy-me-admin.acme.workers.dev"] }]);
       if (args[0] === "deploy")
@@ -291,8 +295,25 @@ describe("cloudhal deploy", () => {
       "d1 create deploy-me-db",
       "d1 info deploy-me-db --json",
       "r2 bucket create deploy-me-blobs",
+      "r2 bucket lifecycle list deploy-me-blobs",
+      "r2 bucket lifecycle add deploy-me-blobs cloudhal-bundles --expire-days 30 --force",
       "deploy --secrets-file",
       "deploy -c --secrets-file",
+    ]);
+    // RFC-0010: snapshot bundles expire after 30 days; node blobs are untouched
+    expect(lifecycleAdds).toEqual([
+      [
+        "r2",
+        "bucket",
+        "lifecycle",
+        "add",
+        "deploy-me-blobs",
+        "cloudhal-bundles",
+        "bundles/",
+        "--expire-days",
+        "30",
+        "--force",
+      ],
     ]);
     expect(first).toMatchObject({
       siteUrl: "https://deploy-me-site.acme.workers.dev",
@@ -377,6 +398,9 @@ describe("cloudhal deploy", () => {
     expect(purges).toHaveLength(1);
     expect(calls[0]).toBe("d1 info deploy-me-db --json");
     expect(calls).not.toContain("d1 create deploy-me-db");
+    // the rule is there already: listed, not added twice
+    expect(calls).toContain("r2 bucket lifecycle list deploy-me-blobs");
+    expect(lifecycleAdds).toHaveLength(1);
     expect((await remote.getPage(about?.id as string))?.title).toBe("Edited in production");
 
     // push refuses to overwrite; pull brings production home; push --replace would win
@@ -713,6 +737,14 @@ describe("cloudhal deploy", () => {
         created.add(args[2] as string);
         return ok();
       }
+      // a token that may not manage lifecycle rules (RFC-0010): a warning, not a failed deploy
+      if (args[2] === "lifecycle" && args[3] === "add")
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "✘ Authentication error [code: 10000]\n",
+          records: [],
+        };
       if (args[0] === "deploy" && args.includes("-c"))
         return ok("", [{ type: "deploy", targets: ["eu-news-admin.acme.workers.dev"] }]);
       if (args[0] === "deploy")
@@ -748,6 +780,9 @@ describe("cloudhal deploy", () => {
     expect(calls).toContain("d1 create eu-news-db --jurisdiction eu");
     expect(eu.databaseCreated).toBe("eu");
     expect(lines.join("\n")).toMatch(/in the EU jurisdiction \(this cannot be changed later\)/);
+    expect(lines.join("\n")).toMatch(
+      /could not set the R2 lifecycle rule for bundles\/ \(✘ Authentication error \[code: 10000\]\)/,
+    );
 
     // The database exists: the flag changes nothing and says so; the question is never asked.
     calls.length = 0;

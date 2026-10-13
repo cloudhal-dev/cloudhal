@@ -8,7 +8,7 @@
  * edge under `Cache-Tag: cloudhal-site-<siteId>` until a publish/rollback purges that tag, and
  * never past the snapshot's next time gate (RFC-0008 §7.4); previews are never cached.
  */
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { SiteGraphStore } from "@cloudhal/core-ts";
@@ -54,6 +54,9 @@ function getResolver(siteId: string): SiteResolver {
     // Previews travel in the URL (links are rewritten by the entry), not in a cookie: the edge
     // cache does not vary on cookies, so a cookie-carried preview could be served a cached page.
     previewCookie: false,
+    // RFC-0010: the published snapshot's bundle is written after the response, the first time
+    // this deployment renders it without one (release runs, rollbacks, pushes, lifecycle expiry).
+    persistBundle: (task) => waitUntil(task),
   });
   return resolver;
 }

@@ -51,6 +51,11 @@ export interface SiteResolverOptions {
   previewCookie?: boolean | undefined;
   /** Snapshot sources kept per isolate (they are immutable). Default 8. */
   snapshotCacheSize?: number | undefined;
+  /**
+   * RFC-0010 read-through: keeps a background bundle write alive (the Worker's `waitUntil`). With
+   * it, the published snapshot gets a bundle the first time it renders without one.
+   */
+  persistBundle?: ((task: Promise<unknown>) => void) | undefined;
   now?: () => number;
 }
 
@@ -72,6 +77,7 @@ export class SiteResolver {
     previewCookie: boolean;
     now: () => number;
     previewSecret?: string;
+    persistBundle?: (task: Promise<unknown>) => void;
   };
   #pointer: { site: Site; at: number } | undefined;
   readonly #snapshots = new Map<string, Promise<SnapshotSource>>();
@@ -85,6 +91,7 @@ export class SiteResolver {
       previewCookie: options.previewCookie ?? true,
       now: options.now ?? Date.now,
       ...(options.previewSecret ? { previewSecret: options.previewSecret } : {}),
+      ...(options.persistBundle ? { persistBundle: options.persistBundle } : {}),
     };
   }
 
@@ -183,7 +190,9 @@ export class SiteResolver {
       };
     // One instant for the whole request (RFC-0008 §7.1): a page and the lists on it agree.
     const at = this.#o.now();
-    const source = (await this.snapshot(site.publishedSnapshotId)).at(at);
+    const live = await this.snapshot(site.publishedSnapshotId);
+    if (this.#o.persistBundle) live.persistBundle(this.#o.persistBundle);
+    const source = live.at(at);
     const published: Resolution = {
       kind: "published",
       source,

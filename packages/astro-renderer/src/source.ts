@@ -375,6 +375,10 @@ interface View {
 interface Shared {
   loaded?: Promise<Loaded> | undefined;
   assetGates?: Promise<ReadonlyMap<string, number>>;
+  /** RFC-0010: whether the snapshot's bundle was there when it loaded, or is being written. */
+  bundle?: "present" | "missing" | "persisting";
+  /** Bodies read node by node (no bundle), as stored JSON text, kept to write the bundle. */
+  fetched?: Map<string, string> | undefined;
 }
 
 /** Who may see the nodes of a snapshot: the clock gates are checked against, or nobody (previews). */
@@ -480,8 +484,21 @@ export class SnapshotSource implements GraphSource {
   /** Reads the snapshot's nodes once; kinds this renderer does not know are ignored. */
   #load(): Promise<Loaded> {
     this.#shared.loaded ??= (async () => {
+      // RFC-0010: one round of shard reads when the snapshot has a bundle; node by node otherwise.
+      const bundle = await this.#store.readSnapshotBundle(this.#snapshot).catch(() => undefined);
+      this.#shared.bundle = bundle ? "present" : "missing";
+      const fetched = bundle ? undefined : new Map<string, string>();
       const read = <T>(refs: NodeRef[]) =>
-        Promise.all(refs.map((r) => this.#store.readSnapshotNode<T & Site>(r)));
+        Promise.all(
+          refs.map(async (r) => {
+            const hit = bundle?.get(r.hash);
+            if (hit !== undefined) return hit as T & Site;
+            const body = await this.#store.readSnapshotNode<T & Site>(r);
+            // as stored, before anything downstream could touch the object
+            fetched?.set(r.hash, JSON.stringify(body));
+            return body;
+          }),
+        );
       const siteRef = this.#snapshot.nodes.find((n) => n.kind === "site");
       if (!siteRef) throw new Error(`snapshot ${this.#snapshot.id} has no site node`);
       const [site] = await read<Site>([siteRef]);
@@ -512,6 +529,7 @@ export class SnapshotSource implements GraphSource {
         (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
       );
       const shownEntries = visible(entries, false);
+      if (fetched) this.#shared.fetched = fetched;
       return {
         site: site as Site,
         pages: shownPages,
@@ -529,6 +547,28 @@ export class SnapshotSource implements GraphSource {
       this.#shared.loaded = undefined;
     });
     return this.#shared.loaded;
+  }
+
+  /**
+   * RFC-0010 read-through: when this snapshot loaded without a bundle, write one in the background
+   * (`defer` keeps the task alive, e.g. the Worker's `waitUntil`). The resolver calls it for the
+   * published snapshot only: previews and history never get a bundle. Never throws; a failed write
+   * leaves the snapshot loading node by node, and the next request tries again.
+   */
+  persistBundle(defer: (task: Promise<unknown>) => void): void {
+    if (this.#shared.bundle === "present" || this.#shared.bundle === "persisting") return;
+    const task = this.#load()
+      .then(async () => {
+        if (this.#shared.bundle !== "missing") return;
+        this.#shared.bundle = "persisting";
+        await this.#store.writeSnapshotBundle(this.#snapshot, this.#shared.fetched ?? new Map());
+        this.#shared.bundle = "present";
+        this.#shared.fetched = undefined;
+      })
+      .catch(() => {
+        if (this.#shared.bundle === "persisting") this.#shared.bundle = "missing";
+      });
+    defer(task);
   }
 
   #assetGates(loaded: Loaded): Promise<ReadonlyMap<string, number>> {

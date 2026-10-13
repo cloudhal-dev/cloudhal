@@ -40,7 +40,9 @@ import {
   isTimeZone,
   sameAvailability,
 } from "./availability.ts";
+import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
+import { BLOB_CONCURRENCY, eachLimited } from "./concurrency.ts";
 import {
   ConflictError,
   InvariantError,
@@ -1225,7 +1227,37 @@ export class SiteGraphStore {
       },
       ...(blobs ? [blobs] : []),
     ]);
+    // RFC-0010: a snapshot made to be published gets its bundle now, while the bodies are at hand,
+    // so the site Worker's first render after the flip reads a few shards. A bundle is a cache:
+    // failing to write it never fails the snapshot (the site Worker writes it on first render).
+    if (input.reason === "publish") {
+      const bodies = new Map(rows.map((r) => [r.hash, r.body]));
+      await this.writeSnapshotBundle(snapshot, bodies).catch(() => {});
+    }
     return snapshot;
+  }
+
+  /** The bodies of `snapshot` by node hash from its bundle, or undefined (RFC-0010). */
+  readSnapshotBundle(snapshot: Snapshot): Promise<Map<string, unknown> | undefined> {
+    return readSnapshotBundle(this.#blobs, snapshot);
+  }
+
+  /**
+   * Writes `snapshot`'s bundle (RFC-0010). Bodies come from `known` (hash → stored JSON text) or are
+   * read from `nodes/<hash>.json`.
+   */
+  async writeSnapshotBundle(
+    snapshot: Snapshot,
+    known: ReadonlyMap<string, string> = new Map(),
+  ): Promise<void> {
+    const decoder = new TextDecoder();
+    await writeSnapshotBundle(this.#blobs, snapshot, async (ref) => {
+      const text = known.get(ref.hash);
+      if (text !== undefined) return text;
+      const bytes = await this.#blobs.get(`nodes/${ref.hash}.json`);
+      if (!bytes) throw new NotFoundError("blob", ref.hash);
+      return decoder.decode(bytes);
+    });
   }
 
   async getSnapshot(id: string): Promise<Snapshot | undefined> {
@@ -1478,20 +1510,4 @@ export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef
   }
   for (const [id, node] of b) if (!a.has(id)) removed.push(node);
   return { added, removed, changed };
-}
-
-/** Blob reads/writes in flight at once while snapshotting (Workers allow 6 open connections). */
-const BLOB_CONCURRENCY = 6;
-
-/** Runs `fn` over `items` with at most `limit` calls in flight; rejects on the first failure. */
-async function eachLimited<T>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) await fn(items[next++] as T);
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }

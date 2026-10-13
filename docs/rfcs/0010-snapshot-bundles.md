@@ -1,9 +1,9 @@
 # RFC-0010: Snapshot bundles — one read to load a published site
-- Status: Draft
+- Status: Accepted (2026-10-13, PR #23 approved by Halil with the defaults of the open questions as drafted; ADR-0024)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-13
 - Related: ADR-0002 (storage interface, batch-only), ADR-0012 (two Workers, pointer-flip publishing, snapshot sources cached per isolate), RFC-0001 (snapshots), RFC-0004 (blob keys, GC roots), RFC-0008 §6.1 (release bodies; its "Workers Free (50 subrequests)" note is corrected below), the 2026-10-13 security and performance audit (PR #22)
 - Numbering: RFC-0009 stays with editorial notes, as RFC-0007 says.
-- Sources (checked 2026-10-13 in the Cloudflare docs source, `cloudflare/cloudflare-docs` at `0cd4753`, because developers.cloudflare.com was not reachable from the drafting environment): Workers limits, "Subrequests" and "Simultaneous open connections" — https://developers.cloudflare.com/workers/platform/limits/ · R2 object lifecycles — https://developers.cloudflare.com/r2/buckets/object-lifecycles/ **[verify: `wrangler r2 bucket lifecycle` flags]**
+- Sources (checked 2026-10-13 in the Cloudflare docs source, `cloudflare/cloudflare-docs` at `0cd4753`, because developers.cloudflare.com was not reachable from the drafting environment): Workers limits, "Subrequests" and "Simultaneous open connections" — https://developers.cloudflare.com/workers/platform/limits/ · R2 object lifecycles — https://developers.cloudflare.com/r2/buckets/object-lifecycles/ · `wrangler r2 bucket lifecycle list|add` (checked in wrangler 4.148: `add <bucket> <name> <prefix> --expire-days N --force` appends without checking names, so `cloudhal deploy` lists first)
 
 ## Summary
 A published site is rendered from an immutable snapshot whose node bodies live in R2 as one object per node (`nodes/<hash>.json`). The site Worker reads every one of them, one R2 `get` each, the first time an isolate renders a snapshot, which is after every cold start and after every publish. This RFC adds **snapshot bundles**: the bodies of a published snapshot, written as a few shard objects next to the per-node blobs, so the site Worker loads a site with one round of reads whatever its size; the per-node layout stays the source of truth and the fallback.
