@@ -1,5 +1,5 @@
 # RFC-0012: Sanitize HTML bodies before they reach a page
-- Status: Draft
+- Status: Accepted (2026-10-13, approved by Halil with the defaults of the open questions as drafted; ADR-0026)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-13
 - Related: RFC-0001 (content bodies), RFC-0004 §2.3 (`asset:` links in markdown only), RFC-0005 (roles), ADR-0011 (agent keys over REST), the 2026-10-13 security audit (PR #22, finding "HTML bodies are published as-is"), `packages/astro-renderer/src/markdown.ts`, `csp.ts`
 - Sources: WHATWG HTML parsing (https://html.spec.whatwg.org/multipage/parsing.html) · parse5, a spec-compliant HTML parser (https://github.com/inikulin/parse5) · OWASP XSS prevention (https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html) · mutation XSS, Heiderich et al., CCS 2013 (https://cure53.de/fp170.pdf)
@@ -87,6 +87,10 @@ export const HTML_ALLOWLIST: { elements: Record<string, readonly string[]>; glob
   - SVG inline in the body.
   The changeset lists what is dropped, and `cloudhal snapshot` diffs are unaffected.
 - **Bundle size:** parse5 adds to the site Worker bundle. The growth is measured before merge and recorded in the PR, against the Workers script size limits.
+  - *Implementation note (measured 2026-10-13, `pnpm smoke:pack` dry run with wrangler 4.148):*
+    - site Worker: 2,468 → 2,712 KiB, 510 → 566 KiB gzipped (+56 KiB);
+    - admin Worker, whose previews use the renderer: 1,287 → 1,343 KiB gzipped;
+    - both stay far under the Workers Free limit of 3 MB gzipped.
 - **Rollout:** one release. Rollback: revert the renderer; stored content was never changed.
 
 ## Security & policy impact

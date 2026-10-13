@@ -10,42 +10,15 @@ import {
   isAttachment,
   type MediaContext,
 } from "./media.ts";
+import { safeHref, safeSrc } from "./safe-urls.ts";
+import { sanitizeHtml } from "./sanitize.ts";
 
 export type { MediaContext } from "./media.ts";
 
 export const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/**
- * Link targets markdown may produce. Everything else (javascript:, data:, vbscript:, …) is dropped.
- * The check runs on what a browser would parse (WHATWG URL): C0 controls and spaces trimmed at the
- * ends, tabs and newlines removed anywhere (`java\tscript:` is `javascript:`), and a backslash read
- * as a slash, so `/\host` and `\\host` are protocol-relative like `//host`.
- */
-export function safeHref(href: string): string | undefined {
-  const value = asParsed(href);
-  if (/^(https?:|mailto:|tel:)/i.test(value)) return value;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value) || /^[/\\]{2}/.test(value)) return undefined;
-  return value; // relative path, fragment or query
-}
-
-/** A URL as a browser reads it: no tabs or newlines, no C0 controls or spaces at either end. */
-function asParsed(href: string): string {
-  const value = href.replace(/[\t\n\r]/g, "");
-  let start = 0;
-  let end = value.length;
-  while (start < end && value.charCodeAt(start) <= 0x20) start++;
-  while (end > start && value.charCodeAt(end - 1) <= 0x20) end--;
-  return value.slice(start, end);
-}
-
-/** Image sources: what `safeHref` allows (no mailto/tel) plus raster data: URLs. */
-export function safeSrc(src: string): string | undefined {
-  const value = src.trim();
-  if (/^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i.test(value)) return value;
-  const safe = safeHref(value);
-  return safe && !/^(mailto|tel):/i.test(safe) ? safe : undefined;
-}
+export { safeHref, safeSrc };
 
 /** The context of the markdown being rendered right now (`renderMarkdown` is synchronous). */
 let current: MediaContext | undefined;
@@ -176,14 +149,16 @@ export function markdownText(source: string): string {
 }
 
 /**
- * `markdown` bodies are rendered safely; `html` bodies are trusted as-is — only humans can store
- * them (the MCP tools always write markdown), and they do not resolve `asset:` (RFC-0004 §2.3).
+ * `markdown` bodies are rendered as data; `html` bodies go through the allowlist sanitizer
+ * (RFC-0012): any writer can store them — agent keys over REST, `cloudhal push`, every role — so
+ * pages, previews, feeds and static builds never publish them as stored. Neither resolves
+ * `asset:` inside HTML (RFC-0004 §2.3).
  */
 export function renderBody(
   body: { format: "markdown" | "html"; value: string },
   ctx?: MediaContext,
 ): string {
-  return body.format === "markdown" ? renderMarkdown(body.value, ctx) : body.value;
+  return body.format === "markdown" ? renderMarkdown(body.value, ctx) : sanitizeHtml(body.value);
 }
 
 /**
