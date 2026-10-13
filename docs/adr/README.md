@@ -40,3 +40,4 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0021](0021-site-analytics.md) | Site analytics: first-party cookie-less script, Workers Analytics Engine via bindings (no token), D1 rollups, `analytics:read` (RFC-0006) |
 | [0022](0022-reader-comments.md) | Reader comments: guest comments held for moderation, D1 outside the graph, first-party proof of work, agents label and hide while people approve (RFC-0007) |
 | [0023](0023-schedules.md) | Schedules: content releases pinned to exact versions, render-time time gates, one every-minute tick (cron or DO alarm), deterministic jobs plus MCP agent tasks (RFC-0008) |
+| [0024](0024-snapshot-bundles.md) | Snapshot bundles: the site Worker loads a published snapshot from 256-node shard objects, written at publish and read-through; per-node blobs stay the source of truth (RFC-0010) |
