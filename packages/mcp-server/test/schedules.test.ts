@@ -309,6 +309,22 @@ describe("releases over MCP (RFC-0008 §10.3–§10.7)", () => {
     expect(row).toMatchObject({ decision: "allow", reason: expect.stringMatching(/^auto mode/) });
   });
 
+  it("auto: scheduling a draft publishes it when the release is approved (RFC-0008 note 24)", async () => {
+    const draft = await s.store.updateContentEntry({
+      ...(await newArticle(s, "auto-draft")),
+      status: "draft",
+    });
+    const { call } = await connect(s, agentKey("auto"));
+    const r = await call("schedule_release", {
+      siteId: s.site.id,
+      nodeIds: [draft.id],
+      when: { at: plus(2 * HOUR) },
+    });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.data).toMatchObject({ status: "scheduled" });
+    expect(await s.store.getContentEntry(draft.id)).toMatchObject({ status: "published" });
+  });
+
   it("auto: beyond 24 h, or after the elevation ends, it waits for a person", async () => {
     const late = await newArticle(s, "auto-late");
     const { call } = await connect(s, agentKey("auto"));

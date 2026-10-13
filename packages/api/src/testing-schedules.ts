@@ -319,6 +319,7 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
     });
 
     it("a Contributor's release is a request (cause role) an Editor carries out on approval", async () => {
+      const filed = (await store.listContentEntries(site.id)).find((e) => e.terms);
       const own = await store.createContentEntry({
         siteId: site.id,
         collection: "posts",
@@ -329,6 +330,8 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
         body: { format: "markdown", value: "Body." },
         fields: {},
         tags: [],
+        // Approving publishes the draft (RFC-0008 note 24), so it needs the site's primary term.
+        ...(filed?.terms ? { terms: filed.terms } : {}),
         author: person("contributor").actor,
       });
       const created = await post(`${S()}/releases`, { nodeIds: [own.id] }, "contributor");
@@ -373,6 +376,8 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
           executeAt: plus(6 * HOUR),
         },
       });
+      // The Editor's approval published the Contributor's draft (held until the release runs).
+      expect(await store.getContentEntry(own.id)).toMatchObject({ status: "published" });
     });
 
     it("an agent's request is carried out only for exactly what it asked (rl1: and time)", async () => {

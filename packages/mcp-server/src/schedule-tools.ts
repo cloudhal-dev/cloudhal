@@ -232,8 +232,12 @@ async function scheduleWith(
   const r = record.release;
   if (r.state === "awaiting_approval" && ctx.approvals && record.requestId && !ctx.approval)
     await ctx.approvals.closeForRelease(r.siteId, r.id, ctx.principal.actor, "scheduled directly");
+  // Approving publishes the drafts the release holds (marked published, re-pinned): RFC-0008 note 24.
+  const expectedRev = approval
+    ? await releaseService(d, ctx.store, ctx.now).promoteOnApproval(r.siteId, r.id, r.rev, when)
+    : r.rev;
   const release = await d.store.transitionRelease(r.siteId, r.id, {
-    expectedRev: r.rev,
+    expectedRev,
     to: "scheduled",
     when,
     approval: approval ?? null,
