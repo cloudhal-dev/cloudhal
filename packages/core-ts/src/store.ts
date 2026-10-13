@@ -1162,20 +1162,25 @@ export class SiteGraphStore {
         heldRefs = (live?.nodes ?? []).filter((n) => held.has(n.id));
       }
     }
-    for (const row of rows) {
-      const key = `nodes/${row.hash}.json`;
-      if (!(await this.#blobs.head(key))) {
-        await this.#blobs.put(key, new TextEncoder().encode(row.body), {
+    // Node bodies are content-addressed and never deleted, so a hash the previous snapshot holds is
+    // already stored: only new hashes are checked and written, a few at a time. (Every agent edit
+    // snapshots; checking each node in turn cost one blob round trip per node of the site.)
+    const parent = await this.latestSnapshot(siteId);
+    const stored = new Set((parent?.nodes ?? []).map((n) => n.hash));
+    const fresh = new Map<string, string>();
+    for (const row of rows) if (!stored.has(row.hash)) fresh.set(row.hash, row.body);
+    await eachLimited([...fresh], BLOB_CONCURRENCY, async ([hash, body]) => {
+      const key = `nodes/${hash}.json`;
+      if (!(await this.#blobs.head(key)))
+        await this.#blobs.put(key, new TextEncoder().encode(body), {
           contentType: "application/json",
         });
-      }
-    }
+    });
     const nodes: NodeRef[] = composeWithHolds(
       rows.map((r) => ({ id: r.id, kind: r.kind, rev: r.rev, hash: r.hash })),
       heldRefs,
       new Set(heldRefs.map((n) => n.id)),
     );
-    const parent = await this.latestSnapshot(siteId);
     const diff = diffNodeRefs(parent?.nodes ?? [], nodes);
     const snapshot: Snapshot = {
       schemaVersion: 1,
@@ -1473,4 +1478,20 @@ export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef
   }
   for (const [id, node] of b) if (!a.has(id)) removed.push(node);
   return { added, removed, changed };
+}
+
+/** Blob reads/writes in flight at once while snapshotting (Workers allow 6 open connections). */
+const BLOB_CONCURRENCY = 6;
+
+/** Runs `fn` over `items` with at most `limit` calls in flight; rejects on the first failure. */
+async function eachLimited<T>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++] as T);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }

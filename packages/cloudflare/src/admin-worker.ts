@@ -179,6 +179,25 @@ export interface AdminWorkerOptions {
   log?: (line: string) => void;
 }
 
+/**
+ * What `apps/studio/public/_headers` sets on Studio's static files, also on the shell this Worker
+ * serves for client routes: Studio is the most privileged origin of a deployment (sessions,
+ * approvals, members), so it is never framed, loads no plugins and keeps its `<base>`.
+ */
+export const STUDIO_SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  "content-security-policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=31536000",
+};
+
+function withStudioHeaders(res: Response): Response {
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(STUDIO_SECURITY_HEADERS)) out.headers.set(k, v);
+  return out;
+}
+
 const WORKER_PATHS = /^\/(api\/|mcp(\/|$)|\.well-known\/)/;
 
 function required(env: AdminEnv, key: keyof AdminEnv): string {
@@ -224,7 +243,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       if (!WORKER_PATHS.test(url.pathname)) {
         // A client-side route (/sites/…, /login, …): answer with the Studio shell.
         if (!env.ASSETS) return new Response("not found", { status: 404 });
-        return env.ASSETS.fetch(new Request(new URL("/", url), { headers: request.headers }));
+        return withStudioHeaders(
+          await env.ASSETS.fetch(new Request(new URL("/", url), { headers: request.headers })),
+        );
       }
 
       const sql = new D1Driver(env.DB);

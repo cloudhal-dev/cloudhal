@@ -15,6 +15,14 @@ describe("owner setup link", () => {
     expect(takeSetupToken()).toBe("abc123"); // after a reload, from sessionStorage
   });
 
+  it("takes the token from the fragment, where `cloudhal deploy` puts it", () => {
+    window.history.replaceState(null, "", "/login?lang=tr#setup=def456");
+    expect(takeSetupToken()).toBe("def456");
+    expect(window.location.search).toBe("?lang=tr");
+    expect(window.location.hash).toBe("");
+    expect(takeSetupToken()).toBe("def456");
+  });
+
   it("is absent on a normal sign-in", () => {
     expect(takeSetupToken()).toBeUndefined();
   });

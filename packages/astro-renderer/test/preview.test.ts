@@ -100,6 +100,20 @@ describe("markdown safety (agent-written content)", async () => {
     expect(safeHref("  JavaScript:alert(1)")).toBeUndefined();
     expect(safeHref("//evil.example")).toBeUndefined();
     expect(safeHref("#top")).toBe("#top");
+    // What a browser parses: tabs and newlines vanish anywhere, C0 controls at the ends, and a
+    // backslash after the first slash is a slash (`/\host` is protocol-relative).
+    for (const sneaky of [
+      "java\tscript:alert(1)",
+      "java\nscript:alert(1)",
+      "\u0001javascript:alert(1)",
+      "/\\evil.example",
+      "\\\\evil.example",
+      "\\/evil.example",
+      "/\t/evil.example",
+    ])
+      expect(safeHref(sneaky), JSON.stringify(sneaky)).toBeUndefined();
+    expect(safeHref("/about")).toBe("/about");
+    expect(safeHref("posts/a?b=1#c")).toBe("posts/a?b=1#c");
   });
 
   it("gives articles a header and drops a leading H1 that repeats the title", () => {

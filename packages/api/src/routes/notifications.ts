@@ -32,7 +32,7 @@ import {
   type Scope,
 } from "@cloudhal/agent-runtime";
 import { PURGE_LIMITS, utcDay, utcDayStart } from "@cloudhal/comments";
-import type { Actor } from "@cloudhal/core-contracts";
+import type { Actor, Site } from "@cloudhal/core-contracts";
 import { commentsAvailable } from "@cloudhal/mcp-server/comments";
 import { approvalProblem, executeAtOf, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { schedulerHealth } from "@cloudhal/schedules";
@@ -197,6 +197,17 @@ export interface NotificationsPage {
   noticeMinutes: number;
 }
 
+/** The deployment's sites, read once per request (comment and schedule notices both walk them). */
+const sitesByRequest = new WeakMap<Context<Env>, Promise<Site[]>>();
+function requestSites(c: Context<Env>): Promise<Site[]> {
+  let sites = sitesByRequest.get(c);
+  if (!sites) {
+    sites = c.get("store").listSites();
+    sitesByRequest.set(c, sites);
+  }
+  return sites;
+}
+
 /** The comment kinds (RFC-0007 §13), computed from the current state; nothing is stored. */
 async function commentNotifications(c: Context<Env>, now: Date): Promise<Notification[]> {
   const comments = c.get("comments");
@@ -209,7 +220,7 @@ async function commentNotifications(c: Context<Env>, now: Date): Promise<Notific
   const moderateAny = can("comments:moderate");
   const moderateOwn = can("comments:moderate:own");
   if (moderateOwn || can("site:settings")) {
-    for (const site of await c.get("store").listSites()) {
+    for (const site of await requestSites(c)) {
       let nodeIds: string[] | undefined;
       if (!moderateAny && moderateOwn) {
         const person = principal.person?.id ?? principal.actor.id;
@@ -320,7 +331,7 @@ async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notifi
   const out: Notification[] = [];
   let dueWithin24hForMe = false;
   let dueWithin24h = false;
-  for (const site of await graph.listSites()) {
+  for (const site of await requestSites(c)) {
     await deps.store.expireOverdueApprovals(site.id, at);
     for (const r of await deps.store.listReleases(site.id, { limit: 200 })) {
       const creator = (await ownership.personOf(r.createdBy)) === me;
