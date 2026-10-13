@@ -11,18 +11,25 @@ import { authClient } from "../lib/auth.ts";
 const SETUP_KEY = "cloudhal.setupToken";
 
 /**
- * A fresh deployment's owner arrives with `/login?setup=<token>` (printed by `cloudhal deploy`).
- * The token is moved out of the URL at once (screenshots, history, referrers) and kept for this
- * tab only; the server requires it for the first account.
+ * A fresh deployment's owner arrives with `/login#setup=<token>` (printed by `cloudhal deploy`):
+ * in the fragment, the token never reaches a server, its logs or a referrer. `?setup=` (links
+ * printed by earlier versions) works too. The token is moved out of the URL at once (screenshots,
+ * history) and kept for this tab only; the server requires it for the first account.
  */
 export function takeSetupToken(): string | undefined {
   try {
     const url = new URL(window.location.href);
-    const fromUrl = url.searchParams.get("setup");
+    const fromHash = new URLSearchParams(url.hash.replace(/^#/, "")).get("setup");
+    const fromQuery = url.searchParams.get("setup");
+    const fromUrl = fromHash || fromQuery;
     if (fromUrl) {
       sessionStorage.setItem(SETUP_KEY, fromUrl);
       url.searchParams.delete("setup");
-      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      window.history.replaceState(
+        null,
+        "",
+        `${url.pathname}${url.search}${fromHash ? "" : url.hash}`,
+      );
       return fromUrl;
     }
     return sessionStorage.getItem(SETUP_KEY) ?? undefined;

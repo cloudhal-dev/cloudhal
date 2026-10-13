@@ -159,6 +159,10 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             await writeCommentsClient(comments, dir);
             logger.info(`wrote ${comments.module.path} and ${comments.solver.path}`);
           }
+          if (client || comments) {
+            const { writeCloudhalAssetHeaders } = await import("./static-headers.ts");
+            await writeCloudhalAssetHeaders(dir);
+          }
           return;
         }
         const { writeStaticRedirects } = await import("./static-redirects.ts");

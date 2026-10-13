@@ -280,7 +280,9 @@ export function requirementFor(method: string, path: string): RouteRequirement |
  */
 export function routeGuard(options: { requireAuth: boolean; membership: boolean }) {
   return createMiddleware<Env>(async (c, next) => {
-    const path = new URL(c.req.url).pathname;
+    // The path the router dispatches on (percent-decoded), not the raw URL: `/comments/%65xport`
+    // routes to `/comments/export`, so it must not be checked as `/comments/:commentId`.
+    const path = c.req.path;
     const req = requirementFor(c.req.method, path);
     // Default-deny: an undeclared route does not exist.
     if (!req)

@@ -213,6 +213,10 @@ export function describeCommentsApi(label: string, factory: CommentsApiFactory):
       expect((await call(`${S()}/commenters/lookup`, "author", lookup)).status).toBe(403);
       expect((await call(`${S()}/commenters/lookup`, "agent", lookup)).status).toBe(403);
       expect((await call(`${CM()}/export`, "author")).status).toBe(403);
+      // The route guard checks the path the router dispatches (decoded), so an encoded literal
+      // segment cannot borrow the weaker `/comments/:commentId` requirement.
+      for (const path of [`${CM()}/%65xport`, `${CM()}/%65%78port`])
+        expect((await call(path, "author")).status, path).toBe(403);
     });
 
     it("the queue: filters, entry titles, reports — never an email or IP hash (C1)", async () => {

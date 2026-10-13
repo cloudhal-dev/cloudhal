@@ -855,7 +855,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   // First deploy: the owner account can only be created through this one-time link.
   const setupUrl =
     pushed && adminUrl
-      ? `${adminUrl.replace(/\/$/, "")}/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`
+      ? `${adminUrl.replace(/\/$/, "")}/login#setup=${secrets.CLOUDHAL_SETUP_TOKEN}`
       : undefined;
   return {
     dryRun: false,

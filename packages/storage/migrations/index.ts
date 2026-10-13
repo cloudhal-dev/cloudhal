@@ -16,6 +16,7 @@ import { migration0014Analytics } from "./0014_analytics.ts";
 import { migration0015AnalyticsPrivacySignal } from "./0015_analytics_privacy_signal.ts";
 import { migration0016Comments } from "./0016_comments.ts";
 import { migration0017Schedules } from "./0017_schedules.ts";
+import { migration0018QueryIndexes } from "./0018_query_indexes.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -36,4 +37,5 @@ export const migrations: readonly Migration[] = [
   migration0015AnalyticsPrivacySignal,
   migration0016Comments,
   migration0017Schedules,
+  migration0018QueryIndexes,
 ];

@@ -338,7 +338,7 @@ describe("cloudhal deploy", () => {
     });
     // the owner account can only be created through the one-time setup link
     expect(first.setupUrl).toBe(
-      `https://deploy-me-admin.acme.workers.dev/login?setup=${secrets.CLOUDHAL_SETUP_TOKEN}`,
+      `https://deploy-me-admin.acme.workers.dev/login#setup=${secrets.CLOUDHAL_SETUP_TOKEN}`,
     );
     // wrangler's secret files existed only during the deploy
     const leftovers = (await import("node:fs/promises")).readdir(

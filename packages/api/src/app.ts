@@ -130,7 +130,8 @@ export function createApi(deps: ApiDeps) {
     c.set("schedules", schedules);
     c.set("scheduler", deps.scheduler);
     // The fenced Better Auth endpoints never reach credential resolution.
-    if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname))
+    // Raw and decoded: whichever form Better Auth or Hono would dispatch on is fenced.
+    if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname) || FENCED_AUTH_PATHS.test(c.req.path))
       return c.json({ error: "not_found", message: "not found" }, 404);
     if (deps.resolvePrincipal) {
       const principal = await deps.resolvePrincipal(c);
