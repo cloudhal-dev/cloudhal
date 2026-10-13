@@ -195,6 +195,53 @@ export function releasesSuite(
       expect((await tick(T + 2 * 60_000)).ran).toBe(0);
     });
 
+    it("approving a release of a draft publishes it: marked published, dated at T, live after the run", async () => {
+      const s = await story({ status: "draft" });
+      // Creating (or proposing) a release never changes the node's status.
+      const { release: draft } = await svc.create({
+        siteId: site.id,
+        set: [s.id],
+        createdBy: agent,
+        when: { at: iso(T) },
+      });
+      expect((await store.getContentEntry(s.id))?.status).toBe("draft");
+      const release = await svc.schedule(site.id, draft.id, {
+        expectedRev: draft.rev,
+        approval: approval(),
+      });
+      expect(release.state).toBe("scheduled");
+      expect(release.hash).not.toBe(draft.hash);
+      expect(await store.getContentEntry(s.id)).toMatchObject({
+        status: "published",
+        publishedAt: iso(T),
+      });
+      // Held: an ordinary publish keeps it off the live site until T.
+      await publishSite();
+      expect(await liveRef(s.id)).toBeUndefined();
+      expect((await tick(T + 5_000)).ran).toBe(1);
+      const ref = await liveRef(s.id);
+      if (!ref) throw new Error("not live");
+      expect(await store.readSnapshotNode(ref)).toMatchObject({
+        status: "published",
+        publishedAt: iso(T),
+      });
+    });
+
+    it("refuses to approve a release of a draft that could not be published (no primary term)", async () => {
+      const s = await story({ status: "draft", terms: {} });
+      const { release } = await svc.create({
+        siteId: site.id,
+        set: [s.id],
+        createdBy: agent,
+        when: { at: iso(T) },
+      });
+      await expect(
+        svc.schedule(site.id, release.id, { expectedRev: release.rev, approval: approval() }),
+      ).rejects.toThrow(/primary/);
+      expect((await store.getContentEntry(s.id))?.status).toBe("draft");
+      expect((await get(release.id)).state).toBe("draft");
+    });
+
     it("S5: an ordinary publish keeps held nodes at their live version; pendingChanges and stateHash agree", async () => {
       const s = await story();
       const before = await store.stateHash(site.id);

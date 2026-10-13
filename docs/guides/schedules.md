@@ -25,6 +25,8 @@ A release is a set of changes to publish at a time. A single scheduled article i
 - Cloudhal adds what the items need that is not live yet: media an article uses, terms filed on it and their parents, pages a menu now links to. The answer lists them (`closureAdded`).
 - At most **100 items** per release, at most 200 open releases per site, between **1 minute and 366 days** ahead. On Workers Free one request pins at most 20 new versions; larger releases are built in steps (`POST …/releases/:releaseId/items`).
 
+**Drafts.** You can schedule an article or page that is still a draft or in review. When the release is approved, Cloudhal marks it published (with the usual checks, such as a primary category) and dates it at the release time. Creating or proposing a release never changes a draft's status.
+
 At its time the release is applied **on top of whatever is live then**: everything published in between stays published. Exactly the pinned versions go live, never "the latest draft".
 
 ### Approving and scheduling
