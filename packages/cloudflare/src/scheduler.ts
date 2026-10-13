@@ -402,6 +402,19 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
   });
 }
 
+/**
+ * A cron tick's follow-up (RFC-0008 §8.2): Cloudflare fires `* * * * *` at a fixed second of each
+ * minute for a Worker (measured live: :54), so work due a few seconds after a tick would wait for
+ * the next one, almost a minute late. When something is due within the next minute, the handler
+ * waits until then (no CPU is used while waiting) and runs one more tick, so releases go live at
+ * their minute. Returns the wait in ms, or undefined when nothing is due before the next tick.
+ */
+export function followUpDelay(report: TickReport | undefined, now: number): number | undefined {
+  const due = report?.nextDueAt ? Date.parse(report.nextDueAt) : Number.NaN;
+  if (!Number.isFinite(due) || due <= now || due - now >= 60_000) return undefined;
+  return due - now;
+}
+
 /** Isolate-local state of the request backstop: plain numbers only (ADR-0012). */
 export interface BackstopState {
   lastCheck: number;
