@@ -76,6 +76,18 @@ export interface MailConfig {
   readonly fromName?: string;
 }
 
+/**
+ * `cloudhal.json` `observability`: what both Workers send to Workers Logs and Traces. Logs are on
+ * for every request unless sampled down; traces are opt-in (stored traces are billed from
+ * 2026-12-01). Query strings are always redacted: preview links carry their token there.
+ */
+export interface ObservabilityConfig {
+  /** Share of requests whose logs are kept, 0–1 (default 1). */
+  readonly logs?: number;
+  /** Workers Traces: `true` traces every request, a number samples that share (0–1). */
+  readonly traces?: boolean | number;
+}
+
 /** A plain `local@domain` address: no display name, no spaces or line breaks. */
 const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
@@ -97,6 +109,13 @@ export interface ProjectConfig {
   readonly schedules?: SchedulesConfig;
   /** Email delivery (RFC-0011); absent = invites and resets by link only. */
   readonly mail?: MailConfig;
+  /** Workers Logs sampling and opt-in Traces for both Workers; absent = every log, no traces. */
+  readonly observability?: ObservabilityConfig;
+  /**
+   * `"smart"`: Smart Placement for the admin Worker, which runs next to D1 instead of next to the
+   * visitor (it makes several database round trips per request). Absent = default placement.
+   */
+  readonly placement?: "smart";
 }
 
 export const CONFIG_FILE = "cloudhal.json";
@@ -110,6 +129,8 @@ const OWN_KEYS = new Set([
   "comments",
   "schedules",
   "mail",
+  "observability",
+  "placement",
 ]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
@@ -170,6 +191,19 @@ export function parseMailConfig(input: unknown): MailConfig | undefined {
   return { from, ...(name ? { fromName: name.slice(0, 100) } : {}) };
 }
 
+/** Leniently parsed, like `schedules`: rates outside 0–1 and values of the wrong type are left out. */
+export function parseObservabilityConfig(input: unknown): ObservabilityConfig | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const o = input as Record<string, unknown>;
+  const rate = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+  return {
+    ...(rate(o.logs) ? { logs: o.logs as number } : {}),
+    ...(typeof o.traces === "boolean" || rate(o.traces)
+      ? { traces: o.traces as boolean | number }
+      : {}),
+  };
+}
+
 /** Whether the deployment offers reader comments: on unless `comments.available` is `false`. */
 export function commentsAvailable(cfg: Pick<ProjectConfig, "comments">): boolean {
   return cfg.comments?.available !== false;
@@ -225,6 +259,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   const comments = parseCommentsConfig(cfg.comments);
   const schedules = parseSchedulesConfig(cfg.schedules);
   const mail = parseMailConfig(cfg.mail);
+  const observability = parseObservabilityConfig(cfg.observability);
   return {
     siteId: cfg.siteId,
     dataDir: cfg.dataDir ?? ".cloudhal",
@@ -240,6 +275,8 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
     ...(comments ? { comments } : {}),
     ...(schedules ? { schedules } : {}),
     ...(mail ? { mail } : {}),
+    ...(observability ? { observability } : {}),
+    ...(cfg.placement === "smart" ? { placement: "smart" as const } : {}),
   };
 }
 

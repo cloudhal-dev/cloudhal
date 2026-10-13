@@ -165,6 +165,9 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
           }
           return;
         }
+        // The Site Worker's CSP and security headers, for hosts that read `_headers`.
+        const { writeStaticSecurityHeaders } = await import("./static-headers.ts");
+        if (await writeStaticSecurityHeaders(dir)) logger.info("wrote _headers (security headers)");
         const { writeStaticRedirects } = await import("./static-redirects.ts");
         const count = await writeStaticRedirects(resolved, dir);
         if (count > 0) logger.info(`wrote _redirects (${count} redirects)`);

@@ -196,6 +196,10 @@ describe("media in a local project (RFC-0004)", () => {
     expect(await readFile(`${file}.sha256`, "utf8")).toBe(`${asset.sha256}  harbour.png\n`);
     const headers = await readFile(path.join(dist, "_headers"), "utf8");
     expect(headers).toContain("/media/*\n  Cache-Control: public, max-age=31536000, immutable");
+    // the Site Worker's security headers, for hosts that read _headers
+    expect(headers).toContain(
+      "/*\n  Content-Security-Policy: default-src 'self'; script-src 'self'",
+    );
     const post = await readFile(path.join(dist, "posts", "harbour", "index.html"), "utf8");
     expect(post).toContain(`src="/media/${asset.sha256.slice(0, 16)}/harbour.png"`);
     expect(post).toContain('"@type":"ImageObject"');
