@@ -1,5 +1,5 @@
 # RFC-0011: Email delivery with Cloudflare Email Service
-- Status: Draft
+- Status: Accepted (2026-10-13, PR #24 approved by Halil with the defaults of the open questions as drafted; ADR-0025)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-13
 - Related: RFC-0005 §7.2 (`MailSender`, emailed invites) and open question 6 (reset links), RFC-0007 D1 and v1.1 (mail adapters), ADR-0012 (two Workers), the 2026-10-13 audit roadmap (P0 "Email Service")
 - Sources (checked 2026-10-13 in `cloudflare/cloudflare-docs` at `0cd4753`, `src/content/docs/email-service/`): Workers API `send()` and error codes — https://developers.cloudflare.com/email-service/api/send-emails/workers-api/ · send binding restrictions — https://developers.cloudflare.com/email-service/configuration/send-bindings/ · pricing and plans — https://developers.cloudflare.com/email-service/platform/pricing/ · limits and verified destinations — https://developers.cloudflare.com/email-service/platform/limits/ · allowed headers — https://developers.cloudflare.com/email-service/reference/headers/ · local simulation — https://developers.cloudflare.com/email-service/local-development/sending/
@@ -81,7 +81,8 @@ POST /api/password-reset/request {email}  →  202 {ok: true}
 - **Same token machinery:** a member gets the `chrst_` reset link Administrators already issue: 1 hour, single use, and issuing it voids older links. `createdBy` is the member themself. It is audited as `member.password-reset` with `via: "email"`.
 - **Redeeming:** through the existing `/api/password-reset/{inspect,complete}`. Completing a link that was mailed also sets `emailVerified = true`.
 - **Who:** every member, the Owner included: it is their address. Removed people are not members and get nothing.
-- **Off by default:** only when a sender exists. `/api/instance` reports `passwordReset: ["admin"] | ["admin", "email"]`. Studio shows "Forgot password?" on the login page only in the second case. It leads to a `/forgot-password` screen with one email field, which always ends in the same neutral confirmation.
+- **Off by default:** only when a sender exists. `/api/instance` reports `passwordReset: ["admin"] | ["admin", "email"]`. Studio's sign-in screen links "Forgot password?" to a `/forgot-password` screen with one email field, which always ends in the same neutral confirmation.
+  - *Implementation note:* `/api/instance` is for members only, so the sign-in screen cannot read it. The link is always shown; without a sender the request answers 404 `email_unavailable` (the same for every address), and the screen says to ask an Administrator.
 
 ### Message content
 - Plain text only in v1.

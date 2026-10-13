@@ -10,6 +10,7 @@ import { assetDir } from "../assets.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
+import { terminalMailSender } from "./mail-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
 
@@ -20,6 +21,8 @@ export interface StudioOptions {
   readonly studioDist?: string;
   /** Skip authentication (local scripts only). */
   readonly noAuth?: boolean;
+  /** Where printed mail goes (tests); default stdout (RFC-0011). */
+  readonly mailOut?: (text: string) => void;
   /** `false` skips the scheduler's Node ticker (tests). */
   readonly scheduler?: boolean;
   /** @deprecated the comments job runs on the scheduler's tick; `false` skips the ticker. */
@@ -86,6 +89,8 @@ export async function studio(
       automationsEnabled: automationsEnabled(),
     },
     requireAuth: !options.noAuth,
+    // RFC-0011: invites and reset links are printed here instead of sent.
+    ...(cfg.mail ? { mail: terminalMailSender(cfg.mail, options.mailOut) } : {}),
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [
       "http://localhost:5173",

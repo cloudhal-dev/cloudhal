@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InviteDetails } from "../src/lib/api.ts";
 import { forgetHashToken, INVITE_TOKEN_PREFIX, RESET_TOKEN_PREFIX } from "../src/lib/roles.ts";
+import { ForgotPasswordPage } from "../src/routes/ForgotPasswordPage.tsx";
 import { InvitePage } from "../src/routes/InvitePage.tsx";
 import { ResetPasswordPage } from "../src/routes/ResetPasswordPage.tsx";
 import { bodyOf, on, type Route, serve, wrap } from "./roles-fixtures.tsx";
@@ -237,5 +238,45 @@ describe("/reset-password (RFC-0005 open question 6)", { timeout: 45_000 }, () =
     expect(await screen.findByTestId("dead-link")).toHaveTextContent(
       "This reset link can't be used",
     );
+  });
+});
+
+describe("/forgot-password (RFC-0011)", { timeout: 45_000 }, () => {
+  it("asks for a link and answers the same for any address", async () => {
+    const fetch = serve(
+      signedOut,
+      on("POST", "/api/password-reset/request", { status: 202, body: { ok: true } }),
+    );
+    render(wrap(<ForgotPasswordPage />));
+    const form = await screen.findByTestId("forgot-form");
+    fireEvent.click(within(form).getByRole("button", { name: "Email me a link" }));
+    expect(await within(form).findByText("Enter an email address")).toBeTruthy();
+    fireEvent.change(within(form).getByLabelText("Email"), {
+      target: { value: " Ada@Example.com " },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Email me a link" }));
+    const sent = await screen.findByTestId("forgot-sent");
+    expect(sent.textContent).toContain("If Ada@Example.com belongs to an account here");
+    expect(bodyOf(fetch, "POST", "/api/password-reset/request")).toEqual({
+      email: "ada@example.com",
+    });
+  });
+
+  it("says to ask an Administrator when the server cannot send email", async () => {
+    serve(
+      signedOut,
+      on("POST", "/api/password-reset/request", {
+        status: 404,
+        body: { error: "email_unavailable", message: "this server cannot send email" },
+      }),
+    );
+    render(wrap(<ForgotPasswordPage />));
+    const form = await screen.findByTestId("forgot-form");
+    fireEvent.change(within(form).getByLabelText("Email"), {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Email me a link" }));
+    const unavailable = await screen.findByTestId("forgot-unavailable");
+    expect(unavailable.textContent).toContain("Ask an Administrator");
   });
 });

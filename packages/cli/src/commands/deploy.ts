@@ -707,6 +707,13 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     log(
       "scheduler: Workers Free tick budget (40 statements, 1 release a tick). On Workers Paid, deploy once with `--plan paid` (remembered) or set `schedules.plan` in cloudhal.json",
     );
+  // RFC-0011: email delivery through the Email Service binding, locked to `mail.from`.
+  if (cfg.mail)
+    log(
+      plan === "paid"
+        ? `mail: invites and reset links are sent from ${cfg.mail.from} (its domain must be onboarded to Cloudflare Email Service)`
+        : `mail: invites and reset links are sent from ${cfg.mail.from}. On Workers Free, Email Service delivers only to verified destination addresses of this account; any recipient needs Workers Paid`,
+    );
   if (!schedules.automations)
     log(
       "automations: off for this deployment (cloudhal.json `schedules.automations`); releases and time gates go on",
@@ -745,6 +752,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       comments: c,
       scheduler: ticker,
       schedules,
+      mail: cfg.mail,
     });
   const admin = await prepareAdmin(analytics, comments, scheduler);
 

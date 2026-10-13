@@ -50,8 +50,16 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
     let nowMs: number;
     let ip = 0;
     const mailbox: MailMessage[] = [];
+    // RFC-0011: work deferred past the response (reset mails), awaited by `settle()`.
+    const pending: Promise<unknown>[] = [];
+    const settle = async () => {
+      while (pending.length > 0) await Promise.all(pending.splice(0));
+    };
 
-    const make = async (signUp: "first-user" | "open" = "first-user", withMail = false) => {
+    const make = async (
+      signUp: "first-user" | "open" = "first-user",
+      withMail: boolean | "fail" = false,
+    ) => {
       const b = await backend.create();
       store = b.store;
       sql = b.sql;
@@ -80,12 +88,27 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         mcp: { stateKey: "roles-test-state-key-0123456789abcdefgh", audit, approvals },
         schedules: { store: new SqlScheduleStore(b.sql, { now: clock }), maxNewBodies: Infinity },
         admin: { deployToken: DEPLOY_TOKEN, storage: { sql: b.sql, blobs: b.blobs } },
-        ...(withMail ? { mail: { id: "test", send: async (m) => void mailbox.push(m) } } : {}),
+        ...(withMail === "fail"
+          ? {
+              mail: {
+                id: "test",
+                send: async () => {
+                  throw Object.assign(new Error("domain not onboarded"), {
+                    code: "E_SENDER_NOT_VERIFIED",
+                  });
+                },
+              },
+            }
+          : withMail
+            ? { mail: { id: "test", send: async (m) => void mailbox.push(m) } }
+            : {}),
+        defer: (task) => void pending.push(task),
       });
     };
 
     beforeEach(async () => {
       mailbox.length = 0;
+      pending.length = 0;
       await make();
     }, 120_000);
     afterAll(async () => {
@@ -1575,6 +1598,88 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
       ).toBe(410);
       const dump = JSON.stringify(await audit.list({ limit: 200 }));
       expect(dump).not.toMatch(/chrst_/);
+    });
+
+    it("RFC-0011: members ask for a reset link by email; the answer never tells who is a member", async () => {
+      const ask = (email: string) =>
+        call("POST", "/api/password-reset/request", { body: { email } });
+      expect((await ask("owner@example.com")).body.error).toBe("email_unavailable");
+      await make("first-user", true);
+      const owner = await signUpOwner();
+      expect(
+        (await call("GET", "/api/instance", { cookie: owner.cookie })).body.passwordReset,
+      ).toEqual(["admin", "email"]);
+      const author = await join(owner, "author");
+      const verified = () =>
+        sql.get(`SELECT "emailVerified" FROM "user" WHERE "email" = ?`, [author.email]);
+      expect(await verified()).toEqual({ emailVerified: 0 });
+      mailbox.length = 0;
+
+      // the same answer for a member and a stranger; the work happens after the response
+      const member = await ask("  AUTHOR@example.com ");
+      const stranger = await ask("nobody@example.com");
+      expect([member.status, stranger.status]).toEqual([202, 202]);
+      expect(member.body).toEqual(stranger.body);
+      expect(mailbox).toHaveLength(0);
+      expect((await ask("not an address")).status).toBe(400);
+      await settle();
+      expect(mailbox.map((m) => m.to)).toEqual([author.email]);
+      const linkIn = (text: string | undefined) =>
+        ((text ?? "").match(/\/reset-password#(chrst_[A-Za-z0-9_-]{43})/) ?? [])[1] as string;
+      const first = linkIn(mailbox[0]?.text);
+      expect(first).toBeDefined();
+
+      // at most 3 mails per address per hour; each new link voids the older ones
+      for (let i = 0; i < 3; i++) await ask(author.email);
+      await settle();
+      expect(mailbox.filter((m) => m.to === author.email)).toHaveLength(3);
+      expect(
+        (await call("POST", "/api/password-reset/inspect", { body: { token: first } })).status,
+      ).toBe(410);
+      const latest = linkIn(mailbox.at(-1)?.text);
+      const done = await call("POST", "/api/password-reset/complete", {
+        body: { token: latest, password: "a brand new passphrase" },
+      });
+      expect(done.status, JSON.stringify(done.body)).toBe(200);
+      await settle();
+      // opening the mailed link proves the address; the member is told about the change
+      expect(await verified()).toEqual({ emailVerified: 1 });
+      expect(mailbox.at(-1)).toMatchObject({
+        to: author.email,
+        subject: expect.stringMatching(/was changed/),
+      });
+      expect(
+        (
+          await call("POST", "/api/auth/sign-in/email", {
+            body: { email: author.email, password: "a brand new passphrase" },
+          })
+        ).status,
+      ).toBe(200);
+      // an hour later the address can be mailed again
+      nowMs += 61 * 60_000;
+      const before = mailbox.length;
+      await ask(author.email);
+      await settle();
+      expect(mailbox).toHaveLength(before + 1);
+      const dump = JSON.stringify(await audit.list({ limit: 200 }));
+      expect(dump).toMatch(/"via":"email"/);
+      expect(dump).not.toMatch(/chrst_/);
+      expect(dump).not.toMatch(/nobody@example\.com/);
+    });
+
+    it("RFC-0011: an invite whose mail fails is canceled and says why", async () => {
+      await make("first-user", "fail");
+      const owner = await signUpOwner();
+      const failed = await invite(owner, "lost@example.com", "author", { delivery: "email" });
+      expect(failed.status).toBe(502);
+      expect(failed.body).toMatchObject({
+        error: "delivery_failed",
+        details: { code: "E_SENDER_NOT_VERIFIED", retryable: false },
+      });
+      expect((await call("GET", "/api/invites", { cookie: owner.cookie })).body.items).toEqual([]);
+      expect(JSON.stringify(await audit.list({ limit: 50 }))).toMatch(/member\.invite-failed/);
+      // a link still works
+      expect((await invite(owner, "lost@example.com", "author")).status).toBe(201);
     });
 
     // ───────────────────────────── sign-up modes ─────────────────────────────

@@ -96,6 +96,7 @@ export function isKeyEvent(tool: string): tool is KeyEvent {
 export const MEMBER_EVENTS = {
   "member.invite": "memberInvite",
   "member.invite-revoke": "memberInviteRevoke",
+  "member.invite-failed": "memberInviteFailed",
   "member.invite-accept": "memberInviteAccept",
   "member.role": "memberRole",
   "member.remove": "memberRemove",

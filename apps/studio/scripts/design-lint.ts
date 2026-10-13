@@ -70,6 +70,7 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/MembersPage.tsx": "list",
   "routes/InvitePage.tsx": "token",
   "routes/ResetPasswordPage.tsx": "token",
+  "routes/ForgotPasswordPage.tsx": "recover",
   // Schedules (RFC-0008 §15.1, DESIGN.md §2x): the calendar, its two list tabs and a release.
   "routes/SchedulesPage.tsx": "calendar",
   "routes/AutomationsPage.tsx": "list",
@@ -89,6 +90,7 @@ export type Template =
   | "editor"
   | "auth"
   | "token"
+  | "recover"
   | "shell";
 
 /** What each template must be composed from (names must appear in the file). DESIGN.md §2a–2f. */
@@ -127,6 +129,9 @@ export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
   // Public token pages (`/invite`, `/reset-password`, DESIGN.md §2r): the auth frame without tabs,
   // the link's state as a Banner, skeleton lines while it is inspected, a new-password field.
   token: ["AuthLayout", "takeHashToken", "Banner", "Button", "Input", "LinkSkeleton|SkeletonLine"],
+  // `/forgot-password` (RFC-0011, DESIGN.md §2r): the auth frame, one email field, the neutral
+  // answer as a Banner, the way back to sign in.
+  recover: ["AuthLayout", "Input", "Button", "Banner", "LinkButton"],
   shell: ["AppFrame", "Sidebar.Group", "Sidebar.MenuButton", "SidebarSwitcher"],
 };
 

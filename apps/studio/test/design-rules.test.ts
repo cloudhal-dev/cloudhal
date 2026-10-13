@@ -659,6 +659,9 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Button",
     "takeHashToken",
   ],
+  // RFC-0011: asking for a reset link by email (the same answer for every address).
+  "routes/ForgotPasswordPage.tsx": ["AuthLayout", "Banner", "Input", "Button", "LinkButton"],
+  "routes/LoginPage.tsx#reset": ["forgotPassword.link", "Link"],
   "components/UserMenu.tsx#roles": ["RoleBadge", "useMe"],
   "routes/AccountShell.tsx#roles": ["UsersThree", "useMembers"],
   "routes/AccountPage.tsx#roles": ["Avatar", "RoleBadge"],
@@ -1223,6 +1226,7 @@ describe("design rules (DESIGN.md)", () => {
     expect(router).toMatch(/path: "\/team"/);
     expect(router).toMatch(/path: "\/invite"/);
     expect(router).toMatch(/path: "\/reset-password"/);
+    expect(router).toMatch(/path: "\/forgot-password"/);
     // the token pages need no session
     const invite = router.slice(
       router.indexOf("const inviteRoute"),

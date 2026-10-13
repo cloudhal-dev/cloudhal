@@ -213,6 +213,15 @@ export function siteWorkerConfig(
   };
 }
 
+/** The admin Worker's Email Service binding (RFC-0011). */
+export const MAIL_BINDING = "EMAIL";
+
+/** What the generated admin config needs for email delivery (RFC-0011). */
+export interface MailDeployment {
+  readonly from: string;
+  readonly fromName?: string;
+}
+
 /** The admin Worker's config (API + auth + MCP + Studio assets). */
 export function adminWorkerConfig(
   n: DeploymentNames & {
@@ -227,6 +236,8 @@ export function adminWorkerConfig(
     scheduler?: SchedulerTicker;
     /** The tick budget and the automations switch (default: `free`, automations on). */
     schedules?: SchedulesDeployment;
+    /** Email delivery: a `send_email` binding locked to this one sender (RFC-0011). */
+    mail?: MailDeployment;
   },
 ) {
   const names = workerNames(n);
@@ -250,6 +261,12 @@ export function adminWorkerConfig(
     // §8.2: the statements and releases one tick may spend; §11.6: the deployment's kill switch.
     CLOUDHAL_TICK_BUDGET: s.plan,
     CLOUDHAL_AUTOMATIONS: s.automations ? "on" : "off",
+    ...(n.mail
+      ? {
+          CLOUDHAL_MAIL_FROM: n.mail.from,
+          ...(n.mail.fromName ? { CLOUDHAL_MAIL_FROM_NAME: n.mail.fromName } : {}),
+        }
+      : {}),
   };
   return {
     $schema: "node_modules/wrangler/config-schema.json",
@@ -263,6 +280,10 @@ export function adminWorkerConfig(
     // Analytics (RFC-0006 §7.3): reads WAE through the binding, no API token; vars for the
     // dataset, the query budget and the defaults. Comments (RFC-0007): the availability switch.
     ...(a ? { analytics: { binding: "ANALYTICS_SQL" } } : {}),
+    // RFC-0011: the Worker can send only as the configured address.
+    ...(n.mail
+      ? { send_email: [{ name: MAIL_BINDING, allowed_sender_addresses: [n.mail.from] }] }
+      : {}),
     vars,
     // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
     // switching between the cron trigger and the alarm never needs a migration (§8.3).

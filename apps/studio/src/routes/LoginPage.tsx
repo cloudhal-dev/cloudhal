@@ -1,4 +1,4 @@
-import { AuthLayout, Banner, Button, Input, Tabs, Text } from "@cloudhal/ui";
+import { AuthLayout, Banner, Button, Input, Link, Tabs, Text } from "@cloudhal/ui";
 import { Key, SquaresFour } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
@@ -141,6 +141,11 @@ export function LoginPage() {
           description={mode === "signup" ? t("auth.passwordHint") : undefined}
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
         />
+        {mode === "signin" && (
+          <Text size="sm" as="span">
+            <Link href="/forgot-password">{t("forgotPassword.link")}</Link>
+          </Text>
+        )}
         <ErrorBanner error={error} />
         <Button type="submit" variant="primary" loading={busy} className="w-full">
           {mode === "signup" ? t("auth.createAccount") : t("auth.signIn")}

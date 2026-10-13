@@ -506,6 +506,8 @@ export interface InstanceInfo {
   roles?: RolesInfo;
   /** Invite rules (RFC-0005 §7). Older servers omit it. */
   invites?: InvitesInfo;
+  /** How a forgotten password is reset (RFC-0011): `email` when the server can send. */
+  passwordReset?: ("admin" | "email")[];
 }
 
 // ---- staff roles, members and invites (RFC-0005, packages/api/src/routes/{members,invites}.ts) ----
@@ -1749,6 +1751,12 @@ export const api = {
       ),
   },
   passwordReset: {
+    /**
+     * Public (RFC-0011): mails a reset link if the address belongs to a member. Always 202, the same
+     * for anyone; 404 `email_unavailable` when the server cannot send email; 429 `rate_limited`.
+     */
+    request: (email: string) =>
+      request<{ ok: true }>("/api/password-reset/request", { method: "POST", ...json({ email }) }),
     /** Public: whose reset link this is. 410 `reset_gone`. */
     inspect: (token: string) =>
       request<ResetDetails>("/api/password-reset/inspect", { method: "POST", ...json({ token }) }),

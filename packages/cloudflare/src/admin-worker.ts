@@ -24,6 +24,10 @@
  * trigger (`scheduled`), or, with `CLOUDHAL_SCHEDULER=alarm`, from the `SchedulerClock` Durable
  * Object this module exports; admin requests are the backstop when the heartbeat is stale.
  *
+ * Email (RFC-0011, `mail.ts`): with the `EMAIL` send binding and `CLOUDHAL_MAIL_FROM` the API mails
+ * invites and reset links through Cloudflare Email Service, after the response where it must not
+ * show (`defer` → `waitUntil`).
+ *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN, CLOUDHAL_COMMENTS_KEY (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
@@ -49,6 +53,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
 import { siteGateSupport } from "./features.ts";
+import { adminMail, type MailEnv } from "./mail.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
   type BackstopState,
@@ -61,7 +66,7 @@ import {
   schedulerRuntime,
 } from "./scheduler.ts";
 
-export interface AdminEnv extends CommentsEnv, SchedulerEnv {
+export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   ASSETS?: Fetcher;
@@ -371,6 +376,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       });
       const audit = new AuditLog(sql);
       const approvals = new ApprovalStore(sql);
+      const mail = adminMail(env);
       const app = createApi({
         store,
         resolveActor: auth.resolveActor,
@@ -380,6 +386,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         staff: auth.staff,
         signUp: auth.signUp,
         audit,
+        // RFC-0011: emailed invites and reset links when `cloudhal deploy` bound a sender.
+        ...(mail ? { mail } : {}),
+        defer: (task) => ctx.waitUntil(task),
         mcp: {
           stateKey: required(env, "MCP_STATE_KEY"),
           audit,
