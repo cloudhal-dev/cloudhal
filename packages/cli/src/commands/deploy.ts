@@ -34,6 +34,11 @@
  *      plan is remembered in `state.json`) and `CLOUDHAL_AUTOMATIONS` (`off` when
  *      `schedules.automations` is `false`). Cloudflare offers no cheap, reliable way to read an
  *      account's Workers plan with wrangler's login, so the owner says it once.
+ *  12. the Studio build: running from the monorepo, the admin Worker gets `apps/studio/dist`, which
+ *      only a build keeps current. When it is missing or older than the newest file in
+ *      `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, the deploy runs
+ *      `pnpm --filter @cloudhal/studio build` first; `--no-build-studio` fails instead. A published
+ *      install ships Studio prebuilt and is never checked.
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
@@ -44,7 +49,7 @@ import path from "node:path";
 import { datasetName } from "@cloudhal/analytics/wae";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { SCHEDULES_ENGINE_LEVEL } from "@cloudhal/core-ts/releases";
-import { assetDir } from "../assets.ts";
+import { assetDir, monorepoRoot } from "../assets.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
@@ -84,6 +89,12 @@ import {
   readProjectConfig,
   writeProjectConfig,
 } from "../config.ts";
+import {
+  ensureStudioBuild,
+  MONOREPO_STUDIO_DIST,
+  STUDIO_BUILD_COMMAND,
+  type StudioBuilder,
+} from "../studio-build.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { pushSite, setPrimaryDomain } from "./sync.ts";
 
@@ -201,6 +212,14 @@ export interface DeployOptions {
    * used, else `free`. Remembered in `state.json`.
    */
   readonly plan?: WorkersPlan;
+  /**
+   * `--no-build-studio` (`false`): never run the Studio build. Running from the monorepo, a missing
+   * `apps/studio/dist` or one older than the Studio sources then fails the deploy instead of being
+   * rebuilt. A published install ships Studio prebuilt and is never checked.
+   */
+  readonly buildStudio?: boolean;
+  /** Injected in tests: runs the Studio build. */
+  readonly studioBuilder?: StudioBuilder;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -576,11 +595,23 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       "comments: available on this deployment, and off for every site until someone turns them on in Studio (Site settings › Comments)",
     );
 
-  const studioDir = options.studioDir ?? (await assetDir("studio")) ?? "(no built Studio)";
+  const repoRoot = await monorepoRoot();
+  const studioDir =
+    options.studioDir ??
+    (await assetDir("studio")) ??
+    (repoRoot ? path.join(repoRoot, MONOREPO_STUDIO_DIST) : "(no built Studio)");
+  // From the monorepo, `apps/studio/dist` is only as new as its last build: build it (or, with
+  // --no-build-studio, refuse) when it is missing or Studio sources changed since. A published
+  // install ships Studio prebuilt and is never checked.
+  await ensureStudioBuild({
+    studioDir,
+    repoRoot,
+    build: options.buildStudio !== false,
+    log,
+    ...(options.studioBuilder ? { builder: options.studioBuilder } : {}),
+  });
   if (!(await exists(path.join(studioDir, "index.html"))))
-    throw new Error(
-      `built Studio not found at ${studioDir} (run \`pnpm --filter @cloudhal/studio build\`)`,
-    );
+    throw new Error(`built Studio not found at ${studioDir} (run \`${STUDIO_BUILD_COMMAND}\`)`);
 
   // 1. resources
   const existing = await readExistingIds(siteConfigPath(options.projectDir));

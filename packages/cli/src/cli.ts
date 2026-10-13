@@ -45,7 +45,7 @@ Usage:
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
   cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
-                  [--force-downgrade]
+                  [--force-downgrade] [--no-build-studio]
                                                           site + admin Workers on Cloudflare (uses wrangler login);
                                                           --jurisdiction eu keeps a newly created D1 database
                                                           in the EU (cannot be changed later); --scheduler picks
@@ -53,7 +53,9 @@ Usage:
                                                           --plan sizes scheduler ticks for the account's Workers
                                                           plan (default free; remembered);
                                                           --force-downgrade deploys older schedules code over
-                                                          open releases and time gates
+                                                          open releases and time gates; from the monorepo a
+                                                          stale apps/studio/dist is rebuilt first
+                                                          (--no-build-studio: fail instead)
   cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
@@ -127,6 +129,7 @@ export async function main(argv: string[]): Promise<number> {
       scheduler: { type: "string" },
       plan: { type: "string" },
       "force-downgrade": { type: "boolean" },
+      "no-build-studio": { type: "boolean" },
       "cancel-schedules": { type: "boolean" },
       limit: { type: "string" },
     },
@@ -214,6 +217,7 @@ export async function main(argv: string[]): Promise<number> {
         ...(ticker ? { scheduler: ticker } : {}),
         ...(plan ? { plan } : {}),
         ...(values["force-downgrade"] ? { forceDowngrade: true } : {}),
+        ...(values["no-build-studio"] ? { buildStudio: false } : {}),
         log: (l) => console.log(l),
         // The analytics and data-location questions need a person at a terminal.
         ...(tty ? { prompt: askYesNo, askJurisdiction } : {}),

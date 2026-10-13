@@ -9,7 +9,7 @@ cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp)
 cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                         MCP server over stdio for this project
 cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
-                [--force-downgrade]                     site + admin Workers on Cloudflare
+                [--force-downgrade] [--no-build-studio] site + admin Workers on Cloudflare
 cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
 cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
                                                         local site → deployment
@@ -30,6 +30,8 @@ cloudhal schedules status [--remote]                    schedules (RFC-0008): sc
 cloudhal schedules list [--remote] [--limit <n>]        the site's releases
 cloudhal schedules run-due [--remote]                   one scheduler tick now
 ```
+
+**Studio build.** The published CLI ships Studio prebuilt. Run from the monorepo, `cloudhal deploy` uploads `apps/studio/dist` and first checks that it is current: when it is missing, or its `index.html` is older than the newest file in `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, it runs `pnpm --filter @cloudhal/studio build`. With `--no-build-studio` it never builds and fails on a missing or stale build instead.
 
 ### Schedules (RFC-0008)
 
