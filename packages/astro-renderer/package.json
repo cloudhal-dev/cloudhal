@@ -53,6 +53,7 @@
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "marked": "catalog:",
+    "parse5": "catalog:",
     "@cloudhal/analytics": "workspace:*",
     "vite": "catalog:",
     "@cloudhal/comments": "workspace:*"

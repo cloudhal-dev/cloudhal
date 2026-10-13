@@ -42,3 +42,5 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0023](0023-schedules.md) | Schedules: content releases pinned to exact versions, render-time time gates, one every-minute tick (cron or DO alarm), deterministic jobs plus MCP agent tasks (RFC-0008) |
 | [0024](0024-snapshot-bundles.md) | Snapshot bundles: the site Worker loads a published snapshot from 256-node shard objects, written at publish and read-through; per-node blobs stay the source of truth (RFC-0010) |
 | [0025](0025-email-delivery.md) | Email delivery: one `MailSender` on the Cloudflare Email Service binding, locked to one sender; emailed invites and self-service password reset (RFC-0011) |
+| [0026](0026-html-body-sanitizer.md) | HTML bodies are sanitized at render time: parse5 (spec-compliant, Worker-safe), a fixed allowlist, our own serializer; stored content unchanged (RFC-0012) |
+| [0027](0027-observability-and-placement.md) | `cloudhal.json` `observability` (log sampling, opt-in traces) and `placement: "smart"` for the admin Worker; query strings always redacted from logs and traces (RFC-0013) |

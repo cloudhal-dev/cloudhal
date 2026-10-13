@@ -16,7 +16,7 @@ import {
   viewPagePath,
 } from "./archive.ts";
 import { gateNotice } from "./gates.ts";
-import { renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
+import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { archiveHead, siteOrigin } from "./seo.ts";
@@ -80,7 +80,7 @@ export function renderSectionHtml(
           : ""
       }</section>`;
     case "richText":
-      return `<section class="ch-richtext" data-section-id="${esc(section.id)}" data-kind="richText">${section.format === "markdown" ? renderMarkdown(section.body, media) : section.body}</section>`;
+      return `<section class="ch-richtext" data-section-id="${esc(section.id)}" data-kind="richText">${renderBody({ format: section.format, value: section.body }, media)}</section>`;
     case "image": {
       // Like `Image.astro`: an asset's own caption and credit when the section has no caption.
       const asset = section.image.assetId ? media?.assets?.get(section.image.assetId) : undefined;

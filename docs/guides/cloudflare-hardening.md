@@ -11,6 +11,7 @@ on your own account. The sources were checked on 2026-10-13 in `cloudflare/cloud
   - A default-deny route table: every API route names the scope it needs.
   - Rate limits on sign-in and on every public token endpoint.
 - **Site Worker:** a strict `Content-Security-Policy` on HTML pages (`SITE_CSP`: no inline or third-party scripts, no plugins, no foreign framing), `nosniff` and a referrer policy.
+- **Content:** `html` bodies are sanitized when rendered (RFC-0012): parsed like a browser, kept to an allowlist (no scripts, styles, frames, forms, SVG or event handlers), and links and media checked like markdown's. This applies to pages, previews, feeds and static builds, whoever wrote the body. Markdown has always been rendered as data.
 - **Static builds** (`cloudhal build`) get the same policy and headers through `dist/_headers`. Hosts that read `_headers` apply it: Cloudflare Workers static assets, Cloudflare Pages and Netlify. On any other host, set these headers in its own configuration. `cloudhal dev` sends no CSP, because Vite's live reload needs inline code.
 - **Logs:** both Workers send their logs to [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/) with **query strings redacted** (`observability.redact_query_string`). Preview links carry their signed token in the query string, and logs are readable by every account member with Workers access.
 

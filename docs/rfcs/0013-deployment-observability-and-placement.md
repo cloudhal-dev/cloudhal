@@ -1,5 +1,5 @@
 # RFC-0013: `cloudhal.json` settings for observability and placement
-- Status: Draft
+- Status: Accepted (2026-10-13, approved by Halil with the defaults of the open questions as drafted, after the keys shipped in PR #25; ADR-0027)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-13
 - Related: ADR-0012 (two Workers, generated configs), RFC-0006/0007/0008/0011 (earlier `cloudhal.json` keys), the 2026-10-13 audit roadmap (item 3, "ops and security hardening"), PR #25, `docs/guides/cloudflare-hardening.md`
 - Sources (checked 2026-10-13 in `cloudflare/cloudflare-docs` at `0cd4753`, and in the config schema of wrangler 4.148):
