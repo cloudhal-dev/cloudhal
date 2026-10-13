@@ -15,9 +15,16 @@ export type ScopeGroup = "read" | "write" | "release";
 
 /** How the create-key dialog groups scopes: what an agent may see, change, and make live. */
 export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
-  read: ["site:read", "content:read", "analytics:read", "comments:read"],
-  write: ["content:write", "asset:upload", "asset:manage", "site:write", "preview:create"],
-  release: ["site:publish", "site:rollback"],
+  read: ["site:read", "content:read", "analytics:read", "comments:read", "schedules:read"],
+  write: [
+    "content:write",
+    "asset:upload",
+    "asset:manage",
+    "site:write",
+    "preview:create",
+    "schedules:write",
+  ],
+  release: ["site:publish", "releases:publish", "site:rollback"],
 };
 
 /**
@@ -29,15 +36,20 @@ const SCOPE_ORDER: GrantableScope[] = [
   "content:read",
   "analytics:read",
   "comments:read",
+  "schedules:read",
   "content:write",
   "content:write:own",
   "content:draft:own",
   "site:write",
   "preview:create",
+  "schedules:write",
+  "schedules:write:own",
   "asset:manage",
   "asset:upload",
   "site:publish",
   "site:publish:own",
+  "releases:publish",
+  "releases:publish:own",
   "site:rollback",
   "comments:moderate",
   "comments:moderate:own",
@@ -109,9 +121,17 @@ export function scopesForMode(mode: AgentMode): GrantableScope[] {
     "preview:create",
     "analytics:read",
     "comments:read",
+    "schedules:read",
   ];
   if (mode === "plan") return read;
-  return [...read, "content:write", "asset:upload", "site:publish", "site:rollback"];
+  return [
+    ...read,
+    "content:write",
+    "asset:upload",
+    "site:publish",
+    "site:rollback",
+    "schedules:write",
+  ];
 }
 
 /** Same set of scopes, in any order. */

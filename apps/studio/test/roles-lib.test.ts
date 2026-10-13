@@ -71,6 +71,7 @@ describe("role rules (RFC-0005 §2)", () => {
       "site:read",
       "content:read",
       "preview:create",
+      "schedules:read",
       "content:draft:own",
       "asset:upload",
     ]);
@@ -87,9 +88,11 @@ describe("role rules (RFC-0005 §2)", () => {
       { scope: "asset:manage", disabled: true },
       { scope: "site:write", disabled: true },
       { scope: "preview:create", disabled: false },
+      { scope: "schedules:write:own", from: "schedules:write", disabled: false },
     ]);
     expect(scopeOptions("release", FALLBACK_ROLE_SCOPES.contributor)).toEqual([
       { scope: "site:publish", disabled: true },
+      { scope: "releases:publish", disabled: true },
       { scope: "site:rollback", disabled: true },
     ]);
   });

@@ -624,6 +624,12 @@ export const tr: Messages = {
       "comments:moderate:own": "Kendi yazılarınızdaki yorumları etiketler ve gizler",
       "comments:reply": "Yorumlara yanıt taslağı yazar; siz yayınlarsınız",
       "comments:reply:own": "Kendi yazılarınızda yanıt taslağı yazar; siz yayınlarsınız",
+      "schedules:read": "Takvimi, yayın paketlerini ve otomasyon çalışmalarını görür",
+      "schedules:write": "Yayın paketi, ambargo ve yayından kaldırma önerir ve zamanlar",
+      "schedules:write:own": "Kendi sayfa ve makalelerinin yayınını zamanlar",
+      "releases:publish":
+        "Yayın paketlerini onaylar; Otomatik modda düşük riskli olanlar sizsiz çalışır",
+      "releases:publish:own": "Tüm öğeler kendisininse yayın paketlerini onaylar",
     },
     modes: {
       legend: "Mod",
