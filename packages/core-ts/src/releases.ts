@@ -464,9 +464,10 @@ export class ReleaseService {
    * rules still apply, and the release is re-pinned to those versions. Creating or proposing a
    * release never changes a node's status, so a Contributor's draft stays a draft until an Editor
    * approves it, and an unscheduled release leaves nothing half-published. The first publication
-   * date is the release time when there is one. Returns the release's new `rev`.
+   * date is the release time when there is one. Returns the release's new `rev`. Every path that
+   * schedules a release with an approval calls it (`schedule` here, and the MCP/REST carry-out).
    */
-  async #promoteOnApproval(
+  async promoteOnApproval(
     siteId: string,
     id: string,
     expectedRev: number,
@@ -781,7 +782,7 @@ export class ReleaseService {
         })
       : undefined;
     const expectedRev = input.approval
-      ? await this.#promoteOnApproval(
+      ? await this.promoteOnApproval(
           siteId,
           id,
           input.expectedRev,
