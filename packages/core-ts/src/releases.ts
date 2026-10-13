@@ -28,6 +28,7 @@ import type {
   ReleaseApproval,
   ReleaseItem,
   ReleaseState,
+  ReleaseWhen,
   Snapshot,
 } from "@cloudhal/core-contracts";
 import {
@@ -457,6 +458,60 @@ export class ReleaseService {
   }
 
   /**
+   * Approving a release means publishing what it holds: articles and pages pinned as drafts or in
+   * review are marked `published` when someone who may publish approves it (a person, or an `auto`
+   * key within its window), through the ordinary write path, so required primary terms and gate
+   * rules still apply, and the release is re-pinned to those versions. Creating or proposing a
+   * release never changes a node's status, so a Contributor's draft stays a draft until an Editor
+   * approves it, and an unscheduled release leaves nothing half-published. The first publication
+   * date is the release time when there is one. Returns the release's new `rev`. Every path that
+   * schedules a release with an approval calls it (`schedule` here, and the MCP/REST carry-out).
+   */
+  async promoteOnApproval(
+    siteId: string,
+    id: string,
+    expectedRev: number,
+    when: ReleaseWhen | undefined,
+  ): Promise<number> {
+    const rec = await this.#record(siteId, id);
+    if (rec.release.rev !== expectedRev) throw new ScheduleConflictError("release", id);
+    const at = when?.kind === "at" ? when.at : undefined;
+    let promoted = 0;
+    for (const item of rec.release.items) {
+      if (item.kind !== "set") continue;
+      const entry = await this.graph.getContentEntry(item.nodeId);
+      if (entry) {
+        if (entry.siteId !== siteId || entry.status === "published") continue;
+        await this.graph.updateContentEntry(
+          {
+            ...entry,
+            status: "published",
+            ...(at && !entry.publishedAt && !entry.availability?.from ? { publishedAt: at } : {}),
+          },
+          { releaseEdit: id },
+        );
+        promoted++;
+        continue;
+      }
+      const page = await this.graph.getPage(item.nodeId);
+      if (page && page.siteId === siteId && page.status !== "published") {
+        await this.graph.updatePage({ ...page, status: "published" }, { releaseEdit: id });
+        promoted++;
+      }
+    }
+    if (promoted === 0) return expectedRev;
+    const set = rec.release.items.filter((i) => i.kind === "set").map((i) => i.nodeId);
+    const remove = rec.release.items.filter((i) => i.kind !== "set").map((i) => i.nodeId);
+    const pin = await this.#pin(siteId, { set, remove });
+    const repinned = await this.schedules.repinRelease(siteId, id, {
+      expectedRev,
+      items: pin.items,
+      purgePlan: pin.purgePlan,
+    });
+    return repinned.rev;
+  }
+
+  /**
    * Pins items (§6.1): the working-copy version of each `set` node and the live version as its
    * base, the dependency closure, every target body written to the blob store now (the run reads
    * none), and the purge plan `L → L ⊕ items`. `lenient` (re-pins) drops nodes that are live in
@@ -726,8 +781,16 @@ export class ReleaseService {
           now: this.#now(),
         })
       : undefined;
+    const expectedRev = input.approval
+      ? await this.promoteOnApproval(
+          siteId,
+          id,
+          input.expectedRev,
+          when ?? (await this.#record(siteId, id)).release.when,
+        )
+      : input.expectedRev;
     const release = await this.schedules.transitionRelease(siteId, id, {
-      expectedRev: input.expectedRev,
+      expectedRev,
       to: input.approval ? "scheduled" : "awaiting_approval",
       ...(when ? { when } : {}),
       ...(input.approval ? { approval: input.approval } : {}),

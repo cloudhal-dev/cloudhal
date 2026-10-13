@@ -15,6 +15,7 @@ import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   adminBuiltinInputs,
+  followUpDelay,
   nextAlarm,
   releasePurger,
   type SchedulerEnv,
@@ -94,6 +95,12 @@ describe("the SchedulerClock Durable Object (§8.3)", () => {
       nextAlarm(report({ nextWakeAt: new Date(NOW + 5 * 3_600_000).toISOString() }), NOW),
     ).toBe(NOW + 3_600_000);
     expect(nextAlarm(report({}), NOW)).toBe(NOW + 3_600_000);
+    // The cron follow-up: only for work due strictly within the next minute.
+    const at = (ms: number) => new Date(NOW + ms).toISOString();
+    expect(followUpDelay(report({ nextDueAt: at(6_000) }), NOW)).toBe(6_000);
+    expect(followUpDelay(report({ nextDueAt: at(60_000) }), NOW)).toBeUndefined();
+    expect(followUpDelay(report({ nextDueAt: at(0) }), NOW)).toBeUndefined();
+    expect(followUpDelay(report({}), NOW)).toBeUndefined();
     expect(nextAlarm(report({ more: true }), NOW)).toBe(NOW + 1_000);
     expect(nextAlarm(report({ nextWakeAt: new Date(NOW - 5_000).toISOString() }), NOW)).toBe(
       NOW + 1_000,
@@ -239,6 +246,26 @@ describe("a published release's purge (§6.3 after the batch)", () => {
     const done = await new ReleaseService({ graph }).get(site.id, release.id);
     expect(done.release.outcome).toMatchObject({ kind: "published", purge: "tags" });
     expect(woke).toEqual([]);
+  });
+
+  it("a tick late in the minute reports the release due seconds later; the follow-up runs it on time", async () => {
+    // Cloudflare fired this Worker's cron at :54 of each minute (measured live): a release due at
+    // :00 was seen 6 s early and published by the next tick, 54 s late.
+    const due = now + 3_600_000;
+    const { release } = await scheduled(due);
+    const s = siteWorker(() => 200);
+    const early = await tick(due - 6_000, s, []);
+    expect(early.ran).toBe(0);
+    expect(early.nextDueAt).toBe(new Date(due).toISOString());
+    expect(followUpDelay(early, due - 6_000)).toBe(6_000);
+    const followUp = await tick(due, s, []);
+    expect(followUp.ran).toBe(1);
+    const done = await new ReleaseService({ graph }).get(site.id, release.id);
+    expect(done.release.outcome).toMatchObject({ kind: "published", latenessSeconds: 0 });
+    // Nothing due before the next tick: no follow-up.
+    expect(followUp.nextDueAt === undefined || followUpDelay(followUp, due) === undefined).toBe(
+      true,
+    );
   });
 
   it("an empty bucket defers the tags into the purge queue and records `deferred`", async () => {
