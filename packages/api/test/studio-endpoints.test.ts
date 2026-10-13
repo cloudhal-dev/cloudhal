@@ -295,6 +295,8 @@ describe("instance and skills", () => {
         adminMaxHours: 72,
         delivery: ["link"],
       },
+      // RFC-0011: no mail sender, so only Administrator-issued reset links
+      passwordReset: ["admin"],
     });
     const skills = (await (
       await app.request("/api/skills", { headers: { "x-test-user": "1" } })

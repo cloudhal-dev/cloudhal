@@ -43,6 +43,7 @@ const API_ERRORS = [
   "rank",
   "invalid_expiry",
   "delivery_unavailable",
+  "delivery_failed",
   "already_member",
   "too_many_invites",
   "rate_limited",

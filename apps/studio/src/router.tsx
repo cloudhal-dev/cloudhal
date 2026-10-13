@@ -59,6 +59,10 @@ const ResetPasswordPage = lazyRouteComponent(
   () => import("./routes/ResetPasswordPage.tsx"),
   "ResetPasswordPage",
 );
+const ForgotPasswordPage = lazyRouteComponent(
+  () => import("./routes/ForgotPasswordPage.tsx"),
+  "ForgotPasswordPage",
+);
 const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
   () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers"]),
@@ -132,6 +136,12 @@ const inviteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invite",
   component: InvitePage,
+});
+/** RFC-0011: asks for a reset link by email; public, answers the same for every address. */
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/forgot-password",
+  component: ForgotPasswordPage,
 });
 const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -371,6 +381,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   inviteRoute,
   resetPasswordRoute,
+  forgotPasswordRoute,
   indexRoute,
   accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute, teamRoute]),
   siteRoute.addChildren([

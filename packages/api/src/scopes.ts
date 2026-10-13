@@ -87,6 +87,7 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", "/api/invites/:id", "members:invite"],
   ["POST", "/api/invites/inspect", "public"],
   ["POST", "/api/invites/accept", "public"],
+  ["POST", "/api/password-reset/request", "public"],
   ["POST", "/api/password-reset/inspect", "public"],
   ["POST", "/api/password-reset/complete", "public"],
 

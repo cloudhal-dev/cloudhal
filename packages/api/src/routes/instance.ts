@@ -65,6 +65,11 @@ export interface InstanceInfo {
   roles: RolesInfo;
   /** Invite rules (RFC-0005 §7). */
   invites: InvitesInfo;
+  /**
+   * How a forgotten password is reset: by an Administrator's link, and by email when the server
+   * can send (RFC-0011; Studio then offers "Forgot password?").
+   */
+  passwordReset: ("admin" | "email")[];
 }
 
 export interface CommentsFeature {

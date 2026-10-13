@@ -65,6 +65,20 @@ export interface SchedulesConfig {
   readonly plan?: "free" | "paid";
 }
 
+/**
+ * `cloudhal.json` `mail` (RFC-0011): the sender of invites and reset links. Its domain must be
+ * onboarded to Cloudflare Email Service; `cloudhal deploy` binds `send_email` locked to `from`.
+ */
+export interface MailConfig {
+  /** A plain `local@domain` address. */
+  readonly from: string;
+  /** Display name (default: none). */
+  readonly fromName?: string;
+}
+
+/** A plain `local@domain` address: no display name, no spaces or line breaks. */
+const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
 export interface ProjectConfig {
   readonly siteId: string;
@@ -81,12 +95,22 @@ export interface ProjectConfig {
   readonly comments?: CommentsConfig;
   /** Schedules (RFC-0008); absent = automations on, the Free tick budget. */
   readonly schedules?: SchedulesConfig;
+  /** Email delivery (RFC-0011); absent = invites and resets by link only. */
+  readonly mail?: MailConfig;
 }
 
 export const CONFIG_FILE = "cloudhal.json";
 
 /** The keys `ProjectConfig` owns; others (e.g. `media`, read by the starter) are kept on write. */
-const OWN_KEYS = new Set(["siteId", "dataDir", "domains", "analytics", "comments", "schedules"]);
+const OWN_KEYS = new Set([
+  "siteId",
+  "dataDir",
+  "domains",
+  "analytics",
+  "comments",
+  "schedules",
+  "mail",
+]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
 
@@ -126,6 +150,24 @@ export function parseSchedulesConfig(input: unknown): SchedulesConfig | undefine
     ...(typeof o.automations === "boolean" ? { automations: o.automations } : {}),
     ...(o.plan === "free" || o.plan === "paid" ? { plan: o.plan } : {}),
   };
+}
+
+/**
+ * `mail` (RFC-0011). Unlike the lenient blocks above, a `from` that is there but is not a plain
+ * address is an error: mail silently off would hide a typo until the first invite.
+ */
+export function parseMailConfig(input: unknown): MailConfig | undefined {
+  if (input === undefined || input === null) return undefined;
+  if (typeof input !== "object" || Array.isArray(input))
+    throw new Error(`${CONFIG_FILE}: mail must be an object like {"from": "studio@example.com"}`);
+  const o = input as Record<string, unknown>;
+  const from = typeof o.from === "string" ? o.from.trim() : "";
+  if (!MAIL_ADDRESS.test(from) || from.length > 254)
+    throw new Error(
+      `${CONFIG_FILE}: mail.from must be a plain address like "studio@example.com" (no display name; use mail.fromName)`,
+    );
+  const name = typeof o.fromName === "string" ? o.fromName.replace(/[\r\n]+/g, " ").trim() : "";
+  return { from, ...(name ? { fromName: name.slice(0, 100) } : {}) };
 }
 
 /** Whether the deployment offers reader comments: on unless `comments.available` is `false`. */
@@ -182,6 +224,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   const analytics = parseAnalyticsConfig(cfg.analytics);
   const comments = parseCommentsConfig(cfg.comments);
   const schedules = parseSchedulesConfig(cfg.schedules);
+  const mail = parseMailConfig(cfg.mail);
   return {
     siteId: cfg.siteId,
     dataDir: cfg.dataDir ?? ".cloudhal",
@@ -196,6 +239,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
     ...(analytics ? { analytics } : {}),
     ...(comments ? { comments } : {}),
     ...(schedules ? { schedules } : {}),
+    ...(mail ? { mail } : {}),
   };
 }
 

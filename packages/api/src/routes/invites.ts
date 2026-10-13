@@ -8,7 +8,8 @@
  *   `<studio>/invite#chinv_…`, shown once (not with `delivery: "email"`). Re-inviting an email
  *   replaces its pending invite. Errors: 403 `rank`, 400 `invalid_expiry`, 400
  *   `delivery_unavailable`, 409 `already_member`, 409 `too_many_invites` (50 pending), 429
- *   `rate_limited` (20 per inviter per hour)
+ *   `rate_limited` (20 per inviter per hour), 502 `delivery_failed` {details: {code, retryable}}
+ *   (the mail failed; the invite is canceled, RFC-0011)
  * - `DELETE /:id` → `{invite}` (revoked); 409 `invite_not_pending`
  *
  * Public, JSON only (415), 10 per minute per IP (429):
@@ -31,6 +32,8 @@ import { type Context, Hono } from "hono";
 import { actorIdForUser, type StaffService } from "../auth.ts";
 import type { Env } from "../context.ts";
 import { apiError, badRequest, notFound } from "../errors.ts";
+import { MailError } from "../mail.ts";
+import { inviteMail } from "../mail-messages.ts";
 import { param } from "../params.ts";
 import type { InviteRow } from "../staff.ts";
 import {
@@ -77,7 +80,7 @@ export function inviteView(i: InviteRow): InviteView {
   };
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function gone() {
   return apiError(
@@ -250,12 +253,36 @@ export function inviteRoutes(options: {
         tokenHash: await hashToken(token),
       });
       const url = `${studioOrigin(c, options.studioOrigin, options.trustedOrigins)}/invite#${token}`;
-      if (delivery === "email" && mail)
-        await mail.send({
-          to: email,
-          subject: `You are invited to ${await staff.store.deploymentName()}`,
-          text: `${person.name ?? "Someone"} invited you to join as ${role}.\n\nAccept: ${url}\n\nThe link works once and expires ${expiresAt}.`,
-        });
+      if (delivery === "email" && mail) {
+        try {
+          await mail.send(
+            inviteMail({
+              to: email,
+              deployment: await staff.store.deploymentName(),
+              inviter: person.name ?? null,
+              role,
+              url,
+              expiresAt,
+            }),
+          );
+        } catch (e) {
+          // RFC-0011: an invite nobody received never stays pending.
+          const failure = MailError.from(e);
+          await staff.store.cancelInvite(invite.id, person.userId);
+          await auditEvent(c.get("audit"), actor, "member.invite-failed", {
+            inviteId: invite.id,
+            email,
+            role,
+            code: failure.code,
+          });
+          throw apiError(
+            502,
+            "delivery_failed",
+            "the invite could not be emailed, so it was canceled; copy a link instead",
+            { code: failure.code, retryable: failure.retryable },
+          );
+        }
+      }
       await auditEvent(c.get("audit"), actor, "member.invite", {
         inviteId: invite.id,
         email,

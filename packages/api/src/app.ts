@@ -62,6 +62,11 @@ export function createApi(deps: ApiDeps) {
   const app = new Hono<Env>();
   app.onError(errorHandler);
   const clock = deps.now ?? (() => new Date());
+  const defer =
+    deps.defer ??
+    ((task: Promise<unknown>) => {
+      task.catch(() => {});
+    });
   const ownership: OwnershipResolver = deps.staff?.ownership ?? PEOPLE_ONLY_OWNERSHIP;
   // Upload tickets (RFC-0004 §5.5) are signed with a secret every instance shares when there is
   // one; a server without one (local tools) signs with a key of its own process.
@@ -123,6 +128,7 @@ export function createApi(deps: ApiDeps) {
     c.set("ownership", ownership);
     c.set("policy", policy);
     c.set("mail", deps.mail);
+    c.set("defer", defer);
     c.set("now", clock);
     c.set("uploadSecret", uploadSecret);
     c.set("analytics", deps.analytics);
@@ -259,6 +265,7 @@ export function createApi(deps: ApiDeps) {
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
         invites: invitesInfo(Boolean(deps.mail)),
+        passwordReset: deps.staff && deps.mail ? ["admin", "email"] : ["admin"],
       }),
       deps.mcp?.skills ?? [],
     ),
@@ -268,7 +275,7 @@ export function createApi(deps: ApiDeps) {
     const links = { studioOrigin: deps.studioOrigin, trustedOrigins: trusted };
     app.route("/api/members", memberRoutes(links));
     app.route("/api/invites", inviteRoutes(links));
-    app.route("/api/password-reset", passwordResetRoutes);
+    app.route("/api/password-reset", passwordResetRoutes(links));
   }
   app.route("/api/activity", deploymentActivity);
   app.route("/api/notifications", notificationRoutes(clock));

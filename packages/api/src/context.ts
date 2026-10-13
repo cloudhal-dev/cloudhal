@@ -79,8 +79,13 @@ export interface ApiDeps {
    * `/api/password-reset` are mounted; when absent (auth-less servers, tests) every person is `*`.
    */
   readonly staff?: StaffService;
-  /** Optional email delivery for invites (RFC-0005 §7.2). */
+  /** Optional email delivery: invites (RFC-0005 §7.2) and reset links (RFC-0011). */
   readonly mail?: MailSender;
+  /**
+   * Runs work after the response (Workers: `ctx.waitUntil`). Default: started, not awaited. The
+   * email reset request sends this way, so its answer takes as long for members as for anyone.
+   */
+  readonly defer?: (task: Promise<unknown>) => void;
   /** Origin of the Studio that serves `/invite` and `/reset-password` (default: the request's). */
   readonly studioOrigin?: string;
   /**
@@ -127,6 +132,7 @@ export type Env = {
     /** The MCP tools' policies, for "could the approver make this call?" (RFC-0005 §6). */
     policy: () => PolicyEngine;
     mail: MailSender | undefined;
+    defer: (task: Promise<unknown>) => void;
     now: () => Date;
     /** Signs upload tickets (RFC-0004 §5.5): the preview secret, the MCP state key, or random. */
     uploadSecret: UploadSecret;

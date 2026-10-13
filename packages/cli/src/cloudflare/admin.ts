@@ -10,6 +10,7 @@ import {
   adminWorkerConfig,
   type CommentsDeployment,
   type DeploymentNames,
+  type MailDeployment,
   readExistingIds,
   type SchedulerTicker,
   type SchedulesDeployment,
@@ -40,6 +41,8 @@ export async function prepareAdminWorker(options: {
   scheduler?: SchedulerTicker | undefined;
   /** The tick budget and the automations switch (RFC-0008 §8.2, §11.6). */
   schedules?: SchedulesDeployment | undefined;
+  /** Email delivery (RFC-0011): the `send_email` binding and the sender vars. */
+  mail?: MailDeployment | undefined;
 }): Promise<PreparedAdmin> {
   const dir = path.join(options.projectDir, options.dataDir, "deploy", "admin");
   await mkdir(dir, { recursive: true });
@@ -67,6 +70,7 @@ export async function prepareAdminWorker(options: {
       ...(options.comments ? { comments: options.comments } : {}),
       ...(options.scheduler ? { scheduler: options.scheduler } : {}),
       ...(options.schedules ? { schedules: options.schedules } : {}),
+      ...(options.mail ? { mail: options.mail } : {}),
     }),
     "Cloudhal admin Worker (API, auth, MCP, Studio)",
   );

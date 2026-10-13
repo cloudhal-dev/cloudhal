@@ -13,6 +13,7 @@
     "./admin": "./src/admin-worker.ts",
     "./workerd-prelude": "./src/workerd-prelude.ts",
     "./purge": "./src/purge.ts",
+    "./mail": "./src/mail.ts",
     "./comments": "./src/comments.ts",
     "./scheduler": "./src/scheduler.ts"
   },
@@ -59,6 +60,10 @@
       "./purge": {
         "types": "./dist/src/purge.d.ts",
         "default": "./dist/src/purge.js"
+      },
+      "./mail": {
+        "types": "./dist/src/mail.d.ts",
+        "default": "./dist/src/mail.js"
       },
       "./comments": {
         "types": "./dist/src/comments.d.ts",

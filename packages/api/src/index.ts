@@ -4,4 +4,5 @@ export { createReleaseApprovalCheck } from "@cloudhal/mcp-server/schedules";
 export { type CloudhalApi, createApi } from "./app.ts";
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";
+export { MailError, type MailMessage, type MailSender } from "./mail.ts";
 export { releaseApprovalCheck, releaseRights } from "./schedules.ts";
