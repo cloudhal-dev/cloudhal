@@ -60,6 +60,7 @@ import {
   DEFAULT_COMMENTS_RATE_LIMIT,
   DEFAULT_SCHEDULES_DEPLOYMENT,
   type DeploymentNames,
+  type ObservabilityDeployment,
   rateLimitNamespaceId,
   readExistingIds,
   readExistingVars,
@@ -707,6 +708,16 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     log(
       "scheduler: Workers Free tick budget (40 statements, 1 release a tick). On Workers Paid, deploy once with `--plan paid` (remembered) or set `schedules.plan` in cloudhal.json",
     );
+  // Workers Logs sampling and opt-in Traces for both Workers; Smart Placement for the admin Worker.
+  const observability: ObservabilityDeployment = observabilityOf(cfg);
+  if (observability.traces !== false)
+    log(
+      `observability: Workers Traces on for ${Math.round(observability.traces * 100)}% of requests (stored traces count toward Cloudflare Observability usage from 2026-12-01)`,
+    );
+  if (cfg.placement === "smart")
+    log(
+      "placement: Smart Placement on for the admin Worker; compare its request duration in the Workers dashboard before and after (docs/guides/cloudflare-hardening.md)",
+    );
   // RFC-0011: email delivery through the Email Service binding, locked to `mail.from`.
   if (cfg.mail)
     log(
@@ -727,6 +738,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       ...(cfg.domains?.site ? { domain: cfg.domains.site, siteHosts: [cfg.domains.site] } : {}),
       ...(analytics ? { analytics } : {}),
       comments,
+      observability,
     }),
     `Cloudhal site Worker for ${site.name}`,
   );
@@ -753,6 +765,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       scheduler: ticker,
       schedules,
       mail: cfg.mail,
+      observability,
+      placement: cfg.placement,
     });
   const admin = await prepareAdmin(analytics, comments, scheduler);
 
@@ -945,5 +959,16 @@ function commentsResult(
     ...(c.available ? { cron: scheduler === "cron" } : {}),
     ...(c.rateLimit ? { rateLimit: true } : {}),
     ...(purged ? { purged } : {}),
+  };
+}
+
+/** `cloudhal.json` `observability` as the generated configs need it. */
+export function observabilityOf(
+  cfg: Pick<ProjectConfig, "observability">,
+): ObservabilityDeployment {
+  const t = cfg.observability?.traces;
+  return {
+    logs: cfg.observability?.logs ?? 1,
+    traces: t === true ? 1 : typeof t === "number" && t > 0 ? t : false,
   };
 }

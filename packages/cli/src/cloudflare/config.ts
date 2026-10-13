@@ -158,6 +158,8 @@ export function siteWorkerConfig(
     comments?: CommentsDeployment;
     /** Extra hostnames the site answers on (custom domains): analytics and comments check them. */
     siteHosts?: readonly string[];
+    /** Logs sampling and opt-in traces (default: every log, no traces). */
+    observability?: ObservabilityDeployment;
   },
 ) {
   const a = n.analytics;
@@ -209,7 +211,40 @@ export function siteWorkerConfig(
     ...customDomain(n.domain),
     // Workers Cache: published pages are cached until a publish purges `cloudhal-site-<id>`.
     cache: { enabled: true },
-    observability: { enabled: true },
+    observability: observabilitySettings(n.observability),
+  };
+}
+
+/** What the generated configs need for Workers Logs and Traces (`cloudhal.json` `observability`). */
+export interface ObservabilityDeployment {
+  /** Share of requests whose logs are kept (1 = all). */
+  readonly logs: number;
+  /** Share of requests traced; `false` = no traces. */
+  readonly traces: number | false;
+}
+
+/** Every log, no traces: what a deployment that says nothing gets. */
+export const DEFAULT_OBSERVABILITY: ObservabilityDeployment = { logs: 1, traces: false };
+
+/**
+ * The `observability` block of both Workers (https://developers.cloudflare.com/workers/observability/
+ * logs/workers-logs/, …/traces/). Query strings are redacted from logs and traces: preview links
+ * carry their signed token there (`?cloudhal-preview=…`), and logs are readable by every account
+ * member with Workers access.
+ */
+export function observabilitySettings(o: ObservabilityDeployment = DEFAULT_OBSERVABILITY) {
+  return {
+    enabled: true,
+    ...(o.logs < 1 ? { head_sampling_rate: o.logs } : {}),
+    redact_query_string: true,
+    ...(o.traces === false
+      ? {}
+      : {
+          traces: {
+            enabled: true,
+            ...(o.traces < 1 ? { head_sampling_rate: o.traces } : {}),
+          },
+        }),
   };
 }
 
@@ -238,6 +273,10 @@ export function adminWorkerConfig(
     schedules?: SchedulesDeployment;
     /** Email delivery: a `send_email` binding locked to this one sender (RFC-0011). */
     mail?: MailDeployment;
+    /** Logs sampling and opt-in traces (default: every log, no traces). */
+    observability?: ObservabilityDeployment;
+    /** Smart Placement: run next to D1 rather than next to the person (default: off). */
+    placement?: "smart";
   },
 ) {
   const names = workerNames(n);
@@ -293,6 +332,9 @@ export function adminWorkerConfig(
     migrations: [{ tag: SCHEDULER_CLOCK_MIGRATION, new_sqlite_classes: [SCHEDULER_CLOCK_CLASS] }],
     triggers: { crons: scheduler === "cron" ? [MINUTE_CRON] : [] },
     ...customDomain(n.domain),
+    // Every API call makes several D1 round trips; Smart Placement may run the Worker near the
+    // database (fetch handler only: the cron and the clock's alarm are unaffected).
+    ...(n.placement === "smart" ? { placement: { mode: "smart" } } : {}),
     assets: {
       directory: n.studioDir,
       binding: "ASSETS",
@@ -301,7 +343,7 @@ export function adminWorkerConfig(
       not_found_handling: "none",
       run_worker_first: ["/api/*", "/mcp", "/mcp/*", "/.well-known/*"],
     },
-    observability: { enabled: true },
+    observability: observabilitySettings(n.observability),
   };
 }
 
