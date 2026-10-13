@@ -122,5 +122,6 @@ try {
   console.log("\nSmoke test passed.");
 } finally {
   if (keep) console.log(`kept ${tmp}`);
-  else await rm(tmp, { recursive: true, force: true });
+  // The stopped dev server can still be flushing node_modules/.vite: retry instead of ENOTEMPTY.
+  else await rm(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 }
