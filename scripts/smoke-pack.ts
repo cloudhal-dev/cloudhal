@@ -96,10 +96,14 @@ try {
 
   // cloudhal dev serves live pages
   const port = 41000 + Math.floor(Math.random() * 10000);
+  // Its own process group: `npx` does not pass a SIGTERM on to `cloudhal dev`, whose orphan kept
+  // the script alive and wrote node_modules/.vite while the temp project was being removed.
   const dev = spawn("npx", ["cloudhal", "dev", "--port", String(port)], {
     cwd: site,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
+  const exited = new Promise((resolve) => dev.once("exit", resolve));
   try {
     let ok = false;
     for (let i = 0; i < 120 && !ok; i++) {
@@ -114,7 +118,12 @@ try {
     if (!ok) throw new Error("cloudhal dev did not serve the site");
     console.log("✓ cloudhal dev serves the site");
   } finally {
-    dev.kill("SIGTERM");
+    try {
+      if (dev.pid) process.kill(-dev.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
+    await exited;
   }
 
   run("npx", ["cloudhal", "deploy", "--dry-run"], site);
@@ -122,6 +131,6 @@ try {
   console.log("\nSmoke test passed.");
 } finally {
   if (keep) console.log(`kept ${tmp}`);
-  // The stopped dev server can still be flushing node_modules/.vite: retry instead of ENOTEMPTY.
+  // A dev server child may still be flushing node_modules/.vite for a moment after the group stops.
   else await rm(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 }
