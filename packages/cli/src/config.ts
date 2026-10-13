@@ -77,7 +77,7 @@ export interface MailConfig {
 }
 
 /**
- * `cloudhal.json` `observability`: what both Workers send to Workers Logs and Traces. Logs are on
+ * `cloudhal.json` `observability` (RFC-0013): what both Workers send to Workers Logs and Traces. Logs are on
  * for every request unless sampled down; traces are opt-in (stored traces are billed from
  * 2026-12-01). Query strings are always redacted: preview links carry their token there.
  */
@@ -112,7 +112,7 @@ export interface ProjectConfig {
   /** Workers Logs sampling and opt-in Traces for both Workers; absent = every log, no traces. */
   readonly observability?: ObservabilityConfig;
   /**
-   * `"smart"`: Smart Placement for the admin Worker, which runs next to D1 instead of next to the
+   * `"smart"` (RFC-0013): Smart Placement for the admin Worker, which runs next to D1 instead of next to the
    * visitor (it makes several database round trips per request). Absent = default placement.
    */
   readonly placement?: "smart";

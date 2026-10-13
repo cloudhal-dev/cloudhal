@@ -51,9 +51,14 @@ export const HTML_ALLOWLIST: { elements: Record<string, readonly string[]>; glob
   - `th`/`td`: `colspan rowspan scope headers`.
   - `time`: `datetime`.
   - `details`: `open`.
-  - `audio`/`video`: `src poster controls preload muted loop playsinline`, with URLs checked by `safeSrc`.
-  - `source`/`track`: `src type kind srclang label`, with `src` checked by `safeSrc`.
-- **Never kept:** event handlers (`on*`), `style`, `srcset` (v1), `formaction`, `xlink:*`, `data-*`, and any URL whose scheme is not `http`, `https`, `mailto`, `tel` or relative.
+  - `audio`/`video`: `src poster controls preload muted loop playsinline`; `poster` is checked like an image, `src` like other media (below).
+  - `source`/`track`: `src type kind srclang label`; `src` is checked like other media.
+- **URLs**, the same rules markdown already applies (`markdown.ts`):
+  - links (`a href`): `safeHref`, so `http`, `https`, `mailto`, `tel` or relative;
+  - images (`img src`, `video poster`): `safeSrc`, so `http`, `https`, relative, or a raster `data:image/(png|jpeg|gif|webp|avif);base64,…` URL. Never `data:image/svg+xml`, never `mailto`/`tel`;
+  - other media (`audio`/`video`/`source`/`track` `src`): `http`, `https` or relative only, so no `data:` URL.
+  - A URL that fails its rule drops the attribute; an `img` without a `src` is dropped.
+- **Never kept:** event handlers (`on*`), `style`, `srcset` (v1), `formaction`, `xlink:*` and `data-*` attributes.
 
 ### Invariants
 1. No element, attribute or URL outside the allowlist reaches a rendered page, a preview, a feed or a static build.
