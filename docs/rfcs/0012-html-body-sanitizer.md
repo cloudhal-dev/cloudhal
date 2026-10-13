@@ -87,7 +87,10 @@ export const HTML_ALLOWLIST: { elements: Record<string, readonly string[]>; glob
   - SVG inline in the body.
   The changeset lists what is dropped, and `cloudhal snapshot` diffs are unaffected.
 - **Bundle size:** parse5 adds to the site Worker bundle. The growth is measured before merge and recorded in the PR, against the Workers script size limits.
-  - *Implementation note (measured 2026-10-13):* the sanitizer bundles to about 151 KB minified, 42 KB gzipped, parse5 and `entities` included (esbuild, `--minify`). The site Worker was 2,468 KiB, 510 KiB gzipped, in the smoke test's dry run, so it grows to roughly 552 KiB gzipped. The Workers Free limit is 3 MB gzipped.
+  - *Implementation note (measured 2026-10-13, `pnpm smoke:pack` dry run with wrangler 4.148):*
+    - site Worker: 2,468 → 2,712 KiB, 510 → 566 KiB gzipped (+56 KiB);
+    - admin Worker, whose previews use the renderer: 1,287 → 1,343 KiB gzipped;
+    - both stay far under the Workers Free limit of 3 MB gzipped.
 - **Rollout:** one release. Rollback: revert the renderer; stored content was never changed.
 
 ## Security & policy impact

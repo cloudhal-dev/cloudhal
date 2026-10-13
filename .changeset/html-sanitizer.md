@@ -15,4 +15,4 @@ HTML bodies are sanitized when rendered (RFC-0012, ADR-0026).
 - **Stored content is never changed:** a later, wider allowlist applies to old content without a migration.
 - **The Studio preview** of a rich-text section with an HTML body now goes through the same sanitizer.
 
-`safeHref` and `safeSrc` moved to `src/safe-urls.ts`; `@cloudhal/astro-renderer/markdown` still exports them. The site Worker grows by about 42 KB gzipped (parse5).
+`safeHref` and `safeSrc` moved to `src/safe-urls.ts`; `@cloudhal/astro-renderer/markdown` still exports them. The site and admin Workers each grow by about 56 KiB gzipped (parse5).
