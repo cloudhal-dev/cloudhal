@@ -63,8 +63,11 @@ const secrets = {
 };
 const human = { kind: "human" as const, id: "user_gatescf0001", name: "Halil" };
 const browser = { origin: "https://admin.example" };
-/** The gate that opens during the test, after `t`. */
-const SOON_MS = 20_000;
+/**
+ * How far ahead of the cache-cap test its own gate is set: room for one publish and a few fetches.
+ * The gate is placed when that test starts, never in `beforeAll`, so no earlier test races it.
+ */
+const SOON_MS = 10_000;
 
 type Harness = ReturnType<typeof createTestHarness>;
 
@@ -161,7 +164,7 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     await local.close();
     // The fixture is written straight into D1 once the Workers run, so `t` is "now" for them.
     remote = new SiteGraphStore({ ...target, gates: GATES_ENFORCED });
-    fx = await applyGatesFixture(remote, p.siteId, Date.now(), { soonMs: SOON_MS });
+    fx = await applyGatesFixture(remote, p.siteId, Date.now());
     const snap = await remote.createSnapshot(p.siteId, { actor: human, reason: "publish" });
     await remote.publish((await remote.getSite(p.siteId)) as Site, snap.id);
     snapshotId = snap.id;
@@ -221,7 +224,6 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
         "embargoed entry",
         "embargoed page",
         "entry closing at t",
-        "entry opening soon",
         "expired entry",
         "expired page",
       ].sort(),
@@ -281,7 +283,26 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
       );
       return Number(m?.[1]);
     };
-    const soon = fx.t + SOON_MS;
+    // A gate a few seconds from now, published like any other: the next gate after it is t+1h.
+    const news = await remote.getTermBySlug(p.siteId, "category", "news");
+    if (!news) throw new Error("no seed term");
+    const soon = Date.now() + SOON_MS;
+    await remote.createContentEntry({
+      siteId: p.siteId,
+      collection: "posts",
+      slug: "opens-soon",
+      locale: "en",
+      status: "published",
+      title: "Story ZQXU7",
+      body: { format: "markdown", value: "Body of ZQXU7." },
+      fields: {},
+      tags: [],
+      terms: { category: { ids: [news.id], primary: news.id } },
+      author: human,
+      availability: { from: new Date(soon).toISOString() },
+    });
+    const snap = await remote.createSnapshot(p.siteId, { actor: human, reason: "publish" });
+    await remote.publish((await remote.getSite(p.siteId)) as Site, snap.id);
     const left = Math.ceil((soon - Date.now()) / 1000);
     for (const route of ["/", "/rss.xml", "/sitemap.xml", "/posts/hello-world", "/category/news"]) {
       const age = await maxAge(route);
@@ -293,7 +314,7 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     await new Promise((r) => setTimeout(r, Math.max(0, soon - Date.now()) + 1000));
     const opened = await siteFetch("/posts/opens-soon");
     expect(opened.status).toBe(200);
-    expect(await opened.text()).toContain("ZQX7");
+    expect(await opened.text()).toContain("ZQXU7");
     expect(await (await siteFetch("/rss.xml")).text()).toContain("/posts/opens-soon</link>");
     // the next gate is t+1h now
     const age = await maxAge("/");

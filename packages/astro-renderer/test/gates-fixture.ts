@@ -6,13 +6,15 @@
  *
  * - entries: embargoed until t+1h (cover image and an inline image only it uses, a tag only it
  *   has, related to "Hello, world" through News), expired at t−1h, opening exactly at t, closing
- *   exactly at t; optionally one opening `soonMs` after t (a real gate crossing on workerd);
+ *   exactly at t;
  * - pages: `/launch` embargoed until t+2h, `/old-campaign` expired at t−2h;
  * - a shared image used by the embargoed entry and by "Hello, world" (never gated);
  * - a `primary` menu linking About, the embargoed page and the embargoed entry.
  *
- * Every gated node carries a marker (`ZQX…`) in its title and summary or heading, so a sweep can
- * look for leaks as plain text in any body or header.
+ * Every gated node carries a marker (`ZQXU…`) in its title and summary or heading, so a sweep can
+ * look for leaks as plain text in any body or header. The `U` keeps a marker out of every generated
+ * id (Crockford base32 has no I, L, O or U) and every hex hash, so a match is a leak, never a random
+ * id that happens to contain the marker (a bare `ZQX6` did, about once in a thousand runs).
  */
 import type { Asset, ContentEntry, Page } from "@cloudhal/core-contracts";
 import { isAvailable, type SiteGraphStore } from "@cloudhal/core-ts";
@@ -50,7 +52,6 @@ export async function applyGatesFixture(
   store: SiteGraphStore,
   siteId: string,
   t: number,
-  options: { soonMs?: number } = {},
 ): Promise<GatesFixture> {
   const iso = (ms: number) => new Date(ms).toISOString();
   const site = await store.getSite(siteId);
@@ -115,13 +116,13 @@ export async function applyGatesFixture(
 
   const embargoed = await entry(
     "embargoed-scoop",
-    "ZQX1",
+    "ZQXU1",
     { from: iso(t + HOUR) },
     {
       coverImage: { assetId: ridingAsset.id, src: "", alt: "" },
       body: {
         format: "markdown",
-        value: `Body of ZQX1.\n\n![Inline](asset:${ridingAsset.id})\n\n![Shared](asset:${sharedAsset.id})`,
+        value: `Body of ZQXU1.\n\n![Inline](asset:${ridingAsset.id})\n\n![Shared](asset:${sharedAsset.id})`,
       },
       terms: {
         category: { ids: [news.id], primary: news.id },
@@ -129,13 +130,9 @@ export async function applyGatesFixture(
       },
     },
   );
-  const expired = await entry("expired-offer", "ZQX2", { until: iso(t - HOUR) });
-  const opensNow = await entry("opens-now", "ZQX3", { from: iso(t) });
-  const closesNow = await entry("closes-now", "ZQX4", { until: iso(t) });
-  const soon =
-    options.soonMs === undefined
-      ? undefined
-      : await entry("opens-soon", "ZQX7", { from: iso(t + options.soonMs) });
+  const expired = await entry("expired-offer", "ZQXU2", { until: iso(t - HOUR) });
+  const opensNow = await entry("opens-now", "ZQXU3", { from: iso(t) });
+  const closesNow = await entry("closes-now", "ZQXU4", { until: iso(t) });
 
   let current = (await store.getSite(siteId)) ?? site;
   const page = async (
@@ -158,8 +155,8 @@ export async function applyGatesFixture(
     current = r.site;
     return r.page;
   };
-  const launch = await page("/launch", "ZQX5", { from: iso(t + 2 * HOUR) });
-  const campaign = await page("/old-campaign", "ZQX6", { until: iso(t - 2 * HOUR) });
+  const launch = await page("/launch", "ZQXU5", { from: iso(t + 2 * HOUR) });
+  const campaign = await page("/old-campaign", "ZQXU6", { until: iso(t - 2 * HOUR) });
 
   await store.createMenu({
     siteId,
@@ -177,13 +174,12 @@ export async function applyGatesFixture(
     return { name, node, path, leaks: [node.id, path, marker] };
   };
   const watched: Watched[] = [
-    watch("embargoed entry", embargoed, "ZQX1"),
-    watch("expired entry", expired, "ZQX2"),
-    watch("entry opening at t", opensNow, "ZQX3"),
-    watch("entry closing at t", closesNow, "ZQX4"),
-    watch("embargoed page", launch, "ZQX5"),
-    watch("expired page", campaign, "ZQX6"),
-    ...(soon ? [watch("entry opening soon", soon, "ZQX7")] : []),
+    watch("embargoed entry", embargoed, "ZQXU1"),
+    watch("expired entry", expired, "ZQXU2"),
+    watch("entry opening at t", opensNow, "ZQXU3"),
+    watch("entry closing at t", closesNow, "ZQXU4"),
+    watch("embargoed page", launch, "ZQXU5"),
+    watch("expired page", campaign, "ZQXU6"),
   ];
   const gates = [
     ...new Set(
