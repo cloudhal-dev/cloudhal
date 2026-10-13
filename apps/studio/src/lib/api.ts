@@ -179,6 +179,11 @@ export type AgentScope =
   | "comments:moderate:own"
   | "comments:reply"
   | "comments:reply:own"
+  | "schedules:read"
+  | "schedules:write"
+  | "schedules:write:own"
+  | "releases:publish"
+  | "releases:publish:own"
   | "*";
 
 /** Scopes only a person holds through their role: never on a key (RFC-0005 I7). */

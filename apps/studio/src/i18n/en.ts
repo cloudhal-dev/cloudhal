@@ -615,6 +615,11 @@ export const en = {
       "comments:moderate:own": "Label and hide comments on your own articles",
       "comments:reply": "Draft replies to comments; you publish them",
       "comments:reply:own": "Draft replies on your own articles; you publish them",
+      "schedules:read": "See the schedule, releases and automation runs",
+      "schedules:write": "Propose and schedule releases, embargoes and expiries",
+      "schedules:write:own": "Schedule releases of your own pages and articles",
+      "releases:publish": "Approve releases; in Auto mode, low-risk ones run without you",
+      "releases:publish:own": "Approve releases when every item is your own",
     },
     modes: {
       legend: "Mode",
