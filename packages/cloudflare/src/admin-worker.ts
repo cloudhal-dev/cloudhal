@@ -52,6 +52,7 @@ import { siteGateSupport } from "./features.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
   type BackstopState,
+  followUpDelay,
   releasePurger,
   requestBackstop,
   runAdminTick,
@@ -413,15 +414,25 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
     ): Promise<void> {
       const sql = new D1Driver(env.DB);
       await ensureMigrated(sql);
-      try {
-        await runAdminTick(env, {
+      const tick = (now: Date) =>
+        runAdminTick(env, {
           trigger: "cron",
-          now: new Date(controller.scheduledTime || Date.now()),
+          now,
           log,
-          analytics: (s, now) => adminAnalytics(env, s, { now: () => now, log }),
+          analytics: (s, at) => adminAnalytics(env, s, { now: () => at, log }),
           commentsOn: commentsOn(env),
           waitUntil: (p) => ctx.waitUntil(p),
         });
+      try {
+        const started = controller.scheduledTime || Date.now();
+        const report = await tick(new Date(started));
+        // Work due before the next tick runs at its time, not up to a minute later.
+        const wait = followUpDelay(report, Math.max(started, Date.now()));
+        if (wait !== undefined) {
+          const due = Math.max(started, Date.now()) + wait;
+          await new Promise((resolve) => setTimeout(resolve, wait));
+          await tick(new Date(Math.max(Date.now(), due)));
+        }
       } catch (e) {
         log(`schedules tick (cron) failed: ${e instanceof Error ? e.message : String(e)}`);
       }

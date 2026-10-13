@@ -72,6 +72,12 @@ export interface TickReport {
   more: boolean;
   /** The next instant anything is due (canonical), when known. */
   nextWakeAt?: string;
+  /**
+   * The next instant something is really due (a release, an occurrence, a window close, a system
+   * job), before `wake: "minute"` caps `nextWakeAt` at the next minute boundary. A cron tick whose
+   * trigger fires late in the minute uses it to run that work on time (`followUpDelay`).
+   */
+  nextDueAt?: string;
   /** Statements this tick executed, when it was metered. */
   statements?: number;
 }
@@ -855,6 +861,7 @@ export async function runDue(nowDate: Date, deps: RunDueDeps): Promise<TickRepor
   // Something due but left (a paused site, no executor) must not make an alarm fire in a loop.
   if (nextWake && instantMs(nextWake) <= instantMs(now))
     nextWake = canonicalInstant(instantMs(now) + MINUTE_MS);
+  if (nextWake && instantMs(nextWake) > instantMs(now)) report.nextDueAt = nextWake;
   if (deps.wake === "minute") {
     const nextMinute = canonicalInstant(
       Math.floor(instantMs(now) / MINUTE_MS) * MINUTE_MS + MINUTE_MS,
