@@ -10,7 +10,7 @@ catalogMode: strict
 catalog:
   "@biomejs/biome": 2.5.15
   "@changesets/cli": 3.0.3
-  "@types/node": ^24.0.0
+  "@types/node": ^26.6.5
   ajv: 8.20.0
   ajv-formats: 3.0.1
   json-schema-to-typescript: 16.0.0
