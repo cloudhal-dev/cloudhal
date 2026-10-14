@@ -5,11 +5,14 @@
  * Names are plain English words shared by every theme (`testimonial`, `pricing-table`), never
  * prefixed with the theme: content written under one theme renders under any other that defines
  * the same name. The built-ins (`callout`, `button`, `embed`, `faq`) are reserved; restyle them
- * through `blocks` in `theme.ts` instead. Keep this file free of Astro and DOM imports.
+ * through `blocks` in `theme.ts` instead.
+ *
+ * Keep this file data only, with type imports only: the CLI loads it on its own (Studio, agents,
+ * deploy) and checks every type, so it needs nothing from the project at run time.
  */
-import { defineBlockTypes } from "@cloudhal/core-ts/blocks";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
 
-export const blockTypes = defineBlockTypes([
+export const blockTypes: readonly BlockType[] = [
   {
     name: "testimonial",
     title: { en: "Testimonial", tr: "Referans" },
@@ -39,4 +42,4 @@ export const blockTypes = defineBlockTypes([
       markdown: "This changed how we publish.",
     },
   },
-]);
+];

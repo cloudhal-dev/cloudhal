@@ -20,7 +20,7 @@ cloudhal build    # static HTML from the published (or latest) snapshot
 
 ## Blocks (`src/blocks.ts`)
 Typed blocks (RFC-0015) go in page sections and inside article and rich-text bodies. Cloudhal ships `callout`, `button`, `embed` and `faq`; this theme adds `testimonial`.
-- **Declare** a type in `src/blocks.ts` with `defineBlockTypes`: a plain English name shared by every theme (`pricing-table`, never `mytheme-pricing`), where it may go, its props in the JSON Schema subset, whether it wraps text, and an example. The file is data only: no Astro or DOM imports.
+- **Declare** a type in `src/blocks.ts` (`blockTypes`): a plain English name shared by every theme (`pricing-table`, never `mytheme-pricing`), where it may go, its props in the JSON Schema subset, whether it wraps text, and an example. The file is data only, with type imports only (`import type { BlockType }`); the CLI checks every type.
 - **Render** it with a component in `theme.ts` → `blocks` (`{ testimonial: Testimonial }`). The component gets `{ props, content, contentHtml, media }`. `contentHtml` is the wrapped text, already rendered safely; props are checked against the type first. A built-in may be listed there too, to restyle it.
 - `cloudhal studio` and `cloudhal mcp` read the file, so Studio's forms and `/` menu and agents (`list_block_types`) offer the type. `cloudhal deploy` checks it and bundles it into the admin Worker.
 

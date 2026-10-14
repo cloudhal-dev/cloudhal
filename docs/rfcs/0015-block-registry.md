@@ -239,7 +239,7 @@ Status:
   - `get_body` adds `props` to typed blocks. `create_page`, `update_page`, `create_entry`, `update_entry` and `edit_body` report `unknownBlocks`: types the site does not know, kept as written. The page tools' `sections` say how to write `component` sections.
   - AI commands (RFC-0016) are told to keep directive lines exactly as written and edit only the text between them.
 - **6d, first part, shipped.**
-  - A theme declares its types in `src/blocks.ts` (`blockTypes`). `cloudhal studio` and `cloudhal mcp` load the file into the store's registry (`openLocalStore(dir, { blocks })`). `cloudhal deploy` checks it before building anything and imports it in the generated admin Worker entry (`createAdminWorker({ skills, blockTypes })`).
+  - A theme declares its types in `src/blocks.ts` (`blockTypes`). Unlike the §6 sketch, the file uses type imports only (`import type { BlockType }`) rather than calling `defineBlockTypes`, so the CLI can load it without the project's dependencies; the CLI checks every type itself. `cloudhal studio` and `cloudhal mcp` load the file into the store's registry (`openLocalStore(dir, { blocks })`). `cloudhal deploy` checks it before building anything and imports it in the generated admin Worker entry (`createAdminWorker({ skills, blockTypes })`).
   - Scheduled releases still write through a built-ins registry: theme types count as unknown there and are kept, so they are never refused.
   - Theme components now render inside bodies too:
     - `Body.astro` and `EntryArticle.astro` (`renderBodyParts`) cut the body's HTML where the theme's blocks go, after their props were checked;

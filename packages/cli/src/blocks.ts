@@ -1,6 +1,6 @@
 /**
  * The theme's block types (RFC-0015 §6): `src/blocks.ts` in the project, pure data exported as
- * `blockTypes` (`defineBlockTypes([...])`). `cloudhal studio`, `mcp` and `deploy` load it so the
+ * `blockTypes` (type imports only, so it loads without the project's dependencies). `cloudhal studio`, `mcp` and `deploy` load it so the
  * store validates, Studio offers and agents list the theme's types next to the built-ins.
  */
 import { stat } from "node:fs/promises";
@@ -36,7 +36,14 @@ export async function blockTypesFile(projectDir: string): Promise<string | undef
 export async function loadBlockRegistry(projectDir: string): Promise<BlockRegistry> {
   const file = await blockTypesFile(projectDir);
   if (!file) return createBlockRegistry();
-  const mod = (await import(pathToFileURL(file).href)) as { blockTypes?: unknown };
+  let mod: { blockTypes?: unknown };
+  try {
+    mod = (await import(pathToFileURL(file).href)) as { blockTypes?: unknown };
+  } catch (e) {
+    throw new Error(
+      `${BLOCK_TYPES_FILE}: ${(e as Error).message}. Keep the file data only, with type imports only (\`import type\`).`,
+    );
+  }
   if (!Array.isArray(mod.blockTypes))
     throw new Error(`${BLOCK_TYPES_FILE}: export \`blockTypes\` (defineBlockTypes([...]))`);
   try {
