@@ -54,6 +54,7 @@ import {
 import { isCloudhalCacheTag } from "./cache-tags.ts";
 import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments.ts";
 import { SITE_CSP } from "./csp.ts";
+import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 
 interface Env {
@@ -362,6 +363,14 @@ function withSecurityHeaders(response: Response): Response {
   if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
   const headers = new Headers(response.headers);
   if (!headers.has("content-security-policy")) headers.set("content-security-policy", SITE_CSP);
+  // A page with a video player asked for its frames (RFC-0015 §4): this page only.
+  if (headers.has(EMBED_HEADER)) {
+    headers.set(
+      "content-security-policy",
+      withEmbedFrames(headers.get("content-security-policy") ?? SITE_CSP),
+    );
+    headers.delete(EMBED_HEADER);
+  }
   headers.set("x-content-type-options", "nosniff");
   headers.set("referrer-policy", "strict-origin-when-cross-origin");
   return new Response(response.body, {

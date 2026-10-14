@@ -1,7 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE_CSP } from "./csp.ts";
+import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
 export const CLOUDHAL_ASSETS_RULE = "/_cloudhal/*";
@@ -34,14 +35,17 @@ export const STATIC_SECURITY_RULE = "/*";
  * content gets the same defence in depth wherever the site is hosted. A `/*` rule already in the
  * file (the owner's own) is kept as it is; idempotent.
  */
-export async function writeStaticSecurityHeaders(dir: URL | string): Promise<boolean> {
+export async function writeStaticSecurityHeaders(
+  dir: URL | string,
+  options: { embeds?: boolean } = {},
+): Promise<boolean> {
   const root = typeof dir === "string" ? dir : fileURLToPath(dir.href);
   const file = path.join(root, "_headers");
   const existing = await readFile(file, "utf8").catch(() => "");
   if (existing.split("\n").some((line) => line.trim() === STATIC_SECURITY_RULE)) return false;
   const rule = [
     STATIC_SECURITY_RULE,
-    `  Content-Security-Policy: ${SITE_CSP}`,
+    `  Content-Security-Policy: ${options.embeds ? withEmbedFrames(SITE_CSP) : SITE_CSP}`,
     "  X-Content-Type-Options: nosniff",
     "  Referrer-Policy: strict-origin-when-cross-origin",
     "",
@@ -50,4 +54,26 @@ export async function writeStaticSecurityHeaders(dir: URL | string): Promise<boo
     existing === "" || existing.endsWith("\n\n") ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
   await writeFile(file, `${existing}${separator}${rule}`);
   return true;
+}
+
+const rootOf = (dir: URL | string) => (typeof dir === "string" ? dir : fileURLToPath(dir.href));
+
+/** Writes the click-to-load player module (RFC-0015 §4) into the build's `/_cloudhal/`. */
+export async function writeEmbedClient(dir: URL | string): Promise<void> {
+  const file = path.join(rootOf(dir), ...EMBED_SCRIPT.path.split("/").filter(Boolean));
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, EMBED_SCRIPT.code);
+}
+
+/** Whether any page of a static build shows a video player (its HTML marks one). */
+export async function buildShowsEmbeds(dir: URL | string): Promise<boolean> {
+  const entries = await readdir(rootOf(dir), { recursive: true, withFileTypes: true }).catch(
+    () => [],
+  );
+  for (const e of entries) {
+    if (!e.isFile() || !e.name.endsWith(".html")) continue;
+    const html = await readFile(path.join(e.parentPath, e.name), "utf8");
+    if (html.includes("data-embed-src=")) return true;
+  }
+  return false;
 }

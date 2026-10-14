@@ -74,6 +74,9 @@
 .ch-embed__host {
   @apply ml-auto text-sm text-zinc-500;
 }
+.ch-embed__frame {
+  @apply aspect-video w-full rounded border-0;
+}
 .ch-faq__item {
   @apply border-b border-zinc-200 py-3;
 }
