@@ -1,5 +1,5 @@
 # RFC-0016: In-editor AI commands and model choice
-- Status: Draft (2026-10-14). The direction was approved by Halil on 2026-10-14: Cloudflare Workers AI, with the model chosen by the site owner, and AI Gateway as an option. This settles RFC-0014 open question 1.
+- Status: Accepted (2026-10-14, approved by Halil with the defaults of the open questions as drafted; ADR-0029). The direction (Cloudflare Workers AI, the model chosen by the site owner, AI Gateway as an option) was approved first and settles RFC-0014 open question 1.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-14
 - Related:
   - RFC-0014 (body blocks; phase 5 "in-editor AI");
@@ -134,7 +134,7 @@ ai_settings(site_id PK, enabled, model, gateway, daily_limit, rev, updated_at, u
 - **Secrets.** On Node, `CLOUDHAL_AI_TOKEN` is read from the environment only. It is never logged and never sent to Studio.
 
 ## Open questions
-Defaults proposed, to be accepted with this RFC:
+Accepted with these defaults (ADR-0029):
 1. **Default model:** `@cf/zai-org/glm-4.7-flash` (cheap and multilingual). Turkish quality is to be checked by the owner on real articles; the recommended list also offers `@cf/openai/gpt-oss-120b` and `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
 2. **Daily cap:** 100 commands per site.
 3. **Who may use AI:** every role (`ai:invoke`), with a per-person cap left for later.

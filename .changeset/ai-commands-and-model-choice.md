@@ -6,7 +6,7 @@
 "@cloudhal/cli": minor
 ---
 
-In-editor AI, step 1 (RFC-0016, draft): Workers AI with the model chosen per site.
+In-editor AI, step 1 (RFC-0016, ADR-0029): Workers AI with the model chosen per site.
 - **storage:** migration `0020_ai` adds two tables: `ai_settings` (one row per site; no row means AI is off) and `ai_usage` (per site and UTC day).
 - **agent-runtime:**
   - `ai:invoke`, a new person-only scope. Agents bring their own model, so it never goes on an API key.
