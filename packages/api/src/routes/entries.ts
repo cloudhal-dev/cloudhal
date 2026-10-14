@@ -3,11 +3,12 @@ import { renderEntryPreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
+import { entryDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { API_ACTOR } from "../governance.ts";
 import { entryLimit, personOf } from "../own.ts";
 import { param } from "../params.ts";
-import { previewResponse } from "../preview.ts";
+import { type DraftPreview, previewResponse } from "../preview.ts";
 
 const STATUSES = new Set<PublishStatus>(["draft", "review", "published", "archived"]);
 
@@ -64,6 +65,16 @@ export const entries: Hono<Env> = new Hono<Env>()
     const entry = await store.getContentEntry(param(c, "entryId"));
     if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
     return previewResponse(c, renderEntryPreview(site, entry).html);
+  })
+  // The editor's unsaved title, summary, body and cover (RFC-0014 phase 1c): writes nothing.
+  .post("/:entryId/preview", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    const entry = await store.getContentEntry(param(c, "entryId"));
+    if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
+    const draft = entryDraft(entry, await c.req.json().catch(() => ({})));
+    return c.json({ html: renderEntryPreview(site, draft).html } satisfies DraftPreview);
   })
   .get("/:entryId", async (c) => {
     const entry = await c.get("store").getContentEntry(param(c, "entryId"));

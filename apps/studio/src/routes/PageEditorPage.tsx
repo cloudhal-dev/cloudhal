@@ -38,6 +38,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { BodyEditor } from "../components/BodyEditor.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { DraftEditorPreview } from "../components/DraftPreview.tsx";
 import {
   DangerZoneCard,
   DetailsCard,
@@ -45,7 +46,6 @@ import {
   PreviewToggle,
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
-import { EditorPreview } from "../components/EditorPreview.tsx";
 import {
   isScheduleError,
   ScheduleAction,
@@ -473,11 +473,20 @@ export function PageEditorPage() {
       <EditorLayout
         previewVisible={previewVisible}
         preview={
-          <EditorPreview
+          <DraftEditorPreview
+            queryKey={["page-preview", siteId, pageId]}
             src={api.preview.page(siteId, pageId)}
             rev={draft.rev}
             name={draft.path}
             dirty={dirty}
+            input={{
+              id: draft.id,
+              siteId: draft.siteId,
+              title: draft.title,
+              seo: draft.seo,
+              sections: draft.sections,
+            }}
+            render={api.pages.previewDraft}
           />
         }
         main={

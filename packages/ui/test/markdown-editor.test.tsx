@@ -47,6 +47,10 @@ const labels: MarkdownEditorLabels = {
   sourceBadge: "Markdown",
   sourceHint: "Kept exactly as written.",
   editSource: "Edit as Markdown",
+  outline: "Outline",
+  outlineEmpty: "No headings yet",
+  outlineSkipped: "Skips a level",
+  outlineExtraH1: "Title is H1",
 };
 
 function Harness({ initial, onChange }: { initial: string; onChange?: (v: string) => void }) {
@@ -176,6 +180,23 @@ describe("MarkdownEditor", () => {
     expect(
       await screen.findByRole("toolbar", { name: "Selection formatting" }),
     ).toBeInTheDocument();
+  });
+
+  it("lists the headings in an outline, flags level problems and jumps to one", async () => {
+    render(<Harness initial={"# Top\n\nIntro\n\n## Section\n\n#### Deep\n"} />);
+    const button = screen.getByRole("button", { name: /Outline/ });
+    expect(button.textContent).toContain("2"); // two problems
+    fireEvent.click(button);
+    const nav = await screen.findByRole("navigation", { name: "Outline" });
+    const items = within(nav).getAllByRole("button");
+    expect(items.map((b) => b.textContent)).toEqual([
+      "TopTitle is H1",
+      "Section",
+      "DeepSkips a level",
+    ]);
+    fireEvent.click(items[1] as HTMLElement);
+    const editor = tiptap();
+    await waitFor(() => expect(editor.state.selection.$from.parent.textContent).toBe("Section"));
   });
 
   it("is read-only when asked", () => {

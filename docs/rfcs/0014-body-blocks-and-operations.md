@@ -144,7 +144,13 @@ Validators are precompiled, never `eval` (hard rule 6). RFC-0015 defines the reg
 - **Round-trip guard.** A block the editor would change the meaning of is kept read-only as a "source block" and saved as written. This covers raw HTML, link definitions, and anything whose rendered HTML would differ after a trip through the editor.
 - **Markdown mode** edits the source.
 
-Phase 1b adds CodeMirror 6 for Markdown mode, a slash menu, a selection toolbar, images from the media library, markdown-aware paste and "Edit as Markdown" on source blocks. An outline and a draft preview follow.
+Phase 1b adds CodeMirror 6 for Markdown mode, a slash menu, a selection toolbar, images from the media library, markdown-aware paste and "Edit as Markdown" on source blocks.
+
+Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged) and draft previews. These are two additive, read-only REST routes: `POST /api/sites/:siteId/entries/:entryId/preview` and `POST …/pages/:pageId/preview`.
+- **Input.** The editor's unsaved fields: title, summary, body and cover for an article; title, SEO and sections for a page.
+- **What the server does.** It overlays them on the stored node and renders the result.
+- **Output.** `{ html }` for the editor's sandboxed frame.
+- **Rules.** The routes need scope `content:read` and write nothing. Mistyped fields and sections that don't validate fall back to the stored value, so a draft that would not save still previews.
 
 ### 8. Phases
 | Phase | Studio | Contracts | MCP / API |

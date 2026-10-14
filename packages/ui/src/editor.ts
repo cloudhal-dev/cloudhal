@@ -13,6 +13,8 @@ export {
   type MarkdownEditorLabels,
   type MarkdownEditorMode,
   type MarkdownEditorProps,
+  type OutlineEntry,
+  outlineOf,
   type PickedImage,
   pasteMarkdown,
 } from "./blocks/MarkdownEditor.tsx";
