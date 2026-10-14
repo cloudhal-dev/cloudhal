@@ -12,6 +12,7 @@ import {
   type MarkdownEditorLabels,
   pasteMarkdown,
   type SlashItem,
+  selectionBlocks,
 } from "../src/editor.ts";
 
 const labels: MarkdownEditorLabels = {
@@ -235,6 +236,34 @@ describe("editor helpers", () => {
     expect(looksLikeMarkdown("a **strong** word")).toBe(true);
     expect(looksLikeMarkdown("Just a sentence, nothing more.")).toBe(false);
     expect(looksLikeMarkdown("2 * 3 = 6")).toBe(false);
+  });
+
+  it("hands the selected blocks to AI and replaces them, unless they changed meanwhile", async () => {
+    const { Editor: TiptapEditor } = await import("@tiptap/core");
+    const extensions = editorExtensions();
+    const codec = createMarkdownCodec(extensions);
+    const loaded = codec.load("# Title\n\nFirst **bold**.\n\nSecond.\n\nThird.\n");
+    const editor = new TiptapEditor({ extensions, content: loaded.doc });
+    const save = () => codec.save(editor.getJSON(), loaded.base);
+    // From inside "First" to inside "Second": both whole paragraphs.
+    const firstStart = (editor.state.doc.child(0).nodeSize as number) + 3;
+    const secondInside =
+      editor.state.doc.child(0).nodeSize + editor.state.doc.child(1).nodeSize + 3;
+    editor.commands.setTextSelection({ from: firstStart, to: secondInside });
+    const picked = selectionBlocks(editor, codec);
+    expect(picked?.markdown).toBe("First **bold**.\n\nSecond.");
+    expect(picked?.replace("One *merged* paragraph.")).toBe(true);
+    expect(save()).toBe("# Title\n\nOne *merged* paragraph.\n\nThird.\n");
+
+    // A late answer for blocks someone edited since is refused.
+    editor.commands.setTextSelection({ from: 3, to: 5 });
+    const stale = selectionBlocks(editor, codec);
+    expect(stale?.markdown).toBe("# Title");
+    editor.commands.insertContentAt(3, "X");
+    expect(stale?.replace("# Other")).toBe(false);
+    expect(save()).toContain("# TiXtle");
+    editor.commands.setTextSelection(1);
+    expect(selectionBlocks(editor, codec)).toBeUndefined();
   });
 
   it("pastes markdown as blocks, and leaves rich HTML to the editor", async () => {

@@ -1,10 +1,13 @@
 import { InputArea } from "@cloudhal/ui";
-import type { MarkdownEditorLabels, PickedImage } from "@cloudhal/ui/editor";
+import type { AiSelection, MarkdownEditorLabels, PickedImage } from "@cloudhal/ui/editor";
+import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { previewImageUrl } from "../lib/seo.ts";
+import { AiCommandDialog } from "./AiCommandDialog.tsx";
 import { AssetPickerDialog } from "./MediaPicker.tsx";
+import { useGate } from "./useMe.ts";
 
 /** What the media picker hands back: an image, or nothing when it was closed. */
 type Picked = PickedImage | undefined;
@@ -40,12 +43,18 @@ export function BodyEditor({
   siteId,
   defaultLocale,
   host,
+  nodeId,
+  pageLocale,
   value,
   onChange,
   size = "base",
   readOnly = false,
 }: {
   siteId: string;
+  /** The page or article (in-editor AI, RFC-0016): without it, no "Ask AI". */
+  nodeId?: string;
+  /** Its language (what "Translate" offers first). */
+  pageLocale?: string;
   /** The site's default language (the picker's alt-text checks). */
   defaultLocale: string;
   host: string | undefined;
@@ -111,9 +120,12 @@ export function BodyEditor({
       outlineEmpty: t("bodyEditor.outlineEmpty"),
       outlineSkipped: t("bodyEditor.outlineSkipped"),
       outlineExtraH1: t("bodyEditor.outlineExtraH1"),
+      askAi: t("bodyEditor.ai.ask"),
     }),
     [t],
   );
+  const ai = useAiAvailable(siteId, nodeId !== undefined && !readOnly);
+  const [asking, setAsking] = useState<AiSelection | undefined>();
   const resolveSrc = useCallback((src: string) => bodyImageSrc(siteId, host, src), [siteId, host]);
   const fallback = (
     <InputArea
@@ -141,8 +153,17 @@ export function BodyEditor({
           readOnly={readOnly}
           locale={locale}
           {...(readOnly ? {} : { onPickImage: pickImage })}
+          {...(ai ? { onAskAi: setAsking } : {})}
         />
       </Suspense>
+      {/* Closed until "Ask AI" hands it a selection (only offered with a node and AI on). */}
+      <AiCommandDialog
+        siteId={siteId}
+        nodeId={nodeId ?? ""}
+        pageLocale={pageLocale ?? defaultLocale}
+        selection={ai ? asking : undefined}
+        onClose={() => setAsking(undefined)}
+      />
       <AssetPickerDialog
         siteId={siteId}
         defaultLocale={defaultLocale}
@@ -153,5 +174,26 @@ export function BodyEditor({
         onPick={(item) => finish({ src: `asset:${item.asset.id}` })}
       />
     </>
+  );
+}
+
+/**
+ * Whether "Ask AI" is offered (RFC-0016): the person may (`ai.invoke`), the site turned AI on, and
+ * the server reaches Workers AI. Shares the settings query with Settings › AI.
+ */
+function useAiAvailable(siteId: string, wanted: boolean): boolean {
+  const gate = useGate("ai.invoke");
+  const settings = useQuery({
+    queryKey: ["ai", siteId, "settings"],
+    queryFn: () => api.ai.settings(siteId),
+    enabled: wanted && gate.allowed,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  return (
+    wanted &&
+    gate.allowed &&
+    settings.data?.settings.enabled === true &&
+    settings.data.transport !== "none"
   );
 }

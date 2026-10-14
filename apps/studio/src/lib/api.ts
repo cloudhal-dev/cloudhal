@@ -379,6 +379,16 @@ export interface AiDayUsage {
   outputTokens: number;
 }
 
+/** One in-editor AI command (RFC-0016 §3). */
+export interface AiCommandRequest {
+  command: "improve" | "shorten" | "expand" | "fix" | "tone" | "translate" | "custom";
+  nodeId: string;
+  text: string;
+  tone?: "formal" | "friendly" | "plain";
+  locale?: string;
+  instruction?: string;
+}
+
 /** A model in the picker: recommended ones first, then the account's catalogue. */
 export interface AiPickerModel {
   id: string;
@@ -1997,6 +2007,43 @@ export const api = {
       siteId: string,
       input: { enabled: boolean; model: string; gateway?: string; dailyLimit: number; rev: number },
     ) => request<AiSettings>(`/api/sites/${siteId}/ai/settings`, { method: "PUT", ...json(input) }),
+    /**
+     * Runs a command on the selected markdown and yields the model's text as it arrives. An error
+     * before the first chunk is an `ApiRequestError` with the code (`ai_budget`, `ai_off`, …).
+     */
+    command: async function* (
+      siteId: string,
+      body: AiCommandRequest,
+      signal?: AbortSignal,
+    ): AsyncGenerator<string, void, undefined> {
+      const res = await fetch(`/api/sites/${siteId}/ai/commands`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok || !res.body) {
+        const error = (await res
+          .json()
+          .catch(() => ({ error: "ai_failed", message: res.statusText }))) as ApiError;
+        throw new ApiRequestError(res.status, error);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          if (text) yield text;
+        }
+        const rest = decoder.decode();
+        if (rest) yield rest;
+      } finally {
+        reader.releaseLock();
+      }
+    },
     /** The model picker (503 when the server cannot reach Workers AI). */
     models: (siteId: string) =>
       request<{ models: AiPickerModel[]; catalog: "live" | "unavailable" }>(

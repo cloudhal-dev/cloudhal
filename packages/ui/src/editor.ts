@@ -8,6 +8,7 @@ export { allowedHref, editorExtensions } from "./blocks/editor/extensions.tsx";
 export { isLossy, mergeBlocks, splitMarkdown } from "./blocks/editor/markdown-blocks.ts";
 export { filterSlashItems, type SlashItem } from "./blocks/editor/slash.ts";
 export {
+  type AiSelection,
   looksLikeMarkdown,
   MarkdownEditor,
   type MarkdownEditorLabels,
@@ -17,4 +18,5 @@ export {
   outlineOf,
   type PickedImage,
   pasteMarkdown,
+  selectionBlocks,
 } from "./blocks/MarkdownEditor.tsx";

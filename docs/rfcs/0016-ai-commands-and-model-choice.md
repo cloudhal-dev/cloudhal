@@ -27,6 +27,12 @@
     - unified billing: https://developers.cloudflare.com/changelog/post/2026-08-07-workers-ai-unified-billing/ ;
     - pricing: https://developers.cloudflare.com/ai-gateway/reference/pricing .
 
+**Status by step (2026-10-14).**
+- **Step 1:** the transports, settings, model picker, commands API and the Settings › AI section.
+- **Step 2:** "Ask AI" in the body editor's selection toolbar, streaming into a diff with Replace.
+
+Both steps are in PR #34.
+
 ## Summary
 - Editors get an AI menu on selected blocks: improve, shorten, expand, fix spelling and grammar, change tone, translate, or a short instruction of their own.
 - Calls go to Cloudflare Workers AI, using a model the site owner picks in Studio. The picker shows the account's live model catalogue, with a short recommended list.
