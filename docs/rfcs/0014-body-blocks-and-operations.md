@@ -1,0 +1,200 @@
+# RFC-0014: Body blocks and body operations
+- Status: Draft. Halil approved the direction on 2026-10-14 (options below marked **approved**). The contract changes in §3–§5 wait for acceptance. Phase 1 needs no contract change and ships with this draft.
+- Author: Halil (Madraka), drafted with Claude · Date: 2026-10-14
+- Related: ADR-0015 (agent modes; "proposals" follow-up), RFC-0004 (`asset:` references), RFC-0008 (three-way release diff), RFC-0012 (HTML sanitizer), DESIGN.md §2y (body editor), the 2026-10-13 editor research (Tiptap, CodeMirror, Lexical, Plate, BlockNote, Milkdown, MDXEditor, ProseMirror compared on license, markdown fidelity, size and Kumo skinning)
+- Sources (checked 2026-10-13/14):
+  - Tiptap 3 Markdown extension (beta, built on `marked`): https://tiptap.dev/docs/editor/markdown
+  - Tiptap pricing and paid add-ons (Tracked Changes, AI Toolkit, Comments): https://tiptap.dev/pricing
+  - `marked` lexer tokens and `raw`: https://marked.js.org/using_pro#lexer
+  - CommonMark 0.31.2 and GFM 0.29: https://spec.commonmark.org/0.31.2/ · https://github.github.com/gfm/
+  - Generic directives proposal: https://talk.commonmark.org/t/generic-directives-plugins-syntax/444
+  - MCP sampling (a server-to-client request): https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
+
+## Summary
+Bodies stay markdown. Markdown is written by people, agents and `cloudhal push` alike. Cloudhal adds two things:
+- a versioned profile, "Cloudhal Markdown v1";
+- a block index the store maintains: a stable id, content hash and author per top-level block.
+
+Agents gain `edit_body`: operations on blocks addressed by id. These can apply directly or propose; a person accepts or rejects a proposal block by block. Studio gets a rich editor that keeps the original bytes of every block nobody touched.
+
+## Motivation
+- **Editing.** People edit bodies in a monospace textarea.
+- **Agents.** Agents can only replace a whole body (`update_entry.body`). A one-word fix sends up to 1 MB and races every other edit on `rev`.
+- **Approvals.** A person approving an agent's change sees the word "body" and nothing more.
+- **Diffs and provenance.** Snapshot and release diffs say which nodes changed, not what. Nothing records which agent or person wrote a paragraph.
+- **Why now.** The theme and UI generator planned next needs typed blocks inside bodies. Those need an address and a syntax first.
+
+## Proposal
+
+### 1. The stored format: markdown, constrained by a profile (option E, **approved**)
+`Body.value` and `RichTextSection.body` remain markdown text, the source of truth. We don't store ProseMirror/Tiptap JSON or mdast.
+
+**Profile v1** is CommonMark plus GFM (tables, task lists, strikethrough, autolinks), plus `asset:<id>` links and images (RFC-0004).
+
+Directives cover typed blocks (§6, RFC-0015): `:::name{key="v"}` … `:::` containers and `::name{…}` leaves. Until the registry exists, an unknown directive renders as its text.
+
+The profile leaves these out:
+- raw HTML stays escaped, as today;
+- MDX, because it compiles to code;
+- footnotes, because `marked` doesn't render them;
+- frontmatter, which belongs in `fields`.
+
+Golden fixtures go in `packages/core-contracts/fixtures/{valid,invalid}/body-markdown/`. Each fixture fixes the block boundaries and the rendered HTML, so the TypeScript and Rust splitters agree.
+
+### 2. Block splitting (normative)
+A body is split into top-level blocks:
+- **TypeScript** uses `marked`'s lexer with GFM, plus a tokenizer for directive containers.
+- **Rust** uses its own splitter, checked against the same fixtures.
+
+The rules:
+1. Each block's `raw` text, with the blank lines after it, joins back into the exact source (verified for `marked` 18).
+2. A block's `hash` is `sha256` of its `raw` text with trailing whitespace removed.
+3. Blank lines before the first block belong to no block.
+
+### 3. Block index (contract; all fields optional, `schemaVersion` stays 1)
+```jsonc
+// common.schema.json#/$defs
+"BodyBlock": {
+  "type": "object", "additionalProperties": false,
+  "required": ["id", "hash"],
+  "properties": {
+    "id":   { "type": "string", "pattern": "^blk_[0-9A-Za-z]{8,24}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "by":   { "$ref": "#/$defs/Actor" },
+    "via":  { "type": "string", "enum": ["studio", "mcp", "api", "import", "ai-command", "proposal"] },
+    "at":   { "type": "string", "format": "date-time" }
+  }
+}
+// content-entry.schema.json Body, and section.schema.json RichTextSection, gain:
+"profile": { "type": "integer", "enum": [1] },
+"blocks":  { "type": "array", "items": { "$ref": "common.schema.json#/$defs/BodyBlock" }, "maxItems": 5000 }
+```
+
+**Who writes it.** Only the store writes `blocks`. Every write path re-indexes the body: REST, MCP `update_entry`, `edit_body`, push and import.
+
+**Keeping ids.** Ids carry over through a deterministic alignment with the previous index:
+- first, the longest common subsequence of hashes;
+- then, by position for blocks whose content changed.
+
+**Provenance.** `by`, `via` and `at` change only when a block's hash changes. Snapshots and diffs include `blocks` for free.
+
+**Markdown only.** HTML bodies get no index.
+
+### 4. Agent operations
+New MCP tools: `get_body` and `edit_body`. A REST `PATCH …/body` mirrors `edit_body`.
+```ts
+get_body({ siteId, target: { entryId } | { pageId, sectionId } })
+  → { rev, profile, blocks: { id, hash, type, markdown, by?, via? }[], markdown }
+
+edit_body({ siteId, target, rev, mode: "apply" | "propose", note?, ops: Op[] /* ≤ 50 */ })
+type Op =
+  | { op: "replace"; block: string; ifHash?: string; markdown: string }
+  | { op: "replaceText"; block: string; find: string; replace: string } // find matches exactly once
+  | { op: "insert"; after: string | null; markdown: string }
+  | { op: "insertBlock"; after: string | null; type: string; props: object; markdown?: string } // RFC-0015
+  | { op: "setProps"; block: string; props: object }                                            // RFC-0015
+  | { op: "move"; block: string; after: string | null }
+  | { op: "delete"; block: string; ifHash?: string };
+  → { rev, changed, added, removed, diff, snapshot } | { proposal }
+```
+
+Invariants:
+1. **One write.** An apply is one CAS write on `rev` (hard rule 4), and it is auto-snapshotted like every agent write.
+2. **Rebase.** If `rev` is stale but every block an op targets has the same hash, the server applies the ops to the latest body. Otherwise it returns `conflict` with the current blocks.
+3. **Profile check.** The result must still parse under the profile. An op whose markdown splits into a different number of blocks than it says is rejected.
+4. **Scopes.** Ops need `content:write`. Proposing needs `content:write` or the new `content:propose`. `update_entry.body` keeps working unchanged.
+5. **Approvals.** Approval requests carry a structured block diff (§5), not the word "body".
+
+### 5. Proposals and diffs
+**The record.** A proposal is a row, not a graph node until it is accepted:
+```
+proposals(id, site_id, target, base_rev, base_hashes, ops, actor, via, note,
+          status: open | accepted | rejected | partial | stale, created_at, decided_by, decided_at)
+```
+
+**In Studio.** The proposal shows as tracked changes on the body: inserted blocks, deleted blocks struck through, and a word diff inside replaced blocks. A person accepts or rejects each op, or all of them.
+
+**Accepting.** Accepting applies the ops through `edit_body`:
+- the person is the writer of record;
+- the blocks keep the agent as `by`, with `via: "proposal"`;
+- the audit log records both.
+
+**Stale ops.** An op whose block hash changed since the proposal is shown as stale and can't be accepted as it is.
+
+**Diffs.** A Worker-safe `bodyDiff(a, b)` in core-ts aligns blocks by id and hash and word-diffs replaced blocks. It serves:
+- the snapshot diff dialog;
+- the release compare, replacing "N characters";
+- approval `changes`;
+- a `diff_node` MCP tool.
+
+### 6. Typed blocks (RFC-0015, outline only)
+One registry entry per block type: a JSON Schema for its props, a directive form, an editor form and an Astro component.
+
+The same entry drives:
+- the editor's slash menu and node views;
+- the renderer;
+- MCP (`list_block_types`, `insertBlock`, `setProps`);
+- the future generator.
+
+Validators are precompiled, never `eval` (hard rule 6). RFC-0015 defines the registry contract and the `component` section kind.
+
+### 7. Studio editor (phase 1, no contract change; shipped with this draft)
+`MarkdownEditor` (`@cloudhal/ui/editor`, DESIGN.md §2y) runs on the MIT parts of Tiptap 3 and loads lazily. It is the client-side half of §2–§3:
+- **Minimal-diff save.** Untouched blocks keep their original bytes, and only edited or new blocks are serialized anew. Opening and saving a body changes nothing.
+- **Round-trip guard.** A block the editor would change the meaning of is kept read-only as a "source block" and saved as written. This covers raw HTML, link definitions, and anything whose rendered HTML would differ after a trip through the editor.
+- **Markdown mode** edits the source.
+
+Later phases add CodeMirror 6 source mode, slash and bubble menus, the media picker, paste cleanup, an outline and a draft preview.
+
+### 8. Phases
+| Phase | Studio | Contracts | MCP / API |
+|---|---|---|---|
+| 1. Editor | `MarkdownEditor` (this PR), then CodeMirror and the menus | none | none |
+| 2. Diffs | Body diff in snapshot, release and approval views | approval `changes` | `diff_node` |
+| 3. Blocks and ops | Block ids, provenance gutter | §3 accepted, `pnpm gen` | `get_body`, `edit_body` apply, rebase |
+| 4. Proposals | Tracked changes, accept/reject | proposals table | `mode: "propose"` |
+| 5. In-editor AI | AI menu streaming into proposals | `ai:invoke`, budget | `/ai/commands` (after open question 1) |
+| 6. Registry | Typed blocks with Kumo forms | RFC-0015 | `list_block_types`, `insertBlock` |
+| 7. Generator | Kumo catalog panels (`@cloudflare/kumo/catalog`) | outputs are ordinary changes | generator tools that propose |
+
+## Alternatives considered
+| Option | Pros | Cons | Why not |
+|---|---|---|---|
+| Markdown as today, no index | No contract change | No block identity, provenance or fine diff | Doesn't solve agent edits or approvals |
+| Store ProseMirror/Tiptap JSON | Lossless in the editor | Ties the contract to one editor's schema; agents and Rust must speak it | Worse for agents and the Rust core |
+| Store mdast | Generic tree | Outside our schema subset (hard rule 2); verbose | Too generic, a heavy migration |
+| Own block/node schema | Best diffs | Rewrites every body; a new format for agents | Migration cost with no gain over the index |
+| BlockNote / Plate instead of Tiptap | Block UI, MIT suggestion plugins (Plate) | BlockNote's markdown is officially lossy and its AI is GPL or commercial; Plate is larger and Slate-based | Tiptap shares `marked` with the renderer and skins cleanly with Kumo; we build proposals ourselves |
+| Tiptap paid Tracked Changes / AI Toolkit | Ready-made | Paid, alpha/beta, a vendor service and JWT | MIT/Apache-only dependencies (**approved**) |
+| Real-time collaboration (Yjs) now | Simultaneous typing | A Durable Object transport, a new failure mode | Block ops plus CAS cover people and agents on different blocks; Yjs later as a transport only (**approved: later**) |
+
+## Compatibility & migration
+- **Contracts.** All new fields are optional and `schemaVersion` stays 1.
+- **Existing bodies.** They get an index on their next write; a one-off `cloudhal` job can index the rest. A missing `blocks` means not indexed yet, never "empty".
+- **Readers.** Old readers ignore `profile` and `blocks`. Renderers are unchanged until directives arrive (RFC-0015).
+- **Rollback.** Stop writing `blocks`. Bodies are untouched throughout, because the index never changes the markdown.
+- **Phase 1** changes no stored data. Studio writes the same markdown, byte for byte where nobody edited.
+
+## Security & policy impact
+- **Rendering.** Agent and AI output is markdown under the profile, rendered by the existing safe renderer (raw HTML escaped, URLs checked, RFC-0012 for HTML bodies).
+- **Proposals.**
+  - AI output from in-editor commands or agents is never applied without a person in `manual` mode.
+  - Whether `plan` mode may propose is open question 2.
+  - Prompt injection through content can at worst produce a proposal.
+- **Scopes.** One new scope, `content:propose`. `ai:invoke` and a per-site budget come with phase 5, in their own ADR.
+- **Tenant isolation.** Proposals are keyed by site and checked like other node reads.
+- **Dependencies.** MIT/Apache only (**approved**): Tiptap's MIT packages, CodeMirror 6, `marked`; no paid add-ons and no private registry in CI.
+
+## Open questions
+1. **Where the in-editor AI model call happens** (decided by the owner before phase 5):
+   - the user's own key, which needs secret storage (hard rule 9);
+   - Workers AI, which needs no secret, but its Turkish quality is unverified;
+   - hand-off to a connected agent as a proposal, which keeps Cloudhal model-free but doesn't stream;
+   - or none.
+
+   MCP sampling doesn't fit, because Studio is not an MCP client.
+2. Should `plan`-mode agents be able to propose? Should `edits`-mode body changes to published articles become proposals by default?
+3. HTML bodies: should they stay source-only (today), be frozen, or be offered a reviewed "convert to markdown"?
+4. Should profile v1 add footnotes, math or inline directives now, or later?
+5. Should one registry cover sections and body blocks, with a `component` section kind? (RFC-0015)
+6. Should `Body.value` and `RichTextSection.body` be unified under one name while the contract changes anyway?
