@@ -2413,6 +2413,10 @@ export const tr: Messages = {
         approveAny: "Yayın paketlerini onaylamak için en az {role} rolü gerekir.",
       },
       automations: { manage: "Otomasyonları yönetmek için en az {role} rolü gerekir." },
+      ai: {
+        invoke: "Editörde yapay zekâyı kullanmak için en az {role} rolü gerekir.",
+        settings: "Yapay zekâ ayarlarını değiştirmek için en az {role} rolü gerekir.",
+      },
       ownership: { transfer: "Sahipliği yalnızca {role} devredebilir." },
     },
   },

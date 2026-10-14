@@ -2363,6 +2363,10 @@ export const en = {
         approveAny: "Only {roles} and above approve releases.",
       },
       automations: { manage: "Only {roles} and above manage automations." },
+      ai: {
+        invoke: "Only {roles} and above use AI in the editor.",
+        settings: "Only {roles} and above change the AI settings.",
+      },
       ownership: { transfer: "Only {roles} can transfer ownership." },
     },
   },

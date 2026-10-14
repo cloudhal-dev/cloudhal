@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
-import { createApi } from "@cloudhal/api";
+import { AiStore, createApi, restTransport } from "@cloudhal/api";
 import { serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
@@ -91,6 +91,9 @@ export async function studio(
     requireAuth: !options.noAuth,
     // RFC-0011: invites and reset links are printed here instead of sent.
     ...(cfg.mail ? { mail: terminalMailSender(cfg.mail, options.mailOut) } : {}),
+    // RFC-0016: Workers AI over REST when the environment has an account id and a token (never
+    // stored); the settings are kept either way.
+    ai: { store: new AiStore(local.sql), ...localAiTransport() },
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
     trustedOrigins: [
       "http://localhost:5173",
@@ -147,4 +150,13 @@ export async function studio(
       await local.close();
     },
   };
+}
+
+/** Workers AI over REST from `CLOUDFLARE_ACCOUNT_ID` and `CLOUDHAL_AI_TOKEN` (RFC-0016 §1). */
+export function localAiTransport(env: Record<string, string | undefined> = process.env): {
+  transport?: ReturnType<typeof restTransport>;
+} {
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const token = env.CLOUDHAL_AI_TOKEN?.trim();
+  return accountId && token ? { transport: restTransport({ accountId, token }) } : {};
 }

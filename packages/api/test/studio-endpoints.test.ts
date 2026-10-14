@@ -499,6 +499,8 @@ describe("instance and skills", () => {
           keys: false,
           purge: { pending: 0 },
         },
+        // RFC-0016: no way to reach Workers AI
+        ai: "none",
         // RFC-0008 §13: a server without schedules says so
         schedules: {
           available: false,

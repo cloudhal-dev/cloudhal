@@ -20,7 +20,8 @@ export function rank(role: Role): number {
   return ROLES.length - ROLES.indexOf(role);
 }
 
-const READ: Scope[] = ["site:read", "content:read", "preview:create"];
+// RFC-0016 (D6): every role may use in-editor AI; the owner's switch and the daily cap limit it.
+const READ: Scope[] = ["site:read", "content:read", "preview:create", "ai:invoke"];
 const EDITOR: Scope[] = [
   ...READ,
   "content:write",
@@ -243,6 +244,9 @@ export const ABILITIES = {
   "releases.approveAny": "releases:publish",
   "automations.manage": "automations:manage",
   "schedules.settings": "site:settings",
+  // RFC-0016: in-editor AI commands; the site's AI settings (Administrator).
+  "ai.invoke": "ai:invoke",
+  "ai.settings": "site:settings",
   "ownership.transfer": "owner",
 } as const satisfies Record<string, Scope | "owner">;
 

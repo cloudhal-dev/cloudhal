@@ -725,6 +725,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         ? `mail: invites and reset links are sent from ${cfg.mail.from} (its domain must be onboarded to Cloudflare Email Service)`
         : `mail: invites and reset links are sent from ${cfg.mail.from}. On Workers Free, Email Service delivers only to verified destination addresses of this account; any recipient needs Workers Paid`,
     );
+  // RFC-0016: Workers AI for in-editor commands; each site's owner turns it on in Studio.
+  if (cfg.ai)
+    log(
+      "ai: Workers AI is bound to the admin Worker; turn AI on per site in Studio › Settings › AI (billed per use, 10,000 free neurons a day)",
+    );
   if (!schedules.automations)
     log(
       "automations: off for this deployment (cloudhal.json `schedules.automations`); releases and time gates go on",
@@ -765,6 +770,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       scheduler: ticker,
       schedules,
       mail: cfg.mail,
+      ai: Boolean(cfg.ai),
       observability,
       placement: cfg.placement,
     });

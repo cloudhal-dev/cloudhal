@@ -16,6 +16,7 @@ import { errorHandler, unauthorized } from "./errors.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
+import { aiRoutes } from "./routes/ai.ts";
 import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
@@ -258,6 +259,8 @@ export function createApi(deps: ApiDeps) {
           // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
           comments: await commentsFeature(deps.comments),
           // RFC-0008 §13: whether schedules are served, the ticker, gates, the limits.
+          // RFC-0016: how this deployment reaches Workers AI (the binding, REST, or not at all).
+          ai: deps.ai?.transport?.kind ?? "none",
           schedules: schedulesFeature(
             schedules,
             schedulesAvailable(schedules) && (await gatesEnforcedEverywhere(deps.store)),
@@ -284,6 +287,8 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/pages", pages);
   app.route("/api/sites/:siteId/entries", entries);
   app.route("/api/sites/:siteId/proposals", proposals);
+  // RFC-0016: in-editor AI settings, the model picker and commands.
+  app.route("/api/sites/:siteId/ai", aiRoutes(deps.ai));
   app.route("/api/sites/:siteId/snapshots", snapshots);
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);

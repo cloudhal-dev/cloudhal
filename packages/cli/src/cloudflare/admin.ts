@@ -44,6 +44,8 @@ export async function prepareAdminWorker(options: {
   schedules?: SchedulesDeployment | undefined;
   /** Email delivery (RFC-0011): the `send_email` binding and the sender vars. */
   mail?: MailDeployment | undefined;
+  /** In-editor AI (RFC-0016): the Workers AI binding. */
+  ai?: boolean | undefined;
   /** Logs sampling and opt-in traces. */
   observability?: ObservabilityDeployment | undefined;
   /** Smart Placement for the admin Worker. */
@@ -76,6 +78,7 @@ export async function prepareAdminWorker(options: {
       ...(options.scheduler ? { scheduler: options.scheduler } : {}),
       ...(options.schedules ? { schedules: options.schedules } : {}),
       ...(options.mail ? { mail: options.mail } : {}),
+      ...(options.ai ? { ai: true } : {}),
       ...(options.observability ? { observability: options.observability } : {}),
       ...(options.placement ? { placement: options.placement } : {}),
     }),

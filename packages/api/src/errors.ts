@@ -203,7 +203,7 @@ export function unauthorized(): HTTPException {
 
 /** A JSON error with any status (RFC-0005 codes: `missing_scope`, `rank`, `invite_gone`, …). */
 export function apiError(
-  status: 400 | 401 | 403 | 404 | 409 | 410 | 413 | 415 | 422 | 429 | 502,
+  status: 400 | 401 | 403 | 404 | 409 | 410 | 413 | 415 | 422 | 429 | 502 | 503,
   error: string,
   message: string,
   details?: unknown,

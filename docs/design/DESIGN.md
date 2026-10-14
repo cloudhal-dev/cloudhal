@@ -363,6 +363,20 @@ Markdown bodies (article bodies, page `richText` sections in markdown) are edite
 - **Approvals** (§2m): a pending `edit_body` request shows "What approving changes in “{title}”" and the same `BodyDiff` under its prompt (`data-approval-changes`), computed when the list loads; a request that no longer applies shows none.
 - Not yet (later phases, RFC-0014): AI edits by block.
 
+### 2z. AI settings (RFC-0016)
+Site › Settings gets an **AI** section (`components/AiSettings.tsx`, lazy namespace `aiSettings`), after Schedules:
+- a success `Badge` "On" (`Sparkle`) in the header while AI is on;
+- a secondary `Banner` "This deployment can't reach Workers AI yet" when `/ai/settings` reports `transport: "none"`, saying what to add (`"ai": {}` in cloudhal.json, or the two environment variables on Node). The rows stay editable, so an owner can choose settings first.
+- **Rows** (`SettingRow`s):
+  - "AI in the editor" — a `Switch`, off until the owner turns it on.
+  - "Model" — a `Combobox` over `GET …/ai/models`. Recommended models come first, labelled "· Recommended", then the account's catalogue. Under it: the recommended model's note, its context window, and where the text goes ("Selected text goes to Workers AI in this Cloudflare account" or "…to {provider} through your AI Gateway").
+  - "Daily limit" — a number `Input`, 0 to 10,000, with a `Meter` "7 of 100 used today".
+- **A `Collapsible` "AI Gateway and other providers"**, open when either is set:
+  - "AI Gateway" — an id `Input`;
+  - "Model from another provider" — `provider/model`. While it is filled, it is the model used and the `Combobox` is disabled; it needs a gateway, and the field says so.
+- An alert `Banner` warns when the chosen Workers AI model is missing from the live catalogue: "…no longer offered by Workers AI…".
+- Below Administrator (`ai.settings` = `site:settings`) the controls are disabled with the gating reason, and the model shows as text.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
