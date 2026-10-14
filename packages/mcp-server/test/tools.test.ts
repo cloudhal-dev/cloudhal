@@ -46,6 +46,10 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "create_entry",
       "update_entry",
       "delete_entry",
+      // RFC-0014 §4
+      "get_body",
+      "edit_body",
+      "diff_node",
       "list_taxonomies",
       "list_terms",
       "resolve_terms",

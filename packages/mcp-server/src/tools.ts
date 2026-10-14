@@ -43,6 +43,7 @@ import {
 } from "@cloudhal/schedules";
 import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
+import { bodyTools } from "./body-tools.ts";
 import { commentTools } from "./comment-tools.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -347,6 +348,7 @@ export function defineTools(): ToolDefinition[] {
   const at = raw.findIndex((t) => t.name === "delete_entry") + 1;
   return [
     ...raw.slice(0, at),
+    ...bodyTools(),
     ...taxonomyTools(),
     ...menuTools(),
     ...assetTools(),
