@@ -37,6 +37,52 @@
 .ch-image {
   @apply py-6;
 }
+/* Block types (RFC-0015): callout, button, video link and questions. */
+.ch-block {
+  @apply py-4;
+}
+.ch-callout {
+  @apply space-y-2 rounded border-l-4 border-sky-500 bg-sky-50 px-4 py-3;
+}
+.ch-callout--success {
+  @apply border-emerald-500 bg-emerald-50;
+}
+.ch-callout--warning {
+  @apply border-amber-500 bg-amber-50;
+}
+.ch-callout--danger {
+  @apply border-red-500 bg-red-50;
+}
+.ch-button {
+  @apply inline-block rounded px-4 py-2 font-medium;
+}
+.ch-button--primary {
+  @apply bg-zinc-900 text-white;
+}
+.ch-button--secondary {
+  @apply border border-zinc-300 text-zinc-900;
+}
+.ch-embed__link {
+  @apply flex items-center gap-3 rounded border border-zinc-200 px-4 py-3 no-underline;
+}
+.ch-embed__play {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white;
+}
+.ch-embed__title {
+  @apply font-medium text-zinc-900;
+}
+.ch-embed__host {
+  @apply ml-auto text-sm text-zinc-500;
+}
+.ch-faq__item {
+  @apply border-b border-zinc-200 py-3;
+}
+.ch-faq__item summary {
+  @apply cursor-pointer font-medium;
+}
+.ch-faq__answer {
+  @apply mt-2 space-y-2 text-zinc-700;
+}
 .ch-image figcaption {
   @apply mt-2 text-sm text-zinc-500;
 }

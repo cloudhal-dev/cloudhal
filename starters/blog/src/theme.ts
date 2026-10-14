@@ -3,10 +3,21 @@
  *   import MyHero from "./components/MyHero.astro";
  *   export const components = { hero: MyHero };
  */
-import type { SectionComponents } from "@cloudhal/astro-renderer/components/Sections.astro";
+import type {
+  BlockComponents,
+  SectionComponents,
+} from "@cloudhal/astro-renderer/components/Sections.astro";
 import type { CollectionIndexHook } from "@cloudhal/astro-renderer/navigation";
 
 export const components: SectionComponents = {};
+
+/**
+ * Block types (RFC-0015) rendered by this theme's own components, by type name, e.g.
+ *   import Callout from "./components/Callout.astro";
+ *   export const blocks = { callout: Callout };
+ * Each gets `{ section, props, content, media }`. Types not listed use Cloudhal's built-in markup.
+ */
+export const blocks: BlockComponents = {};
 
 /** Entries per category/tag archive page (`/category/<slug>/page/<n>`). */
 export const ARCHIVE_PAGE_SIZE = 20;

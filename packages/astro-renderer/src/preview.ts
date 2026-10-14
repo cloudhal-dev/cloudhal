@@ -15,6 +15,7 @@ import {
   pageCount,
   viewPagePath,
 } from "./archive.ts";
+import { renderComponentSection } from "./blocks.ts";
 import { gateNotice } from "./gates.ts";
 import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
@@ -118,6 +119,9 @@ export function renderSectionHtml(
           : `<ul>${items}</ul>`
       }</section>`;
     }
+    // RFC-0015: previews show unknown or misfitting blocks as a labelled placeholder.
+    case "component":
+      return renderComponentSection(section, { ...(media ? { media } : {}), preview: true });
   }
 }
 

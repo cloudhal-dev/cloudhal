@@ -3,32 +3,39 @@
  * Renders a page's sections by `kind`. Themes override any component through `components`;
  * `entries` supplies collection data for contentList sections, keyed by collection name — or by
  * section id for a section with a `filter`, whose entries the page resolved on their own. `media`
- * resolves assets in image, hero and rich-text sections (RFC-0004).
+ * resolves assets in image, hero and rich-text sections (RFC-0004). Component sections (RFC-0015)
+ * render through `Block.astro`: the theme's `blocks` map, else Cloudhal's built-in markup.
  */
 import type { ContentEntry, Section } from "@cloudhal/core-contracts";
 import type { MediaContext } from "../media.ts";
+import Block from "./Block.astro";
 import ContentList from "./ContentList.astro";
 import Hero from "./Hero.astro";
 import Image from "./Image.astro";
 import RichText from "./RichText.astro";
 
-export type SectionComponents = Partial<Record<Section["kind"], unknown>>;
+export type SectionComponents = Partial<Record<Exclude<Section["kind"], "component">, unknown>>;
+/** A theme's components for block types (RFC-0015), by type name. */
+export type BlockComponents = Record<string, unknown>;
 
 interface Props {
   sections: Section[];
   entries?: Record<string, ContentEntry[]>;
   components?: SectionComponents;
+  blocks?: BlockComponents;
   media?: MediaContext;
 }
-const { sections, entries = {}, components = {}, media } = Astro.props;
+const { sections, entries = {}, components = {}, blocks = {}, media } = Astro.props;
 const defaults = { hero: Hero, richText: RichText, image: Image, contentList: ContentList };
 type AnyComponent = (props: never) => unknown;
 const resolved = { ...defaults, ...components } as Record<
-  Section["kind"],
+  Exclude<Section["kind"], "component">,
   AnyComponent | undefined
 >;
 ---
 {sections.map((section) => {
+  if (section.kind === "component")
+    return <Block section={section} blocks={blocks} {...(media ? { media } : {})} />;
   const Component = resolved[section.kind];
   if (!Component) return <div data-unknown-section={section.kind} />;
   return section.kind === "contentList"

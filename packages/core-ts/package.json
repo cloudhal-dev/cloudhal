@@ -24,7 +24,8 @@
     "./media/fixtures": "./src/media/fixtures.ts",
     "./releases": "./src/releases.ts",
     "./automations": "./src/automations.ts",
-    "./body-blocks": "./src/body-blocks.ts"
+    "./body-blocks": "./src/body-blocks.ts",
+    "./blocks": "./src/blocks.ts"
   },
   "files": [
     "dist",
@@ -123,6 +124,10 @@
       "./body-blocks": {
         "types": "./dist/src/body-blocks.d.ts",
         "default": "./dist/src/body-blocks.js"
+      },
+      "./blocks": {
+        "types": "./dist/src/blocks.d.ts",
+        "default": "./dist/src/blocks.js"
       }
     }
   },

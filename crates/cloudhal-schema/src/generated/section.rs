@@ -362,6 +362,58 @@ impl<'de> ::serde::Deserialize<'de> for BodyProfile {
             .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
     }
 }
+#[doc = "`ComponentSectionType`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct ComponentSectionType(::std::string::String);
+impl ::std::ops::Deref for ComponentSectionType {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<ComponentSectionType> for ::std::string::String {
+    fn from(value: ComponentSectionType) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for ComponentSectionType {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z][a-z0-9-]{1,40}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][a-z0-9-]{1,40}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for ComponentSectionType {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for ComponentSectionType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ComponentSectionType {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
@@ -1064,6 +1116,15 @@ pub enum Section {
         id: Id,
         limit: ::std::num::NonZeroU64,
         sort: ContentListSectionSort,
+    },
+    #[doc = "ComponentSection\n\nA typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates."]
+    #[serde(rename = "component")]
+    Component {
+        id: Id,
+        #[doc = "Validated against the type's props schema by the store, not by this contract."]
+        props: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+        #[serde(rename = "type")]
+        type_: ComponentSectionType,
     },
 }
 #[doc = "Lower-case URL segment."]

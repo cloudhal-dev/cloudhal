@@ -1,4 +1,5 @@
 import type { Page, PublishStatus, Section } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
 import {
   ApprovalDialog,
   Badge,
@@ -23,6 +24,7 @@ import {
   ArrowUp,
   CaretDown,
   Copy,
+  Cube,
   type Icon,
   Image as ImageIcon,
   ListBullets,
@@ -35,6 +37,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
+import {
+  blockIcon,
+  ComponentSectionForm,
+  newBlockSection,
+  useBlockTitle,
+  useBlockTypes,
+} from "../components/BlockSection.tsx";
 import { BodyEditor } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
@@ -76,6 +85,7 @@ const KIND_ICON: Record<Section["kind"], Icon> = {
   richText: TextAlignLeft,
   image: ImageIcon,
   contentList: ListBullets,
+  component: Cube,
 };
 
 const sectionId = () => `sec_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -92,6 +102,9 @@ function newSection(kind: Section["kind"], heading: string): Section {
       return { id, kind, image: { src: "/assets/image.jpg", alt: "" } };
     case "contentList":
       return { id, kind, collection: "posts", limit: 10, sort: "newest" };
+    case "component":
+      // Component sections start from a block type (`newBlockSection`), not from here.
+      return { id, kind, type: "callout", props: {} };
   }
 }
 
@@ -125,16 +138,28 @@ function SectionForm({
   section,
   onChange,
   media,
+  blocks,
   readOnly,
 }: {
   section: Section;
   onChange: (s: Section) => void;
   media: MediaContext;
+  /** The deployment's block types (RFC-0015), for component sections. */
+  blocks: readonly BlockType[];
   /** The fieldset turns off native fields; the rich body editor needs telling. */
   readOnly: boolean;
 }) {
   const t = useT();
   switch (section.kind) {
+    case "component":
+      return (
+        <ComponentSectionForm
+          section={section}
+          onChange={onChange}
+          types={blocks}
+          readOnly={readOnly}
+        />
+      );
     case "hero":
       return (
         <>
@@ -253,6 +278,8 @@ function SectionForm({
 export function PageEditorPage() {
   const t = useT();
   const { siteId, pageId } = useParams({ from: "/sites/$siteId/pages/$pageId" });
+  const blockTypes = useBlockTypes(siteId);
+  const blockTitle = useBlockTitle(blockTypes);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
@@ -345,6 +372,13 @@ export function PageEditorPage() {
     setDraft({ ...draft, sections });
   };
   const kindLabel = (k: Section["kind"]) => t(`editor.sectionKinds.${k}`);
+  const sectionTitle = (s: Section) =>
+    s.kind === "component" ? blockTitle(s.type) : kindLabel(s.kind);
+  const sectionIcon = (s: Section) =>
+    s.kind === "component"
+      ? blockIcon(blockTypes.find((b) => b.name === s.type))
+      : KIND_ICON[s.kind];
+  const sectionBlocks = blockTypes.filter((b) => b.where.includes("section"));
   const toRemove = removeIndex === undefined ? undefined : draft.sections[removeIndex];
   const addMenu = (
     <DropdownMenu>
@@ -367,6 +401,31 @@ export function PageEditorPage() {
             {kindLabel(k)}
           </DropdownMenu.Item>
         ))}
+        {sectionBlocks.length > 0 && (
+          <>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Group>
+              <DropdownMenu.Label>{t("editor.blocks.menu")}</DropdownMenu.Label>
+              {sectionBlocks.map((b) => {
+                const BlockIcon = blockIcon(b);
+                return (
+                  <DropdownMenu.Item
+                    key={b.name}
+                    icon={BlockIcon}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        sections: [...draft.sections, newBlockSection(sectionId(), b)],
+                      })
+                    }
+                  >
+                    {blockTitle(b.name)}
+                  </DropdownMenu.Item>
+                );
+              })}
+            </DropdownMenu.Group>
+          </>
+        )}
       </DropdownMenu.Content>
     </DropdownMenu>
   );
@@ -546,12 +605,12 @@ export function PageEditorPage() {
                 />
               ) : (
                 draft.sections.map((s, i) => {
-                  const KindIcon = KIND_ICON[s.kind];
+                  const KindIcon = sectionIcon(s);
                   return (
                     <SectionCard
                       key={s.id}
                       as="h3"
-                      title={kindLabel(s.kind)}
+                      title={sectionTitle(s)}
                       icon={<KindIcon size={16} />}
                       actions={
                         <>
@@ -586,6 +645,7 @@ export function PageEditorPage() {
                           nodeId: draft.id,
                           locale: draft.locale,
                         }}
+                        blocks={blockTypes}
                         readOnly={readOnlyReason !== undefined || locked}
                       />
                       {s.kind === "richText" && s.format === "markdown" && (

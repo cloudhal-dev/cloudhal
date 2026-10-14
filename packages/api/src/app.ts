@@ -20,6 +20,7 @@ import { aiRoutes } from "./routes/ai.ts";
 import { analytics } from "./routes/analytics.ts";
 import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
+import { blockTypes } from "./routes/block-types.ts";
 import { comments } from "./routes/comments.ts";
 import { entries } from "./routes/entries.ts";
 import {
@@ -287,6 +288,8 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/pages", pages);
   app.route("/api/sites/:siteId/entries", entries);
   app.route("/api/sites/:siteId/proposals", proposals);
+  // RFC-0015: the block registry (built-ins and the theme's types).
+  app.route("/api/sites/:siteId/block-types", blockTypes);
   // RFC-0016: in-editor AI settings, the model picker and commands.
   app.route("/api/sites/:siteId/ai", aiRoutes(deps.ai));
   app.route("/api/sites/:siteId/snapshots", snapshots);

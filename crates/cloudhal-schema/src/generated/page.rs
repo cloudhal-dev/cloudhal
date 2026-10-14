@@ -1068,6 +1068,15 @@ pub enum Section {
         limit: ::std::num::NonZeroU64,
         sort: SectionSort,
     },
+    #[doc = "ComponentSection\n\nA typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates."]
+    #[serde(rename = "component")]
+    Component {
+        id: Id,
+        #[doc = "Validated against the type's props schema by the store, not by this contract."]
+        props: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+        #[serde(rename = "type")]
+        type_: SectionType,
+    },
 }
 #[doc = "`SectionBody`"]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -1420,6 +1429,58 @@ impl ::std::convert::TryFrom<::std::string::String> for SectionSubheading {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for SectionSubheading {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`SectionType`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct SectionType(::std::string::String);
+impl ::std::ops::Deref for SectionType {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<SectionType> for ::std::string::String {
+    fn from(value: SectionType) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for SectionType {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z][a-z0-9-]{1,40}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][a-z0-9-]{1,40}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for SectionType {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for SectionType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SectionType {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

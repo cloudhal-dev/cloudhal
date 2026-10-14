@@ -1,0 +1,4 @@
+{
+  "reason": "a block type name is lowercase kebab-case (RFC-0015)",
+  "data": { "id": "sec_callout0002", "kind": "component", "type": "Callout", "props": {} }
+}

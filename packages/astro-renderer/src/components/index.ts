@@ -1,3 +1,4 @@
+export { default as Block } from "./Block.astro";
 export { default as Comments } from "./Comments.astro";
 export { default as ContentList } from "./ContentList.astro";
 export { default as Hero } from "./Hero.astro";

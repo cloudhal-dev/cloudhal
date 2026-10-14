@@ -78,6 +78,11 @@ export {
   resolveAnalyticsRange,
   utcMidnight,
 } from "./blocks/analytics-range.ts";
+export {
+  BlockPropsForm,
+  type BlockPropsFormLabels,
+  type BlockPropsFormProps,
+} from "./blocks/BlockPropsForm.tsx";
 export { BodyDiff, type BodyDiffLabels, type BodyDiffProps } from "./blocks/BodyDiff.tsx";
 export {
   type BreakdownLabels,

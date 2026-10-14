@@ -39,7 +39,8 @@ export type PublishStatus = "draft" | "review" | "published" | "archived";
  * This interface was referenced by `Page`'s JSON-Schema
  * via the `definition` "Section".
  */
-export type Section = HeroSection | RichTextSection | ImageSection | ContentListSection;
+export type Section =
+  HeroSection | RichTextSection | ImageSection | ContentListSection | ComponentSection;
 /**
  * The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies.
  *
@@ -198,6 +199,20 @@ export interface ContentListSection {
    * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
    */
   filter?: string;
+}
+/**
+ * A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.
+ */
+export interface ComponentSection {
+  id: Id;
+  kind: "component";
+  type: string;
+  /**
+   * Validated against the type's props schema by the store, not by this contract.
+   */
+  props: {
+    [k: string]: unknown | undefined;
+  };
 }
 /**
  * Search and social metadata of a routable node (page, term archive).

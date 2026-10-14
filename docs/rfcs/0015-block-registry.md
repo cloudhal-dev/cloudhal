@@ -225,6 +225,9 @@ A props schema is a JSON Schema object written in a subset small enough to:
 | 6c | MCP: `list_block_types`, `insertBlock`, `setProps`, `component` sections in page tools; AI commands keep directives intact | none |
 | 6d | Theme types: `src/blocks.ts`, deploy bundling, unknown-type UI | none |
 
+Status:
+- **6a shipped.** One deviation: `embed` renders a link card to the video (a play mark, its title and host) and loads nothing from the video host. The click-to-load player needs a first-party script and the per-build CSP `frame-src` (§5), and lands with 6d's deploy bundling. Theme components can already map `embed` to their own player through `theme.ts` `blocks`.
+
 ## Open questions
 Accepted with these defaults (ADR-0030):
 1. **Built-in types:** `callout`, `button`, `embed` (YouTube or Vimeo, click to load), `faq` (sections only).

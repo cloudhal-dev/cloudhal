@@ -40,6 +40,7 @@ import {
   isTimeZone,
   sameAvailability,
 } from "./availability.ts";
+import { BLOCK_LIMITS, type BlockRegistry, createBlockRegistry } from "./blocks.ts";
 import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
@@ -139,6 +140,11 @@ export interface SiteGraphStoreOptions {
    * process); the admin Worker asks the site Worker's `/__cloudhal/features`.
    */
   readonly gates?: GateSupport;
+  /**
+   * RFC-0015: the block registry component sections are validated against (default: the
+   * built-ins; deployments pass the theme's types too). Unknown types are kept, not refused.
+   */
+  readonly blocks?: BlockRegistry;
 }
 
 /**
@@ -212,6 +218,7 @@ export class SiteGraphStore {
     this.#now = options.now ?? (() => new Date());
     this.#newId = options.idGen ?? newId;
     this.#gates = options.gates;
+    this.blocks = options.blocks ?? createBlockRegistry();
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.proposals = new BodyProposals({
@@ -246,6 +253,8 @@ export class SiteGraphStore {
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
   readonly #onHookError: (error: unknown) => void;
   readonly #gates: GateSupport | undefined;
+  /** RFC-0015: the block types component sections are checked against. */
+  readonly blocks: BlockRegistry;
 
   /**
    * Whether `availability` may be written for this site (S15): the renderer serving it has
@@ -429,6 +438,7 @@ export class SiteGraphStore {
     fillMissingSrc("page", draft);
     draft = await this.#indexSections(draft, undefined, ts, options.writer);
     assertValid("page", draft);
+    checkComponentSections(this.blocks, draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
     await this.#checkGates(site.id, undefined, draft.availability);
@@ -492,6 +502,7 @@ export class SiteGraphStore {
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
     draft = await this.#indexSections(draft, stored, ts, options.writer);
     assertValid("page", draft);
+    checkComponentSections(this.blocks, draft);
     await assertUnlocked(this.#sql, stored.siteId, [page.id], options.releaseEdit);
     await this.#checkGates(draft.siteId, stored.availability, draft.availability);
     const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
@@ -1574,4 +1585,24 @@ export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef
   }
   for (const [id, node] of b) if (!a.has(id)) removed.push(node);
   return { added, removed, changed };
+}
+
+/**
+ * RFC-0015 §7: every component section of a known type follows its props schema; unknown types
+ * are kept (a theme may have removed them) but still capped at the prop limit.
+ */
+function checkComponentSections(blocks: BlockRegistry, page: Page): void {
+  for (const section of page.sections) {
+    if (section.kind !== "component") continue;
+    const issues =
+      Object.keys(section.props).length > BLOCK_LIMITS.props
+        ? [{ path: "", message: `at most ${BLOCK_LIMITS.props} props` }]
+        : (blocks.checkSection(section.type, section.props) ?? []);
+    if (issues.length)
+      throw new InvariantError(
+        "invalid_props",
+        `section ${section.id} (${section.type}): ${issues.map((i) => `${i.path || "props"} ${i.message}`).join("; ")}`,
+        { sectionId: section.id, type: section.type, issues },
+      );
+  }
 }

@@ -1,0 +1,10 @@
+{
+  "reason": "a component section has only id, kind, type and props; values go in props",
+  "data": {
+    "id": "sec_callout0003",
+    "kind": "component",
+    "type": "callout",
+    "props": {},
+    "tone": "info"
+  }
+}
