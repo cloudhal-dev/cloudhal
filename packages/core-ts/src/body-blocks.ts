@@ -14,6 +14,7 @@
  * Worker-safe: `marked` only, no Node APIs.
  */
 import { Marked, type TokenizerAndRendererExtension, type Tokens } from "marked";
+import type { BlockRegistry } from "./blocks.ts";
 import { type Directive, directiveStart, matchDirective } from "./directives.ts";
 
 /** One top-level block of a markdown body. */
@@ -259,4 +260,31 @@ export function bodyDirectives(markdown: string): Directive[] {
     if (token.type === "directive") found.push((token as DirectiveToken).directive);
   });
   return found;
+}
+
+/**
+ * Block type names the registry does not know, used in component sections or body directives
+ * (RFC-0015 §7): kept as written, and reported to the writer so content from another theme is
+ * never lost silently. Sorted, each once.
+ */
+export function unknownBlockTypes(
+  registry: Pick<BlockRegistry, "get">,
+  content: {
+    sections?:
+      | readonly { kind: string; type?: string; format?: string; body?: string }[]
+      | undefined;
+    markdown?: string | undefined;
+  },
+): string[] {
+  const names = new Set<string>();
+  const body = (markdown: string) => {
+    if (!markdown.includes("::")) return;
+    for (const d of bodyDirectives(markdown)) if (!registry.get(d.name)) names.add(d.name);
+  };
+  for (const s of content.sections ?? []) {
+    if (s.kind === "component" && s.type && !registry.get(s.type)) names.add(s.type);
+    if (s.kind === "richText" && s.format === "markdown" && s.body) body(s.body);
+  }
+  if (content.markdown) body(content.markdown);
+  return [...names].sort();
 }

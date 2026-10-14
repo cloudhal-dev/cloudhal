@@ -33,7 +33,13 @@ import {
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
 import type { BlockWriter, EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
-import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
+import {
+  mintPreviewToken,
+  previewUrl,
+  primaryOrigin,
+  termName,
+  unknownBlockTypes,
+} from "@cloudhal/core-ts";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
 import {
   afterRunCall,
@@ -139,6 +145,25 @@ function coverImage(input: unknown): NonNullable<ContentEntry["coverImage"]> {
   // `src` is written by the store from the asset (invariant 8).
   return { assetId: c.assetId, alt: c.alt ?? "", src: `asset:${c.assetId}` };
 }
+
+/** Reported when a write keeps blocks of types this deployment does not know (RFC-0015 §7). */
+const unknownBlocks = {
+  type: "array",
+  items: { type: "string" },
+  description:
+    "Block types used here that this site does not know (another theme's?): kept as written, not shown on the site. list_block_types shows the known ones.",
+};
+
+function unknownBlocksOf(
+  ctx: ToolContext,
+  content: Parameters<typeof unknownBlockTypes>[1],
+): { unknownBlocks?: string[] } {
+  const names = unknownBlockTypes(ctx.store.blocks, content);
+  return names.length ? { unknownBlocks: names } : {};
+}
+
+const entryMarkdown = (entry: ContentEntry) =>
+  entry.body.format === "markdown" ? entry.body.value : undefined;
 
 /** Agents write markdown only; raw HTML sections are for people in Studio (security review H3). */
 function assertNoHtmlSections(sections: unknown): void {
@@ -372,7 +397,8 @@ function rawTools(): ToolDefinition[] {
   const sectionInput = {
     type: "array",
     items: SECTION,
-    description: "Ordered sections; keep existing ids when editing.",
+    description:
+      'Ordered sections; keep existing ids when editing. Typed blocks (a callout, a button, an FAQ, the theme\'s own) are sections with kind "component", a type and its props: list_block_types.',
   };
   return [
     {
@@ -466,11 +492,10 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "path", "title"],
       ),
-      outputSchema: obj({ page: PAGE, site: SITE, snapshot: SNAPSHOT, hint: { type: "string" } }, [
-        "page",
-        "site",
-        "snapshot",
-      ]),
+      outputSchema: obj(
+        { page: PAGE, site: SITE, snapshot: SNAPSHOT, hint: { type: "string" }, unknownBlocks },
+        ["page", "site", "snapshot"],
+      ),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -497,7 +522,12 @@ function rawTools(): ToolDefinition[] {
           );
           const snapshot = await autoSnapshot(ctx, site.id, "create_page");
           const hint = await menuHint(ctx, site.id, { kind: "page", id: result.page.id });
-          return { ...result, snapshot, ...(hint ? { hint } : {}) };
+          return {
+            ...result,
+            snapshot,
+            ...(hint ? { hint } : {}),
+            ...unknownBlocksOf(ctx, { sections: result.page.sections }),
+          };
         } catch (e) {
           mapError(e);
         }
@@ -520,7 +550,7 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "pageId", "rev"],
       ),
-      outputSchema: obj({ page: PAGE, snapshot: SNAPSHOT }, ["page", "snapshot"]),
+      outputSchema: obj({ page: PAGE, snapshot: SNAPSHOT, unknownBlocks }, ["page", "snapshot"]),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -548,7 +578,7 @@ function rawTools(): ToolDefinition[] {
         try {
           const saved = await ctx.store.updatePage(next, { writer: mcpWriter(ctx) });
           const snapshot = await autoSnapshot(ctx, page.siteId, "update_page");
-          return { page: saved, snapshot };
+          return { page: saved, snapshot, ...unknownBlocksOf(ctx, { sections: saved.sections }) };
         } catch (e) {
           mapError(e);
         }
@@ -690,10 +720,10 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "slug", "title", "body"],
       ),
-      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT, hint: { type: "string" } }, [
-        "entry",
-        "snapshot",
-      ]),
+      outputSchema: obj(
+        { entry: ENTRY, snapshot: SNAPSHOT, hint: { type: "string" }, unknownBlocks },
+        ["entry", "snapshot"],
+      ),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -731,7 +761,12 @@ function rawTools(): ToolDefinition[] {
           await reportDeltas(ctx, undefined, entry);
           const snapshot = await autoSnapshot(ctx, site.id, "create_entry");
           const hint = await menuHint(ctx, site.id, { kind: "contentEntry", id: entry.id });
-          return { entry, snapshot, ...(hint ? { hint } : {}) };
+          return {
+            entry,
+            snapshot,
+            ...(hint ? { hint } : {}),
+            ...unknownBlocksOf(ctx, { markdown: entryMarkdown(entry) }),
+          };
         } catch (e) {
           mapError(e);
         }
@@ -762,7 +797,7 @@ function rawTools(): ToolDefinition[] {
         },
         ["siteId", "entryId", "rev"],
       ),
-      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT }, ["entry", "snapshot"]),
+      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT, unknownBlocks }, ["entry", "snapshot"]),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -859,7 +894,11 @@ function rawTools(): ToolDefinition[] {
           const saved = await ctx.store.updateContentEntry(next, { writer: mcpWriter(ctx) });
           await reportDeltas(ctx, entry, saved);
           const snapshot = await autoSnapshot(ctx, entry.siteId, "update_entry");
-          return { entry: saved, snapshot };
+          return {
+            entry: saved,
+            snapshot,
+            ...unknownBlocksOf(ctx, { markdown: entryMarkdown(saved) }),
+          };
         } catch (e) {
           mapError(e);
         }

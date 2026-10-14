@@ -1513,6 +1513,7 @@ export const tr: Messages = {
     create_entry: "Makale oluştur",
     update_entry: "Makaleyi güncelle",
     delete_entry: "Makaleyi sil",
+    list_block_types: "Blok tiplerini listele",
     get_body: "Gövdeyi oku",
     edit_body: "Gövdeyi düzenle",
     diff_node: "Sürümleri karşılaştır",

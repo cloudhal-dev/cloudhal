@@ -3,9 +3,22 @@
  * Worker-safe. Operations apply in order to the body's blocks (ids from `currentBlocks`); the
  * result is checked against the profile's splitter, so an op can never silently merge with or
  * split its neighbours (invariant 3).
+ *
+ * Typed blocks (RFC-0015 §7) have two more operations, `insertBlock` and `setProps`, so agents
+ * never write directive syntax by hand. `expandBlockOps` turns them into `insert` and `replace`
+ * against the registry before anything applies, so proposals, approvals and Studio see the
+ * ordinary operations.
  */
 import type { BodyBlock } from "@cloudhal/core-contracts";
+import type { BlockRegistry } from "./blocks.ts";
 import { splitMarkdown } from "./body-blocks.ts";
+import {
+  checkDirective,
+  type DirectiveAttrs,
+  directiveProps,
+  parseDirective,
+  writeDirective,
+} from "./directives.ts";
 
 export type BodyOp =
   /** The block becomes `markdown` (exactly one block). `ifHash` refuses if it changed. */
@@ -16,6 +29,25 @@ export type BodyOp =
   | { op: "insert"; after: string | null; markdown: string }
   | { op: "move"; block: string; after: string | null; ifHash?: string }
   | { op: "delete"; block: string; ifHash?: string };
+
+/** Typed-block operations (RFC-0015 §7), expanded by `expandBlockOps`. */
+export type BlockOp =
+  /**
+   * A new block of `type` after `after` (null: at the start). `markdown` is a container's inner
+   * text (a container without it starts empty); a leaf takes none.
+   */
+  | {
+      op: "insertBlock";
+      after: string | null;
+      type: string;
+      props: Record<string, unknown>;
+      markdown?: string;
+    }
+  /** Changes a block's props (merged; `null` removes one) and keeps its inner text. */
+  | { op: "setProps"; block: string; ifHash?: string; props: Record<string, unknown> };
+
+/** What `edit_body` and REST `PATCH …/body` accept. */
+export type EditOp = BodyOp | BlockOp;
 
 export const MAX_BODY_OPS = 50;
 
@@ -39,7 +71,7 @@ const HASH = /^[0-9a-f]{64}$/;
  * block ids, hashes and strings where they belong. Unknown keys are dropped. Whether they apply is
  * `applyBodyOps`'s question.
  */
-export function parseBodyOps(raw: unknown): BodyOp[] {
+export function parseBodyOps(raw: unknown): EditOp[] {
   if (!Array.isArray(raw) || raw.length === 0)
     throw new BodyOpError("invalid", "ops: a list of operations");
   if (raw.length > MAX_BODY_OPS)
@@ -83,9 +115,105 @@ export function parseBodyOps(raw: unknown): BodyOp[] {
         return { op: "move", block: block(), after: after(), ...ifHash() };
       case "delete":
         return { op: "delete", block: block(), ...ifHash() };
+      case "insertBlock": {
+        const props = isProps(o.props) ? o.props : bad("props: an object");
+        const type = typeof o.type === "string" ? o.type : bad("type: a block type name");
+        return {
+          op: "insertBlock",
+          after: after(),
+          type,
+          props,
+          ...(o.markdown === undefined ? {} : { markdown: text("markdown") }),
+        };
+      }
+      case "setProps":
+        return {
+          op: "setProps",
+          block: block(),
+          ...ifHash(),
+          props: isProps(o.props) ? o.props : bad("props: an object"),
+        };
       default:
-        return bad("op: replace, replaceText, insert, move or delete");
+        return bad("op: replace, replaceText, insert, move, delete, insertBlock or setProps");
     }
+  });
+}
+
+const isProps = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/**
+ * `ops` with `insertBlock` and `setProps` turned into `insert` and `replace` (the directive
+ * written for the agent), checked against `registry`: a known body type, props that fit. `blocks`
+ * are the body's current blocks (`currentBlocks`). A `setProps` without `ifHash` is pinned to the
+ * block as it is now, since its props merge onto what is there.
+ */
+export function expandBlockOps(
+  ops: readonly EditOp[],
+  blocks: readonly { id: string; hash: string; markdown: string }[],
+  registry: BlockRegistry,
+): BodyOp[] {
+  const byId = new Map(blocks.map((b) => [b.id, b]));
+  const known = (name: string, n: number) => {
+    const type = registry.get(name);
+    if (!type)
+      throw new BodyOpError("invalid", `unknown block type "${name}"; call list_block_types`, n);
+    return type;
+  };
+  const check = (
+    name: string,
+    attrs: Record<string, unknown>,
+    content: string | undefined,
+    n: number,
+  ) => {
+    const issues = checkDirective(registry, {
+      name,
+      attrs: attrs as DirectiveAttrs,
+      fence: 3,
+      ...(content === undefined ? {} : { content }),
+    });
+    if (issues?.length)
+      throw new BodyOpError(
+        "invalid",
+        `${name}: ${issues.map((i) => `${i.path || "props"} ${i.message}`).join("; ")}`,
+        n,
+      );
+  };
+  return ops.map((op, n): BodyOp => {
+    if (op.op === "insertBlock") {
+      const type = known(op.type, n);
+      const container = type.content === "markdown";
+      if (!container && op.markdown !== undefined)
+        throw new BodyOpError("invalid", `${op.type} wraps no text: leave markdown out`, n);
+      const content = container ? (op.markdown ?? "") : undefined;
+      check(op.type, op.props, content, n);
+      return {
+        op: "insert",
+        after: op.after,
+        markdown: writeDirective(op.type, op.props, content),
+      };
+    }
+    if (op.op === "setProps") {
+      const block = byId.get(op.block);
+      if (!block) throw new BodyOpError("not_found", `block ${op.block} not found`, n);
+      if (op.ifHash !== undefined && op.ifHash !== block.hash)
+        throw new BodyOpError("conflict", `block ${op.block} changed since you read it`, n);
+      const d = parseDirective(block.markdown);
+      if (!d) throw new BodyOpError("invalid", `block ${op.block} is not a typed block`, n);
+      const type = known(d.name, n);
+      const props: Record<string, unknown> = directiveProps(type, d.attrs);
+      for (const [key, value] of Object.entries(op.props))
+        if (value === null) delete props[key];
+        else props[key] = value;
+      check(d.name, props, d.content, n);
+      return {
+        op: "replace",
+        block: op.block,
+        ifHash: block.hash,
+        markdown: writeDirective(d.name, props, d.content),
+      };
+    }
+    return op;
   });
 }
 

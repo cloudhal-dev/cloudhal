@@ -233,6 +233,11 @@ Status:
   - The store refuses directives of known types whose props do not fit (422 `invalid_props`), in article bodies and markdown rich-text sections; unknown types are kept. Reporting them as `unknownBlocks` in the write's result comes with 6c.
   - Bodies render the built-ins with the same markup as sections, the inner markdown through the same safe renderer; unknown and misfitting directives render nothing on the site and a placeholder in previews. **Deviation:** a theme's own components (`theme.ts` `blocks`) apply to sections only for now. Using them inside bodies needs the article and rich-text renderers to split bodies into Astro components, which lands with 6d's theme types.
   - The editor shows directives as framed blocks with a "Properties" popover (the generated form); a container's inner text is edited in place and keeps the bytes of its untouched blocks. The `/` menu lists the body types.
+- **6c shipped.**
+  - MCP `list_block_types` (`content:read`, optionally `where`) returns each type's name, title, places, props schema, `content` and example.
+  - `edit_body` takes `insertBlock { after, type, props, markdown? }` and `setProps { block, ifHash?, props }` (merged; `null` removes a prop). `expandBlockOps` turns them into `insert` and `replace` before anything applies, so proposals, approvals, per-op accept, REST `PATCH …/body` and Studio see ordinary operations. A `setProps` without `ifHash` is pinned to the block it merged onto.
+  - `get_body` adds `props` to typed blocks. `create_page`, `update_page`, `create_entry`, `update_entry` and `edit_body` report `unknownBlocks`: types the site does not know, kept as written. The page tools' `sections` say how to write `component` sections.
+  - AI commands (RFC-0016) are told to keep directive lines exactly as written and edit only the text between them.
 
 ## Open questions
 Accepted with these defaults (ADR-0030):
