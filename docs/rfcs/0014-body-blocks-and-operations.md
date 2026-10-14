@@ -1,5 +1,5 @@
 # RFC-0014: Body blocks and body operations
-- Status: Draft. Halil approved the direction on 2026-10-14 (options below marked **approved**). The contract changes in §3–§5 wait for acceptance. Phase 1 needs no contract change and ships with this draft.
+- Status: Accepted (2026-10-14, approved by Halil with the defaults of the open questions as recorded in ADR-0028). Phases 1 and 2a shipped before acceptance without a contract change.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-14
 - Related: ADR-0015 (agent modes; "proposals" follow-up), RFC-0004 (`asset:` references), RFC-0008 (three-way release diff), RFC-0012 (HTML sanitizer), DESIGN.md §2y (body editor), the 2026-10-13 editor research (Tiptap, CodeMirror, Lexical, Plate, BlockNote, Milkdown, MDXEditor, ProseMirror compared on license, markdown fidelity, size and Kumo skinning)
 - Sources (checked 2026-10-13/14):
@@ -171,6 +171,15 @@ Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged
 | 6. Registry | Typed blocks with Kumo forms | RFC-0015 | `list_block_types`, `insertBlock` |
 | 7. Generator | Kumo catalog panels (`@cloudflare/kumo/catalog`) | outputs are ordinary changes | generator tools that propose |
 
+**Status by phase (2026-10-14).**
+- **Shipped:** phases 1 (editor), 2a (`bodyDiff`, Studio diffs) and 3 (the contract, the store's index, `get_body`, `edit_body` in apply mode with rebase, `diff_node`).
+- **Waiting for phase 4 (proposals):**
+  - `mode: "propose"`;
+  - the proposals table;
+  - structured approval `changes` (until then, the `edit_body` approval prompt carries the operation summary and the word counts);
+  - the REST `PATCH …/body`.
+- **Unindexed bodies:** a body without an index (written before this phase, or over 5,000 blocks) shows content-derived ids (`blk_v…`). The store's first write keeps those ids, so no one-off job is needed.
+
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
 |---|---|---|---|
@@ -184,7 +193,7 @@ Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged
 
 ## Compatibility & migration
 - **Contracts.** All new fields are optional and `schemaVersion` stays 1.
-- **Existing bodies.** They get an index on their next write; a one-off `cloudhal` job can index the rest. A missing `blocks` means not indexed yet, never "empty".
+- **Existing bodies.** They get an index on their next write. Until then, `get_body` shows content-derived ids, which that write keeps. A missing `blocks` means not indexed yet, never "empty".
 - **Readers.** Old readers ignore `profile` and `blocks`. Renderers are unchanged until directives arrive (RFC-0015).
 - **Rollback.** Stop writing `blocks`. Bodies are untouched throughout, because the index never changes the markdown.
 - **Phase 1** changes no stored data. Studio writes the same markdown, byte for byte where nobody edited.
@@ -200,15 +209,15 @@ Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged
 - **Dependencies.** MIT/Apache only (**approved**): Tiptap's MIT packages, CodeMirror 6, `marked`; no paid add-ons and no private registry in CI.
 
 ## Open questions
-1. **Where the in-editor AI model call happens** (decided by the owner before phase 5):
+Accepted with these defaults (ADR-0028):
+1. **Where the in-editor AI model call happens.** No default: Cloudhal makes no model call until the owner chooses, and phase 5 waits for that choice. The options stay as listed:
    - the user's own key, which needs secret storage (hard rule 9);
    - Workers AI, which needs no secret, but its Turkish quality is unverified;
-   - hand-off to a connected agent as a proposal, which keeps Cloudhal model-free but doesn't stream;
-   - or none.
+   - hand-off to a connected agent as a proposal, which keeps Cloudhal model-free but doesn't stream.
 
    MCP sampling doesn't fit, because Studio is not an MCP client.
-2. Should `plan`-mode agents be able to propose? Should `edits`-mode body changes to published articles become proposals by default?
-3. HTML bodies: should they stay source-only (today), be frozen, or be offered a reviewed "convert to markdown"?
-4. Should profile v1 add footnotes, math or inline directives now, or later?
-5. Should one registry cover sections and body blocks, with a `component` section kind? (RFC-0015)
-6. Should `Body.value` and `RichTextSection.body` be unified under one name while the contract changes anyway?
+2. **Proposals and modes.** `plan`-mode agents may propose, which is ADR-0015's "plan mode leaving a draft change set for review": a proposal changes nothing until a person accepts it. `edits`-mode body changes keep applying directly, as today.
+3. **HTML bodies** stay source-only: edited as text, never converted.
+4. **Profile v1** has no footnotes, math or inline directives. They can come in a later profile.
+5. **One registry for sections and body blocks**, with a `component` section kind. RFC-0015 designs it.
+6. **`Body.value` and `RichTextSection.body` keep their names.** Renaming either would break every reader for no gain; `get_body` gives agents one shape.

@@ -127,6 +127,42 @@
         "from": { "$ref": "#/$defs/Timestamp" },
         "until": { "$ref": "#/$defs/Timestamp" }
       }
+    },
+    "BodyProfile": {
+      "type": "integer",
+      "enum": [1],
+      "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
+    },
+    "BodyBlock": {
+      "type": "object",
+      "description": "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.",
+      "additionalProperties": false,
+      "required": ["id", "hash"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^blk_[0-9A-Za-z]{8,24}$",
+          "description": "Stable across writes that keep the block's content or its place among unchanged blocks."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 (hex) of the block's markdown without trailing whitespace."
+        },
+        "by": { "$ref": "#/$defs/Actor" },
+        "via": {
+          "type": "string",
+          "enum": ["studio", "mcp", "api", "import", "ai-command", "proposal"],
+          "description": "The channel of that change."
+        },
+        "at": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "BodyBlocks": {
+      "type": "array",
+      "description": "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.",
+      "maxItems": 5000,
+      "items": { "$ref": "#/$defs/BodyBlock" }
     }
   }
 }

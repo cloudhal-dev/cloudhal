@@ -41,6 +41,13 @@ export type Locale = string;
  */
 export type PublishStatus = "draft" | "review" | "published" | "archived";
 /**
+ * The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "BodyProfile".
+ */
+export type BodyProfile = 1;
+/**
  * Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.
  *
  * This interface was referenced by `ContentEntry`'s JSON-Schema
@@ -54,6 +61,15 @@ export type ActorKind = "human" | "agent" | "system";
  * via the `definition` "Timestamp".
  */
 export type Timestamp = string;
+/**
+ * A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.
+ *
+ * @maxItems 5000
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "BodyBlocks".
+ */
+export type BodyBlocks = BodyBlock[];
 /**
  * Monotonic per-node revision used for optimistic locking (compare-and-swap on write).
  *
@@ -111,6 +127,39 @@ export interface ContentEntry {
 export interface Body {
   format: "markdown" | "html";
   value: string;
+  profile?: BodyProfile;
+  blocks?: BodyBlocks;
+}
+/**
+ * One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "BodyBlock".
+ */
+export interface BodyBlock {
+  /**
+   * Stable across writes that keep the block's content or its place among unchanged blocks.
+   */
+  id: string;
+  /**
+   * SHA-256 (hex) of the block's markdown without trailing whitespace.
+   */
+  hash: string;
+  by?: Actor;
+  /**
+   * The channel of that change.
+   */
+  via?: "studio" | "mcp" | "api" | "import" | "ai-command" | "proposal";
+  at?: Timestamp;
+}
+/**
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "Actor".
+ */
+export interface Actor {
+  kind: ActorKind;
+  id: Id;
+  name?: string;
 }
 /**
  * Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.
@@ -128,15 +177,6 @@ export interface TermAssignment {
    * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
    */
   primary?: string;
-}
-/**
- * This interface was referenced by `ContentEntry`'s JSON-Schema
- * via the `definition` "Actor".
- */
-export interface Actor {
-  kind: ActorKind;
-  id: Id;
-  name?: string;
 }
 /**
  * Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.

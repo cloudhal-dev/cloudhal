@@ -15,6 +15,10 @@ export const KNOWN_TOOLS = [
   "create_entry",
   "update_entry",
   "delete_entry",
+  // RFC-0014 body tools
+  "get_body",
+  "edit_body",
+  "diff_node",
   "create_snapshot",
   "list_snapshots",
   "diff_snapshots",

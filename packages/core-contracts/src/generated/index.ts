@@ -7,8 +7,8 @@
 
 export type { SchemaVersion, Id, Slug, Revision, Timestamp, Project, Metadata } from "./project.ts";
 export type { Locale, TimeZone, Site, Domain, ThemeRef } from "./site.ts";
-export type { PublishStatus, Section, Page, HeroSection, ImageRef, Link, RichTextSection, ImageSection, ContentListSection, Seo, Availability } from "./page.ts";
-export type { ActorKind, ContentEntry, Body, TermAssignment, Actor } from "./content-entry.ts";
+export type { PublishStatus, Section, BodyProfile, ActorKind, BodyBlocks, Page, HeroSection, ImageRef, Link, RichTextSection, BodyBlock, Actor, ImageSection, ContentListSection, Seo, Availability } from "./page.ts";
+export type { ContentEntry, Body, TermAssignment } from "./content-entry.ts";
 export type { Snapshot, NodeRef, ChangeSummary } from "./snapshot.ts";
 export type { SkillManifest } from "./skill-manifest.ts";
 export type { Path, Taxonomy, TaxonomyLabel, TaxonomyArchive } from "./taxonomy.ts";

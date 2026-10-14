@@ -4,6 +4,7 @@ import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { pageDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
+import { writerOf } from "../governance.ts";
 import { param } from "../params.ts";
 import { type DraftPreview, previewResponse } from "../preview.ts";
 
@@ -45,7 +46,9 @@ export const pages: Hono<Env> = new Hono<Env>()
       Page,
       "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
     >;
-    const result = await c.get("store").createPage(site, { ...input, siteId: site.id });
+    const result = await c
+      .get("store")
+      .createPage(site, { ...input, siteId: site.id }, { writer: writerOf(c) });
     return c.json(result, 201);
   })
   .get("/:pageId/preview", async (c) => {
@@ -67,7 +70,7 @@ export const pages: Hono<Env> = new Hono<Env>()
     const body = (await c.req.json()) as Page;
     if (body.id !== param(c, "pageId") || body.siteId !== param(c, "siteId"))
       throw badRequest("ids must match the URL");
-    return c.json(await c.get("store").updatePage(body));
+    return c.json(await c.get("store").updatePage(body, { writer: writerOf(c) }));
   })
   .delete("/:pageId", async (c) => {
     const store = c.get("store");

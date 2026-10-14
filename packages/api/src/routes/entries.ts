@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { entryDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
-import { API_ACTOR } from "../governance.ts";
+import { API_ACTOR, writerOf } from "../governance.ts";
 import { entryLimit, personOf } from "../own.ts";
 import { param } from "../params.ts";
 import { type DraftPreview, previewResponse } from "../preview.ts";
@@ -55,7 +55,7 @@ export const entries: Hono<Env> = new Hono<Env>()
       owner: c.get("ownership"),
       next,
     });
-    const entry = await c.get("store").createContentEntry(next);
+    const entry = await c.get("store").createContentEntry(next, { writer: writerOf(c) });
     return c.json(entry, 201);
   })
   .get("/:entryId/preview", async (c) => {
@@ -113,7 +113,7 @@ export const entries: Hono<Env> = new Hono<Env>()
           409,
         );
     }
-    return c.json(await c.get("store").updateContentEntry(body));
+    return c.json(await c.get("store").updateContentEntry(body, { writer: writerOf(c) }));
   })
   .delete("/:entryId", async (c) => {
     const store = c.get("store");

@@ -1,0 +1,207 @@
+/** RFC-0014 §4: agents read and edit bodies by block. */
+import { AuditLog, defaultScopes, PolicyEngine } from "@cloudhal/agent-runtime";
+import type { ContentEntry, Page } from "@cloudhal/core-contracts";
+import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
+import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
+import { beforeEach, describe, expect, it } from "vitest";
+import { defineTools, runTool, type ToolContext, toolPolicies } from "../src/tools.ts";
+
+const tools = defineTools();
+const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+const agent = { kind: "agent" as const, id: "agent_bodytools1", name: "Body Agent" };
+const person = { kind: "human" as const, id: "user_bodytools01", name: "Editor" };
+
+interface Block {
+  id: string;
+  hash: string;
+  type: string;
+  markdown: string;
+  by?: { id: string };
+  via?: string;
+}
+
+describe("body tools", () => {
+  let ctx: ToolContext;
+  let store: SiteGraphStore;
+  let policy: PolicyEngine;
+  let audit: AuditLog;
+  let siteId: string;
+  let entry: ContentEntry;
+
+  beforeEach(async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    siteId = (await seedStarterSite(store, { name: "Body Site", slug: "body" })).id;
+    policy = new PolicyEngine(toolPolicies(tools));
+    audit = new AuditLog(sql);
+    ctx = { store, principal: { actor: agent, scopes: defaultScopes(agent) } };
+    entry = await store.createContentEntry(
+      {
+        siteId,
+        collection: "posts",
+        slug: "blocks",
+        locale: "en",
+        status: "draft",
+        title: "Blocks",
+        body: { format: "markdown", value: "# Title\n\nFirst paragraph.\n\nSecond paragraph.\n" },
+        fields: {},
+        tags: [],
+        author: person,
+      },
+      { writer: { actor: person, via: "studio" } },
+    );
+  });
+
+  const call = (name: string, args: Record<string, unknown>) =>
+    runTool(byName[name] as (typeof tools)[number], args, ctx, { policy, audit, confirmed: false });
+  const read = async () =>
+    (await call("get_body", { siteId, entryId: entry.id })).result as {
+      rev: number;
+      markdown: string;
+      blocks: Block[];
+    };
+
+  it("reads a body as blocks with their authors", async () => {
+    const body = await read();
+    expect(body.rev).toBe(entry.rev);
+    expect(body.blocks.map((b) => [b.type, b.markdown])).toEqual([
+      ["heading", "# Title"],
+      ["paragraph", "First paragraph."],
+      ["paragraph", "Second paragraph."],
+    ]);
+    expect(body.blocks[0]?.by?.id).toBe(person.id);
+    expect(body.blocks[0]?.id).toBe(entry.body.blocks?.[0]?.id);
+  });
+
+  it("edits one block, keeps the others and their authors, and snapshots", async () => {
+    const body = await read();
+    const [, one, two] = body.blocks;
+    const res = await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops: [
+        { op: "replaceText", block: two?.id, find: "Second", replace: "2nd" },
+        { op: "insert", after: one?.id, markdown: "Inserted." },
+      ],
+    });
+    const out = res.result as {
+      rev: number;
+      changed: string[];
+      added: string[];
+      removed: string[];
+      words: { added: number; removed: number };
+      snapshot: { id: string };
+    };
+    expect(out.changed).toEqual([two?.id]);
+    expect(out.added).toHaveLength(1);
+    expect(out.removed).toEqual([]);
+    expect(out.snapshot.id).toMatch(/^snap_/);
+    const saved = (await store.getContentEntry(entry.id)) as ContentEntry;
+    expect(saved.body.value).toBe("# Title\n\nFirst paragraph.\n\nInserted.\n\n2nd paragraph.\n");
+    const blocks = saved.body.blocks ?? [];
+    expect(blocks[1]?.by).toEqual(person); // untouched
+    expect(blocks[3]?.id).toBe(two?.id);
+    expect(blocks[3]?.by).toEqual(agent);
+    expect(blocks[3]?.via).toBe("mcp");
+  });
+
+  it("rebases a stale rev only when the named blocks are unchanged", async () => {
+    const body = await read();
+    const [title, one, two] = body.blocks;
+    // Someone else edits the title in between.
+    await store.updateContentEntry(
+      {
+        ...entry,
+        body: { ...entry.body, value: "# New title\n\nFirst paragraph.\n\nSecond paragraph.\n" },
+      },
+      { writer: { actor: person, via: "studio" } },
+    );
+    // Without ifHash the server cannot tell: conflict.
+    await expect(
+      call("edit_body", {
+        siteId,
+        entryId: entry.id,
+        rev: body.rev,
+        ops: [{ op: "delete", block: two?.id }],
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+    // With the hash it read, the edit lands on the newer body.
+    await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops: [{ op: "delete", block: two?.id, ifHash: two?.hash }],
+    });
+    expect((await store.getContentEntry(entry.id))?.body.value).toBe(
+      "# New title\n\nFirst paragraph.\n",
+    );
+    // A block someone changed is a conflict.
+    const fresh = await read();
+    await expect(
+      call("edit_body", {
+        siteId,
+        entryId: entry.id,
+        rev: fresh.rev,
+        ops: [{ op: "replace", block: title?.id, ifHash: title?.hash, markdown: "# X" }],
+      }),
+    ).rejects.toMatchObject({ code: expect.stringMatching(/conflict|not_found/) });
+    expect(one).toBeDefined();
+  });
+
+  it("edits a page's rich-text section and refuses other sections", async () => {
+    const home = (await store.listPages(siteId)).find((p) => p.path === "/") as Page;
+    const section = {
+      id: "sec_bodytool0001",
+      kind: "richText",
+      format: "markdown",
+      body: "Hello there.",
+    } as Page["sections"][number];
+    const page = await store.updatePage({ ...home, sections: [...home.sections, section] });
+    const got = (await call("get_body", { siteId, pageId: page.id, sectionId: section.id }))
+      .result as { rev: number; blocks: Block[] };
+    await call("edit_body", {
+      siteId,
+      pageId: page.id,
+      sectionId: section.id,
+      rev: got.rev,
+      ops: [{ op: "replace", block: got.blocks[0]?.id, markdown: "Hello, world." }],
+    });
+    const saved = (await store.getPage(page.id)) as Page;
+    expect(saved.sections.find((s) => s.id === section.id)).toMatchObject({
+      body: "Hello, world.",
+    });
+    const hero = page.sections.find((s) => s.kind === "hero");
+    if (hero)
+      await expect(
+        call("get_body", { siteId, pageId: page.id, sectionId: hero.id }),
+      ).rejects.toMatchObject({ code: "invalid" });
+  });
+
+  it("diffs a node between its live version and its draft", async () => {
+    const snap = await store.createSnapshot(siteId, { actor: person, reason: "manual" });
+    await store.publish(
+      (await store.getSite(siteId)) as NonNullable<Awaited<ReturnType<typeof store.getSite>>>,
+      snap.id,
+    );
+    const body = await read();
+    await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops: [{ op: "replaceText", block: body.blocks[1]?.id, find: "First", replace: "Opening" }],
+    });
+    const diff = (await call("diff_node", { siteId, nodeId: entry.id })).result as {
+      from: string;
+      to: string;
+      fields: string[];
+      bodies: { field: string; counts: { changed: number } }[];
+    };
+    expect(diff.from).toBe(snap.id);
+    expect(diff.to).toBe("draft");
+    expect(diff.fields).toContain("body");
+    expect(diff.bodies[0]).toMatchObject({ field: "body", counts: { changed: 1 } });
+  });
+});

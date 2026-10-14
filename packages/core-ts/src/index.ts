@@ -20,6 +20,9 @@ export {
   type UploadTicketRequest,
 } from "./assets.ts";
 export * from "./availability.ts";
+export * from "./body-blocks.ts";
+export * from "./body-index.ts";
+export * from "./body-ops.ts";
 export * from "./bundles.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";

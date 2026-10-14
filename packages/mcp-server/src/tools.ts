@@ -24,7 +24,7 @@ import {
   ownOnlyChangeSet,
 } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
-import type { Asset, ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
+import type { Actor, Asset, ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
   PageSchema,
@@ -32,7 +32,7 @@ import {
   SiteSchema,
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
-import type { EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
+import type { BlockWriter, EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import { mintPreviewToken, previewUrl, primaryOrigin, termName } from "@cloudhal/core-ts";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
 import {
@@ -43,6 +43,7 @@ import {
 } from "@cloudhal/schedules";
 import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
+import { bodyTools } from "./body-tools.ts";
 import { commentTools } from "./comment-tools.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -84,6 +85,11 @@ import {
   type TermsInput,
   termLookup,
 } from "./terms.ts";
+
+/** Body blocks an agent changes carry it and the MCP channel (RFC-0014 §3). */
+function mcpWriter(ctx: { principal: { actor: Actor } }): BlockWriter {
+  return { actor: ctx.principal.actor, via: "mcp" };
+}
 
 export {
   type JsonSchema,
@@ -342,6 +348,7 @@ export function defineTools(): ToolDefinition[] {
   const at = raw.findIndex((t) => t.name === "delete_entry") + 1;
   return [
     ...raw.slice(0, at),
+    ...bodyTools(),
     ...taxonomyTools(),
     ...menuTools(),
     ...assetTools(),
@@ -474,15 +481,19 @@ function rawTools(): ToolDefinition[] {
         assertNoHtmlSections(a.sections);
         const site = await requireSite(ctx, a.siteId as string);
         try {
-          const result = await ctx.store.createPage(site, {
-            siteId: site.id,
-            path: a.path as string,
-            title: a.title as string,
-            locale: (a.locale as string | undefined) ?? site.defaultLocale,
-            status: "draft",
-            sections: (a.sections as Section[] | undefined) ?? [],
-            ...(a.seo ? { seo: a.seo as Seo } : {}),
-          });
+          const result = await ctx.store.createPage(
+            site,
+            {
+              siteId: site.id,
+              path: a.path as string,
+              title: a.title as string,
+              locale: (a.locale as string | undefined) ?? site.defaultLocale,
+              status: "draft",
+              sections: (a.sections as Section[] | undefined) ?? [],
+              ...(a.seo ? { seo: a.seo as Seo } : {}),
+            },
+            { writer: mcpWriter(ctx) },
+          );
           const snapshot = await autoSnapshot(ctx, site.id, "create_page");
           const hint = await menuHint(ctx, site.id, { kind: "page", id: result.page.id });
           return { ...result, snapshot, ...(hint ? { hint } : {}) };
@@ -534,7 +545,7 @@ function rawTools(): ToolDefinition[] {
           ...(a.seo ? { seo: a.seo as Seo } : {}),
         };
         try {
-          const saved = await ctx.store.updatePage(next);
+          const saved = await ctx.store.updatePage(next, { writer: mcpWriter(ctx) });
           const snapshot = await autoSnapshot(ctx, page.siteId, "update_page");
           return { page: saved, snapshot };
         } catch (e) {
@@ -698,21 +709,24 @@ function rawTools(): ToolDefinition[] {
         });
         const { terms, tags } = await entryTerms(ctx, site, undefined, a);
         try {
-          const entry = await ctx.store.createContentEntry({
-            siteId: site.id,
-            collection: (a.collection as string | undefined) ?? "posts",
-            slug: a.slug as string,
-            locale: (a.locale as string | undefined) ?? site.defaultLocale,
-            status: "draft",
-            title: a.title as string,
-            ...(a.summary ? { summary: a.summary as string } : {}),
-            body: { format: "markdown", value: a.body as string },
-            fields: (a.fields as Record<string, unknown> | undefined) ?? {},
-            tags,
-            ...(terms ? { terms } : {}),
-            ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
-            author: ctx.principal.actor,
-          });
+          const entry = await ctx.store.createContentEntry(
+            {
+              siteId: site.id,
+              collection: (a.collection as string | undefined) ?? "posts",
+              slug: a.slug as string,
+              locale: (a.locale as string | undefined) ?? site.defaultLocale,
+              status: "draft",
+              title: a.title as string,
+              ...(a.summary ? { summary: a.summary as string } : {}),
+              body: { format: "markdown", value: a.body as string },
+              fields: (a.fields as Record<string, unknown> | undefined) ?? {},
+              tags,
+              ...(terms ? { terms } : {}),
+              ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
+              author: ctx.principal.actor,
+            },
+            { writer: mcpWriter(ctx) },
+          );
           await reportDeltas(ctx, undefined, entry);
           const snapshot = await autoSnapshot(ctx, site.id, "create_entry");
           const hint = await menuHint(ctx, site.id, { kind: "contentEntry", id: entry.id });
@@ -841,7 +855,7 @@ function rawTools(): ToolDefinition[] {
             : {}),
         };
         try {
-          const saved = await ctx.store.updateContentEntry(next);
+          const saved = await ctx.store.updateContentEntry(next, { writer: mcpWriter(ctx) });
           await reportDeltas(ctx, entry, saved);
           const snapshot = await autoSnapshot(ctx, entry.siteId, "update_entry");
           return { entry: saved, snapshot };

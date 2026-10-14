@@ -11,7 +11,12 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import { GOVERNANCE_ENTRY_LIMIT, type SiteGraphStore, splitTarget } from "@cloudhal/core-ts";
+import {
+  type BlockWriter,
+  GOVERNANCE_ENTRY_LIMIT,
+  type SiteGraphStore,
+  splitTarget,
+} from "@cloudhal/core-ts";
 import type { Context } from "hono";
 import type { Env } from "./context.ts";
 import { notFound } from "./errors.ts";
@@ -213,4 +218,14 @@ export async function previewGovernance(
       break;
   }
   return preview;
+}
+
+/**
+ * Who is writing through the REST API, for the provenance of body blocks (RFC-0014 §3): people
+ * in Studio sessions write `via: "studio"`, API keys and anything else `via: "api"`.
+ */
+export function writerOf(c: Context<Env>): BlockWriter {
+  const actor = c.get("actor") ?? API_ACTOR;
+  const keyed = c.get("principal")?.keyId !== undefined;
+  return { actor, via: actor.kind === "human" && !keyed ? "studio" : "api" };
 }

@@ -360,6 +360,35 @@ export const PageSchema = {
     }
   },
   "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
     "Availability": {
       "type": "object",
       "description": "Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.",
@@ -373,6 +402,60 @@ export const PageSchema = {
           "$ref": "#/$defs/Timestamp"
         }
       }
+    },
+    "BodyBlock": {
+      "type": "object",
+      "description": "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^blk_[0-9A-Za-z]{8,24}$",
+          "description": "Stable across writes that keep the block's content or its place among unchanged blocks."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 (hex) of the block's markdown without trailing whitespace."
+        },
+        "by": {
+          "$ref": "#/$defs/Actor"
+        },
+        "via": {
+          "type": "string",
+          "enum": [
+            "studio",
+            "mcp",
+            "api",
+            "import",
+            "ai-command",
+            "proposal"
+          ],
+          "description": "The channel of that change."
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "BodyBlocks": {
+      "type": "array",
+      "description": "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.",
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/BodyBlock"
+      }
+    },
+    "BodyProfile": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
     },
     "Id": {
       "type": "string",
@@ -540,6 +623,12 @@ export const PageSchema = {
             "body": {
               "type": "string",
               "maxLength": 200000
+            },
+            "profile": {
+              "$ref": "#/$defs/BodyProfile"
+            },
+            "blocks": {
+              "$ref": "#/$defs/BodyBlocks"
             }
           }
         },
@@ -731,6 +820,12 @@ export const SectionSchema = {
         "body": {
           "type": "string",
           "maxLength": 200000
+        },
+        "profile": {
+          "$ref": "#/$defs/BodyProfile"
+        },
+        "blocks": {
+          "$ref": "#/$defs/BodyBlocks"
         }
       }
     },
@@ -810,6 +905,89 @@ export const SectionSchema = {
     }
   ],
   "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
+    "BodyBlock": {
+      "type": "object",
+      "description": "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^blk_[0-9A-Za-z]{8,24}$",
+          "description": "Stable across writes that keep the block's content or its place among unchanged blocks."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 (hex) of the block's markdown without trailing whitespace."
+        },
+        "by": {
+          "$ref": "#/$defs/Actor"
+        },
+        "via": {
+          "type": "string",
+          "enum": [
+            "studio",
+            "mcp",
+            "api",
+            "import",
+            "ai-command",
+            "proposal"
+          ],
+          "description": "The channel of that change."
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "BodyBlocks": {
+      "type": "array",
+      "description": "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.",
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/BodyBlock"
+      }
+    },
+    "BodyProfile": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
+    },
     "Id": {
       "type": "string",
       "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
@@ -878,6 +1056,11 @@ export const SectionSchema = {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "minLength": 1,
       "maxLength": 128
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
     }
   }
 } as const;
@@ -1054,8 +1237,68 @@ export const ContentEntrySchema = {
         "value": {
           "type": "string",
           "maxLength": 1000000
+        },
+        "profile": {
+          "$ref": "#/$defs/BodyProfile"
+        },
+        "blocks": {
+          "$ref": "#/$defs/BodyBlocks"
         }
       }
+    },
+    "BodyBlock": {
+      "type": "object",
+      "description": "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^blk_[0-9A-Za-z]{8,24}$",
+          "description": "Stable across writes that keep the block's content or its place among unchanged blocks."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 (hex) of the block's markdown without trailing whitespace."
+        },
+        "by": {
+          "$ref": "#/$defs/Actor"
+        },
+        "via": {
+          "type": "string",
+          "enum": [
+            "studio",
+            "mcp",
+            "api",
+            "import",
+            "ai-command",
+            "proposal"
+          ],
+          "description": "The channel of that change."
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "BodyBlocks": {
+      "type": "array",
+      "description": "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.",
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/BodyBlock"
+      }
+    },
+    "BodyProfile": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
     },
     "Id": {
       "type": "string",

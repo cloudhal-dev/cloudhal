@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "entry_01HZX8K3QBLK",
+  "siteId": "site_01HZX8K3Q9EF",
+  "collection": "posts",
+  "slug": "indexed-body",
+  "locale": "en",
+  "status": "review",
+  "title": "The first agent-written article",
+  "summary": "How the newsroom agent researched and drafted this piece.",
+  "body": {
+    "format": "markdown",
+    "value": "# Hello\n\nBody text.",
+    "profile": 1,
+    "blocks": [
+      {
+        "id": "blk_01HZX8K3Q9AA",
+        "hash": "01c8de44e04d2f7a304f50963545a2aff58c33e9c44a1f33fdcb978fb224cb74",
+        "by": {
+          "kind": "human",
+          "id": "user_01HZX8K3Q9CD"
+        },
+        "via": "studio",
+        "at": "2026-10-07T20:00:00Z"
+      },
+      {
+        "id": "blk_01HZX8K3Q9AB",
+        "hash": "4319bbb0a28e6761cdf1b618cbd54d368d4eaf35a98c3f3802f4820dff1448a5",
+        "by": {
+          "kind": "agent",
+          "id": "agent_01HZX8K3Q9YZ",
+          "name": "Newsroom Agent"
+        },
+        "via": "mcp",
+        "at": "2026-10-07T21:00:00Z"
+      }
+    ]
+  },
+  "fields": {
+    "readingMinutes": 4,
+    "category": "product",
+    "featured": true
+  },
+  "tags": ["agents", "launch"],
+  "author": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9YZ",
+    "name": "Newsroom Agent"
+  },
+  "coverImage": {
+    "src": "/assets/cover.jpg",
+    "alt": "Cover"
+  },
+  "rev": 2,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z"
+}
