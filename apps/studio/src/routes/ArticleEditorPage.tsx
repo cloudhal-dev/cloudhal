@@ -23,6 +23,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
+import { BodyEditor } from "../components/BodyEditor.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
   DangerZoneCard,
@@ -447,15 +448,25 @@ export function ArticleEditorPage() {
                 </Text>
               }
             >
-              <InputArea
-                aria-label={t("editor.body")}
-                value={draft.body.value}
-                onValueChange={(v) => set("body", { ...draft.body, value: v })}
-                autoResize
-                minRows={12}
-                maxRows={32}
-                className="w-full font-mono"
-              />
+              {draft.body.format === "markdown" ? (
+                <BodyEditor
+                  siteId={siteId}
+                  host={host}
+                  value={draft.body.value}
+                  onChange={(v) => set("body", { ...draft.body, value: v })}
+                  readOnly={readOnlyReason !== undefined || locked}
+                />
+              ) : (
+                <InputArea
+                  aria-label={t("editor.body")}
+                  value={draft.body.value}
+                  onValueChange={(v) => set("body", { ...draft.body, value: v })}
+                  autoResize
+                  minRows={12}
+                  maxRows={32}
+                  className="w-full font-mono"
+                />
+              )}
             </SectionCard>
           </fieldset>
         }

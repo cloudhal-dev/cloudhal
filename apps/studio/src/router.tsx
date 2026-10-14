@@ -34,7 +34,8 @@ const ApprovalsPage = lazyRouteComponent(
   "ApprovalsPage",
 );
 const ArticleEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers", "comments"]),
+  () =>
+    withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers", "comments", "bodyEditor"]),
   "ArticleEditorPage",
 );
 const ArticlesPage = lazyRouteComponent(
@@ -65,7 +66,7 @@ const ForgotPasswordPage = lazyRouteComponent(
 );
 const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers"]),
+  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers", "bodyEditor"]),
   "PageEditorPage",
 );
 const PagesPage = lazyRouteComponent(

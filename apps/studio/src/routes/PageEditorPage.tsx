@@ -35,6 +35,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
+import { BodyEditor } from "../components/BodyEditor.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
@@ -120,10 +121,13 @@ function SectionForm({
   section,
   onChange,
   media,
+  readOnly,
 }: {
   section: Section;
   onChange: (s: Section) => void;
   media: MediaContext;
+  /** The fieldset turns off native fields; the rich body editor needs telling. */
+  readOnly: boolean;
 }) {
   const t = useT();
   switch (section.kind) {
@@ -159,7 +163,16 @@ function SectionForm({
         </>
       );
     case "richText":
-      return (
+      return section.format === "markdown" ? (
+        <BodyEditor
+          siteId={media.siteId}
+          host={media.host}
+          value={section.body}
+          onChange={(v) => onChange({ ...section, body: v })}
+          size="sm"
+          readOnly={readOnly}
+        />
+      ) : (
         <InputArea
           label={t("editor.body")}
           value={section.body}
@@ -555,6 +568,7 @@ export function PageEditorPage() {
                           defaultLocale: site.data?.defaultLocale ?? draft.locale,
                           host,
                         }}
+                        readOnly={readOnlyReason !== undefined || locked}
                       />
                     </SectionCard>
                   );
