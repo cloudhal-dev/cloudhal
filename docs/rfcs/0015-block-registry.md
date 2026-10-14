@@ -247,7 +247,11 @@ Status:
     - theme components receive `{ props, content, contentHtml, media }`, with `section` added in page sections.
   - Previews know the deployment's types (`MediaContext.blocks`), so a theme's block shows as "shown by the theme on the site" rather than as unknown.
   - The blog starter ships `testimonial` as its example.
-  - Still to come in 6d: the click-to-load embed player and the per-build CSP `frame-src`.
+- **6d, second part, shipped.** With it every phase of this RFC is in.
+  - `embed` keeps its link card, now marked with the player's address (`data-embed-src`: `youtube-nocookie.com/embed/…`, or `player.vimeo.com/video/…?dnt=1`) and followed by `<script type="module" src="/_cloudhal/embed.1.js">`. The module swaps the card for the player's iframe on a plain click; nothing loads from the video host before. Without JavaScript the link opens the video page.
+  - The module is a constant (`embed-client.ts`), written by builds into `/_cloudhal/` and served by `cloudhal dev`. Its name carries a version, since `/_cloudhal/*` is cached as immutable, and a test pins the code's hash to it.
+  - **CSP, per page on Cloudflare:** a page that may show a player sets `x-cloudhal-embeds` (`usesEmbeds`); the Site Worker adds the two hosts to that page's `frame-src`, keeping a policy the page set, such as Turnstile's, and drops the marker. Other pages keep `SITE_CSP`.
+  - **CSP, per build for static builds:** the `/*` rule allows the two hosts only when a page of the build shows a player.
 
 ## Open questions
 Accepted with these defaults (ADR-0030):

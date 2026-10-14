@@ -593,4 +593,39 @@ describe("Site Worker on workerd", () => {
     expect(gone.status).toBe(410);
     expect(gone.headers.get("cache-control")).toBe("no-store");
   });
+
+  it("loads video players on click, and allows their frames only on pages that show one (RFC-0015 §4)", async () => {
+    const hello = (await remote.listContentEntries(siteId)).find((e) => e.slug === "hello-world");
+    if (!hello) throw new Error("no hello-world post");
+    await remote.updateContentEntry({
+      ...hello,
+      body: {
+        format: "markdown",
+        value: `${hello.body.value.trimEnd()}\n\n::embed{url="https://youtu.be/aqz-KE-bpKQ" title="Bunny"}\n`,
+      },
+    });
+    const snap = await remote.createSnapshot(siteId, {
+      actor: human,
+      reason: "publish",
+      label: "video",
+    });
+    await remote.publish(
+      (await remote.getSite(siteId)) as NonNullable<Awaited<ReturnType<typeof remote.getSite>>>,
+      snap.id,
+    );
+    await purge(PURGE_TOKEN);
+    const post = await get("/posts/hello-world");
+    const html = await post.text();
+    expect(html).toContain('data-embed-src="https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ"');
+    expect(html).not.toContain("<iframe");
+    const csp = post.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("frame-src https://www.youtube-nocookie.com https://player.vimeo.com;");
+    expect(csp).toContain("script-src 'self';");
+    expect(post.headers.get("x-cloudhal-embeds")).toBeNull();
+    expect((await get("/about")).headers.get("content-security-policy")).not.toContain("frame-src");
+    // the player module is a first-party static asset
+    const script = await get("/_cloudhal/embed.1.js");
+    expect(script.status).toBe(200);
+    expect(await script.text()).toContain("ch-embed__frame");
+  });
 });

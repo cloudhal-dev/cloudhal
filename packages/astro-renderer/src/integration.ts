@@ -97,6 +97,9 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             entrypoint: "@cloudhal/astro-renderer/analytics-middleware",
             order: "pre",
           });
+        // The click-to-load video player (RFC-0015 §4): served here in dev, written by builds.
+        if (!cloudflare && command === "dev")
+          addMiddleware({ entrypoint: "@cloudhal/astro-renderer/embed-middleware", order: "pre" });
         // Reader comments (RFC-0007 §8.2, §15.2), on the same targets: the Site Worker build ships
         // the module and its proof-of-work worker as hashed static assets and its entry answers the
         // endpoints; `cloudhal dev` serves both and answers them from a middleware on SQLite.
@@ -159,15 +162,23 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             await writeCommentsClient(comments, dir);
             logger.info(`wrote ${comments.module.path} and ${comments.solver.path}`);
           }
-          if (client || comments) {
-            const { writeCloudhalAssetHeaders } = await import("./static-headers.ts");
-            await writeCloudhalAssetHeaders(dir);
-          }
+          const { writeEmbedClient } = await import("./static-headers.ts");
+          await writeEmbedClient(dir);
+          const { writeCloudhalAssetHeaders } = await import("./static-headers.ts");
+          await writeCloudhalAssetHeaders(dir);
           return;
         }
-        // The Site Worker's CSP and security headers, for hosts that read `_headers`.
-        const { writeStaticSecurityHeaders } = await import("./static-headers.ts");
-        if (await writeStaticSecurityHeaders(dir)) logger.info("wrote _headers (security headers)");
+        // The Site Worker's CSP and security headers, for hosts that read `_headers`; the video
+        // players' frames are allowed only when a page of this build shows one (RFC-0015 §4).
+        const { buildShowsEmbeds, writeEmbedClient, writeStaticSecurityHeaders } = await import(
+          "./static-headers.ts"
+        );
+        const embeds = await buildShowsEmbeds(dir);
+        if (embeds) await writeEmbedClient(dir);
+        if (await writeStaticSecurityHeaders(dir, { embeds }))
+          logger.info(
+            `wrote _headers (security headers${embeds ? ", video players allowed" : ""})`,
+          );
         const { writeStaticRedirects } = await import("./static-redirects.ts");
         const count = await writeStaticRedirects(resolved, dir);
         if (count > 0) logger.info(`wrote _redirects (${count} redirects)`);

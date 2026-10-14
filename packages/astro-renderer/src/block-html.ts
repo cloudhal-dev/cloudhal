@@ -4,10 +4,11 @@
  * markdown props go through the caller's safe markdown renderer, links through `safeHref`; no raw
  * HTML ever comes from props.
  *
- * `embed` renders a link card to the video (no third-party request until the reader follows it);
- * an in-page player needs a first-party script and a per-page CSP and comes later.
+ * `embed` renders a link card to the video; the first-party player module (`embed-client.ts`)
+ * turns it into the player when the reader follows it, so the video host sees nothing before.
  */
 import { BUILT_IN_BLOCK_TYPES } from "@cloudhal/core-ts/blocks";
+import { EMBED_SCRIPT, embedPlayerSrc } from "./embed-client.ts";
 import { safeHref } from "./safe-urls.ts";
 
 const escapeHtml = (s: string) =>
@@ -64,9 +65,16 @@ export function builtInBlockHtml(
     case "embed": {
       const href = safeHref(str(props.url));
       const title = escapeHtml(str(props.title));
-      return href
-        ? `<figure class="ch-embed" data-block="embed"><a class="ch-embed__link" href="${escapeHtml(href)}" rel="noopener noreferrer" target="_blank"><span class="ch-embed__play" aria-hidden="true">▶</span><span class="ch-embed__title">${title}</span><span class="ch-embed__host">${escapeHtml(videoHost(href))}</span></a></figure>`
+      if (!href) return "";
+      // The link card works without JavaScript; the first-party player module swaps it for the
+      // video's iframe when followed (`embed-client.ts`), so nothing loads from the host before.
+      const player = embedPlayerSrc(href);
+      const data = player
+        ? ` data-embed-src="${escapeHtml(player)}" data-embed-title="${title}"`
         : "";
+      return `<figure class="ch-embed" data-block="embed"${data}><a class="ch-embed__link" href="${escapeHtml(href)}" rel="noopener noreferrer" target="_blank"><span class="ch-embed__play" aria-hidden="true">▶</span><span class="ch-embed__title">${title}</span><span class="ch-embed__host">${escapeHtml(videoHost(href))}</span></a>${
+        player ? `<script type="module" src="${EMBED_SCRIPT.path}"></script>` : ""
+      }</figure>`;
     }
     case "faq": {
       const items = Array.isArray(props.items) ? (props.items as Record<string, unknown>[]) : [];

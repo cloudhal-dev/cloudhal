@@ -17,6 +17,7 @@ import {
 } from "@cloudhal/astro-renderer/cache-tags";
 import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
 import { Comments, EntryArticle, Sections } from "@cloudhal/astro-renderer/components";
+import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
@@ -174,6 +175,15 @@ tags.push(
   ...navigationCacheTags(footerMenu),
 );
 addCacheTags(Astro.response.headers, tags);
+
+// Video players (RFC-0015 §4): the Site Worker allows their frames on this page only.
+if (
+  (route.kind === "page" && usesEmbeds({ sections: route.page.sections })) ||
+  (route.kind === "entry" &&
+    route.entry.body.format === "markdown" &&
+    usesEmbeds({ markdown: route.entry.body.value }))
+)
+  Astro.response.headers.set(EMBED_HEADER, "1");
 
 // Time gates (RFC-0008 §7.3): the published source never returns an embargoed or expired page or
 // entry (it is a 404), so a gate that is closed here means a preview or `cloudhal dev`: say so.

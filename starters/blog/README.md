@@ -22,6 +22,7 @@ cloudhal build    # static HTML from the published (or latest) snapshot
 Typed blocks (RFC-0015) go in page sections and inside article and rich-text bodies. Cloudhal ships `callout`, `button`, `embed` and `faq`; this theme adds `testimonial`.
 - **Declare** a type in `src/blocks.ts` (`blockTypes`): a plain English name shared by every theme (`pricing-table`, never `mytheme-pricing`), where it may go, its props in the JSON Schema subset, whether it wraps text, and an example. The file is data only, with type imports only (`import type { BlockType }`); the CLI checks every type.
 - **Render** it with a component in `theme.ts` → `blocks` (`{ testimonial: Testimonial }`). The component gets `{ props, content, contentHtml, media }`. `contentHtml` is the wrapped text, already rendered safely; props are checked against the type first. A built-in may be listed there too, to restyle it.
+- `embed` shows a link card; Cloudhal's small player module turns it into the YouTube (no-cookie) or Vimeo player on click, and the page's CSP allows those two frames only where a video is shown. The page route sets `x-cloudhal-embeds` for that (`usesEmbeds`); keep it if you rewrite the route.
 - `cloudhal studio` and `cloudhal mcp` read the file, so Studio's forms and `/` menu and agents (`list_block_types`) offer the type. `cloudhal deploy` checks it and bundles it into the admin Worker.
 
 ## Analytics
