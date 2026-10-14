@@ -4,7 +4,7 @@ import { type BlobStore, migrate, migrations, type SqlDriver } from "@cloudhal/s
 import { FsBlobStore } from "@cloudhal/storage/fs";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { GATES_ENFORCED } from "./availability.ts";
-import type { BlockRegistry } from "./blocks.ts";
+import type { BlockRegistry, PropsSchema } from "./blocks.ts";
 import { SiteGraphStore } from "./store.ts";
 
 export interface LocalStore {
@@ -23,10 +23,11 @@ export interface LocalStore {
  *
  * @param options.blocks the deployment's block registry (the theme's `src/blocks.ts`, RFC-0015
  *   §6); built-ins only when absent
+ * @param options.themeSettings the theme's design settings (`src/settings.ts`, RFC-0017 §1)
  */
 export async function openLocalStore(
   dataDir: string,
-  options: { blocks?: BlockRegistry | undefined } = {},
+  options: { blocks?: BlockRegistry | undefined; themeSettings?: PropsSchema | undefined } = {},
 ): Promise<LocalStore> {
   const dir = path.resolve(dataDir);
   await mkdir(path.join(dir, "blobs"), { recursive: true });
@@ -39,6 +40,7 @@ export async function openLocalStore(
     blobs,
     gates: GATES_ENFORCED,
     ...(options.blocks ? { blocks: options.blocks } : {}),
+    ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
   });
   return { store, sql, blobs, dataDir: dir, close: () => sql.close() };
 }

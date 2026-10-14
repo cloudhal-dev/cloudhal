@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Design settings (src/settings.ts, RFC-0017): CSS variables and data-ch-* attributes on <html>. */
+.ch-body {
+  background: var(--ch-surface, #ffffff);
+  color: var(--ch-text, #18181b);
+}
+[data-ch-font="serif"] .ch-body {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+}
+[data-ch-font="humanist"] .ch-body {
+  font-family:
+    Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", source-sans-pro, sans-serif;
+}
+[data-ch-font="mono"] .ch-body {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+.ch-richtext a {
+  color: var(--ch-link, #0369a1);
+}
+
 /* Section defaults; a theme overrides these or swaps components. */
 .ch-hero {
   @apply py-12;
@@ -11,7 +30,8 @@
   @apply mt-3 text-lg text-zinc-600;
 }
 .ch-hero__cta {
-  @apply mt-6 inline-block rounded bg-zinc-900 px-4 py-2 text-white;
+  @apply mt-6 inline-block rounded px-4 py-2 text-white;
+  background: var(--ch-brand, #18181b);
 }
 .ch-article-header {
   @apply space-y-2 border-b border-zinc-200 pt-8 pb-6;
@@ -57,7 +77,8 @@
   @apply inline-block rounded px-4 py-2 font-medium;
 }
 .ch-button--primary {
-  @apply bg-zinc-900 text-white;
+  @apply text-white;
+  background: var(--ch-brand, #18181b);
 }
 .ch-button--secondary {
   @apply border border-zinc-300 text-zinc-900;
@@ -282,4 +303,16 @@ footer .ch-nav-menu > ul {
 }
 .cloudhal-comments-pages a {
   @apply text-sm underline underline-offset-4;
+}
+
+/* Corners (src/settings.ts `radius`): after the base rules, so they win. */
+[data-ch-radius="none"] .ch-button,
+[data-ch-radius="none"] .ch-hero__cta,
+[data-ch-radius="none"] .ch-callout {
+  border-radius: 0;
+}
+[data-ch-radius="large"] .ch-button,
+[data-ch-radius="large"] .ch-hero__cta,
+[data-ch-radius="large"] .ch-callout {
+  border-radius: 0.75rem;
 }

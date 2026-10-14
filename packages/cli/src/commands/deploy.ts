@@ -52,7 +52,12 @@ import { BUNDLE_PREFIX } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { SCHEDULES_ENGINE_LEVEL } from "@cloudhal/core-ts/releases";
 import { assetDir, monorepoRoot } from "../assets.ts";
-import { blockTypesFile, loadBlockRegistry } from "../blocks.ts";
+import {
+  blockTypesFile,
+  loadBlockRegistry,
+  loadThemeSettings,
+  themeSettingsFile,
+} from "../blocks.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
@@ -749,9 +754,12 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     }),
     `Cloudhal site Worker for ${site.name}`,
   );
-  // The theme's block types (RFC-0015 §6) are checked before anything is built or uploaded.
+  // The theme's block types (RFC-0015 §6) and design settings (RFC-0017 §1) are checked before
+  // anything is built or uploaded.
   await loadBlockRegistry(options.projectDir);
+  await loadThemeSettings(options.projectDir);
   const blockTypes = await blockTypesFile(options.projectDir);
+  const themeSettings = await themeSettingsFile(options.projectDir);
   log("building the site Worker");
   const siteConfig = await buildSiteWorker(options.projectDir, (l) => log(`  ${l}`));
 
@@ -770,6 +778,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       studioDir,
       skillsDir,
       blockTypes,
+      themeSettings,
       domain: cfg.domains?.studio,
       analytics: a,
       comments: c,

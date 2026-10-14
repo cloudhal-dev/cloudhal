@@ -25,6 +25,9 @@ Typed blocks (RFC-0015) go in page sections and inside article and rich-text bod
 - `embed` shows a link card; Cloudhal's small player module turns it into the YouTube (no-cookie) or Vimeo player on click, and the page's CSP allows those two frames only where a video is shown. The page route sets `x-cloudhal-embeds` for that (`usesEmbeds`); keep it if you rewrite the route.
 - `cloudhal studio` and `cloudhal mcp` read the file, so Studio's forms and `/` menu and agents (`list_block_types`) offer the type. `cloudhal deploy` checks it and bundles it into the admin Worker.
 
+## Design settings (`src/settings.ts`)
+What Studio's Settings › Appearance, agents (`set_theme_settings`) and the generator may change about the look (RFC-0017): brand, link, background and text colors, the typeface and the corners. The file is data only, in the same JSON Schema subset as block props, with `x-contrast` rules that hold color pairs to WCAG AA and `x-labels` for the choices' words. `layouts/Base.astro` turns the site's values into `--ch-*` CSS variables and `data-ch-*` attributes (`themeVariables`), and `styles/global.css` uses them. Add a setting by declaring it here and using its variable or attribute in your CSS.
+
 ## Analytics
 Themes need nothing for analytics (RFC-0006). Deployed with `cloudhal deploy`, the Site Worker adds the first-party script tag to published pages while analytics are on (`cloudhal.json` → `analytics`, then per site in Studio). `cloudhal dev` records your own visits only with `"dev": true` in that block, which `astro.config.mjs` passes to the `cloudhal()` integration. Static builds (`cloudhal build`) carry no script. What is collected, and a paragraph for your privacy policy: `docs/guides/analytics-privacy.md` in the Cloudhal repository.
 

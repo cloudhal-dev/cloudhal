@@ -47,6 +47,7 @@ import { sites } from "./routes/sites.ts";
 import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
 import { terms } from "./routes/terms.ts";
+import { themeSettings } from "./routes/theme-settings.ts";
 import { routeGuard } from "./scopes.ts";
 import { randomUploadSecret, type UploadSecret } from "./uploads.ts";
 
@@ -290,6 +291,7 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites/:siteId/proposals", proposals);
   // RFC-0015: the block registry (built-ins and the theme's types).
   app.route("/api/sites/:siteId/block-types", blockTypes);
+  app.route("/api/sites/:siteId/theme-settings", themeSettings);
   // RFC-0016: in-editor AI settings, the model picker and commands.
   app.route("/api/sites/:siteId/ai", aiRoutes(deps.ai));
   app.route("/api/sites/:siteId/snapshots", snapshots);

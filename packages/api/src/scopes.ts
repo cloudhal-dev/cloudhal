@@ -120,6 +120,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/proposals/:proposalId/preview`, "content:read"],
   // RFC-0015: the block registry, for Studio's section menu and forms
   ["GET", `${S}/block-types`, "content:read"],
+  ["GET", `${S}/theme-settings`, "content:read"],
+  ["PUT", `${S}/theme-settings`, "site:settings"],
   // RFC-0016: in-editor AI — everyone who reads content sees whether it is on; Administrators
   // change it; commands need ai:invoke (every role holds it; the site's switch and cap limit it)
   ["GET", `${S}/ai/settings`, "content:read"],

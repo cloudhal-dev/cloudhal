@@ -1,4 +1,14 @@
-import { Button, Checkbox, Input, InputArea, Radio, Select, Text } from "@cloudflare/kumo";
+import {
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  InputArea,
+  InputGroup,
+  Radio,
+  Select,
+  Text,
+} from "@cloudflare/kumo";
 import {
   type ArrayPropSchema,
   type FlatObjectPropSchema,
@@ -107,7 +117,11 @@ export function BlockPropsForm({
       case "string": {
         const current = typeof v === "string" ? v : "";
         if (s.enum) {
-          const words = (option: string) => enumLabel?.(key, option) ?? option;
+          // The schema's own words first (`x-labels`, a theme's), then the host's, then the value.
+          const words = (option: string) => {
+            const own = s["x-labels"]?.[option];
+            return own !== undefined ? text(own) : (enumLabel?.(key, option) ?? option);
+          };
           return s["x-widget"] === "radio" ? (
             <Radio.Group
               key={path}
@@ -150,6 +164,41 @@ export function BlockPropsForm({
               onValueChange={set}
             />
           );
+        if (s.format === "color") {
+          const swatch = /^#[0-9a-fA-F]{6}$/.test(current)
+            ? current
+            : typeof s.default === "string"
+              ? s.default
+              : undefined;
+          return (
+            <Field
+              key={path}
+              label={label}
+              description={description}
+              error={error ? { message: error, match: true } : undefined}
+            >
+              <InputGroup className="w-full" disabled={disabled}>
+                <InputGroup.Addon>
+                  <span
+                    aria-hidden="true"
+                    data-color-swatch=""
+                    className="block size-4 rounded-sm ring ring-kumo-line"
+                    style={swatch ? { background: swatch } : undefined}
+                  />
+                </InputGroup.Addon>
+                <InputGroup.Input
+                  aria-label={label}
+                  value={current}
+                  placeholder={typeof s.default === "string" ? s.default : "#000000"}
+                  maxLength={7}
+                  spellCheck={false}
+                  className="font-mono"
+                  onChange={(e) => set((e.target as HTMLInputElement).value)}
+                />
+              </InputGroup>
+            </Field>
+          );
+        }
         return (
           <Input
             key={path}

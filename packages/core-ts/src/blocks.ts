@@ -28,6 +28,8 @@ export interface StringPropSchema extends Annotations {
   maxLength?: number;
   pattern?: string;
   enum?: readonly string[];
+  /** Words for `enum` values in forms, per value (per locale allowed): `{ serif: { en: "Serif" } }`. */
+  "x-labels"?: Readonly<Record<string, Localized>>;
   /** `url`: a safe link; `asset`: `asset:<id>`; `color`: `#rrggbb`; `markdown`: markdown text. */
   format?: "url" | "asset" | "color" | "markdown";
 }
@@ -68,6 +70,12 @@ export interface PropsSchema extends Annotations {
   properties: Readonly<Record<string, PropSchema>>;
   required?: readonly string[];
   additionalProperties: false;
+  /**
+   * Root only (RFC-0017 §1): pairs of `color` props and the contrast ratio they must reach
+   * (WCAG 2.2: 4.5 for text, 3 for large text and UI parts). A missing value counts as its
+   * `default`.
+   */
+  "x-contrast"?: readonly (readonly [string, string, number])[];
 }
 
 export type BlockPlace = "section" | "body";
@@ -111,12 +119,21 @@ export interface PropsIssue {
 
 const ANNOTATIONS = ["title", "description", "default", "x-widget"];
 const KEYS: Record<string, readonly string[]> = {
-  string: ["type", "minLength", "maxLength", "pattern", "enum", "format", ...ANNOTATIONS],
+  string: [
+    "type",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "enum",
+    "format",
+    "x-labels",
+    ...ANNOTATIONS,
+  ],
   number: ["type", "minimum", "maximum", "multipleOf", ...ANNOTATIONS],
   integer: ["type", "minimum", "maximum", "multipleOf", ...ANNOTATIONS],
   boolean: ["type", ...ANNOTATIONS],
   array: ["type", "items", "minItems", "maxItems", ...ANNOTATIONS],
-  object: ["type", "properties", "required", "additionalProperties", ...ANNOTATIONS],
+  object: ["type", "properties", "required", "additionalProperties", "x-contrast", ...ANNOTATIONS],
 };
 const FORMATS = new Set(["url", "asset", "color", "markdown"]);
 const WIDGETS = new Set(["textarea", "radio", "asset-picker"]);
@@ -181,6 +198,17 @@ function checkSchema(
           !values.every((v) => typeof v === "string")
         )
           out.push({ path: `${path}/enum`, message: `1 to ${BLOCK_LIMITS.enumValues} strings` });
+      }
+      if (s["x-labels"] !== undefined) {
+        const labels = s["x-labels"];
+        if (!isObj(labels) || !Array.isArray(s.enum))
+          out.push({ path: `${path}/x-labels`, message: "words for the enum values" });
+        else
+          for (const [value, words] of Object.entries(labels)) {
+            if (!(s.enum as unknown[]).includes(value))
+              out.push({ path: `${path}/x-labels/${value}`, message: "not an enum value" });
+            checkLocalized(words, `${path}/x-labels/${value}`, out);
+          }
       }
       if (s.pattern !== undefined) {
         const p = s.pattern;
@@ -275,7 +303,50 @@ export function checkPropsSchema(schema: unknown): PropsIssue[] {
     return out;
   }
   checkSchema(schema, "", "root", out);
+  if (out.length) return out;
+  checkContrastRules(schema as unknown as PropsSchema, out);
   return out;
+}
+
+/** `x-contrast` rules: on the root only, naming two `color` props, with a ratio from 1 to 21. */
+function checkContrastRules(schema: PropsSchema, out: PropsIssue[]): void {
+  for (const [key, child] of Object.entries(schema.properties))
+    if (isObj(child) && "x-contrast" in child)
+      out.push({ path: `/${key}/x-contrast`, message: "contrast rules go on the root" });
+  const rules = schema["x-contrast"];
+  if (rules === undefined) return;
+  if (!Array.isArray(rules) || rules.length > 20) {
+    out.push({ path: "/x-contrast", message: "at most 20 rules" });
+    return;
+  }
+  rules.forEach((rule, i) => {
+    const at = `/x-contrast/${i}`;
+    if (!Array.isArray(rule) || rule.length !== 3) {
+      out.push({ path: at, message: "[color prop, color prop, ratio]" });
+      return;
+    }
+    const [a, b, ratio] = rule as unknown[];
+    for (const k of [a, b]) {
+      const p = typeof k === "string" ? schema.properties[k] : undefined;
+      if (p?.type !== "string" || p.format !== "color")
+        out.push({ path: at, message: `${String(k)} is not a color prop` });
+    }
+    if (typeof ratio !== "number" || !(ratio >= 1 && ratio <= 21))
+      out.push({ path: at, message: "a ratio from 1 to 21" });
+  });
+}
+
+/** WCAG 2.2 contrast ratio of two `#rrggbb` colors (1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
 }
 
 // ── validating a value ──────────────────────────────────────────────────────────────────────
@@ -404,6 +475,23 @@ export function validateProps(schema: PropsSchema, props: unknown): PropsIssue[]
   if (isObj(props) && Object.keys(props).length > BLOCK_LIMITS.props)
     out.push({ path: "", message: `at most ${BLOCK_LIMITS.props} props` });
   validateObject(schema, props, "", out);
+  for (const [a, b, ratio] of schema["x-contrast"] ?? []) {
+    const value = (k: string) => {
+      const v = isObj(props) ? props[k] : undefined;
+      const d = (schema.properties[k] as StringPropSchema | undefined)?.default;
+      const c = v ?? d;
+      return typeof c === "string" && COLOR.test(c) ? c : undefined;
+    };
+    const x = value(a);
+    const y = value(b);
+    if (!x || !y) continue;
+    const got = contrastRatio(x, y);
+    if (got < ratio)
+      out.push({
+        path: a,
+        message: `contrast with ${b} is ${got.toFixed(1)}:1; needs ${ratio}:1`,
+      });
+  }
   return out;
 }
 

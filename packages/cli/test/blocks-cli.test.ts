@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadBlockRegistry } from "../src/blocks.ts";
+import { loadBlockRegistry, loadThemeSettings } from "../src/blocks.ts";
 import { adminEntry } from "../src/cloudflare/admin.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +44,30 @@ describe("theme block types", () => {
     }
   });
 
+  it("loads the starter's design settings and refuses settings outside the subset (RFC-0017)", async () => {
+    const settings = await loadThemeSettings(starter);
+    expect(Object.keys(settings?.properties ?? {})).toEqual([
+      "brand",
+      "link",
+      "surface",
+      "text",
+      "font",
+      "radius",
+    ]);
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-settings-"));
+    try {
+      expect(await loadThemeSettings(tmp)).toBeUndefined();
+      await mkdir(path.join(tmp, "src"));
+      await writeFile(
+        path.join(tmp, "src", "settings.ts"),
+        `export const themeSettings = { type: "object", additionalProperties: false, properties: { css: { type: "string", format: "css" } } };\n`,
+      );
+      await expect(loadThemeSettings(tmp)).rejects.toThrow(/src\/settings\.ts: themeSettings/);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("imports the theme's file in the admin Worker's entry, after the prelude", () => {
     const entry = adminEntry("../../../src/blocks.ts");
     expect(entry.indexOf('import "@cloudhal/cloudflare/workerd-prelude";')).toBeLessThan(
@@ -52,5 +76,11 @@ describe("theme block types", () => {
     expect(entry).toContain("createAdminWorker({ skills, blockTypes })");
     expect(adminEntry()).toContain("createAdminWorker({ skills })");
     expect(adminEntry()).not.toContain("blockTypes");
+    expect(adminEntry(undefined, "../../../src/settings.ts")).toContain(
+      'import { themeSettings } from "../../../src/settings.ts";',
+    );
+    expect(adminEntry("../../../src/blocks.ts", "../../../src/settings.ts")).toContain(
+      "createAdminWorker({ skills, blockTypes, themeSettings })",
+    );
   });
 });

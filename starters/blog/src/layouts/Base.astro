@@ -2,9 +2,11 @@
 import { SeoHead } from "@cloudhal/astro-renderer/components";
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
+import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
+import { themeSettings } from "../settings.ts";
 import "../styles/global.css";
 
 interface Props {
@@ -18,11 +20,13 @@ interface Props {
   notice?: { state: string; at: string; text: string } | undefined;
 }
 const { site, meta, nav, footer, notice } = Astro.props;
+// The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
+const look = themeVariables(site, themeSettings);
 const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
 <!doctype html>
-<html lang={meta.lang}>
+<html lang={meta.lang} {...look.attributes}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -31,8 +35,9 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="generator" content="Cloudhal" />
+    {look.style && <style set:html={look.style} />}
   </head>
-  <body class="min-h-screen bg-white text-zinc-900 antialiased">
+  <body class="ch-body min-h-screen antialiased">
     <header class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6">
       <a href="/" class="text-lg font-semibold">{site.name}</a>
       {nav.length > 0 && (

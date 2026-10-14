@@ -51,7 +51,7 @@ import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
-import { type BlockType, createBlockRegistry } from "@cloudhal/core-ts/blocks";
+import { type BlockType, createBlockRegistry, type PropsSchema } from "@cloudhal/core-ts/blocks";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -190,6 +190,8 @@ export interface AdminWorkerOptions {
   skills?: SkillSource[];
   /** The theme's block types (`src/blocks.ts`, RFC-0015 §6), bundled at deploy time. */
   blockTypes?: readonly BlockType[];
+  /** The theme's design settings (`src/settings.ts`, RFC-0017 §1), bundled at deploy time. */
+  themeSettings?: PropsSchema;
   log?: (line: string) => void;
 }
 
@@ -328,6 +330,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         sql,
         blobs,
         blocks,
+        ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
         // S15: `availability` is refused until the site Worker says it enforces gates.
         gates: siteGateSupport({
           fetch: siteBinding

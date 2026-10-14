@@ -314,4 +314,48 @@ describe("body tools", () => {
     });
     expect((res.result as { unknownBlocks?: string[] }).unknownBlocks).toEqual(["pricing-table"]);
   });
+
+  it("reads and changes the theme's design settings, checked against its schema (RFC-0017)", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const s2 = new SiteGraphStore({
+      sql,
+      blobs: new MemoryBlobStore(),
+      themeSettings: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          brand: { type: "string", format: "color", default: "#18181b" },
+          surface: { type: "string", format: "color", default: "#ffffff" },
+        },
+        "x-contrast": [["brand", "surface", 3]],
+      },
+    });
+    const site2 = (await seedStarterSite(s2, { name: "Look", slug: "look" })).id;
+    const ctx2: ToolContext = {
+      store: s2,
+      principal: { actor: agent, scopes: ["*"], mode: "edits" },
+    };
+    const run = (name: string, args: Record<string, unknown>) =>
+      runTool(byName[name] as (typeof tools)[number], args, ctx2, {
+        policy,
+        audit,
+        confirmed: true,
+      });
+    const got = (await run("get_theme_settings", { siteId: site2 })).result as {
+      schema: { properties: Record<string, unknown> };
+      values: Record<string, unknown>;
+      rev: number;
+    };
+    expect(Object.keys(got.schema.properties)).toEqual(["brand", "surface"]);
+    expect(got.values).toEqual({});
+    await expect(
+      run("set_theme_settings", { siteId: site2, rev: got.rev, values: { brand: "#f4f4f5" } }),
+    ).rejects.toMatchObject({ code: "invalid_props" });
+    const set = (
+      await run("set_theme_settings", { siteId: site2, rev: got.rev, values: { brand: "#1d4ed8" } })
+    ).result as { values: Record<string, unknown> };
+    expect(set.values).toEqual({ brand: "#1d4ed8" });
+    expect(byName.set_theme_settings?.requiresApproval).toBe(true);
+  });
 });

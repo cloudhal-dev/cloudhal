@@ -403,6 +403,17 @@ Pages can hold **component sections**: a block type from the registry (`GET /api
 - **Read-only** roles and release locks disable the form like any section.
 - **On the site and in previews:** built-ins render escaped, framework-free markup (`.ch-callout`, `.ch-button`, `.ch-embed`, `.ch-faq` in the starter's CSS); a theme can map a type to its own Astro component in `theme.ts` `blocks`. A section whose props do not fit, or whose type no one renders, renders nothing on the site and a labelled placeholder in previews.
 
+### 2ab. Appearance (RFC-0017 §1, ADR-0031)
+Site › Settings gets an **Appearance** section after Domains (`components/AppearanceSettings.tsx`): the theme's design settings from its `src/settings.ts` (`GET`/`PUT /api/sites/:siteId/theme-settings`).
+- **The form** is `BlockPropsForm` over the theme's schema (§2aa).
+  - Colors are a `Field` with an `InputGroup`: a swatch addon (`ring ring-kumo-line`, the value or the default) and a `font-mono` input of at most 7 characters.
+  - Enums are worded by the schema's `x-labels`, per locale.
+  - Each field's description comes from the theme.
+- **Checks as typed:** the same interpreter the store runs, contrast rules included ("contrast with surface is 1.9:1; needs 4.5:1"). "Save changes" is disabled while a problem shows. The server answers misfits with 422 `invalid_props`, and a stale site `rev` with 409 and the conflict `Banner`.
+- **The description** names the theme. A secondary hint under the form says saved changes show on the site after the next publish.
+- A theme without settings shows only "The {theme} theme has no design settings to change."
+- Below Administrator (`settings.write` = `site:settings`) the fields are disabled, with the gating reason on the button.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>

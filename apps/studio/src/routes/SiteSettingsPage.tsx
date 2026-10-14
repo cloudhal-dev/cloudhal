@@ -41,6 +41,10 @@ import {
   AnalyticsSettingsSection,
 } from "../components/AnalyticsSettings.tsx";
 import {
+  APPEARANCE_SETTINGS_SECTION,
+  AppearanceSettingsSection,
+} from "../components/AppearanceSettings.tsx";
+import {
   COMMENT_SETTINGS_SECTION,
   CommentSettingsSection,
 } from "../components/CommentSettings.tsx";
@@ -86,6 +90,7 @@ import {
 const SECTIONS = [
   "general",
   "domains",
+  APPEARANCE_SETTINGS_SECTION,
   ANALYTICS_SETTINGS_SECTION,
   COMMENT_SETTINGS_SECTION,
   SCHEDULE_SETTINGS_SECTION,
@@ -874,6 +879,8 @@ export function SiteSettingsPage() {
           <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
           <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
         </ReadOnly>
+        {/* The theme's design settings (RFC-0017 §1): settings.write changes them. */}
+        <AppearanceSettingsSection siteId={siteId} />
         {/* Gated on its own abilities (analytics.read to see, analytics.settings to change). */}
         <AnalyticsSettingsSection siteId={siteId} />
         {/* Reader comments (RFC-0007 §14): comments.read to see, comments.settings to change. */}

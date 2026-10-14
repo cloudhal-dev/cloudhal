@@ -1095,7 +1095,19 @@ export const tr: Messages = {
     },
   },
   siteSettings: {
-    sections: { general: "Genel", domains: "Alan adları", previews: "Önizleme bağlantıları" },
+    sections: {
+      general: "Genel",
+      domains: "Alan adları",
+      appearance: "Görünüm",
+      previews: "Önizleme bağlantıları",
+    },
+    appearance: {
+      description: "{theme} temasının değiştirmenize izin verdiği renkler, yazı ve biçimler.",
+      none: "{theme} temasında değiştirilebilecek tasarım ayarı yok.",
+      publishHint: "Kaydedilen değişiklikler bir sonraki yayında sitede görünür.",
+      saved: "Görünüm kaydedildi",
+      failed: "Görünüm kaydedilemedi",
+    },
     conflictTitle: "Bu site başka bir yerde değişti",
     conflictDescription:
       "Sen açtıktan sonra bir kişi ya da agent bu siteyi kaydetti. En son sürümü yükle, değişikliğini kontrol et ve yeniden kaydet.",
@@ -1513,6 +1525,8 @@ export const tr: Messages = {
     create_entry: "Makale oluştur",
     update_entry: "Makaleyi güncelle",
     delete_entry: "Makaleyi sil",
+    get_theme_settings: "Tasarım ayarlarını oku",
+    set_theme_settings: "Tasarım ayarlarını değiştir",
     list_block_types: "Blok tiplerini listele",
     get_body: "Gövdeyi oku",
     edit_body: "Gövdeyi düzenle",
