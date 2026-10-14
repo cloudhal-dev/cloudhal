@@ -19,7 +19,7 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import type { BlockType } from "@cloudhal/core-ts/blocks";
+import type { BlockType, PropsSchema } from "@cloudhal/core-ts/blocks";
 import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 
 import type {
@@ -31,6 +31,15 @@ import type {
   MenuWrite,
   ResolvedMenu,
 } from "./menus.ts";
+
+/** `GET /api/sites/:siteId/theme-settings` (RFC-0017 §1). */
+export interface ThemeSettings {
+  theme: string;
+  /** `null` when the theme declares no settings. */
+  schema: PropsSchema | null;
+  values: Record<string, unknown>;
+  rev: number;
+}
 
 export interface ApiError {
   error: string;
@@ -1996,6 +2005,16 @@ export const api = {
       request<void>(`/api/sites/${entry.siteId}/entries/${entry.id}?rev=${entry.rev}`, {
         method: "DELETE",
       }),
+  },
+  /** The theme's design settings (RFC-0017 §1): its schema and the site's values. */
+  themeSettings: {
+    get: (siteId: string) => request<ThemeSettings>(`/api/sites/${siteId}/theme-settings`),
+    /** Saves values read at `rev`; 409 when the site changed in between, 422 when they misfit. */
+    save: (siteId: string, input: { rev: number; values: Record<string, unknown> }) =>
+      request<{ values: Record<string, unknown>; rev: number }>(
+        `/api/sites/${siteId}/theme-settings`,
+        { method: "PUT", ...json(input) },
+      ),
   },
   /** The deployment's block types (RFC-0015): built-ins and the theme's. */
   blockTypes: (siteId: string) =>

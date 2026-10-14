@@ -16,6 +16,8 @@ export const KNOWN_TOOLS = [
   "update_entry",
   "delete_entry",
   // RFC-0014 body tools, RFC-0015 block types
+  "get_theme_settings",
+  "set_theme_settings",
   "list_block_types",
   "get_body",
   "edit_body",

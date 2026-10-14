@@ -46,7 +46,9 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "create_entry",
       "update_entry",
       "delete_entry",
-      // RFC-0015 §6, RFC-0014 §4
+      // RFC-0017 §1, RFC-0015 §6, RFC-0014 §4
+      "get_theme_settings",
+      "set_theme_settings",
       "list_block_types",
       "get_body",
       "edit_body",

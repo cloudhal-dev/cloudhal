@@ -653,3 +653,61 @@ describe("instance and skills", () => {
     });
   });
 });
+
+describe("theme settings (RFC-0017)", () => {
+  it("serves the theme's schema and values, and saves values that fit", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const store = new SiteGraphStore({
+      sql,
+      blobs: new MemoryBlobStore(),
+      themeSettings: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          brand: { type: "string", format: "color", default: "#18181b" },
+          surface: { type: "string", format: "color", default: "#ffffff" },
+        },
+        "x-contrast": [["brand", "surface", 3]],
+      },
+    });
+    await store.init();
+    const site = await seedStarterSite(store, { name: "Look", slug: "look" });
+    const app = createApi({ store, resolveActor: async () => human });
+    const url = `/api/sites/${site.id}/theme-settings`;
+    const got = (await (await app.request(url)).json()) as {
+      theme: string;
+      schema: { properties: Record<string, unknown> } | null;
+      values: Record<string, unknown>;
+      rev: number;
+    };
+    expect(got.theme).toBe("blog");
+    expect(Object.keys(got.schema?.properties ?? {})).toEqual(["brand", "surface"]);
+    const put = (values: Record<string, unknown>, rev = got.rev) =>
+      app.request(url, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rev, values }),
+      });
+    const misfit = await put({ brand: "#fafafa" });
+    expect(misfit.status).toBe(422);
+    expect(((await misfit.json()) as { error: string }).error).toBe("invalid_props");
+    const ok = await put({ brand: "#1d4ed8" });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ values: { brand: "#1d4ed8" }, rev: got.rev + 1 });
+    expect((await put({ brand: "#1e40af" })).status).toBe(409);
+  });
+
+  it("says when the theme declares none", async () => {
+    const { site, get, app } = await setup();
+    const got = (await (await get(`/api/sites/${site.id}/theme-settings`)).json()) as {
+      schema: unknown;
+    };
+    expect(got.schema).toBeNull();
+    const res = await app.request(`/api/sites/${site.id}/theme-settings`, {
+      method: "PUT",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: JSON.stringify({ rev: 0, values: {} }),
+    });
+    expect(res.status).toBe(400);
+  });
+});

@@ -336,6 +336,93 @@ export async function editBody(
 export function bodyTools(): ToolDefinition[] {
   return [
     {
+      name: "get_theme_settings",
+      title: "Read the design settings",
+      description:
+        "The theme's design settings (RFC-0017): their schema (colors as #rrggbb, enums, numbers; per-locale titles), the contrast rules colors must meet, and the site's current values. Change them with set_theme_settings; they show on the site after a publish.",
+      inputSchema: obj({ siteId: id }, ["siteId"]),
+      outputSchema: obj(
+        {
+          theme: { type: "string" },
+          schema: { type: ["object", "null"] },
+          values: { type: "object" },
+          rev: { type: "integer" },
+        },
+        ["theme", "schema", "values", "rev"],
+      ),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      scopes: ["content:read"],
+      handler: async (a, ctx) => {
+        const site = await ctx.store.getSite(a.siteId as string);
+        if (!site) throw new ToolError("not_found", `site ${a.siteId} not found`);
+        return {
+          theme: site.theme.name,
+          schema: ctx.store.themeSettings ?? null,
+          values: site.theme.config ?? {},
+          rev: site.rev,
+        };
+      },
+    },
+    {
+      name: "set_theme_settings",
+      title: "Change the design settings",
+      description:
+        "Change the site's design settings (colors, type, spacing: get_theme_settings lists them). Values are merged onto the current ones; null removes one. They are checked against the theme's schema and contrast rules, and show on the site after a publish. Always waits for a person.",
+      inputSchema: obj(
+        {
+          siteId: id,
+          rev: {
+            type: "integer",
+            minimum: 0,
+            description: "The site's rev from get_theme_settings",
+          },
+          values: { type: "object", description: "Settings to change; null removes one" },
+        },
+        ["siteId", "rev", "values"],
+      ),
+      outputSchema: obj({ values: { type: "object" }, rev: { type: "integer" } }, [
+        "values",
+        "rev",
+      ]),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      scopes: ["site:write"],
+      requiresApproval: true,
+      approvalPrompt: async (a) => {
+        const keys = Object.keys((a.values ?? {}) as Record<string, unknown>);
+        return `Change the site's design settings (${keys.join(", ") || "none"})?`;
+      },
+      handler: async (a, ctx) => {
+        const site = await ctx.store.getSite(a.siteId as string);
+        if (!site) throw new ToolError("not_found", `site ${a.siteId} not found`);
+        if (!ctx.store.themeSettings)
+          throw new ToolError("invalid", "this theme declares no design settings");
+        const values: Record<string, unknown> = { ...(site.theme.config ?? {}) };
+        for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>))
+          if (v === null) delete values[k];
+          else values[k] = v;
+        try {
+          const saved = await ctx.store.updateSite({
+            ...site,
+            rev: a.rev as number,
+            theme: { ...site.theme, config: values },
+          });
+          return { values: saved.theme.config ?? {}, rev: saved.rev };
+        } catch (e) {
+          mapError(e);
+        }
+      },
+    },
+    {
       name: "list_block_types",
       title: "List block types",
       description:

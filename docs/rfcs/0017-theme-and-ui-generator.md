@@ -114,6 +114,18 @@ New block types, components and layouts are code. They are written in the projec
 - The generator may *suggest* a missing block type in its `notes` (for example, "a `pricing-table` type would fit here").
 - A repository skill `theme-block` scaffolds one: the type in `src/blocks.ts`, an Astro component, a `theme.ts` mapping, styles and a test.
 
+### Status
+- **7a shipped.**
+  - The theme declares `src/settings.ts` (`themeSettings`, type imports only, like `src/blocks.ts`). `cloudhal studio`, `cloudhal mcp` and `cloudhal deploy` load and check it, and the admin Worker bundles it (`createAdminWorker({ themeSettings })`).
+  - The store checks `Site.theme.config` when it changes, and leaves values that a theme change made misfit as they are.
+  - The props subset gains `x-contrast` on the root (pairs of color props and a ratio from 1 to 21; an unset value counts as its `default`) and `x-labels` (words for enum values, per locale). `contrastRatio` is exported.
+  - REST: `GET /api/sites/:siteId/theme-settings` (`content:read`) and `PUT` `{ rev, values }` (`site:settings`).
+  - MCP: `get_theme_settings` and `set_theme_settings`, which merges values (`null` removes one) and always waits for a person.
+  - **Deviation:** `set_theme_settings` needs `site:write`, like the menu tools. `site:settings` is a person-only scope that no tool may require, so it gates the REST route and Studio's form only.
+  - The renderer's `themeVariables` (`@cloudhal/astro-renderer/theme-settings`) turns settings into `--ch-*` variables for colors and numbers, and `data-ch-*` attributes for enums and switches. Only typed values pass, and anything else falls back to the default.
+  - The blog starter declares brand, link, background and text colors, a typeface and corners, with contrast rules, and reads them in `Base.astro` and `global.css`. One visible change: body links now take the link color.
+  - Studio adds Settings › Appearance (DESIGN.md §2ab).
+
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
 |---|---|---|---|

@@ -40,7 +40,13 @@ import {
   isTimeZone,
   sameAvailability,
 } from "./availability.ts";
-import { BLOCK_LIMITS, type BlockRegistry, createBlockRegistry } from "./blocks.ts";
+import {
+  BLOCK_LIMITS,
+  type BlockRegistry,
+  createBlockRegistry,
+  type PropsSchema,
+  validateProps,
+} from "./blocks.ts";
 import { bodyDirectives } from "./body-blocks.ts";
 import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
@@ -147,6 +153,11 @@ export interface SiteGraphStoreOptions {
    * built-ins; deployments pass the theme's types too). Unknown types are kept, not refused.
    */
   readonly blocks?: BlockRegistry;
+  /**
+   * RFC-0017 §1: the theme's design settings (`src/settings.ts`), which `Site.theme.config` is
+   * checked against when it changes. Without it the config is left alone.
+   */
+  readonly themeSettings?: PropsSchema;
 }
 
 /**
@@ -221,6 +232,7 @@ export class SiteGraphStore {
     this.#newId = options.idGen ?? newId;
     this.#gates = options.gates;
     this.blocks = options.blocks ?? createBlockRegistry();
+    this.themeSettings = options.themeSettings;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.proposals = new BodyProposals({
@@ -257,6 +269,8 @@ export class SiteGraphStore {
   readonly #gates: GateSupport | undefined;
   /** RFC-0015: the block types component sections are checked against. */
   readonly blocks: BlockRegistry;
+  /** RFC-0017: the theme's design settings, when it declares any. */
+  readonly themeSettings: PropsSchema | undefined;
 
   /**
    * Whether `availability` may be written for this site (S15): the renderer serving it has
@@ -384,6 +398,7 @@ export class SiteGraphStore {
     };
     assertValid("site", site);
     checkTimeZone(site.timeZone);
+    checkThemeConfig(this.themeSettings, site.theme.config, undefined);
     await this.#runUnique(
       await insertNodeStatement("site", site, ts),
       "site",
@@ -408,6 +423,13 @@ export class SiteGraphStore {
   async updateSite(site: Site): Promise<Site> {
     const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
     assertValid("site", next);
+    // Only a config that changes is checked: values a theme change made misfit stay as written.
+    if (this.themeSettings && next.theme.config !== undefined)
+      checkThemeConfig(
+        this.themeSettings,
+        next.theme.config,
+        (await this.getSite(site.id))?.theme.config,
+      );
     // §4.1: a known zone needs no read; an unknown one is refused unless it is the stored one.
     if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
       checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
@@ -1594,6 +1616,23 @@ export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef
  * RFC-0015 §7: every component section of a known type follows its props schema; unknown types
  * are kept (a theme may have removed them) but still capped at the prop limit.
  */
+/** A site's design settings must fit the theme's schema when they change (RFC-0017 §1). */
+function checkThemeConfig(
+  schema: PropsSchema | undefined,
+  config: Record<string, unknown> | undefined,
+  stored: Record<string, unknown> | undefined,
+): void {
+  if (!schema || config === undefined) return;
+  if (stored !== undefined && JSON.stringify(stored) === JSON.stringify(config)) return;
+  const issues = validateProps(schema, config);
+  if (issues.length)
+    throw new InvariantError(
+      "invalid_props",
+      `theme settings: ${issues.map((i) => `${i.path || "settings"} ${i.message}`).join("; ")}`,
+      { type: "theme", issues },
+    );
+}
+
 /** Body directives of known types must fit them (RFC-0015 §7); unknown ones are kept. */
 function checkBodyDirectives(blocks: BlockRegistry, markdown: string, where: string): void {
   if (!markdown.includes("::")) return;

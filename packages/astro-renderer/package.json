@@ -39,7 +39,8 @@
     "./comments": "./src/comments-view.ts",
     "./comments-middleware": "./src/comments-middleware.ts",
     "./embed-middleware": "./src/embed-middleware.ts",
-    "./embeds": "./src/embed-client.ts"
+    "./embeds": "./src/embed-client.ts",
+    "./theme-settings": "./src/theme-settings.ts"
   },
   "files": [
     "dist",
@@ -195,6 +196,10 @@
       "./embeds": {
         "types": "./dist/src/embed-client.d.ts",
         "default": "./dist/src/embed-client.js"
+      },
+      "./theme-settings": {
+        "types": "./dist/src/theme-settings.d.ts",
+        "default": "./dist/src/theme-settings.js"
       }
     }
   }

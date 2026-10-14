@@ -1082,7 +1082,19 @@ export const en = {
     },
   },
   siteSettings: {
-    sections: { general: "General", domains: "Domains", previews: "Preview links" },
+    sections: {
+      general: "General",
+      domains: "Domains",
+      appearance: "Appearance",
+      previews: "Preview links",
+    },
+    appearance: {
+      description: "Colors, type and shapes the {theme} theme lets you change.",
+      none: "The {theme} theme has no design settings to change.",
+      publishHint: "Saved changes show on the site after the next publish.",
+      saved: "Appearance saved",
+      failed: "Could not save the appearance",
+    },
     conflictTitle: "This site changed somewhere else",
     conflictDescription:
       "A person or an agent saved this site after you opened it. Load the latest version, check your change and save again.",
@@ -1486,6 +1498,8 @@ export const en = {
     create_entry: "Create article",
     update_entry: "Update article",
     delete_entry: "Delete article",
+    get_theme_settings: "Read design settings",
+    set_theme_settings: "Change design settings",
     list_block_types: "List block types",
     get_body: "Read body",
     edit_body: "Edit body",
