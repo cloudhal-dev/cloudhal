@@ -114,6 +114,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/snapshots`, "content:draft:own"],
   ["GET", `${S}/snapshots/:snapshotId`, "site:read"],
   ["GET", `${S}/snapshots/:snapshotId/diff/:otherId`, "site:read"],
+  // a node's content in a snapshot (drafts included), for body diffs: content readers only
+  ["GET", `${S}/snapshots/:snapshotId/nodes/:nodeId`, "content:read"],
   ["POST", `${S}/snapshots/:snapshotId/publish`, "site:publish:own"],
   ["POST", `${S}/snapshots/:snapshotId/rollback`, "site:rollback"],
   ["GET", `${S}/activity`, "member"],

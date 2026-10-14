@@ -78,6 +78,7 @@ export {
   resolveAnalyticsRange,
   utcMidnight,
 } from "./blocks/analytics-range.ts";
+export { BodyDiff, type BodyDiffLabels, type BodyDiffProps } from "./blocks/BodyDiff.tsx";
 export {
   type BreakdownLabels,
   BreakdownMeters,

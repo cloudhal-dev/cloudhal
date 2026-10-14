@@ -181,6 +181,15 @@ export const snapshots: Hono<Env> = new Hono<Env>()
     if (!snap || snap.siteId !== param(c, "siteId")) throw notFound("snapshot not found");
     return c.json(snap);
   })
+  // One node as this snapshot holds it (RFC-0014 phase 2: Studio's body diffs). Read-only.
+  .get("/:snapshotId/nodes/:nodeId", async (c) => {
+    const store = c.get("store");
+    const snap = await store.getSnapshot(param(c, "snapshotId"));
+    if (!snap || snap.siteId !== param(c, "siteId")) throw notFound("snapshot not found");
+    const ref = snap.nodes.find((n) => n.id === param(c, "nodeId"));
+    if (!ref) throw notFound("node not in this snapshot");
+    return c.json(await store.readSnapshotNode(ref));
+  })
   .get("/:snapshotId/diff/:otherId", async (c) => {
     const store = c.get("store");
     const siteId = param(c, "siteId");

@@ -37,6 +37,7 @@ import {
 import { assetTitle, formatSize, typeLabel } from "../lib/media.ts";
 import type { MenuDiffSummary } from "../lib/menus.ts";
 import { archivePath } from "../lib/taxonomy.ts";
+import { SnapshotNodeChanges } from "./BodyChanges.tsx";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { useMenuTitle } from "./Menus.tsx";
 import { type TaxonomyData, taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx";
@@ -398,9 +399,20 @@ export function SnapshotDiffDialog({
                                   {row.kind === "contentEntry" && deltasOf(row.id).length > 0 && (
                                     <AssignmentDeltas deltas={deltasOf(row.id)} data={taxonomy} />
                                   )}
+                                  {row.change === "changed" &&
+                                    (row.kind === "contentEntry" || row.kind === "page") &&
+                                    baseId &&
+                                    snapshot && (
+                                      <SnapshotNodeChanges
+                                        siteId={siteId}
+                                        nodeId={row.id}
+                                        fromSnapshot={baseId}
+                                        toSnapshot={snapshot.id}
+                                      />
+                                    )}
                                 </div>
                               </Table.Cell>
-                              <Table.Cell>
+                              <Table.Cell className="align-top">
                                 <Text variant="mono-secondary" as="span">
                                   {row.from !== undefined && row.to !== undefined
                                     ? t("diff.revs", { from: row.from, to: row.to })

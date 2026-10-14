@@ -127,6 +127,14 @@ proposals(id, site_id, target, base_rev, base_hashes, ops, actor, via, note,
 - approval `changes`;
 - a `diff_node` MCP tool.
 
+*Shipped ahead of acceptance (no contract change).*
+- `@cloudhal/core-ts/body-blocks` exports `splitMarkdown` (§2) and `bodyDiff`.
+- Until block ids exist, `bodyDiff` aligns blocks by their trimmed source with the longest common subsequence. Removed and added blocks that still share at least 35 % of their words are paired as edits.
+- Studio's snapshot diff ("Show changes") and release compare render the result.
+- The snapshot diff reads both versions from a read-only `GET /api/sites/:siteId/snapshots/:snapshotId/nodes/:nodeId` (`content:read`).
+
+Approval `changes` and `diff_node` wait for acceptance.
+
 ### 6. Typed blocks (RFC-0015, outline only)
 One registry entry per block type: a JSON Schema for its props, a directive form, an editor form and an Astro component.
 
