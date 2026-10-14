@@ -1,5 +1,5 @@
 import type { Asset, ContentEntry } from "@cloudhal/core-contracts";
-import { createBlockRegistry } from "@cloudhal/core-ts/blocks";
+import { type BlockRegistry, createBlockRegistry } from "@cloudhal/core-ts/blocks";
 import { type DirectiveToken, directiveExtension } from "@cloudhal/core-ts/body-blocks";
 import { checkDirective, directiveProps } from "@cloudhal/core-ts/directives";
 import { ASSET_HREF, assetUrl, mediaPath } from "@cloudhal/core-ts/media";
@@ -91,31 +91,46 @@ function assetEmbed(asset: Asset, text: string, title?: string | null): string {
  * images only keep safe URL schemes. `asset:<id>` links and images resolve to the site's media.
  */
 const md = new Marked({ gfm: true, async: false });
-const blockTypes = createBlockRegistry();
+const builtInTypes = createBlockRegistry();
+
+/** A theme's blocks in the body being rendered right now (`renderBodyParts`). */
+let themed: { registry: BlockRegistry; names: ReadonlySet<string>; slots: BlockSlot[] } | undefined;
+
+/** Where a theme component goes in a body's HTML (`renderBodyParts`); escaped text never matches. */
+const SLOT = (i: number) => `<!--ch-block-slot:${i}-->`;
+const SLOT_RE = /<!--ch-block-slot:(\d+)-->/;
+
 md.use({
   // Body directives (RFC-0015 §5): a built-in block renders like its component section; a
-  // container's inner markdown goes through this same renderer. Unknown types and props that do
-  // not fit render nothing on the site and a labelled placeholder in previews.
+  // container's inner markdown goes through this same renderer. A type the theme renders with its
+  // own component becomes a slot (`renderBodyParts`). Unknown types and props that do not fit
+  // render nothing on the site and a labelled placeholder in previews.
   extensions: [
     {
       ...directiveExtension,
       renderer(token) {
-        const { directive } = token as DirectiveToken;
-        const issues = checkDirective(blockTypes, directive);
-        const known = issues !== undefined && isBuiltInBlock(directive.name);
+        const { directive, tokens } = token as DirectiveToken;
+        const registry = themed?.registry ?? current?.blocks ?? builtInTypes;
+        const issues = checkDirective(registry, directive);
         const ctx = current;
+        const valid = issues !== undefined && issues.length === 0;
+        const props = directiveProps(registry.get(directive.name), directive.attrs);
+        const contentHtml = directive.content !== undefined ? this.parser.parse(tokens) : undefined;
+        if (valid && themed?.names.has(directive.name)) {
+          themed.slots.push({
+            type: directive.name,
+            props,
+            ...(directive.content !== undefined ? { content: directive.content } : {}),
+            ...(contentHtml !== undefined ? { contentHtml } : {}),
+          });
+          return SLOT(themed.slots.length - 1);
+        }
         const html =
-          known && issues.length === 0
-            ? builtInBlockHtml(
-                directive.name,
-                directiveProps(blockTypes.get(directive.name), directive.attrs),
-                {
-                  markdown: (source) => renderMarkdown(source, ctx),
-                  ...(directive.content !== undefined
-                    ? { contentHtml: this.parser.parse((token as DirectiveToken).tokens) }
-                    : {}),
-                },
-              )
+          valid && isBuiltInBlock(directive.name)
+            ? builtInBlockHtml(directive.name, props, {
+                markdown: (source) => renderMarkdown(source, ctx),
+                ...(contentHtml !== undefined ? { contentHtml } : {}),
+              })
             : "";
         const attrs = `data-block-type="${escapeHtml(directive.name)}"`;
         if (html) return `<div class="ch-block" ${attrs}>${html}</div>`;
@@ -124,7 +139,11 @@ md.use({
           "div",
           attrs,
           directive.name,
-          issues === undefined || !known ? "unknown block type" : "props do not fit the block type",
+          issues === undefined
+            ? "unknown block type"
+            : valid
+              ? "shown by the theme on the site"
+              : "props do not fit the block type",
         );
       },
     },
@@ -202,6 +221,53 @@ export function renderBody(
   return body.format === "markdown" ? renderMarkdown(body.value, ctx) : sanitizeHtml(body.value);
 }
 
+/** A theme block in a body (RFC-0015 §5): its type, props and, for a container, its text. */
+export interface BlockSlot {
+  type: string;
+  props: Record<string, unknown>;
+  /** A container's inner markdown. */
+  content?: string;
+  /** The same, rendered by the safe renderer. */
+  contentHtml?: string;
+}
+
+/** A body as HTML runs and the theme blocks between them, in order. */
+export type BodyPart = { html: string } | { slot: BlockSlot };
+
+/**
+ * A body for a theme that renders some block types with its own components (`Body.astro`): the
+ * HTML is cut where each such block goes. `registry` holds the theme's types (validation);
+ * `components` names the types the theme renders. Without any, it is `renderBody` in one part.
+ */
+export function renderBodyParts(
+  body: { format: "markdown" | "html"; value: string },
+  ctx: MediaContext | undefined,
+  blocks: { registry: BlockRegistry; components: ReadonlySet<string> } | undefined,
+): BodyPart[] {
+  if (body.format !== "markdown" || !blocks || !body.value.includes("::"))
+    return [{ html: renderBody(body, ctx) }];
+  const previous = themed;
+  const slots: BlockSlot[] = [];
+  themed = { registry: blocks.registry, names: blocks.components, slots };
+  let html: string;
+  try {
+    html = renderMarkdown(body.value, ctx);
+  } finally {
+    themed = previous;
+  }
+  const parts: BodyPart[] = [];
+  const pieces = html.split(SLOT_RE);
+  pieces.forEach((piece, i) => {
+    if (i % 2 === 0) {
+      if (piece) parts.push({ html: piece });
+    } else {
+      const slot = slots[Number(piece)];
+      if (slot) parts.push({ slot });
+    }
+  });
+  return parts;
+}
+
 /**
  * The cover image above the body: eager (it is the largest image above the fold), safe src only.
  * With its asset known, it gets the asset's size, alt fallback, placeholder, `srcset` when
@@ -231,18 +297,15 @@ function coverFigure(image: ContentEntry["coverImage"], ctx?: MediaContext): str
   return `<figure class="ch-cover"><img src="${escapeHtml(src)}" alt="${escapeHtml(image.alt)}"${size} fetchpriority="high" decoding="async"></figure>`;
 }
 
-/**
- * An article: a header (title, summary, publication date) followed by the body. A leading `# H1`
- * that repeats the title is dropped so authors may write it either way.
- */
-export function renderEntryArticle(
+/** An article's pieces: the body to render (a leading H1 repeating the title dropped) and the HTML around it. */
+export function entryArticleParts(
   entry: Pick<
     ContentEntry,
     "id" | "title" | "summary" | "body" | "publishedAt" | "createdAt" | "coverImage"
   >,
   locale = "en",
   ctx?: MediaContext,
-): string {
+): { body: ContentEntry["body"]; header: string; cover: string; media: MediaContext } {
   let body = entry.body;
   if (body.format === "markdown") {
     const m = body.value.match(/^\s*#\s+(.+?)\s*#*\s*(?:\r?\n|$)/);
@@ -255,7 +318,29 @@ export function renderEntryArticle(
     : "";
   const summary = entry.summary ? `<p class="ch-summary">${escapeHtml(entry.summary)}</p>` : "";
   const media: MediaContext = { locale, ...ctx };
-  return `<article class="ch-article" data-entry-id="${escapeHtml(entry.id)}"><header class="ch-article-header"><h1>${escapeHtml(entry.title)}</h1>${summary}${date}</header>${coverFigure(entry.coverImage, media)}<div class="ch-richtext">${renderBody(body, media)}</div></article>`;
+  return {
+    body,
+    header: `<header class="ch-article-header"><h1>${escapeHtml(entry.title)}</h1>${summary}${date}</header>`,
+    cover: coverFigure(entry.coverImage, media),
+    media,
+  };
+}
+
+/**
+ * An article: a header (title, summary, publication date) followed by the body. A leading `# H1`
+ * that repeats the title is dropped so authors may write it either way. Themes with their own
+ * block components use `EntryArticle.astro`, which has the same markup.
+ */
+export function renderEntryArticle(
+  entry: Pick<
+    ContentEntry,
+    "id" | "title" | "summary" | "body" | "publishedAt" | "createdAt" | "coverImage"
+  >,
+  locale = "en",
+  ctx?: MediaContext,
+): string {
+  const { body, header, cover, media } = entryArticleParts(entry, locale, ctx);
+  return `<article class="ch-article" data-entry-id="${escapeHtml(entry.id)}">${header}${cover}<div class="ch-richtext">${renderBody(body, media)}</div></article>`;
 }
 
 /** The media path of an asset (re-exported for themes). */

@@ -1,0 +1,38 @@
+---
+/**
+ * A markdown or HTML body (RFC-0015 §5): Cloudhal's safe renderer, with the block types the theme
+ * renders itself (`blocks` in theme.ts, declared in `src/blocks.ts`) placed as its components.
+ * They get `{ props, content, contentHtml, media }`: `content` is a container's inner markdown,
+ * `contentHtml` the same rendered safely. Props were checked against the type first.
+ */
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import { themeRegistry } from "../blocks.ts";
+import { renderBodyParts } from "../markdown.ts";
+import type { MediaContext } from "../media.ts";
+
+interface Props {
+  body: { format: "markdown" | "html"; value: string };
+  media?: MediaContext;
+  /** The theme's components by block type name. */
+  blocks?: Record<string, unknown>;
+  /** The theme's block types (`src/blocks.ts`). */
+  blockTypes?: readonly BlockType[];
+}
+const { body, media, blocks = {}, blockTypes } = Astro.props;
+type AnyComponent = (props: never) => unknown;
+const names = new Set(Object.keys(blocks));
+const parts = renderBodyParts(
+  body,
+  media,
+  names.size ? { registry: themeRegistry(blockTypes), components: names } : undefined,
+);
+---
+{parts.map((part) => {
+  if ("html" in part) return <Fragment set:html={part.html} />;
+  const Own = blocks[part.slot.type] as AnyComponent;
+  return (
+    <div class="ch-block" data-block-type={part.slot.type}>
+      <Own props={part.slot.props} content={part.slot.content} contentHtml={part.slot.contentHtml} media={media} />
+    </div>
+  );
+})}

@@ -18,6 +18,12 @@ cloudhal build    # static HTML from the published (or latest) snapshot
 - `NAV_CATEGORIES` — append top-level categories (by position) to the header after the pages; `false` for a pages-only menu.
 - `RELATED_POSTS` — how many related posts to show under an article (0 hides the list).
 
+## Blocks (`src/blocks.ts`)
+Typed blocks (RFC-0015) go in page sections and inside article and rich-text bodies. Cloudhal ships `callout`, `button`, `embed` and `faq`; this theme adds `testimonial`.
+- **Declare** a type in `src/blocks.ts` with `defineBlockTypes`: a plain English name shared by every theme (`pricing-table`, never `mytheme-pricing`), where it may go, its props in the JSON Schema subset, whether it wraps text, and an example. The file is data only: no Astro or DOM imports.
+- **Render** it with a component in `theme.ts` → `blocks` (`{ testimonial: Testimonial }`). The component gets `{ props, content, contentHtml, media }`. `contentHtml` is the wrapped text, already rendered safely; props are checked against the type first. A built-in may be listed there too, to restyle it.
+- `cloudhal studio` and `cloudhal mcp` read the file, so Studio's forms and `/` menu and agents (`list_block_types`) offer the type. `cloudhal deploy` checks it and bundles it into the admin Worker.
+
 ## Analytics
 Themes need nothing for analytics (RFC-0006). Deployed with `cloudhal deploy`, the Site Worker adds the first-party script tag to published pages while analytics are on (`cloudhal.json` → `analytics`, then per site in Studio). `cloudhal dev` records your own visits only with `"dev": true` in that block, which `astro.config.mjs` passes to the `cloudhal()` integration. Static builds (`cloudhal build`) carry no script. What is collected, and a paragraph for your privacy policy: `docs/guides/analytics-privacy.md` in the Cloudhal repository.
 

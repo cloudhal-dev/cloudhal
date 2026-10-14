@@ -198,6 +198,23 @@ describe("cloudhal init → dev → snapshot → build", () => {
   });
 
   it("build renders the published snapshot, not later edits", async () => {
+    // Typed blocks in an article body (RFC-0015): a built-in, and the starter's own `testimonial`
+    // rendered by its component (src/blocks.ts, theme.ts).
+    {
+      const cfg = await readProjectConfig(projectDir);
+      const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+      const posts = await local.store.listContentEntries(cfg.siteId, "posts");
+      const hello = posts.find((e) => e.slug === "hello-world");
+      if (!hello) throw new Error("no hello-world post");
+      await local.store.updateContentEntry({
+        ...hello,
+        body: {
+          format: "markdown",
+          value: `${hello.body.value.trimEnd()}\n\n:::callout{tone="warning"}\nBack up first.\n:::\n\n:::testimonial{author="Ada Lovelace" role="Analyst"}\nThis **changed** how we publish.\n:::\n`,
+        },
+      });
+      await local.close();
+    }
     const snap = await snapshot({ projectDir, label: "v1", publish: true });
     expect(snap.summary.added).toBeGreaterThan(0);
 
@@ -217,6 +234,11 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(index).not.toContain("Changed after publish");
     const post = await readFile(path.join(r.outDir, "posts", "hello-world", "index.html"), "utf8");
     expect(post).toContain("<title>Hello, world · ");
+    expect(post).toContain('class="ch-callout ch-callout--warning"');
+    expect(post).toMatch(
+      /<div class="ch-block" data-block-type="testimonial"[^>]*><figure class="testimonial"[^>]*><blockquote[^>]*><p>This <strong>changed<\/strong> how we publish\.<\/p>/,
+    );
+    expect(post).toMatch(/testimonial__author[^>]*>Ada Lovelace</);
     // search and link-preview basics in the static build
     expect(post).toMatch(/<link rel="canonical" href="[^"]+\/posts\/hello-world">/);
     expect(post).toContain('<meta property="og:type" content="article">');

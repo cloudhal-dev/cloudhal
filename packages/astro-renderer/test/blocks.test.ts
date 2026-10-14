@@ -1,8 +1,9 @@
 /** RFC-0015 §5: built-in block types render escaped, safe markup; misfits render nothing. */
 import type { ComponentSection } from "@cloudhal/core-contracts";
+import { defineBlockTypes } from "@cloudhal/core-ts/blocks";
 import { describe, expect, it } from "vitest";
-import { renderComponentSection } from "../src/blocks.ts";
-import { renderMarkdown } from "../src/markdown.ts";
+import { renderComponentSection, themeRegistry } from "../src/blocks.ts";
+import { renderBodyParts, renderMarkdown } from "../src/markdown.ts";
 import { renderSectionHtml } from "../src/preview.ts";
 
 const section = (type: string, props: Record<string, unknown>): ComponentSection => ({
@@ -100,5 +101,68 @@ describe("body directives", () => {
 
   it("leave text that is not exactly a directive as ordinary markdown", () => {
     expect(renderMarkdown(":::callout\nnever closed")).toContain(":::callout");
+  });
+});
+
+describe("theme block types (RFC-0015 §6)", () => {
+  const testimonial = defineBlockTypes([
+    {
+      name: "testimonial",
+      title: { en: "Testimonial" },
+      where: ["section", "body"],
+      content: "markdown",
+      props: {
+        type: "object",
+        additionalProperties: false,
+        required: ["author"],
+        properties: { author: { type: "string", maxLength: 120 } },
+      },
+      example: { props: { author: "Ada" }, markdown: "Great." },
+    },
+  ]);
+  const registry = themeRegistry(testimonial);
+
+  it("cuts a body where the theme's own components go, after checking their props", () => {
+    const parts = renderBodyParts(
+      {
+        format: "markdown",
+        value:
+          'Intro.\n\n:::testimonial{author="Ada"}\nIt **works**.\n:::\n\n:::testimonial{role="x"}\nNo author.\n:::\n\n::button{label="Go" href="/go"}\n',
+      },
+      undefined,
+      { registry, components: new Set(["testimonial"]) },
+    );
+    expect(parts).toHaveLength(3);
+    expect(parts[0]).toEqual({ html: "<p>Intro.</p>\n" });
+    expect(parts[1]).toEqual({
+      slot: {
+        type: "testimonial",
+        props: { author: "Ada" },
+        content: "It **works**.",
+        contentHtml: "<p>It <strong>works</strong>.</p>\n",
+      },
+    });
+    // The misfit renders nothing; the built-in keeps its markup.
+    expect((parts[2] as { html: string }).html).toContain("ch-button");
+    expect((parts[2] as { html: string }).html).not.toContain("No author");
+  });
+
+  it("renders bodies in one part when the theme has no components, and builds a registry once", () => {
+    expect(renderBodyParts({ format: "markdown", value: "Hi." }, undefined, undefined)).toEqual([
+      { html: "<p>Hi.</p>\n" },
+    ]);
+    expect(themeRegistry(testimonial)).toBe(registry);
+  });
+
+  it("tells a theme's type from an unknown one in previews", () => {
+    const html = renderMarkdown(
+      '::pricing-table{plan="pro"}\n\n:::testimonial{author="Ada"}\nYes.\n:::',
+      {
+        preview: true,
+        blocks: registry,
+      },
+    );
+    expect(html).toContain("pricing-table: unknown block type");
+    expect(html).toContain("testimonial: shown by the theme on the site");
   });
 });

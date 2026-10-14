@@ -4,7 +4,7 @@
  * and by `preview.ts`, so agents' previews match the site. Props are validated before render.
  */
 import type { ComponentSection } from "@cloudhal/core-contracts";
-import { type BlockRegistry, createBlockRegistry } from "@cloudhal/core-ts/blocks";
+import { type BlockRegistry, type BlockType, createBlockRegistry } from "@cloudhal/core-ts/blocks";
 import {
   builtInBlockHtml,
   escapeBlockHtml,
@@ -25,7 +25,7 @@ export function renderComponentSection(
   section: ComponentSection,
   options: { media?: MediaContext; registry?: BlockRegistry; preview?: boolean } = {},
 ): string {
-  const registry = options.registry ?? builtIns;
+  const registry = options.registry ?? options.media?.blocks ?? builtIns;
   const issues = registry.checkSection(section.type, section.props);
   const known = issues !== undefined && isBuiltInBlock(section.type);
   const html =
@@ -41,6 +41,26 @@ export function renderComponentSection(
     "section",
     attrs,
     section.type,
-    issues === undefined || !known ? "unknown block type" : "props do not fit the block type",
+    issues === undefined
+      ? "unknown block type"
+      : issues.length
+        ? "props do not fit the block type"
+        : "shown by the theme on the site",
   );
+}
+
+const registries = new WeakMap<readonly BlockType[], BlockRegistry>();
+
+/**
+ * The registry for a theme's block types (`src/blocks.ts`): the built-ins and the theme's, built
+ * once per list. Invalid types throw here, as at deploy.
+ */
+export function themeRegistry(types: readonly BlockType[] | undefined): BlockRegistry {
+  if (!types?.length) return builtIns;
+  let registry = registries.get(types);
+  if (!registry) {
+    registry = createBlockRegistry(types);
+    registries.set(types, registry);
+  }
+  return registry;
 }

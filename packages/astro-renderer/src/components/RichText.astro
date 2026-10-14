@@ -1,14 +1,19 @@
 ---
 import type { RichTextSection } from "@cloudhal/core-contracts";
-import { renderBody } from "../markdown.ts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
 import type { MediaContext } from "../media.ts";
+import Body from "./Body.astro";
 
 interface Props {
   section: RichTextSection;
   /** Resolves `asset:<id>` in the markdown (RFC-0004 §7.6). */
   media?: MediaContext;
+  /** The theme's block components and types (RFC-0015 §5), for blocks inside the text. */
+  blocks?: Record<string, unknown>;
+  blockTypes?: readonly BlockType[];
 }
-const { section, media } = Astro.props;
-const html = renderBody({ format: section.format, value: section.body }, media);
+const { section, media, blocks, blockTypes } = Astro.props;
 ---
-<section class="ch-richtext" data-section-id={section.id} data-kind="richText" set:html={html} />
+<section class="ch-richtext" data-section-id={section.id} data-kind="richText">
+  <Body body={{ format: section.format, value: section.body }} media={media} blocks={blocks} blockTypes={blockTypes} />
+</section>

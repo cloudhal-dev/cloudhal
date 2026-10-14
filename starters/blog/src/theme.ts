@@ -8,16 +8,19 @@ import type {
   SectionComponents,
 } from "@cloudhal/astro-renderer/components/Sections.astro";
 import type { CollectionIndexHook } from "@cloudhal/astro-renderer/navigation";
+import Testimonial from "./components/blocks/Testimonial.astro";
 
 export const components: SectionComponents = {};
 
 /**
- * Block types (RFC-0015) rendered by this theme's own components, by type name, e.g.
+ * Block types (RFC-0015) rendered by this theme's own components, by type name: the types this
+ * theme declares in `src/blocks.ts`, and any built-in it restyles, e.g.
  *   import Callout from "./components/Callout.astro";
- *   export const blocks = { callout: Callout };
- * Each gets `{ section, props, content, media }`. Types not listed use Cloudhal's built-in markup.
+ *   export const blocks = { callout: Callout, testimonial: Testimonial };
+ * Each gets `{ props, content, contentHtml, media }` (and `section` on pages), in page sections
+ * and inside article and rich-text bodies. Types not listed use Cloudhal's built-in markup.
  */
-export const blocks: BlockComponents = {};
+export const blocks: BlockComponents = { testimonial: Testimonial };
 
 /** Entries per category/tag archive page (`/category/<slug>/page/<n>`). */
 export const ARCHIVE_PAGE_SIZE = 20;

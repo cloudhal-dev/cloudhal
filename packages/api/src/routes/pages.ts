@@ -33,7 +33,7 @@ async function pagePreview(c: Context<Env>, site: Site, page: Page): Promise<str
       collections.map(async (col) => [col, await store.listContentEntries(site.id, col)]),
     ),
   );
-  return renderPagePreview(site, page, entries).html;
+  return renderPagePreview(site, page, entries, { blocks: store.blocks }).html;
 }
 
 export const pages: Hono<Env> = new Hono<Env>()
