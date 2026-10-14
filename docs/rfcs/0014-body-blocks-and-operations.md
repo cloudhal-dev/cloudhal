@@ -182,7 +182,7 @@ Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged
   - REST `PATCH /api/sites/:siteId/entries/:entryId/body` and `PATCH …/pages/:pageId/sections/:sectionId/body` (`{ rev, ops }`): `edit_body`'s apply mode for people, sharing its code (`editBody` in `@cloudhal/mcp-server/body`). REST refuses API keys, so agents propose through MCP only.
 - **Phase 4 is complete.**
 - **Phase 5** follows RFC-0016 (accepted, ADR-0029): Workers AI with the model chosen per site. That settles open question 1, as approved by Halil on 2026-10-14.
-- **Phase 6** follows RFC-0015 (draft): one block registry for `component` sections and body directives.
+- **Phase 6** follows RFC-0015 (accepted, ADR-0030): one block registry for `component` sections and body directives.
 - **Unindexed bodies:** a body without an index (written before this phase, or over 5,000 blocks) shows content-derived ids (`blk_v…`). The store's first write keeps those ids, so no one-off job is needed.
 
 ## Alternatives considered

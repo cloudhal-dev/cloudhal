@@ -1,5 +1,5 @@
 # RFC-0015: Block registry — typed blocks for page sections and bodies
-- Status: Draft (2026-10-14)
+- Status: Accepted (2026-10-14, approved by Halil with the defaults of the open questions, except question 6: type names are global and English-rooted, not theme-prefixed; ADR-0030)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-14
 - Related:
   - RFC-0014 §1 (profile v1 reserves directives), §6 (outline of this RFC), open question 5 (one registry with a `component` section kind), phase 6;
@@ -37,7 +37,10 @@
 ```ts
 // @cloudhal/core-ts/blocks (Worker-safe, no dependencies beyond core-ts)
 export interface BlockType {
-  /** `[a-z][a-z0-9-]{1,40}`; built-ins are unprefixed, a theme's are `<theme>-<name>` by convention. */
+  /**
+   * `[a-z][a-z0-9-]{1,40}`: one global namespace of plain English names, built-in and theme alike
+   * (`callout`, `pricing-table`, `testimonial`), never prefixed with a theme (D7).
+   */
   name: string;
   title: Record<string, string>;            // per UI locale, `en` required: "Callout"
   description?: Record<string, string>;
@@ -148,9 +151,15 @@ A props schema is a JSON Schema object written in a subset small enough to:
 - **Declaring.** A theme declares its types in `src/blocks.ts`. The file is pure data with no Astro or DOM imports, so Node and Workers can import it:
   ```ts
   import { defineBlockTypes } from "@cloudhal/core-ts/blocks";
-  export const blockTypes = defineBlockTypes([{ name: "acme-pricing", where: ["section"], props: {…}, … }]);
+  export const blockTypes = defineBlockTypes([{ name: "pricing-table", where: ["section"], props: {…}, … }]);
   ```
-  Its components go in `src/theme.ts`'s new `blocks` map: `export const blocks = { "acme-pricing": Pricing }`.
+  Its components go in `src/theme.ts`'s new `blocks` map: `export const blocks = { "pricing-table": Pricing }`.
+- **Names are global (D7).** Block type names are one shared, English-rooted vocabulary (`testimonial`, `pricing-table`, `feature-grid`), never theme-prefixed.
+  - Content is portable: a `testimonial` written under one theme renders under any other theme that also defines `testimonial`.
+  - Agents and the generator (phase 7) learn one set of names.
+  - A theme may override a built-in's component, as with sections today, but not its props schema. Declaring a type whose name is a built-in's is a deploy error.
+  - Two types with the same name in one deployment are an error too.
+  - If two themes define the same name with different props, the store validates against the deployed theme's schema. Content that no longer fits is kept and flagged like an unknown type (§7), never rewritten.
 - **Deploying.** `cloudhal deploy` validates the theme's types (names, subset, examples against their own schema) and generates `block-types.ts` into the admin Worker, the way skills are bundled today. `cloudhal studio` imports the file directly.
 - **Serving.**
   - `GET /api/sites/:siteId/block-types` (`content:read`) returns the registry Studio uses.
@@ -217,10 +226,10 @@ A props schema is a JSON Schema object written in a subset small enough to:
 | 6d | Theme types: `src/blocks.ts`, deploy bundling, unknown-type UI | none |
 
 ## Open questions
-Defaults proposed, to be accepted with this RFC:
+Accepted with these defaults (ADR-0030):
 1. **Built-in types:** `callout`, `button`, `embed` (YouTube or Vimeo, click to load), `faq` (sections only).
 2. **Body directive props:** scalars only; lists and objects are section-only.
 3. **Validation:** the props subset interpreter (§3), not ajv at deploy.
 4. **Unknown types:** kept, reported, editable as markdown or JSON, not rendered publicly.
 5. **Existing section kinds:** unchanged in v1; moving them into the registry is a later, compatible step.
-6. **Theme type names:** a convention (`<theme>-<name>`), not enforced; built-in names are reserved.
+6. **Type names (D7):** one global namespace of plain English names, with no theme prefix (`pricing-table`, `testimonial`). Built-in names are reserved for their schema; themes may restyle them.
