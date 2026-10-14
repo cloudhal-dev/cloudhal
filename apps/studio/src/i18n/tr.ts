@@ -352,6 +352,22 @@ export const tr: Messages = {
       richText: "Zengin metin",
       image: "Görsel",
       contentList: "İçerik listesi",
+      component: "Blok",
+    },
+    blocks: {
+      menu: "Bloklar",
+      unknown: "Bilinmeyen blok · {type}",
+      unknownHint:
+        "Bu kurulumda bu adla bir blok tipi yok (tema değişmiş olabilir). Olduğu gibi korunur ve sitede gösterilmez.",
+      item: "Öğe {n}",
+      addItem: "Öğe ekle",
+      removeItem: "Öğeyi kaldır",
+      moveUp: "Yukarı taşı",
+      moveDown: "Aşağı taşı",
+      values: {
+        tone: { info: "Bilgi", success: "Başarı", warning: "Uyarı", danger: "Tehlike" },
+        variant: { primary: "Birincil", secondary: "İkincil" },
+      },
     },
     bodyTitle: "Gövde",
     markdown: "Markdown",

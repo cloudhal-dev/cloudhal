@@ -1,0 +1,28 @@
+---
+/**
+ * A component section (RFC-0015 §5): the theme's own component for the type when it maps one
+ * (`blocks` in theme.ts, given `{ section, props, content, media }`), else Cloudhal's built-in
+ * markup (`renderComponentSection`). Unknown types and props that do not fit render nothing.
+ */
+import type { ComponentSection } from "@cloudhal/core-contracts";
+import { renderComponentSection } from "../blocks.ts";
+import type { MediaContext } from "../media.ts";
+
+interface Props {
+  section: ComponentSection;
+  media?: MediaContext;
+  /** The theme's components by block type name. */
+  blocks?: Record<string, unknown>;
+}
+const { section, media, blocks = {} } = Astro.props;
+type AnyComponent = (props: never) => unknown;
+const Own = blocks[section.type] as AnyComponent | undefined;
+const content = typeof section.props.content === "string" ? section.props.content : undefined;
+---
+{Own ? (
+  <section class="ch-block" data-section-id={section.id} data-kind="component" data-block-type={section.type}>
+    <Own section={section} props={section.props} content={content} media={media} />
+  </section>
+) : (
+  <Fragment set:html={renderComponentSection(section, media ? { media } : {})} />
+)}

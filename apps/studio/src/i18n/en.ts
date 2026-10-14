@@ -351,6 +351,22 @@ export const en = {
       richText: "Rich text",
       image: "Image",
       contentList: "Content list",
+      component: "Block",
+    },
+    blocks: {
+      menu: "Blocks",
+      unknown: "Unknown block · {type}",
+      unknownHint:
+        "This deployment has no block type with this name (the theme may have changed). It is kept as is and not shown on the site.",
+      item: "Item {n}",
+      addItem: "Add item",
+      removeItem: "Remove item",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      values: {
+        tone: { info: "Info", success: "Success", warning: "Warning", danger: "Danger" },
+        variant: { primary: "Primary", secondary: "Secondary" },
+      },
     },
     bodyTitle: "Body",
     markdown: "Markdown",

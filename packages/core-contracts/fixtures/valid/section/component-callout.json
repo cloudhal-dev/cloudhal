@@ -1,0 +1,10 @@
+{
+  "id": "sec_callout0001",
+  "kind": "component",
+  "type": "callout",
+  "props": {
+    "tone": "warning",
+    "title": "Before you start",
+    "content": "Back up your **database** first."
+  }
+}

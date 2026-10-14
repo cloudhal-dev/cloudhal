@@ -138,7 +138,10 @@ export type InvariantCode =
   | "invalid_time_zone"
   // ── RFC-0008 (releases) ──
   /** §6.2: the node is held by a release awaiting approval, scheduled or running; unschedule it first. */
-  | "scheduled_locked";
+  | "scheduled_locked"
+  // ── RFC-0015 (block registry) ──
+  /** A component section's props break its block type's schema (`details.issues`). */
+  | "invalid_props";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

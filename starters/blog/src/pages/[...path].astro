@@ -45,6 +45,7 @@ import RelatedPosts from "../components/RelatedPosts.astro";
 import Base from "../layouts/Base.astro";
 import {
   ARCHIVE_PAGE_SIZE,
+  blocks,
   collectionIndex,
   components,
   NAV_CATEGORIES,
@@ -189,7 +190,7 @@ const meta =
 ---
 <Base site={site} meta={meta} nav={nav} footer={footer} notice={notice}>
   {route.kind === "page" && (
-    <Sections sections={route.page.sections} entries={entries} components={components} media={media} />
+    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} media={media} />
   )}
   {route.kind === "entry" && (
     <Fragment>

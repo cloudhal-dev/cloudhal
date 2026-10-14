@@ -382,6 +382,21 @@ Site › Settings gets an **AI** section (`components/AiSettings.tsx`, lazy name
 - An alert `Banner` warns when the chosen Workers AI model is missing from the live catalogue: "…no longer offered by Workers AI…".
 - Below Administrator (`ai.settings` = `site:settings`) the controls are disabled with the gating reason, and the model shows as text.
 
+### 2aa. Component sections (RFC-0015 phase 6a, ADR-0030)
+Pages can hold **component sections**: a block type from the registry (`GET /api/sites/:siteId/block-types`, `content:read`) with its props (`components/BlockSection.tsx`).
+- **Adding:** the page editor's add-section `DropdownMenu` lists the section kinds, then a `DropdownMenu.Separator` and a group "Blocks" with every type allowed in sections, each with its icon (the type names a Phosphor icon; `Cube` otherwise) and its title in the UI language. A new section starts from the type's example.
+- **The card:** a `SectionCard` titled with the type's title and icon, like the other kinds.
+- **The form:** **`BlockPropsForm`** from `@cloudhal/ui`, generated from the type's props schema — no code per type, for Cloudhal's types and a theme's alike:
+  - a `string` is an `Input` (`type="url"` for links); `format: "markdown"` or `x-widget: "textarea"` an `InputArea`; an `enum` a `Select`, or a horizontal `Radio.Group` with `x-widget: "radio"` (enum values worded through `editor.blocks.values.*` when Studio knows them, else the value);
+  - `number`/`integer` a number `Input`; `boolean` a `Checkbox`;
+  - a flat object a `fieldset` with its fields; a list a bold `Text` label, then one `InsetPanel` per item headed "Item {n}" with ghost square buttons Move up (`ArrowUp`), Move down (`ArrowDown`) and Remove item (`Trash`), then a secondary `sm` "Add item" (`Plus`), disabled at `maxItems`;
+  - labels and hints come from the schema's `title`/`description` (per locale when given), else the prop name in words;
+  - an optional field emptied is removed from the props, not stored as "";
+  - problems from the same interpreter the store runs (`validateProps`) show on their field as it is edited (for a link: "a safe link"); saving props that do not fit is refused with 422 `invalid_props`.
+- **Unknown types** (a theme type this deployment no longer has): the card is titled "Unknown block · {name}", with an alert `Banner` saying it is kept but not shown on the site, and the props as read-only JSON in a `font-mono` `InputArea`. It saves unchanged.
+- **Read-only** roles and release locks disable the form like any section.
+- **On the site and in previews:** built-ins render escaped, framework-free markup (`.ch-callout`, `.ch-button`, `.ch-embed`, `.ch-faq` in the starter's CSS); a theme can map a type to its own Astro component in `theme.ts` `blocks`. A section whose props do not fit, or whose type no one renders, renders nothing on the site and a labelled placeholder in previews.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>

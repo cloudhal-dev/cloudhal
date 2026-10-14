@@ -1,0 +1,4 @@
+{
+  "reason": "props is required, even when empty",
+  "data": { "id": "sec_callout0004", "kind": "component", "type": "callout" }
+}

@@ -313,6 +313,34 @@ describe("body proposals", () => {
   });
 });
 
+describe("block types (RFC-0015)", () => {
+  it("lists the registry and refuses component props that do not fit", async () => {
+    const { store, site, app, get } = await setup();
+    const listed = (await (await get(`/api/sites/${site.id}/block-types`)).json()) as {
+      types: { name: string; where: string[] }[];
+    };
+    expect(listed.types.map((t) => t.name)).toEqual(["callout", "button", "embed", "faq"]);
+    const home = (await store.listPages(site.id)).find((p) => p.path === "/");
+    if (!home) throw new Error("no home page");
+    const res = await app.request(`/api/sites/${site.id}/pages/${home.id}`, {
+      method: "PUT",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: JSON.stringify({
+        ...home,
+        sections: [
+          ...home.sections,
+          { id: "sec_block000001", kind: "component", type: "faq", props: { items: [] } },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({
+      error: "invalid_props",
+      details: { type: "faq", issues: [{ path: "items", message: "at least 1 item" }] },
+    });
+  });
+});
+
 describe("PATCH body (RFC-0014 §4)", () => {
   const patch = (app: Awaited<ReturnType<typeof setup>>["app"], path: string, body: unknown) =>
     app.request(path, {

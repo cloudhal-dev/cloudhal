@@ -19,6 +19,7 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
 import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 
 import type {
@@ -1996,6 +1997,9 @@ export const api = {
         method: "DELETE",
       }),
   },
+  /** The deployment's block types (RFC-0015): built-ins and the theme's. */
+  blockTypes: (siteId: string) =>
+    request<{ types: BlockType[] }>(`/api/sites/${siteId}/block-types`).then((r) => r.types),
   ai: {
     /** Whether AI is on, the model, the cap, today's use and how the server reaches Workers AI. */
     settings: (siteId: string) =>

@@ -8,7 +8,8 @@
 /**
  * A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.
  */
-export type Section = HeroSection | RichTextSection | ImageSection | ContentListSection;
+export type Section =
+  HeroSection | RichTextSection | ImageSection | ContentListSection | ComponentSection;
 /**
  * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
  */
@@ -113,4 +114,18 @@ export interface ContentListSection {
    * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
    */
   filter?: string;
+}
+/**
+ * A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.
+ */
+export interface ComponentSection {
+  id: Id;
+  kind: "component";
+  type: string;
+  /**
+   * Validated against the type's props schema by the store, not by this contract.
+   */
+  props: {
+    [k: string]: unknown | undefined;
+  };
 }

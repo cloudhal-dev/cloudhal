@@ -705,6 +705,38 @@ export const PageSchema = {
               "maxLength": 512
             }
           }
+        },
+        {
+          "type": "object",
+          "title": "ComponentSection",
+          "description": "A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "type",
+            "props"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
+            },
+            "props": {
+              "type": "object",
+              "description": "Validated against the type's props schema by the store, not by this contract.",
+              "additionalProperties": true
+            }
+          }
         }
       ]
     },
@@ -900,6 +932,38 @@ export const SectionSchema = {
           "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
           "minLength": 1,
           "maxLength": 512
+        }
+      }
+    },
+    {
+      "type": "object",
+      "title": "ComponentSection",
+      "description": "A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "type",
+        "props"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,40}$"
+        },
+        "props": {
+          "type": "object",
+          "description": "Validated against the type's props schema by the store, not by this contract.",
+          "additionalProperties": true
         }
       }
     }
