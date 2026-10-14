@@ -6,9 +6,13 @@
 export { createMarkdownCodec, type MarkdownCodec } from "./blocks/editor/codec.ts";
 export { allowedHref, editorExtensions } from "./blocks/editor/extensions.tsx";
 export { isLossy, mergeBlocks, splitMarkdown } from "./blocks/editor/markdown-blocks.ts";
+export { filterSlashItems, type SlashItem } from "./blocks/editor/slash.ts";
 export {
+  looksLikeMarkdown,
   MarkdownEditor,
   type MarkdownEditorLabels,
   type MarkdownEditorMode,
   type MarkdownEditorProps,
+  type PickedImage,
+  pasteMarkdown,
 } from "./blocks/MarkdownEditor.tsx";

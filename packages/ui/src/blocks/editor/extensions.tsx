@@ -3,7 +3,8 @@
  * GFM in `@cloudhal/astro-renderer`), plus `sourceBlock` for anything the editor must not rewrite.
  * Every extension is MIT (ADR: no paid Tiptap add-ons).
  */
-import { Badge, Text } from "@cloudflare/kumo";
+import { Badge, Button, Text } from "@cloudflare/kumo";
+import { PencilSimple } from "@phosphor-icons/react";
 import { type AnyExtension, Node } from "@tiptap/core";
 import Image, { type ImageOptions } from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -12,6 +13,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { NodeViewWrapper, type ReactNodeViewProps, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { InsetPanel } from "../InsetPanel.tsx";
+import { SlashCommand, type SlashOptions } from "./slash.ts";
 
 /** Link targets the site keeps (the renderer's `safeHref`, plus `asset:` media links). */
 export function allowedHref(url: string): boolean {
@@ -25,10 +27,19 @@ export interface SourceBlockLabels {
   badge: string;
   /** Why it is not editable here, e.g. "Kept as written — edit it in Markdown mode." */
   hint: string;
+  /** The button that opens it in Markdown mode, e.g. "Edit as Markdown". */
+  edit?: string;
 }
 
-function SourceBlockView({ node, extension }: ReactNodeViewProps) {
-  const labels = (extension.options as { labels: SourceBlockLabels }).labels;
+interface SourceBlockOptions {
+  labels: SourceBlockLabels;
+  /** Opens Markdown mode with this block's text selected. */
+  onEdit?: ((markdown: string) => void) | undefined;
+}
+
+function SourceBlockView({ node, extension, editor }: ReactNodeViewProps) {
+  const { labels, onEdit } = extension.options as SourceBlockOptions;
+  const markdown = String(node.attrs.markdown ?? "");
   return (
     <NodeViewWrapper data-source-block="" contentEditable={false}>
       <InsetPanel variant="recessed" label={labels.badge}>
@@ -38,9 +49,20 @@ function SourceBlockView({ node, extension }: ReactNodeViewProps) {
             <Text variant="secondary" size="sm">
               {labels.hint}
             </Text>
+            {onEdit && labels.edit && editor.isEditable && (
+              <Button
+                variant="ghost"
+                size="xs"
+                icon={<PencilSimple />}
+                className="ms-auto"
+                onClick={() => onEdit(markdown)}
+              >
+                {labels.edit}
+              </Button>
+            )}
           </div>
           <code className="block whitespace-pre-wrap break-words font-mono text-[0.9em] text-kumo-default">
-            {String(node.attrs.markdown ?? "")}
+            {markdown}
           </code>
         </div>
       </InsetPanel>
@@ -52,7 +74,7 @@ function SourceBlockView({ node, extension }: ReactNodeViewProps) {
  * A block kept exactly as written: raw HTML, link definitions, or markdown the editor would
  * change the meaning of. It renders read-only and serializes to its own bytes.
  */
-export const SourceBlock = Node.create<{ labels: SourceBlockLabels }>({
+export const SourceBlock = Node.create<SourceBlockOptions>({
   name: "sourceBlock",
   group: "block",
   atom: true,
@@ -112,7 +134,10 @@ export const AssetImage = Image.extend<
 export interface EditorExtensionOptions {
   placeholder?: string;
   sourceBlock?: SourceBlockLabels;
+  onEditSource?: (markdown: string) => void;
   resolveSrc?: (src: string) => string | undefined;
+  /** The slash menu (editing only; the codec leaves it out). */
+  slash?: SlashOptions;
 }
 
 /** The schema shared by the editor and its markdown codec. */
@@ -138,7 +163,11 @@ export function editorExtensions(options: EditorExtensionOptions = {}): AnyExten
       allowBase64: true,
       ...(options.resolveSrc ? { resolveSrc: options.resolveSrc } : {}),
     }),
-    SourceBlock.configure(options.sourceBlock ? { labels: options.sourceBlock } : {}),
+    SourceBlock.configure({
+      ...(options.sourceBlock ? { labels: options.sourceBlock } : {}),
+      onEdit: options.onEditSource,
+    }),
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),
+    ...(options.slash ? [SlashCommand.configure(options.slash)] : []),
   ];
 }

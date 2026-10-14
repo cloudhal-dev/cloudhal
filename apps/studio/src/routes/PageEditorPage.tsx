@@ -166,6 +166,7 @@ function SectionForm({
       return section.format === "markdown" ? (
         <BodyEditor
           siteId={media.siteId}
+          defaultLocale={media.defaultLocale}
           host={media.host}
           value={section.body}
           onChange={(v) => onChange({ ...section, body: v })}

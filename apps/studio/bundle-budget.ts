@@ -52,8 +52,9 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](schedules|schedules-api|schedule-notices)\.ts$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](Schedule[A-Za-z]*|Schedules|Automation[A-Za-z]*|Release[A-Za-z]*)\.tsx$/,
   // The rich body editor (RFC-0014 phase 1): Tiptap, ProseMirror and the editor block load with
-  // the first markdown body on screen (`components/BodyEditor.tsx`), never with the shell.
-  /[\\/]node_modules[\\/].*[\\/](@tiptap|prosemirror-[a-z-]+|linkifyjs|orderedmap|rope-sequence|w3c-keyname)[\\/]/,
+  // the first markdown body on screen (`components/BodyEditor.tsx`), never with the shell;
+  // CodeMirror (Markdown mode) only with the first switch to it.
+  /[\\/]node_modules[\\/].*[\\/](@tiptap|prosemirror-[a-z-]+|linkifyjs|orderedmap|rope-sequence|w3c-keyname|@codemirror|@lezer|@marijn|crelt|style-mod)[\\/]/,
   /[\\/]packages[\\/]ui[\\/]src[\\/](editor\.ts|blocks[\\/]MarkdownEditor\.tsx|blocks[\\/]editor[\\/])/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,

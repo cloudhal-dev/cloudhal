@@ -1,9 +1,10 @@
-import { Button, cn, Input, InputArea, Popover, Tabs, Toolbar } from "@cloudflare/kumo";
+import { Button, cn, Input, InputArea, Popover, Tabs, Text, Toolbar } from "@cloudflare/kumo";
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
   Code,
   CodeBlock,
+  Image as ImageIcon,
   LinkSimple,
   ListBullets,
   ListChecks,
@@ -16,12 +17,31 @@ import {
   TextHTwo,
   TextItalic,
   TextStrikethrough,
+  TextT,
 } from "@phosphor-icons/react";
 import type { Editor, JSONContent } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { createMarkdownCodec, type LoadedMarkdown } from "./editor/codec.ts";
+import { BubbleMenu } from "@tiptap/react/menus";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { createMarkdownCodec, type LoadedMarkdown, type MarkdownCodec } from "./editor/codec.ts";
 import { allowedHref, editorExtensions } from "./editor/extensions.tsx";
+import type { SlashItem, SlashState } from "./editor/slash.ts";
+
+// CodeMirror loads with the first switch to Markdown mode, not with the rich editor.
+const SourceEditor = lazy(() =>
+  import("./editor/SourceEditor.tsx").then((m) => ({ default: m.SourceEditor })),
+);
 
 /** Every word the editor shows; Studio passes them through `useT()`. */
 export interface MarkdownEditorLabels {
@@ -52,9 +72,29 @@ export interface MarkdownEditorLabels {
   linkApply: string;
   linkRemove: string;
   linkInvalid: string;
+  /** Toolbar and slash menu: insert an image from the media library. */
+  image: string;
+  /** Slash menu: a plain paragraph. */
+  paragraph: string;
+  /** Slash menu's accessible name, e.g. "Insert block". */
+  insertMenu: string;
+  /** Slash menu with nothing matching what was typed. */
+  noMatches: string;
+  /** Accessible name of the toolbar that follows a selection. */
+  selectionToolbar: string;
   /** Blocks kept exactly as written. */
   sourceBadge: string;
   sourceHint: string;
+  /** Source block's button that opens it in Markdown mode. */
+  editSource: string;
+}
+
+/** An image chosen in the host's media picker. */
+export interface PickedImage {
+  /** Stored as is: `asset:<id>` for library media, or an address. */
+  src: string;
+  /** Empty lets the site use the library's alt text for `asset:` images. */
+  alt?: string;
 }
 
 export type MarkdownEditorMode = "rich" | "markdown";
@@ -75,6 +115,10 @@ export interface MarkdownEditorProps {
   size?: "sm" | "base";
   readOnly?: boolean;
   className?: string;
+  /** Opens the host's media picker; resolves with the image, or `undefined` when cancelled. */
+  onPickImage?: () => Promise<PickedImage | undefined>;
+  /** UI language, for matching slash-menu words (Turkish İ/ı). */
+  locale?: string;
 }
 
 /**
@@ -88,6 +132,8 @@ export interface MarkdownEditorProps {
  *   Markdown mode edits it.
  * - The schema follows what the site renders (`marked` with GFM): headings, lists, task lists,
  *   tables, code, quotes, links (the site's link rules plus `asset:`), images.
+ * - `/` opens a menu of blocks, a selection gets a small formatting toolbar, pasted markdown
+ *   arrives as blocks, and Markdown mode is CodeMirror (loaded on first use).
  */
 export function MarkdownEditor({
   value,
@@ -100,20 +146,60 @@ export function MarkdownEditor({
   size = "base",
   readOnly = false,
   className,
+  onPickImage,
+  locale = "en",
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<MarkdownEditorMode>(defaultMode);
+  // The text a source block asked to open in Markdown mode (selected there once).
+  const [sourceFocus, setSourceFocus] = useState<string | undefined>();
+  const [slash, setSlash] = useState<SlashState | null>(null);
   const resolveRef = useRef(resolveSrc);
   resolveRef.current = resolveSrc;
+  const pickRef = useRef(onPickImage);
+  pickRef.current = onPickImage;
+  const labelsRef = useRef(labels);
+  labelsRef.current = labels;
+  const editorRef = useRef<Editor | null>(null);
+
+  const insertImage = useCallback(async (e: Editor) => {
+    const picked = await pickRef.current?.();
+    if (!picked?.src) {
+      e.commands.focus();
+      return;
+    }
+    e.chain()
+      .focus()
+      .setImage({ src: picked.src, alt: picked.alt ?? "" })
+      .run();
+  }, []);
+
   const extensions = useMemo(
     () =>
       editorExtensions({
         ...(placeholder ? { placeholder } : {}),
-        sourceBlock: { badge: labels.sourceBadge, hint: labels.sourceHint },
+        sourceBlock: {
+          badge: labels.sourceBadge,
+          hint: labels.sourceHint,
+          edit: labels.editSource,
+        },
+        onEditSource: (markdown) => {
+          setSourceFocus(markdown);
+          setMode("markdown");
+        },
         resolveSrc: (src) => (resolveRef.current ? resolveRef.current(src) : src),
+        slash: {
+          items: () => slashItems(labelsRef.current, pickRef.current ? insertImage : undefined),
+          onState: setSlash,
+          locale,
+        },
       }),
-    [placeholder, labels.sourceBadge, labels.sourceHint],
+    [placeholder, labels.sourceBadge, labels.sourceHint, labels.editSource, insertImage, locale],
   );
-  const codec = useMemo(() => createMarkdownCodec(extensions), [extensions]);
+  // The codec reads and writes markdown with the same schema, without the editing-only parts.
+  const codec = useMemo(
+    () => createMarkdownCodec(editorExtensions({ ...(placeholder ? { placeholder } : {}) })),
+    [placeholder],
+  );
   // What the editor was loaded from, and the last markdown it emitted: a `value` that differs from
   // both came from outside (Markdown mode, a reload) and is loaded again.
   const loaded = useRef<LoadedMarkdown>(codec.load(value));
@@ -135,6 +221,10 @@ export function MarkdownEditor({
             size === "sm" ? "min-h-32" : "min-h-64",
           ),
         },
+        handlePaste: (_view, event) => {
+          const e = editorRef.current;
+          return e ? pasteMarkdown(e, codec, event) : false;
+        },
       },
       onUpdate: ({ editor: e }) => {
         const next = codec.save(e.getJSON() as JSONContent, loaded.current.base);
@@ -145,6 +235,7 @@ export function MarkdownEditor({
     },
     [extensions],
   );
+  editorRef.current = editor;
 
   useEffect(() => {
     if (!editor || value === emitted.current) return;
@@ -161,7 +252,12 @@ export function MarkdownEditor({
     <div className={cn("ch-md-editor grid min-w-0 gap-2", className)} data-mode={mode}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {mode === "rich" && editor ? (
-          <FormatToolbar editor={editor} labels={labels} disabled={readOnly} />
+          <FormatToolbar
+            editor={editor}
+            labels={labels}
+            disabled={readOnly}
+            onImage={onPickImage ? () => void insertImage(editor) : undefined}
+          />
         ) : (
           <span />
         )}
@@ -169,7 +265,10 @@ export function MarkdownEditor({
           variant="segmented"
           size="sm"
           value={mode}
-          onValueChange={(v) => setMode(v as MarkdownEditorMode)}
+          onValueChange={(v) => {
+            setSourceFocus(undefined);
+            setMode(v as MarkdownEditorMode);
+          }}
           tabs={[
             { value: "rich", label: labels.rich },
             { value: "markdown", label: labels.markdown },
@@ -182,20 +281,304 @@ export function MarkdownEditor({
         className="min-w-0 rounded-lg bg-kumo-control ring ring-kumo-line focus-within:ring-kumo-focus"
       >
         <EditorContent editor={editor} />
+        {editor && mode === "rich" && !readOnly && (
+          <SelectionMenu editor={editor} labels={labels} />
+        )}
       </div>
       {mode === "markdown" && (
-        <InputArea
-          aria-label={label}
-          value={value}
-          onValueChange={(v) => onChange(v)}
-          autoResize
-          minRows={size === "sm" ? 6 : 12}
-          maxRows={40}
-          readOnly={readOnly}
-          className="w-full font-mono"
-        />
+        <Suspense
+          fallback={
+            <InputArea
+              aria-label={label}
+              value={value}
+              onValueChange={(v) => onChange(v)}
+              autoResize
+              minRows={size === "sm" ? 6 : 12}
+              maxRows={40}
+              readOnly={readOnly}
+              className="w-full font-mono"
+            />
+          }
+        >
+          <SourceEditor
+            value={value}
+            onChange={onChange}
+            label={label}
+            readOnly={readOnly}
+            minRows={size === "sm" ? 6 : 12}
+            selectOnMount={sourceFocus}
+            {...(placeholder ? { placeholder } : {})}
+          />
+        </Suspense>
       )}
+      {slash && mode === "rich" && <SlashMenu state={slash} labels={labels} />}
     </div>
+  );
+}
+
+/** The blocks `/` offers, in the editor's words. */
+function slashItems(
+  labels: MarkdownEditorLabels,
+  insertImage: ((e: Editor) => Promise<void>) | undefined,
+): SlashItem[] {
+  const items: (SlashItem & { icon?: ReactNode })[] = [
+    {
+      key: "paragraph",
+      label: labels.paragraph,
+      keywords: ["text", "paragraph", "p"],
+      run: (e) => e.chain().focus().setParagraph().run(),
+    },
+    {
+      key: "heading2",
+      label: labels.heading2,
+      keywords: ["heading", "title", "h2"],
+      run: (e) => e.chain().focus().setHeading({ level: 2 }).run(),
+    },
+    {
+      key: "heading3",
+      label: labels.heading3,
+      keywords: ["subheading", "h3"],
+      run: (e) => e.chain().focus().setHeading({ level: 3 }).run(),
+    },
+    {
+      key: "bulletList",
+      label: labels.bulletList,
+      keywords: ["bullet", "list", "ul"],
+      run: (e) => e.chain().focus().toggleBulletList().run(),
+    },
+    {
+      key: "orderedList",
+      label: labels.orderedList,
+      keywords: ["numbered", "list", "ol"],
+      run: (e) => e.chain().focus().toggleOrderedList().run(),
+    },
+    {
+      key: "taskList",
+      label: labels.taskList,
+      keywords: ["todo", "task", "checklist"],
+      run: (e) => e.chain().focus().toggleTaskList().run(),
+    },
+    {
+      key: "quote",
+      label: labels.quote,
+      keywords: ["quote", "blockquote"],
+      run: (e) => e.chain().focus().toggleBlockquote().run(),
+    },
+    {
+      key: "codeBlock",
+      label: labels.codeBlock,
+      keywords: ["code", "pre", "snippet"],
+      run: (e) => e.chain().focus().toggleCodeBlock().run(),
+    },
+    {
+      key: "table",
+      label: labels.table,
+      keywords: ["table", "grid"],
+      run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    {
+      key: "rule",
+      label: labels.rule,
+      keywords: ["divider", "rule", "line", "hr"],
+      run: (e) => e.chain().focus().setHorizontalRule().run(),
+    },
+  ];
+  if (insertImage)
+    items.push({
+      key: "image",
+      label: labels.image,
+      keywords: ["image", "picture", "photo", "media"],
+      run: (e) => void insertImage(e),
+    });
+  return items;
+}
+
+const SLASH_ICONS: Record<string, ReactNode> = {
+  paragraph: <TextT />,
+  heading2: <TextHTwo />,
+  heading3: <TextHThree />,
+  bulletList: <ListBullets />,
+  orderedList: <ListNumbers />,
+  taskList: <ListChecks />,
+  quote: <Quotes />,
+  codeBlock: <CodeBlock />,
+  table: <Table />,
+  rule: <Minus />,
+  image: <ImageIcon />,
+};
+
+/**
+ * The `/` menu: a listbox under the caret. Keys stay in the editor (arrows, Enter or Tab to
+ * insert, Escape to dismiss); the pointer works too.
+ */
+function SlashMenu({ state, labels }: { state: SlashState; labels: MarkdownEditorLabels }) {
+  const list = useRef<HTMLDivElement>(null);
+  const mount = useRef(state.mount);
+  // Positioned once per opening; Floating UI keeps it under the `/` from then on.
+  useEffect(() => {
+    if (!list.current) return;
+    return mount.current(list.current);
+  }, []);
+  useEffect(() => {
+    list.current
+      ?.querySelector<HTMLElement>(`[data-index="${state.index}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [state.index]);
+  return createPortal(
+    <div
+      ref={list}
+      role="listbox"
+      aria-label={labels.insertMenu}
+      data-slash-menu=""
+      className="fixed top-0 left-0 z-50 max-h-72 w-64 overflow-y-auto rounded-lg bg-kumo-elevated p-1 shadow-lg ring ring-kumo-line"
+    >
+      {state.items.length === 0 ? (
+        <div className="px-2 py-1.5">
+          <Text variant="secondary" size="sm">
+            {labels.noMatches}
+          </Text>
+        </div>
+      ) : (
+        state.items.map((item, i) => (
+          <div
+            key={item.key}
+            role="option"
+            tabIndex={-1}
+            aria-selected={i === state.index}
+            data-index={i}
+            data-slash-item={item.key}
+            className={cn(
+              "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-kumo-default",
+              i === state.index && "bg-kumo-tint",
+            )}
+            onMouseEnter={() => state.hover(i)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => state.choose(item)}
+            onKeyDown={() => {}}
+          >
+            <span className="flex size-4 items-center justify-center text-kumo-subtle">
+              {SLASH_ICONS[item.key]}
+            </span>
+            {item.label}
+          </div>
+        ))
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+/** A toolbar over selected text: the inline formats and the link. */
+function SelectionMenu({ editor, labels }: { editor: Editor; labels: MarkdownEditorLabels }) {
+  // While the link popover is open the editor loses focus; the menu stays.
+  const linkOpen = useRef(false);
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      bold: e.isActive("bold"),
+      italic: e.isActive("italic"),
+      strike: e.isActive("strike"),
+      code: e.isActive("code"),
+      link: e.isActive("link"),
+    }),
+  });
+  const chain = () => editor.chain().focus();
+  const items: ToolbarItem[] = [
+    {
+      key: "bold",
+      label: labels.bold,
+      icon: <TextB />,
+      active: state.bold,
+      run: () => chain().toggleBold().run(),
+    },
+    {
+      key: "italic",
+      label: labels.italic,
+      icon: <TextItalic />,
+      active: state.italic,
+      run: () => chain().toggleItalic().run(),
+    },
+    {
+      key: "strike",
+      label: labels.strike,
+      icon: <TextStrikethrough />,
+      active: state.strike,
+      run: () => chain().toggleStrike().run(),
+    },
+    {
+      key: "code",
+      label: labels.code,
+      icon: <Code />,
+      active: state.code,
+      run: () => chain().toggleCode().run(),
+    },
+  ];
+  return (
+    <BubbleMenu
+      editor={editor}
+      options={{ placement: "top", offset: 8 }}
+      shouldShow={({ editor: e, state: s, view }) =>
+        linkOpen.current ||
+        (view.hasFocus() &&
+          e.isEditable &&
+          !s.selection.empty &&
+          !(s.selection instanceof NodeSelection) &&
+          !e.isActive("codeBlock"))
+      }
+      className="z-40"
+    >
+      <Toolbar
+        size="sm"
+        aria-label={labels.selectionToolbar}
+        className="rounded-lg bg-kumo-elevated shadow-md ring ring-kumo-line"
+        data-selection-toolbar=""
+      >
+        {items.map((item) => (
+          <ToolbarButton key={item.key} item={item} />
+        ))}
+        <LinkButton
+          editor={editor}
+          labels={labels}
+          active={state.link}
+          onOpenChange={(open) => {
+            linkOpen.current = open;
+          }}
+        />
+      </Toolbar>
+    </BubbleMenu>
+  );
+}
+
+/**
+ * Pasted text that reads as markdown (and no richer HTML came with it) arrives as blocks, through
+ * the same codec as loading: what the editor cannot model becomes a source block.
+ */
+export function pasteMarkdown(
+  editor: Editor,
+  codec: MarkdownCodec,
+  event: ClipboardEvent,
+): boolean {
+  const text = event.clipboardData?.getData("text/plain") ?? "";
+  const html = event.clipboardData?.getData("text/html") ?? "";
+  if (!text || editor.isActive("codeBlock") || !looksLikeMarkdown(text)) return false;
+  // Rendered pages (GitHub, docs) paste better from their HTML; editors (VS Code) send styled
+  // spans only, so their text is the source.
+  if (html && /<(h[1-6]|ul|ol|li|table|blockquote|pre|strong|em|b|i|a|img)[\s>]/i.test(html))
+    return false;
+  const nodes = codec.load(text).doc.content ?? [];
+  const only = nodes.length === 1 ? nodes[0] : undefined;
+  // One paragraph goes inline at the caret instead of splitting the block.
+  const content = only?.type === "paragraph" ? (only.content ?? []) : nodes;
+  if (!content.length) return false;
+  editor.chain().focus().insertContent(content).run();
+  return true;
+}
+
+/** Block syntax or inline markers that plain text rarely has. */
+export function looksLikeMarkdown(text: string): boolean {
+  return (
+    /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s?|```|~~~|\|.*\|\s*$|- \[[ xX]\]\s)/m.test(text) ||
+    /\*\*[^*\n]+\*\*|__[^_\n]+__|\[[^\]\n]+\]\([^)\s]+\)|`[^`\n]+`|~~[^~\n]+~~/.test(text)
   );
 }
 
@@ -212,10 +595,12 @@ function FormatToolbar({
   editor,
   labels,
   disabled,
+  onImage,
 }: {
   editor: Editor;
   labels: MarkdownEditorLabels;
   disabled: boolean;
+  onImage: (() => void) | undefined;
 }) {
   const state = useEditorState({
     editor,
@@ -332,6 +717,9 @@ function FormatToolbar({
         icon: <Minus />,
         run: () => chain().setHorizontalRule().run(),
       },
+      ...(onImage
+        ? [{ key: "image", label: labels.image, icon: <ImageIcon />, run: onImage }]
+        : []),
     ],
     [
       {
@@ -360,18 +748,7 @@ function FormatToolbar({
       {groups.map((group, i) => (
         <span key={group[0]?.key} className={cn("flex", i > 0 && "border-kumo-hairline border-l")}>
           {group.map((item) => (
-            <Toolbar.Button
-              key={item.key}
-              icon={item.icon}
-              aria-label={item.label}
-              title={item.label}
-              aria-pressed={item.active === undefined ? undefined : item.active}
-              disabled={item.disabled}
-              data-format={item.key}
-              className={cn(item.active && "bg-kumo-tint")}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={item.run}
-            />
+            <ToolbarButton key={item.key} item={item} />
           ))}
           {i === 0 && <LinkButton editor={editor} labels={labels} active={state.link} />}
         </span>
@@ -380,14 +757,33 @@ function FormatToolbar({
   );
 }
 
+function ToolbarButton({ item }: { item: ToolbarItem }) {
+  return (
+    <Toolbar.Button
+      icon={item.icon}
+      aria-label={item.label}
+      title={item.label}
+      aria-pressed={item.active === undefined ? undefined : item.active}
+      disabled={item.disabled}
+      data-format={item.key}
+      className={cn(item.active && "bg-kumo-tint")}
+      // Keep the editor's selection: the button never takes focus from it.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={item.run}
+    />
+  );
+}
+
 function LinkButton({
   editor,
   labels,
   active,
+  onOpenChange,
 }: {
   editor: Editor;
   labels: MarkdownEditorLabels;
   active: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [href, setHref] = useState("");
@@ -398,6 +794,7 @@ function LinkButton({
       setInvalid(false);
     }
     setOpen(next);
+    onOpenChange?.(next);
   };
   const apply = () => {
     const url = href.trim();
@@ -406,11 +803,11 @@ function LinkButton({
       return;
     }
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-    setOpen(false);
+    openWith(false);
   };
   const remove = () => {
     editor.chain().focus().extendMarkRange("link").unsetLink().run();
-    setOpen(false);
+    openWith(false);
   };
   return (
     <Popover open={open} onOpenChange={openWith}>

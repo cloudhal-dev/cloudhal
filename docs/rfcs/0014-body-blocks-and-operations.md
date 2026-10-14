@@ -144,7 +144,7 @@ Validators are precompiled, never `eval` (hard rule 6). RFC-0015 defines the reg
 - **Round-trip guard.** A block the editor would change the meaning of is kept read-only as a "source block" and saved as written. This covers raw HTML, link definitions, and anything whose rendered HTML would differ after a trip through the editor.
 - **Markdown mode** edits the source.
 
-Later phases add CodeMirror 6 source mode, slash and bubble menus, the media picker, paste cleanup, an outline and a draft preview.
+Phase 1b adds CodeMirror 6 for Markdown mode, a slash menu, a selection toolbar, images from the media library, markdown-aware paste and "Edit as Markdown" on source blocks. An outline and a draft preview follow.
 
 ### 8. Phases
 | Phase | Studio | Contracts | MCP / API |
