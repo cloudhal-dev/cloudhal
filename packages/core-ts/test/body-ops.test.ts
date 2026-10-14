@@ -1,6 +1,13 @@
 /** RFC-0014 §4: block-addressed body edits. */
 import { describe, expect, it } from "vitest";
-import { applyBodyOps, type BodyOp, BodyOpError, currentBlocks } from "../src/index.ts";
+import {
+  applyBodyOps,
+  type BodyOp,
+  BodyOpError,
+  currentBlocks,
+  parseBodyOps,
+  proposalSteps,
+} from "../src/index.ts";
 
 const BODY = "# Title\n\nFirst paragraph.\n\n\nSecond paragraph.\n\n- a\n- b\n";
 
@@ -93,5 +100,79 @@ describe("applyBodyOps", () => {
     expect(await apply(() => [{ op: "insert", after: null, markdown: "Hello." }], "")).toBe(
       "Hello.\n",
     );
+  });
+});
+
+describe("parseBodyOps (REST input)", () => {
+  const id = "blk_abcdefgh12";
+  it("keeps well-formed operations and drops unknown keys", () => {
+    expect(
+      parseBodyOps([
+        { op: "replace", block: id, markdown: "x", extra: 1 },
+        { op: "replaceText", block: id, find: "a", replace: "" },
+        { op: "insert", after: null, markdown: "y" },
+        { op: "move", block: id, after: id, ifHash: "a".repeat(64) },
+        { op: "delete", block: id },
+      ]),
+    ).toEqual([
+      { op: "replace", block: id, markdown: "x" },
+      { op: "replaceText", block: id, find: "a", replace: "" },
+      { op: "insert", after: null, markdown: "y" },
+      { op: "move", block: id, after: id, ifHash: "a".repeat(64) },
+      { op: "delete", block: id },
+    ]);
+  });
+
+  it("names the operation that is malformed", () => {
+    const fails = (raw: unknown, op?: number) => {
+      try {
+        parseBodyOps(raw);
+      } catch (e) {
+        expect(e).toBeInstanceOf(BodyOpError);
+        expect((e as BodyOpError).op).toBe(op);
+        return;
+      }
+      throw new Error("accepted");
+    };
+    fails(undefined);
+    fails([]);
+    fails(Array.from({ length: 51 }, () => ({ op: "delete", block: id })));
+    fails(
+      [
+        { op: "delete", block: id },
+        { op: "replace", block: id },
+      ],
+      1,
+    );
+    fails([{ op: "delete", block: "not-a-block" }], 0);
+    fails([{ op: "insert", markdown: "x" }], 0);
+    fails([{ op: "delete", block: id, ifHash: "short" }], 0);
+    fails([{ op: "rename", block: id }], 0);
+    fails(["delete"], 0);
+  });
+});
+
+describe("proposalSteps", () => {
+  it("reads each operation against the current blocks, on one line", async () => {
+    const blocks = await currentBlocks(BODY, undefined);
+    const [title, first, second] = blocks.map((b) => b.id) as [string, string, string];
+    expect(
+      proposalSteps(
+        [
+          { op: "replace", block: first, markdown: "New\nfirst." },
+          { op: "replaceText", block: second, find: "Second", replace: "2nd" },
+          { op: "insert", after: null, markdown: "x".repeat(200) },
+          { op: "move", block: title, after: second },
+          { op: "delete", block: "blk_gone00000001" },
+        ],
+        blocks,
+      ),
+    ).toEqual([
+      { op: "replace", before: "First paragraph.", after: "New first." },
+      { op: "replaceText", before: "Second", after: "2nd" },
+      { op: "insert", after: `${"x".repeat(139)}…` },
+      { op: "move", before: "# Title" },
+      { op: "delete" },
+    ]);
   });
 });

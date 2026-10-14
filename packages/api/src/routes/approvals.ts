@@ -3,9 +3,10 @@
  * rollback / delete / elevation requests, and people's publishes their role cannot make alone
  * (cause `role`, RFC-0005 §6). People only; decisions are audited.
  *
- * - `GET  /?status=pending|approved|denied|consumed|expired` → `{items: (Approval & {canDecide})[]}`.
- *   With `audit:read` (Editor+) every request; otherwise requests from the caller's own keys,
- *   their own requests, and those they can decide.
+ * - `GET  /?status=pending|approved|denied|consumed|expired` → `{items: (Approval & {canDecide,
+ *   changes?})[]}`. With `audit:read` (Editor+) every request; otherwise requests from the
+ *   caller's own keys, their own requests, and those they can decide. Pending requests of tools
+ *   that describe their effect carry `changes` (RFC-0014 §5: `edit_body`'s block diff, now).
  * - `POST /:approvalId/approve` · `POST /:approvalId/deny`
  *   403 `cannot_decide` (details.code: own_request | not_key_creator | mode_above_role |
  *   missing_scope | not_own): only someone who could make the same call right now decides (I8);
@@ -45,6 +46,7 @@ import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { commentEntries, isBoundState, ownedNodeIds } from "@cloudhal/mcp-server/comments";
 import { approvalProblem, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import {
+  type ApprovalChanges,
   defineTools,
   type ToolContext,
   type ToolDefinition,
@@ -65,6 +67,27 @@ function carriedOut(tool: string): ToolDefinition | undefined {
   toolDefs ??= new Map(defineTools().map((t) => [t.name, t]));
   const def = toolDefs.get(tool);
   return def?.carryOutOnApproval ? def : undefined;
+}
+
+/**
+ * What a pending request would change now (RFC-0014 §5: `edit_body`'s block diff), for the person
+ * deciding; undefined for tools that do not say, or when it no longer applies.
+ */
+async function changesOf(c: Context<Env>, a: Approval): Promise<ApprovalChanges | undefined> {
+  toolDefs ??= new Map(defineTools().map((t) => [t.name, t]));
+  const def = toolDefs.get(a.tool);
+  if (!def?.changes || a.status !== "pending") return undefined;
+  const principal = c.get("principal") ?? { actor: a.actor, scopes: [] };
+  try {
+    return await def.changes((a.input ?? {}) as Record<string, unknown>, {
+      store: c.get("store"),
+      principal,
+      ownership: c.get("ownership"),
+    });
+  } catch {
+    // The body moved on or the node is gone: the request will not apply as asked anyway.
+    return undefined;
+  }
 }
 
 /** The entries a comment request touches: its comments' entries, or the thread's entry. */
@@ -353,14 +376,16 @@ export const approvals: Hono<Env> = new Hono<Env>()
     const listed = status ? (items ?? []).filter((a) => a.status === status) : (items ?? []);
     const principal = c.get("principal");
     const seesAll = !principal?.person || holds(principal.scopes, "audit:read");
-    const out: (Approval & { canDecide: boolean })[] = [];
+    const out: (Approval & { canDecide: boolean; changes?: ApprovalChanges })[] = [];
     for (const a of listed) {
       const decidable = a.status === "pending" && (await canDecide(c, a, "approve")).ok;
       const mine =
         a.actor.id === principal?.actor.id ||
         (principal?.person !== undefined &&
           (await c.get("ownership").personOf(a.actor)) === principal.person.id);
-      if (seesAll || mine || decidable) out.push({ ...a, canDecide: decidable });
+      if (!(seesAll || mine || decidable)) continue;
+      const changes = await changesOf(c, a);
+      out.push({ ...a, canDecide: decidable, ...(changes ? { changes } : {}) });
     }
     return c.json({ items: out });
   })

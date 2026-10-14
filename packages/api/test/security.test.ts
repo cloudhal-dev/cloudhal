@@ -171,6 +171,64 @@ describe("input hardening", () => {
 });
 
 describe("approvals API (H1)", () => {
+  it("shows what a pending edit_body request would change, block by block (RFC-0014 §5)", async () => {
+    const { ApprovalStore } = await import("@cloudhal/agent-runtime");
+    const { sql, store, site } = await setup();
+    const approvals = new ApprovalStore(sql);
+    const app = createApi({
+      store,
+      resolveActor: async () => human,
+      mcp: { stateKey: "approvals-api-state-key-0123456789abcdef", approvals },
+    });
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "asked",
+      locale: "en",
+      status: "draft",
+      title: "Asked",
+      body: { format: "markdown", value: "First.\n\nSecond.\n" },
+      fields: {},
+      tags: [],
+      author: human,
+    });
+    const block = entry.body.blocks?.[1]?.id;
+    const ask = (input: unknown, argsHash: string) =>
+      approvals.request({
+        siteId: site.id,
+        tool: "edit_body",
+        argsHash,
+        input,
+        actor: agent,
+        prompt: "Edit the body?",
+        stateHash: "s",
+      });
+    const fits = await ask(
+      { siteId: site.id, entryId: entry.id, rev: entry.rev, ops: [{ op: "delete", block }] },
+      "a",
+    );
+    const gone = await ask(
+      {
+        siteId: site.id,
+        entryId: entry.id,
+        rev: entry.rev,
+        ops: [{ op: "delete", block: "blk_missing000001" }],
+      },
+      "b",
+    );
+    const { items } = (await (
+      await app.request(`/api/sites/${site.id}/approvals?status=pending`)
+    ).json()) as { items: { id: string; changes?: unknown }[] };
+    expect(items.find((a) => a.id === fits.id)?.changes).toMatchObject({
+      kind: "body",
+      nodeId: entry.id,
+      title: "Asked",
+      diff: { words: { added: 0, removed: 1 } },
+    });
+    // No longer applies: no changes, the request is still listed.
+    expect(items.find((a) => a.id === gone.id)).not.toHaveProperty("changes");
+  });
+
   it("lists pending requests and lets a person decide once; decisions are audited", async () => {
     const { ApprovalStore, AuditLog } = await import("@cloudhal/agent-runtime");
     const { sql, store, site } = await setup();

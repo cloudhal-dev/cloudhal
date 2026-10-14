@@ -12,6 +12,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./tools": "./src/tools.ts",
+    "./body": "./src/body-tools.ts",
     "./analytics": "./src/analytics-reports.ts",
     "./comments": "./src/comments.ts",
     "./schedules": "./src/schedules.ts",
@@ -59,6 +60,10 @@
       "./tools": {
         "types": "./dist/src/tools.d.ts",
         "default": "./dist/src/tools.js"
+      },
+      "./body": {
+        "types": "./dist/src/body-tools.d.ts",
+        "default": "./dist/src/body-tools.js"
       },
       "./analytics": {
         "types": "./dist/src/analytics-reports.d.ts",

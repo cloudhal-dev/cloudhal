@@ -1344,6 +1344,7 @@ export const en = {
     },
     manualPrompt: "{agent} works in Manual mode, so this change waits for you: {tool}.",
     manualPromptShort: "Manual mode: {tool}",
+    bodyChanges: "What approving changes in “{title}”",
     manualHint:
       "Manual mode asks before every change. Approving lets the agent make this one edit with exactly these arguments; it is snapshotted like any other.",
     autoHeldBack:
@@ -1556,6 +1557,17 @@ export const en = {
     accepted: "Suggestion accepted",
     rejected: "Suggestion rejected",
     failed: "Could not decide on the suggestion",
+    steps: "Changes to accept",
+    acceptSome: "Accept {count} of {total}",
+    chooseOne: "Choose at least one change.",
+    step: {
+      replace: "Rewrite “{before}”",
+      replaceText: "Change “{before}” to “{after}”",
+      insert: "Add “{after}”",
+      move: "Move “{before}”",
+      delete: "Remove “{before}”",
+    },
+    aBlock: "a block",
   },
   diff: {
     title: "Changes in {name}",

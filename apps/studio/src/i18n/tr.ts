@@ -1367,6 +1367,7 @@ export const tr: Messages = {
     manualPrompt:
       "{agent} Manuel modda çalışıyor, bu yüzden bu değişiklik senin onayını bekliyor: {tool}.",
     manualPromptShort: "Manuel mod: {tool}",
+    bodyChanges: "Onaylarsan “{title}” içinde değişecekler",
     manualHint:
       "Manuel mod her değişiklikten önce sorar. Onaylarsan agent bu tek düzenlemeyi tam bu argümanlarla yapabilir; değişiklik her zamanki gibi snapshot'lanır.",
     autoHeldBack:
@@ -1583,6 +1584,17 @@ export const tr: Messages = {
     accepted: "Öneri kabul edildi",
     rejected: "Öneri reddedildi",
     failed: "Öneri hakkında karar verilemedi",
+    steps: "Kabul edilecek değişiklikler",
+    acceptSome: "{total} değişiklikten {count} tanesini kabul et",
+    chooseOne: "En az bir değişiklik seç.",
+    step: {
+      replace: "Yeniden yaz: “{before}”",
+      replaceText: "“{before}” ifadesini “{after}” yap",
+      insert: "Ekle: “{after}”",
+      move: "Taşı: “{before}”",
+      delete: "Kaldır: “{before}”",
+    },
+    aBlock: "bir blok",
   },
   diff: {
     title: "{name} içindeki değişiklikler",

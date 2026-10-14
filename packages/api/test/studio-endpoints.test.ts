@@ -255,6 +255,157 @@ describe("body proposals", () => {
     expect((await post(app, `${base}/${three.id}/accept`)).status).toBe(409);
     expect((await post(app, `${base}/prop_missing000001/accept`)).status).toBe(404);
   });
+
+  it("describes each operation, previews a choice of them, accepts that choice and audits it", async () => {
+    const { store, site, app, get, audit } = await setup();
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "chosen",
+      locale: "en",
+      status: "draft",
+      title: "Chosen",
+      body: { format: "markdown", value: "First.\n\nSecond.\n" },
+      fields: {},
+      tags: [],
+      author: human,
+    });
+    const [first, second] = entry.body.blocks ?? [];
+    const proposal = await store.proposals.create({
+      siteId: site.id,
+      nodeId: entry.id,
+      ops: [
+        { op: "replaceText", block: first?.id as string, find: "First", replace: "Opening" },
+        { op: "delete", block: second?.id as string },
+      ],
+      actor: agentActor,
+    });
+    const base = `/api/sites/${site.id}/proposals`;
+    const listed = (await (await get(`${base}?nodeId=${entry.id}`)).json()) as {
+      items: { steps: unknown[] }[];
+    };
+    expect(listed.items[0]?.steps).toEqual([
+      { op: "replaceText", before: "First", after: "Opening" },
+      { op: "delete", before: "Second." },
+    ]);
+    const preview = (await (
+      await post(app, `${base}/${proposal.id}/preview`, { ops: [1] })
+    ).json()) as {
+      diff: { words: { added: number; removed: number } };
+    };
+    expect(preview.diff.words).toEqual({ added: 0, removed: 1 });
+    expect((await post(app, `${base}/${proposal.id}/preview`, { ops: "all" })).status).toBe(400);
+    expect((await post(app, `${base}/${proposal.id}/preview`, { ops: [] })).status).toBe(400);
+
+    const accepted = await post(app, `${base}/${proposal.id}/accept`, { ops: [0] });
+    expect(((await accepted.json()) as { proposal: { status: string } }).proposal.status).toBe(
+      "partial",
+    );
+    expect((await store.getContentEntry(entry.id))?.body.value).toBe("Opening.\n\nSecond.\n");
+    const rows = await audit.list({ siteId: site.id });
+    expect(rows[0]).toMatchObject({
+      actor: human,
+      tool: "edit_body",
+      decision: "allow",
+      reason: `accepted proposal ${proposal.id} from Writer`,
+      input: { proposalId: proposal.id, nodeId: entry.id, ops: [0] },
+    });
+  });
+});
+
+describe("PATCH body (RFC-0014 §4)", () => {
+  const patch = (app: Awaited<ReturnType<typeof setup>>["app"], path: string, body: unknown) =>
+    app.request(path, {
+      method: "PATCH",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("applies block operations to an article body in one write, and refuses bad ones", async () => {
+    const { store, site, app } = await setup();
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "patched",
+      locale: "en",
+      status: "draft",
+      title: "Patched",
+      body: { format: "markdown", value: "First.\n\nSecond.\n" },
+      fields: {},
+      tags: [],
+      author: human,
+    });
+    const [first, second] = entry.body.blocks ?? [];
+    const url = `/api/sites/${site.id}/entries/${entry.id}/body`;
+    const res = await patch(app, url, {
+      rev: entry.rev,
+      ops: [
+        { op: "replace", block: first?.id, markdown: "First, edited." },
+        { op: "insert", after: second?.id, markdown: "Third." },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const result = (await res.json()) as { rev: number; changed: string[]; added: string[] };
+    expect(result.changed).toEqual([first?.id]);
+    expect(result.added).toHaveLength(1);
+    const saved = await store.getContentEntry(entry.id);
+    expect(saved?.body.value).toBe("First, edited.\n\nSecond.\n\nThird.\n");
+    expect(saved?.rev).toBe(result.rev);
+    expect(saved?.body.blocks?.[0]).toMatchObject({ by: human, via: "studio" });
+
+    // A stale rev without ifHash is a conflict; a malformed op names its index.
+    const stale = await patch(app, url, {
+      rev: entry.rev,
+      ops: [{ op: "delete", block: second?.id }],
+    });
+    expect(stale.status).toBe(409);
+    const bad = await patch(app, url, {
+      rev: result.rev,
+      ops: [
+        { op: "delete", block: second?.id },
+        { op: "replace", block: first?.id },
+      ],
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: "invalid", details: { op: 1 } });
+    expect((await patch(app, url, { ops: [] })).status).toBe(400);
+    expect(
+      (
+        await patch(app, `/api/sites/${site.id}/entries/entry_missing000001/body`, {
+          rev: 1,
+          ops: [{ op: "delete", block: second?.id }],
+        })
+      ).status,
+    ).toBe(404);
+  });
+
+  it("edits a page's markdown rich-text section", async () => {
+    const { store, site, app } = await setup();
+    const home = (await store.listPages(site.id)).find((p) => p.path === "/");
+    if (!home) throw new Error("no home page");
+    const page = await store.updatePage({
+      ...home,
+      sections: [
+        ...home.sections,
+        { id: "sec_patched00001", kind: "richText", format: "markdown", body: "Hello." },
+      ] as typeof home.sections,
+    });
+    const section = page.sections.find((s) => s.id === "sec_patched00001");
+    const block = section?.kind === "richText" ? section.blocks?.[0] : undefined;
+    const res = await patch(
+      app,
+      `/api/sites/${site.id}/pages/${page.id}/sections/sec_patched00001/body`,
+      {
+        rev: page.rev,
+        ops: [{ op: "replaceText", block: block?.id, find: "Hello", replace: "Hello, world" }],
+      },
+    );
+    expect(res.status).toBe(200);
+    const saved = await store.getPage(page.id);
+    expect(saved?.sections.find((s) => s.id === "sec_patched00001")).toMatchObject({
+      body: "Hello, world.",
+    });
+  });
 });
 
 describe("preview links", () => {

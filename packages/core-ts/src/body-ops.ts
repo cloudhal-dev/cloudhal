@@ -31,6 +31,64 @@ export class BodyOpError extends Error {
   }
 }
 
+const BLOCK_ID = /^blk_[0-9A-Za-z]{8,24}$/;
+const HASH = /^[0-9a-f]{64}$/;
+
+/**
+ * Operations from outside a typed caller (REST `PATCH …/body`), checked for shape: known `op`,
+ * block ids, hashes and strings where they belong. Unknown keys are dropped. Whether they apply is
+ * `applyBodyOps`'s question.
+ */
+export function parseBodyOps(raw: unknown): BodyOp[] {
+  if (!Array.isArray(raw) || raw.length === 0)
+    throw new BodyOpError("invalid", "ops: a list of operations");
+  if (raw.length > MAX_BODY_OPS)
+    throw new BodyOpError("invalid", `at most ${MAX_BODY_OPS} operations per call`);
+  return raw.map((x, n) => {
+    const bad = (what: string): never => {
+      throw new BodyOpError("invalid", what, n);
+    };
+    if (typeof x !== "object" || x === null) return bad("an operation is an object");
+    const o = x as Record<string, unknown>;
+    const block = () =>
+      typeof o.block === "string" && BLOCK_ID.test(o.block) ? o.block : bad("block: a block id");
+    const text = (key: string) =>
+      typeof o[key] === "string" ? (o[key] as string) : bad(`${key}: text`);
+    const after = () =>
+      o.after === null
+        ? null
+        : typeof o.after === "string" && BLOCK_ID.test(o.after)
+          ? o.after
+          : bad("after: a block id, or null for the start");
+    const ifHash = () => {
+      if (o.ifHash === undefined) return {};
+      return typeof o.ifHash === "string" && HASH.test(o.ifHash)
+        ? { ifHash: o.ifHash }
+        : bad("ifHash: the block's hash");
+    };
+    switch (o.op) {
+      case "replace":
+        return { op: "replace", block: block(), ...ifHash(), markdown: text("markdown") };
+      case "replaceText":
+        return {
+          op: "replaceText",
+          block: block(),
+          ...ifHash(),
+          find: text("find"),
+          replace: text("replace"),
+        };
+      case "insert":
+        return { op: "insert", after: after(), markdown: text("markdown") };
+      case "move":
+        return { op: "move", block: block(), after: after(), ...ifHash() };
+      case "delete":
+        return { op: "delete", block: block(), ...ifHash() };
+      default:
+        return bad("op: replace, replaceText, insert, move or delete");
+    }
+  });
+}
+
 interface Item {
   id?: string;
   markdown: string;

@@ -101,6 +101,15 @@ describe("ROUTE_SCOPES (I15)", () => {
     expect(requirementFor("POST", "/api/sites/site_x/proposals/prop_y/reject")).toBe(
       "content:draft:own",
     );
+    expect(requirementFor("POST", "/api/sites/site_x/proposals/prop_y/preview")).toBe(
+      "content:read",
+    );
+    expect(requirementFor("PATCH", "/api/sites/site_x/entries/entry_y/body")).toBe(
+      "content:draft:own",
+    );
+    expect(requirementFor("PATCH", "/api/sites/site_x/pages/page_y/sections/sec_z/body")).toBe(
+      "content:write",
+    );
     expect(requirementFor("GET", "/api/sites/site_x/snapshots/snap_y/nodes/entry_z")).toBe(
       "content:read",
     );

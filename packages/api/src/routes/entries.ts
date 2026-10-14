@@ -2,6 +2,7 @@ import { checkEntryLimit } from "@cloudhal/agent-runtime";
 import { renderEntryPreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
+import { patchBody } from "../body.ts";
 import type { Env } from "../context.ts";
 import { entryDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
@@ -115,6 +116,8 @@ export const entries: Hono<Env> = new Hono<Env>()
     }
     return c.json(await c.get("store").updateContentEntry(body, { writer: writerOf(c) }));
   })
+  // RFC-0014 §4: operations on the body's blocks instead of the whole entry.
+  .patch("/:entryId/body", (c) => patchBody(c, { entryId: param(c, "entryId") }))
   .delete("/:entryId", async (c) => {
     const store = c.get("store");
     const entry = await store.getContentEntry(param(c, "entryId"));
