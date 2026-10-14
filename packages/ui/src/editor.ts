@@ -4,6 +4,12 @@
  */
 
 export { createMarkdownCodec, type MarkdownCodec } from "./blocks/editor/codec.ts";
+export {
+  DirectiveContainer,
+  type DirectiveLabels,
+  DirectiveLeaf,
+  type EditorBlocks,
+} from "./blocks/editor/directives.tsx";
 export { allowedHref, editorExtensions } from "./blocks/editor/extensions.tsx";
 export { isLossy, mergeBlocks, splitMarkdown } from "./blocks/editor/markdown-blocks.ts";
 export { filterSlashItems, type SlashItem } from "./blocks/editor/slash.ts";

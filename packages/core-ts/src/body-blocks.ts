@@ -8,13 +8,20 @@
  *   sources), pairs what was removed and added between two kept blocks into "changed" blocks when
  *   they still share most of their words, and diffs those word by word.
  *
+ * Body directives (RFC-0015, `directives.ts`) are one block each, whatever they wrap; their type
+ * is `directive:<name>`.
+ *
  * Worker-safe: `marked` only, no Node APIs.
  */
-import { Marked } from "marked";
+import { Marked, type TokenizerAndRendererExtension, type Tokens } from "marked";
+import { type Directive, directiveStart, matchDirective } from "./directives.ts";
 
 /** One top-level block of a markdown body. */
 export interface MarkdownUnit {
-  /** `marked`'s token type (`paragraph`, `heading`, `list`, `table`, `code`, `html`, `def`, …). */
+  /**
+   * `marked`'s token type (`paragraph`, `heading`, `list`, `table`, `code`, `html`, `def`, …), or
+   * `directive:<name>` for a body directive.
+   */
   type: string;
   /** The block's own source. */
   raw: string;
@@ -28,7 +35,38 @@ export interface SplitMarkdown {
   units: MarkdownUnit[];
 }
 
+/** A body directive as `marked` sees it; a container's inner markdown is lexed into `tokens`. */
+export interface DirectiveToken extends Tokens.Generic {
+  type: "directive";
+  raw: string;
+  directive: Directive;
+  tokens: Tokens.Generic[];
+}
+
+/**
+ * Teaches a `marked` instance body directives (block level). The splitter, the store and the
+ * site renderer share it, so a directive is one block everywhere; renderers add a `renderer`.
+ */
+export const directiveExtension: TokenizerAndRendererExtension = {
+  name: "directive",
+  level: "block",
+  start: (src) => directiveStart(src),
+  tokenizer(src) {
+    const m = matchDirective(src);
+    if (!m) return undefined;
+    const token: DirectiveToken = {
+      type: "directive",
+      raw: m.raw,
+      directive: m.directive,
+      tokens: m.directive.content ? this.lexer.blockTokens(m.directive.content, []) : [],
+    };
+    return token;
+  },
+  childTokens: ["tokens"],
+};
+
 const marked = new Marked({ gfm: true, async: false });
+marked.use({ extensions: [directiveExtension] });
 
 /** Top-level blocks of a markdown body; `prefix + units.map(u => u.text).join("")` is the source. */
 export function splitMarkdown(markdown: string): SplitMarkdown {
@@ -41,7 +79,11 @@ export function splitMarkdown(markdown: string): SplitMarkdown {
       else prefix += token.raw;
       continue;
     }
-    units.push({ type: token.type, raw: token.raw, text: token.raw });
+    const type =
+      token.type === "directive"
+        ? `directive:${(token as DirectiveToken).directive.name}`
+        : token.type;
+    units.push({ type, raw: token.raw, text: token.raw });
   }
   return { prefix, units };
 }
@@ -208,4 +250,13 @@ export function bodyDiff(before: string, after: string): BodyDiff {
   }
   gap(a.slice(i), b.slice(j));
   return { blocks, counts, words };
+}
+
+/** Every body directive in `markdown`, nested ones (in containers, quotes, lists) included. */
+export function bodyDirectives(markdown: string): Directive[] {
+  const found: Directive[] = [];
+  marked.walkTokens(marked.lexer(markdown), (token) => {
+    if (token.type === "directive") found.push((token as DirectiveToken).directive);
+  });
+  return found;
 }

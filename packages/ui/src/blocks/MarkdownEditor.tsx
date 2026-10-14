@@ -9,6 +9,7 @@ import {
   Text,
   Toolbar,
 } from "@cloudflare/kumo";
+import { localized } from "@cloudhal/core-ts/blocks";
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
@@ -46,7 +47,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { blockIcon } from "./blockIcon.ts";
 import { createMarkdownCodec, type LoadedMarkdown, type MarkdownCodec } from "./editor/codec.ts";
+import { DirectiveContext, type EditorBlocks } from "./editor/directives.tsx";
 import { allowedHref, editorExtensions } from "./editor/extensions.tsx";
 import type { SlashItem, SlashState } from "./editor/slash.ts";
 
@@ -160,6 +163,11 @@ export interface MarkdownEditorProps {
    * blocks to the host. The host shows the result and calls `replace` if the person accepts it.
    */
   onAskAi?: (selection: AiSelection) => void;
+  /**
+   * Typed blocks (RFC-0015): the body block types, offered in the `/` menu and edited through
+   * their generated forms. Without it, directives still load and save unchanged.
+   */
+  blocks?: EditorBlocks;
 }
 
 /**
@@ -190,6 +198,7 @@ export function MarkdownEditor({
   onPickImage,
   locale = "en",
   onAskAi,
+  blocks,
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<MarkdownEditorMode>(defaultMode);
   // The text a source block asked to open in Markdown mode (selected there once).
@@ -203,6 +212,8 @@ export function MarkdownEditor({
   askRef.current = onAskAi;
   const labelsRef = useRef(labels);
   labelsRef.current = labels;
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
   const editorRef = useRef<Editor | null>(null);
 
   const insertImage = useCallback(async (e: Editor) => {
@@ -217,6 +228,11 @@ export function MarkdownEditor({
       .run();
   }, []);
 
+  // The codec reads and writes markdown with the same schema, without the editing-only parts.
+  const codec = useMemo(
+    () => createMarkdownCodec(editorExtensions({ ...(placeholder ? { placeholder } : {}) })),
+    [placeholder],
+  );
   const extensions = useMemo(
     () =>
       editorExtensions({
@@ -232,17 +248,23 @@ export function MarkdownEditor({
         },
         resolveSrc: (src) => (resolveRef.current ? resolveRef.current(src) : src),
         slash: {
-          items: () => slashItems(labelsRef.current, pickRef.current ? insertImage : undefined),
+          items: () => [
+            ...slashItems(labelsRef.current, pickRef.current ? insertImage : undefined),
+            ...blockSlashItems(blocksRef.current, locale, (md) => codec.load(md).doc.content ?? []),
+          ],
           onState: setSlash,
           locale,
         },
       }),
-    [placeholder, labels.sourceBadge, labels.sourceHint, labels.editSource, insertImage, locale],
-  );
-  // The codec reads and writes markdown with the same schema, without the editing-only parts.
-  const codec = useMemo(
-    () => createMarkdownCodec(editorExtensions({ ...(placeholder ? { placeholder } : {}) })),
-    [placeholder],
+    [
+      placeholder,
+      labels.sourceBadge,
+      labels.sourceHint,
+      labels.editSource,
+      insertImage,
+      locale,
+      codec,
+    ],
   );
   // What the editor was loaded from, and the last markdown it emitted: a `value` that differs from
   // both came from outside (Markdown mode, a reload) and is loaded again.
@@ -327,7 +349,22 @@ export function MarkdownEditor({
         hidden={mode !== "rich"}
         className="min-w-0 rounded-lg bg-kumo-control ring ring-kumo-line focus-within:ring-kumo-focus"
       >
-        <EditorContent editor={editor} />
+        <DirectiveContext.Provider
+          value={
+            blocks
+              ? {
+                  ...blocks,
+                  locale,
+                  onEditSource: (markdown: string) => {
+                    setSourceFocus(markdown);
+                    setMode("markdown");
+                  },
+                }
+              : undefined
+          }
+        >
+          <EditorContent editor={editor} />
+        </DirectiveContext.Provider>
         {editor && mode === "rich" && !readOnly && (
           <SelectionMenu
             editor={editor}
@@ -451,6 +488,40 @@ function slashItems(
   return items;
 }
 
+/** The body block types `/` offers (RFC-0015), inserted with their examples. */
+function blockSlashItems(
+  blocks: EditorBlocks | undefined,
+  locale: string,
+  load: (markdown: string) => JSONContent[],
+): SlashItem[] {
+  if (!blocks) return [];
+  return blocks.types
+    .filter((t) => t.where.includes("body"))
+    .map((t) => {
+      const Icon = blockIcon(t);
+      const english = localized(t.title, "en");
+      const item: SlashItem & { icon: ReactNode } = {
+        key: `block:${t.name}`,
+        label: localized(t.title, locale),
+        keywords: [t.name, english, "block"],
+        icon: <Icon />,
+        run: (e) => {
+          const attrs = { name: t.name, props: { ...t.example.props } };
+          const content =
+            t.content === "markdown"
+              ? {
+                  type: "directiveContainer",
+                  attrs,
+                  content: t.example.markdown ? load(t.example.markdown) : [{ type: "paragraph" }],
+                }
+              : { type: "directiveLeaf", attrs };
+          e.chain().focus().insertContent(content).run();
+        },
+      };
+      return item;
+    });
+}
+
 const SLASH_ICONS: Record<string, ReactNode> = {
   paragraph: <TextT />,
   heading2: <TextHTwo />,
@@ -515,7 +586,7 @@ function SlashMenu({ state, labels }: { state: SlashState; labels: MarkdownEdito
             onKeyDown={() => {}}
           >
             <span className="flex size-4 items-center justify-center text-kumo-subtle">
-              {SLASH_ICONS[item.key]}
+              {(item as SlashItem & { icon?: ReactNode }).icon ?? SLASH_ICONS[item.key]}
             </span>
             {item.label}
           </div>

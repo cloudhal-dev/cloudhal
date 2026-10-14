@@ -39,6 +39,10 @@ export const messages: NamespaceMessages<"bodyEditor"> = {
     outlineExtraH1: "H2 kullan: sayfanın H1’i var",
     sourceBadge: "Markdown",
     sourceHint: "Yazıldığı gibi korunur. Markdown modunda düzenle.",
+    blocks: {
+      properties: "Özellikler",
+      invalid: "Özellikleri kontrol et",
+    },
     placeholder: "Buraya yaz ya da blok eklemek için / yaz…",
     ai: {
       ask: "Yapay zekâya sor",

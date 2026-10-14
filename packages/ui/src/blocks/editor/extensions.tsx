@@ -1,6 +1,7 @@
 /**
  * The editor's schema (RFC-0014 phase 1): CommonMark + GFM as the site renders it (`marked` with
- * GFM in `@cloudhal/astro-renderer`), plus `sourceBlock` for anything the editor must not rewrite.
+ * GFM in `@cloudhal/astro-renderer`), plus `sourceBlock` for anything the editor must not rewrite
+ * and the body directive nodes (RFC-0015).
  * Every extension is MIT (ADR: no paid Tiptap add-ons).
  */
 import { Badge, Button, Text } from "@cloudflare/kumo";
@@ -13,6 +14,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { NodeViewWrapper, type ReactNodeViewProps, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { InsetPanel } from "../InsetPanel.tsx";
+import { DirectiveContainer, DirectiveLeaf } from "./directives.tsx";
 import { SlashCommand, type SlashOptions } from "./slash.ts";
 
 /** Link targets the site keeps (the renderer's `safeHref`, plus `asset:` media links). */
@@ -167,6 +169,9 @@ export function editorExtensions(options: EditorExtensionOptions = {}): AnyExten
       ...(options.sourceBlock ? { labels: options.sourceBlock } : {}),
       onEdit: options.onEditSource,
     }),
+    // Body directives (RFC-0015); their views read `DirectiveContext`.
+    DirectiveLeaf,
+    DirectiveContainer,
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),
     ...(options.slash ? [SlashCommand.configure(options.slash)] : []),
   ];

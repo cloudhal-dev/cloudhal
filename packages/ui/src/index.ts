@@ -99,6 +99,7 @@ export {
   type BulkActionBarLabels,
   type BulkActionBarProps,
 } from "./blocks/BulkActionBar.tsx";
+export { blockIcon } from "./blocks/blockIcon.ts";
 export {
   type CalendarDayContext,
   type CalendarDensity,

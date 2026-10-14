@@ -227,6 +227,12 @@ A props schema is a JSON Schema object written in a subset small enough to:
 
 Status:
 - **6a shipped.** One deviation: `embed` renders a link card to the video (a play mark, its title and host) and loads nothing from the video host. The click-to-load player needs a first-party script and the per-build CSP `frame-src` (§5), and lands with 6d's deploy bundling. Theme components can already map `embed` to their own player through `theme.ts` `blocks`.
+- **6b shipped.**
+  - `@cloudhal/core-ts/directives` parses and writes the syntax (`matchDirective`, `parseDirective`, `writeDirective`, `directiveProps`, `checkDirective`). `directiveExtension` teaches `marked` the blocks, so the splitter, the store, the site renderer and the editor agree that a directive is one block (`directive:<name>` in the index and in `get_body`).
+  - A container closes only on a line of exactly its own colons, never inside fenced code. A paragraph is interrupted only where a whole directive starts. Text that does not parse exactly stays ordinary markdown.
+  - The store refuses directives of known types whose props do not fit (422 `invalid_props`), in article bodies and markdown rich-text sections; unknown types are kept. Reporting them as `unknownBlocks` in the write's result comes with 6c.
+  - Bodies render the built-ins with the same markup as sections, the inner markdown through the same safe renderer; unknown and misfitting directives render nothing on the site and a placeholder in previews. **Deviation:** a theme's own components (`theme.ts` `blocks`) apply to sections only for now. Using them inside bodies needs the article and rich-text renderers to split bodies into Astro components, which lands with 6d's theme types.
+  - The editor shows directives as framed blocks with a "Properties" popover (the generated form); a container's inner text is edited in place and keeps the bytes of its untouched blocks. The `/` menu lists the body types.
 
 ## Open questions
 Accepted with these defaults (ADR-0030):

@@ -1,6 +1,10 @@
 import type { Asset, ContentEntry } from "@cloudhal/core-contracts";
+import { createBlockRegistry } from "@cloudhal/core-ts/blocks";
+import { type DirectiveToken, directiveExtension } from "@cloudhal/core-ts/body-blocks";
+import { checkDirective, directiveProps } from "@cloudhal/core-ts/directives";
 import { ASSET_HREF, assetUrl, mediaPath } from "@cloudhal/core-ts/media";
 import { Marked } from "marked";
+import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
 import {
   assetAlt,
   assetCaption,
@@ -87,7 +91,44 @@ function assetEmbed(asset: Asset, text: string, title?: string | null): string {
  * images only keep safe URL schemes. `asset:<id>` links and images resolve to the site's media.
  */
 const md = new Marked({ gfm: true, async: false });
+const blockTypes = createBlockRegistry();
 md.use({
+  // Body directives (RFC-0015 §5): a built-in block renders like its component section; a
+  // container's inner markdown goes through this same renderer. Unknown types and props that do
+  // not fit render nothing on the site and a labelled placeholder in previews.
+  extensions: [
+    {
+      ...directiveExtension,
+      renderer(token) {
+        const { directive } = token as DirectiveToken;
+        const issues = checkDirective(blockTypes, directive);
+        const known = issues !== undefined && isBuiltInBlock(directive.name);
+        const ctx = current;
+        const html =
+          known && issues.length === 0
+            ? builtInBlockHtml(
+                directive.name,
+                directiveProps(blockTypes.get(directive.name), directive.attrs),
+                {
+                  markdown: (source) => renderMarkdown(source, ctx),
+                  ...(directive.content !== undefined
+                    ? { contentHtml: this.parser.parse((token as DirectiveToken).tokens) }
+                    : {}),
+                },
+              )
+            : "";
+        const attrs = `data-block-type="${escapeHtml(directive.name)}"`;
+        if (html) return `<div class="ch-block" ${attrs}>${html}</div>`;
+        if (!ctx?.preview) return "";
+        return missingBlockHtml(
+          "div",
+          attrs,
+          directive.name,
+          issues === undefined || !known ? "unknown block type" : "props do not fit the block type",
+        );
+      },
+    },
+  ],
   renderer: {
     html({ text }) {
       return escapeHtml(text);
