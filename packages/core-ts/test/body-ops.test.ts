@@ -113,6 +113,8 @@ describe("parseBodyOps (REST input)", () => {
         { op: "insert", after: null, markdown: "y" },
         { op: "move", block: id, after: id, ifHash: "a".repeat(64) },
         { op: "delete", block: id },
+        { op: "insertBlock", after: null, type: "button", props: { label: "Go" } },
+        { op: "setProps", block: id, props: { tone: null } },
       ]),
     ).toEqual([
       { op: "replace", block: id, markdown: "x" },
@@ -120,6 +122,8 @@ describe("parseBodyOps (REST input)", () => {
       { op: "insert", after: null, markdown: "y" },
       { op: "move", block: id, after: id, ifHash: "a".repeat(64) },
       { op: "delete", block: id },
+      { op: "insertBlock", after: null, type: "button", props: { label: "Go" } },
+      { op: "setProps", block: id, props: { tone: null } },
     ]);
   });
 

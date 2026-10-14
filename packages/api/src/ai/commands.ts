@@ -86,6 +86,7 @@ const RULES = [
   "Write CommonMark/GFM Markdown. Never write raw HTML.",
   "Keep the same structure (headings, lists, tables, block quotes) unless the task needs a change.",
   "Keep links, link targets, image references (including asset: addresses) and code exactly as they are.",
+  "Keep block directives intact: lines that open a block (`:::name{...}` or `::name{...}`) and the `:::` lines that close one stay exactly as written, attributes included; edit only the text between them (RFC-0015).",
   "Keep the language of the selection unless the task says to translate.",
 ].join("\n");
 

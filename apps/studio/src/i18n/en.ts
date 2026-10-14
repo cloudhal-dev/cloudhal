@@ -1486,6 +1486,7 @@ export const en = {
     create_entry: "Create article",
     update_entry: "Update article",
     delete_entry: "Delete article",
+    list_block_types: "List block types",
     get_body: "Read body",
     edit_body: "Edit body",
     diff_node: "Compare versions",

@@ -236,4 +236,82 @@ describe("body tools", () => {
     expect(diff.fields).toContain("body");
     expect(diff.bodies[0]).toMatchObject({ field: "body", counts: { changed: 1 } });
   });
+
+  it("lists block types and inserts, reads and changes typed blocks for the agent (RFC-0015)", async () => {
+    const types = (await call("list_block_types", { siteId, where: "body" })).result as {
+      types: { name: string; content: string }[];
+    };
+    expect(types.types.map((t) => t.name)).toEqual(["callout", "button", "embed"]);
+    expect(types.types[0]?.content).toBe("markdown");
+
+    const body = await read();
+    const [, one] = body.blocks;
+    await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops: [
+        {
+          op: "insertBlock",
+          after: one?.id,
+          type: "callout",
+          props: { tone: "warning", title: 'Say "hi"' },
+          markdown: "Back up **first**.",
+        },
+        { op: "insertBlock", after: null, type: "button", props: { label: "Go", href: "/go" } },
+      ],
+    });
+    let saved = (await store.getContentEntry(entry.id)) as ContentEntry;
+    expect(saved.body.value).toBe(
+      '::button{label="Go" href="/go"}\n\n# Title\n\nFirst paragraph.\n\n:::callout{tone="warning" title="Say \\"hi\\""}\nBack up **first**.\n:::\n\nSecond paragraph.\n',
+    );
+
+    const after = await read();
+    const callout = after.blocks.find((b) => b.type === "directive:callout") as Block & {
+      props: Record<string, unknown>;
+    };
+    expect(callout.props).toEqual({ tone: "warning", title: 'Say "hi"' });
+    await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: after.rev,
+      ops: [{ op: "setProps", block: callout.id, props: { tone: "success", title: null } }],
+    });
+    saved = (await store.getContentEntry(entry.id)) as ContentEntry;
+    expect(saved.body.value).toContain(':::callout{tone="success"}\nBack up **first**.\n:::');
+
+    // Props that do not fit, unknown types and syntax mistakes are refused before anything is written.
+    const now = await read();
+    for (const op of [
+      {
+        op: "insertBlock",
+        after: null,
+        type: "button",
+        props: { label: "Go", href: "javascript:x" },
+      },
+      { op: "insertBlock", after: null, type: "pricing-table", props: {} },
+      {
+        op: "insertBlock",
+        after: null,
+        type: "button",
+        props: { label: "Go", href: "/" },
+        markdown: "x",
+      },
+      { op: "setProps", block: now.blocks[1]?.id, props: { tone: "info" } },
+    ])
+      await expect(
+        call("edit_body", { siteId, entryId: entry.id, rev: now.rev, ops: [op] }),
+      ).rejects.toMatchObject({ code: "invalid" });
+  });
+
+  it("reports block types the site does not know, and keeps them", async () => {
+    const body = await read();
+    const res = await call("edit_body", {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops: [{ op: "insert", after: null, markdown: '::pricing-table{plan="pro"}' }],
+    });
+    expect((res.result as { unknownBlocks?: string[] }).unknownBlocks).toEqual(["pricing-table"]);
+  });
 });

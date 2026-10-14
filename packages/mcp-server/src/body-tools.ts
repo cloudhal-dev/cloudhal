@@ -18,9 +18,13 @@ import {
   BodyOpError,
   bodyDiff,
   currentBlocks,
+  type EditOp,
+  expandBlockOps,
   MAX_BODY_OPS,
   opTargets,
+  unknownBlockTypes,
 } from "@cloudhal/core-ts";
+import { directiveProps, parseDirective } from "@cloudhal/core-ts/directives";
 import {
   autoSnapshot,
   entryLimitCheck,
@@ -96,6 +100,35 @@ const OPS: JsonSchema = {
         "op",
         "block",
       ]),
+      obj(
+        {
+          op: { type: "string", enum: ["insertBlock"] },
+          after: { ...BLOCK_ID, type: ["string", "null"], description: "null: at the start" },
+          type: str("A block type allowed in bodies (list_block_types)"),
+          props: {
+            type: "object",
+            description:
+              "The type's props (scalars only in bodies); written as the block's attributes for you",
+          },
+          markdown: str(
+            "A container type's inner text (markdown); leave out for types without text",
+          ),
+        },
+        ["op", "after", "type", "props"],
+      ),
+      obj(
+        {
+          op: { type: "string", enum: ["setProps"] },
+          block: BLOCK_ID,
+          ifHash: HASH,
+          props: {
+            type: "object",
+            description:
+              "Props to change, merged onto the block's (null removes one); its inner text stays",
+          },
+        },
+        ["op", "block", "props"],
+      ),
     ],
   },
 };
@@ -106,6 +139,7 @@ const BLOCK_OUT: JsonSchema = obj(
     hash: { type: "string" },
     type: { type: "string" },
     markdown: { type: "string" },
+    props: { type: "object", description: "A typed block's props (type directive:<name>)" },
     by: { type: "object" },
     via: { type: "string" },
     at: { type: "string" },
@@ -197,8 +231,15 @@ const bodyError = (e: BodyOpError) =>
  * The new markdown for `ops`, rebasing a stale `rev` when that is safe: every block an op names
  * still exists, and every op that replaces, moves or deletes a block carries the `ifHash` it read.
  */
-async function plan(body: Located, rev: number, ops: BodyOp[]) {
+async function plan(body: Located, rev: number, edits: EditOp[], ctx: ToolContext) {
   const blocks = await currentBlocks(body.markdown, body.index);
+  let ops: BodyOp[];
+  try {
+    ops = expandBlockOps(edits, blocks, ctx.store.blocks);
+  } catch (e) {
+    if (e instanceof BodyOpError) throw bodyError(e);
+    throw e;
+  }
   if (rev !== body.rev) {
     const ids = new Set(blocks.map((b) => b.id));
     const missing = ops.flatMap(opTargets).filter((t) => !ids.has(t));
@@ -213,18 +254,18 @@ async function plan(body: Located, rev: number, ops: BodyOp[]) {
       );
   }
   try {
-    return { blocks, markdown: applyBodyOps(body.markdown, blocks, ops) };
+    return { blocks, ops, markdown: applyBodyOps(body.markdown, blocks, ops) };
   } catch (e) {
     if (e instanceof BodyOpError) throw bodyError(e);
     throw e;
   }
 }
 
-function summary(ops: readonly BodyOp[]): string {
-  const count = (kind: BodyOp["op"]) => ops.filter((o) => o.op === kind).length;
+function summary(ops: readonly EditOp[]): string {
+  const count = (kind: EditOp["op"]) => ops.filter((o) => o.op === kind).length;
   const parts = [
-    [count("replace") + count("replaceText"), "edit"],
-    [count("insert"), "insert"],
+    [count("replace") + count("replaceText") + count("setProps"), "edit"],
+    [count("insert") + count("insertBlock"), "insert"],
     [count("move"), "move"],
     [count("delete"), "delete"],
   ]
@@ -241,8 +282,7 @@ async function prepare(a: Record<string, unknown>, ctx: ToolContext) {
       throw new ToolError("denied", "pages are edited by Editors; you may edit your own articles");
     await entryLimitCheck(ctx, "update", body.entry);
   }
-  const ops = a.ops as BodyOp[];
-  const { blocks, markdown } = await plan(body, a.rev as number, ops);
+  const { blocks, ops, markdown } = await plan(body, a.rev as number, a.ops as EditOp[], ctx);
   if (markdown === body.markdown) throw new ToolError("invalid", "the operations change nothing");
   return { body, ops, blocks, markdown };
 }
@@ -254,6 +294,8 @@ export interface BodyEditResult {
   added: string[];
   removed: string[];
   words: { added: number; removed: number };
+  /** Block types the body uses that this site does not know (RFC-0015 §7). */
+  unknownBlocks?: string[];
 }
 
 /**
@@ -281,6 +323,10 @@ export async function editBody(
       added: after.filter((b) => !before.has(b.id)).map((b) => b.id),
       removed: blocks.filter((b) => !now.has(b.id)).map((b) => b.id),
       words: bodyDiff(body.markdown, markdown).words,
+      ...(() => {
+        const names = unknownBlockTypes(ctx.store.blocks, { markdown });
+        return names.length ? { unknownBlocks: names } : {};
+      })(),
     };
   } catch (e) {
     mapError(e);
@@ -289,6 +335,47 @@ export async function editBody(
 
 export function bodyTools(): ToolDefinition[] {
   return [
+    {
+      name: "list_block_types",
+      title: "List block types",
+      description:
+        "The typed blocks this site can use (RFC-0015): callouts, buttons, video embeds, FAQs and the theme's own. Each has a name, where it may go (page sections with kind \"component\", or bodies through edit_body's insertBlock), its props as JSON Schema, whether it wraps text, and an example. Names are plain English and shared across themes.",
+      inputSchema: obj(
+        {
+          siteId: id,
+          where: {
+            type: "string",
+            enum: ["section", "body"],
+            description: "Only the types allowed there",
+          },
+        },
+        ["siteId"],
+      ),
+      outputSchema: obj({ types: { type: "array", items: { type: "object" } } }, ["types"]),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      scopes: ["content:read"],
+      handler: async (a, ctx) => {
+        const site = await ctx.store.getSite(a.siteId as string);
+        if (!site) throw new ToolError("not_found", `site ${a.siteId} not found`);
+        const where = a.where as "section" | "body" | undefined;
+        return {
+          types: ctx.store.blocks.list(where).map((t) => ({
+            name: t.name,
+            title: t.title,
+            ...(t.description ? { description: t.description } : {}),
+            where: t.where,
+            content: t.content ?? "none",
+            props: t.props,
+            example: t.example,
+          })),
+        };
+      },
+    },
     {
       name: "get_body",
       title: "Read body by blocks",
@@ -317,14 +404,18 @@ export function bodyTools(): ToolDefinition[] {
           rev: body.rev,
           profile: 1,
           markdown: body.markdown,
-          blocks: await currentBlocks(body.markdown, body.index),
+          blocks: (await currentBlocks(body.markdown, body.index)).map((b) => {
+            // Typed blocks (RFC-0015 §2): their props, read for the agent.
+            const d = b.type.startsWith("directive:") ? parseDirective(b.markdown) : undefined;
+            return d ? { ...b, props: directiveProps(ctx.store.blocks.get(d.name), d.attrs) } : b;
+          }),
         };
       },
     },
     {
       name: "edit_body",
       title: "Edit body by blocks",
-      description: `Change a markdown body by block instead of rewriting it: replace a block, replace text inside one, insert, move or delete blocks (up to ${MAX_BODY_OPS} operations, applied in order, one write). Read the ids with get_body first. A stale rev is rebased when every named block still exists and carries ifHash; otherwise you get a conflict. Other blocks keep their bytes and their authors. Snapshots afterwards. With mode "propose" nothing is written: a person accepts or rejects the operations in Studio.`,
+      description: `Change a markdown body by block instead of rewriting it: replace a block, replace text inside one, insert, move or delete blocks, insert a typed block (insertBlock: a callout, a button, …; list_block_types) or change one's props (setProps) without writing its syntax (up to ${MAX_BODY_OPS} operations, applied in order, one write). Read the ids with get_body first. A stale rev is rebased when every named block still exists and carries ifHash; otherwise you get a conflict. Other blocks keep their bytes and their authors. Snapshots afterwards. With mode "propose" nothing is written: a person accepts or rejects the operations in Studio.`,
       inputSchema: obj(
         {
           siteId: id,
@@ -347,6 +438,7 @@ export function bodyTools(): ToolDefinition[] {
         added: { type: "array", items: { type: "string" } },
         removed: { type: "array", items: { type: "string" } },
         words: obj({ added: { type: "integer" }, removed: { type: "integer" } }),
+        unknownBlocks: { type: "array", items: { type: "string" } },
         snapshot: SNAPSHOT,
         proposal: obj({ id: { type: "string" }, status: { type: "string" } }, ["id", "status"]),
       }),
@@ -372,10 +464,10 @@ export function bodyTools(): ToolDefinition[] {
         if (entry && entry.siteId === a.siteId) await entryLimitCheck(ctx, "update", entry);
       },
       approvalPrompt: async (a, ctx) => {
-        const ops = (a.ops ?? []) as BodyOp[];
+        const ops = (a.ops ?? []) as EditOp[];
         try {
           const body = await locate(a, ctx);
-          const { markdown } = await plan(body, a.rev as number, ops);
+          const { markdown } = await plan(body, a.rev as number, ops, ctx);
           const d = bodyDiff(body.markdown, markdown);
           const what = body.kind === "article" ? "article" : "page";
           return `Edit the body of ${what} "${quote(body.title)}" (${summary(ops)}: +${d.words.added} / −${d.words.removed} words)?`;
