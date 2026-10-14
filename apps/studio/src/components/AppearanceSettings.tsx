@@ -64,6 +64,7 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
       />
     );
   const dirty = JSON.stringify(values) !== JSON.stringify(saved.values);
+  const disabled = !gate.allowed;
   return (
     <SettingsSection
       id={APPEARANCE_SETTINGS_SECTION}
@@ -78,7 +79,7 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
           )}
           <Button
             variant="primary"
-            disabled={!dirty || issues.length > 0 || !gate.allowed}
+            disabled={!dirty || issues.length > 0 || disabled}
             title={gate.reason}
             loading={save.isPending}
             onClick={() => save.mutate(values)}
@@ -109,7 +110,7 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
           onChange={setValues}
           issues={issues}
           locale={locale}
-          disabled={!gate.allowed}
+          disabled={disabled}
           enumLabel={enumLabel}
           labels={{
             item: t("editor.blocks.item"),
@@ -120,7 +121,7 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
           }}
         />
         <Text variant="secondary" size="sm">
-          {t("siteSettings.appearance.publishHint")}
+          {disabled && gate.reason ? gate.reason : t("siteSettings.appearance.publishHint")}
         </Text>
       </div>
     </SettingsSection>
