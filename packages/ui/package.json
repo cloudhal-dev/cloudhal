@@ -17,6 +17,7 @@
     ".": "./src/index.ts",
     "./code": "./src/code.ts",
     "./charts": "./src/charts.ts",
+    "./editor": "./src/editor.ts",
     "./styles.css": "./src/styles.css"
   },
   "files": [
@@ -30,7 +31,17 @@
   "dependencies": {
     "@cloudflare/kumo": "catalog:",
     "@cloudhal/core-contracts": "workspace:*",
-    "echarts": "catalog:"
+    "echarts": "catalog:",
+    "marked": "catalog:",
+    "@tiptap/core": "catalog:",
+    "@tiptap/react": "catalog:",
+    "@tiptap/pm": "catalog:",
+    "@tiptap/starter-kit": "catalog:",
+    "@tiptap/markdown": "catalog:",
+    "@tiptap/extension-table": "catalog:",
+    "@tiptap/extension-image": "catalog:",
+    "@tiptap/extension-list": "catalog:",
+    "@tiptap/extensions": "catalog:"
   },
   "peerDependencies": {
     "@phosphor-icons/react": "^2.1.10",

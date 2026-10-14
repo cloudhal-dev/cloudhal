@@ -14,6 +14,7 @@
 import type { Locale } from "./index.tsx";
 import type { messages as analytics } from "./lazy/analytics.en.ts";
 import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.ts";
+import type { messages as bodyEditor } from "./lazy/bodyEditor.en.ts";
 import type { messages as comments } from "./lazy/comments.en.ts";
 import type { messages as commentsSettings } from "./lazy/commentsSettings.en.ts";
 import type { messages as readers } from "./lazy/readers.en.ts";
@@ -26,6 +27,7 @@ type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString
 export interface NamespaceCatalogs {
   analytics: DeepString<(typeof analytics)["analytics"]>;
   analyticsSettings: DeepString<(typeof analyticsSettings)["analyticsSettings"]>;
+  bodyEditor: DeepString<(typeof bodyEditor)["bodyEditor"]>;
   comments: DeepString<(typeof comments)["comments"]>;
   commentsSettings: DeepString<(typeof commentsSettings)["commentsSettings"]>;
   readers: DeepString<(typeof readers)["readers"]>;
@@ -47,6 +49,10 @@ const LOADERS: { [N in Namespace]: Record<Locale, Loader<N>> } = {
   analyticsSettings: {
     en: () => import("./lazy/analyticsSettings.en.ts"),
     tr: () => import("./lazy/analyticsSettings.tr.ts"),
+  },
+  bodyEditor: {
+    en: () => import("./lazy/bodyEditor.en.ts"),
+    tr: () => import("./lazy/bodyEditor.tr.ts"),
   },
   comments: {
     en: () => import("./lazy/comments.en.ts"),

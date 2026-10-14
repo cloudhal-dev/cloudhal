@@ -1,0 +1,34 @@
+import type { NamespaceMessages } from "../namespaces.ts";
+
+/** Turkish `bodyEditor.*` (lazy namespace; keys from `bodyEditor.en.ts`). */
+export const messages: NamespaceMessages<"bodyEditor"> = {
+  bodyEditor: {
+    rich: "Zengin metin",
+    markdown: "Markdown",
+    toolbar: "Biçimlendirme",
+    bold: "Kalın",
+    italic: "İtalik",
+    strike: "Üstü çizili",
+    code: "Satır içi kod",
+    heading2: "Başlık",
+    heading3: "Alt başlık",
+    bulletList: "Madde işaretli liste",
+    orderedList: "Numaralı liste",
+    taskList: "Yapılacaklar listesi",
+    quote: "Alıntı",
+    codeBlock: "Kod bloğu",
+    table: "Tablo ekle",
+    rule: "Ayırıcı",
+    link: "Bağlantı",
+    undo: "Geri al",
+    redo: "Yinele",
+    linkTitle: "Bağlantı",
+    linkUrl: "Adres",
+    linkApply: "Uygula",
+    linkRemove: "Bağlantıyı kaldır",
+    linkInvalid: "https, mailto, tel, asset ya da site içi bir adres kullan.",
+    sourceBadge: "Markdown",
+    sourceHint: "Yazıldığı gibi korunur. Markdown modunda düzenle.",
+    placeholder: "Buraya yaz ya da Markdown'a geç…",
+  },
+};

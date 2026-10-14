@@ -8,3 +8,91 @@
 [data-sidebar="viewport"] {
   overscroll-behavior: contain;
 }
+
+/*
+ * MarkdownEditor content (`@cloudhal/ui/editor`): readable defaults for the body while it is
+ * edited. 14px text (DESIGN.md), Kumo tokens only; the site's own theme renders the real page.
+ */
+.ch-md-content {
+  @apply text-sm leading-relaxed text-kumo-default;
+}
+.ch-md-content > * + * {
+  @apply mt-3;
+}
+.ch-md-content h1 {
+  @apply text-xl font-semibold text-kumo-strong;
+}
+.ch-md-content h2 {
+  @apply text-lg font-semibold text-kumo-strong;
+}
+.ch-md-content :is(h3, h4, h5, h6) {
+  @apply text-base font-semibold text-kumo-strong;
+}
+.ch-md-content :is(h1, h2, h3, h4, h5, h6) + * {
+  @apply mt-1.5;
+}
+.ch-md-content strong {
+  @apply font-medium text-kumo-strong;
+}
+.ch-md-content a {
+  @apply text-kumo-link underline underline-offset-2;
+}
+.ch-md-content code {
+  @apply rounded bg-kumo-recessed px-1 py-0.5 font-mono text-[0.9em];
+}
+.ch-md-content pre {
+  @apply overflow-x-auto rounded-md bg-kumo-recessed px-3 py-2 font-mono text-[0.9em];
+}
+.ch-md-content pre code {
+  @apply bg-transparent p-0 text-[1em];
+}
+.ch-md-content blockquote {
+  @apply border-l-2 border-kumo-line pl-3 text-kumo-subtle;
+}
+.ch-md-content ul {
+  @apply list-disc pl-6;
+}
+.ch-md-content ol {
+  @apply list-decimal pl-6;
+}
+.ch-md-content li > * + * {
+  @apply mt-1;
+}
+.ch-md-content ul[data-type="taskList"] {
+  @apply list-none pl-0;
+}
+.ch-md-content ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+.ch-md-content ul[data-type="taskList"] li > label {
+  @apply flex h-lh items-center;
+}
+.ch-md-content ul[data-type="taskList"] li > div {
+  @apply min-w-0 flex-1;
+}
+.ch-md-content hr {
+  @apply my-4 border-kumo-line;
+}
+.ch-md-content .tableWrapper {
+  @apply overflow-x-auto;
+}
+.ch-md-content table {
+  @apply w-full border-collapse;
+}
+.ch-md-content :is(th, td) {
+  @apply min-w-16 border border-kumo-line px-2 py-1 text-left align-top;
+}
+.ch-md-content th {
+  @apply bg-kumo-recessed font-medium;
+}
+.ch-md-content .selectedCell {
+  @apply bg-kumo-tint;
+}
+.ch-md-content img.ProseMirror-selectednode,
+.ch-md-content [data-source-block].ProseMirror-selectednode {
+  @apply rounded-md ring-2 ring-kumo-focus;
+}
+.ch-md-content p.is-editor-empty:first-child::before {
+  @apply pointer-events-none float-left h-0 text-kumo-placeholder;
+  content: attr(data-placeholder);
+}
