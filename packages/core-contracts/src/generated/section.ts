@@ -14,6 +14,24 @@ export type Section = HeroSection | RichTextSection | ImageSection | ContentList
  */
 export type Id = string;
 /**
+ * The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies.
+ */
+export type BodyProfile = 1;
+/**
+ * Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.
+ */
+export type ActorKind = "human" | "agent" | "system";
+/**
+ * RFC 3339 / ISO 8601 instant in UTC.
+ */
+export type Timestamp = string;
+/**
+ * A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.
+ *
+ * @maxItems 5000
+ */
+export type BodyBlocks = BodyBlock[];
+/**
  * Lower-case URL segment.
  */
 export type Slug = string;
@@ -49,6 +67,32 @@ export interface RichTextSection {
   kind: "richText";
   format: "markdown" | "html";
   body: string;
+  profile?: BodyProfile;
+  blocks?: BodyBlocks;
+}
+/**
+ * One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.
+ */
+export interface BodyBlock {
+  /**
+   * Stable across writes that keep the block's content or its place among unchanged blocks.
+   */
+  id: string;
+  /**
+   * SHA-256 (hex) of the block's markdown without trailing whitespace.
+   */
+  hash: string;
+  by?: Actor;
+  /**
+   * The channel of that change.
+   */
+  via?: "studio" | "mcp" | "api" | "import" | "ai-command" | "proposal";
+  at?: Timestamp;
+}
+export interface Actor {
+  kind: ActorKind;
+  id: Id;
+  name?: string;
 }
 export interface ImageSection {
   id: Id;

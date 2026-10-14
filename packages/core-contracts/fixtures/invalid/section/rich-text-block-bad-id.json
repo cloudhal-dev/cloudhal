@@ -1,0 +1,21 @@
+{
+  "reason": "block ids start with blk_ and via is a known channel",
+  "data": {
+    "id": "sec_01HZX8K3Q9QS",
+    "kind": "richText",
+    "format": "markdown",
+    "body": "## Hello\n\nWelcome.",
+    "profile": 1,
+    "blocks": [
+      {
+        "id": "sec_01HZX8K3Q9AC",
+        "hash": "8547edb146cd803f907b9b2d9bc69dbf132abaef73e99035517dc01663408bf1"
+      },
+      {
+        "id": "blk_01HZX8K3Q9AD",
+        "hash": "3fc2118d352cbb01db0d8b015d9df5926e416c4b75379601277187da80329c6b",
+        "via": "email"
+      }
+    ]
+  }
+}

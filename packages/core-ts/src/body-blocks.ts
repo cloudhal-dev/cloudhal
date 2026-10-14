@@ -140,7 +140,7 @@ export function wordDiff(before: string, after: string): WordChange[] {
 }
 
 /** Share of words two blocks have in common (0–1), to tell an edit from a replacement. */
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const wa = a.toLowerCase().split(/\s+/).filter(Boolean);
   const wb = b.toLowerCase().split(/\s+/).filter(Boolean);
   if (!wa.length || !wb.length) return 0;
@@ -158,7 +158,7 @@ function similarity(a: string, b: string): number {
 }
 
 /** Below this, a removed and an added block are a replacement, not an edit. */
-const EDIT_SIMILARITY = 0.35;
+export const EDIT_SIMILARITY = 0.35;
 
 /** What changed from one markdown body to another, block by block. */
 export function bodyDiff(before: string, after: string): BodyDiff {

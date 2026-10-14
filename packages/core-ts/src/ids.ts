@@ -32,4 +32,6 @@ export const ID_PREFIX = {
   system: "sys",
   /** Governance operations (`op_guards.op_id`, `GovernanceResult.opId`). */
   operation: "op",
+  /** RFC-0014 body blocks (`BodyBlock.id`). */
+  block: "blk",
 } as const;

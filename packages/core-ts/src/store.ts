@@ -40,6 +40,7 @@ import {
   isTimeZone,
   sameAvailability,
 } from "./availability.ts";
+import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { BLOB_CONCURRENCY, eachLimited } from "./concurrency.ts";
@@ -155,6 +156,8 @@ export interface PublishChange {
  */
 export interface NodeWriteOptions {
   readonly releaseEdit?: string;
+  /** Who is writing: the provenance of body blocks this write changes (RFC-0014 §3). */
+  readonly writer?: BlockWriter;
 }
 
 export interface SnapshotInput {
@@ -400,9 +403,13 @@ export class SiteGraphStore {
    * page insert (guarded on the site's new hash and on archive paths, invariant 13) and an
    * assertion, so a stale site revision changes nothing and raises a ConflictError.
    */
-  async createPage(site: Site, input: Creatable<Page>): Promise<{ page: Page; site: Site }> {
+  async createPage(
+    site: Site,
+    input: Creatable<Page>,
+    options: NodeWriteOptions = {},
+  ): Promise<{ page: Page; site: Site }> {
     const ts = this.#stamp();
-    const draft: Page = structuredClone({
+    let draft: Page = structuredClone({
       ...input,
       schemaVersion: 1,
       id: input.id ?? this.#newId(ID_PREFIX.page),
@@ -411,6 +418,7 @@ export class SiteGraphStore {
       updatedAt: ts,
     });
     fillMissingSrc("page", draft);
+    draft = await this.#indexSections(draft, undefined, ts, options.writer);
     assertValid("page", draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
@@ -467,13 +475,14 @@ export class SiteGraphStore {
    */
   async updatePage(page: Page, options: NodeWriteOptions = {}): Promise<Page> {
     const ts = this.#stamp();
-    const draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
+    let draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
     fillMissingSrc("page", draft);
-    assertValid("page", draft);
     checkReservedPath(draft.path);
     const stored = await this.getPage(page.id);
     if (!stored || stored.rev !== page.rev)
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    draft = await this.#indexSections(draft, stored, ts, options.writer);
+    assertValid("page", draft);
     await assertUnlocked(this.#sql, stored.siteId, [page.id], options.releaseEdit);
     await this.#checkGates(draft.siteId, stored.availability, draft.availability);
     const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
@@ -564,7 +573,10 @@ export class SiteGraphStore {
    * guarded on every referenced term still being assignable; a deprecated non-empty `tags` is
    * translated into `terms.tag` (§4.4).
    */
-  async createContentEntry(input: Creatable<ContentEntry>): Promise<ContentEntry> {
+  async createContentEntry(
+    input: Creatable<ContentEntry>,
+    options: NodeWriteOptions = {},
+  ): Promise<ContentEntry> {
     const ts = this.#stamp();
     const entry: ContentEntry = {
       ...input,
@@ -575,7 +587,7 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(input, ts),
     };
-    return this.#writeEntry(undefined, entry, ts);
+    return this.#writeEntry(undefined, entry, ts, options);
   }
 
   async getContentEntry(id: string): Promise<ContentEntry | undefined> {
@@ -612,6 +624,35 @@ export class SiteGraphStore {
     return this.#writeEntry(entry, next, ts, options);
   }
 
+  /** A page with its markdown rich-text sections indexed against `stored`'s (RFC-0014 §3). */
+  async #indexSections(
+    page: Page,
+    stored: Page | undefined,
+    ts: string,
+    writer: BlockWriter | undefined,
+  ): Promise<Page> {
+    const before = new Map((stored?.sections ?? []).map((s) => [s.id, s]));
+    const sections = await Promise.all(
+      page.sections.map(async (section) => {
+        if (section.kind !== "richText") return section;
+        const bare = withoutIndex(section) as typeof section;
+        if (bare.format !== "markdown") return bare;
+        const old = before.get(section.id);
+        const previous = old?.kind === "richText" && old.format === "markdown" ? old : undefined;
+        const index = await indexMarkdown({
+          markdown: bare.body,
+          previous: previous?.blocks,
+          previousMarkdown: previous?.body,
+          writer,
+          at: ts,
+          newId: () => this.#newId(ID_PREFIX.block),
+        });
+        return { ...bare, ...index };
+      }),
+    );
+    return { ...page, sections };
+  }
+
   async #writeEntry(
     prev: ContentEntry | undefined,
     draft: ContentEntry,
@@ -619,6 +660,8 @@ export class SiteGraphStore {
     options: NodeWriteOptions = {},
   ): Promise<ContentEntry> {
     fillMissingSrc("contentEntry", draft);
+    // The block index is the store's (RFC-0014 §3): a client's is dropped before validation.
+    draft = { ...draft, body: withoutIndex(draft.body) };
     assertValid("content-entry", canonicalTerms(draft));
     const site = await this.getSite(draft.siteId);
     if (!site) throw new NotFoundError("site", draft.siteId);
@@ -628,6 +671,18 @@ export class SiteGraphStore {
       if (!stored || stored.rev !== prev.rev)
         throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
       await assertUnlocked(this.#sql, stored.siteId, [prev.id], options.releaseEdit);
+    }
+    if (draft.body.format === "markdown") {
+      const previous = stored?.body.format === "markdown" ? stored.body : undefined;
+      const index = await indexMarkdown({
+        markdown: draft.body.value,
+        previous: previous?.blocks,
+        previousMarkdown: previous?.value,
+        writer: options.writer,
+        at: ts,
+        newId: () => this.#newId(ID_PREFIX.block),
+      });
+      draft = { ...draft, body: { ...draft.body, ...index } };
     }
     await this.#checkGates(site.id, stored?.availability, draft.availability);
     // §7.5: an entry not shown yet keeps its date on its embargo. When a write moves `from` and

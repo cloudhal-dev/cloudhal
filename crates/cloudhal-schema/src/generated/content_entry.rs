@@ -132,8 +132,221 @@ pub struct Availability {
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Body {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub blocks: ::std::option::Option<BodyBlocks>,
     pub format: BodyFormat,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub profile: ::std::option::Option<BodyProfile>,
     pub value: BodyValue,
+}
+#[doc = "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct BodyBlock {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub at: ::std::option::Option<Timestamp>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub by: ::std::option::Option<Actor>,
+    #[doc = "SHA-256 (hex) of the block's markdown without trailing whitespace."]
+    pub hash: BodyBlockHash,
+    #[doc = "Stable across writes that keep the block's content or its place among unchanged blocks."]
+    pub id: BodyBlockId,
+    #[doc = "The channel of that change."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub via: ::std::option::Option<BodyBlockVia>,
+}
+#[doc = "SHA-256 (hex) of the block's markdown without trailing whitespace."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct BodyBlockHash(::std::string::String);
+impl ::std::ops::Deref for BodyBlockHash {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<BodyBlockHash> for ::std::string::String {
+    fn from(value: BodyBlockHash) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for BodyBlockHash {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for BodyBlockHash {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for BodyBlockHash {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BodyBlockHash {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "Stable across writes that keep the block's content or its place among unchanged blocks."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct BodyBlockId(::std::string::String);
+impl ::std::ops::Deref for BodyBlockId {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<BodyBlockId> for ::std::string::String {
+    fn from(value: BodyBlockId) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for BodyBlockId {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^blk_[0-9A-Za-z]{8,24}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^blk_[0-9A-Za-z]{8,24}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for BodyBlockId {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for BodyBlockId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BodyBlockId {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "The channel of that change."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum BodyBlockVia {
+    #[serde(rename = "studio")]
+    Studio,
+    #[serde(rename = "mcp")]
+    Mcp,
+    #[serde(rename = "api")]
+    Api,
+    #[serde(rename = "import")]
+    Import,
+    #[serde(rename = "ai-command")]
+    AiCommand,
+    #[serde(rename = "proposal")]
+    Proposal,
+}
+impl ::std::fmt::Display for BodyBlockVia {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Studio => f.write_str("studio"),
+            Self::Mcp => f.write_str("mcp"),
+            Self::Api => f.write_str("api"),
+            Self::Import => f.write_str("import"),
+            Self::AiCommand => f.write_str("ai-command"),
+            Self::Proposal => f.write_str("proposal"),
+        }
+    }
+}
+impl ::std::str::FromStr for BodyBlockVia {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "studio" => Ok(Self::Studio),
+            "mcp" => Ok(Self::Mcp),
+            "api" => Ok(Self::Api),
+            "import" => Ok(Self::Import),
+            "ai-command" => Ok(Self::AiCommand),
+            "proposal" => Ok(Self::Proposal),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for BodyBlockVia {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for BodyBlockVia {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct BodyBlocks(pub ::std::vec::Vec<BodyBlock>);
+impl ::std::ops::Deref for BodyBlocks {
+    type Target = ::std::vec::Vec<BodyBlock>;
+    fn deref(&self) -> &::std::vec::Vec<BodyBlock> {
+        &self.0
+    }
+}
+impl ::std::convert::From<BodyBlocks> for ::std::vec::Vec<BodyBlock> {
+    fn from(value: BodyBlocks) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<::std::vec::Vec<BodyBlock>> for BodyBlocks {
+    fn from(value: ::std::vec::Vec<BodyBlock>) -> Self {
+        Self(value)
+    }
 }
 #[doc = "`BodyFormat`"]
 #[derive(
@@ -184,6 +397,40 @@ impl ::std::convert::TryFrom<::std::string::String> for BodyFormat {
         value: ::std::string::String,
     ) -> ::std::result::Result<Self, self::error::ConversionError> {
         value.parse()
+    }
+}
+#[doc = "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."]
+#[derive(:: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct BodyProfile(i64);
+impl ::std::ops::Deref for BodyProfile {
+    type Target = i64;
+    fn deref(&self) -> &i64 {
+        &self.0
+    }
+}
+impl ::std::convert::From<BodyProfile> for i64 {
+    fn from(value: BodyProfile) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::TryFrom<i64> for BodyProfile {
+    type Error = self::error::ConversionError;
+    fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if ![1_i64].contains(&value) {
+            Err("invalid value".into())
+        } else {
+            Ok(Self(value))
+        }
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BodyProfile {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        Self::try_from(<i64>::deserialize(deserializer)?)
+            .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
     }
 }
 #[doc = "`BodyValue`"]

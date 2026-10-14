@@ -89,7 +89,9 @@
       "required": ["format", "value"],
       "properties": {
         "format": { "type": "string", "enum": ["markdown", "html"] },
-        "value": { "type": "string", "maxLength": 1000000 }
+        "value": { "type": "string", "maxLength": 1000000 },
+        "profile": { "$ref": "common.schema.json#/$defs/BodyProfile" },
+        "blocks": { "$ref": "common.schema.json#/$defs/BodyBlocks" }
       }
     }
   }
