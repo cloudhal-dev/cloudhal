@@ -107,6 +107,10 @@ export function BodyEditor({
       sourceBadge: t("bodyEditor.sourceBadge"),
       sourceHint: t("bodyEditor.sourceHint"),
       editSource: t("bodyEditor.editSource"),
+      outline: t("bodyEditor.outline"),
+      outlineEmpty: t("bodyEditor.outlineEmpty"),
+      outlineSkipped: t("bodyEditor.outlineSkipped"),
+      outlineExtraH1: t("bodyEditor.outlineExtraH1"),
     }),
     [t],
   );

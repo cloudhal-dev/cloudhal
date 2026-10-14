@@ -319,6 +319,11 @@ export type ArchiveReason =
   | "retired"
   | "archiveOff";
 
+/** `POST …/entries/:id/preview`, `POST …/pages/:id/preview`: the unsaved form, rendered. */
+export interface DraftPreview {
+  html: string;
+}
+
 /** `POST …/terms/:id/preview`: the archive page with the unsaved text, and its public state. */
 export interface TermPreview {
   html: string;
@@ -1849,6 +1854,12 @@ export const api = {
       request<{ site: Site }>(`/api/sites/${page.siteId}/pages/${page.id}?rev=${page.rev}`, {
         method: "DELETE",
       }),
+    /** The page with the editor's unsaved title, SEO and sections. Nothing is written. */
+    previewDraft: (page: Pick<Page, "id" | "siteId" | "title" | "seo" | "sections">) =>
+      request<DraftPreview>(`/api/sites/${page.siteId}/pages/${page.id}/preview`, {
+        method: "POST",
+        ...json({ title: page.title, seo: page.seo ?? null, sections: page.sections }),
+      }),
   },
   entries: {
     /** `filter` is sent encoded, so its `+` survives as `%2B` (RFC-0002 §5). 400 on an unknown term. */
@@ -1864,6 +1875,19 @@ export const api = {
     },
     get: (siteId: string, id: string) =>
       request<ContentEntry>(`/api/sites/${siteId}/entries/${id}`),
+    /** The article with the editor's unsaved title, summary, body and cover. Nothing is written. */
+    previewDraft: (
+      entry: Pick<ContentEntry, "id" | "siteId" | "title" | "summary" | "body" | "coverImage">,
+    ) =>
+      request<DraftPreview>(`/api/sites/${entry.siteId}/entries/${entry.id}/preview`, {
+        method: "POST",
+        ...json({
+          title: entry.title,
+          summary: entry.summary ?? "",
+          body: entry.body,
+          coverImage: entry.coverImage ?? null,
+        }),
+      }),
     create: (siteId: string, entry: NewEntry) =>
       request<ContentEntry>(`/api/sites/${siteId}/entries`, { method: "POST", ...json(entry) }),
     update: (entry: ContentEntry) =>

@@ -25,6 +25,7 @@ import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { BodyEditor } from "../components/BodyEditor.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { DraftEditorPreview } from "../components/DraftPreview.tsx";
 import {
   DangerZoneCard,
   type DetailRow,
@@ -33,7 +34,6 @@ import {
   PreviewToggle,
   usePreviewVisible,
 } from "../components/EditorLayout.tsx";
-import { EditorPreview } from "../components/EditorPreview.tsx";
 import {
   isScheduleError,
   ScheduleAction,
@@ -358,11 +358,21 @@ export function ArticleEditorPage() {
       <EditorLayout
         previewVisible={previewVisible}
         preview={
-          <EditorPreview
+          <DraftEditorPreview
+            queryKey={["entry-preview", siteId, entryId]}
             src={api.preview.entry(siteId, entryId)}
             rev={draft.rev}
             name={title}
             dirty={dirty}
+            input={{
+              id: draft.id,
+              siteId: draft.siteId,
+              title: draft.title,
+              summary: draft.summary,
+              body: draft.body,
+              coverImage: draft.coverImage,
+            }}
+            render={api.entries.previewDraft}
           />
         }
         main={

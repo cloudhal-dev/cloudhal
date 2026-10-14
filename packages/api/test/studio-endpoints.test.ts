@@ -107,6 +107,79 @@ describe("preview", () => {
   });
 });
 
+describe("draft preview", () => {
+  const post = (app: Awaited<ReturnType<typeof setup>>["app"], path: string, body: unknown) =>
+    app.request(path, {
+      method: "POST",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("renders an article's unsaved title and body without writing anything", async () => {
+    const { store, site, app } = await setup();
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "saved-one",
+      locale: "en",
+      status: "draft",
+      title: "Saved title",
+      body: { format: "markdown", value: "Saved body" },
+      fields: {},
+      tags: [],
+      author: human,
+    });
+    const path = `/api/sites/${site.id}/entries/${entry.id}/preview`;
+    const res = await post(app, path, {
+      title: "Unsaved <title>",
+      summary: "Unsaved summary",
+      body: { format: "markdown", value: "## Unsaved heading\n\n<script>x()</script>" },
+      // Mistyped fields are dropped, never an error: the draft still previews.
+      coverImage: { src: 42 },
+      slug: "ignored",
+    });
+    expect(res.status).toBe(200);
+    const { html } = (await res.json()) as { html: string };
+    expect(html).toContain("Unsaved &lt;title&gt;");
+    expect(html).toContain("<h2>Unsaved heading</h2>");
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("Saved body");
+    // Nothing was written.
+    const after = await store.getContentEntry(entry.id);
+    expect(after?.title).toBe("Saved title");
+    expect(after?.rev).toBe(entry.rev);
+    // An empty or broken request previews the saved entry.
+    const empty = await app.request(path, {
+      method: "POST",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: "not json",
+    });
+    expect(((await empty.json()) as { html: string }).html).toContain("Saved body");
+    expect(
+      (await post(app, `/api/sites/${site.id}/entries/entry_missing00001/preview`, {})).status,
+    ).toBe(404);
+  });
+
+  it("renders a page's unsaved sections, keeping only valid ones", async () => {
+    const { store, site, app } = await setup();
+    const home = (await store.listPages(site.id)).find((p) => p.path === "/");
+    if (!home) throw new Error("no home page");
+    const path = `/api/sites/${site.id}/pages/${home.id}/preview`;
+    const res = await post(app, path, {
+      title: "Home draft",
+      sections: [
+        { id: "sec_draft0000001", kind: "richText", format: "markdown", body: "Draft **section**" },
+        { id: "bad", kind: "nope" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const { html } = (await res.json()) as { html: string };
+    expect(html).toContain("<strong>section</strong>");
+    expect(html).not.toContain("nope");
+    expect((await store.getPage(home.id))?.rev).toBe(home.rev);
+  });
+});
+
 describe("preview links", () => {
   it("mints signed links for drafts and snapshots on the site's primary domain", async () => {
     const { verifyPreviewToken } = await import("@cloudhal/core-ts");

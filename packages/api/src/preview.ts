@@ -14,3 +14,11 @@ export function previewResponse(c: Context, html: string): Response {
     "x-content-type-options": "nosniff",
   });
 }
+
+/**
+ * What a draft preview (`POST …/preview`) answers: the document for the editor's `srcDoc`. The
+ * editor's sandboxed iframe enforces what the headers above do for a served preview.
+ */
+export interface DraftPreview {
+  html: string;
+}

@@ -89,6 +89,11 @@ describe("ROUTE_SCOPES (I15)", () => {
     // RFC-0003 menus: reads for every member, writes for Editor and above.
     expect(requirementFor("GET", "/api/sites/site_x/menus/references")).toBe("site:read");
     expect(requirementFor("POST", "/api/sites/site_x/menus/preview")).toBe("site:read");
+    // RFC-0014 phase 1c: the editors' draft previews only read.
+    expect(requirementFor("POST", "/api/sites/site_x/entries/entry_y/preview")).toBe(
+      "content:read",
+    );
+    expect(requirementFor("POST", "/api/sites/site_x/pages/page_y/preview")).toBe("content:read");
     expect(requirementFor("POST", "/api/sites/site_x/menus/from-pages")).toBe("site:write");
     expect(requirementFor("PUT", "/api/sites/site_x/menus/menu_y")).toBe("site:write");
     expect(requirementFor("POST", "/api/sites/site_x/menus/menu_y/ops")).toBe("site:write");

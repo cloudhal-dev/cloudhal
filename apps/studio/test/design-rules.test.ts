@@ -384,8 +384,11 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/PendingApprovalsBanner.tsx": ["Banner", "Banner.Action"],
   "routes/SiteOverviewPage.tsx#approvals": ["PendingApprovalsBanner"],
   "routes/SiteShell.tsx#approvals": ["usePendingApprovals", "Sidebar.MenuBadge"],
-  "routes/PageEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
-  "routes/ArticleEditorPage.tsx#preview": ["EditorLayout", "EditorPreview", "PreviewToggle"],
+  // The editors' preview follows the unsaved form (RFC-0014 phase 1c): `DraftEditorPreview`
+  // wraps `EditorPreview`.
+  "routes/PageEditorPage.tsx#preview": ["EditorLayout", "DraftEditorPreview", "PreviewToggle"],
+  "routes/ArticleEditorPage.tsx#preview": ["EditorLayout", "DraftEditorPreview", "PreviewToggle"],
+  "components/DraftPreview.tsx": ["EditorPreview"],
   "routes/SiteOverviewPage.tsx#activity": ["RecentActivity"],
   // Notifications (§2n, ADR-0016 addendum "told before it ends"): bell, panel, toasts, opt-in.
   "components/AppFrame.tsx#notifications": ["NotificationsBell"],
