@@ -242,6 +242,7 @@ describe("agent modes on API keys (ADR-0015)", () => {
       "analytics:read",
       "comments:read",
       "schedules:read",
+      "content:propose",
     ]);
 
     const client = await connect({ "x-api-key": key.key });

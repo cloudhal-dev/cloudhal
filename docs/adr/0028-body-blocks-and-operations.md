@@ -26,7 +26,7 @@ Adopt RFC-0014. The owner accepted it on 2026-10-14 with the defaults below.
   - every write is auto-snapshotted like any other agent write.
 
   `diff_node` returns `bodyDiff` between two versions. Approval requests carry structured `changes`.
-- **Proposals.** `mode: "propose"` stores the operations in a proposals table. A person accepts or rejects them op by op. Accepting applies them as the person, with `via: "proposal"` and the agent kept as `by`. Ops whose blocks changed in the meantime are marked stale.
+- **Proposals.** `mode: "propose"` stores the operations in a proposals table. A person accepts or rejects them op by op. Accepting applies them as the person, with `via: "proposal"` and the agent kept as `by`. Ops whose blocks changed in the meantime are marked stale. Proposing needs `content:propose` (with `content:read`), which every write scope implies and `plan` keys get by default.
 - **Defaults for the open questions:**
   1. **In-editor AI:** no model call until the owner chooses a provider. Phase 5 waits for that choice.
   2. **Modes:** `plan` may propose. `edits` keeps applying body changes directly.

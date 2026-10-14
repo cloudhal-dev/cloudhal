@@ -110,6 +110,11 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/entries/:entryId`, "content:read"],
   ["PUT", `${S}/entries/:entryId`, "content:draft:own"],
   ["DELETE", `${S}/entries/:entryId`, "content:draft:own"],
+  // RFC-0014 body proposals: anyone who reads content sees them; deciding is an entry update
+  // (own limits in the handler) or, for page sections, full content:write
+  ["GET", `${S}/proposals`, "content:read"],
+  ["POST", `${S}/proposals/:proposalId/accept`, "content:draft:own"],
+  ["POST", `${S}/proposals/:proposalId/reject`, "content:draft:own"],
   ["GET", `${S}/snapshots`, "site:read"],
   ["POST", `${S}/snapshots`, "content:draft:own"],
   ["GET", `${S}/snapshots/:snapshotId`, "site:read"],

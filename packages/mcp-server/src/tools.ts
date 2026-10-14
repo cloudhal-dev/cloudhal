@@ -1150,6 +1150,7 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
     ...(t.requiresApproval ? { requiresApproval: true } : {}),
     ...(t.own ? { own: t.own } : {}),
     ...(t.classify ? { classify: t.classify } : {}),
+    ...(t.proposeScopes ? { proposeScopes: t.proposeScopes } : {}),
   }));
 }
 
@@ -1443,10 +1444,16 @@ export async function runTool(
 const RUN_BOOKKEEPING = new Set(["end_run", "get_mode", "pause_automation", "begin_run"]);
 
 /** A call's class inside a run (§11.4): its own `classify`, else read-only or not. */
-function runCallClass(def: ToolDefinition, args: Record<string, unknown>): CallClass {
-  if (def.classify) return def.classify(args);
+function runCallClass(def: ToolDefinition, args: Record<string, unknown>): RunCallClass {
+  const cls = def.classify?.(args);
+  // A proposal is a note a person reads before deciding, like a label (RFC-0014 phase 4).
+  if (cls === "propose") return "advisory";
+  if (cls) return cls;
   return def.annotations.readOnlyHint === true ? "read" : "advisory";
 }
+
+/** The classes runs account for (RFC-0008 §11.4): `propose` counts as `advisory`. */
+type RunCallClass = Exclude<CallClass, "propose">;
 
 /**
  * Why a run may not make this call (RFC-0008 §10.7, §11.4, §11.5), or undefined: another site,
@@ -1458,7 +1465,7 @@ async function runRefusal(
   args: Record<string, unknown>,
   ctx: ToolContext,
   run: RunContext,
-  cls: CallClass,
+  cls: RunCallClass,
   decision: Decision,
 ): Promise<ToolError | undefined> {
   const siteId = run.automation.siteId;
@@ -1525,7 +1532,7 @@ async function noteRunCall(
   ctx: ToolContext,
   run: RunContext,
   tool: string,
-  cls: CallClass,
+  cls: RunCallClass,
   result: "allowed" | "refused",
 ): Promise<void> {
   const store = ctx.schedules?.store;

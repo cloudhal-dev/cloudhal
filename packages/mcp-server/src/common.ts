@@ -61,7 +61,9 @@ export interface ToolDefinition {
    * Per-argument policy (RFC-0007 §10.2): `read`, `advisory`, `reduce` or `person`. `person`
    * calls wait for a person in every mode, `bypass` included.
    */
-  classify?: (args: Record<string, unknown>) => CallClass;
+  classify?: (args: Record<string, unknown>) => CallClass | undefined;
+  /** The scopes a `propose` call needs instead of `scopes` (ADR-0028). */
+  proposeScopes?: Scope[];
   /**
    * What an approval of this call is bound to, instead of the site graph's `stateHash` (RFC-0007
    * §10.3): comment tools bind to the `cm1:` hash of the comments and threads they name.

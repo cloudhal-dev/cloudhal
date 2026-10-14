@@ -83,6 +83,7 @@ describe("role rules (RFC-0005 §2)", () => {
   it("offers own variants in the scope picker and disables what the role lacks", () => {
     const author = scopeOptions("write", FALLBACK_ROLE_SCOPES.author);
     expect(author).toEqual([
+      { scope: "content:propose", disabled: false },
       { scope: "content:write:own", from: "content:write", disabled: false },
       { scope: "asset:upload", disabled: false },
       { scope: "asset:manage", disabled: true },

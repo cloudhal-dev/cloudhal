@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { defaultScopes, PolicyEngine, type ToolPolicy } from "../src/policy.ts";
+import { scopesForMode } from "../src/modes.ts";
+import {
+  defaultScopes,
+  implies,
+  PolicyEngine,
+  type Scope,
+  type ToolPolicy,
+} from "../src/policy.ts";
 
 const tools: ToolPolicy[] = [
   {
@@ -155,6 +162,68 @@ describe("PolicyEngine", () => {
       expect(
         comments.evaluate(key("edits"), "moderate_comments", { ...approve, confirmed: true }),
       ).toEqual({ kind: "allow" });
+    });
+
+    it("propose is free in every mode, plan included; no class falls back to the usual rules", () => {
+      const body = new PolicyEngine([
+        {
+          name: "edit_body",
+          scopes: ["content:write"],
+          annotations: { readOnlyHint: false },
+          classify: (a) => (a.mode === "propose" ? "propose" : undefined),
+        },
+      ]);
+      const writer = (mode: "plan" | "manual" | "edits" | "auto") => ({
+        actor: agent,
+        scopes: ["content:write" as const],
+        mode,
+      });
+      for (const mode of ["plan", "manual", "edits", "auto"] as const)
+        expect(body.evaluate(writer(mode), "edit_body", { args: { mode: "propose" } })).toEqual({
+          kind: "allow",
+        });
+      // Applying is an ordinary write: plan refuses, manual waits, edits goes ahead.
+      expect(body.evaluate(writer("plan"), "edit_body", { args: {} })).toMatchObject({
+        kind: "deny",
+        code: "mode",
+      });
+      expect(body.evaluate(writer("manual"), "edit_body", { args: {} })).toMatchObject({
+        kind: "approval-required",
+        cause: "manual-mode",
+      });
+      expect(body.evaluate(writer("edits"), "edit_body", { args: {} })).toEqual({ kind: "allow" });
+    });
+
+    it("a propose call needs content:propose, which plan keys and every write variant hold", () => {
+      const body = new PolicyEngine([
+        {
+          name: "edit_body",
+          scopes: ["content:write"],
+          annotations: { readOnlyHint: false },
+          own: "entry",
+          classify: (a) => (a.mode === "propose" ? "propose" : undefined),
+          proposeScopes: ["content:read", "content:propose"],
+        },
+      ]);
+      const propose = { args: { mode: "propose" } };
+      const planKey = { actor: agent, scopes: scopesForMode("plan"), mode: "plan" as const };
+      expect(body.evaluate(planKey, "edit_body", propose)).toEqual({ kind: "allow" });
+      expect(body.evaluate(planKey, "edit_body", { args: {} })).toMatchObject({
+        code: "missing_scope",
+      });
+      // A Contributor's draft scope implies proposing, without an own limit (nothing is written).
+      const drafter = { actor: agent, scopes: ["content:read", "content:draft:own"] as Scope[] };
+      expect(body.evaluate(drafter, "edit_body", propose)).toEqual({ kind: "allow" });
+      expect(implies("content:write", "content:propose")).toBe(true);
+      expect(
+        body.evaluate({ actor: agent, scopes: ["content:read"] }, "edit_body", propose),
+      ).toEqual({ kind: "deny", reason: "missing scope content:propose", code: "missing_scope" });
+      // A skill must declare what the call needs.
+      const skilled = {
+        ...planKey,
+        skill: { name: "editor", scopes: ["content:read"], approval: [] },
+      };
+      expect(body.evaluate(skilled, "edit_body", propose)).toMatchObject({ code: "skill" });
     });
 
     it("own variants satisfy the tool with a comment limit", () => {

@@ -33,7 +33,9 @@ export function scopesForMode(mode: AgentMode): Scope[] {
     // RFC-0008 §10.1: the schedule, read-only, in every mode.
     "schedules:read",
   ];
-  if (mode === "plan") return read;
+  // RFC-0014 §5 (ADR-0028): a plan key may propose body edits; they change nothing until a person
+  // accepts them. Other modes get it through `content:write`.
+  if (mode === "plan") return [...read, "content:propose"];
   // `asset:upload` is part of the default agent-key scopes outside plan (RFC-0004, ADR-0018);
   // `schedules:write` lets the agent propose and ask for releases (RFC-0008 §10.1).
   return [
