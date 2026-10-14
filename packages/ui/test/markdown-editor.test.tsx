@@ -1,7 +1,18 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { EditorView } from "@codemirror/view";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { Editor } from "@tiptap/core";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MarkdownEditor, type MarkdownEditorLabels } from "../src/editor.ts";
+import {
+  createMarkdownCodec,
+  editorExtensions,
+  filterSlashItems,
+  looksLikeMarkdown,
+  MarkdownEditor,
+  type MarkdownEditorLabels,
+  pasteMarkdown,
+  type SlashItem,
+} from "../src/editor.ts";
 
 const labels: MarkdownEditorLabels = {
   rich: "Rich text",
@@ -28,8 +39,14 @@ const labels: MarkdownEditorLabels = {
   linkApply: "Apply",
   linkRemove: "Remove link",
   linkInvalid: "Not allowed",
+  image: "Image",
+  paragraph: "Text",
+  insertMenu: "Insert block",
+  noMatches: "No matches",
+  selectionToolbar: "Selection formatting",
   sourceBadge: "Markdown",
   sourceHint: "Kept exactly as written.",
+  editSource: "Edit as Markdown",
 };
 
 function Harness({ initial, onChange }: { initial: string; onChange?: (v: string) => void }) {
@@ -49,6 +66,8 @@ function Harness({ initial, onChange }: { initial: string; onChange?: (v: string
 }
 
 const editable = () => screen.getByRole("textbox", { name: "Body" });
+/** The Tiptap editor behind the rich editing area (Tiptap keeps it on its DOM node). */
+const tiptap = () => (editable() as HTMLElement & { editor: Editor }).editor;
 
 describe("MarkdownEditor", () => {
   afterEach(cleanup);
@@ -82,18 +101,144 @@ describe("MarkdownEditor", () => {
     expect(screen.getByRole("button", { name: "Heading" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("switches to Markdown mode and back, loading what was typed there", async () => {
+  it("switches to Markdown mode (CodeMirror) and back, loading what was typed there", async () => {
     render(<Harness initial={"Hello\n"} />);
     fireEvent.click(screen.getByRole("tab", { name: "Markdown" }));
-    const source = screen.getByRole("textbox", { name: "Body" });
-    expect(source).toHaveValue("Hello\n");
-    fireEvent.change(source, { target: { value: "## Changed\n" } });
+    const source = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>("[data-source-editor] .cm-editor");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(source.querySelector(".cm-content")?.textContent).toContain("Hello");
+    const view = EditorView.findFromDOM(source) as EditorView;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "## Changed\n" } });
     fireEvent.click(screen.getByRole("tab", { name: "Rich text" }));
     await waitFor(() => expect(editable().querySelector("h2")?.textContent).toBe("Changed"));
+  });
+
+  it("opens a source block in Markdown mode with its text selected", async () => {
+    render(<Harness initial={"Intro\n\n<div>raw</div>\n"} />);
+    const edit = await screen.findByRole("button", { name: "Edit as Markdown" });
+    fireEvent.click(edit);
+    const source = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>("[data-source-editor] .cm-editor");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    const view = EditorView.findFromDOM(source) as EditorView;
+    const { from, to } = view.state.selection.main;
+    expect(view.state.sliceDoc(from, to)).toBe("<div>raw</div>");
+  });
+
+  it("inserts a block from the slash menu", async () => {
+    const onChange = vi.fn();
+    render(<Harness initial={"First\n"} onChange={onChange} />);
+    const editor = tiptap();
+    editor.commands.focus("end");
+    editor.commands.insertContent(" /chec");
+    const menu = await screen.findByRole("listbox", { name: "Insert block" });
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Checklist"]);
+    fireEvent.keyDown(editor.view.dom, { key: "Enter" });
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Insert block" })).not.toBeInTheDocument(),
+    );
+    expect(editor.isActive("taskList")).toBe(true);
+    expect(onChange.mock.lastCall?.[0]).toBe("- [ ] First\n");
+  });
+
+  it("inserts an image picked by the host", async () => {
+    const onChange = vi.fn();
+    const pick = vi.fn(async () => ({ src: "asset:asset_abc123" }));
+    render(
+      <MarkdownEditor
+        value={"Text\n"}
+        onChange={onChange}
+        label="Body"
+        labels={labels}
+        onPickImage={pick}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Image" }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(pick).toHaveBeenCalledOnce();
+    expect(onChange.mock.lastCall?.[0]).toContain("![](asset:asset_abc123)");
+  });
+
+  it("shows a formatting toolbar over selected text", async () => {
+    render(<Harness initial={"Select me\n"} />);
+    const editor = tiptap();
+    editor.commands.focus();
+    editor.commands.setTextSelection({ from: 1, to: 7 });
+    expect(
+      await screen.findByRole("toolbar", { name: "Selection formatting" }),
+    ).toBeInTheDocument();
   });
 
   it("is read-only when asked", () => {
     render(<MarkdownEditor value="Hi" onChange={() => {}} label="Body" labels={labels} readOnly />);
     expect(editable()).toHaveAttribute("contenteditable", "false");
+  });
+});
+
+describe("editor helpers", () => {
+  const item = (key: string, label: string, keywords: string[] = []): SlashItem => ({
+    key,
+    label,
+    keywords,
+    run: () => {},
+  });
+
+  it("finds slash items by label, key or keyword, in Turkish too", () => {
+    const items = [
+      item("heading2", "Başlık", ["heading", "h2"]),
+      item("image", "Görsel", ["image", "picture"]),
+      item("quote", "Alıntı", ["quote"]),
+    ];
+    expect(filterSlashItems(items, "").map((i) => i.key)).toEqual(["heading2", "image", "quote"]);
+    expect(filterSlashItems(items, "gör", "tr").map((i) => i.key)).toEqual(["image"]);
+    // Turkish case rules: "ALI" is "alı" (Alıntı), "ALİ" is "ali".
+    expect(filterSlashItems(items, "ALI", "tr").map((i) => i.key)).toEqual(["quote"]);
+    expect(filterSlashItems(items, "ALİ", "tr").map((i) => i.key)).toEqual([]);
+    expect(filterSlashItems(items, "h2").map((i) => i.key)).toEqual(["heading2"]);
+    expect(filterSlashItems(items, "zzz")).toEqual([]);
+  });
+
+  it("tells markdown from plain text", () => {
+    expect(looksLikeMarkdown("# Title")).toBe(true);
+    expect(looksLikeMarkdown("- one\n- two")).toBe(true);
+    expect(looksLikeMarkdown("see [docs](https://x.test)")).toBe(true);
+    expect(looksLikeMarkdown("a **strong** word")).toBe(true);
+    expect(looksLikeMarkdown("Just a sentence, nothing more.")).toBe(false);
+    expect(looksLikeMarkdown("2 * 3 = 6")).toBe(false);
+  });
+
+  it("pastes markdown as blocks, and leaves rich HTML to the editor", async () => {
+    const { Editor: TiptapEditor } = await import("@tiptap/core");
+    const extensions = editorExtensions();
+    const codec = createMarkdownCodec(extensions);
+    const editor = new TiptapEditor({ extensions, content: "<p></p>" });
+    const paste = (data: Record<string, string>) =>
+      pasteMarkdown(editor, codec, {
+        clipboardData: { getData: (type: string) => data[type] ?? "" },
+      } as unknown as ClipboardEvent);
+    expect(paste({ "text/plain": "## Title\n\n- a\n- b" })).toBe(true);
+    expect(editor.getJSON().content?.map((n) => n.type)).toEqual(
+      expect.arrayContaining(["heading", "bulletList"]),
+    );
+    // VS Code sends styled spans: the text is the source.
+    expect(
+      paste({
+        "text/plain": "**bold**",
+        "text/html": "<div><span style='x'>**bold**</span></div>",
+      }),
+    ).toBe(true);
+    // A rendered page's HTML is richer than its text.
+    expect(paste({ "text/plain": "# T", "text/html": "<h1>T</h1>" })).toBe(false);
+    expect(paste({ "text/plain": "plain words" })).toBe(false);
+    editor.destroy();
   });
 });

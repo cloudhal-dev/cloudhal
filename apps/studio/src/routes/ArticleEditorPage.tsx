@@ -451,6 +451,7 @@ export function ArticleEditorPage() {
               {draft.body.format === "markdown" ? (
                 <BodyEditor
                   siteId={siteId}
+                  defaultLocale={site.data?.defaultLocale ?? draft.locale}
                   host={host}
                   value={draft.body.value}
                   onChange={(v) => set("body", { ...draft.body, value: v })}
