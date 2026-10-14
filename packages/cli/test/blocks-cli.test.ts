@@ -1,0 +1,56 @@
+/**
+ * RFC-0015 §6 in the CLI: the theme's `src/blocks.ts` joins the built-ins for `studio`, `mcp` and
+ * `deploy`, which refuses invalid types; the admin Worker bundles the file with its entry.
+ */
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { loadBlockRegistry } from "../src/blocks.ts";
+import { adminEntry } from "../src/cloudflare/admin.ts";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const starter = path.resolve(here, "../../../starters/blog");
+
+describe("theme block types", () => {
+  it("loads the starter's types next to the built-ins", async () => {
+    const registry = await loadBlockRegistry(starter);
+    expect(registry.list().map((t) => t.name)).toEqual([
+      "callout",
+      "button",
+      "embed",
+      "faq",
+      "testimonial",
+    ]);
+    expect(registry.checkSection("testimonial", { author: "Ada", content: "Yes." })).toEqual([]);
+  });
+
+  it("uses the built-ins without a file, and names the file when its types are invalid", async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-blocks-"));
+    try {
+      expect((await loadBlockRegistry(tmp)).list()).toHaveLength(4);
+      await mkdir(path.join(tmp, "src"));
+      // Pure data, like a theme's file; `callout` is a built-in's name.
+      await writeFile(
+        path.join(tmp, "src", "blocks.ts"),
+        `export const blockTypes = [{ name: "callout", title: { en: "Mine" }, where: ["section"], props: { type: "object", additionalProperties: false, properties: {} }, example: { props: {} } }];\n`,
+      );
+      await expect(loadBlockRegistry(tmp)).rejects.toThrow(
+        /src\/blocks\.ts: callout: a built-in block type has this name/,
+      );
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("imports the theme's file in the admin Worker's entry, after the prelude", () => {
+    const entry = adminEntry("../../../src/blocks.ts");
+    expect(entry.indexOf('import "@cloudhal/cloudflare/workerd-prelude";')).toBeLessThan(
+      entry.indexOf('import { blockTypes } from "../../../src/blocks.ts";'),
+    );
+    expect(entry).toContain("createAdminWorker({ skills, blockTypes })");
+    expect(adminEntry()).toContain("createAdminWorker({ skills })");
+    expect(adminEntry()).not.toContain("blockTypes");
+  });
+});

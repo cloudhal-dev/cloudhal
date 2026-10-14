@@ -16,9 +16,8 @@ import {
   termCacheTag,
 } from "@cloudhal/astro-renderer/cache-tags";
 import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
-import { Comments, Sections } from "@cloudhal/astro-renderer/components";
+import { Comments, EntryArticle, Sections } from "@cloudhal/astro-renderer/components";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
-import { renderEntryArticle } from "@cloudhal/astro-renderer/markdown";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
   type ActiveRoute,
@@ -38,6 +37,7 @@ import {
   termAncestors,
 } from "@cloudhal/astro-renderer/taxonomy";
 import type { ContentEntry } from "@cloudhal/core-contracts";
+import { blockTypes } from "../blocks.ts";
 import Archive from "../components/Archive.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import PostTerms from "../components/PostTerms.astro";
@@ -190,7 +190,7 @@ const meta =
 ---
 <Base site={site} meta={meta} nav={nav} footer={footer} notice={notice}>
   {route.kind === "page" && (
-    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} media={media} />
+    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} />
   )}
   {route.kind === "entry" && (
     <Fragment>
@@ -202,7 +202,7 @@ const meta =
           { name: route.entry.title },
         ]}
       />
-      <Fragment set:html={renderEntryArticle(route.entry, locale, media)} />
+      <EntryArticle entry={route.entry} locale={locale} media={media} blocks={blocks} blockTypes={blockTypes} />
       <PostTerms taxonomy={terms} locale={locale} />
       <RelatedPosts title={t.related} entries={related} locale={locale} />
       <Comments view={comments} />

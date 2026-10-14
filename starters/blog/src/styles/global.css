@@ -83,6 +83,19 @@
 .ch-faq__answer {
   @apply mt-2 space-y-2 text-zinc-700;
 }
+/* This theme's own block type (src/blocks.ts). */
+.testimonial blockquote {
+  @apply border-l-4 border-zinc-300 pl-4 text-lg italic text-zinc-800;
+}
+.testimonial figcaption {
+  @apply mt-2 flex gap-2 text-sm;
+}
+.testimonial__author {
+  @apply font-medium text-zinc-900;
+}
+.testimonial__role {
+  @apply text-zinc-500;
+}
 .ch-image figcaption {
   @apply mt-2 text-sm text-zinc-500;
 }

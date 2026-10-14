@@ -34,6 +34,7 @@
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN, CLOUDHAL_COMMENTS_KEY (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
+
 import {
   ApprovalStore,
   AuditLog,
@@ -50,6 +51,7 @@ import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { type BlockType, createBlockRegistry } from "@cloudhal/core-ts/blocks";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -186,6 +188,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export interface AdminWorkerOptions {
   /** Skills exposed over MCP (bundled at deploy time). */
   skills?: SkillSource[];
+  /** The theme's block types (`src/blocks.ts`, RFC-0015 §6), bundled at deploy time. */
+  blockTypes?: readonly BlockType[];
   log?: (line: string) => void;
 }
 
@@ -219,6 +223,8 @@ function required(env: AdminEnv, key: keyof AdminEnv): string {
 
 export function createAdminWorker(options: AdminWorkerOptions = {}) {
   const skills: LoadedSkill[] = (options.skills ?? []).map((s) => skillFromSource(s));
+  // Checked once per isolate; `cloudhal deploy` refused invalid types before uploading.
+  const blocks = createBlockRegistry(options.blockTypes ?? []);
   const log = options.log ?? ((line: string) => console.log(line));
   // Only plain values survive between requests. Workers do not let one request await I/O started
   // by another (it hangs), so no promise, auth instance or binding wrapper is cached here.
@@ -321,6 +327,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       const store: SiteGraphStore = new SiteGraphStore({
         sql,
         blobs,
+        blocks,
         // S15: `availability` is refused until the site Worker says it enforces gates.
         gates: siteGateSupport({
           fetch: siteBinding

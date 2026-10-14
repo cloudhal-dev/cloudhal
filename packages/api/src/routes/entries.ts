@@ -65,7 +65,7 @@ export const entries: Hono<Env> = new Hono<Env>()
     if (!site) throw notFound("site not found");
     const entry = await store.getContentEntry(param(c, "entryId"));
     if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
-    return previewResponse(c, renderEntryPreview(site, entry).html);
+    return previewResponse(c, renderEntryPreview(site, entry, { blocks: store.blocks }).html);
   })
   // The editor's unsaved title, summary, body and cover (RFC-0014 phase 1c): writes nothing.
   .post("/:entryId/preview", async (c) => {
@@ -75,7 +75,9 @@ export const entries: Hono<Env> = new Hono<Env>()
     const entry = await store.getContentEntry(param(c, "entryId"));
     if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
     const draft = entryDraft(entry, await c.req.json().catch(() => ({})));
-    return c.json({ html: renderEntryPreview(site, draft).html } satisfies DraftPreview);
+    return c.json({
+      html: renderEntryPreview(site, draft, { blocks: store.blocks }).html,
+    } satisfies DraftPreview);
   })
   .get("/:entryId", async (c) => {
     const entry = await c.get("store").getContentEntry(param(c, "entryId"));

@@ -4,9 +4,11 @@
  * `entries` supplies collection data for contentList sections, keyed by collection name — or by
  * section id for a section with a `filter`, whose entries the page resolved on their own. `media`
  * resolves assets in image, hero and rich-text sections (RFC-0004). Component sections (RFC-0015)
- * render through `Block.astro`: the theme's `blocks` map, else Cloudhal's built-in markup.
+ * render through `Block.astro`: the theme's `blocks` map, else Cloudhal's built-in markup; rich
+ * text places the theme's block components inside the text too (`Body.astro`).
  */
 import type { ContentEntry, Section } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
 import type { MediaContext } from "../media.ts";
 import Block from "./Block.astro";
 import ContentList from "./ContentList.astro";
@@ -23,9 +25,11 @@ interface Props {
   entries?: Record<string, ContentEntry[]>;
   components?: SectionComponents;
   blocks?: BlockComponents;
+  /** The theme's block types (`src/blocks.ts`): checked before its components render them. */
+  blockTypes?: readonly BlockType[];
   media?: MediaContext;
 }
-const { sections, entries = {}, components = {}, blocks = {}, media } = Astro.props;
+const { sections, entries = {}, components = {}, blocks = {}, blockTypes, media } = Astro.props;
 const defaults = { hero: Hero, richText: RichText, image: Image, contentList: ContentList };
 type AnyComponent = (props: never) => unknown;
 const resolved = { ...defaults, ...components } as Record<
@@ -35,10 +39,12 @@ const resolved = { ...defaults, ...components } as Record<
 ---
 {sections.map((section) => {
   if (section.kind === "component")
-    return <Block section={section} blocks={blocks} {...(media ? { media } : {})} />;
+    return <Block section={section} blocks={blocks} blockTypes={blockTypes} {...(media ? { media } : {})} />;
   const Component = resolved[section.kind];
   if (!Component) return <div data-unknown-section={section.kind} />;
   return section.kind === "contentList"
     ? <Component section={section} entries={entries[section.id] ?? entries[section.collection] ?? []} />
-    : <Component section={section} media={media} />;
+    : section.kind === "richText"
+      ? <Component section={section} media={media} blocks={blocks} blockTypes={blockTypes} />
+      : <Component section={section} media={media} />;
 })}

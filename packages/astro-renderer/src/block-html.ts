@@ -87,7 +87,7 @@ export function missingBlockHtml(
   tag: "section" | "div",
   attrs: string,
   type: string,
-  why: "unknown block type" | "props do not fit the block type",
+  why: "unknown block type" | "props do not fit the block type" | "shown by the theme on the site",
 ): string {
   return `<${tag} class="ch-block ch-block--missing" ${attrs}><p>${escapeHtml(`${type}: ${why}`)}</p></${tag}>`;
 }

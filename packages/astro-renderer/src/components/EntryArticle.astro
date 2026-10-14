@@ -1,0 +1,31 @@
+---
+/**
+ * An article page's content (`renderEntryArticle`'s markup) with the theme's own block components
+ * inside the body (RFC-0015 §5, `Body.astro`).
+ */
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import { entryArticleParts } from "../markdown.ts";
+import type { MediaContext } from "../media.ts";
+import Body from "./Body.astro";
+
+interface Props {
+  entry: Pick<
+    ContentEntry,
+    "id" | "title" | "summary" | "body" | "publishedAt" | "createdAt" | "coverImage"
+  >;
+  locale?: string;
+  media?: MediaContext;
+  blocks?: Record<string, unknown>;
+  blockTypes?: readonly BlockType[];
+}
+const { entry, locale = "en", media, blocks, blockTypes } = Astro.props;
+const parts = entryArticleParts(entry, locale, media);
+---
+<article class="ch-article" data-entry-id={entry.id}>
+  <Fragment set:html={parts.header} />
+  <Fragment set:html={parts.cover} />
+  <div class="ch-richtext">
+    <Body body={parts.body} media={parts.media} blocks={blocks} blockTypes={blockTypes} />
+  </div>
+</article>

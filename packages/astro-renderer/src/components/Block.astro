@@ -1,11 +1,14 @@
 ---
 /**
  * A component section (RFC-0015 §5): the theme's own component for the type when it maps one
- * (`blocks` in theme.ts, given `{ section, props, content, media }`), else Cloudhal's built-in
- * markup (`renderComponentSection`). Unknown types and props that do not fit render nothing.
+ * (`blocks` in theme.ts, given `{ section, props, content, contentHtml, media }`), else Cloudhal's
+ * built-in markup (`renderComponentSection`). Props are checked against the type first (the
+ * theme's types from `src/blocks.ts`); unknown types and props that do not fit render nothing.
  */
 import type { ComponentSection } from "@cloudhal/core-contracts";
-import { renderComponentSection } from "../blocks.ts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import { renderComponentSection, themeRegistry } from "../blocks.ts";
+import { renderMarkdown } from "../markdown.ts";
 import type { MediaContext } from "../media.ts";
 
 interface Props {
@@ -13,16 +16,24 @@ interface Props {
   media?: MediaContext;
   /** The theme's components by block type name. */
   blocks?: Record<string, unknown>;
+  /** The theme's block types (`src/blocks.ts`). */
+  blockTypes?: readonly BlockType[];
 }
-const { section, media, blocks = {} } = Astro.props;
+const { section, media, blocks = {}, blockTypes } = Astro.props;
 type AnyComponent = (props: never) => unknown;
+const registry = themeRegistry(blockTypes);
 const Own = blocks[section.type] as AnyComponent | undefined;
+// A type the theme declares must fit; one it only maps a component for is its own business.
+const fits = (registry.checkSection(section.type, section.props) ?? []).length === 0;
 const content = typeof section.props.content === "string" ? section.props.content : undefined;
+const contentHtml = content !== undefined ? renderMarkdown(content, media) : undefined;
 ---
 {Own ? (
-  <section class="ch-block" data-section-id={section.id} data-kind="component" data-block-type={section.type}>
-    <Own section={section} props={section.props} content={content} media={media} />
-  </section>
+  fits && (
+    <section class="ch-block" data-section-id={section.id} data-kind="component" data-block-type={section.type}>
+      <Own section={section} props={section.props} content={content} contentHtml={contentHtml} media={media} />
+    </section>
+  )
 ) : (
-  <Fragment set:html={renderComponentSection(section, media ? { media } : {})} />
+  <Fragment set:html={renderComponentSection(section, { registry, ...(media ? { media } : {}) })} />
 )}

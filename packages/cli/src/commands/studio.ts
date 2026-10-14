@@ -7,6 +7,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
+import { loadBlockRegistry } from "../blocks.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
@@ -51,7 +52,10 @@ export async function studio(
   options: StudioOptions,
 ): Promise<{ url: string; stop(): Promise<void> }> {
   const cfg = await readProjectConfig(options.projectDir);
-  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  // The theme's block types (RFC-0015 §6) join the built-ins: validated, offered, listed.
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir), {
+    blocks: await loadBlockRegistry(options.projectDir),
+  });
   const studioDist = options.studioDist ?? (await assetDir("studio")) ?? "";
   const serveStudio = await exists(path.join(studioDist, "index.html"));
 

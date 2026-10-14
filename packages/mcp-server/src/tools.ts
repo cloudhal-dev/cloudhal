@@ -1072,6 +1072,7 @@ function rawTools(): ToolDefinition[] {
             throw new ToolError("not_found", `entry ${a.entryId} not found`);
           doc = renderEntryPreview(site, entry, {
             assets: await assetsOf(ctx, "contentEntry", entry),
+            blocks: ctx.store.blocks,
           });
         } else if (a.pageId) {
           const page = await ctx.store.getPage(a.pageId as string);
@@ -1091,6 +1092,7 @@ function rawTools(): ToolDefinition[] {
           );
           doc = renderPagePreview(site, page, entries, {
             assets: await assetsOf(ctx, "page", page),
+            blocks: ctx.store.blocks,
           });
         } else {
           throw new ToolError("invalid", "pass pageId or entryId");

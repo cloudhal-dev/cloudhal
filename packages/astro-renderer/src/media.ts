@@ -8,7 +8,9 @@
  * 13) because it needs Transformations enabled on a real zone. `"none"` (the default; offline,
  * static builds, previews, workers.dev) is a passthrough: the original URL, no `srcset`.
  */
+
 import type { Asset, ImageRef } from "@cloudhal/core-contracts";
+import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import { assetUrl, formatBytes, MEDIA_TYPES, mediaPath } from "@cloudhal/core-ts/media";
 
 const escapeHtml = (s: string) =>
@@ -31,6 +33,11 @@ export interface MediaContext {
   readonly preview?: boolean | undefined;
   /** Called once per unresolved `asset:` reference (logged by the caller). */
   readonly onMiss?: ((id: string) => void) | undefined;
+  /**
+   * The deployment's block registry (RFC-0015 §6), for previews: a theme's type is then told
+   * apart from an unknown one. The site renders theme types with the theme's components.
+   */
+  readonly blocks?: BlockRegistry | undefined;
 }
 
 export interface ImageAttributeOptions {

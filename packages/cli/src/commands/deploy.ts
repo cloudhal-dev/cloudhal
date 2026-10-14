@@ -43,6 +43,7 @@
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
  */
+
 import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -51,6 +52,7 @@ import { BUNDLE_PREFIX } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { SCHEDULES_ENGINE_LEVEL } from "@cloudhal/core-ts/releases";
 import { assetDir, monorepoRoot } from "../assets.ts";
+import { blockTypesFile, loadBlockRegistry } from "../blocks.ts";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import { buildSiteWorker } from "../cloudflare/build.ts";
 import {
@@ -747,6 +749,9 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     }),
     `Cloudhal site Worker for ${site.name}`,
   );
+  // The theme's block types (RFC-0015 §6) are checked before anything is built or uploaded.
+  await loadBlockRegistry(options.projectDir);
+  const blockTypes = await blockTypesFile(options.projectDir);
   log("building the site Worker");
   const siteConfig = await buildSiteWorker(options.projectDir, (l) => log(`  ${l}`));
 
@@ -764,6 +769,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       siteId: cfg.siteId,
       studioDir,
       skillsDir,
+      blockTypes,
       domain: cfg.domains?.studio,
       analytics: a,
       comments: c,
