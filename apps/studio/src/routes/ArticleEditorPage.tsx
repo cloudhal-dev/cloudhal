@@ -473,6 +473,8 @@ export function ArticleEditorPage() {
                   siteId={siteId}
                   defaultLocale={site.data?.defaultLocale ?? draft.locale}
                   host={host}
+                  nodeId={draft.id}
+                  pageLocale={draft.locale}
                   value={draft.body.value}
                   onChange={(v) => set("body", { ...draft.body, value: v })}
                   readOnly={readOnlyReason !== undefined || locked}

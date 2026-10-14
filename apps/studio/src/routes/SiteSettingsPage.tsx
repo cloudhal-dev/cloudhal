@@ -35,6 +35,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { AI_SETTINGS_SECTION, AiSettingsSection } from "../components/AiSettings.tsx";
 import {
   ANALYTICS_SETTINGS_SECTION,
   AnalyticsSettingsSection,
@@ -88,6 +89,7 @@ const SECTIONS = [
   ANALYTICS_SETTINGS_SECTION,
   COMMENT_SETTINGS_SECTION,
   SCHEDULE_SETTINGS_SECTION,
+  AI_SETTINGS_SECTION,
   "previews",
 ] as const;
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -836,7 +838,7 @@ function PreviewLinksSection({
 
 /** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
-  const t = useT("analyticsSettings", "commentsSettings", "scheduleSettings");
+  const t = useT("analyticsSettings", "commentsSettings", "scheduleSettings", "aiSettings");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
@@ -863,7 +865,9 @@ export function SiteSettingsPage() {
                 ? t("commentsSettings.title")
                 : id === SCHEDULE_SETTINGS_SECTION
                   ? t("scheduleSettings.title")
-                  : t(`siteSettings.sections.${id}`),
+                  : id === AI_SETTINGS_SECTION
+                    ? t("aiSettings.title")
+                    : t(`siteSettings.sections.${id}`),
         }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
@@ -876,6 +880,8 @@ export function SiteSettingsPage() {
         <CommentSettingsSection siteId={siteId} />
         {/* Schedules (RFC-0008 §15.1): scheduler health, kill switch, daily cap. */}
         <ScheduleSettingsSection siteId={siteId} />
+        {/* In-editor AI (RFC-0016): content readers see it; site:settings changes it. */}
+        <AiSettingsSection siteId={siteId} />
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>

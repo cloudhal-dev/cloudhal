@@ -22,6 +22,7 @@ import {
   ListNumbers,
   Minus,
   Quotes,
+  Sparkle,
   Table,
   TextB,
   TextHThree,
@@ -106,6 +107,22 @@ export interface MarkdownEditorLabels {
   outlineSkipped: string;
   /** An H1 in the body: the title is already the page's H1. */
   outlineExtraH1: string;
+  /** The selection toolbar's AI button (shown only with `onAskAi`), e.g. "Ask AI". */
+  askAi?: string;
+}
+
+/**
+ * The blocks a selection touches, for the host's AI commands (RFC-0016): their markdown, and a way
+ * to put new markdown in their place.
+ */
+export interface AiSelection {
+  /** The whole top-level blocks the selection touches, as markdown. */
+  markdown: string;
+  /**
+   * Replaces those blocks with `markdown` (one undo step). False, and nothing changed, when the
+   * blocks were edited since they were read.
+   */
+  replace: (markdown: string) => boolean;
 }
 
 /** An image chosen in the host's media picker. */
@@ -138,6 +155,11 @@ export interface MarkdownEditorProps {
   onPickImage?: () => Promise<PickedImage | undefined>;
   /** UI language, for matching slash-menu words (Turkish İ/ı). */
   locale?: string;
+  /**
+   * In-editor AI (RFC-0016): the selection toolbar gets `labels.askAi`, which hands the selected
+   * blocks to the host. The host shows the result and calls `replace` if the person accepts it.
+   */
+  onAskAi?: (selection: AiSelection) => void;
 }
 
 /**
@@ -167,6 +189,7 @@ export function MarkdownEditor({
   className,
   onPickImage,
   locale = "en",
+  onAskAi,
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<MarkdownEditorMode>(defaultMode);
   // The text a source block asked to open in Markdown mode (selected there once).
@@ -176,6 +199,8 @@ export function MarkdownEditor({
   resolveRef.current = resolveSrc;
   const pickRef = useRef(onPickImage);
   pickRef.current = onPickImage;
+  const askRef = useRef(onAskAi);
+  askRef.current = onAskAi;
   const labelsRef = useRef(labels);
   labelsRef.current = labels;
   const editorRef = useRef<Editor | null>(null);
@@ -304,7 +329,18 @@ export function MarkdownEditor({
       >
         <EditorContent editor={editor} />
         {editor && mode === "rich" && !readOnly && (
-          <SelectionMenu editor={editor} labels={labels} />
+          <SelectionMenu
+            editor={editor}
+            labels={labels}
+            {...(onAskAi && labels.askAi
+              ? {
+                  onAskAi: () => {
+                    const selection = selectionBlocks(editor, codec);
+                    if (selection) askRef.current?.(selection);
+                  },
+                }
+              : {})}
+          />
         )}
       </div>
       {mode === "markdown" && (
@@ -583,7 +619,52 @@ function OutlineButton({ editor, labels }: { editor: Editor; labels: MarkdownEdi
 }
 
 /** A toolbar over selected text: the inline formats and the link. */
-function SelectionMenu({ editor, labels }: { editor: Editor; labels: MarkdownEditorLabels }) {
+/**
+ * The top-level blocks the selection touches (RFC-0016), as markdown, with `replace`: it refuses
+ * when those blocks changed since, so a late AI answer never overwrites newer edits.
+ */
+export function selectionBlocks(editor: Editor, codec: MarkdownCodec): AiSelection | undefined {
+  const { doc, selection } = editor.state;
+  if (selection.empty) return undefined;
+  const first = doc.resolve(selection.from).index(0);
+  const last = doc.resolve(Math.max(selection.from, selection.to - 1)).index(0);
+  const nodes: JSONContent[] = [];
+  let from = -1;
+  let to = -1;
+  doc.forEach((node, offset, index) => {
+    if (index < first || index > last) return;
+    if (from < 0) from = offset;
+    to = offset + node.nodeSize;
+    nodes.push(node.toJSON() as JSONContent);
+  });
+  if (!nodes.length) return undefined;
+  const original = JSON.stringify(nodes);
+  return {
+    markdown: nodes.map((n) => codec.block(n)).join("\n\n"),
+    replace: (markdown) => {
+      const now: JSONContent[] = [];
+      editor.state.doc.forEach((node, offset) => {
+        if (offset >= from && offset + node.nodeSize <= to) now.push(node.toJSON() as JSONContent);
+      });
+      if (JSON.stringify(now) !== original) return false;
+      const content = (codec.load(markdown).doc.content ?? []).filter(
+        (n) => !(n.type === "paragraph" && !n.content?.length),
+      );
+      if (!content.length) return false;
+      return editor.chain().focus().insertContentAt({ from, to }, content).run();
+    },
+  };
+}
+
+function SelectionMenu({
+  editor,
+  labels,
+  onAskAi,
+}: {
+  editor: Editor;
+  labels: MarkdownEditorLabels;
+  onAskAi?: () => void;
+}) {
   // While the link popover is open the editor loses focus; the menu stays.
   const linkOpen = useRef(false);
   const state = useEditorState({
@@ -658,6 +739,11 @@ function SelectionMenu({ editor, labels }: { editor: Editor; labels: MarkdownEdi
             linkOpen.current = open;
           }}
         />
+        {onAskAi && labels.askAi && (
+          <ToolbarButton
+            item={{ key: "ai", label: labels.askAi, icon: <Sparkle />, run: onAskAi }}
+          />
+        )}
       </Toolbar>
     </BubbleMenu>
   );

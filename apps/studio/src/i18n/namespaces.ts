@@ -12,6 +12,7 @@
  * renders it. The type checks (and `test/i18n.test.tsx`) keep `en` and `tr` on the same keys.
  */
 import type { Locale } from "./index.tsx";
+import type { messages as aiSettings } from "./lazy/aiSettings.en.ts";
 import type { messages as analytics } from "./lazy/analytics.en.ts";
 import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.ts";
 import type { messages as bodyEditor } from "./lazy/bodyEditor.en.ts";
@@ -25,6 +26,7 @@ type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString
 
 /** Every lazy namespace's shape (from its English module), keyed by namespace. */
 export interface NamespaceCatalogs {
+  aiSettings: DeepString<(typeof aiSettings)["aiSettings"]>;
   analytics: DeepString<(typeof analytics)["analytics"]>;
   analyticsSettings: DeepString<(typeof analyticsSettings)["analyticsSettings"]>;
   bodyEditor: DeepString<(typeof bodyEditor)["bodyEditor"]>;
@@ -42,6 +44,10 @@ type Loader<N extends Namespace> = () => Promise<{ messages: NamespaceMessages<N
 
 /** One dynamic import per namespace and locale, so a page loads only the language it shows. */
 const LOADERS: { [N in Namespace]: Record<Locale, Loader<N>> } = {
+  aiSettings: {
+    en: () => import("./lazy/aiSettings.en.ts"),
+    tr: () => import("./lazy/aiSettings.tr.ts"),
+  },
   analytics: {
     en: () => import("./lazy/analytics.en.ts"),
     tr: () => import("./lazy/analytics.tr.ts"),

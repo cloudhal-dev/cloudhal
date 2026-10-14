@@ -82,7 +82,7 @@ const SiteSettingsPage = lazyRouteComponent(
   () =>
     withMessages(
       import("./routes/SiteSettingsPage.tsx"),
-      ["analyticsSettings", "commentsSettings", "scheduleSettings"],
+      ["analyticsSettings", "commentsSettings", "scheduleSettings", "aiSettings"],
       LOCALE_LIST,
     ),
   "SiteSettingsPage",

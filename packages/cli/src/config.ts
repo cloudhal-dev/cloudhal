@@ -88,6 +88,12 @@ export interface ObservabilityConfig {
   readonly traces?: boolean | number;
 }
 
+/**
+ * `cloudhal.json` `ai` (RFC-0016): `{}` binds Workers AI (`AI`) to the admin Worker, so each site's
+ * owner can turn in-editor AI on in Studio. No keys: the binding bills to the account.
+ */
+export type AiConfig = Record<string, never>;
+
 /** A plain `local@domain` address: no display name, no spaces or line breaks. */
 const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
@@ -109,6 +115,8 @@ export interface ProjectConfig {
   readonly schedules?: SchedulesConfig;
   /** Email delivery (RFC-0011); absent = invites and resets by link only. */
   readonly mail?: MailConfig;
+  /** In-editor AI through Workers AI (RFC-0016); absent = no `AI` binding. */
+  readonly ai?: AiConfig;
   /** Workers Logs sampling and opt-in Traces for both Workers; absent = every log, no traces. */
   readonly observability?: ObservabilityConfig;
   /**
@@ -129,6 +137,7 @@ const OWN_KEYS = new Set([
   "comments",
   "schedules",
   "mail",
+  "ai",
   "observability",
   "placement",
 ]);
@@ -259,6 +268,8 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   const comments = parseCommentsConfig(cfg.comments);
   const schedules = parseSchedulesConfig(cfg.schedules);
   const mail = parseMailConfig(cfg.mail);
+  // RFC-0016: `{}` or `true` binds Workers AI; anything else leaves it off.
+  const ai = cfg.ai === (true as unknown) || (cfg.ai && typeof cfg.ai === "object");
   const observability = parseObservabilityConfig(cfg.observability);
   return {
     siteId: cfg.siteId,
@@ -275,6 +286,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
     ...(comments ? { comments } : {}),
     ...(schedules ? { schedules } : {}),
     ...(mail ? { mail } : {}),
+    ...(ai ? { ai: {} } : {}),
     ...(observability ? { observability } : {}),
     ...(cfg.placement === "smart" ? { placement: "smart" as const } : {}),
   };

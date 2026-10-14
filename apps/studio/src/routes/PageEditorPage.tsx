@@ -116,6 +116,9 @@ interface MediaContext {
   siteId: string;
   defaultLocale: string;
   host: string | undefined;
+  /** The page (in-editor AI's context, RFC-0016) and its language. */
+  nodeId: string;
+  locale: string;
 }
 
 function SectionForm({
@@ -169,6 +172,8 @@ function SectionForm({
           siteId={media.siteId}
           defaultLocale={media.defaultLocale}
           host={media.host}
+          nodeId={media.nodeId}
+          pageLocale={media.locale}
           value={section.body}
           onChange={(v) => onChange({ ...section, body: v })}
           size="sm"
@@ -578,6 +583,8 @@ export function PageEditorPage() {
                           siteId,
                           defaultLocale: site.data?.defaultLocale ?? draft.locale,
                           host,
+                          nodeId: draft.id,
+                          locale: draft.locale,
                         }}
                         readOnly={readOnlyReason !== undefined || locked}
                       />

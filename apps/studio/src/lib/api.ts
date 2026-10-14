@@ -195,7 +195,9 @@ export type PersonScope =
   | "members:invite"
   | "members:manage"
   | "agents:manage"
-  | "commenters:data";
+  | "commenters:data"
+  /** RFC-0016: in-editor AI commands. */
+  | "ai:invoke";
 /**
  * Schedule scopes (RFC-0008 §10.1): the calendar, releases and gates (`:own`: one's own nodes),
  * approving releases, and automations (people only). Studio reads them through roles and abilities.
@@ -351,6 +353,51 @@ export interface ProposalItem {
   steps?: ProposalStep[];
   diff?: BodyDiff;
   problem?: string;
+}
+
+// ---- in-editor AI (RFC-0016, packages/api/src/routes/ai.ts) -------------------------------------
+
+/** How the server reaches Workers AI: the Worker binding, the REST API, or not at all. */
+export type AiTransportKind = "binding" | "rest" | "none";
+
+export interface AiSettings {
+  enabled: boolean;
+  /** A Workers AI id (`@cf/…`) or, through a gateway, `provider/model`. */
+  model: string;
+  gateway?: string;
+  dailyLimit: number;
+  /** 0 until first saved. */
+  rev: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface AiDayUsage {
+  day: string;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** One in-editor AI command (RFC-0016 §3). */
+export interface AiCommandRequest {
+  command: "improve" | "shorten" | "expand" | "fix" | "tone" | "translate" | "custom";
+  nodeId: string;
+  text: string;
+  tone?: "formal" | "friendly" | "plain";
+  locale?: string;
+  instruction?: string;
+}
+
+/** A model in the picker: recommended ones first, then the account's catalogue. */
+export interface AiPickerModel {
+  id: string;
+  description?: string;
+  contextWindow?: number;
+  beta?: boolean;
+  recommended?: "default" | "quality" | "general";
+  /** In the live catalogue (false: recommended, but the catalogue could not be read). */
+  listed: boolean;
 }
 
 /** What a pending approval request would change (RFC-0014 §5): a body, block by block. */
@@ -547,6 +594,8 @@ export interface InstanceInfo {
     comments?: CommentsFeature;
     /** Schedules (RFC-0008 §13). Older servers omit it: read as not available. */
     schedules?: SchedulesFeature;
+    /** In-editor AI (RFC-0016): how the server reaches Workers AI. Older servers omit it. */
+    ai?: AiTransportKind;
   };
   /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
   agentModes?: AgentModesInfo;
@@ -596,6 +645,8 @@ export type Ability =
   | "releases.approveAny"
   | "automations.manage"
   | "schedules.settings"
+  | "ai.invoke"
+  | "ai.settings"
   | "ownership.transfer";
 
 export interface RolesInfo {
@@ -817,7 +868,7 @@ export interface NotificationsPage {
 /** The on/off features (`analytics` is an object of its own). */
 export type InstanceFeature = Exclude<
   keyof InstanceInfo["features"],
-  "analytics" | "comments" | "schedules"
+  "analytics" | "comments" | "schedules" | "ai"
 >;
 
 /** A skill agents can read over MCP (`GET /api/skills`). */
@@ -1944,6 +1995,60 @@ export const api = {
       request<void>(`/api/sites/${entry.siteId}/entries/${entry.id}?rev=${entry.rev}`, {
         method: "DELETE",
       }),
+  },
+  ai: {
+    /** Whether AI is on, the model, the cap, today's use and how the server reaches Workers AI. */
+    settings: (siteId: string) =>
+      request<{ settings: AiSettings; usage: AiDayUsage; transport: AiTransportKind }>(
+        `/api/sites/${siteId}/ai/settings`,
+      ),
+    /** Saves settings read at `rev`; 409 when someone saved in between. */
+    save: (
+      siteId: string,
+      input: { enabled: boolean; model: string; gateway?: string; dailyLimit: number; rev: number },
+    ) => request<AiSettings>(`/api/sites/${siteId}/ai/settings`, { method: "PUT", ...json(input) }),
+    /**
+     * Runs a command on the selected markdown and yields the model's text as it arrives. An error
+     * before the first chunk is an `ApiRequestError` with the code (`ai_budget`, `ai_off`, …).
+     */
+    command: async function* (
+      siteId: string,
+      body: AiCommandRequest,
+      signal?: AbortSignal,
+    ): AsyncGenerator<string, void, undefined> {
+      const res = await fetch(`/api/sites/${siteId}/ai/commands`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok || !res.body) {
+        const error = (await res
+          .json()
+          .catch(() => ({ error: "ai_failed", message: res.statusText }))) as ApiError;
+        throw new ApiRequestError(res.status, error);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          if (text) yield text;
+        }
+        const rest = decoder.decode();
+        if (rest) yield rest;
+      } finally {
+        reader.releaseLock();
+      }
+    },
+    /** The model picker (503 when the server cannot reach Workers AI). */
+    models: (siteId: string) =>
+      request<{ models: AiPickerModel[]; catalog: "live" | "unavailable" }>(
+        `/api/sites/${siteId}/ai/models`,
+      ),
   },
   proposals: {
     /** Open proposals on one article or page, newest first. */

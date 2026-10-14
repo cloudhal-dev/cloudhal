@@ -15,6 +15,8 @@ import {
   useT,
   withMessages,
 } from "../src/i18n/index.tsx";
+import { messages as aiSettingsEn } from "../src/i18n/lazy/aiSettings.en.ts";
+import { messages as aiSettingsTr } from "../src/i18n/lazy/aiSettings.tr.ts";
 import { messages as analyticsEn } from "../src/i18n/lazy/analytics.en.ts";
 import { messages as analyticsTr } from "../src/i18n/lazy/analytics.tr.ts";
 import { messages as analyticsSettingsEn } from "../src/i18n/lazy/analyticsSettings.en.ts";
@@ -68,6 +70,7 @@ describe("i18n", () => {
 
 describe("lazy message namespaces", () => {
   const modules = {
+    aiSettings: [aiSettingsEn, aiSettingsTr],
     analytics: [analyticsEn, analyticsTr],
     analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
     bodyEditor: [bodyEditorEn, bodyEditorTr],
@@ -105,6 +108,7 @@ describe("lazy message namespaces", () => {
       [schedulesEn, schedulesTr],
       [scheduleSettingsEn, scheduleSettingsTr],
       [bodyEditorEn, bodyEditorTr],
+      [aiSettingsEn, aiSettingsTr],
     ] as const) {
       const english = new Map(flat(enModule));
       // Placeholders, product names and codes may stay as they are; sentences may not.

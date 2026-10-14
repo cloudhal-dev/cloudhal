@@ -273,6 +273,8 @@ export function adminWorkerConfig(
     schedules?: SchedulesDeployment;
     /** Email delivery: a `send_email` binding locked to this one sender (RFC-0011). */
     mail?: MailDeployment;
+    /** In-editor AI (RFC-0016): the Workers AI binding. */
+    ai?: boolean;
     /** Logs sampling and opt-in traces (default: every log, no traces). */
     observability?: ObservabilityDeployment;
     /** Smart Placement: run next to D1 rather than next to the person (default: off). */
@@ -323,6 +325,9 @@ export function adminWorkerConfig(
     ...(n.mail
       ? { send_email: [{ name: MAIL_BINDING, allowed_sender_addresses: [n.mail.from] }] }
       : {}),
+    // RFC-0016: Workers AI for in-editor commands; billed per use, nothing runs until a site's
+    // owner turns AI on.
+    ...(n.ai ? { ai: { binding: "AI" } } : {}),
     vars,
     // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
     // switching between the cron trigger and the alarm never needs a migration (§8.3).

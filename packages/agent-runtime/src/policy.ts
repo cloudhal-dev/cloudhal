@@ -40,6 +40,8 @@ export type Scope =
   | "releases:publish"
   | "releases:publish:own"
   | "automations:manage"
+  // RFC-0016: in-editor AI commands (people only: agents bring their own model).
+  | "ai:invoke"
   | "*";
 
 /**
@@ -95,6 +97,8 @@ export const PERSON_SCOPES: readonly Scope[] = [
   // RFC-0008 §10.1 (D7): creating, editing, resuming, running and deleting automations — standing
   // rules of autonomy stay with people.
   "automations:manage",
+  // RFC-0016 (D6): in-editor AI commands; agents bring their own model.
+  "ai:invoke",
 ];
 
 /** @deprecated use `KEY_SCOPES` (what a key may carry). */

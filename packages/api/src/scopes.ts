@@ -118,6 +118,12 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // (own limits in the handler) or, for page sections, full content:write
   ["GET", `${S}/proposals`, "content:read"],
   ["POST", `${S}/proposals/:proposalId/preview`, "content:read"],
+  // RFC-0016: in-editor AI — everyone who reads content sees whether it is on; Administrators
+  // change it; commands need ai:invoke (every role holds it; the site's switch and cap limit it)
+  ["GET", `${S}/ai/settings`, "content:read"],
+  ["PUT", `${S}/ai/settings`, "site:settings"],
+  ["GET", `${S}/ai/models`, "site:settings"],
+  ["POST", `${S}/ai/commands`, "ai:invoke"],
   ["POST", `${S}/proposals/:proposalId/accept`, "content:draft:own"],
   ["POST", `${S}/proposals/:proposalId/reject`, "content:draft:own"],
   ["GET", `${S}/snapshots`, "site:read"],

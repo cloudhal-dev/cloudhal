@@ -28,6 +28,9 @@
  * invites and reset links through Cloudflare Email Service, after the response where it must not
  * show (`defer` → `waitUntil`).
  *
+ * In-editor AI (RFC-0016): with the `AI` binding (`ai` in cloudhal.json) the API reaches Workers AI
+ * without a secret; each site's owner turns it on, picks the model and sets the daily cap in Studio.
+ *
  * Secrets: BETTER_AUTH_SECRET, MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN,
  * CLOUDHAL_DEPLOY_TOKEN, CLOUDHAL_COMMENTS_KEY (all ≥ 32 chars; `cloudhal deploy` generates them).
  */
@@ -42,7 +45,7 @@ import { type AnalyticsDefaults, parseAnalyticsDefaults } from "@cloudhal/analyt
 import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlQueryBudget } from "@cloudhal/analytics/sql";
 import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
-import { createApi } from "@cloudhal/api";
+import { type AiBinding, AiStore, bindingTransport, createApi } from "@cloudhal/api";
 import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
@@ -69,6 +72,8 @@ import {
 export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
+  /** Workers AI (RFC-0016), bound when cloudhal.json has an `ai` key. */
+  AI?: AiBinding;
   ASSETS?: Fetcher;
   SITE?: Fetcher;
   BETTER_AUTH_SECRET: string;
@@ -409,6 +414,11 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           : {}),
         analytics: adminAnalytics(env, sql, { log }),
         ...(comments ? { comments } : {}),
+        // RFC-0016: settings always; commands only with the binding.
+        ai: {
+          store: new AiStore(sql),
+          ...(env.AI ? { transport: bindingTransport(env.AI) } : {}),
+        },
         // RFC-0008 §12–§13: the schedule routes and tools; "Publish now" purges like a tick.
         schedules: {
           store: new SqlScheduleStore(sql),

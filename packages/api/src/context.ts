@@ -16,6 +16,7 @@ import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { MailSender } from "./mail.ts";
+import type { AiDeps } from "./routes/ai.ts";
 import type { UploadSecret } from "./uploads.ts";
 
 /** Resolves who is calling: a session cookie, an API key, … Returns undefined for anonymous. */
@@ -112,6 +113,11 @@ export interface ApiDeps {
    * and tools (rollout steps 7–8) read it as `c.get("scheduler")`.
    */
   readonly scheduler?: SchedulerControl;
+  /**
+   * In-editor AI (RFC-0016): the settings store, and how calls reach Workers AI (`bindingTransport`
+   * on Workers, `restTransport` from Node). Without a transport AI stays unavailable.
+   */
+  readonly ai?: AiDeps;
 }
 
 export type Env = {

@@ -77,6 +77,7 @@ export const KEY_SCOPES: readonly Exclude<AgentScope, "*">[] = [
   "content:write",
   "content:write:own",
   "content:draft:own",
+  "content:propose",
   "preview:create",
   "site:publish",
   "site:publish:own",
@@ -127,7 +128,7 @@ export function sameScopeSet(a: readonly AnyScope[], b: readonly AnyScope[]): bo
 
 // ---- the server's role rules, with Studio's copy as the fallback ------------------------------
 
-const READ: AnyScope[] = ["site:read", "content:read", "preview:create"];
+const READ: AnyScope[] = ["site:read", "content:read", "preview:create", "ai:invoke"];
 const EDITOR: AnyScope[] = [
   ...READ,
   "content:write",
@@ -206,6 +207,8 @@ export const FALLBACK_ABILITIES: Record<Ability, AnyScope | "owner"> = {
   "releases.approveAny": "releases:publish",
   "automations.manage": "automations:manage",
   "schedules.settings": "site:settings",
+  "ai.invoke": "ai:invoke",
+  "ai.settings": "site:settings",
   "ownership.transfer": "owner",
 };
 

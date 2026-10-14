@@ -361,7 +361,26 @@ Markdown bodies (article bodies, page `richText` sections in markdown) are edite
 - **Preview:** the editor's preview follows unsaved edits (§2f).
 - **Suggestions** (RFC-0014 phase 4): an agent's open proposals for a body (`edit_body` with `mode: "propose"`) sit above its editor — the article body, or each markdown rich-text section of a page — under a `Text` heading "Suggestions" with an info `Badge` "2 open" (`components/BodyProposals.tsx`). Each is an `InsetPanel`: an `ActorBadge` "{name} suggests", `RelativeTime`, the agent's note, then a `BodyDiff` of what accepting would change **now** (computed by `GET /api/sites/:siteId/proposals`, `content:read`), then a secondary "Reject" and a primary "Accept" (`POST …/:id/accept|reject`; deciding needs what updating the node needs — own limits for articles, `content:write` for pages). Accepting writes at once, so while the form has unsaved changes "Accept" is disabled with the hint "Save or discard your changes first." beside it — a hint, not a `Tooltip`, which would wrap the button in its own. A proposal whose blocks changed since it was filed shows a warning `Badge` "Out of date" (its `Tooltip` names the block) and the hint text in place of the diff; it can only be rejected. Accepting one that went stale meanwhile returns 409 and a danger toast. Accepted blocks keep the agent as their author with `via: "proposal"`. A suggestion of several operations lists them as a `Checkbox.Group` "Changes to accept", one `Checkbox.Item` per operation in words ("Change “First” to “Opening”", "Remove “Second.”"; "Rewrite “…”" for a replaced block, whose new text the diff shows; the agent's text as plain text, one line, at most 80 characters), all ticked; unticking one re-fetches the diff for the rest (`POST …/:id/preview`, a `SkeletonLine` meanwhile) and Accept becomes "Accept 1 of 2"; with none ticked the hint "Choose at least one change." replaces the diff and Accept is disabled.
 - **Approvals** (§2m): a pending `edit_body` request shows "What approving changes in “{title}”" and the same `BodyDiff` under its prompt (`data-approval-changes`), computed when the list loads; a request that no longer applies shows none.
-- Not yet (later phases, RFC-0014): AI edits by block.
+- **Ask AI** (RFC-0016 §3): when the site has AI on, the person holds `ai.invoke` and the server reaches Workers AI, the selection toolbar ends with a `Sparkle` button "Ask AI". It hands the whole top-level blocks the selection touches to `AiCommandDialog` (`MarkdownEditor`'s `onAskAi`, `selectionBlocks`).
+  - The `LayerDialog` has a "What to do" `Select` with the seven commands. "Change tone" adds a tone `Select`, "Translate" a language `Select` named through `Intl.DisplayNames`, "Your own instruction" an `InputArea` of at most 500 characters. A secondary "Run" button sits beside them.
+  - While the answer streams: "Writing…", with the text as plain text in a `bg-kumo-recessed` box, and a "Stop" button.
+  - Then a `BodyDiff` of selection → answer under "Suggested text". A code fence around the whole answer is dropped. "Try again" reruns.
+  - The primary **Replace** puts the answer into the editor in one undo step. It is refused, with an error `Banner`, when the selected blocks changed meanwhile. Cancel discards.
+  - Server refusals are worded: `ai_budget`, `ai_busy`, `ai_off`, `ai_model_unavailable`, `ai_rate_limited`, `ai_unavailable`, `ai_failed`. Nothing is saved until the person saves the form.
+
+### 2z. AI settings (RFC-0016)
+Site › Settings gets an **AI** section (`components/AiSettings.tsx`, lazy namespace `aiSettings`), after Schedules:
+- a success `Badge` "On" (`Sparkle`) in the header while AI is on;
+- a secondary `Banner` "This deployment can't reach Workers AI yet" when `/ai/settings` reports `transport: "none"`, saying what to add (`"ai": {}` in cloudhal.json, or the two environment variables on Node). The rows stay editable, so an owner can choose settings first.
+- **Rows** (`SettingRow`s):
+  - "AI in the editor" — a `Switch`, off until the owner turns it on.
+  - "Model" — a `Combobox` over `GET …/ai/models`. Recommended models come first, labelled "· Recommended", then the account's catalogue. Under it: the recommended model's note, its context window, and where the text goes ("Selected text goes to Workers AI in this Cloudflare account" or "…to {provider} through your AI Gateway").
+  - "Daily limit" — a number `Input`, 0 to 10,000, with a `Meter` "7 of 100 used today".
+- **A `Collapsible` "AI Gateway and other providers"**, open when either is set:
+  - "AI Gateway" — an id `Input`;
+  - "Model from another provider" — `provider/model`. While it is filled, it is the model used and the `Combobox` is disabled; it needs a gateway, and the field says so.
+- An alert `Banner` warns when the chosen Workers AI model is missing from the live catalogue: "…no longer offered by Workers AI…".
+- Below Administrator (`ai.settings` = `site:settings`) the controls are disabled with the gating reason, and the model shows as text.
 
 ## 3. Sidebar specification
 ```tsx
