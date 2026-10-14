@@ -25,7 +25,8 @@
     "./releases": "./src/releases.ts",
     "./automations": "./src/automations.ts",
     "./body-blocks": "./src/body-blocks.ts",
-    "./blocks": "./src/blocks.ts"
+    "./blocks": "./src/blocks.ts",
+    "./directives": "./src/directives.ts"
   },
   "files": [
     "dist",
@@ -128,6 +129,10 @@
       "./blocks": {
         "types": "./dist/src/blocks.d.ts",
         "default": "./dist/src/blocks.js"
+      },
+      "./directives": {
+        "types": "./dist/src/directives.d.ts",
+        "default": "./dist/src/directives.js"
       }
     }
   },

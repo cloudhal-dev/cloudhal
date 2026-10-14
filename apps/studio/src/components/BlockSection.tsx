@@ -6,26 +6,14 @@
  */
 import type { ComponentSection } from "@cloudhal/core-contracts";
 import { type BlockType, localized, sectionSchema, validateProps } from "@cloudhal/core-ts/blocks";
-import { Banner, BlockPropsForm, InputArea } from "@cloudhal/ui";
-import {
-  Cube,
-  CursorClick,
-  type Icon,
-  Info,
-  Play,
-  Question,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { Banner, BlockPropsForm, blockIcon, InputArea } from "@cloudhal/ui";
+import { WarningCircle } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
-const ICONS: Record<string, Icon> = { Info, CursorClick, Play, Question };
-
-/** A block type's icon (a Phosphor name in the type), or a generic one. */
-export const blockIcon = (type: BlockType | undefined): Icon =>
-  (type?.icon && ICONS[type.icon]) || Cube;
+export { blockIcon };
 
 /** The deployment's block types (rarely change: cached for the session). */
 export function useBlockTypes(siteId: string): BlockType[] {
@@ -90,21 +78,7 @@ export function ComponentSectionForm({
         />
       </div>
     );
-  const values = (prop: string, value: string) => {
-    const known: Record<string, Record<string, string>> = {
-      tone: {
-        info: t("editor.blocks.values.tone.info"),
-        success: t("editor.blocks.values.tone.success"),
-        warning: t("editor.blocks.values.tone.warning"),
-        danger: t("editor.blocks.values.tone.danger"),
-      },
-      variant: {
-        primary: t("editor.blocks.values.variant.primary"),
-        secondary: t("editor.blocks.values.variant.secondary"),
-      },
-    };
-    return known[prop]?.[value] ?? value;
-  };
+  const values = useBlockEnumLabel();
   return (
     <BlockPropsForm
       schema={schema}
@@ -122,6 +96,29 @@ export function ComponentSectionForm({
         moveDown: t("editor.blocks.moveDown"),
       }}
     />
+  );
+}
+
+/** Words for the built-ins' enum values (`tone` → "Warning"); other values show as written. */
+export function useBlockEnumLabel() {
+  const { t } = useI18n();
+  return useCallback(
+    (prop: string, value: string) => {
+      const known: Record<string, Record<string, string>> = {
+        tone: {
+          info: t("editor.blocks.values.tone.info"),
+          success: t("editor.blocks.values.tone.success"),
+          warning: t("editor.blocks.values.tone.warning"),
+          danger: t("editor.blocks.values.tone.danger"),
+        },
+        variant: {
+          primary: t("editor.blocks.values.variant.primary"),
+          secondary: t("editor.blocks.values.variant.secondary"),
+        },
+      };
+      return known[prop]?.[value] ?? value;
+    },
+    [t],
   );
 }
 

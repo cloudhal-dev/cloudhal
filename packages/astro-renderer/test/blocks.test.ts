@@ -2,6 +2,7 @@
 import type { ComponentSection } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import { renderComponentSection } from "../src/blocks.ts";
+import { renderMarkdown } from "../src/markdown.ts";
 import { renderSectionHtml } from "../src/preview.ts";
 
 const section = (type: string, props: Record<string, unknown>): ComponentSection => ({
@@ -57,5 +58,47 @@ describe("component sections", () => {
     expect(renderSectionHtml(section("callout", { tone: "loud" }))).toContain(
       "callout: props do not fit the block type",
     );
+  });
+});
+
+describe("body directives", () => {
+  it("render built-ins like their sections, inner markdown through the same renderer", () => {
+    const html = renderMarkdown(
+      [
+        "Intro.",
+        "",
+        ':::callout{tone="warning" title="<b>Careful</b>"}',
+        "Back up **first**.",
+        "",
+        "[docs](javascript:alert(1)) <script>x</script>",
+        ":::",
+        "",
+        '::button{label="Start" href="/start" variant="secondary"}',
+      ].join("\n"),
+    );
+    expect(html).toContain('<div class="ch-block" data-block-type="callout">');
+    expect(html).toContain("ch-callout--warning");
+    expect(html).toContain("&lt;b&gt;Careful&lt;/b&gt;");
+    expect(html).toContain("<strong>first</strong>");
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain('<a class="ch-button ch-button--secondary" href="/start">Start</a>');
+    expect(html).not.toContain(":::");
+  });
+
+  it("render nothing for unknown or misfitting directives, and say why in previews", () => {
+    const body =
+      '::pricing-table{plan="pro"}\n\n::button{label="Go" href="javascript:x"}\n\nAfter.';
+    const site = renderMarkdown(body);
+    expect(site).not.toContain("pricing-table");
+    expect(site).not.toContain("javascript");
+    expect(site).toContain("<p>After.</p>");
+    const preview = renderMarkdown(body, { preview: true });
+    expect(preview).toContain("pricing-table: unknown block type");
+    expect(preview).toContain("button: props do not fit the block type");
+  });
+
+  it("leave text that is not exactly a directive as ordinary markdown", () => {
+    expect(renderMarkdown(":::callout\nnever closed")).toContain(":::callout");
   });
 });

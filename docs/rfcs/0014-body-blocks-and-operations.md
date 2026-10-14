@@ -31,7 +31,7 @@ Agents gain `edit_body`: operations on blocks addressed by id. These can apply d
 
 **Profile v1** is CommonMark plus GFM (tables, task lists, strikethrough, autolinks), plus `asset:<id>` links and images (RFC-0004).
 
-Directives cover typed blocks (§6, RFC-0015): `:::name{key="v"}` … `:::` containers and `::name{…}` leaves. Until the registry exists, an unknown directive renders as its text.
+Directives cover typed blocks (§6, RFC-0015): `:::name{key="v"}` … `:::` containers and `::name{…}` leaves. Since RFC-0015 phase 6b, a directive of a type the deployment does not know is kept and renders nothing on the site (a placeholder in previews).
 
 The profile leaves these out:
 - raw HTML stays escaped, as today;

@@ -41,6 +41,10 @@ export const messages = {
     outlineExtraH1: "Use H2: the page has its H1",
     sourceBadge: "Markdown",
     sourceHint: "Kept exactly as written. Edit it in Markdown mode.",
+    blocks: {
+      properties: "Properties",
+      invalid: "Check properties",
+    },
     placeholder: "Write here, or type / to add a block…",
     ai: {
       ask: "Ask AI",

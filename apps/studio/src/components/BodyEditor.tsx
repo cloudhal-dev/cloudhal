@@ -1,11 +1,17 @@
 import { InputArea } from "@cloudhal/ui";
-import type { AiSelection, MarkdownEditorLabels, PickedImage } from "@cloudhal/ui/editor";
+import type {
+  AiSelection,
+  EditorBlocks,
+  MarkdownEditorLabels,
+  PickedImage,
+} from "@cloudhal/ui/editor";
 import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { previewImageUrl } from "../lib/seo.ts";
 import { AiCommandDialog } from "./AiCommandDialog.tsx";
+import { useBlockEnumLabel, useBlockTypes } from "./BlockSection.tsx";
 import { AssetPickerDialog } from "./MediaPicker.tsx";
 import { useGate } from "./useMe.ts";
 
@@ -124,6 +130,28 @@ export function BodyEditor({
     }),
     [t],
   );
+  // Typed blocks (RFC-0015): the body types in the `/` menu, edited through their forms.
+  const blockTypes = useBlockTypes(siteId);
+  const enumLabel = useBlockEnumLabel();
+  const blocks = useMemo<EditorBlocks>(
+    () => ({
+      types: blockTypes.filter((b) => b.where.includes("body")),
+      enumLabel,
+      labels: {
+        properties: t("bodyEditor.blocks.properties"),
+        invalid: t("bodyEditor.blocks.invalid"),
+        unknown: t("editor.blocks.unknown", { type: "{type}" }),
+        unknownHint: t("editor.blocks.unknownHint"),
+        editSource: t("bodyEditor.editSource"),
+        item: t("editor.blocks.item"),
+        addItem: t("editor.blocks.addItem"),
+        removeItem: t("editor.blocks.removeItem"),
+        moveUp: t("editor.blocks.moveUp"),
+        moveDown: t("editor.blocks.moveDown"),
+      },
+    }),
+    [blockTypes, enumLabel, t],
+  );
   const ai = useAiAvailable(siteId, nodeId !== undefined && !readOnly);
   const [asking, setAsking] = useState<AiSelection | undefined>();
   const resolveSrc = useCallback((src: string) => bodyImageSrc(siteId, host, src), [siteId, host]);
@@ -152,6 +180,7 @@ export function BodyEditor({
           size={size}
           readOnly={readOnly}
           locale={locale}
+          blocks={blocks}
           {...(readOnly ? {} : { onPickImage: pickImage })}
           {...(ai ? { onAskAi: setAsking } : {})}
         />

@@ -41,10 +41,12 @@ import {
   sameAvailability,
 } from "./availability.ts";
 import { BLOCK_LIMITS, type BlockRegistry, createBlockRegistry } from "./blocks.ts";
+import { bodyDirectives } from "./body-blocks.ts";
 import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { BLOB_CONCURRENCY, eachLimited } from "./concurrency.ts";
+import { checkDirective } from "./directives.ts";
 import {
   ConflictError,
   InvariantError,
@@ -693,6 +695,7 @@ export class SiteGraphStore {
       await assertUnlocked(this.#sql, stored.siteId, [prev.id], options.releaseEdit);
     }
     if (draft.body.format === "markdown") {
+      checkBodyDirectives(this.blocks, draft.body.value, "body");
       const previous = stored?.body.format === "markdown" ? stored.body : undefined;
       const index = await indexMarkdown({
         markdown: draft.body.value,
@@ -1591,8 +1594,24 @@ export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef
  * RFC-0015 §7: every component section of a known type follows its props schema; unknown types
  * are kept (a theme may have removed them) but still capped at the prop limit.
  */
+/** Body directives of known types must fit them (RFC-0015 §7); unknown ones are kept. */
+function checkBodyDirectives(blocks: BlockRegistry, markdown: string, where: string): void {
+  if (!markdown.includes("::")) return;
+  for (const d of bodyDirectives(markdown)) {
+    const issues = checkDirective(blocks, d);
+    if (issues?.length)
+      throw new InvariantError(
+        "invalid_props",
+        `${where}: ${d.name}: ${issues.map((i) => `${i.path || "props"} ${i.message}`).join("; ")}`,
+        { type: d.name, issues },
+      );
+  }
+}
+
 function checkComponentSections(blocks: BlockRegistry, page: Page): void {
   for (const section of page.sections) {
+    if (section.kind === "richText" && section.format === "markdown")
+      checkBodyDirectives(blocks, section.body, `section ${section.id}`);
     if (section.kind !== "component") continue;
     const issues =
       Object.keys(section.props).length > BLOCK_LIMITS.props
