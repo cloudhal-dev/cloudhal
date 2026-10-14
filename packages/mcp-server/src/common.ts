@@ -27,6 +27,7 @@ import {
   NotFoundError,
   UniqueConstraintError,
 } from "@cloudhal/core-ts";
+import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 import type { FetchTransport } from "@cloudhal/core-ts/media";
 import { ScheduleConflictError, ScheduleError } from "@cloudhal/schedules";
 import type { CommentsDeps } from "./comments.ts";
@@ -64,6 +65,11 @@ export interface ToolDefinition {
   classify?: (args: Record<string, unknown>) => CallClass | undefined;
   /** The scopes a `propose` call needs instead of `scopes` (ADR-0028). */
   proposeScopes?: Scope[];
+  /**
+   * What the call would change, for a person deciding its approval request (RFC-0014 §5): Studio
+   * lists it with the request. Computed against the current state when the request is listed.
+   */
+  changes?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<ApprovalChanges>;
   /**
    * What an approval of this call is bound to, instead of the site graph's `stateHash` (RFC-0007
    * §10.3): comment tools bind to the `cm1:` hash of the comments and threads they name.
@@ -220,6 +226,16 @@ export type ToolErrorCode =
   | "no_egress_in_runs"
   | "budget_exceeded"
   | "run";
+
+/** What an approval request would change (RFC-0014 §5): a body, block by block. */
+export interface ApprovalChanges {
+  kind: "body";
+  /** The article, or the page whose rich-text section `sectionId` it changes. */
+  nodeId: string;
+  sectionId?: string;
+  title: string;
+  diff: BodyDiff;
+}
 
 export class ToolError extends Error {
   override readonly name = "ToolError";

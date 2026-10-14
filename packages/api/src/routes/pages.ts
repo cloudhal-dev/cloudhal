@@ -1,6 +1,7 @@
 import { renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { Page, Site } from "@cloudhal/core-contracts";
 import { type Context, Hono } from "hono";
+import { patchBody } from "../body.ts";
 import type { Env } from "../context.ts";
 import { pageDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
@@ -72,6 +73,10 @@ export const pages: Hono<Env> = new Hono<Env>()
       throw badRequest("ids must match the URL");
     return c.json(await c.get("store").updatePage(body, { writer: writerOf(c) }));
   })
+  // RFC-0014 §4: operations on a markdown rich-text section's blocks.
+  .patch("/:pageId/sections/:sectionId/body", (c) =>
+    patchBody(c, { pageId: param(c, "pageId"), sectionId: param(c, "sectionId") }),
+  )
   .delete("/:pageId", async (c) => {
     const store = c.get("store");
     const site = await requireSite(c);

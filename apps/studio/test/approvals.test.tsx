@@ -1,3 +1,4 @@
+import { bodyDiff } from "@cloudhal/core-ts/body-blocks";
 import { Toasty } from "@cloudhal/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -135,6 +136,39 @@ describe("ApprovalsPage", () => {
     const history = container.querySelector('[data-approval-id="appr_old"]') as HTMLElement;
     expect(history.querySelector("[data-status]")).toHaveAttribute("data-status", "denied");
     expect(within(history).getByText("by you")).toBeInTheDocument();
+  });
+
+  it("shows what an edit_body request changes, block by block", async () => {
+    const EDIT: Approval = {
+      ...base,
+      id: "appr_body",
+      tool: "edit_body",
+      input: { siteId: "site_1", entryId: "entry_1", rev: 3, ops: [] },
+      prompt: 'Edit the body of article "Launch"?',
+      changes: {
+        kind: "body",
+        nodeId: "entry_1",
+        title: "Launch",
+        diff: bodyDiff("We launch soon.\n\nMore later.\n", "We launch today.\n\nMore later.\n"),
+      },
+    };
+    serve((url) => {
+      if (url.startsWith("/api/sites/site_1/approvals"))
+        return { status: 200, body: { items: [EDIT] } };
+      if (url === "/api/me")
+        return { status: 200, body: { actor: { kind: "human", id: "user_owner01" } } };
+      return undefined;
+    });
+    const { container } = render(wrap(<ApprovalsPage />));
+    const row = await findRow(container, "appr_body");
+    const changes = await waitFor(() => {
+      const el = row.querySelector('[data-approval-changes="entry_1"]');
+      if (!el) throw new Error("no changes");
+      return el as HTMLElement;
+    });
+    expect(changes).toHaveTextContent("What approving changes in “Launch”");
+    expect(changes.querySelector("ins")).toHaveTextContent("today.");
+    expect(changes.querySelector("del")).toHaveTextContent("soon.");
   });
 
   it("approves a non-destructive request straight away", async () => {

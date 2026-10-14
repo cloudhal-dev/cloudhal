@@ -1,6 +1,7 @@
 import {
   Badge,
   Banner,
+  BodyDiff,
   Button,
   Collapsible,
   PageLayout,
@@ -30,6 +31,7 @@ import { ModeBadge } from "../components/AgentModes.tsx";
 import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx";
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
 import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
+import { useBodyDiffLabels } from "../components/BodyChanges.tsx";
 import { ApproveCommentsDialog, CommentRequestDetails } from "../components/CommentApprovals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {
@@ -311,6 +313,7 @@ function PendingRequest({
           )}
         </div>
       )}
+      {request.changes?.kind === "body" && <BodyRequestChanges changes={request.changes} />}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <span className="flex items-center gap-1.5">
           <Text variant="secondary" size="sm" as="span">
@@ -353,6 +356,20 @@ function PendingRequest({
           )}
         </Collapsible.DefaultPanel>
       </Collapsible.Root>
+    </div>
+  );
+}
+
+/** What approving an `edit_body` request changes, block by block (RFC-0014 §5). */
+function BodyRequestChanges({ changes }: { changes: NonNullable<Approval["changes"]> }) {
+  const t = useT();
+  const labels = useBodyDiffLabels();
+  return (
+    <div className="grid min-w-0 gap-1.5" data-approval-changes={changes.nodeId}>
+      <Text variant="secondary" size="sm">
+        {t("approvals.bodyChanges", { title: changes.title })}
+      </Text>
+      <BodyDiff diff={changes.diff} labels={labels} />
     </div>
   );
 }

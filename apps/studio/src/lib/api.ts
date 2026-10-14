@@ -338,10 +338,28 @@ export interface BodyProposal {
 }
 
 /** `GET …/proposals`: open ones carry what accepting would change now, or why it can't. */
+/** One operation of a proposal as it reads against the body now (`@cloudhal/core-ts`). */
+export interface ProposalStep {
+  op: "replace" | "replaceText" | "insert" | "move" | "delete";
+  before?: string;
+  after?: string;
+}
+
 export interface ProposalItem {
   proposal: BodyProposal;
+  /** Open proposals: each operation, to accept some of them. */
+  steps?: ProposalStep[];
   diff?: BodyDiff;
   problem?: string;
+}
+
+/** What a pending approval request would change (RFC-0014 §5): a body, block by block. */
+export interface ApprovalChanges {
+  kind: "body";
+  nodeId: string;
+  sectionId?: string;
+  title: string;
+  diff: BodyDiff;
 }
 
 /** `POST …/entries/:id/preview`, `POST …/pages/:id/preview`: the unsaved form, rendered. */
@@ -845,6 +863,8 @@ export interface Approval {
    * it (everyone could decide).
    */
   canDecide?: boolean;
+  /** Pending `edit_body` requests: what approving would change now (RFC-0014 §5). */
+  changes?: ApprovalChanges;
   /** A person's own request (cause `role`): why their role could not do it alone (English). */
   reason?: string;
   status: ApprovalStatus;
@@ -1930,6 +1950,12 @@ export const api = {
     list: (siteId: string, nodeId: string) =>
       request<{ items: ProposalItem[] }>(`/api/sites/${siteId}/proposals${query({ nodeId })}`).then(
         (r) => r.items,
+      ),
+    /** What accepting only the operations `ops` would change now. */
+    preview: (siteId: string, id: string, ops: number[]) =>
+      request<{ diff?: BodyDiff; problem?: string }>(
+        `/api/sites/${siteId}/proposals/${encodeURIComponent(id)}/preview`,
+        { method: "POST", ...json({ ops }) },
       ),
     /** Applies it (or the operations `ops`); 409 `stale` when the text changed since. */
     accept: (siteId: string, id: string, ops?: number[]) =>

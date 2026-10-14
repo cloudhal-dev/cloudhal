@@ -233,6 +233,60 @@ function summary(ops: readonly BodyOp[]): string {
   return parts.join(", ");
 }
 
+/** The body a call names, checked against the caller's own limit, and what `ops` make of it. */
+async function prepare(a: Record<string, unknown>, ctx: ToolContext) {
+  const body = await locate(a, ctx);
+  if (ctx.limit) {
+    if (!body.entry)
+      throw new ToolError("denied", "pages are edited by Editors; you may edit your own articles");
+    await entryLimitCheck(ctx, "update", body.entry);
+  }
+  const ops = a.ops as BodyOp[];
+  const { blocks, markdown } = await plan(body, a.rev as number, ops);
+  if (markdown === body.markdown) throw new ToolError("invalid", "the operations change nothing");
+  return { body, ops, blocks, markdown };
+}
+
+/** What a body edit wrote: the new `rev`, the block ids it changed, added and removed. */
+export interface BodyEditResult {
+  rev: number;
+  changed: string[];
+  added: string[];
+  removed: string[];
+  words: { added: number; removed: number };
+}
+
+/**
+ * Applies `a.ops` to the body `a` names (`entryId`, or `pageId` with `sectionId`) at `a.rev`, in
+ * one write as `writer` (RFC-0014 §4): `edit_body` and REST `PATCH …/body` share it. Own limits
+ * come from `ctx.limit`; snapshotting is the caller's.
+ */
+export async function editBody(
+  a: Record<string, unknown>,
+  ctx: ToolContext,
+  writer: BlockWriter,
+): Promise<BodyEditResult> {
+  const { body, blocks, markdown } = await prepare(a, ctx);
+  try {
+    const saved = await body.write(markdown, writer);
+    const located = await locate(a, ctx);
+    const after = await currentBlocks(located.markdown, located.index);
+    const before = new Map(blocks.map((b) => [b.id, b.hash]));
+    const now = new Set(after.map((b) => b.id));
+    return {
+      rev: saved.rev,
+      changed: after
+        .filter((b) => before.has(b.id) && before.get(b.id) !== b.hash)
+        .map((b) => b.id),
+      added: after.filter((b) => !before.has(b.id)).map((b) => b.id),
+      removed: blocks.filter((b) => !now.has(b.id)).map((b) => b.id),
+      words: bodyDiff(body.markdown, markdown).words,
+    };
+  } catch (e) {
+    mapError(e);
+  }
+}
+
 export function bodyTools(): ToolDefinition[] {
   return [
     {
@@ -330,20 +384,8 @@ export function bodyTools(): ToolDefinition[] {
         }
       },
       handler: async (a, ctx) => {
-        const body = await locate(a, ctx);
-        if (ctx.limit) {
-          if (!body.entry)
-            throw new ToolError(
-              "denied",
-              "pages are edited by Editors; you may edit your own articles",
-            );
-          await entryLimitCheck(ctx, "update", body.entry);
-        }
-        const ops = a.ops as BodyOp[];
-        const { blocks, markdown } = await plan(body, a.rev as number, ops);
-        if (markdown === body.markdown)
-          throw new ToolError("invalid", "the operations change nothing");
         if (a.mode === "propose") {
+          const { body, ops } = await prepare(a, ctx);
           try {
             const proposal = await ctx.store.proposals.create({
               siteId: body.siteId,
@@ -359,27 +401,22 @@ export function bodyTools(): ToolDefinition[] {
             mapError(e);
           }
         }
+        const result = await editBody(a, ctx, { actor: ctx.principal.actor, via: "mcp" });
         try {
-          const saved = await body.write(markdown, { actor: ctx.principal.actor, via: "mcp" });
-          const located = await locate(a, ctx);
-          const after = await currentBlocks(located.markdown, located.index);
-          const before = new Map(blocks.map((b) => [b.id, b.hash]));
-          const now = new Set(after.map((b) => b.id));
-          const d = bodyDiff(body.markdown, markdown);
-          const snapshot = await autoSnapshot(ctx, body.siteId, "edit_body");
-          return {
-            rev: saved.rev,
-            changed: after
-              .filter((b) => before.has(b.id) && before.get(b.id) !== b.hash)
-              .map((b) => b.id),
-            added: after.filter((b) => !before.has(b.id)).map((b) => b.id),
-            removed: blocks.filter((b) => !now.has(b.id)).map((b) => b.id),
-            words: d.words,
-            snapshot,
-          };
+          return { ...result, snapshot: await autoSnapshot(ctx, a.siteId as string, "edit_body") };
         } catch (e) {
           mapError(e);
         }
+      },
+      changes: async (a, ctx) => {
+        const { body, markdown } = await prepare(a, ctx);
+        return {
+          kind: "body",
+          nodeId: (a.entryId ?? a.pageId) as string,
+          ...(typeof a.sectionId === "string" ? { sectionId: a.sectionId } : {}),
+          title: body.title,
+          diff: bodyDiff(body.markdown, markdown),
+        };
       },
     },
     {

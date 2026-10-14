@@ -17,7 +17,7 @@ const proposal = (id: string, extra: Record<string, unknown> = {}) => ({
   siteId: "site_1",
   nodeId: "entry_1",
   baseRev: 3,
-  ops: [],
+  ops: [{ op: "delete", block: "blk_xxxxxxxx" }],
   actor: { kind: "agent", id: "agent_1", name: "Writer" },
   note: "A stronger opening.",
   status: "open",
@@ -81,6 +81,48 @@ it("waits for unsaved changes before accepting, and rejects", async () => {
   await waitFor(() =>
     expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/prop_1/reject"))).toBe(true),
   );
+});
+
+it("accepts some of a suggestion's operations, with the diff following the choice", async () => {
+  const calls = serve(
+    {
+      "/api/sites/site_1/proposals?nodeId=entry_1": {
+        items: [
+          {
+            proposal: proposal("prop_3", {
+              ops: [
+                { op: "replaceText", block: "blk_aaaaaaaa", find: "First", replace: "Opening" },
+                { op: "delete", block: "blk_bbbbbbbb" },
+              ],
+            }),
+            steps: [
+              { op: "replaceText", before: "First", after: "Opening" },
+              { op: "delete", before: "Second." },
+            ],
+            diff: bodyDiff("First.\n\nSecond.\n", "Opening.\n"),
+          },
+        ],
+      },
+    },
+    (call) =>
+      call.url.endsWith("/prop_3/preview")
+        ? { body: { diff: bodyDiff("First.\n\nSecond.\n", "Opening.\n\nSecond.\n") } }
+        : undefined,
+  );
+  const onDecided = mount(false);
+  const remove = await screen.findByRole("checkbox", { name: "Remove “Second.”" });
+  expect(screen.getByRole("checkbox", { name: "Change “First” to “Opening”" })).toBeChecked();
+  expect(screen.getByRole("button", { name: "Accept" })).toBeEnabled();
+  fireEvent.click(screen.getByText("Remove “Second.”"));
+  await waitFor(() => expect(remove).not.toBeChecked());
+  const some = await screen.findByRole("button", { name: "Accept 1 of 2" });
+  await waitFor(() => expect(some).toBeEnabled());
+  const preview = calls.find((c) => c.url.endsWith("/prop_3/preview"));
+  expect(preview?.body).toEqual({ ops: [0] });
+  fireEvent.click(some);
+  await waitFor(() => expect(onDecided).toHaveBeenCalled());
+  const accept = calls.find((c) => c.url.endsWith("/prop_3/accept"));
+  expect(accept?.body).toEqual({ ops: [0] });
 });
 
 it("shows nothing without suggestions", async () => {

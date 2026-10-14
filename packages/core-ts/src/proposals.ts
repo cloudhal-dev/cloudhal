@@ -103,8 +103,52 @@ export interface ProposalGraph {
   updatePage(page: Page, options: { writer: { actor: Actor; via: "proposal" } }): Promise<Page>;
 }
 
+/** One operation of a proposal as a person reads it (Studio lists them to pick from). */
+export interface ProposalStep {
+  op: BodyOp["op"];
+  /**
+   * The block it changes, moves or removes as it reads now, or the text `replaceText` finds;
+   * shortened to one line. Absent for inserts, and for a block that is gone.
+   */
+  before?: string;
+  /** What it writes: the new block, or the replacement text; shortened to one line. */
+  after?: string;
+}
+
+/** At most `max` characters of `text` on one line. */
+function excerpt(text: string, max = 140): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
+}
+
+/** How each operation reads against the current blocks. */
+export function proposalSteps(
+  ops: readonly BodyOp[],
+  blocks: readonly { id: string; markdown: string }[],
+): ProposalStep[] {
+  const text = new Map(blocks.map((b) => [b.id, b.markdown]));
+  const before = (id: string) => {
+    const t = text.get(id);
+    return t === undefined ? {} : { before: excerpt(t) };
+  };
+  return ops.map((op) => {
+    switch (op.op) {
+      case "insert":
+        return { op: op.op, after: excerpt(op.markdown) };
+      case "replace":
+        return { op: op.op, ...before(op.block), after: excerpt(op.markdown) };
+      case "replaceText":
+        return { op: op.op, before: excerpt(op.find), after: excerpt(op.replace) };
+      default:
+        return { op: op.op, ...before(op.block) };
+    }
+  });
+}
+
 /** What accepting the proposal (or some of its operations) would make of the body now. */
 export interface ProposalPreview {
+  /** Every operation of the proposal, as it reads against the current body. */
+  steps: ProposalStep[];
   /** The body as it is. */
   current: string;
   /** The body with the operations applied; absent when they no longer apply. */
@@ -274,13 +318,15 @@ export class BodyProposals {
   async preview(p: BodyProposal, selected?: readonly number[]): Promise<ProposalPreview> {
     const target = await this.target(p.siteId, p.nodeId, p.sectionId);
     const blocks = await currentBlocks(target.markdown, target.blocks);
+    const steps = proposalSteps(p.ops, blocks);
     try {
       return {
+        steps,
         current: target.markdown,
         proposed: applyBodyOps(target.markdown, blocks, this.#pinned(p, selected)),
       };
     } catch (e) {
-      if (e instanceof BodyOpError) return { current: target.markdown, problem: e.message };
+      if (e instanceof BodyOpError) return { steps, current: target.markdown, problem: e.message };
       throw e;
     }
   }

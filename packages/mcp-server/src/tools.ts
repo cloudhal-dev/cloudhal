@@ -92,6 +92,7 @@ function mcpWriter(ctx: { principal: { actor: Actor } }): BlockWriter {
 }
 
 export {
+  type ApprovalChanges,
   type JsonSchema,
   type MediaToolOptions,
   type ToolContext,

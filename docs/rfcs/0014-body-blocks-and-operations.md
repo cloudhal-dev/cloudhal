@@ -176,11 +176,11 @@ Phase 1c adds a heading outline (an H1 in the body or a skipped level is flagged
   - `edit_body` with `mode: "propose"` and an optional `note`: the operations are checked against the body and stored, nothing is written. The call class `propose` is allowed in every mode, `plan` included, and needs `content:read` and the new `content:propose` instead of `content:write`. `plan` keys get `content:propose` by default; every write variant (`content:write`, `…:write:own`, `…:draft:own`) implies it.
   - the `body_proposals` table (migration 0019) and `store.proposals` in core-ts: each proposal keeps the hashes of the blocks it targets; accepting pins every operation to them, so a block changed since makes the proposal `stale` (409) instead of overwriting it. A proposal is decided once (`accepted`, `partial`, `rejected`, `stale`), with a compare-and-set on its status.
   - REST `GET /api/sites/:siteId/proposals` (open ones carry the `bodyDiff` against the current body), `POST …/:id/accept` (optionally `{ ops: number[] }`) and `POST …/:id/reject`; deciding needs what updating the node needs.
-  - Studio's suggestions above the body editor (DESIGN.md §2y).
-- **Still open:**
-  - choosing single operations of a proposal in Studio (the API accepts a subset);
-  - structured approval `changes` (until then, the `edit_body` approval prompt carries the operation summary and the word counts);
-  - the REST `PATCH …/body`.
+  - Studio's suggestions above the body editor (DESIGN.md §2y), with a checkbox per operation when there are several: the diff follows the choice (`POST …/proposals/:id/preview`) and Accept applies only those.
+  - Decisions are audited as `edit_body` rows by the person, naming the proposal and its agent.
+  - Approval `changes`: pending `edit_body` requests carry the block diff they would make now (`ToolDefinition.changes`, computed when Approvals lists them), and Studio shows it under the request.
+  - REST `PATCH /api/sites/:siteId/entries/:entryId/body` and `PATCH …/pages/:pageId/sections/:sectionId/body` (`{ rev, ops }`): `edit_body`'s apply mode for people, sharing its code (`editBody` in `@cloudhal/mcp-server/body`). REST refuses API keys, so agents propose through MCP only.
+- **Phase 4 is complete.**
 - **Unindexed bodies:** a body without an index (written before this phase, or over 5,000 blocks) shows content-derived ids (`blk_v…`). The store's first write keeps those ids, so no one-off job is needed.
 
 ## Alternatives considered
