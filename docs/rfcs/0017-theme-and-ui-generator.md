@@ -1,5 +1,5 @@
 # RFC-0017: Theme and UI generator — design settings, generated pages and Kumo catalog panels
-- Status: Draft
+- Status: Accepted (2026-10-14, approved by Halil with the defaults of every open question; ADR-0031)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-14
 - Related:
   - RFC-0014 §8, phase 7 ("Generator": Kumo catalog panels, outputs are ordinary changes, generator tools that propose);
@@ -153,6 +153,7 @@ New block types, components and layouts are code. They are written in the projec
 - **Kumo catalog validation uses Zod.** Zod's JIT path uses `new Function`, which Workers forbid. Server-side validation must run Zod without JIT, or with a precompiled check; see open question 1.
 
 ## Open questions
+Accepted with the defaults below (ADR-0031).
 1. **Server-side tree validation on Workers:** run Zod without JIT, or precompile the panel schema (hard rule 6)? Default: validate with Zod's jitless mode on the server, and also in the browser before render.
 2. **Font hosting:** only the named system stacks in 7a, or self-hosted font assets from the media library too? Default: system stacks and theme-bundled fonts only.
 3. **`cloudhal init --prompt`:** generate with the account's Workers AI over REST, which needs an account id and token, or seed and let the person run "Generate…" in Studio afterwards? Default: Studio after init; `--prompt` only when the AI environment variables are set.
