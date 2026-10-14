@@ -34,6 +34,7 @@ export function rank(role: Role): number {
 const IMPLIES: Partial<Record<AnyScope, readonly AnyScope[]>> = {
   "content:write": ["content:write:own"],
   "content:write:own": ["content:draft:own"],
+  "content:draft:own": ["content:propose"],
   // RFC-0008 §10.1: publishing later is no more power than publishing now.
   "site:publish": ["site:publish:own", "releases:publish"],
   "site:publish:own": ["releases:publish:own"],

@@ -14,6 +14,7 @@ export type Scope =
   | "content:write"
   | "content:write:own"
   | "content:draft:own"
+  | "content:propose"
   | "preview:create"
   | "site:publish"
   | "site:publish:own"
@@ -52,6 +53,9 @@ export const KEY_SCOPES: readonly Scope[] = [
   "content:write",
   "content:write:own",
   "content:draft:own",
+  // RFC-0014 §5 (ADR-0028): file body proposals a person accepts or rejects; changes no content,
+  // so `plan` keys hold it. Every write variant implies it.
+  "content:propose",
   "preview:create",
   "site:publish",
   "site:publish:own",
@@ -111,6 +115,7 @@ export function isKeyScope(value: unknown): value is Scope {
 const IMPLIES: Partial<Record<Scope, readonly Scope[]>> = {
   "content:write": ["content:write:own"],
   "content:write:own": ["content:draft:own"],
+  "content:draft:own": ["content:propose"],
   // RFC-0008 §10.1: publishing later is no more power than publishing now.
   "site:publish": ["site:publish:own", "releases:publish"],
   "site:publish:own": ["releases:publish:own"],
@@ -186,14 +191,15 @@ const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" 
  * | `reduce` | reversible, can only make something less visible | ✗ | waits | ✓ | ✓ | ✓ |
  * | `publish` | makes content public, or removes it, at a time | ✗ | waits | waits | low-risk in window ✓, else waits | ✓ |
  * | `person` | makes something public | ✗ | waits | waits | waits | **waits** |
+ * | `propose` | files a proposal a person accepts or rejects; changes no content (ADR-0028) | ✓ | ✓ | ✓ | ✓ | ✓ |
  *
  * `person` calls wait with cause `tool` in every mode, `bypass` included, and for people calling
  * over MCP too (they are asked in their own client). `publish` (RFC-0008 §10.3) follows ADR-0015's
  * publish rules instead: in `auto` mode the decision carries `autoApprove: "low-risk-release"` and
  * the server applies the low-risk check and the window rule (§10.7) to the release itself.
- * Tools without `classify` behave as before.
+ * Tools without `classify`, or whose `classify` returns nothing for a call, behave as before.
  */
-export type CallClass = "read" | "advisory" | "reduce" | "publish" | "person";
+export type CallClass = "read" | "advisory" | "reduce" | "publish" | "person" | "propose";
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -216,7 +222,12 @@ export interface ToolPolicy {
    */
   own?: "entry" | "changeset" | "comment" | "release";
   /** Per-argument policy (RFC-0007 §10.2); `evaluate` receives the call's arguments. */
-  classify?: (args: Record<string, unknown>) => CallClass;
+  classify?: (args: Record<string, unknown>) => CallClass | undefined;
+  /**
+   * The scopes a `propose` call needs instead of `scopes` (ADR-0028): proposing an edit to a body
+   * needs `content:propose`, not the write it proposes.
+   */
+  proposeScopes?: Scope[];
 }
 
 export interface Principal {
@@ -314,9 +325,11 @@ export class PolicyEngine {
   ): Decision {
     const tool = this.#tools.get(toolName);
     if (!tool) return { kind: "deny", reason: `unknown tool ${toolName}` };
+    const cls = tool.classify?.(options.args ?? {});
+    const required = cls === "propose" && tool.proposeScopes ? tool.proposeScopes : tool.scopes;
     let limit: OwnLimit | undefined;
     const missing: Scope[] = [];
-    for (const s of tool.scopes) {
+    for (const s of required) {
       // Person-only scopes never satisfy a tool (I7), not even through `*`.
       if (PERSON_SCOPES.includes(s)) {
         missing.push(s);
@@ -347,7 +360,7 @@ export class PolicyEngine {
       const covered = (s: Scope) =>
         holds(declared, s) ||
         (tool.own !== undefined && (OWN_VARIANTS[s] ?? []).some((v) => holds(declared, v.scope)));
-      const outside = tool.scopes.filter((s) => !covered(s));
+      const outside = required.filter((s) => !covered(s));
       if (outside.length > 0)
         return {
           kind: "deny",
@@ -357,8 +370,8 @@ export class PolicyEngine {
     }
     const mode = effectiveMode(principal);
     const limited = limit ? { limit } : {};
-    if (tool.classify)
-      return classified(tool, tool.classify(options.args ?? {}), principal, mode, {
+    if (cls)
+      return classified(tool, cls, principal, mode, {
         confirmed: options.confirmed === true,
         limited,
       });
@@ -412,7 +425,9 @@ function classified(
   mode: AgentMode | undefined,
   o: { confirmed: boolean; limited: { limit?: OwnLimit } },
 ): Decision {
-  if (cls === "read") return { kind: "allow", ...o.limited };
+  // Reading changes nothing; a proposal changes nothing until a person accepts it, so `plan`
+  // mode may propose (ADR-0015's follow-up, ADR-0028).
+  if (cls === "read" || cls === "propose") return { kind: "allow", ...o.limited };
   if (mode === "plan")
     return {
       kind: "deny",

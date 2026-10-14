@@ -190,6 +190,7 @@ describe("narrow (I5)", () => {
       "site:read",
       "content:read",
       "content:draft:own",
+      "content:propose",
       "preview:create",
       "asset:upload",
       "schedules:read",

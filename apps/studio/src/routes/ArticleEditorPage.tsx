@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { BodyEditor } from "../components/BodyEditor.tsx";
+import { BodyProposals } from "../components/BodyProposals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DraftEditorPreview } from "../components/DraftPreview.tsx";
 import {
@@ -458,6 +459,15 @@ export function ArticleEditorPage() {
                 </Text>
               }
             >
+              {draft.body.format === "markdown" && (
+                <BodyProposals
+                  siteId={siteId}
+                  nodeId={draft.id}
+                  dirty={dirty}
+                  readOnly={readOnlyReason !== undefined || locked}
+                  onDecided={() => query.refetch()}
+                />
+              )}
               {draft.body.format === "markdown" ? (
                 <BodyEditor
                   siteId={siteId}

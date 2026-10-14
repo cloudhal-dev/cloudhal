@@ -38,6 +38,7 @@ import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
 import { passwordResetRoutes } from "./routes/password-reset.ts";
 import { previewLinks } from "./routes/preview-links.ts";
+import { proposals } from "./routes/proposals.ts";
 import { redirects } from "./routes/redirects.ts";
 import { scheduleRoutes, schedulerRoute } from "./routes/schedules.ts";
 import { sites } from "./routes/sites.ts";
@@ -282,6 +283,7 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/sites", sites);
   app.route("/api/sites/:siteId/pages", pages);
   app.route("/api/sites/:siteId/entries", entries);
+  app.route("/api/sites/:siteId/proposals", proposals);
   app.route("/api/sites/:siteId/snapshots", snapshots);
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);

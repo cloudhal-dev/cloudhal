@@ -36,6 +36,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { BodyEditor } from "../components/BodyEditor.tsx";
+import { BodyProposals } from "../components/BodyProposals.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DraftEditorPreview } from "../components/DraftPreview.tsx";
@@ -580,6 +581,16 @@ export function PageEditorPage() {
                         }}
                         readOnly={readOnlyReason !== undefined || locked}
                       />
+                      {s.kind === "richText" && s.format === "markdown" && (
+                        <BodyProposals
+                          siteId={siteId}
+                          nodeId={draft.id}
+                          sectionId={s.id}
+                          dirty={dirty}
+                          readOnly={readOnlyReason !== undefined || locked}
+                          onDecided={() => query.refetch()}
+                        />
+                      )}
                     </SectionCard>
                   );
                 })

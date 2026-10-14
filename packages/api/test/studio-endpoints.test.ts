@@ -199,6 +199,64 @@ describe("snapshot nodes", () => {
   });
 });
 
+describe("body proposals", () => {
+  const agentActor = { kind: "agent" as const, id: "agent_proposal01", name: "Writer" };
+  const post = (app: Awaited<ReturnType<typeof setup>>["app"], path: string, body: unknown = {}) =>
+    app.request(path, {
+      method: "POST",
+      headers: { "x-test-user": "1", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("lists open proposals with their diff, and accepts, rejects or reports them stale", async () => {
+    const { store, site, app, get } = await setup();
+    const entry = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "proposed",
+      locale: "en",
+      status: "draft",
+      title: "Proposed",
+      body: { format: "markdown", value: "First.\n\nSecond.\n" },
+      fields: {},
+      tags: [],
+      author: human,
+    });
+    const blocks = entry.body.blocks ?? [];
+    const propose = (markdown: string) =>
+      store.proposals.create({
+        siteId: site.id,
+        nodeId: entry.id,
+        ops: [{ op: "replace", block: blocks[0]?.id as string, markdown }],
+        actor: agentActor,
+        note: "Better",
+      });
+    const one = await propose("First, better.");
+    const two = await propose("First, other.");
+    const base = `/api/sites/${site.id}/proposals`;
+    const listed = (await (await get(`${base}?nodeId=${entry.id}`)).json()) as {
+      items: { proposal: { id: string }; diff?: { words: { added: number } } }[];
+    };
+    expect(listed.items.map((i) => i.proposal.id).sort()).toEqual([one.id, two.id].sort());
+    expect(listed.items[0]?.diff?.words.added).toBeGreaterThan(0);
+
+    const accepted = await post(app, `${base}/${one.id}/accept`);
+    expect(accepted.status).toBe(200);
+    expect((await store.getContentEntry(entry.id))?.body.value).toBe("First, better.\n\nSecond.\n");
+    // The second proposal targeted the same block: it is stale now, never applied.
+    const stale = await post(app, `${base}/${two.id}/accept`);
+    expect(stale.status).toBe(409);
+    expect(((await stale.json()) as { error: string }).error).toBe("stale");
+    // A new proposal is read against the body as it is now; rejecting it changes nothing.
+    const three = await propose("Something else.");
+    const rejected = await post(app, `${base}/${three.id}/reject`);
+    expect(rejected.status).toBe(200);
+    expect((await store.getContentEntry(entry.id))?.body.value).toBe("First, better.\n\nSecond.\n");
+    expect((await post(app, `${base}/${three.id}/accept`)).status).toBe(409);
+    expect((await post(app, `${base}/prop_missing000001/accept`)).status).toBe(404);
+  });
+});
+
 describe("preview links", () => {
   it("mints signed links for drafts and snapshots on the site's primary domain", async () => {
     const { verifyPreviewToken } = await import("@cloudhal/core-ts");
@@ -326,6 +384,7 @@ describe("instance and skills", () => {
             "analytics:read",
             "comments:read",
             "schedules:read",
+            "content:propose",
           ],
           manual: [
             "site:read",

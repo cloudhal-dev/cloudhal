@@ -17,6 +17,7 @@ export type ScopeGroup = "read" | "write" | "release";
 export const SCOPE_GROUPS: Record<ScopeGroup, GrantableScope[]> = {
   read: ["site:read", "content:read", "analytics:read", "comments:read", "schedules:read"],
   write: [
+    "content:propose",
     "content:write",
     "asset:upload",
     "asset:manage",
@@ -40,6 +41,7 @@ const SCOPE_ORDER: GrantableScope[] = [
   "content:write",
   "content:write:own",
   "content:draft:own",
+  "content:propose",
   "site:write",
   "preview:create",
   "schedules:write",
@@ -123,7 +125,7 @@ export function scopesForMode(mode: AgentMode): GrantableScope[] {
     "comments:read",
     "schedules:read",
   ];
-  if (mode === "plan") return read;
+  if (mode === "plan") return [...read, "content:propose"];
   return [
     ...read,
     "content:write",

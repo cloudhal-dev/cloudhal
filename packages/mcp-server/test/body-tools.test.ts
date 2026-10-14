@@ -1,5 +1,5 @@
 /** RFC-0014 §4: agents read and edit bodies by block. */
-import { AuditLog, defaultScopes, PolicyEngine } from "@cloudhal/agent-runtime";
+import { AuditLog, defaultScopes, PolicyEngine, scopesForMode } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Page } from "@cloudhal/core-contracts";
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
@@ -178,6 +178,38 @@ describe("body tools", () => {
       await expect(
         call("get_body", { siteId, pageId: page.id, sectionId: hero.id }),
       ).rejects.toMatchObject({ code: "invalid" });
+  });
+
+  it("files a proposal instead of writing, in plan mode too", async () => {
+    const body = await read();
+    const planner: ToolContext = {
+      ...ctx,
+      principal: { actor: agent, scopes: scopesForMode("plan"), mode: "plan" },
+    };
+    const callAs = (c: ToolContext, args: Record<string, unknown>) =>
+      runTool(byName.edit_body as (typeof tools)[number], args, c, { policy, audit });
+    const ops = [
+      { op: "replaceText", block: body.blocks[1]?.id, find: "First", replace: "Opening" },
+    ];
+    // a plan key may not write…
+    const denied = await callAs(planner, { siteId, entryId: entry.id, rev: body.rev, ops });
+    expect(denied).toMatchObject({ decision: { kind: "deny", code: "missing_scope" } });
+    // …but may propose.
+    const res = await callAs(planner, {
+      siteId,
+      entryId: entry.id,
+      rev: body.rev,
+      ops,
+      mode: "propose",
+      note: "A stronger opening.",
+    });
+    const { proposal } = res.result as { proposal: { id: string; status: string } };
+    expect(proposal.status).toBe("open");
+    expect((await store.getContentEntry(entry.id))?.rev).toBe(entry.rev);
+    const stored = await store.proposals.get(proposal.id);
+    expect(stored).toMatchObject({ actor: agent, note: "A stronger opening.", nodeId: entry.id });
+    await store.proposals.accept(proposal.id, person);
+    expect((await store.getContentEntry(entry.id))?.body.value).toContain("Opening paragraph.");
   });
 
   it("diffs a node between its live version and its draft", async () => {

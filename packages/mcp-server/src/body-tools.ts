@@ -5,7 +5,8 @@
  * - `get_body` returns the blocks with their ids and hashes (and who last wrote each).
  * - `edit_body` applies up to 50 operations in one write. A stale `rev` is rebased when every
  *   block the operations name still exists and carries the `ifHash` the agent read; anything else
- *   is a conflict with the current blocks to read again. Every write is snapshotted.
+ *   is a conflict with the current blocks to read again. Every write is snapshotted. With
+ *   `mode: "propose"` it files the operations for a person instead (any mode, `plan` included).
  * - `diff_node` compares a node across snapshots (or with its current draft), body block by block.
  */
 import type { ContentEntry, Page, Snapshot } from "@cloudhal/core-contracts";
@@ -269,23 +270,32 @@ export function bodyTools(): ToolDefinition[] {
     {
       name: "edit_body",
       title: "Edit body by blocks",
-      description: `Change a markdown body by block instead of rewriting it: replace a block, replace text inside one, insert, move or delete blocks (up to ${MAX_BODY_OPS} operations, applied in order, one write). Read the ids with get_body first. A stale rev is rebased when every named block still exists and carries ifHash; otherwise you get a conflict. Other blocks keep their bytes and their authors. Snapshots afterwards.`,
-      inputSchema: obj({ siteId: id, ...TARGET, rev: { type: "integer", minimum: 0 }, ops: OPS }, [
-        "siteId",
-        "rev",
-        "ops",
-      ]),
-      outputSchema: obj(
+      description: `Change a markdown body by block instead of rewriting it: replace a block, replace text inside one, insert, move or delete blocks (up to ${MAX_BODY_OPS} operations, applied in order, one write). Read the ids with get_body first. A stale rev is rebased when every named block still exists and carries ifHash; otherwise you get a conflict. Other blocks keep their bytes and their authors. Snapshots afterwards. With mode "propose" nothing is written: a person accepts or rejects the operations in Studio.`,
+      inputSchema: obj(
         {
-          rev: { type: "integer" },
-          changed: { type: "array", items: { type: "string" } },
-          added: { type: "array", items: { type: "string" } },
-          removed: { type: "array", items: { type: "string" } },
-          words: obj({ added: { type: "integer" }, removed: { type: "integer" } }),
-          snapshot: SNAPSHOT,
+          siteId: id,
+          ...TARGET,
+          rev: { type: "integer", minimum: 0 },
+          ops: OPS,
+          mode: {
+            type: "string",
+            enum: ["apply", "propose"],
+            description:
+              "apply (default) writes now; propose files the operations for a person to accept or reject in Studio and changes nothing (allowed in plan mode)",
+          },
+          note: str("With propose: why, in a sentence the person will read", { maxLength: 1000 }),
         },
-        ["rev", "changed", "added", "removed", "snapshot"],
+        ["siteId", "rev", "ops"],
       ),
+      outputSchema: obj({
+        rev: { type: "integer" },
+        changed: { type: "array", items: { type: "string" } },
+        added: { type: "array", items: { type: "string" } },
+        removed: { type: "array", items: { type: "string" } },
+        words: obj({ added: { type: "integer" }, removed: { type: "integer" } }),
+        snapshot: SNAPSHOT,
+        proposal: obj({ id: { type: "string" }, status: { type: "string" } }, ["id", "status"]),
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -294,6 +304,9 @@ export function bodyTools(): ToolDefinition[] {
       },
       scopes: ["content:write"],
       own: "entry",
+      // A proposal changes nothing until a person accepts it: every mode may propose (ADR-0028).
+      classify: (a) => (a.mode === "propose" ? "propose" : undefined),
+      proposeScopes: ["content:read", "content:propose"],
       precheck: async (a, ctx) => {
         if (!ctx.limit) return;
         if (typeof a.entryId !== "string")
@@ -330,6 +343,22 @@ export function bodyTools(): ToolDefinition[] {
         const { blocks, markdown } = await plan(body, a.rev as number, ops);
         if (markdown === body.markdown)
           throw new ToolError("invalid", "the operations change nothing");
+        if (a.mode === "propose") {
+          try {
+            const proposal = await ctx.store.proposals.create({
+              siteId: body.siteId,
+              nodeId: (a.entryId ?? a.pageId) as string,
+              sectionId: a.sectionId as string | undefined,
+              ops,
+              actor: ctx.principal.actor,
+              note: a.note as string | undefined,
+            });
+            return { proposal: { id: proposal.id, status: proposal.status } };
+          } catch (e) {
+            if (e instanceof BodyOpError) throw bodyError(e);
+            mapError(e);
+          }
+        }
         try {
           const saved = await body.write(markdown, { actor: ctx.principal.actor, via: "mcp" });
           const located = await locate(a, ctx);

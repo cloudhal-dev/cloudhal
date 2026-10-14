@@ -75,6 +75,7 @@ import {
   runOpBatch,
 } from "./node-sql.ts";
 import { type Creatable, type NodeKind, type SiteNode, uniquenessKey } from "./nodes.ts";
+import { BodyProposals } from "./proposals.ts";
 import type { RedirectMatch } from "./redirects.ts";
 import {
   type PublishReleaseInput,
@@ -199,6 +200,8 @@ export class SiteGraphStore {
   readonly #blobs: BlobStore;
   readonly #now: () => Date;
   readonly #newId: (prefix: string) => string;
+  /** Body proposals (RFC-0014 §5): operations agents filed for a person to accept or reject. */
+  readonly proposals: BodyProposals;
   readonly #tax: TaxonomyEngine;
   readonly #menus: MenuEngine;
   readonly #assets: AssetEngine;
@@ -211,6 +214,12 @@ export class SiteGraphStore {
     this.#gates = options.gates;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
+    this.proposals = new BodyProposals({
+      sql: this.#sql,
+      graph: this,
+      newId: () => this.#newId(ID_PREFIX.proposal),
+      now: () => this.#stamp(),
+    });
     this.#assets = new AssetEngine({
       sql: this.#sql,
       blobs: this.#blobs,

@@ -19,6 +19,7 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
+import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 
 import type {
   FromPagesPreview,
@@ -167,6 +168,7 @@ export type AgentScope =
   | "content:write"
   | "content:write:own"
   | "content:draft:own"
+  | "content:propose"
   | "preview:create"
   | "site:publish"
   | "site:publish:own"
@@ -318,6 +320,29 @@ export type ArchiveReason =
   | "internal"
   | "retired"
   | "archiveOff";
+
+/** RFC-0014 body proposals (`@cloudhal/core-ts` `BodyProposal`), as Studio lists them. */
+export interface BodyProposal {
+  id: string;
+  siteId: string;
+  nodeId: string;
+  sectionId?: string;
+  baseRev: number;
+  ops: unknown[];
+  actor: Actor;
+  note?: string;
+  status: "open" | "accepted" | "partial" | "rejected" | "stale";
+  createdAt: string;
+  decidedBy?: Actor;
+  decidedAt?: string;
+}
+
+/** `GET …/proposals`: open ones carry what accepting would change now, or why it can't. */
+export interface ProposalItem {
+  proposal: BodyProposal;
+  diff?: BodyDiff;
+  problem?: string;
+}
 
 /** `POST …/entries/:id/preview`, `POST …/pages/:id/preview`: the unsaved form, rendered. */
 export interface DraftPreview {
@@ -1899,6 +1924,24 @@ export const api = {
       request<void>(`/api/sites/${entry.siteId}/entries/${entry.id}?rev=${entry.rev}`, {
         method: "DELETE",
       }),
+  },
+  proposals: {
+    /** Open proposals on one article or page, newest first. */
+    list: (siteId: string, nodeId: string) =>
+      request<{ items: ProposalItem[] }>(`/api/sites/${siteId}/proposals${query({ nodeId })}`).then(
+        (r) => r.items,
+      ),
+    /** Applies it (or the operations `ops`); 409 `stale` when the text changed since. */
+    accept: (siteId: string, id: string, ops?: number[]) =>
+      request<{ proposal: BodyProposal }>(
+        `/api/sites/${siteId}/proposals/${encodeURIComponent(id)}/accept`,
+        { method: "POST", ...json(ops ? { ops } : {}) },
+      ),
+    reject: (siteId: string, id: string) =>
+      request<{ proposal: BodyProposal }>(
+        `/api/sites/${siteId}/proposals/${encodeURIComponent(id)}/reject`,
+        { method: "POST", ...json({}) },
+      ),
   },
   snapshots: {
     list: (siteId: string) => request<Snapshot[]>(`/api/sites/${siteId}/snapshots`),

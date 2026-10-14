@@ -126,6 +126,7 @@ describe("agent modes", () => {
       "analytics:read",
       "comments:read",
       "schedules:read",
+      "content:propose",
     ]);
     expect(scopesForMode("auto")).toContain("site:publish");
     // RFC-0008 §10.1: schedules:read everywhere; manual and up may propose and ask

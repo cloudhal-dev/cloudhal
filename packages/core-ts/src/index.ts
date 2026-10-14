@@ -44,6 +44,7 @@ export {
 export * from "./menu.ts";
 export * from "./names.ts";
 export * from "./preview-token.ts";
+export * from "./proposals.ts";
 export {
   ancestorPaths,
   joinTarget,
