@@ -1902,6 +1902,11 @@ export const api = {
   },
   snapshots: {
     list: (siteId: string) => request<Snapshot[]>(`/api/sites/${siteId}/snapshots`),
+    /** One page or article as a snapshot holds it (drafts included; `content:read`). */
+    node: <T>(siteId: string, snapshotId: string, nodeId: string) =>
+      request<T>(
+        `/api/sites/${siteId}/snapshots/${encodeURIComponent(snapshotId)}/nodes/${encodeURIComponent(nodeId)}`,
+      ),
     /**
      * With `publish: true` an Author whose change set is not all their own gets 202 with a `role`
      * request instead (see `publishResultOf`); a Contributor gets 403 `missing_scope`.

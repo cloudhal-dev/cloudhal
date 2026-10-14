@@ -988,6 +988,9 @@ importers:
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
+      '@cloudhal/core-ts':
+        specifier: workspace:*
+        version: link:../core-ts
       '@codemirror/commands':
         specifier: 'catalog:'
         version: 6.11.1

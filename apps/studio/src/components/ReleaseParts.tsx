@@ -31,6 +31,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import type { ReleaseDiff, ReleaseItemView, ReleaseView } from "../lib/api.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
+import { TextChange } from "./BodyChanges.tsx";
 import { type ST, scheduleKeys, useScheduleWords } from "./Schedules.tsx";
 
 const KIND_ICON: Record<ReleaseItemView["nodeKind"], typeof Article> = {
@@ -243,6 +244,13 @@ export function ReleaseDiffDialog({
       })
     : [];
   const others = row ? otherChanges(row.base, row.target) : [];
+  // The body's own changes, live → pinned, block by block (RFC-0014 phase 2).
+  const bodyText = (v: unknown) =>
+    v && typeof v === "object" ? String((v as { value?: unknown }).value ?? "") : "";
+  const bodyChange =
+    row && changed.includes("body")
+      ? { before: bodyText(row.base?.body), after: bodyText(row.target?.body) }
+      : undefined;
   return (
     <LayerDialog.Root open={item !== undefined} onOpenChange={onOpenChange}>
       <LayerDialog.Content size="lg" closeLabel={t(`${d}.close`)}>
@@ -311,6 +319,15 @@ export function ReleaseDiffDialog({
                   )}
                 </Table.Body>
               </Table>
+              {bodyChange && (
+                <div className="mt-4" data-testid="release-body-diff">
+                  <TextChange
+                    title={t(`${d}.fields.body`)}
+                    before={bodyChange.before}
+                    after={bodyChange.after}
+                  />
+                </div>
+              )}
             </div>
           )}
         </LayerDialog.Body>

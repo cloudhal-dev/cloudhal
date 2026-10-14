@@ -180,6 +180,25 @@ describe("draft preview", () => {
   });
 });
 
+describe("snapshot nodes", () => {
+  it("returns a node as a snapshot holds it, and 404s outside it", async () => {
+    const { store, site, get } = await setup();
+    const home = (await store.listPages(site.id)).find((p) => p.path === "/");
+    if (!home) throw new Error("no home page");
+    const snap = await store.createSnapshot(site.id, { reason: "manual", actor: human });
+    await store.updatePage({ ...home, title: "Changed later" });
+    const res = await get(`/api/sites/${site.id}/snapshots/${snap.id}/nodes/${home.id}`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { title: string }).title).toBe(home.title);
+    expect(
+      (await get(`/api/sites/${site.id}/snapshots/${snap.id}/nodes/page_missing0001`)).status,
+    ).toBe(404);
+    expect(
+      (await get(`/api/sites/site_other000001/snapshots/${snap.id}/nodes/${home.id}`)).status,
+    ).toBe(404);
+  });
+});
+
 describe("preview links", () => {
   it("mints signed links for drafts and snapshots on the site's primary domain", async () => {
     const { verifyPreviewToken } = await import("@cloudhal/core-ts");
