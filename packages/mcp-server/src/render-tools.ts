@@ -58,7 +58,7 @@ function summary(r: RenderPageResult): string {
     `Rendered ${r.path} (the draft) at ${r.widths.map((w) => `${w.width}`).join(", ")} px.`,
     ...r.widths.map(
       (w) =>
-        `${w.width} px: ${w.images} screenshot(s) of a ${w.height} px page${w.truncated ? " (truncated: render again with fewer widths or look at preview_page for the rest)" : ""}.`,
+        `${w.width} px: ${w.images} screenshot(s) of a ${w.height} px page${w.truncated ? " (truncated: the screenshots stop there; preview_page has the whole page as HTML)" : ""}.`,
     ),
     failed.length
       ? `Checks: ${failed.length} of ${r.checks.length} found problems.`

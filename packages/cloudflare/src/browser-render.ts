@@ -16,7 +16,7 @@ export interface BrowserBinding {
   fetch(input: string, init?: RequestInit): Promise<Response>;
 }
 
-const HOST = "https://browser.internal";
+const HOST = "https://fake.host";
 const HEADER = 4;
 const MAX_MESSAGE = 1_048_575;
 
@@ -59,7 +59,8 @@ export function chunksToMessage(chunks: Uint8Array[]): string | undefined {
   return undefined;
 }
 
-function bindingSocket(ws: WebSocket): CdpSocket {
+/** The binding's DevTools socket as a `CdpSocket` (exported for tests). */
+export function bindingSocket(ws: WebSocket): CdpSocket {
   const chunks: Uint8Array[] = [];
   const messageListeners: ((m: string) => void)[] = [];
   // Browser Rendering closes a socket that stays quiet; keep it talking while we work.
@@ -70,14 +71,21 @@ function bindingSocket(ws: WebSocket): CdpSocket {
       clearInterval(ping);
     }
   }, 1000);
-  ws.addEventListener("message", (event) => {
-    if (typeof event.data === "string") {
-      for (const l of messageListeners) l(event.data);
-      return;
-    }
-    chunks.push(new Uint8Array(event.data as ArrayBuffer));
+  // Recent compatibility dates deliver binary messages as Blobs (the web default); ask for
+  // ArrayBuffers, and keep any Blob in order while it is read.
+  (ws as WebSocket & { binaryType: string }).binaryType = "arraybuffer";
+  let queue = Promise.resolve();
+  const take = (bytes: Uint8Array) => {
+    chunks.push(bytes);
     for (let m = chunksToMessage(chunks); m !== undefined; m = chunksToMessage(chunks))
       for (const l of messageListeners) l(m);
+  };
+  ws.addEventListener("message", (event) => {
+    const data = event.data as string | ArrayBuffer | Blob;
+    queue = queue.then(async () => {
+      if (typeof data === "string") for (const l of messageListeners) l(data);
+      else take(new Uint8Array(data instanceof Blob ? await data.arrayBuffer() : data));
+    });
   });
   ws.addEventListener("close", () => clearInterval(ping));
   return {
