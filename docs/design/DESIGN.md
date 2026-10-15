@@ -427,6 +427,11 @@ Site › Settings gets an **Appearance** section after Domains (`components/Appe
 - **Preview.** `PreviewPanel live morph`:
   - The server sends the whole preview document with each change (`GET …/build/events`, server-sent events). The panel merges it into the shown document: sections are matched by `data-section-id`, unchanged ones are kept, so scroll position and open tabs survive. Changed sections are outlined for 1.6 s and the last one scrolls into view.
   - To merge, the frame is `sandbox="allow-same-origin"`. Scripts stay off. The document is Cloudhal's own escaped preview HTML under the preview CSP.
+- **Picking (click-to-scope).**
+  - The preview header has a secondary "Pick" button (`Target`, `aria-pressed`). While picking it turns primary and reads "Click a part of the page".
+  - `PreviewPanel pick` lays a transparent button over the frame: the part under the pointer gets a `ring-kumo-brand` outline with a light brand tint, a click picks it, and Escape stops.
+  - The picked part keeps a `ring-kumo-brand` outline that follows scrolling and new versions.
+  - Build chat shows the scope as an `info` `Badge` (`Target`) above the brief, with an icon-only "Change the whole page instead" button.
 - **No editing here.** People edit in the page editor; agents change the draft through MCP.
 
 ### 2ad. Corrections in the article editor (RFC-0019 §2, phase 19b)

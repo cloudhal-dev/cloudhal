@@ -1,9 +1,11 @@
 /**
  * Studio's Build chat (RFC-0020 §6, phase 20c): a person describes the page; the site's model
- * changes the draft step by step while the Build view's preview and activity follow along. The
- * transcript is this browser's only: the draft and its snapshot are what last.
+ * changes the draft step by step while the Build view's preview and activity follow along. A part
+ * picked in the preview (`scope`) aims the next briefs at it until it is cleared. The transcript is
+ * this browser's only: the draft and its snapshot are what last.
  */
 import {
+  Badge,
   Banner,
   type BuildChatItem,
   BuildChatLog,
@@ -14,11 +16,18 @@ import {
   SectionEmpty,
   SkeletonLine,
 } from "@cloudhal/ui";
-import { GearSix, Sparkle, StopCircle, WarningCircle } from "@phosphor-icons/react";
+import { GearSix, Sparkle, StopCircle, Target, WarningCircle, X } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api, errorCode } from "../lib/api.ts";
+
+/** A part of the page picked in the preview, with the words that name it. */
+export interface BuildScope {
+  sectionId: string;
+  componentId?: string | undefined;
+  label: string;
+}
 
 const ERRORS = new Set([
   "ai_budget",
@@ -30,7 +39,17 @@ const ERRORS = new Set([
   "ai_failed",
 ]);
 
-export function BuildChat({ siteId, pageId }: { siteId: string; pageId: string }) {
+export function BuildChat({
+  siteId,
+  pageId,
+  scope,
+  onClearScope,
+}: {
+  siteId: string;
+  pageId: string;
+  scope?: BuildScope | undefined;
+  onClearScope?: () => void;
+}) {
   const t = useT("build");
   const settings = useQuery({
     queryKey: ["ai-settings", siteId],
@@ -67,7 +86,13 @@ export function BuildChat({ siteId, pageId }: { siteId: string; pageId: string }
     abort.current = controller;
     const repairs: string[] = [];
     try {
-      for await (const e of api.ai.build(siteId, pageId, brief, controller.signal)) {
+      const target = scope
+        ? {
+            sectionId: scope.sectionId,
+            ...(scope.componentId ? { componentId: scope.componentId } : {}),
+          }
+        : undefined;
+      for await (const e of api.ai.build(siteId, pageId, brief, controller.signal, target)) {
         if (e.type === "say") {
           add({ role: "model", text: e.text });
           progress(t("build.chat.thinking"));
@@ -136,6 +161,22 @@ export function BuildChat({ siteId, pageId }: { siteId: string; pageId: string }
             />
           )}
           <div className="grid gap-3">
+            {scope && (
+              <div className="flex items-center gap-2" data-testid="build-scope">
+                <Badge variant="info" icon={<Target />}>
+                  {t("build.chat.scope", { part: scope.label })}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  shape="square"
+                  icon={<X />}
+                  aria-label={t("build.chat.clearScope")}
+                  disabled={running}
+                  onClick={onClearScope}
+                />
+              </div>
+            )}
             <InputArea
               className="w-full"
               label={t("build.chat.brief")}

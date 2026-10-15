@@ -10,7 +10,7 @@
  *   400 `invalid`, 404, 409 `ai_off`, 429 `ai_budget` | `ai_busy` | `ai_rate_limited`,
  *   502 `ai_failed` | `ai_model_unavailable`, 503 `ai_unavailable`. A failure after the first
  *   chunk aborts the stream. Each command is audited (`ai_command`) without its text.
- * - `POST /build/:pageId` (`content:write`) `{ message }` → Studio's Build chat (RFC-0020 §6,
+ * - `POST /build/:pageId` (`content:write`) `{ message, scope? }` → Studio's Build chat (RFC-0020 §6,
  *   phase 20c): the model changes the page draft step by step; progress streams as NDJSON
  *   (`BuildTurnEvent`s), every step lands in the Build view, and the turn ends with one snapshot.
  *   The same checks as a command (AI on, the daily cap counts one turn as one command, one AI job
@@ -28,7 +28,13 @@ import {
 } from "../ai/commands.ts";
 import { modelPicker } from "../ai/models.ts";
 import { AiSettingsError, type AiStore, checkAiSettings, isWorkersAiModel } from "../ai/store.ts";
-import { BUILD_BRIEF_LIMIT, type BuildTurnEvent, runBuildTurn } from "../build-turn.ts";
+import {
+  BUILD_BRIEF_LIMIT,
+  type BuildScope,
+  type BuildTurnEvent,
+  locateScope,
+  runBuildTurn,
+} from "../build-turn.ts";
 import type { Env } from "../context.ts";
 import { apiError, notFound } from "../errors.ts";
 import { API_ACTOR, writerOf } from "../governance.ts";
@@ -55,6 +61,17 @@ const STATUS = {
   ai_rate_limited: 429,
   ai_unavailable: 503,
 } as const;
+
+/** A request's `scope`: undefined when absent, null when malformed. */
+function buildScopeOf(raw: unknown): BuildScope | undefined | null {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+  const { sectionId, componentId } = raw as Record<string, unknown>;
+  if (typeof sectionId !== "string" || sectionId.length > 64) return null;
+  if (componentId !== undefined && (typeof componentId !== "string" || componentId.length > 64))
+    return null;
+  return { sectionId, ...(componentId ? { componentId } : {}) };
+}
 
 function aiFailure(e: unknown): never {
   const err = AiError.from(e);
@@ -257,7 +274,10 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
       if (!settings.enabled) throw apiError(409, "ai_off", "AI is off for this site");
       if (!isWorkersAiModel(settings.model) && !settings.gateway)
         throw apiError(409, "ai_off", "the chosen model needs an AI Gateway; check the settings");
-      const body = (await c.req.json().catch(() => ({}))) as { message?: unknown };
+      const body = (await c.req.json().catch(() => ({}))) as {
+        message?: unknown;
+        scope?: unknown;
+      };
       const message = typeof body.message === "string" ? body.message.trim() : "";
       if (!message || message.length > BUILD_BRIEF_LIMIT)
         throw apiError(400, "invalid", `message: 1 to ${BUILD_BRIEF_LIMIT} characters`, {
@@ -268,6 +288,17 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
       const pageId = param(c, "pageId");
       const first = await graph.getPage(pageId);
       if (!site || !first || first.siteId !== siteId) throw notFound("page not found");
+      // RFC-0020 §6: the part of the page the person picked in the preview.
+      const scope = buildScopeOf(body.scope);
+      if (scope === null || (scope && !locateScope(first, scope)))
+        throw apiError(
+          400,
+          "invalid",
+          "scope: a section of this page, or a component of one of its surfaces",
+          {
+            field: "scope",
+          },
+        );
 
       const actor = c.get("actor") ?? API_ACTOR;
       const who = personOf(c) ?? actor.id;
@@ -306,6 +337,7 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
               pageId,
               actor,
               locale: first.locale,
+              ...(scope ? { scope } : {}),
               signal,
               build: c.get("build"),
               load: async () => {

@@ -2096,12 +2096,14 @@ export const api = {
       pageId: string,
       message: string,
       signal?: AbortSignal,
+      /** The part of the page picked in the preview (RFC-0020 §6). */
+      scope?: { sectionId: string; componentId?: string | undefined },
     ): AsyncGenerator<BuildTurnEvent, void, undefined> {
       const res = await fetch(`/api/sites/${siteId}/ai/build/${pageId}`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(scope ? { message, scope } : { message }),
         ...(signal ? { signal } : {}),
       });
       if (!res.ok || !res.body) {

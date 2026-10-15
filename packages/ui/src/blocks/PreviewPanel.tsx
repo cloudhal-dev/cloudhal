@@ -66,8 +66,61 @@ export interface PreviewPanelProps {
   morph?: boolean;
   /** With `morph`: `data-section-id`s that just changed, outlined briefly and scrolled into view. */
   highlight?: readonly string[];
+  /** With `morph`: picking a section or component in the preview (RFC-0020 §6 click-to-scope). */
+  pick?: PreviewPick;
   className?: string;
 }
+
+/** A part of the previewed page: a section, or one component of a surface section. */
+export interface PreviewTarget {
+  sectionId: string;
+  componentId?: string | undefined;
+}
+
+export interface PreviewPick {
+  /** Picking now: the pointer outlines the part under it, a click picks it, Escape stops. */
+  active: boolean;
+  /** The picked part, outlined while it is on the page. */
+  selected?: PreviewTarget | undefined;
+  onPick: (target: PreviewTarget) => void;
+  /** Escape while picking. */
+  onCancel?: () => void;
+  /** Accessible name of the picking layer ("Pick a part of the page"). */
+  label: string;
+}
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The section or component at a point of the preview document (frame viewport coordinates). */
+export function previewTargetAt(doc: Document, x: number, y: number): PreviewTarget | undefined {
+  const el = doc.elementFromPoint(x, y);
+  const section = el?.closest("[data-section-id]");
+  const sectionId = section?.getAttribute("data-section-id");
+  if (!el || !section || !sectionId) return undefined;
+  const component = el.closest("[data-component-id]");
+  const componentId =
+    component && section.contains(component)
+      ? (component.getAttribute("data-component-id") ?? undefined)
+      : undefined;
+  return componentId ? { sectionId, componentId } : { sectionId };
+}
+
+/** The element a target names in the preview document, if it is (still) there. */
+export function previewElement(doc: Document, target: PreviewTarget): Element | undefined {
+  const section = doc.querySelector(`[data-section-id="${CSS.escape(target.sectionId)}"]`);
+  if (!section || !target.componentId) return section ?? undefined;
+  return (
+    section.querySelector(`[data-component-id="${CSS.escape(target.componentId)}"]`) ?? undefined
+  );
+}
+
+const sameBox = (a: Box | undefined, b: Box | undefined) =>
+  a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
 /**
  * Merges a newer preview document into the shown one: `main`'s children are matched by
@@ -141,6 +194,7 @@ export function PreviewPanel({
   fill = false,
   morph = false,
   highlight,
+  pick,
   className,
 }: PreviewPanelProps) {
   const [device, setDevice] = useState<PreviewDevice>(defaultDevice);
@@ -191,6 +245,53 @@ export function PreviewPanel({
   const deviceWidth = preset === "fill" ? box.width || 1024 : preset;
   const scale = box.width > 0 ? Math.min(1, box.width / deviceWidth) : 1;
   const frameHeight = box.height > 0 ? box.height / scale : 800;
+  // Picking (RFC-0020 §6): a layer over the frame finds the part under the pointer by coordinates,
+  // so the frame keeps running no scripts and its document is never changed.
+  const layer = useRef<HTMLButtonElement>(null);
+  const [hover, setHover] = useState<Box | undefined>();
+  const [chosen, setChosen] = useState<Box | undefined>();
+  const picking = morph && !!pick?.active;
+  const selected = morph ? pick?.selected : undefined;
+  const boxOf = (el: Element | undefined): Box | undefined => {
+    if (!el) return undefined;
+    const r = el.getBoundingClientRect();
+    return { x: r.left * scale, y: r.top * scale, w: r.width * scale, h: r.height * scale };
+  };
+  const pointAt = (e: { clientX: number; clientY: number }) => {
+    const doc = frame.current?.contentDocument;
+    const r = layer.current?.getBoundingClientRect();
+    if (!doc || !r) return undefined;
+    return previewTargetAt(doc, (e.clientX - r.left) / scale, (e.clientY - r.top) / scale);
+  };
+  // The picked part's outline follows scrolling and every merged version.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the loop reads the latest values
+  useEffect(() => {
+    if (!selected) {
+      setChosen(undefined);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const doc = frame.current?.contentDocument;
+      const next = doc ? boxOf(previewElement(doc, selected)) : undefined;
+      setChosen((prev) => (sameBox(prev, next) ? prev : next));
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [selected?.sectionId, selected?.componentId, scale]);
+  useEffect(() => {
+    if (!picking) {
+      setHover(undefined);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") pick?.onCancel?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picking, pick]);
+
   const icon = { desktop: Monitor, tablet: DeviceTablet, mobile: DeviceMobile };
 
   return (
@@ -253,7 +354,7 @@ export function PreviewPanel({
         >
           <div
             className={cn(
-              "mx-auto h-full overflow-hidden",
+              "relative mx-auto h-full overflow-hidden",
               preset !== "fill" && deviceWidth * scale < box.width && "ring ring-kumo-line",
             )}
             style={{ width: Math.min(box.width || deviceWidth, deviceWidth * scale) }}
@@ -277,6 +378,48 @@ export function PreviewPanel({
                 background: "white",
               }}
             />
+            {chosen && (
+              <div
+                aria-hidden
+                data-testid="preview-selected"
+                className="pointer-events-none absolute rounded-sm ring-2 ring-kumo-brand"
+                style={{ left: chosen.x, top: chosen.y, width: chosen.w, height: chosen.h }}
+              />
+            )}
+            {picking && (
+              <button
+                type="button"
+                ref={layer}
+                data-testid="preview-pick-layer"
+                aria-label={pick?.label}
+                className="absolute inset-0 cursor-crosshair border-0 bg-transparent p-0"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") pick?.onCancel?.();
+                }}
+                onMouseMove={(e) => {
+                  const doc = frame.current?.contentDocument;
+                  const target = pointAt(e);
+                  const next = doc && target ? boxOf(previewElement(doc, target)) : undefined;
+                  setHover((prev) => (sameBox(prev, next) ? prev : next));
+                }}
+                onMouseLeave={() => setHover(undefined)}
+                onWheel={(e) =>
+                  frame.current?.contentWindow?.scrollBy(e.deltaX / scale, e.deltaY / scale)
+                }
+                onClick={(e) => {
+                  const target = pointAt(e);
+                  if (target) pick?.onPick(target);
+                }}
+              >
+                {hover && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute rounded-sm bg-kumo-brand/15 ring-2 ring-kumo-brand"
+                    style={{ left: hover.x, top: hover.y, width: hover.w, height: hover.h }}
+                  />
+                )}
+              </button>
+            )}
           </div>
           {(loading || waiting) && (
             <div

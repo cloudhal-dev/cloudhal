@@ -7,7 +7,9 @@
  *   {"done":true}    the model is finished
  *
  * A line is whole or not, so every finished step is repaired, validated (`patchPage`), written to
- * the draft and shown in the Build view while the model is still writing the next one. Refused
+ * the draft and shown in the Build view while the model is still writing the next one. With a
+ * `scope` (the section or component the person picked in the preview, Lovable's visual edit as
+ * data) the brief names that part and its JSON Pointer, so the model changes only it. Refused
  * steps go back to the model with their JSON Pointers for at most `maxRounds` rounds. The turn
  * never publishes; it ends with one snapshot. Worker-safe; the model, the store and the events
  * are injected.
@@ -65,6 +67,56 @@ export interface BuildTurnDeps {
   readonly maxTokens?: number | undefined;
   /** Rounds in all, the first included (default 3). */
   readonly maxRounds?: number | undefined;
+  /** What the person picked in the preview: the brief is about this part (RFC-0020 §6). */
+  readonly scope?: BuildScope | undefined;
+}
+
+/** A section of the page, or one component of a surface section. */
+export interface BuildScope {
+  readonly sectionId: string;
+  readonly componentId?: string | undefined;
+}
+
+/**
+ * Where `scope` is on the page: its JSON Pointer and the part itself, or undefined when it is not
+ * there (any more).
+ */
+export function locateScope(
+  page: Page,
+  scope: BuildScope,
+): { pointer: string; value: unknown; label: string } | undefined {
+  const i = page.sections.findIndex((s) => s.id === scope.sectionId);
+  const section = page.sections[i];
+  if (!section) return undefined;
+  if (!scope.componentId)
+    return {
+      pointer: `/sections/${i}`,
+      value: section,
+      label: `section ${section.id} (${section.kind})`,
+    };
+  if (section.kind !== "surface") return undefined;
+  const j = section.components.findIndex((c) => c.id === scope.componentId);
+  const component = section.components[j];
+  if (!component) return undefined;
+  return {
+    pointer: `/sections/${i}/components/${j}`,
+    value: component,
+    label: `the ${component.component} "${component.id}" in section ${section.id}`,
+  };
+}
+
+/** The brief as the model reads it: with a scope, the picked part comes first. */
+export function scopedBrief(brief: string, page: Page, scope: BuildScope | undefined): string {
+  const text = brief.slice(0, BUILD_BRIEF_LIMIT);
+  const at = scope ? locateScope(page, scope) : undefined;
+  if (!at) return text;
+  const json = JSON.stringify(at.value);
+  return [
+    `The person picked ${at.label} in the preview, at ${at.pointer}. Change only that part (and what it contains) unless the brief clearly asks for more.`,
+    `It is now: ${json.length > 6000 ? `${json.slice(0, 6000)}…` : json}`,
+    "",
+    `Brief: ${text}`,
+  ].join("\n");
 }
 
 /** Enough for a full landing page in small steps. */
@@ -150,7 +202,7 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
   let refusedTotal = 0;
   const messages: AiMessage[] = [
     { role: "system", content: buildSystemPrompt(deps.catalog, page, deps.locale) },
-    { role: "user", content: brief.slice(0, BUILD_BRIEF_LIMIT) },
+    { role: "user", content: scopedBrief(brief, page, deps.scope) },
   ];
 
   const applyStep = async (ops: PatchOp[]): Promise<string[]> => {

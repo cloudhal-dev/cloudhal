@@ -305,6 +305,10 @@ export {
   PreviewPanel,
   type PreviewPanelLabels,
   type PreviewPanelProps,
+  type PreviewPick,
+  type PreviewTarget,
+  previewElement,
+  previewTargetAt,
 } from "./blocks/PreviewPanel.tsx";
 export {
   RecurrenceEditor,

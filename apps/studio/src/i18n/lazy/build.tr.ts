@@ -47,6 +47,14 @@ export const messages: NamespaceMessages<"build"> = {
       unavailableHint:
         "Cloudflare'de AI, Worker'ın bağlantısını kullanır; yerelde CLOUDFLARE_ACCOUNT_ID ve CLOUDHAL_AI_TOKEN ayarlayın.",
       settings: "Ayarları aç",
+      pick: "Seç",
+      picking: "Sayfadan bir parçaya tıklayın",
+      pickLabel: "Değiştirilecek parçayı sayfadan seçin",
+      pickHint: "Önizlemede bir bölüme ya da öğeye tıklayın; Escape ile çıkın.",
+      scope: "Değişecek: {part}",
+      scopeSection: "{index}. bölüm",
+      scopeComponent: "{index}. bölümdeki {component} “{id}”",
+      clearScope: "Bunun yerine tüm sayfayı değiştir",
       errors: {
         ai_budget:
           "Bu sitenin bugünkü AI hakları bitti. Bir Yönetici, Ayarlar › AI bölümünden günlük sınırı artırabilir.",

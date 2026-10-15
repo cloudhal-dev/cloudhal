@@ -380,12 +380,25 @@ export function visibilityWrapper(node: Pick<SurfaceNode, "visible" | "hidden">)
   ];
 }
 
+/**
+ * Previews mark each component's outer element with its id, so Studio's Build view can tell which
+ * component the pointer is on (RFC-0020 §6 click-to-scope). The public site's markup is unchanged.
+ */
+function markComponent(html: string, id: string, ctx: SurfaceContext): string {
+  if (!ctx.preview) return html;
+  return html.replace(/^<([a-z][a-z0-9-]*)(?=[\s>/])/, `<$1 data-component-id="${escapeHtml(id)}"`);
+}
+
 function nodeHtml(node: SurfaceNode, scope: string, ctx: SurfaceContext): string {
   const [open, close] = visibilityWrapper(node);
   if (node.entry.kind === "block")
-    return open + blockNodeHtml(node, ctx.media, ctx.preview) + close;
+    return open + markComponent(blockNodeHtml(node, ctx.media, ctx.preview), node.id, ctx) + close;
   const inner = node.children.map((c) => nodeHtml(c, scope, ctx)).join("");
-  return open + primitiveHtml(node, scope, ctx.media).replace(CHILDREN, inner) + close;
+  return (
+    open +
+    markComponent(primitiveHtml(node, scope, ctx.media), node.id, ctx).replace(CHILDREN, inner) +
+    close
+  );
 }
 
 /** What a page's source offers for entry sources (`GraphSource`). */

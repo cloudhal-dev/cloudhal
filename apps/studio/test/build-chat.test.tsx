@@ -101,4 +101,43 @@ describe("Build chat", () => {
       await screen.findByText(/Today's AI commands for this site are used up/),
     ).toBeInTheDocument();
   });
+
+  it("aims the brief at the part picked in the preview, until it is cleared (RFC-0020 §6)", async () => {
+    const fetch = serve(() =>
+      ndjson([
+        { type: "done", rev: 2, steps: 1, refused: 0, usage: { inputTokens: 1, outputTokens: 1 } },
+      ]),
+    );
+    const cleared = vi.fn();
+    render(
+      wrap(
+        <BuildChat
+          siteId="site_1"
+          pageId="page_1"
+          scope={{
+            sectionId: "sec_hero00001",
+            componentId: "cta",
+            label: "Button “cta” in section 2",
+          }}
+          onClearScope={cleared}
+        />,
+      ),
+    );
+    expect(await screen.findByText("Changing Button “cta” in section 2")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("What should the page have?"), {
+      target: { value: "Make it say Start free" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    expect(await screen.findByText("1 steps applied to the draft")).toBeInTheDocument();
+    const [, init] = fetch.mock.calls.find(([u]) => String(u).includes("/ai/build/")) as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body))).toEqual({
+      message: "Make it say Start free",
+      scope: { sectionId: "sec_hero00001", componentId: "cta" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change the whole page instead" }));
+    expect(cleared).toHaveBeenCalledOnce();
+  });
 });
