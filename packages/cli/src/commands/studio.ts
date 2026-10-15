@@ -7,7 +7,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
-import { loadBlockRegistry, loadThemeSettings } from "../blocks.ts";
+import { loadBlockRegistry, loadThemeDesign, loadThemeSettings } from "../blocks.ts";
 import { readProjectConfig } from "../config.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
@@ -57,6 +57,7 @@ export async function studio(
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir), {
     blocks: await loadBlockRegistry(options.projectDir),
     themeSettings: await loadThemeSettings(options.projectDir),
+    themeDesign: await loadThemeDesign(options.projectDir),
   });
   const studioDist = options.studioDist ?? (await assetDir("studio")) ?? "";
   const serveStudio = await exists(path.join(studioDist, "index.html"));

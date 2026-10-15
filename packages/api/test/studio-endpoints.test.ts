@@ -644,6 +644,7 @@ describe("instance and skills", () => {
       "rollback",
       "safe-edit",
       "site-bootstrap",
+      "site-design",
       "stale-review",
     ]);
     expect(skills.find((s) => s.name === "rollback")?.approval).toContain("rollback");

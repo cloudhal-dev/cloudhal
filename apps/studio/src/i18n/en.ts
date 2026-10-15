@@ -1109,7 +1109,23 @@ export const en = {
       general: "General",
       domains: "Domains",
       appearance: "Appearance",
+      design: "Design rules",
       previews: "Preview links",
+    },
+    design: {
+      description:
+        "Your brand and design rules in Markdown (DESIGN.md). Every agent and Build chat reads them before building: what the site is for, its colors and type, the layouts and components to prefer, page recipes, and what to avoid. They shape choices, never permissions.",
+      label: "This site's rules",
+      placeholder: "## Brand\nWhat the site is for, who reads it, its voice.\n\n## Layout\n…",
+      template: "Start from the headings",
+      theme: "The {theme} theme's rules",
+      themeHint: "Agents read these first; your rules win where they differ.",
+      noTheme: "The {theme} theme ships no design rules.",
+      warnings: "Worth a look",
+      saved: "Design rules saved",
+      failed: "Could not save the design rules",
+      count: "{count} of {max} characters",
+      agentHint: "Agents can propose changes; they wait for a person in Approvals.",
     },
     appearance: {
       description: "Colors, type and shapes the {theme} theme lets you change.",

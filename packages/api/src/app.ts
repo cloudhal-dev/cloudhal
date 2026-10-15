@@ -23,6 +23,7 @@ import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
 import { blockTypes } from "./routes/block-types.ts";
 import { comments } from "./routes/comments.ts";
+import { design } from "./routes/design.ts";
 import { entries } from "./routes/entries.ts";
 import {
   agentModesInfo,
@@ -300,6 +301,8 @@ export function createApi(deps: ApiDeps) {
   // RFC-0015: the block registry (built-ins and the theme's types).
   app.route("/api/sites/:siteId/block-types", blockTypes);
   app.route("/api/sites/:siteId/theme-settings", themeSettings);
+  // RFC-0021: the site's design rules (DESIGN.md).
+  app.route("/api/sites/:siteId/design", design);
   // RFC-0016: in-editor AI settings, the model picker and commands.
   app.route("/api/sites/:siteId/ai", aiRoutes(deps.ai));
   app.route("/api/sites/:siteId/snapshots", snapshots);

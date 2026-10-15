@@ -95,6 +95,7 @@ import {
   ToolError,
   toToolError,
 } from "./common.ts";
+import { designTools } from "./design-tools.ts";
 import { elevationTools } from "./elevation-tools.ts";
 import {
   menuChangeSummary,
@@ -408,6 +409,8 @@ export function defineTools(): ToolDefinition[] {
   return [
     ...raw.slice(0, at),
     ...bodyTools(),
+    // RFC-0021 §2: DESIGN.md
+    ...designTools(),
     ...taxonomyTools(),
     ...menuTools(),
     ...assetTools(),

@@ -27,6 +27,7 @@ export * from "./bundles.ts";
 export * from "./cache-purge.ts";
 export * from "./cache-tags.ts";
 export * from "./corrections.ts";
+export * from "./design.ts";
 export * from "./domains.ts";
 export * from "./errors.ts";
 export * from "./filter.ts";

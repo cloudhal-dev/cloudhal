@@ -174,6 +174,9 @@ export const SiteSchema = {
     "theme": {
       "$ref": "#/$defs/ThemeRef"
     },
+    "design": {
+      "$ref": "#/$defs/Design"
+    },
     "timeZone": {
       "$ref": "#/$defs/TimeZone",
       "description": "The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."
@@ -196,6 +199,21 @@ export const SiteSchema = {
     }
   },
   "$defs": {
+    "Design": {
+      "type": "object",
+      "description": "The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.",
+      "additionalProperties": false,
+      "required": [
+        "markdown"
+      ],
+      "properties": {
+        "markdown": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24000
+        }
+      }
+    },
     "Domain": {
       "type": "object",
       "additionalProperties": false,

@@ -27,7 +27,11 @@ export interface LocalStore {
  */
 export async function openLocalStore(
   dataDir: string,
-  options: { blocks?: BlockRegistry | undefined; themeSettings?: PropsSchema | undefined } = {},
+  options: {
+    blocks?: BlockRegistry | undefined;
+    themeSettings?: PropsSchema | undefined;
+    themeDesign?: string | undefined;
+  } = {},
 ): Promise<LocalStore> {
   const dir = path.resolve(dataDir);
   await mkdir(path.join(dir, "blobs"), { recursive: true });
@@ -41,6 +45,7 @@ export async function openLocalStore(
     gates: GATES_ENFORCED,
     ...(options.blocks ? { blocks: options.blocks } : {}),
     ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
+    ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),
   });
   return { store, sql, blobs, dataDir: dir, close: () => sql.close() };
 }

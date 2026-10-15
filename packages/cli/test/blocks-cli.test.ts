@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadBlockRegistry, loadThemeSettings } from "../src/blocks.ts";
+import { loadBlockRegistry, loadThemeDesign, loadThemeSettings } from "../src/blocks.ts";
 import { adminEntry } from "../src/cloudflare/admin.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -82,5 +82,27 @@ describe("theme block types", () => {
     expect(adminEntry("../../../src/blocks.ts", "../../../src/settings.ts")).toContain(
       "createAdminWorker({ skills, blockTypes, themeSettings })",
     );
+  });
+
+  it("reads the theme's DESIGN.md and bundles it with the admin Worker (RFC-0021)", async () => {
+    const starter = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../../starters/blog",
+    );
+    const design = await loadThemeDesign(starter);
+    expect(design).toMatch(/^## Brand\nThe blog theme is an editorial theme/);
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-design-"));
+    try {
+      expect(await loadThemeDesign(tmp)).toBeUndefined();
+      await mkdir(path.join(tmp, "src"));
+      await writeFile(path.join(tmp, "src", "DESIGN.md"), "   \n");
+      expect(await loadThemeDesign(tmp)).toBeUndefined();
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+    const entry = adminEntry(undefined, undefined, true);
+    expect(entry).toContain('import themeDesign from "./theme-design.ts";');
+    expect(entry).toContain("createAdminWorker({ skills, themeDesign })");
+    expect(adminEntry()).not.toContain("themeDesign");
   });
 });

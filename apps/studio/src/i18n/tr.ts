@@ -1122,7 +1122,23 @@ export const tr: Messages = {
       general: "Genel",
       domains: "Alan adları",
       appearance: "Görünüm",
+      design: "Tasarım kuralları",
       previews: "Önizleme bağlantıları",
+    },
+    design: {
+      description:
+        "Markdown biçiminde marka ve tasarım kurallarınız (DESIGN.md). Her ajan ve Build chat inşa etmeden önce bunları okur: sitenin amacı, renkleri ve yazısı, tercih edilecek düzenler ve bileşenler, sayfa tarifleri ve kaçınılacaklar. Seçimleri yönlendirir, izinleri asla değiştirmez.",
+      label: "Bu sitenin kuralları",
+      placeholder: "## Brand\nSitenin amacı, okuru, sesi.\n\n## Layout\n…",
+      template: "Başlıklardan başla",
+      theme: "{theme} temasının kuralları",
+      themeHint: "Ajanlar önce bunları okur; farklı olduğu yerde sizin kurallarınız geçerlidir.",
+      noTheme: "{theme} teması tasarım kuralı içermiyor.",
+      warnings: "Göz atmaya değer",
+      saved: "Tasarım kuralları kaydedildi",
+      failed: "Tasarım kuralları kaydedilemedi",
+      count: "{count} / {max} karakter",
+      agentHint: "Ajanlar değişiklik önerebilir; öneriler Onaylar bölümünde bir kişiyi bekler.",
     },
     appearance: {
       description: "{theme} temasının değiştirmenize izin verdiği renkler, yazı ve biçimler.",

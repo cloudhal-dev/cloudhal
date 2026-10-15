@@ -172,6 +172,8 @@ export interface SiteGraphStoreOptions {
    * checked against when it changes. Without it the config is left alone.
    */
   readonly themeSettings?: PropsSchema;
+  /** RFC-0021 §1: the theme's DESIGN.md (`src/DESIGN.md`), read by agents with the site's rules. */
+  readonly themeDesign?: string;
 }
 
 /**
@@ -252,6 +254,7 @@ export class SiteGraphStore {
     this.#gates = options.gates;
     this.blocks = options.blocks ?? createBlockRegistry();
     this.themeSettings = options.themeSettings;
+    this.themeDesign = options.themeDesign;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.proposals = new BodyProposals({
@@ -290,6 +293,8 @@ export class SiteGraphStore {
   readonly blocks: BlockRegistry;
   /** RFC-0017: the theme's design settings, when it declares any. */
   readonly themeSettings: PropsSchema | undefined;
+  /** RFC-0021: the theme's DESIGN.md, when it ships one. */
+  readonly themeDesign: string | undefined;
 
   /**
    * Whether `availability` may be written for this site (S15): the renderer serving it has
