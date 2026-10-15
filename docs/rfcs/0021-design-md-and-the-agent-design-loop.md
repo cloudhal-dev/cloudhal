@@ -281,9 +281,11 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
     - A component whose `children` was not a list crashed the check: a single id is now made a list, anything else is reported.
     - Components without an id were reported as `"undefined" is used twice`; now as "every component needs an id".
     - A patch could remove `/sections` itself; `patchPage` now refuses changes to the page's shape.
-  - **Still open.**
-    - Llama 3.3 and GLM build pages whose components never reach the root, so they render empty: the design pass scores them 1.
-    - The judge needs calibrated examples per score.
+  - **Unlinked components, fixed.** Llama 3.3 and GLM built pages whose components never reached the root, so the pages rendered empty (the design pass scored them 1).
+    - After each round, Build now names the components the model added but no parent lists, with the path to link them, and asks for one more round. Components that were already loose before the turn are left alone.
+    - Studio shows "Placing the parts it added…".
+    - The eval counts a page with nothing a reader would see as not finished, and records how many components were reported unlinked.
+  - **Still open.** The judge needs calibrated examples per score.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |

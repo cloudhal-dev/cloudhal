@@ -43,6 +43,8 @@ export const messages = {
       lookedClean: "Looked at the page in a browser: every check passed",
       lookedIssues: "Looked at the page in a browser: {checks} to fix",
       improving: "Improving what it saw…",
+      /** Components the model added but did not place on the page yet. */
+      linking: "Placing the parts it added…",
       checks: {
         "overflow-x": "sideways scrolling",
         "img-alt": "images without alt text",

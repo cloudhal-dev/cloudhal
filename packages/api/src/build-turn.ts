@@ -19,6 +19,7 @@ import { DESIGN_GUIDANCE } from "@cloudhal/core-ts/design";
 import {
   type Catalog,
   catalogPrompt,
+  checkSurface,
   type PatchIssue,
   type PatchOp,
   patchPage,
@@ -35,6 +36,8 @@ export type BuildTurnEvent =
   | { type: "say"; text: string }
   /** RFC-0021 21c: the page was rendered; the model looks at it (failed check ids). */
   | { type: "look"; failed: string[]; images: number }
+  /** Components the model added but never linked into a parent's children (they do not show). */
+  | { type: "unlinked"; components: string[] }
   /** The step being written right now: the components named so far (an unvalidated ghost). */
   | { type: "writing"; components: string[] }
   | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
@@ -442,6 +445,31 @@ export function parseLine(line: string): Line | undefined {
 
 const issueText = (i: Pick<PatchIssue, "path" | "message">) => `${i.path || "/"} ${i.message}`;
 
+/**
+ * Components on the page's surfaces that the root never reaches, as `section/component` keys and
+ * the model-facing lines that say where to link them. They are kept in the draft but never show.
+ */
+export function unlinkedComponents(
+  page: Page,
+  catalog: Catalog,
+  ignore: ReadonlySet<string> = new Set(),
+): { keys: string[]; lines: string[] } {
+  const keys: string[] = [];
+  const lines: string[] = [];
+  page.sections.forEach((section, i) => {
+    if (section.kind !== "surface") return;
+    const loose = checkSurface(section, catalog).unreachable.filter(
+      (id) => !ignore.has(`${section.id}/${id}`),
+    );
+    if (loose.length === 0) return;
+    keys.push(...loose.map((id) => `${section.id}/${id}`));
+    lines.push(
+      `- section ${i} (${section.id}): ${loose.map((id) => `"${id}"`).join(", ")} (add each id to a parent's children: /sections/${i}/components/<parent position>/children/-)`,
+    );
+  });
+  return { keys, lines };
+}
+
 /** Runs one turn; never throws for model or validation problems (they become events). */
 export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<void> {
   const maxRounds = deps.maxRounds ?? 3;
@@ -611,20 +639,35 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
       return { refused, output };
     };
     let lastOutput = "";
+    // Components that were already loose before the turn are the person's; only new ones count.
+    const looseBefore = new Set(unlinkedComponents(page, deps.catalog).keys);
     for (let round = 1; round <= maxRounds; round++) {
       const { refused, output } = await runRound(round);
       lastOutput = output;
       refusedTotal += refused.length;
-      if (refused.length === 0 || round === maxRounds) break;
+      const unlinked = unlinkedComponents(page, deps.catalog, looseBefore);
+      const fresh = unlinked.keys;
+      if (fresh.length) deps.emit({ type: "unlinked", components: fresh });
+      if ((refused.length === 0 && fresh.length === 0) || round === maxRounds) break;
       messages.push(
         { role: "assistant", content: output },
         {
           role: "user",
           content: [
-            "These lines were refused; nothing else was lost:",
-            ...refused.map((r) => `- ${r}`),
+            ...(refused.length
+              ? [
+                  "These lines were refused; nothing else was lost:",
+                  ...refused.map((r) => `- ${r}`),
+                ]
+              : []),
+            ...(fresh.length
+              ? [
+                  "These components are on the page but no parent lists them in its children, so they do not show:",
+                  ...unlinked.lines,
+                ]
+              : []),
             `The page is now (JSON): ${pageForModel(page)}`,
-            'Send corrected JSON Lines for those parts only, then {"done":true}.',
+            'Send JSON Lines that fix only these parts, then {"done":true}.',
           ].join("\n"),
         },
       );

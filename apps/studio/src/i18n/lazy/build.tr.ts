@@ -40,6 +40,7 @@ export const messages: NamespaceMessages<"build"> = {
       lookedClean: "Sayfaya tarayıcıda bakıldı: tüm denetimler geçti",
       lookedIssues: "Sayfaya tarayıcıda bakıldı: düzeltilecekler: {checks}",
       improving: "Gördüklerini iyileştiriyor…",
+      linking: "Eklediği parçaları yerleştiriyor…",
       checks: {
         "overflow-x": "yana kaydırma",
         "img-alt": "alternatif metni olmayan görseller",
