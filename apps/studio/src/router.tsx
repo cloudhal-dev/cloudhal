@@ -69,6 +69,10 @@ const PageEditorPage = lazyRouteComponent(
   () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers", "bodyEditor"]),
   "PageEditorPage",
 );
+const BuildPage = lazyRouteComponent(
+  () => withMessages(import("./routes/BuildPage.tsx"), ["build"]),
+  "BuildPage",
+);
 const PagesPage = lazyRouteComponent(
   () => withMessages(import("./routes/PagesPage.tsx"), ["readers"]),
   "PagesPage",
@@ -372,6 +376,12 @@ const pageEditorRoute = createRoute({
   path: "/pages/$pageId",
   component: PageEditorPage,
 });
+// RFC-0020 §6: a page as agents build it, live.
+const buildRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/pages/$pageId/build",
+  component: BuildPage,
+});
 const articleEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/articles/$entryId",
@@ -395,6 +405,7 @@ const routeTree = rootRoute.addChildren([
     approvalsRoute,
     siteSettingsRoute,
     pageEditorRoute,
+    buildRoute,
     articleEditorRoute,
     taxonomyRoute,
     termEditorRoute,

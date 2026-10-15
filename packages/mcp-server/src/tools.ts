@@ -118,6 +118,7 @@ function mcpWriter(ctx: { principal: { actor: Actor } }): BlockWriter {
 
 export {
   type ApprovalChanges,
+  type BuildObserver,
   type JsonSchema,
   type MediaToolOptions,
   type ToolContext,
@@ -597,6 +598,12 @@ function rawTools(): ToolDefinition[] {
         try {
           const saved = await ctx.store.updatePage(next, { writer: mcpWriter(ctx) });
           const snapshot = await autoSnapshot(ctx, page.siteId, "update_page");
+          ctx.build?.pageChanged({
+            siteId: page.siteId,
+            page: saved,
+            tool: "update_page",
+            actor: ctx.principal.actor,
+          });
           return { page: saved, snapshot, ...unknownBlocksOf(ctx, { sections: saved.sections }) };
         } catch (e) {
           mapError(e);
@@ -691,18 +698,34 @@ function rawTools(): ToolDefinition[] {
         try {
           patched = patchPage(page, a.ops as PatchOp[], siteCatalog(site, ctx));
         } catch (e) {
-          if (e instanceof SurfacePatchError)
+          if (e instanceof SurfacePatchError) {
+            ctx.build?.patchRejected({
+              siteId: site.id,
+              pageId: page.id,
+              tool: "patch_draft",
+              actor: ctx.principal.actor,
+              issues: e.issues,
+            });
             throw new ToolError(
               "invalid_surface",
               `${e.message}. Fix the parts at these JSON Pointers and send the operations again; get_catalog lists every component and its props`,
               { issues: e.issues },
             );
+          }
           throw e;
         }
         assertNoHtmlSections(patched.value.sections);
         try {
           const saved = await ctx.store.updatePage(patched.value, { writer: mcpWriter(ctx) });
           const snapshot = await autoSnapshot(ctx, page.siteId, "patch_draft");
+          ctx.build?.pageChanged({
+            siteId: site.id,
+            page: saved,
+            tool: "patch_draft",
+            actor: ctx.principal.actor,
+            ops: a.ops as unknown[],
+            repairs: patched.notes,
+          });
           return {
             page: saved,
             snapshot,

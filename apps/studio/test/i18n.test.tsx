@@ -23,6 +23,8 @@ import { messages as analyticsSettingsEn } from "../src/i18n/lazy/analyticsSetti
 import { messages as analyticsSettingsTr } from "../src/i18n/lazy/analyticsSettings.tr.ts";
 import { messages as bodyEditorEn } from "../src/i18n/lazy/bodyEditor.en.ts";
 import { messages as bodyEditorTr } from "../src/i18n/lazy/bodyEditor.tr.ts";
+import { messages as buildEn } from "../src/i18n/lazy/build.en.ts";
+import { messages as buildTr } from "../src/i18n/lazy/build.tr.ts";
 import { messages as commentsEn } from "../src/i18n/lazy/comments.en.ts";
 import { messages as commentsTr } from "../src/i18n/lazy/comments.tr.ts";
 import { messages as commentsSettingsEn } from "../src/i18n/lazy/commentsSettings.en.ts";
@@ -74,6 +76,7 @@ describe("lazy message namespaces", () => {
     analytics: [analyticsEn, analyticsTr],
     analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
     bodyEditor: [bodyEditorEn, bodyEditorTr],
+    build: [buildEn, buildTr],
     comments: [commentsEn, commentsTr],
     commentsSettings: [commentsSettingsEn, commentsSettingsTr],
     readers: [readersEn, readersTr],
@@ -109,6 +112,7 @@ describe("lazy message namespaces", () => {
       [scheduleSettingsEn, scheduleSettingsTr],
       [bodyEditorEn, bodyEditorTr],
       [aiSettingsEn, aiSettingsTr],
+      [buildEn, buildTr],
     ] as const) {
       const english = new Map(flat(enModule));
       // Placeholders, product names and codes may stay as they are; sentences may not.

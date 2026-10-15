@@ -144,3 +144,56 @@ describe("surface tools", () => {
     ).rejects.toMatchObject({ code: "invalid_surface" });
   });
 });
+
+describe("build observer (RFC-0020 §6)", () => {
+  it("patch_draft reports applied changes and refused builds", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const siteId = (await seedStarterSite(store, { name: "Watched", slug: "watched" })).id;
+    const home = (await store.listPages(siteId)).find((p) => p.path === "/") as Page;
+    const seen: string[] = [];
+    const ctx: ToolContext = {
+      store,
+      principal: { actor: agent, scopes: defaultScopes(agent) },
+      build: {
+        pageChanged: (c) =>
+          seen.push(`changed ${c.tool} rev ${c.page.rev} repairs ${c.repairs?.length}`),
+        patchRejected: (r) => seen.push(`rejected ${r.tool} ${r.issues.length}`),
+      },
+    };
+    const policy = new PolicyEngine(toolPolicies(tools));
+    const audit = new AuditLog(sql);
+    const run = (args: Record<string, unknown>) =>
+      runTool(byName.patch_draft as (typeof tools)[number], args, ctx, { policy, audit });
+    await run({
+      siteId,
+      pageId: home.id,
+      rev: home.rev,
+      ops: [{ op: "replace", path: "/title", value: "Live" }],
+    });
+    await expect(
+      run({
+        siteId,
+        pageId: home.id,
+        rev: home.rev + 1,
+        ops: [
+          {
+            op: "add",
+            path: "/sections/-",
+            value: {
+              id: "sec_x00000001",
+              kind: "surface",
+              catalog: "blog@1",
+              components: [{ id: "root", component: "Hologram" }],
+            },
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "invalid_surface" });
+    expect(seen).toEqual([
+      `changed patch_draft rev ${home.rev + 1} repairs 0`,
+      "rejected patch_draft 1",
+    ]);
+  });
+});

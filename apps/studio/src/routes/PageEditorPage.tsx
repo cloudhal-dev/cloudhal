@@ -13,6 +13,7 @@ import {
   Input,
   InputArea,
   LayerCard,
+  LinkButton,
   PageLayout,
   SectionCard,
   Select,
@@ -28,6 +29,7 @@ import {
   Cube,
   type Icon,
   Image as ImageIcon,
+  Lightning,
   ListBullets,
   Plus,
   Rows,
@@ -493,6 +495,16 @@ export function PageEditorPage() {
       actions={
         <>
           <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />
+          <Tooltip content={t("editor.buildLiveHint")}>
+            <LinkButton
+              href={`/sites/${siteId}/pages/${pageId}/build`}
+              variant="secondary"
+              icon={Lightning}
+              data-testid="build-live"
+            >
+              {t("editor.buildLive")}
+            </LinkButton>
+          </Tooltip>
           <StatusActions
             status={draft.status}
             busy={save.isPending}

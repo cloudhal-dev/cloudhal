@@ -14,7 +14,7 @@ import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import type { CommentsDeps } from "./comments.ts";
-import type { MediaToolOptions } from "./common.ts";
+import type { BuildObserver, MediaToolOptions } from "./common.ts";
 import type { SchedulesDeps } from "./schedules.ts";
 import { createCloudhalMcpServer } from "./server.ts";
 
@@ -36,6 +36,8 @@ export interface HttpOptions {
   schedules?: SchedulesDeps | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
+  /** Told about page writes and refused builds (RFC-0020 §6, Studio's Build view). */
+  build?: BuildObserver | undefined;
   confirmTokenFallback?: boolean | undefined;
   /** Out-of-band approvals: agents' gated calls wait for a person in Studio (ADR-0014). */
   approvals?: ApprovalStore | undefined;
@@ -64,6 +66,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         skills: options.skills,
         previewBaseUrl: options.previewBaseUrl,
         previewSecret: options.previewSecret,
+        build: options.build,
         media: options.media,
         analytics: options.analytics,
         comments: options.comments,

@@ -18,7 +18,7 @@ import {
 } from "@cloudhal/agent-runtime";
 import type { AnalyticsService } from "@cloudhal/analytics/service";
 import { CommentsError } from "@cloudhal/comments";
-import type { Actor, ContentEntry, Site, Snapshot } from "@cloudhal/core-contracts";
+import type { Actor, ContentEntry, Page, Site, Snapshot } from "@cloudhal/core-contracts";
 import type { InvariantCode, SiteGraphStore } from "@cloudhal/core-ts";
 import {
   ConflictError,
@@ -116,8 +116,34 @@ export interface MediaToolOptions {
   agentDailyBytes?: number | undefined;
 }
 
+/**
+ * Watches drafts being built (RFC-0020 §6): Studio's Build view follows a page while agents
+ * change it. Called after a write succeeds, and when a build's operations are refused, so a
+ * person sees the agent correct itself. Never awaited; must not throw.
+ */
+export interface BuildObserver {
+  pageChanged(change: {
+    readonly siteId: string;
+    readonly page: Page;
+    readonly tool: string;
+    readonly actor: Actor;
+    /** The operations applied (after repairs), when the change was a patch. */
+    readonly ops?: readonly unknown[] | undefined;
+    readonly repairs?: readonly string[] | undefined;
+  }): void;
+  patchRejected(rejection: {
+    readonly siteId: string;
+    readonly pageId: string;
+    readonly tool: string;
+    readonly actor: Actor;
+    readonly issues: readonly unknown[];
+  }): void;
+}
+
 export interface ToolContext {
   store: SiteGraphStore;
+  /** Studio's Build view, when a server runs one (RFC-0020 §6). */
+  build?: BuildObserver | undefined;
   principal: Principal;
   /** Out-of-band approvals (HTTP): where `request_elevation` files its request. */
   approvals?: ApprovalStore | undefined;

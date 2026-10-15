@@ -58,7 +58,64 @@ export interface PreviewPanelProps {
   height?: string;
   /** Fill the parent's height (the parent sets it, e.g. a sticky editor column). */
   fill?: boolean;
+  /**
+   * Live builds (RFC-0020 §6): each new `srcDoc` is merged into the shown document instead of
+   * reloading it, so scroll position and open tabs survive. The frame then allows same-origin
+   * access for the panel only; scripts stay off (`sandbox="allow-same-origin"`).
+   */
+  morph?: boolean;
+  /** With `morph`: `data-section-id`s that just changed, outlined briefly and scrolled into view. */
+  highlight?: readonly string[];
   className?: string;
+}
+
+/**
+ * Merges a newer preview document into the shown one: `main`'s children are matched by
+ * `data-section-id` and kept when unchanged, so only what changed is replaced. Anything else that
+ * differs (the header, the title) is replaced as a whole.
+ */
+export function morphPreview(doc: Document, html: string): void {
+  const next = new DOMParser().parseFromString(html, "text/html");
+  if (doc.title !== next.title) doc.title = next.title;
+  const main = doc.querySelector("main");
+  const nextMain = next.querySelector("main");
+  if (!main || !nextMain) {
+    doc.body.replaceWith(doc.importNode(next.body, true));
+    return;
+  }
+  const header = doc.querySelector("body > header");
+  const nextHeader = next.querySelector("body > header");
+  if (header && nextHeader && header.outerHTML !== nextHeader.outerHTML)
+    header.replaceWith(doc.importNode(nextHeader, true));
+  const byId = new Map<string, Element>();
+  for (const child of Array.from(main.children)) {
+    const id = child.getAttribute("data-section-id");
+    if (id) byId.set(id, child);
+  }
+  const children = Array.from(nextMain.children).map((child) => {
+    const id = child.getAttribute("data-section-id");
+    const old = id ? byId.get(id) : undefined;
+    return old && old.outerHTML === child.outerHTML ? old : doc.importNode(child, true);
+  });
+  main.replaceChildren(...children);
+}
+
+/** Outlines the changed sections for a moment and brings the last one into view. */
+function flash(doc: Document, ids: readonly string[]): void {
+  let last: Element | undefined;
+  for (const id of ids) {
+    const el = doc.querySelector(`[data-section-id="${CSS.escape(id)}"]`);
+    if (!el) continue;
+    last = el;
+    el.animate(
+      [
+        { outline: "2px solid rgb(37 99 235)", outlineOffset: "4px" },
+        { outline: "2px solid rgb(37 99 235 / 0)", outlineOffset: "4px" },
+      ],
+      { duration: 1600, easing: "ease-out" },
+    );
+  }
+  last?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function withVersion(src: string, version: string | number | undefined, nonce: number): string {
@@ -82,6 +139,8 @@ export function PreviewPanel({
   defaultDevice = "desktop",
   height = "min(78vh, 960px)",
   fill = false,
+  morph = false,
+  highlight,
   className,
 }: PreviewPanelProps) {
   const [device, setDevice] = useState<PreviewDevice>(defaultDevice);
@@ -91,6 +150,18 @@ export function PreviewPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const url = withVersion(src, version, nonce);
   const draft = live || srcDoc !== undefined;
+  const frame = useRef<HTMLIFrameElement>(null);
+  // Morphing: the frame loads the first document (and each reload's); later ones are merged in.
+  const [shown, setShown] = useState<string | undefined>(srcDoc);
+  if (morph && shown === undefined && srcDoc !== undefined) setShown(srcDoc);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: merge only when a new document arrives
+  useEffect(() => {
+    if (!morph || srcDoc === undefined || srcDoc === shown || loading) return;
+    const doc = frame.current?.contentDocument;
+    if (!doc?.body) return;
+    morphPreview(doc, srcDoc);
+    if (highlight?.length) flash(doc, highlight);
+  }, [srcDoc]);
 
   // A new URL means a new document is loading. A draft document swaps in place (no skeleton on
   // every keystroke); only a reload remounts it.
@@ -101,6 +172,7 @@ export function PreviewPanel({
   // biome-ignore lint/correctness/useExhaustiveDependencies: a reload remounts the draft frame
   useEffect(() => {
     if (draft) setLoading(true);
+    if (morph) setShown(srcDoc);
   }, [nonce]);
   const waiting = draft ? srcDoc === undefined : false;
 
@@ -189,8 +261,9 @@ export function PreviewPanel({
             <iframe
               key={draft ? `draft.${nonce}` : url}
               title={labels.frameTitle}
-              {...(draft ? { srcDoc } : { src: url })}
-              sandbox=""
+              ref={frame}
+              {...(draft ? { srcDoc: morph ? shown : srcDoc } : { src: url })}
+              sandbox={morph ? "allow-same-origin" : ""}
               referrerPolicy="no-referrer"
               onLoad={() => setLoading(false)}
               className="block origin-top-left border-0"

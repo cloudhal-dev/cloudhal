@@ -94,6 +94,12 @@ export {
   foldBreakdown,
 } from "./blocks/Breakdown.tsx";
 export {
+  BuildActivity,
+  type BuildActivityItem,
+  type BuildActivityLabels,
+  type BuildActivityProps,
+} from "./blocks/BuildActivity.tsx";
+export {
   type BulkAction,
   BulkActionBar,
   type BulkActionBarLabels,
@@ -281,6 +287,7 @@ export {
   usePageScrollRootRef,
 } from "./blocks/PageLayout.tsx";
 export {
+  morphPreview,
   PREVIEW_DEVICE_WIDTH,
   type PreviewDevice,
   PreviewPanel,

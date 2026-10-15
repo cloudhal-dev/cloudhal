@@ -42,12 +42,14 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { type CommentsDeps, isBoundState } from "./comments.ts";
-import type { MediaToolOptions } from "./common.ts";
+import type { BuildObserver, MediaToolOptions } from "./common.ts";
 import { type RunContext, resolveRun, runPrincipal, type SchedulesDeps } from "./schedules.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
 
 export interface CloudhalMcpOptions {
   store: SiteGraphStore;
+  /** Told about page writes and refused builds (RFC-0020 §6, Studio's Build view). */
+  build?: BuildObserver | undefined;
   /** Who this server instance acts for. One instance per principal (per request over HTTP). */
   principal: Principal;
   audit?: AuditLog | undefined;
@@ -357,6 +359,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           now: options.now,
           previewBaseUrl: options.previewBaseUrl,
           previewSecret: options.previewSecret,
+          build: options.build,
           ownership: options.ownership,
           media: options.media,
           analytics: options.analytics,
