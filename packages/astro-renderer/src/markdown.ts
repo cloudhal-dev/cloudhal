@@ -26,6 +26,38 @@ export { safeHref, safeSrc };
 
 /** The context of the markdown being rendered right now (`renderMarkdown` is synchronous). */
 let current: MediaContext | undefined;
+/** Heading ids already given out in the document being rendered (nested renders share them). */
+let headingIds: Map<string, number> | undefined;
+
+const TURKISH: Record<string, string> = { ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g" };
+/**
+ * Ids our own markup uses (comments, forms) or may use: a heading that would take one gets `h-`
+ * in front, so content can never shadow an element Cloudhal's scripts look up by id.
+ */
+const RESERVED_ID = /^(?:comment|cloudhal|ch-)/;
+
+/**
+ * A heading's anchor (RFC-0018 §3): ASCII slug of its text, unique in the document. Text without
+ * Latin letters or digits falls back to `section`; repeats get `-2`, `-3`, ….
+ */
+export function headingSlug(text: string, taken?: Map<string, number>): string {
+  const base =
+    text
+      .replace(/[ıİşŞğĞ]/g, (c) => TURKISH[c] ?? c)
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/ß/g, "ss")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 64)
+      .replace(/-+$/, "") || "section";
+  const slug = RESERVED_ID.test(base) || /^\d/.test(base) ? `h-${base}` : base;
+  if (!taken) return slug;
+  const seen = taken.get(slug) ?? 0;
+  taken.set(slug, seen + 1);
+  return seen === 0 ? slug : `${slug}-${seen + 1}`;
+}
 
 /**
  * `asset:<id>` (exactly; RFC-0004 §7.6 rule 1) resolved against the render's assets. Anything else
@@ -152,6 +184,13 @@ md.use({
     html({ text }) {
       return escapeHtml(text);
     },
+    // h2–h6 get ids for a table of contents and deep links; the h1 is the article's own title.
+    heading({ tokens, depth }) {
+      const inner = this.parser.parseInline(tokens);
+      if (depth === 1) return `<h1>${inner}</h1>\n`;
+      const id = headingSlug(htmlText(inner), headingIds);
+      return `<h${depth} id="${id}">${inner}</h${depth}>\n`;
+    },
     link({ href, title, tokens }) {
       const label = this.parser.parseInline(tokens);
       if (/^\s*asset:/i.test(href)) {
@@ -180,11 +219,14 @@ md.use({
  */
 export function renderMarkdown(source: string, ctx?: MediaContext): string {
   const previous = current;
+  const outer = headingIds === undefined;
   current = ctx;
+  if (outer) headingIds = new Map();
   try {
     return md.parse(source) as string;
   } finally {
     current = previous;
+    if (outer) headingIds = undefined;
   }
 }
 
@@ -198,7 +240,12 @@ const ENTITIES: Record<string, string> = {
 
 /** Markdown as plain text (meta descriptions): rendered safely, then tags dropped and entities decoded. */
 export function markdownText(source: string): string {
-  return renderMarkdown(source)
+  return htmlText(renderMarkdown(source));
+}
+
+/** Text of HTML this module produced: tags dropped, entities decoded, whitespace collapsed. */
+export function htmlText(html: string): string {
+  return html
     .replace(/<[^>]*>/g, " ")
     .replace(/&(?:amp|lt|gt|quot|#39);/g, (m) => ENTITIES[m] ?? m)
     .replace(/&#(\d{1,7});/g, (m, n: string) =>

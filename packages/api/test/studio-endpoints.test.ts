@@ -141,7 +141,7 @@ describe("draft preview", () => {
     expect(res.status).toBe(200);
     const { html } = (await res.json()) as { html: string };
     expect(html).toContain("Unsaved &lt;title&gt;");
-    expect(html).toContain("<h2>Unsaved heading</h2>");
+    expect(html).toContain('<h2 id="unsaved-heading">Unsaved heading</h2>');
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("Saved body");
     // Nothing was written.
