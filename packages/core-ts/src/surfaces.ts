@@ -910,10 +910,20 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       message: `at most ${SURFACE_LIMITS.components} components`,
     });
   const byId = new Map<string, { c: SurfaceComponent; i: number }>();
+  /** A component's children when they are a list (anything else is reported below). */
+  const kidsOf = (c: SurfaceComponent): string[] =>
+    Array.isArray(c.children) ? (c.children as string[]) : [];
   components.forEach((c, i) => {
-    if (byId.has(c.id))
+    if (typeof c.id !== "string" || !c.id)
+      issues.push({ path: `/components/${i}/id`, message: "every component needs an id" });
+    else if (byId.has(c.id))
       issues.push({ path: `/components/${i}/id`, message: `"${c.id}" is used twice` });
     else byId.set(c.id, { c, i });
+    if (c.children !== undefined && !Array.isArray(c.children))
+      issues.push({
+        path: `/components/${i}/children`,
+        message: "children is a list of component ids",
+      });
   });
   if (!byId.has("root"))
     issues.push({ path: "/components", message: 'one component has id "root"' });
@@ -922,7 +932,7 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     const at = `/components/${i}`;
     const entry = catalog.get(c.component);
     if (!entry) unknown.push(c.id);
-    (c.children ?? []).forEach((child, j) => {
+    kidsOf(c).forEach((child, j) => {
       const target = byId.get(child);
       if (!target) issues.push({ path: `${at}/children/${j}`, message: `no component "${child}"` });
       else if (child === "root" || child === c.id)
@@ -936,7 +946,7 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     });
     if (!entry) return;
     const rule = childRule(entry);
-    const kids = c.children ?? [];
+    const kids = kidsOf(c);
     if (rule === "none" && kids.length)
       issues.push({ path: `${at}/children`, message: `${c.component} has no children` });
     else if (Array.isArray(rule))
@@ -967,8 +977,8 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       return;
     }
     const next = new Set(trail).add(id);
-    for (const child of byId.get(id)?.c.children ?? [])
-      if (byId.has(child)) walk(child, depth + 1, next);
+    const node = byId.get(id)?.c;
+    for (const child of node ? kidsOf(node) : []) if (byId.has(child)) walk(child, depth + 1, next);
   };
   if (byId.has("root")) walk("root", 1, new Set());
   const unreachable = components.map((c) => c.id).filter((id) => !reached.has(id));
@@ -1045,6 +1055,11 @@ export function repairComponent(
 ): { component: SurfaceComponent; notes: string[] } {
   const notes: string[] = [];
   let next: SurfaceComponent = c;
+  // One child written as its id instead of a list of one.
+  if (typeof (c.children as unknown) === "string") {
+    next = { ...next, children: [c.children as unknown as string] };
+    notes.push(`${c.id}: children "${c.children}" made a list`);
+  }
   const name = nearestComponent(c.component, catalog);
   if (name && name !== c.component) {
     notes.push(`${c.id}: component "${c.component}" → "${name}"`);
@@ -1305,6 +1320,16 @@ export function patchPage(
       ]);
     throw e;
   }
+  // A build changes the page's parts, never its shape: it keeps a title and a list of sections.
+  if (!Array.isArray(value.sections) || typeof value.title !== "string")
+    throw new SurfacePatchError([
+      {
+        code: "VALIDATION_FAILED",
+        path: Array.isArray(value.sections) ? "/title" : "/sections",
+        message: "the page keeps its title and its list of sections; change what is inside them",
+        op: 0,
+      },
+    ]);
   const issues = checkPageSurfaces(value.sections ?? [], catalog).map(
     (i): PatchIssue => ({ code: "VALIDATION_FAILED", path: i.path, message: i.message }),
   );

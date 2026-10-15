@@ -77,6 +77,22 @@ describe("catalog", () => {
 });
 
 describe("checkSurface", () => {
+  it("reports components without an id and children that are not a list, without failing", () => {
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: { a: 1 } as unknown as string[] },
+          { component: "Text", props: { text: "x" } } as unknown as SurfaceComponent,
+          { component: "Text", props: { text: "y" } } as unknown as SurfaceComponent,
+        ]),
+      ),
+    ).toEqual([
+      "/components/0/children children is a list of component ids",
+      "/components/1/id every component needs an id",
+      "/components/2/id every component needs an id",
+    ]);
+  });
+
   const ok = surface(
     [
       { id: "root", component: "Stack", children: ["title", "plans"] },
@@ -371,6 +387,39 @@ describe("patchPage", () => {
     createdAt: "2026-10-15T00:00:00.000Z",
     updatedAt: "2026-10-15T00:00:00.000Z",
   } as unknown as Page;
+
+  it("keeps the page's shape, and reads one child written as its id (RFC-0021 eval findings)", () => {
+    for (const op of [
+      { op: "remove", path: "/sections" },
+      { op: "replace", path: "/title", value: 3 },
+    ] as const)
+      expect(() => patchPage(page, [op], catalog)).toThrow(
+        expect.objectContaining({
+          issues: [
+            expect.objectContaining({
+              message:
+                "the page keeps its title and its list of sections; change what is inside them",
+            }),
+          ],
+        }),
+      );
+    const built = patchPage(
+      page,
+      [
+        {
+          op: "add",
+          path: "/sections/-",
+          value: surface([
+            { id: "root", component: "Stack", children: "title" as unknown as string[] },
+            { id: "title", component: "Heading", props: { text: "Hi", level: 2 } },
+          ]),
+        },
+      ],
+      catalog,
+    );
+    expect((built.value.sections[0] as SurfaceSection).components[0]?.children).toEqual(["title"]);
+    expect(built.notes).toContain('root: children "title" made a list');
+  });
 
   it("builds a surface op by op, repairing on the way", () => {
     const s = patchPage(

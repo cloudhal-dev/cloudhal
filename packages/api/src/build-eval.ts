@@ -280,7 +280,7 @@ export async function runBuildEvalOnce(input: {
   });
   run.totalMs = now() - started;
   if (input.design && run.finished) run.design = await designPass(page);
-  run.components = page.sections.reduce(
+  run.components = (page.sections ?? []).reduce(
     (n, s) => n + (s.kind === "surface" ? s.components.length : 0),
     0,
   );
