@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
+import { buildEval, describeRun } from "./commands/ai.ts";
 import {
   analyticsExport,
   analyticsRollup,
@@ -89,6 +90,9 @@ Usage:
   cloudhal schedules list [--remote] [--limit <n>]        the site's releases
   cloudhal schedules run-due [--remote]                   one scheduler tick now (self-hosting: run it from
                                                           the system's cron every minute)
+  cloudhal ai build-eval [--remote] [--models a,b] [--briefs landing,faq] [--out <file>]
+                                                          compare models on Build chat's turn, in memory
+                                                          (real model calls; RFC-0020 open question 7)
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
@@ -135,6 +139,8 @@ export async function main(argv: string[]): Promise<number> {
       "no-build-studio": { type: "boolean" },
       "cancel-schedules": { type: "boolean" },
       limit: { type: "string" },
+      models: { type: "string" },
+      briefs: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -425,6 +431,35 @@ export async function main(argv: string[]): Promise<number> {
         return r.failed > 0 ? 1 : 0;
       }
       throw new Error("usage: cloudhal schedules status|list|run-due [--remote]");
+    }
+    case "ai": {
+      const [what] = rest;
+      if (what !== "build-eval")
+        throw new Error("usage: cloudhal ai build-eval [--remote] [--models a,b] [--briefs x,y]");
+      const split = (v: string | undefined) =>
+        v
+          ? v
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
+      const models = split(values.models);
+      const briefs = split(values.briefs);
+      const report = await buildEval({
+        projectDir,
+        ...(values.remote ? { remote: true } : {}),
+        ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+        ...(models ? { models } : {}),
+        ...(briefs ? { briefs } : {}),
+        onRun: (r) => console.log(describeRun(r)),
+      });
+      console.log(`\n${report.table}`);
+      if (values.out) {
+        const { writeFile } = await import("node:fs/promises");
+        await writeFile(values.out, `${JSON.stringify(report, null, 2)}\n`);
+        console.log(`\nwrote ${values.out}`);
+      }
+      return 0;
     }
     case "search": {
       const [what] = rest;

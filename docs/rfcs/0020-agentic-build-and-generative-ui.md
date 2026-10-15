@@ -241,6 +241,14 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
     - Build chat shows the picked part ("Changing Button “cta” in section 2") with a button to clear it. Briefs go out with `scope {sectionId, componentId?}` until it is cleared or a later version removes the part.
     - The API refuses a scope that is not on the page (400) before the model runs.
     - The model reads the part, its JSON Pointer and "change only that part unless the brief clearly asks for more". This is guidance, not enforcement: a brief may still change more.
+- **The Build model eval** (open question 7; harness shipped, results to come):
+  - **`@cloudhal/api` `build-eval.ts`.** Five briefs (a landing page, an interactive pricing section, an FAQ, an edit, and a click-to-scope edit) go through Build chat's own turn on each model, in memory. The store's checks apply through `patchPage`, and nothing is stored.
+  - **Measures per turn:** finished (`done` with at least one step); acceptance (steps written as sent after repairs, out of all steps); repairs, refusals and rounds; first-step and total time; tokens.
+  - **Ranking:** finished turns, then acceptance, then median total time.
+  - **Where it runs.**
+    - `cloudhal ai build-eval [--remote] [--models a,b] [--briefs …] [--out file]` runs locally over REST, or on the deployment's AI binding through `POST /api/admin/sites/:siteId/ai/build-eval` (deployment token, NDJSON per run, then the summary).
+    - The default candidates are seven Workers AI text models (`BUILD_EVAL_MODELS`).
+  - **Not run in CI.** Every run is a real model call on the operator's account, so the eval runs on request. Results and the recommended Build default land here once it has been run.
 - **20d shipped** (markdown surfaces):
   - **core-ts.**
     - `bodySurfaces` finds ```` ```surface ```` fences; ```` ``` ```` and `~~~` both open one, and fences inside other code blocks do not count.

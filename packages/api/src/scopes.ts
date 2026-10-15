@@ -51,6 +51,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/schedules/status", "deploy-token"],
   ["POST", "/api/admin/schedules/run-due", "deploy-token"],
   ["GET", "/api/admin/sites/:siteId/schedules/releases", "deploy-token"],
+  // RFC-0020 open question 7: `cloudhal ai build-eval --remote`
+  ["POST", "/api/admin/sites/:siteId/ai/build-eval", "deploy-token"],
   // RFC-0019 §3: `cloudhal search reindex --remote`
   ["POST", "/api/admin/sites/:siteId/search/reindex", "deploy-token"],
   // RFC-0006 §7.5: analytics backfill and the operator's status and export
