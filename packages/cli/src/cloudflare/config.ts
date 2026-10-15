@@ -64,6 +64,11 @@ export const SCHEDULER_CLOCK_BINDING = "SCHEDULER_CLOCK";
 export const SCHEDULER_CLOCK_CLASS = "SchedulerClock";
 export const SCHEDULER_CLOCK_MIGRATION = "v1";
 
+/** Build rooms (RFC-0020 §6): one Durable Object per page for Studio's Build view. */
+export const BUILD_ROOMS_BINDING = "BUILD_ROOMS";
+export const BUILD_ROOMS_CLASS = "BuildRoom";
+export const BUILD_ROOMS_MIGRATION = "v2";
+
 /** What the generated configs need for reader comments (RFC-0007 §15.3–15.4). */
 export interface CommentsDeployment {
   /** `cloudhal.json` `comments.available` (default true); `false` sets `CLOUDHAL_COMMENTS_AVAILABLE=false`. */
@@ -332,9 +337,16 @@ export function adminWorkerConfig(
     // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
     // switching between the cron trigger and the alarm never needs a migration (§8.3).
     durable_objects: {
-      bindings: [{ name: SCHEDULER_CLOCK_BINDING, class_name: SCHEDULER_CLOCK_CLASS }],
+      bindings: [
+        { name: SCHEDULER_CLOCK_BINDING, class_name: SCHEDULER_CLOCK_CLASS },
+        { name: BUILD_ROOMS_BINDING, class_name: BUILD_ROOMS_CLASS },
+      ],
     },
-    migrations: [{ tag: SCHEDULER_CLOCK_MIGRATION, new_sqlite_classes: [SCHEDULER_CLOCK_CLASS] }],
+    // Migrations only ever append: v1 is the clock, v2 the build rooms (RFC-0020 §6).
+    migrations: [
+      { tag: SCHEDULER_CLOCK_MIGRATION, new_sqlite_classes: [SCHEDULER_CLOCK_CLASS] },
+      { tag: BUILD_ROOMS_MIGRATION, new_sqlite_classes: [BUILD_ROOMS_CLASS] },
+    ],
     triggers: { crons: scheduler === "cron" ? [MINUTE_CRON] : [] },
     ...customDomain(n.domain),
     // Every API call makes several D1 round trips; Smart Placement may run the Worker near the

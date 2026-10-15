@@ -35,6 +35,35 @@ const secrets = {
   CLOUDHAL_DEPLOY_TOKEN: "e2e-deploy-token-0123456789abcdefghijk",
 };
 
+/** Reads a server-sent events response one JSON payload at a time. */
+function serverSentEvents(res: Response) {
+  const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  return {
+    async next(): Promise<Record<string, unknown>> {
+      for (;;) {
+        const end = buffer.indexOf("\n\n");
+        if (end >= 0) {
+          const block = buffer.slice(0, end);
+          buffer = buffer.slice(end + 2);
+          const data = block
+            .split("\n")
+            .filter((l) => l.startsWith("data:"))
+            .map((l) => l.slice(5).trim())
+            .join("\n");
+          if (data) return JSON.parse(data) as Record<string, unknown>;
+          continue;
+        }
+        const { value, done } = await reader.read();
+        if (done) throw new Error("stream ended");
+        buffer += decoder.decode(value, { stream: true });
+      }
+    },
+    close: () => reader.cancel(),
+  };
+}
+
 describe("Cloudflare deployment (admin + site Workers)", () => {
   let tmp: string;
   let projectDir: string;
@@ -195,6 +224,36 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     );
     const { resources } = await client.listResources();
     expect(resources.map((r) => r.uri)).toContain("skill://publish-article/SKILL.md");
+
+    // RFC-0020 §6: Studio's Build view follows the agent's patch through the page's build room
+    // (a Durable Object), not through the isolate's memory.
+    const pages = (await (
+      await adminFetch(`/api/sites/${siteId}/pages`, { headers: { cookie } })
+    ).json()) as { id: string; path: string; rev: number }[];
+    const about = pages.find((p) => p.path === "/about") as (typeof pages)[number];
+    const stream = await within(
+      adminFetch(`/api/sites/${siteId}/pages/${about.id}/build/events`, { headers: { cookie } }),
+    );
+    expect(stream.status).toBe(200);
+    const events = serverSentEvents(stream);
+    expect((await within(events.next())).type).toBe("STATE_SNAPSHOT");
+    const patched = await client.callTool({
+      name: "patch_draft",
+      arguments: {
+        siteId,
+        pageId: about.id,
+        rev: about.rev,
+        ops: [{ op: "replace", path: "/title", value: "About the edge" }],
+      },
+    });
+    expect(patched.isError, JSON.stringify(patched.content)).toBeFalsy();
+    expect(await within(events.next())).toMatchObject({
+      type: "STATE_DELTA",
+      title: "About the edge",
+      tool: "patch_draft",
+      actor: { kind: "agent", name: "newsroom-agent" },
+    });
+    await events.close();
 
     const created = await client.callTool({
       name: "create_entry",

@@ -48,6 +48,8 @@ export function adminEntry(blockTypes?: string, themeSettings?: string): string 
     "",
     "// The scheduler's Durable Object clock (RFC-0008 §8.3), declared by every deploy.",
     'export { SchedulerClock } from "@cloudhal/cloudflare/admin";',
+    "// Build rooms for Studio's Build view (RFC-0020 §6), declared by every deploy.",
+    'export { BuildRoom } from "@cloudhal/cloudflare/admin";',
     "",
     `export default createAdminWorker({ ${options.join(", ")} });`,
     "",

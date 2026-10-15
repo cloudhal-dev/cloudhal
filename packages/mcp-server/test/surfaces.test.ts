@@ -157,9 +157,14 @@ describe("build observer (RFC-0020 §6)", () => {
       store,
       principal: { actor: agent, scopes: defaultScopes(agent) },
       build: {
-        pageChanged: (c) =>
-          seen.push(`changed ${c.tool} rev ${c.page.rev} repairs ${c.repairs?.length}`),
-        patchRejected: (r) => seen.push(`rejected ${r.tool} ${r.issues.length}`),
+        pageChanged: (c) => {
+          seen.push(`changed ${c.tool} rev ${c.page.rev} repairs ${c.repairs?.length}`);
+        },
+        // An observer may be async (a Durable Object round trip): the tool waits for it.
+        patchRejected: async (r) => {
+          await Promise.resolve();
+          seen.push(`rejected ${r.tool} ${r.issues.length}`);
+        },
       },
     };
     const policy = new PolicyEngine(toolPolicies(tools));

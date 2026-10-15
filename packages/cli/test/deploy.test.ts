@@ -137,13 +137,24 @@ describe("cloudhal deploy", () => {
       },
       // RFC-0008 §8.2–§8.3: the scheduler's minute tick in the old slot, and the clock declared
       triggers: { crons: ["* * * * *"] },
-      durable_objects: { bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }] },
-      migrations: [{ tag: "v1", new_sqlite_classes: ["SchedulerClock"] }],
+      durable_objects: {
+        bindings: [
+          { name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" },
+          { name: "BUILD_ROOMS", class_name: "BuildRoom" },
+        ],
+      },
+      migrations: [
+        { tag: "v1", new_sqlite_classes: ["SchedulerClock"] },
+        { tag: "v2", new_sqlite_classes: ["BuildRoom"] },
+      ],
     });
     expect(r.scheduler).toBe("cron");
     // the generated entry exports the Durable Object class next to the Worker
     expect(await readFile(path.join(deployDir, "admin/worker.ts"), "utf8")).toContain(
       'export { SchedulerClock } from "@cloudhal/cloudflare/admin";',
+    );
+    expect(await readFile(path.join(deployDir, "admin/worker.ts"), "utf8")).toContain(
+      'export { BuildRoom } from "@cloudhal/cloudflare/admin";',
     );
     expect(JSON.stringify(admin)).not.toContain("CLOUDHAL_COMMENTS_KEY");
     const secretsFile = path.join(deployDir, "secrets.json");
@@ -651,7 +662,10 @@ describe("cloudhal deploy", () => {
     expect(adminOn.vars).not.toHaveProperty("CLOUDHAL_ANALYTICS_CRON");
     expect(adminOn.vars).not.toHaveProperty("CLOUDHAL_COMMENTS_CRON");
     expect(adminOn.durable_objects).toEqual({
-      bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }],
+      bindings: [
+        { name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" },
+        { name: "BUILD_ROOMS", class_name: "BuildRoom" },
+      ],
     });
     expect(purges).toHaveLength(2);
     expect(

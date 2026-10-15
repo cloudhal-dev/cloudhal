@@ -2,9 +2,9 @@
  * Build events (RFC-0020 §6, phase 20b): who is changing which page right now. MCP tools and
  * Studio saves report here; `GET …/pages/:pageId/build/events` streams it to Studio's Build view.
  *
- * In-process: one hub per server. On Node (`cloudhal studio`) that is the whole deployment. On
- * Cloudflare a request may land on another isolate than the stream it should reach; phase 20b-2
- * moves the hub into a Durable Object per page.
+ * `createBuildHub` is in-process: on Node (`cloudhal studio`) one process is the whole
+ * deployment. On Cloudflare, `@cloudhal/cloudflare` implements the same interface with a Durable
+ * Object per page, so a change made on one isolate reaches viewers streaming from any other.
  */
 import type { Actor, Page } from "@cloudhal/core-contracts";
 import type { BuildObserver } from "@cloudhal/mcp-server";
@@ -31,16 +31,42 @@ export type BuildChange =
     };
 
 export interface BuildHub extends BuildObserver {
-  /** Follows one page; returns the function that stops following. */
-  subscribe(pageId: string, listener: (change: BuildChange) => void): () => void;
-  /** How many viewers follow a page (tests, diagnostics). */
-  viewers(pageId: string): number;
+  /**
+   * Follows one page; resolves to the function that stops following. Refuses a viewer past
+   * `BUILD_VIEWER_LIMIT` with `BuildViewerLimitError`.
+   */
+  subscribe(
+    pageId: string,
+    listener: (change: BuildChange) => void,
+  ): (() => void) | Promise<() => void>;
 }
 
 /** Most viewers one page may have; a further stream is refused (429) rather than kept. */
 export const BUILD_VIEWER_LIMIT = 20;
 
-export function createBuildHub(now: () => Date = () => new Date()): BuildHub {
+export class BuildViewerLimitError extends Error {
+  override readonly name = "BuildViewerLimitError";
+  constructor() {
+    super(`at most ${BUILD_VIEWER_LIMIT} viewers per page`);
+  }
+}
+
+/** A change as every hub sends it: what the observer was told, with the time it happened. */
+export function buildChange(
+  input:
+    | ({ kind: "changed" } & Parameters<BuildObserver["pageChanged"]>[0])
+    | ({ kind: "rejected" } & Parameters<BuildObserver["patchRejected"]>[0]),
+  now: Date,
+): BuildChange {
+  return { ...input, at: now.toISOString() } as BuildChange;
+}
+
+/** The in-process hub, with a viewer count for tests and diagnostics. */
+export interface LocalBuildHub extends BuildHub {
+  viewers(pageId: string): number;
+}
+
+export function createBuildHub(now: () => Date = () => new Date()): LocalBuildHub {
   const byPage = new Map<string, Set<(change: BuildChange) => void>>();
   const emit = (pageId: string, change: BuildChange) => {
     for (const listener of byPage.get(pageId) ?? []) {
@@ -53,10 +79,10 @@ export function createBuildHub(now: () => Date = () => new Date()): BuildHub {
   };
   return {
     pageChanged(change) {
-      emit(change.page.id, { kind: "changed", ...change, at: now().toISOString() });
+      emit(change.page.id, buildChange({ kind: "changed", ...change }, now()));
     },
     patchRejected(rejection) {
-      emit(rejection.pageId, { kind: "rejected", ...rejection, at: now().toISOString() });
+      emit(rejection.pageId, buildChange({ kind: "rejected", ...rejection }, now()));
     },
     subscribe(pageId, listener) {
       let set = byPage.get(pageId);
@@ -64,6 +90,7 @@ export function createBuildHub(now: () => Date = () => new Date()): BuildHub {
         set = new Set();
         byPage.set(pageId, set);
       }
+      if (set.size >= BUILD_VIEWER_LIMIT) throw new BuildViewerLimitError();
       set.add(listener);
       return () => {
         set.delete(listener);

@@ -119,7 +119,8 @@ export interface MediaToolOptions {
 /**
  * Watches drafts being built (RFC-0020 §6): Studio's Build view follows a page while agents
  * change it. Called after a write succeeds, and when a build's operations are refused, so a
- * person sees the agent correct itself. Never awaited; must not throw.
+ * person sees the agent correct itself. Awaited through `notifyBuild`, which bounds and swallows
+ * failures: watching never fails or slows a write noticeably.
  */
 export interface BuildObserver {
   pageChanged(change: {
@@ -130,14 +131,31 @@ export interface BuildObserver {
     /** The operations applied (after repairs), when the change was a patch. */
     readonly ops?: readonly unknown[] | undefined;
     readonly repairs?: readonly string[] | undefined;
-  }): void;
+  }): void | Promise<void>;
   patchRejected(rejection: {
     readonly siteId: string;
     readonly pageId: string;
     readonly tool: string;
     readonly actor: Actor;
     readonly issues: readonly unknown[];
-  }): void;
+  }): void | Promise<void>;
+}
+
+/** Tells the Build view, waiting at most 2 s; a failure is logged, never thrown (RFC-0020 §6). */
+export async function notifyBuild(report: () => void | Promise<void>): Promise<void> {
+  try {
+    const pending = report();
+    if (!pending) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      pending,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 2_000);
+      }),
+    ]).finally(() => clearTimeout(timer));
+  } catch (e) {
+    console.warn(`cloudhal: build view not told: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 export interface ToolContext {

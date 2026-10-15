@@ -222,9 +222,13 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **Studio Build view** (`/sites/:siteId/pages/:pageId/build`, DESIGN.md §2ac): an activity feed (`BuildActivity`), "Connect an agent", and `PreviewPanel morph`. The panel merges each version into the shown document by `data-section-id`, outlines what changed and keeps scroll and open tabs. The frame is `sandbox="allow-same-origin"`; scripts never run.
   - **Previews** style the primitives.
   - **Demo:** `apps/demo-newsroom/scripts/build-agent.ts`, a scripted MCP agent that builds a landing page step by step, including a refused step it then fixes and a repaired typo.
+- **20b, second part, shipped** (Cloudflare):
+  - **Build rooms.** One `BuildRoom` Durable Object per page (`BUILD_ROOMS`, SQLite-backed, migration `v2`) carries build events between the admin Worker's isolates. Writes post to `/publish`; each Build view stream holds a hibernatable WebSocket to the room, which limits a page to 20 viewers.
+  - **Same API on both runtimes.** `createDurableBuildHub` implements the API's `BuildHub`, so the server-sent events route and Studio are unchanged.
+  - **Async observers.** `BuildObserver` methods may be async. Tools and Studio saves await them through `notifyBuild`, which waits at most 2 seconds and never fails the write.
+  - **Verified on workerd:** an agent's `patch_draft` over MCP reaches a Build view stream through the room.
 - **Deviations in 20b so far:**
   - **No checkpoints yet.** Each `patch_draft` call is still one store write and one snapshot; checkpoints (§6) come with 20c, where a model streams many small operations.
-  - **Cloudflare:** the hub is per isolate. 20b part 2 moves it into a Durable Object per page.
   - **No ghosts yet.** They need partial tool input, which an MCP server never sees; they come with Studio's own model loop (20c).
   - **No undo history yet.** Snapshots cover rollback; per-operation undo comes with checkpoints.
   - **Fragments are whole documents.** The preview is the framework-free preview document, merged in place, not the theme's server-rendered fragments. The theme's look in the Build view follows the site preview work in 20b part 2.
