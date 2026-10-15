@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
-import { buildEval, describeRun } from "./commands/ai.ts";
+import { buildEval, describeJudgeRow, describeRun, judgeCheckCommand } from "./commands/ai.ts";
 import {
   analyticsExport,
   analyticsRollup,
@@ -97,6 +97,8 @@ Usage:
                                                           --design renders each result: failed checks and
                                                           a vision model's score (RFC-0021 21c); --look lets
                                                           the model see its render first, as Build chat does
+  cloudhal ai judge-check [--remote] [--judge <model>]   score the reference pages (empty → strong) with the
+                                                          design judge; fails when it does not rank them
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
@@ -441,8 +443,27 @@ export async function main(argv: string[]): Promise<number> {
     }
     case "ai": {
       const [what] = rest;
+      // RFC-0021 21c: is the design judge worth using? It scores the reference pages.
+      if (what === "judge-check") {
+        const result = await judgeCheckCommand({
+          projectDir,
+          ...(values.remote ? { remote: true } : {}),
+          ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+          ...(values.judge ? { judge: values.judge } : {}),
+          onRow: (r) => console.log(describeJudgeRow(r)),
+        });
+        console.log(`\n${result.table}`);
+        console.log(
+          result.ordered
+            ? "\nThe judge ranks the references in order."
+            : "\nThe judge does not rank the references in order: do not compare models with it.",
+        );
+        return result.ordered ? 0 : 1;
+      }
       if (what !== "build-eval")
-        throw new Error("usage: cloudhal ai build-eval [--remote] [--models a,b] [--briefs x,y]");
+        throw new Error(
+          "usage: cloudhal ai build-eval [--remote] [--models a,b] [--briefs x,y] | cloudhal ai judge-check [--remote] [--judge <model>]",
+        );
       const split = (v: string | undefined) =>
         v
           ? v

@@ -141,7 +141,7 @@ describe("design pass (RFC-0021 21c)", () => {
     expect(String(rubric[0]?.content)).toContain("Cloudhal design guidance");
     const parts = rubric[1]?.content as AiContentPart[];
     expect((parts[0] as { text: string }).text).toContain(
-      `Answer with one JSON object and nothing else: {${DESIGN_RUBRIC.map((c) => `"${c.id}": n`).join(", ")}`,
+      `Answer with one JSON object and nothing else: {"problems": ["…"], ${DESIGN_RUBRIC.map((c) => `"${c.id}": n`).join(", ")}`,
     );
     expect(parts[1]).toEqual({ type: "image_url", image_url: { url: look.images[0]?.url } });
   });
@@ -269,5 +269,70 @@ describe("Build chat looks once per turn (RFC-0021 21c)", () => {
       '<base href="http://localhost/">',
     );
     expect(transport.requests).toHaveLength(2);
+  });
+});
+
+describe("the judge check (RFC-0021 21c calibration)", () => {
+  it("anchors every criterion, asks for problems first, and keeps them", async () => {
+    const { DESIGN_REFERENCES } = await import("../src/design-references.ts");
+    const look = { failed: [], images: [] };
+    const [, user] = rubricMessages("x", look);
+    const text = ((user?.content ?? []) as AiContentPart[])
+      .map((p) => ("text" in p ? p.text : ""))
+      .join("");
+    expect(text).toContain("First list the most important design problems you see");
+    expect(text).toContain(
+      "- rhythm: Do the sections vary and lead the eye down the page? 1 = one undifferentiated block, or nothing; 3 = ",
+    );
+    expect(String(rubricMessages("x", look)[0]?.content)).toContain(
+      "Most AI-built pages deserve 2 or 3",
+    );
+    expect(
+      parseRubric(
+        '{"problems":["No dark hero", "", 3],"fidelity":3,"hierarchy":3,"rhythm":2,"note":"Plain."}',
+      ),
+    ).toEqual({
+      score: 2.67,
+      scores: { fidelity: 3, hierarchy: 3, rhythm: 2 },
+      problems: ["No dark hero"],
+      note: "Plain.",
+    });
+    // the references are valid surfaces, in the order a judge must keep
+    expect(DESIGN_REFERENCES.map((r) => r.id)).toEqual(["empty", "bare", "plain", "strong"]);
+    const { checkSurface } = await import("@cloudhal/core-ts/surfaces");
+    for (const ref of DESIGN_REFERENCES)
+      for (const s of ref.sections)
+        expect(checkSurface(s, catalog)).toMatchObject({ issues: [], unknown: [] });
+  });
+
+  it("passes a judge that ranks the references, and fails one that does not", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const site = await seedStarterSite(store, { name: "Ref", slug: "ref" });
+    const { judgeCheck, judgeCheckTable } = await import("../src/build-eval.ts");
+    const judging = (scoreOf: (html: string) => number): AiTransport => ({
+      kind: "binding",
+      async *stream(r) {
+        const n = scoreOf(JSON.stringify(r.messages));
+        yield {
+          type: "text",
+          text: JSON.stringify(Object.fromEntries(DESIGN_RUBRIC.map((c) => [c.id, n]))),
+        };
+      },
+      models: async () => [],
+    });
+    // the fake browser shows nothing, so the judge tells references apart by call order
+    let call = 0;
+    const ranked = await judgeCheck({
+      transport: judging(() => [1, 2, 3, 4][call++] as number),
+      renderer: browser([]),
+      site,
+    });
+    expect(ranked.ordered).toBe(true);
+    expect(ranked.rows.map((r) => r.inRange)).toEqual([true, true, true, true]);
+    expect(judgeCheckTable(ranked.rows)).toContain("| strong | 3.25–5 | 4 | yes |");
+    const flat = await judgeCheck({ transport: judging(() => 4), renderer: browser([]), site });
+    expect(flat.ordered).toBe(false);
   });
 });

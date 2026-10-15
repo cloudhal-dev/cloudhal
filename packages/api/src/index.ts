@@ -30,6 +30,9 @@ export {
   type BuildEvalRun,
   type BuildEvalSummary,
   buildEvalTable,
+  type JudgeCheckRow,
+  judgeCheck,
+  judgeCheckTable,
   runBuildEvalOnce,
   summariseBuildEval,
 } from "./build-eval.ts";
