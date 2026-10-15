@@ -93,6 +93,17 @@ import {
   type PublishReleaseResult,
   publishRelease,
 } from "./release-apply.ts";
+import {
+  planSearch,
+  SEARCH_PATH,
+  type SearchOptions,
+  type SearchPlan,
+  type SearchResults,
+  type SiteGuard,
+  searchIndex,
+  searchState,
+  searchStatements,
+} from "./search.ts";
 import { checkBodySurfaces, checkPageSurfaces, createCatalog } from "./surfaces.ts";
 import {
   migrateTagsToTerms,
@@ -434,6 +445,14 @@ export class SiteGraphStore {
   }
 
   async updateSite(site: Site): Promise<Site> {
+    return this.#updateSite(site);
+  }
+
+  /** `updateSite` with statements in the same batch, guarded on the site's new hash. */
+  async #updateSite(
+    site: Site,
+    extra?: (guard: SiteGuard, at: string) => SqlStatement[],
+  ): Promise<Site> {
     const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
     assertValid("site", next);
     // Only a config that changes is checked: values a theme change made misfit stay as written.
@@ -447,7 +466,11 @@ export class SiteGraphStore {
     if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
       checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
     const s = await casUpdateStatement("site", next, site.rev);
-    const r = await this.#sql.run(s.sql, s.params ?? []);
+    const more = extra?.({ siteId: site.id, hash: await nodeHash(next) }, next.updatedAt) ?? [];
+    const r =
+      more.length > 0
+        ? ((await this.#sql.batch([s, ...more]))[0] ?? { changes: 0 })
+        : await this.#sql.run(s.sql, s.params ?? []);
     if (r.changes !== 1)
       throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
     return next;
@@ -533,10 +556,10 @@ export class SiteGraphStore {
     const ts = this.#stamp();
     let draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
     fillMissingSrc("page", draft);
-    checkReservedPath(draft.path);
     const stored = await this.getPage(page.id);
     if (!stored || stored.rev !== page.rev)
       throw new ConflictError("page", page.id, page.rev, stored?.rev);
+    checkReservedPath(draft.path, stored.path);
     draft = await this.#indexSections(draft, stored, ts, options.writer);
     assertValid("page", draft);
     checkComponentSections(this.blocks, draft);
@@ -1526,6 +1549,7 @@ export class SiteGraphStore {
    * live before, so the purge can be limited to what changed; without it everything is purged.
    */
   async notifyPublished(site: Site, previousSnapshotId?: string): Promise<void> {
+    await this.refreshSearch(site.id).catch((e: unknown) => this.#onHookError(e));
     await this.#runOnPublished(site, {
       ...(previousSnapshotId ? { from: previousSnapshotId } : {}),
       ...(site.publishedSnapshotId ? { to: site.publishedSnapshotId } : {}),
@@ -1560,7 +1584,12 @@ export class SiteGraphStore {
   }
 
   async #publishPointer(site: Site, snapshotId: string): Promise<Site> {
-    const updated = await this.updateSite({ ...site, publishedSnapshotId: snapshotId });
+    // RFC-0019 §3: the search index follows the pointer in the same batch.
+    const plan = await this.#planSearch(site.id, snapshotId);
+    const updated = await this.#updateSite(
+      { ...site, publishedSnapshotId: snapshotId },
+      plan ? (guard, at) => searchStatements(plan, guard, at) : undefined,
+    );
     await this.#runOnPublished(updated, {
       ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),
       to: snapshotId,
@@ -1613,8 +1642,8 @@ export class SiteGraphStore {
    * latest one (a recovered run: one more). It does not call `onPublished`: the release's purge plan
    * was computed when it was pinned, and the caller (`releaseExecutor`) sends it.
    */
-  publishRelease(input: PublishReleaseInput): Promise<PublishReleaseResult> {
-    return publishRelease(
+  async publishRelease(input: PublishReleaseInput): Promise<PublishReleaseResult> {
+    const result = await publishRelease(
       {
         sql: this.#sql,
         blobs: this.#blobs,
@@ -1624,6 +1653,60 @@ export class SiteGraphStore {
       },
       input,
     );
+    // RFC-0019 §3: the release's batch has no room for the index; it follows right after.
+    await this.refreshSearch(input.release.siteId).catch((e: unknown) => this.#onHookError(e));
+    return result;
+  }
+
+  /**
+   * RFC-0019 §3: the plan that brings the search index to `snapshotId`, from the snapshot it
+   * reflects now (only changed articles) or from scratch. Undefined when it cannot be planned (the
+   * publish goes ahead; the index stays where it was and pages say it is updating).
+   */
+  async #planSearch(
+    siteId: string,
+    snapshotId: string,
+    options: { full?: boolean } = {},
+  ): Promise<SearchPlan | undefined> {
+    try {
+      const target = await this.getSnapshot(snapshotId);
+      if (!target) return undefined;
+      const state = options.full ? undefined : await searchState(this.#sql, siteId);
+      if (state?.snapshotId === snapshotId) return undefined;
+      const base = state ? await this.getSnapshot(state.snapshotId) : undefined;
+      return await planSearch({
+        target,
+        base,
+        read: (ref) => this.readSnapshotNode<ContentEntry>(ref),
+      });
+    } catch (e) {
+      this.#onHookError(e);
+      return undefined;
+    }
+  }
+
+  /**
+   * RFC-0019 §3: brings the site's search index to its live snapshot (after a release or an
+   * import, or `cloudhal search reindex` with `full`). Guarded on the site row as read here.
+   */
+  async refreshSearch(siteId: string, options: { full?: boolean } = {}): Promise<void> {
+    const site = await this.getSite(siteId);
+    if (!site?.publishedSnapshotId) return;
+    const plan = await this.#planSearch(siteId, site.publishedSnapshotId, options);
+    if (!plan) return;
+    await this.#sql.batch(
+      searchStatements(plan, { siteId, hash: await nodeHash(site) }, this.#stamp()),
+    );
+  }
+
+  /** RFC-0019 §3: the snapshot the site's search index reflects and how many articles it holds. */
+  searchStatus(siteId: string): Promise<{ snapshotId: string; entries: number } | undefined> {
+    return searchState(this.#sql, siteId);
+  }
+
+  /** RFC-0019 §3: the site's published articles that match a reader's query. */
+  search(siteId: string, query: string, options: SearchOptions): Promise<SearchResults> {
+    return searchIndex(this.#sql, siteId, query, options);
   }
 
   async #isAncestor(ancestorId: string, descendantId: string): Promise<boolean> {
@@ -1659,12 +1742,21 @@ export class SiteGraphStore {
   }
 }
 
-/** Invariant 12 (RFC-0004): `/media/<16 hex>/…` belongs to the media route. */
-function checkReservedPath(path: string | undefined): void {
+/**
+ * Invariant 12 (RFC-0004): `/media/<16 hex>/…` belongs to the media route; RFC-0019 §3: `/search`
+ * to the site's search page.
+ */
+function checkReservedPath(path: string | undefined, current?: string): void {
   if (path && isReservedMediaPath(path))
     throw new InvariantError(
       "reserved_path",
       `${path} is reserved for media URLs (/media/<16 hex>/…); choose another path`,
+    );
+  // A page that already had the path (before search existed) keeps it; it wins over search.
+  if (path === SEARCH_PATH && current !== SEARCH_PATH)
+    throw new InvariantError(
+      "reserved_path",
+      `${path} is the site's search page; choose another path`,
     );
 }
 

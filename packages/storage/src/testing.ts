@@ -260,8 +260,9 @@ export function describeBlobStoreConformance(label: string, factory: BlobStoreFa
  */
 export async function dropAllTables(driver: SqlDriver): Promise<void> {
   for (let round = 0; round < 20; round++) {
+    // Virtual tables first: dropping one drops its shadow tables, never the other way round.
     const tables = await driver.all<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'",
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY sql LIKE 'CREATE VIRTUAL TABLE%' DESC",
     );
     if (tables.length === 0) return;
     let dropped = 0;

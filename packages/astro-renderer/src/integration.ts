@@ -65,6 +65,8 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   let resolved: CloudhalRendererConfig = config;
   let client: AnalyticsClient | undefined;
   let comments: CommentsClient | undefined;
+  /** `astro dev` (`cloudhal dev`): pages render per request. */
+  let devServer = false;
   return {
     name: "@cloudhal/astro-renderer",
     hooks: {
@@ -74,6 +76,7 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         config: astroConfig,
         command,
       }) => {
+        devServer = command === "dev";
         const root = astroConfig.root.pathname;
         resolved = {
           ...config,
@@ -198,9 +201,17 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             `this build shows the site as of now; a time gate changes it at ${new Date(next).toISOString()} — build again then (the Cloudflare Site Worker needs no rebuild)`,
           );
       },
-      /** On Cloudflare every project page is rendered per request (pointer-flip publishing). */
+      /**
+       * On Cloudflare every project page is rendered per request (pointer-flip publishing). So is
+       * every page under `cloudhal dev`: requests keep their query string (the search page,
+       * comment pages, RFC-0019 §3) and new graph nodes need no route cache. Static builds still
+       * prerender.
+       */
       "astro:route:setup": ({ route }) => {
-        if (config.target === "cloudflare" && route.component.startsWith("src/pages/"))
+        if (
+          (config.target === "cloudflare" || devServer) &&
+          route.component.startsWith("src/pages/")
+        )
           route.prerender = false;
       },
       /**

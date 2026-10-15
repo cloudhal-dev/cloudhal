@@ -31,6 +31,8 @@
  *   (`cloudhal schedules list --remote`)
  * - `POST /api/admin/schedules/run-due` → one tick now, the operator's (`cloudhal schedules
  *   run-due --remote`)
+ * - `POST /api/admin/sites/:siteId/search/reindex` → rebuilds the search index from the live
+ *   snapshot (RFC-0019 §3, `cloudhal search reindex --remote`)
  * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
  *   pins would point into a replaced graph) unless `?cancelSchedules=1` cancels them first
  *   (`cloudhal push --cancel-schedules`).
@@ -377,6 +379,20 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
           limit: Number.isInteger(limit) ? limit : 50,
         });
         return c.json({ releases: list.map(releaseSummary) }, 200, NO_STORE);
+      })
+      // RFC-0019 §3: `cloudhal search reindex --remote` rebuilds the index from the live snapshot.
+      .post("/sites/:siteId/search/reindex", async (c) => {
+        const store = c.get("store");
+        const siteId = param(c, "siteId");
+        const site = await store.getSite(siteId);
+        if (!site) return c.json({ error: "not_found", message: "site not found" }, 404, NO_STORE);
+        await store.refreshSearch(siteId, { full: true });
+        const status = await store.searchStatus(siteId);
+        return c.json(
+          { published: site.publishedSnapshotId ?? null, index: status ?? null },
+          200,
+          NO_STORE,
+        );
       })
       .get("/sites/:siteId/bundle", async (c) => {
         const siteId = param(c, "siteId");

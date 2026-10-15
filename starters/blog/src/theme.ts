@@ -66,6 +66,16 @@ const STRINGS = {
     corrections: "Corrections and updates",
     correctionKind: { correction: "Correction", clarification: "Clarification", update: "Update" },
     appended: (kind: string) => `${kind} appended`,
+    /** RFC-0019 §3: the search form in the header and the search page. */
+    search: "Search",
+    searchLabel: "Search this site",
+    searchPlaceholder: "Search articles…",
+    searchResults: (n: number, q: string) =>
+      n === 1 ? `1 result for “${q}”` : `${n} results for “${q}”`,
+    searchNone: (q: string) => `Nothing matches “${q}”. Try fewer or other words.`,
+    searchUpdating: "Search is catching up with the latest changes.",
+    previous: "← Previous",
+    next: "Next →",
     /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
     embargoed: (when: string) => `Embargoed until ${when}. Only previews show it until then.`,
     expired: (when: string) => `Expired on ${when}. Only previews show it now.`,
@@ -89,6 +99,15 @@ const STRINGS = {
     corrections: "Düzeltmeler ve güncellemeler",
     correctionKind: { correction: "Düzeltme", clarification: "Açıklama", update: "Güncelleme" },
     appended: (kind: string) => `${kind} eklendi`,
+    search: "Ara",
+    searchLabel: "Sitede ara",
+    searchPlaceholder: "Yazılarda ara…",
+    searchResults: (n: number, q: string) => `“${q}” için ${n} sonuç`,
+    searchNone: (q: string) =>
+      `“${q}” ile eşleşen bir şey yok. Daha az ya da başka sözcükler deneyin.`,
+    searchUpdating: "Arama son değişiklikleri eklemeye devam ediyor.",
+    previous: "← Önceki",
+    next: "Sonraki →",
     embargoed: (when: string) =>
       `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
     expired: (when: string) =>

@@ -149,6 +149,29 @@ Invariants:
   - `snapshotId` is not filled in yet. Whether an item is live is read from the live snapshot instead.
   - Without corrections, the visible "Updated" date keeps its earlier rule (an edit more than a day after publication). The JSON-LD `dateModified` keeps `updatedAt`. Only a correction moves the date as the RFC describes.
   - A person's edit of a live note shows in snapshot history. REST writes by people have no audit row of their own yet. Studio does not offer that edit yet; the API does.
+- **19c shipped.**
+  - **Storage.** Migration `0021_search` adds `search_index` (FTS5, `unicode61 remove_diacritics 2`, so "cay" finds "Çay") and `search_state` (the snapshot the index reflects). FTS5, `json_each` and `->>` were checked on better-sqlite3 and Miniflare D1 (open question 5, local half).
+  - **Index** (`@cloudhal/core-ts` `search.ts`):
+    - `publish` and `rollback` write the rows in the same `batch()` as the pointer flip, guarded on the site's new hash. When the index reflects an earlier snapshot, only the articles that changed since are rewritten.
+    - A release (whose batch has no room) and an import (`notifyPublished`) bring the index up right after; pages say "catching up" until it matches.
+    - Rows hold the body as plain text (code, surfaces, URLs and markup dropped; directive text kept; ≤ 20,000 characters), plus the time gates. Embargoed and expired articles are filtered at query time. Drafts are never indexed.
+  - **Queries.** `store.search(siteId, q, {locale, page, now, snapshotId})`:
+    - Up to 8 words of letters and digits, each quoted as a prefix, so no FTS5 syntax gets through.
+    - Ranked by `bm25` (title 10, summary 4, body 1), then by date. Snippets carry control-character markers that the renderer escapes, then turns into `<mark>`. 20 results per page; `stale` when the index lags.
+  - **Renderer.**
+    - `GraphSource.search`: the index in snapshot mode; in live mode (`cloudhal dev`), the same rules in memory, drafts included.
+    - `resolveRoute` answers `/search?q=&page=` after pages (`kind: "search"`); a page past the last is a 404.
+    - `./search` gives themes `searchAvailable`, `searchPageHref` and `snippetHtml`. `searchHead` is `noindex,follow` with no cards.
+    - `/search` is a reserved page path for new pages; a page that already has it keeps it and wins.
+  - **Site Worker.** 30 searches per minute per client address, per isolate (`429` with `Retry-After`). The starter sends `no-store` (browser and edge) and `x-robots-tag: noindex`. Analytics keeps only paths, never the query.
+  - **Starter.** A search field in the header and a search page (form with `method="get"`, results with highlighted snippets, page links), both only where `searchAvailable` is true.
+  - **Operators.** `cloudhal search reindex [--remote]` rebuilds from the live snapshot (`POST /api/admin/sites/:siteId/search/reindex`, deployment token).
+- **Deviations.**
+  - Only articles are indexed, not pages.
+  - There is no chunked rebuild for very large sites yet. A rebuild is one batch of JSON payloads (≤ 512 KB each), and no `search_rev` marker exists; the `stale` flag covers a lagging index.
+  - The limit is per isolate. There is no Rate Limiting binding for search yet.
+  - `cloudhal dev` now renders project pages per request, as the Site Worker does. Astro drops query strings on prerendered routes, and new graph nodes no longer need the route cache. Static builds still prerender.
+  - Open question 5's Workers Free check against a real D1 database waits for the deploy.
 
 ## Open questions
 1. **Default taxonomy.** Should `cloudhal init` create the `author` taxonomy for every new site, or only newsroom presets? Default: every new site, empty. An empty taxonomy shows nothing.

@@ -302,6 +302,33 @@ describe("Site Worker on workerd", () => {
     );
   });
 
+  it("answers /search from the D1 index, never cached, 30 per minute per client (RFC-0019 §3)", async () => {
+    const snap = await remote.createSnapshot(siteId, {
+      actor: human,
+      reason: "publish",
+      label: "search",
+    });
+    await remote.publish((await remote.getSite(siteId)) as NonNullable<Site>, snap.id);
+    expect(await remote.searchStatus(siteId)).toMatchObject({ snapshotId: snap.id });
+    const client = { headers: { "cf-connecting-ip": "203.0.113.9" } };
+    const res = await get("/search?q=hello", client);
+    const html = await res.text();
+    expect(res.status, html.slice(0, 300)).toBe(200);
+    expect(res.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    expect(res.headers.get("x-robots-tag")).toBe("noindex");
+    expect(html).toContain('<a href="/posts/hello-world">');
+    expect(html).toContain("<mark>");
+    expect(html).toContain('<meta name="robots" content="noindex,follow"');
+    for (let i = 1; i < 30; i++) await (await get("/search?q=hello", client)).arrayBuffer();
+    const limited = await get("/search?q=hello", client);
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    // another client is not affected
+    expect(
+      (await get("/search?q=hello", { headers: { "cf-connecting-ip": "198.51.100.4" } })).status,
+    ).toBe(200);
+  });
+
   it("renders menus per request, hides an item whose page was deleted, and falls back to the derived header (RFC-0003)", async () => {
     const publishNow = async (label: string) => {
       const snap = await remote.createSnapshot(siteId, { actor: human, reason: "publish", label });
@@ -350,10 +377,14 @@ describe("Site Worker on workerd", () => {
     const derived = await (await get("/about")).text();
     const about = (await remote.listPages(siteId)).find((p) => p.path === "/about");
     expect(headerOf(derived)).toBe(
-      derivedHeader("Edge Site", [
-        { href: "/about", label: about?.title ?? "About", current: true },
-        { href: "/category/news", label: "News" },
-      ]),
+      derivedHeader(
+        "Edge Site",
+        [
+          { href: "/about", label: about?.title ?? "About", current: true },
+          { href: "/category/news", label: "News" },
+        ],
+        { search: true },
+      ),
     );
     expect(footerOf(derived)).toBe(DEFAULT_FOOTER);
   });

@@ -6,7 +6,7 @@
  * before it is a 404 (or a 410 for a retired term).
  */
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
-import { normalisePath, termName } from "@cloudhal/core-ts";
+import { normalisePath, SEARCH_PATH, termName } from "@cloudhal/core-ts";
 import {
   type ArchiveSummary,
   type ArchiveView,
@@ -18,6 +18,7 @@ import {
   termForSlug,
 } from "./archive.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
+import { type SearchView, searchRequest } from "./search.ts";
 import type { GraphSource } from "./source.ts";
 import {
   archiveFeedPath,
@@ -103,6 +104,7 @@ export type RouteResult =
   | { readonly kind: "entry"; readonly entry: ContentEntry }
   | { readonly kind: "archive"; readonly archive: ArchiveView; readonly index: TaxonomyIndex }
   | { readonly kind: "feed"; readonly archive: ArchiveView; readonly index: TaxonomyIndex }
+  | { readonly kind: "search"; readonly search: SearchView }
   | { readonly kind: "redirect"; readonly status: 301 | 302; readonly location: string }
   | { readonly kind: "gone" }
   | { readonly kind: "not-found" };
@@ -132,7 +134,8 @@ export function redirectLocation(location: string, search = ""): string {
 
 /**
  * Resolves a request path in the order of RFC-0002 §7: page → entry → archive (and its feed) →
- * redirect → 410 for a retired term → 404. A trailing slash is ignored.
+ * redirect → 410 for a retired term → 404. A trailing slash is ignored. `/search` (RFC-0019 §3)
+ * answers after pages, when the source can search: `?q=…&page=n`, past the last page a 404.
  */
 export async function resolveRoute(
   source: GraphSource,
@@ -142,6 +145,12 @@ export async function resolveRoute(
   const path = normalisePath(requestPath);
   const resolved = await resolvePath(source, path);
   if (resolved) return resolved;
+  if (path === SEARCH_PATH && source.search) {
+    const { query, page } = searchRequest(options.search ?? "");
+    const search = await source.search(query, { page });
+    if (page > 1 && page > search.pages) return { kind: "not-found" };
+    return { kind: "search", search };
+  }
   let gone = false;
   const taxonomies = await source.taxonomies();
   const request = parseArchivePath(taxonomies, path);
