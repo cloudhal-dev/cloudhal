@@ -439,6 +439,8 @@ export type BuildTurnEvent =
   | { type: "writing"; components: string[] }
   /** RFC-0021 21c: the page was rendered and the model looks at it (failed check ids). */
   | { type: "look"; failed: string[]; images: number }
+  /** Components added but not linked into a parent's children (they do not show yet). */
+  | { type: "unlinked"; components: string[] }
   | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
   | { type: "step"; ok: false; issues: string[] }
   | {

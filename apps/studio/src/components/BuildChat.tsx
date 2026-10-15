@@ -105,6 +105,7 @@ export function BuildChat({
     abort.current = controller;
     const repairs: string[] = [];
     let looked = false;
+    let unlinked = false;
     try {
       const target = scope
         ? {
@@ -134,9 +135,19 @@ export function BuildChat({
                 })
               : t("build.chat.lookedClean"),
           });
-        } else if (e.type === "round" && e.round > 1)
-          progress(t(looked ? "build.chat.improving" : "build.chat.fixing"));
-        else if (e.type === "step" && e.ok) repairs.push(...e.repairs);
+        } else if (e.type === "unlinked") unlinked = true;
+        else if (e.type === "round" && e.round > 1) {
+          progress(
+            t(
+              looked
+                ? "build.chat.improving"
+                : unlinked
+                  ? "build.chat.linking"
+                  : "build.chat.fixing",
+            ),
+          );
+          unlinked = false;
+        } else if (e.type === "step" && e.ok) repairs.push(...e.repairs);
         else if (e.type === "done")
           add({
             role: "result",

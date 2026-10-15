@@ -17,7 +17,7 @@
 import { renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { Page, Site } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
-import type { Catalog } from "@cloudhal/core-ts/surfaces";
+import { type Catalog, checkSurface } from "@cloudhal/core-ts/surfaces";
 import type { PageRenderer } from "@cloudhal/mcp-server/render";
 import type { AiTransport } from "./ai/client.ts";
 import { DEFAULT_AI_MODEL } from "./ai/store.ts";
@@ -117,6 +117,8 @@ export interface BuildEvalRun {
   rounds: number;
   /** Components on the page at the end (built or kept). */
   components: number;
+  /** Components the model left out of every parent's children, as Build reported them. */
+  unlinked?: number | undefined;
   firstStepMs?: number | undefined;
   totalMs: number;
   inputTokens: number;
@@ -247,7 +249,8 @@ export async function runBuildEvalOnce(input: {
       run.refused++;
       for (const issue of e.issues)
         if (run.samples.length < SAMPLES) run.samples.push(issue.slice(0, 200));
-    } else if (e.type === "done") {
+    } else if (e.type === "unlinked") run.unlinked = (run.unlinked ?? 0) + e.components.length;
+    else if (e.type === "done") {
       run.steps = e.steps;
       run.finished = e.steps > 0;
       run.inputTokens = e.usage.inputTokens;
@@ -280,6 +283,8 @@ export async function runBuildEvalOnce(input: {
   });
   run.totalMs = now() - started;
   if (input.design && run.finished) run.design = await designPass(page);
+  // A page with nothing a reader would see is not finished, whatever the model said.
+  if (run.finished && visibleParts(page, input.catalog) === 0) run.finished = false;
   run.components = (page.sections ?? []).reduce(
     (n, s) => n + (s.kind === "surface" ? s.components.length : 0),
     0,
@@ -310,6 +315,23 @@ export async function runBuildEvalOnce(input: {
     }
     return out;
   }
+}
+
+/**
+ * What a reader would see: non-surface sections, and surface components the root reaches (the
+ * root itself aside).
+ */
+export function visibleParts(page: Page, catalog: Catalog): number {
+  let n = 0;
+  for (const section of page.sections ?? []) {
+    if (section.kind !== "surface") {
+      n++;
+      continue;
+    }
+    const reached = section.components.length - checkSurface(section, catalog).unreachable.length;
+    n += Math.max(0, reached - 1);
+  }
+  return n;
 }
 
 /** The runs per model, summarised and ranked: finished turns, then acceptance, then speed. */
