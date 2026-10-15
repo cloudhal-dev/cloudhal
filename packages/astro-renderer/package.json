@@ -68,13 +68,14 @@
     "@astrojs/cloudflare": "^14.3.0"
   },
   "devDependencies": {
+    "@astrojs/cloudflare": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "astro": "catalog:",
     "better-sqlite3": "catalog:",
+    "happy-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "@astrojs/cloudflare": "catalog:",
-    "@cloudflare/workers-types": "catalog:",
     "wrangler": "catalog:"
   },
   "peerDependenciesMeta": {

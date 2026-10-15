@@ -609,6 +609,60 @@ ol.ch-list {
   @apply flex flex-col gap-3 pb-4;
 }
 
+/* Live surfaces (RFC-0020 §4): conditional components, inputs and action buttons. */
+.ch-node {
+  display: contents;
+}
+.ch-node[hidden] {
+  display: none;
+}
+/* An action button starts from the browser's button: reset it, then give each style its own look. */
+button.ch-button {
+  @apply cursor-pointer border-0 bg-transparent font-medium;
+  font-family: inherit;
+}
+button.ch-button--primary {
+  @apply text-white;
+  background: var(--ch-brand, #18181b);
+}
+button.ch-button--secondary {
+  @apply border border-zinc-300 text-zinc-900;
+}
+.ch-toggle {
+  @apply inline-flex w-fit flex-wrap gap-1 rounded-lg bg-zinc-100 p-1;
+}
+.ch-toggle__option input {
+  @apply sr-only;
+}
+.ch-toggle__option span {
+  @apply block cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600;
+}
+.ch-toggle__option input:checked + span {
+  @apply bg-white text-zinc-900 shadow-sm;
+}
+.ch-toggle__option input:focus-visible + span {
+  @apply outline-2 outline-offset-2;
+}
+.ch-field {
+  @apply grid gap-1.5;
+}
+.ch-field__label {
+  @apply text-sm font-medium;
+}
+.ch-select {
+  @apply w-full max-w-xs rounded-md border border-zinc-300 bg-white px-3 py-2;
+}
+.ch-slider {
+  @apply flex items-center gap-3;
+}
+.ch-slider input {
+  @apply w-full max-w-sm;
+  accent-color: var(--ch-brand, #18181b);
+}
+.ch-slider__value {
+  @apply min-w-12 text-right font-medium tabular-nums;
+}
+
 /* Corners (src/settings.ts `radius`): after the base rules, so they win. */
 [data-ch-radius="none"] .ch-button,
 [data-ch-radius="none"] .ch-hero__cta,

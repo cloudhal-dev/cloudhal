@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
+import { SURFACE_SCRIPT } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
 export const CLOUDHAL_ASSETS_RULE = "/_cloudhal/*";
@@ -63,6 +64,26 @@ export async function writeEmbedClient(dir: URL | string): Promise<void> {
   const file = path.join(rootOf(dir), ...EMBED_SCRIPT.path.split("/").filter(Boolean));
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, EMBED_SCRIPT.code);
+}
+
+/** Writes the interaction runtime (RFC-0020 §4) into the build's `/_cloudhal/`. */
+export async function writeSurfaceClient(dir: URL | string): Promise<void> {
+  const file = path.join(rootOf(dir), ...SURFACE_SCRIPT.path.split("/").filter(Boolean));
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, SURFACE_SCRIPT.code);
+}
+
+/** Whether any page of a static build has a live surface (its HTML marks one). */
+export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean> {
+  const entries = await readdir(rootOf(dir), { recursive: true, withFileTypes: true }).catch(
+    () => [],
+  );
+  for (const e of entries) {
+    if (!e.isFile() || !e.name.endsWith(".html")) continue;
+    if ((await readFile(path.join(e.parentPath, e.name), "utf8")).includes("data-ch-surface="))
+      return true;
+  }
+  return false;
 }
 
 /** Whether any page of a static build shows a video player (its HTML marks one). */

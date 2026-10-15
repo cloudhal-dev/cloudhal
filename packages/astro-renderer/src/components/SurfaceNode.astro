@@ -6,7 +6,13 @@
  */
 import { renderMarkdown } from "../markdown.ts";
 import type { MediaContext } from "../media.ts";
-import { blockNodeHtml, CHILDREN, primitiveHtml, type SurfaceNode } from "../surfaces.ts";
+import {
+  blockNodeHtml,
+  CHILDREN,
+  primitiveHtml,
+  type SurfaceNode,
+  visibilityWrapper,
+} from "../surfaces.ts";
 
 interface Props {
   node: SurfaceNode;
@@ -36,7 +42,10 @@ if (!Own) {
   }
 }
 const Self = Astro.self;
+// A live surface's conditional component: the runtime hides and shows this wrapper (RFC-0020 §4).
+const [shownOpen, shownClose] = visibilityWrapper(node);
 ---
+{shownOpen && <Fragment set:html={shownOpen} />}
 {Own ? (
   <Own props={node.props} node={node} content={content} contentHtml={contentHtml} media={media}>
     {node.children.map((child) => <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />)}
@@ -52,3 +61,4 @@ const Self = Astro.self;
     </Fragment>
   )
 )}
+{shownClose && <Fragment set:html={shownClose} />}
