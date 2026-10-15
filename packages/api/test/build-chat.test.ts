@@ -9,7 +9,13 @@ import type { AiRunRequest, AiTransport } from "../src/ai/client.ts";
 import { AiStore } from "../src/ai/store.ts";
 import { createApi } from "../src/app.ts";
 import { type BuildChange, createBuildHub } from "../src/build.ts";
-import { componentPaths, componentsIn, JsonObjectReader, parseLine } from "../src/build-turn.ts";
+import {
+  closeBrackets,
+  componentPaths,
+  componentsIn,
+  JsonObjectReader,
+  parseLine,
+} from "../src/build-turn.ts";
 
 const human = { kind: "human" as const, id: "user_builder0001", name: "Halil" };
 
@@ -114,12 +120,36 @@ describe("build chat", () => {
     expect(cut.end()).toEqual([{ object: '{"ops":[{"op":"add"' }]);
   });
 
+  it("puts a long step's closing brackets in order, and says where an unreadable one broke", () => {
+    // `}}}]]` for `}}]}`: the step still ends at its last closer, and the next line is read
+    const reader = new JsonObjectReader();
+    const step =
+      '{"ops":[{"op":"add","path":"/sections/-","value":{"id":"sec_priced01","data":{"seats":1}}}]]';
+    const items = [...reader.push(`${step}\n{"done":true}\n`), ...reader.end()];
+    expect(items).toEqual([{ object: step }, { object: '{"done":true}' }]);
+    expect(parseLine(step)).toEqual({
+      ops: [{ op: "add", path: "/sections/-", value: { id: "sec_priced01", data: { seats: 1 } } }],
+      repaired: "closing brackets put in order",
+    });
+    expect(closeBrackets('{"a":[1,{"b":"]}"}')).toBe('{"a":[1,{"b":"]}"}]}');
+    expect(closeBrackets('{"a":1}')).toBeUndefined();
+    const broken = parseLine(
+      '{"ops":[{"op":"add","path":"/sections/-","value":{"children":["a"],"b"}}]}',
+    );
+    expect(broken).toMatchObject({
+      invalid: expect.stringMatching(
+        /^not one JSON object \(.+ at character \d+, near ".*"\); nothing in it was applied\. Send it again in smaller steps/,
+      ),
+    });
+  });
+
   it("forgives raw line breaks in strings and trailing commas, and finds components by id", () => {
     expect(parseLine('{"say":"two\nlines\there",}')).toEqual({ say: "two\nlines\there" });
     expect(parseLine('{"ops":[{"op":"remove","path":"/sections/0"},],}')).toEqual({
       ops: [{ op: "remove", path: "/sections/0" }],
     });
-    expect(parseLine('{"say":"a, }"')).toMatchObject({ invalid: expect.any(String) });
+    // a comma inside a string is kept; the missing closing brace is added
+    expect(parseLine('{"say":"a, }"')).toEqual({ say: "a, }" });
     const page = {
       sections: [
         { id: "sec_a00000001", kind: "richText" },
