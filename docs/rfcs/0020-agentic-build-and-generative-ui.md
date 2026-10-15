@@ -270,10 +270,31 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
     - It reports `size-changed`, answers `ui/resource-teardown`, and ignores messages not from its host.
   - **Clients without UI support** ignore the metadata and get the same text and structured results.
   - **Tests.** A real MCP client sees the metadata and reads the resource; the View runs in happy-dom against a fake host.
+- **20f, second part, shipped** (interop, §9):
+  - **`@cloudhal/core-ts/interop`.** These conversions are deterministic, Worker-safe and never silent: what has no equivalent is left out and listed in `notes`.
+    - `fromA2ui` / `toA2ui` handle A2UI v0.9 messages and the basic catalog (open question 6: v0.9 now; `A2UI_VERSION` is the adapter's version).
+    - `fromJsonRender` / `toJsonRender` handle json-render specs: `root` + `elements`, `$state` ⇄ `{path}`, visibility (`gte`/`lte` as `not`), and `state` ⇄ `data`.
+  - **A2UI import.**
+    - Messages apply in order: later components replace earlier ones, and data updates merge.
+    - Mapping: `Text` with `h1`–`h5` becomes `Heading`, `caption` a small muted `Text`; `Column`/`List` become `Stack`; `Row` stays `Row` (with `justify` mapped); `Card` stays `Card`; `Tabs` becomes `Tabs` + `TabPanel`s; `Modal` becomes `Disclosure`.
+    - A `Button` takes its text child as its label; `openUrl` becomes `href`.
+    - `ChoicePicker` becomes `Toggle` (2–8 exclusive options) or `Select`; `Slider` stays `Slider`.
+    - Template lists are expanded once from the data, with relative paths made absolute.
+    - Functions: `formatString` with plain `${/path}` interpolation becomes `concat`; `formatNumber`, `formatCurrency`, `formatDate`, `pluralize`, `required`, `email` and `length` are renamed to Cloudhal's.
+    - Left out, with a reason: server events, `TextField`, `CheckBox`, `DateTimeInput`, `Image`/`Video`/`AudioPlayer` URLs and `Icon`. Components of other catalogs keep their name and props for the store to judge.
+  - **A2UI export.** Surfaces become basic-catalog messages.
+    - Cloudhal-only components flatten: `Stat`, `Quote`, `List` and `Disclosure` become `Column`s of `Text`; bands, grids and columns become `Column`/`Row`.
+    - Button actions become events named after the action, and `navigate`/`href` become `openUrl`.
+    - Images become absolute URLs on the site's primary domain, or are left out without one.
+  - **MCP.**
+    - `import_surface {format: a2ui | json-render, document, surfaceId?, replaceSectionId?}` (`content:write`) takes messages as an array or JSON Lines. It goes through `patch_draft`'s repairs, validation, write, snapshot and build events, and adds the conversion `notes`.
+    - `export_surface` (`content:read`) returns the document and its `notes`.
 - **Deviations in 20f so far:**
   - **Images.** Images in the MCP Apps preview do not load: the default MCP Apps CSP allows no image hosts, and preview media paths are relative to the deployment.
   - **No capability check.** The `ui` metadata is not gated on the client advertising `io.modelcontextprotocol/ui` (the stateless HTTP transport sees capabilities per request). Hosts without it ignore the metadata.
-  - **Still to do.** A2UI and json-render import/export, and Kumo panels as surfaces (which needs RFC-0017 phase 7c).
+  - **Still to do.** Kumo panels as surfaces (needs RFC-0017 phase 7c).
+  - **Interop is one-shot, not a live stream.** `import_surface` converts a finished message list. An A2UI agent streaming into a Build view through AG-UI (`updateComponents` as patch operations as they arrive) is not wired yet.
+  - **A2UI client messages are out of scope.** Cloudhal surfaces have no server actions, so there are no `action` messages back to an agent. Button events are exported for renderers to route.
 - **Deviations in 20e:**
   - **No server actions.** `submit`, forms, polls and newsletter signup each wait for their own RFC.
   - **Not shipped yet:** `Carousel` and `Counter` (a `Stat` plus an `increment` button covers counters).
