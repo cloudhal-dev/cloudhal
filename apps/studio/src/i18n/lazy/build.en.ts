@@ -49,6 +49,15 @@ export const messages = {
       unavailableHint:
         "On Cloudflare, AI uses the Worker's binding; locally, set CLOUDFLARE_ACCOUNT_ID and CLOUDHAL_AI_TOKEN.",
       settings: "Open settings",
+      /** RFC-0020 §6: picking a part of the page in the preview to aim the next brief at it. */
+      pick: "Pick",
+      picking: "Click a part of the page",
+      pickLabel: "Pick a part of the page to change",
+      pickHint: "Click a section or an element in the preview; Escape stops.",
+      scope: "Changing {part}",
+      scopeSection: "section {index}",
+      scopeComponent: "{component} “{id}” in section {index}",
+      clearScope: "Change the whole page instead",
       errors: {
         ai_budget:
           "Today's AI commands for this site are used up. An Administrator can raise the daily limit in Settings › AI.",

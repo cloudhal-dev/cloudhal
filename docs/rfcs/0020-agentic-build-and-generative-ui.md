@@ -234,6 +234,13 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **One turn, one unit.** A turn is one AI command against the daily cap, one AI job per person, and one snapshot (`reason: manual`). It is audited as `build_chat` without the brief, and it runs at most 5 minutes with 8,192 output tokens per round.
   - **Progress.** Progress streams to Studio as NDJSON: `round`, `say`, `writing` (the components named in the line being written, a lightweight ghost), `step`, `done` and `error`.
   - **Studio.** "Build with AI" sits at the top of the Build view (`BuildChat`, `BuildChatLog`): the brief, Build / Stop, and the transcript with repairs and outcomes. When AI is off or unreachable, the card says so and how to change it.
+- **20c, click-to-scope, shipped** (Lovable's visual edit as data):
+  - **Picking.** "Pick" in the Build view's preview header turns on a layer over the frame. It finds the section or component under the pointer by coordinates (`previewTargetAt`), so the frame still runs no scripts and its document is never changed. The pointer outlines the part; a click picks it; Escape stops.
+  - **Previews mark components.** Each surface component's outer element carries `data-component-id`, in previews only; the public site's markup is unchanged.
+  - **The scope.**
+    - Build chat shows the picked part ("Changing Button “cta” in section 2") with a button to clear it. Briefs go out with `scope {sectionId, componentId?}` until it is cleared or a later version removes the part.
+    - The API refuses a scope that is not on the page (400) before the model runs.
+    - The model reads the part, its JSON Pointer and "change only that part unless the brief clearly asks for more". This is guidance, not enforcement: a brief may still change more.
 - **20d shipped** (markdown surfaces):
   - **core-ts.**
     - `bodySurfaces` finds ```` ```surface ```` fences; ```` ``` ```` and `~~~` both open one, and fences inside other code blocks do not count.
@@ -307,7 +314,6 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
 - **Deviations in 20c:**
   - **Text, not tool calls.** The model answers in JSON Lines over plain text streaming, instead of tool calls through the AI SDK. This works with every Workers AI text model and adds nothing to the admin Worker's bundle.
   - **Ghosts are names.** A ghost shows the component names in the line being written, not an outline in the preview.
-  - **No click-to-scope yet.** Selecting a preview element to scope the next brief is not in this phase.
   - **The transcript is per browser.** It is not kept; the draft and its snapshot are what last.
   - **Model choice is open.** The model eval (open question 7) is still to be done. Build uses the site's chosen model.
 - **Deviations in 20b so far:**

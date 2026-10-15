@@ -126,6 +126,19 @@ describe("renderSurface (RFC-0020)", () => {
     expect(renderSectionHtml(s)).toContain("hologram: unknown block type");
   });
 
+  it("marks components with their ids in previews only (Build view picking, RFC-0020 §6)", () => {
+    const s = surface([
+      { id: "root", component: "Stack", children: ["title", "cta"] },
+      { id: "title", component: "Heading", props: { text: "Hi", level: 2 } },
+      { id: "cta", component: "callout", props: { title: "Note" } },
+    ]);
+    const preview = renderSurface(s, { preview: true });
+    expect(preview).toContain('<div data-component-id="root" class="ch-stack">');
+    expect(preview).toMatch(/<h2 data-component-id="title"/);
+    expect(preview).toMatch(/data-component-id="cta"/);
+    expect(renderSurface(s)).not.toContain("data-component-id");
+  });
+
   it("draws nothing for a surface whose root has not arrived", () => {
     expect(surfaceTree(surface([{ id: "a", component: "Divider" }])).root).toBeUndefined();
     expect(renderSurface(surface([{ id: "a", component: "Divider" }]))).toBe("");

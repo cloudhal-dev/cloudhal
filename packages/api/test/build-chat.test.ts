@@ -175,4 +175,56 @@ describe("build chat", () => {
     expect((await send("POST", `/build/${about.id}`, { message: "" })).status).toBe(400);
     expect((await send("POST", "/build/page_missing0001", { message: "x" })).status).toBe(404);
   });
+
+  it("scopes a brief to the part the person picked in the preview (RFC-0020 §6)", async () => {
+    const { send, store, about, model } = await setup([
+      [heading(3), '{"done":true}'],
+      ['{"done":true}'],
+    ]);
+    await send("PUT", "/settings", {
+      enabled: true,
+      model: "@cf/zai-org/glm-4.7-flash",
+      dailyLimit: 5,
+      rev: 0,
+    });
+    // a surface to pick from
+    const page = (await store.getPage(about.id)) as Page;
+    await store.updatePage({
+      ...page,
+      sections: [
+        ...page.sections,
+        {
+          ...(surface as unknown as SurfaceSection),
+          components: [{ id: "root", component: "Stack", children: [] }],
+        },
+      ],
+    });
+    // a part that is not on the page is refused before the model runs
+    for (const scope of [
+      { sectionId: "sec_missing00001" },
+      { sectionId: "sec_chatbuild001", componentId: "nope" },
+      { sectionId: 42 },
+    ])
+      expect((await send("POST", `/build/${about.id}`, { message: "Bigger", scope })).status).toBe(
+        400,
+      );
+    expect(model.requests).toHaveLength(0);
+
+    const res = await send("POST", `/build/${about.id}`, {
+      message: "Make it bigger",
+      scope: { sectionId: "sec_chatbuild001", componentId: "root" },
+    });
+    expect(res.status).toBe(200);
+    await lines(res);
+    const brief = model.requests[0]?.messages.find((m) => m.role === "user")?.content ?? "";
+    expect(brief).toContain(
+      'The person picked the Stack "root" in section sec_chatbuild001 in the preview, at /sections/1/components/0.',
+    );
+    expect(JSON.parse(/It is now: (.*)/.exec(brief)?.[1] ?? "null")).toEqual({
+      id: "root",
+      component: "Stack",
+      children: [],
+    });
+    expect(brief).toContain("Brief: Make it bigger");
+  });
 });
