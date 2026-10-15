@@ -461,6 +461,7 @@ export function adminRoutes(
                     finished: false,
                     steps: 0,
                     refused: 0,
+                    samples: [],
                     repairs: 0,
                     rounds: 0,
                     components: 0,

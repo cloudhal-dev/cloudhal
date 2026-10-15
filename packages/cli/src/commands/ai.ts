@@ -63,6 +63,7 @@ export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalRep
             finished: false,
             steps: 0,
             refused: 0,
+            samples: [],
             repairs: 0,
             rounds: 0,
             components: 0,
@@ -149,5 +150,5 @@ async function remoteRuns(
 
 export function describeRun(r: BuildEvalRun): string {
   const time = `${(r.totalMs / 1000).toFixed(1)} s`;
-  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}`;
+  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}`;
 }

@@ -102,8 +102,9 @@ describe("Build model eval", () => {
       siteId: "site_eval000001",
       now,
     });
-    // a prose line and a broken step are refused; the misspelt component is repaired
-    expect(sloppy).toMatchObject({ finished: true, steps: 1, refused: 2, repairs: 1, rounds: 2 });
+    // prose is set aside; the broken step is refused, the misspelt component repaired
+    expect(sloppy).toMatchObject({ finished: true, steps: 1, refused: 1, repairs: 1, rounds: 2 });
+    expect(sloppy.samples[0]).toMatch(/^\/sections\/0/);
     const broken = await runBuildEvalOnce({
       transport,
       model: "broken",
@@ -116,7 +117,7 @@ describe("Build model eval", () => {
 
     const summary = summariseBuildEval([sloppy, broken, good]);
     expect(summary.map((s) => s.model)).toEqual(["good", "sloppy", "broken"]);
-    expect(summary[1]).toMatchObject({ acceptance: 0.33, refusalsPerTurn: 2, repairsPerTurn: 1 });
+    expect(summary[1]).toMatchObject({ acceptance: 0.5, refusalsPerTurn: 1, repairsPerTurn: 1 });
     expect(buildEvalTable(summary)).toContain("| `good` | 1/1 | 100% |");
   });
 

@@ -248,7 +248,27 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **Where it runs.**
     - `cloudhal ai build-eval [--remote] [--models a,b] [--briefs …] [--out file]` runs locally over REST, or on the deployment's AI binding through `POST /api/admin/sites/:siteId/ai/build-eval` (deployment token, NDJSON per run, then the summary).
     - The default candidates are seven Workers AI text models (`BUILD_EVAL_MODELS`).
-  - **Not run in CI.** Every run is a real model call on the operator's account, so the eval runs on request. Results and the recommended Build default land here once it has been run.
+  - **Not run in CI.** Every run is a real model call on the operator's account, so the eval runs on request.
+  - **First run** (2026-10-15, the newsroom deployment's AI binding, 7 models × 5 briefs, before the tolerant reader below):
+
+    | Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |
+    |---|---|---|---|---|---|---|---|---|
+    | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | 4/5 | 8% | 0 | 17.4 | 2.8 | 15.8 s | 39.9 s | 1090 |
+    | `@cf/openai/gpt-oss-120b` | 3/5 | 42% | 0 | 1.4 | 2 | 30.0 s | 34.1 s | 2394 |
+    | `@cf/zai-org/glm-4.7-flash` | 3/5 | 6% | 0 | 16.2 | 2 | 50.6 s | 183.8 s | 7950 |
+    | `@cf/openai/gpt-oss-20b` | 2/5 | 5% | 0 | 8.4 | 2.4 | 7.8 s | 62.3 s | 3631 |
+    | `@cf/qwen/qwen3-30b-a3b-fp8` | 0/5 | 0% | 0 | 6 | 3 | – | 24.8 s | 2854 |
+    | `@cf/mistralai/mistral-small-3.1-24b-instruct` | 0/5 | 0% | 0 | 29.2 | 3 | – | 31.3 s | 1442 |
+    | `@cf/meta/llama-4-scout-17b-16e-instruct` | 0/5 | 0% | 0 | 32.8 | 3 | – | 49.2 s | 1329 |
+
+    - **The format was the bottleneck, not one model.** Every model had most of its steps refused (acceptance 0–42%), mostly whole lines at a time. Pretty-printed objects, objects sharing a line, prose and code fences were each refused as a separate line, which filled the refusal rounds. Qwen3, Mistral Small 3.1 and Llama 4 Scout finished nothing.
+    - **Best so far.** Llama 3.3 70B finished the most turns (4/5), with many refusals. gpt-oss-120b had the best acceptance (42%) and the fewest refusals, and finished 3/5. GLM-4.7-Flash, today's default, was the slowest (184 s median, 7,950 output tokens per turn).
+  - **The tolerant reader** (shipped after the first run). Build reads JSON objects wherever the model breaks lines:
+    - an object may span lines, and several may share a line;
+    - prose and code fences are set aside, not refused, and an answer with no object at all gets one clear refusal;
+    - a bare operation, or `ops` holding one operation, is read as a step.
+
+    Runs now keep up to five refusal reasons (`samples`) to show why a model's steps fail. The recommendation waits for a second run on the tolerant reader.
 - **20d shipped** (markdown surfaces):
   - **core-ts.**
     - `bodySurfaces` finds ```` ```surface ```` fences; ```` ``` ```` and `~~~` both open one, and fences inside other code blocks do not count.

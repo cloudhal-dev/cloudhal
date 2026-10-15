@@ -9,7 +9,7 @@ import type { AiRunRequest, AiTransport } from "../src/ai/client.ts";
 import { AiStore } from "../src/ai/store.ts";
 import { createApi } from "../src/app.ts";
 import { type BuildChange, createBuildHub } from "../src/build.ts";
-import { componentsIn, parseLine } from "../src/build-turn.ts";
+import { componentsIn, JsonObjectReader, parseLine } from "../src/build-turn.ts";
 
 const human = { kind: "human" as const, id: "user_builder0001", name: "Halil" };
 
@@ -80,6 +80,40 @@ const lines = async (res: Response) =>
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 
 describe("build chat", () => {
+  it("reads objects wherever the model breaks lines, and sets prose and fences aside", () => {
+    const reader = new JsonObjectReader();
+    const text = [
+      "Sure! Here is the page:",
+      "```json",
+      "{",
+      '  "say": "Building {a} hero"',
+      "}",
+      '{"ops":{"op":"remove","path":"/sections/0"}} {"op":"remove","path":"/sections/1"}',
+      "```",
+      '{"done":true}',
+    ].join("\n");
+    const items = [
+      ...[...text].reduce<ReturnType<JsonObjectReader["push"]>>(
+        (all, ch) => all.concat(reader.push(ch)),
+        [],
+      ),
+      ...reader.end(),
+    ];
+    expect(items.filter((i) => "prose" in i)).toEqual([{ prose: "Sure! Here is the page:" }]);
+    const parsed = items.flatMap((i) => ("object" in i ? [parseLine(i.object)] : []));
+    expect(parsed).toEqual([
+      { say: "Building {a} hero" },
+      { ops: [{ op: "remove", path: "/sections/0" }] },
+      { ops: [{ op: "remove", path: "/sections/1" }] },
+      { done: true },
+    ]);
+    // an answer cut off mid-object comes back whole at the end, and does not parse
+    const cut = new JsonObjectReader();
+    expect(cut.push('{"ops":[{"op":"add"')).toEqual([]);
+    expect(cut.partial).toBe('{"ops":[{"op":"add"');
+    expect(cut.end()).toEqual([{ object: '{"ops":[{"op":"add"' }]);
+  });
+
   it("parses one JSON object per line and names the components being written", () => {
     expect(parseLine('{"say":"Hi"}')).toEqual({ say: "Hi" });
     expect(parseLine('{"done":true}')).toEqual({ done: true });
