@@ -261,6 +261,30 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
   - **Look round.** Build chat's look is one extra round after the refusal rounds (not counted in `maxRounds`). Refusals in it are reported, not retried.
   - **The eval renders the preview HTML,** not the theme's route: eval pages are never stored. The judge sees the same markup and Cloudhal's preview styles for every model, which is what a comparison needs.
 
+- **First design evals** (2026-10-15, the newsroom deployment, `--remote --design --look`, judge Llama 4 Scout):
+
+  | Model | Finished | Acceptance | Total | Failed checks/turn | Design score |
+  |---|---|---|---|---|---|
+  | `@cf/openai/gpt-oss-120b` | 4/5 | 69% | 32.7 s | 0 | 4.0 |
+  | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | 4/5 | 28% | 29.8 s | 0.25 | 4.0 |
+  | `@cf/openai/gpt-oss-20b` | 3/5 | 46% | 35.1 s | 0 | 4.0 |
+  | `@cf/zai-org/glm-4.7-flash` | 5/5 | 20% | 332 s | 0.8 | 3.5 |
+
+  - **The design pass found what "finished" hides.** GLM "finished" 5/5, but two of its pages rendered empty: score 1 and 2.33, with empty sections flagged.
+  - **Looking fixed half of what it found.** The look round found failed checks in 6 turns, mostly a page without a level-1 heading. The model's next round fixed them in 3.
+  - **No builder takes images.** All four builders are text-only, so their look is the checks as text. The models that take images (Llama 4 Scout, Mistral Small 3.1) cannot write Build's JSON.
+  - **The judge barely separates real pages.** It scores empty pages low but nearly every real page exactly 4.
+  - **Pricing failed for every model.** Eight more samples of gpt-oss-120b showed why: the whole surface went into one long step. One sample closed it with `}}}]]` instead of `}}]}` (and the reader, counting only braces, swallowed the lines after it); another garbled the component list.
+    - **Fixed.** The reader tracks brackets and ends an object at its last closer. `parseLine` puts closers in order, as a repair. An unreadable step is refused with where it broke and a request for smaller steps.
+    - **After the fix,** gpt-oss-120b built pricing in both of two runs (acceptance 100% and 96%, scores 3.5 and 4).
+  - **That re-run found three more gaps, now fixed in core.**
+    - A component whose `children` was not a list crashed the check: a single id is now made a list, anything else is reported.
+    - Components without an id were reported as `"undefined" is used twice`; now as "every component needs an id".
+    - A patch could remove `/sections` itself; `patchPage` now refuses changes to the page's shape.
+  - **Still open.**
+    - Llama 3.3 and GLM build pages whose components never reach the root, so they render empty: the design pass scores them 1.
+    - The judge needs calibrated examples per score.
+
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
 |---|---|---|---|
