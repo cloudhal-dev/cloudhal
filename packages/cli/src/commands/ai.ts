@@ -168,11 +168,18 @@ async function remoteRuns(
   return runs;
 }
 
+/** What the model saw when it looked, and what it did. */
+function lookText(l: NonNullable<NonNullable<BuildEvalRun["design"]>["look"]>): string {
+  const saw = `looked (${l.images ? `${l.images} screenshots` : "checks only"}${l.failed.length ? `, failed ${l.failed.join(", ")}` : ", nothing failed"})`;
+  if (!l.round) return `${saw}, no extra round`;
+  return `${saw}, ${l.steps ? `fixed with ${l.steps} step(s)` : "kept the page"}`;
+}
+
 export function describeRun(r: BuildEvalRun): string {
   const time = `${(r.totalMs / 1000).toFixed(1)} s`;
   const d = r.design;
   const design = d
-    ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.looked !== undefined ? `, ${d.looked ? "changed after looking" : "kept after looking"}` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
+    ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.look ? `, ${lookText(d.look)}` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
     : "";
   return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
 }

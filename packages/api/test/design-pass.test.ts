@@ -30,7 +30,7 @@ const catalog = createCatalog({ name: "blog", major: 1 });
 const VISION = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 /** A browser whose page fails the contrast check at 390 px; records the URLs it opened. */
-function browser(opened: string[]): PageRenderer {
+function browser(opened: string[], fail = true): PageRenderer {
   return {
     async session() {
       return {
@@ -40,7 +40,7 @@ function browser(opened: string[]): PageRenderer {
             async evaluate<T>(expression: string): Promise<T> {
               if (expression === RENDER_CHECK_SCRIPT)
                 return RENDER_CHECK_IDS.map((id) =>
-                  id === "contrast" && viewport.width === 390
+                  fail && id === "contrast" && viewport.width === 390
                     ? { id, count: 1, examples: ["section sec_x p — 2.0:1, needs 4.5:1"] }
                     : { id, count: 0, examples: [] },
                 ) as T;
@@ -173,7 +173,7 @@ describe("design pass (RFC-0021 21c)", () => {
     expect(transport.requests[2]?.model).toBe(DESIGN_JUDGE_MODEL);
     expect(run.design).toEqual({
       failed: ["contrast"],
-      looked: true,
+      look: { failed: ["contrast"], images: 4, round: true, steps: 1 },
       score: 3.33,
       scores: { fidelity: 4, hierarchy: 3, rhythm: 2, spacing: 4, readability: 3, mobile: 4 },
       note: "Plain but clear.",
@@ -202,7 +202,25 @@ describe("design pass (RFC-0021 21c)", () => {
     expect(typeof shown).toBe("string");
     expect(shown).toContain("- contrast: 1 at 390 px");
     expect(transport.requests).toHaveLength(2);
-    expect(run.design).toEqual({ failed: ["contrast"], looked: true });
+    expect(run.design).toEqual({
+      failed: ["contrast"],
+      look: { failed: ["contrast"], images: 0, round: true, steps: 1 },
+    });
+
+    const clean = models();
+    const kept = await runBuildEvalOnce({
+      transport: clean,
+      model: "@cf/openai/gpt-oss-120b",
+      brief: BUILD_EVAL_BRIEFS[0] as (typeof BUILD_EVAL_BRIEFS)[number],
+      catalog,
+      siteId: site.id,
+      design: { renderer: browser([], false), site, look: true, judge: false },
+    });
+    expect(clean.requests).toHaveLength(1);
+    expect(kept.design).toEqual({
+      failed: [],
+      look: { failed: [], images: 0, round: false, steps: 0 },
+    });
   });
 });
 
