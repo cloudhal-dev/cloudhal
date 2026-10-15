@@ -1,0 +1,70 @@
+---
+/**
+ * An article (RFC-0018 §3, the article view): kicker (the primary category), title, dek, byline
+ * (author, published, updated, reading time), cover, an "On this page" table of contents for
+ * longer pieces (headings carry ids; no JavaScript), then the body with the theme's own blocks.
+ */
+import { Body } from "@cloudhal/astro-renderer/components";
+import { articleOutline } from "@cloudhal/astro-renderer/kit";
+import { entryArticleParts } from "@cloudhal/astro-renderer/markdown";
+import type { MediaContext } from "@cloudhal/astro-renderer/media";
+import type { EntryTaxonomy } from "@cloudhal/astro-renderer/taxonomy";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import type { ThemeStrings } from "../theme.ts";
+
+interface Props {
+  entry: ContentEntry;
+  terms: EntryTaxonomy;
+  locale: string;
+  t: ThemeStrings;
+  media?: MediaContext;
+  blocks?: Record<string, unknown>;
+  blockTypes?: readonly BlockType[];
+}
+const { entry, terms, locale, t, media, blocks, blockTypes } = Astro.props;
+const parts = entryArticleParts(entry, locale, media);
+const outline = articleOutline(entry);
+const date = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+const published = entry.publishedAt ?? undefined;
+// "Updated" only for a real later edit, not the publish itself.
+const updated =
+  published && Date.parse(entry.updatedAt) - Date.parse(published) > 24 * 3600 * 1000
+    ? entry.updatedAt
+    : undefined;
+const author = entry.author.kind === "human" ? entry.author.name : undefined;
+---
+<article class="ch-article" data-entry-id={entry.id}>
+  <header class="ch-article-head">
+    {terms.section && (
+      terms.section.href ? (
+        <a class="ch-kicker" href={terms.section.href}>{terms.section.name}</a>
+      ) : (
+        <span class="ch-kicker">{terms.section.name}</span>
+      )
+    )}
+    <h1>{entry.title}</h1>
+    {entry.summary && <p class="ch-dek">{entry.summary}</p>}
+    <p class="ch-byline">
+      {author && <span class="ch-byline__author">{t.by(author)}</span>}
+      {published && <time datetime={published}>{date(published)}</time>}
+      {updated && <span>{t.updated(date(updated))}</span>}
+      <span>{t.minRead(outline.readingMinutes)}</span>
+    </p>
+  </header>
+  <Fragment set:html={parts.cover} />
+  {outline.toc.length >= 3 && (
+    <details class="ch-toc" open>
+      <summary>{t.onThisPage}</summary>
+      <ol>
+        {outline.toc.map((item) => (
+          <li data-depth={item.depth}><a href={`#${item.id}`}>{item.text}</a></li>
+        ))}
+      </ol>
+    </details>
+  )}
+  <div class="ch-richtext">
+    <Body body={parts.body} media={parts.media} blocks={blocks} blockTypes={blockTypes} />
+  </div>
+</article>

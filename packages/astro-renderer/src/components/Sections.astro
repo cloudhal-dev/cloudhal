@@ -59,7 +59,7 @@ const resolved = { ...defaults, ...components } as Record<
   const Component = resolved[section.kind];
   if (!Component) return <div data-unknown-section={section.kind} />;
   return section.kind === "contentList"
-    ? <Component section={section} entries={entries[section.id] ?? entries[section.collection] ?? []} />
+    ? <Component section={section} entries={entries[section.id] ?? entries[section.collection] ?? []} media={media} />
     : section.kind === "richText"
       ? <Component section={section} media={media} blocks={blocks} blockTypes={blockTypes} />
       : <Component section={section} media={media} />;

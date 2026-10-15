@@ -9,8 +9,10 @@ import type {
 } from "@cloudhal/astro-renderer/components/Sections.astro";
 import type { CollectionIndexHook } from "@cloudhal/astro-renderer/navigation";
 import Testimonial from "./components/blocks/Testimonial.astro";
+import LatestPosts from "./components/LatestPosts.astro";
 
-export const components: SectionComponents = {};
+/** The article lists on pages draw as cards with covers and reading time. */
+export const components: SectionComponents = { contentList: LatestPosts };
 
 /**
  * Block types (RFC-0015) rendered by this theme's own components, by type name: the types this
@@ -54,6 +56,10 @@ const STRINGS = {
     pageOf: (page: number, pages: number) => `Page ${page} of ${pages}`,
     feed: "RSS feed",
     posts: (n: number) => (n === 1 ? "1 post" : `${n} posts`),
+    by: (name: string) => `By ${name}`,
+    updated: (when: string) => `Updated ${when}`,
+    minRead: (n: number) => `${n} min read`,
+    onThisPage: "On this page",
     /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
     embargoed: (when: string) => `Embargoed until ${when}. Only previews show it until then.`,
     expired: (when: string) => `Expired on ${when}. Only previews show it now.`,
@@ -68,6 +74,10 @@ const STRINGS = {
     pageOf: (page: number, pages: number) => `Sayfa ${page} / ${pages}`,
     feed: "RSS beslemesi",
     posts: (n: number) => `${n} yazı`,
+    by: (name: string) => name,
+    updated: (when: string) => `Güncellendi: ${when}`,
+    minRead: (n: number) => `${n} dk okuma`,
+    onThisPage: "Bu sayfada",
     embargoed: (when: string) =>
       `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
     expired: (when: string) =>

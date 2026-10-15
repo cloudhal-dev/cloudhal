@@ -257,6 +257,21 @@ interface ThemePreset {
 | 18e | Presets, `cloudhal init --preset`, Studio "Start from a preset", `cloudhal seed demo`, `cloudhal theme check` | none |
 | 18f | Motion presets, page transitions, `@cloudhal/theme-landing` | none |
 
+### Status
+- **18a, first part, shipped.**
+  - **Renderer.** Markdown h2–h6 carry stable ids. `@cloudhal/astro-renderer/kit` provides `tableOfContents`, `readingMinutes` and `articleOutline`. Content-list section components now get `media`.
+  - **Article page.** The blog starter's article is `components/Article.astro`:
+    - a kicker from the primary category, linked;
+    - title and dek;
+    - a byline with the author's name (people only), the published date, "Updated" after a real later edit, and the reading time;
+    - the cover;
+    - an "On this page" table of contents when there are three or more headings;
+    - the body with the theme's own blocks.
+  - **Lists.** Article lists draw as cards with a cover thumbnail, date and reading time. This covers home content lists (`components.contentList`), archives and related posts.
+- **Not in this part:**
+  - `loadView` and the views (the route still does its own plumbing).
+  - The wide layout and the color scheme setting. Dark mode needs the theme's fixed greys moved to variables first.
+
 ## Open questions
 1. **Default for `cloudhal init`.** Should a new project get the packaged theme, with ejection when wanted, or keep the local copy? Default: packaged theme. Ejecting is one command, and updates reach the project.
 2. **Where the kit lives.** A subpath of `@cloudhal/astro-renderer` or its own package? Default: the subpath `./kit`, versioned with the renderer and with its own `engine` number.

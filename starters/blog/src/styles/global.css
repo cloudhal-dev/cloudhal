@@ -57,6 +57,12 @@
 .ch-richtext h2 {
   @apply text-2xl font-semibold;
 }
+.ch-richtext h3 {
+  @apply pt-2 text-xl font-semibold;
+}
+.ch-richtext h2 {
+  @apply pt-4;
+}
 .ch-image {
   @apply py-6;
 }
@@ -137,6 +143,85 @@
 }
 .ch-contentlist p {
   @apply text-sm text-zinc-600;
+}
+
+/* The article (RFC-0018 §3): kicker, title, dek, byline, table of contents. */
+.ch-article-head {
+  @apply space-y-3 border-b border-zinc-200 pt-6 pb-6;
+}
+.ch-kicker {
+  @apply inline-block text-sm font-semibold uppercase;
+  color: var(--ch-link, #0369a1);
+  letter-spacing: 0.04em;
+}
+a.ch-kicker:hover {
+  @apply underline underline-offset-4;
+}
+.ch-article-head h1 {
+  @apply text-4xl font-bold tracking-tight sm:text-5xl;
+}
+.ch-dek {
+  @apply text-xl leading-relaxed text-zinc-600;
+}
+.ch-byline {
+  @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500;
+}
+.ch-byline > * + *::before {
+  content: "·";
+  @apply mr-3 text-zinc-400;
+}
+.ch-byline__author {
+  @apply font-medium text-zinc-800;
+}
+.ch-cover {
+  @apply my-6;
+}
+.ch-cover img {
+  @apply w-full rounded-lg;
+}
+.ch-cover figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-toc {
+  @apply my-6 rounded-lg border border-zinc-200 px-4 py-3 text-sm;
+}
+.ch-toc summary {
+  @apply cursor-pointer font-medium;
+}
+.ch-toc ol {
+  @apply mt-2 space-y-1;
+}
+.ch-toc li[data-depth="3"] {
+  @apply pl-4;
+}
+.ch-toc a {
+  @apply text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline;
+}
+.ch-richtext :is(h2, h3)[id] {
+  scroll-margin-top: 1.5rem;
+}
+/* Article lists as cards: cover thumbnail, title, summary, date and reading time. */
+.ch-card-entry {
+  @apply flex gap-4;
+}
+.ch-card-entry__cover {
+  @apply h-24 w-36 shrink-0 rounded-md object-cover sm:h-28 sm:w-44;
+}
+.ch-card-entry__body {
+  @apply min-w-0 space-y-1;
+}
+.ch-card-entry__body a {
+  @apply text-lg font-semibold leading-snug underline-offset-4 hover:underline;
+}
+.ch-card-entry__body p {
+  @apply text-sm text-zinc-600;
+}
+.ch-card-entry__meta {
+  @apply flex flex-wrap gap-x-3 text-xs text-zinc-500;
+}
+.ch-card-entry__meta > * + *::before {
+  content: "·";
+  @apply mr-3;
 }
 
 /* Breadcrumbs, term chips, archives, pagination, related posts (RFC-0002). */

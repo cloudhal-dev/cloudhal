@@ -16,7 +16,7 @@ import {
   termCacheTag,
 } from "@cloudhal/astro-renderer/cache-tags";
 import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
-import { Comments, EntryArticle, Sections } from "@cloudhal/astro-renderer/components";
+import { Comments, Sections } from "@cloudhal/astro-renderer/components";
 import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
@@ -41,6 +41,7 @@ import {
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { blockTypes } from "../blocks.ts";
 import Archive from "../components/Archive.astro";
+import Article from "../components/Article.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
@@ -221,9 +222,9 @@ const meta =
           { name: route.entry.title },
         ]}
       />
-      <EntryArticle entry={route.entry} locale={locale} media={media} blocks={blocks} blockTypes={blockTypes} />
+      <Article entry={route.entry} terms={terms} locale={locale} t={t} media={media} blocks={blocks} blockTypes={blockTypes} />
       <PostTerms taxonomy={terms} locale={locale} />
-      <RelatedPosts title={t.related} entries={related} locale={locale} />
+      <RelatedPosts title={t.related} entries={related} locale={locale} media={media} />
       <Comments view={comments} />
     </Fragment>
   )}
