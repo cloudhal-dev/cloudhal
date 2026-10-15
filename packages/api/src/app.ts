@@ -181,7 +181,7 @@ export function createApi(deps: ApiDeps) {
       throw new Error("admin.deployToken must be at least 32 characters");
     app.route(
       "/api/admin",
-      adminRoutes(deps.admin.deployToken, deps.admin.storage, deps.ai?.transport),
+      adminRoutes(deps.admin.deployToken, deps.admin.storage, deps.ai?.transport, deps.mcp?.render),
     );
   }
 
@@ -304,7 +304,11 @@ export function createApi(deps: ApiDeps) {
   // RFC-0021: the site's design rules (DESIGN.md).
   app.route("/api/sites/:siteId/design", design);
   // RFC-0016: in-editor AI settings, the model picker and commands.
-  app.route("/api/sites/:siteId/ai", aiRoutes(deps.ai));
+  // RFC-0021 21c: Build chat renders with the same browser as `render_page`.
+  app.route(
+    "/api/sites/:siteId/ai",
+    aiRoutes(deps.ai && deps.mcp?.render ? { ...deps.ai, render: deps.mcp.render } : deps.ai),
+  );
   app.route("/api/sites/:siteId/snapshots", snapshots);
   app.route("/api/sites/:siteId/activity", activity);
   app.route("/api/sites/:siteId/preview-links", previewLinks);

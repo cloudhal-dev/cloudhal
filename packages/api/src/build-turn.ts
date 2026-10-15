@@ -27,11 +27,14 @@ import {
 import type { BuildObserver } from "@cloudhal/mcp-server";
 import { notifyBuild } from "@cloudhal/mcp-server";
 import type { AiMessage, AiTransport, AiUsage } from "./ai/client.ts";
+import { lookMessage, type PageLook } from "./design-pass.ts";
 
 /** What Studio's chat shows while a turn runs, as NDJSON lines. */
 export type BuildTurnEvent =
   | { type: "round"; round: number }
   | { type: "say"; text: string }
+  /** RFC-0021 21c: the page was rendered; the model looks at it (failed check ids). */
+  | { type: "look"; failed: string[]; images: number }
   /** The step being written right now: the components named so far (an unvalidated ghost). */
   | { type: "writing"; components: string[] }
   | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
@@ -72,6 +75,14 @@ export interface BuildTurnDeps {
   readonly scope?: BuildScope | undefined;
   /** The effective design rules (RFC-0021): the theme's DESIGN.md, then the site's. */
   readonly design?: string | undefined;
+  /**
+   * RFC-0021 phase 21c: renders the page after the model's steps. The model sees the result
+   * once per turn (screenshots when `images`, the checks always) and may fix it in one more
+   * round. Skipped when it fails; a model without images and nothing failed gets no extra round.
+   */
+  readonly look?: ((page: Page) => Promise<PageLook>) | undefined;
+  /** The model takes images (`acceptsImages`). */
+  readonly images?: boolean | undefined;
 }
 
 /** A section of the page, or one component of a surface section. */
@@ -459,7 +470,8 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
   };
 
   try {
-    for (let round = 1; round <= maxRounds; round++) {
+    /** One round: the model's answer, read step by step; returns what was refused. */
+    const runRound = async (round: number): Promise<{ refused: string[]; output: string }> => {
       deps.emit({ type: "round", round });
       const refused: string[] = [];
       let output = "";
@@ -513,6 +525,12 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
           'no JSON object in the answer: write only JSON Lines ({"say"}, {"ops"}, {"done"})',
         );
       refused.push(...(await flushHeld()));
+      return { refused, output };
+    };
+    let lastOutput = "";
+    for (let round = 1; round <= maxRounds; round++) {
+      const { refused, output } = await runRound(round);
+      lastOutput = output;
       refusedTotal += refused.length;
       if (refused.length === 0 || round === maxRounds) break;
       messages.push(
@@ -528,6 +546,24 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
         },
       );
     }
+    // RFC-0021 21c: the model looks at what it built, once, and may fix it.
+    if (deps.look && steps > 0 && !deps.signal?.aborted) {
+      const look = await deps.look(page).catch(() => undefined);
+      if (look) {
+        const images = Boolean(deps.images) && look.images.length > 0;
+        deps.emit({
+          type: "look",
+          failed: look.failed.map((c) => c.id),
+          images: images ? look.images.length : 0,
+        });
+        if (images || look.failed.length > 0) {
+          messages.push({ role: "assistant", content: lastOutput }, lookMessage(look, images));
+          const { refused } = await runRound(maxRounds + 1);
+          refusedTotal += refused.length;
+        }
+      }
+    }
+
     const snap =
       steps > 0 ? await deps.snapshot(`${TOOL} by ${deps.actor.name ?? deps.actor.id}`) : undefined;
     deps.emit({

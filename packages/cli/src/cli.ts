@@ -91,8 +91,12 @@ Usage:
   cloudhal schedules run-due [--remote]                   one scheduler tick now (self-hosting: run it from
                                                           the system's cron every minute)
   cloudhal ai build-eval [--remote] [--models a,b] [--briefs landing,faq] [--out <file>]
+                        [--design] [--look] [--judge <model>|none]
                                                           compare models on Build chat's turn, in memory
-                                                          (real model calls; RFC-0020 open question 7)
+                                                          (real model calls; RFC-0020 open question 7);
+                                                          --design renders each result: failed checks and
+                                                          a vision model's score (RFC-0021 21c); --look lets
+                                                          the model see its render first, as Build chat does
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
@@ -141,6 +145,9 @@ export async function main(argv: string[]): Promise<number> {
       limit: { type: "string" },
       models: { type: "string" },
       briefs: { type: "string" },
+      design: { type: "boolean" },
+      look: { type: "boolean" },
+      judge: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -451,6 +458,15 @@ export async function main(argv: string[]): Promise<number> {
         ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
         ...(models ? { models } : {}),
         ...(briefs ? { briefs } : {}),
+        // RFC-0021 21c: the design pass (--look and --judge imply it).
+        ...(values.design || values.look || values.judge
+          ? {
+              design: {
+                ...(values.look ? { look: true } : {}),
+                ...(values.judge ? { judge: values.judge === "none" ? false : values.judge } : {}),
+              },
+            }
+          : {}),
         onRun: (r) => console.log(describeRun(r)),
       });
       console.log(`\n${report.table}`);

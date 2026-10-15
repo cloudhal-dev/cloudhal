@@ -70,6 +70,7 @@ import {
 } from "@cloudhal/core-ts/releases";
 import { createCatalog } from "@cloudhal/core-ts/surfaces";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
+import type { RenderDeps } from "@cloudhal/mcp-server/tools";
 import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
 import type { AiTransport } from "../ai/client.ts";
@@ -139,6 +140,8 @@ export function adminRoutes(
   deployToken: string,
   storage: StoragePair,
   aiTransport?: AiTransport,
+  /** A browser for the eval's design pass (RFC-0021 21c). */
+  render?: RenderDeps,
 ): Hono<Env> {
   return (
     new Hono<Env>()
@@ -411,6 +414,7 @@ export function adminRoutes(
         const body = (await c.req.json().catch(() => ({}))) as {
           models?: unknown;
           briefs?: unknown;
+          design?: { judge?: unknown; look?: unknown };
         };
         const list = (v: unknown) =>
           Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
@@ -424,6 +428,25 @@ export function adminRoutes(
             NO_STORE,
           );
         const catalog = createCatalog({ name: site.theme.name, blocks: store.blocks });
+        // RFC-0021 21c: render each result in Browser Rendering, then the judge's score.
+        if (body.design && !render)
+          return c.json(
+            { error: "render_unavailable", message: "this deployment has no browser (BROWSER)" },
+            503,
+            NO_STORE,
+          );
+        const judge = body.design?.judge;
+        const design =
+          body.design && render
+            ? {
+                renderer: render.renderer,
+                site,
+                blocks: store.blocks,
+                ...(judge === false ? { judge: false as const } : {}),
+                ...(typeof judge === "string" ? { judge: judge.slice(0, 120) } : {}),
+                ...(body.design.look === true ? { look: true } : {}),
+              }
+            : undefined;
         const encoder = new TextEncoder();
         const signal = c.req.raw.signal;
         const stream = new ReadableStream<Uint8Array>({
@@ -454,6 +477,7 @@ export function adminRoutes(
                   catalog,
                   siteId: site.id,
                   signal,
+                  ...(design ? { design } : {}),
                 }).catch(
                   (e: unknown): BuildEvalRun => ({
                     model,

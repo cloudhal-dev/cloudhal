@@ -1,5 +1,5 @@
 # RFC-0021: DESIGN.md and the agent design loop
-- Status: Draft (21a and 21b shipped)
+- Status: Accepted; 21a, 21b and 21c shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-15
 - Related:
   - `docs/design/agent-built-sites-gap-analysis.md` (G1, G2; the evidence behind this RFC);
@@ -244,6 +244,22 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
   - **`empty-section`** also fails on a section with no text or media.
   - **`tap-target`** applies WCAG 2.5.8's spacing exception: a small target fails only when a 24 px circle on it touches another target. Links inside sentences are exempt.
   - **`heading-order`** also fails on a page with no level-1 heading.
+
+- **21c shipped.**
+  - **Build chat looks once per turn** (`look` in `runBuildTurn`).
+    - **When.** After the model's steps, the draft is rendered with the deployment's browser (the same one `render_page` uses): its signed preview, or its preview HTML when the site has no domain.
+    - **Vision models** (`VISION_MODELS`: Llama 4 Scout, Mistral Small 3.1, Gemma 3) see two screenshots per width and the failed checks.
+    - **Other models** see the checks as text, and only when something failed.
+    - **The extra round.** The model gets one more round to fix what it saw, or answers `{"done":true}`.
+    - **Studio.** The `look` event says which checks failed, in the person's language, and the extra round shows as "Improving what it saw…".
+  - **The eval's design pass** (`cloudhal ai build-eval --design [--look] [--judge <model>|none]`, local or `--remote`).
+    - **Per result.** The page is rendered (preview HTML), its failed checks recorded, and a vision judge (default Llama 4 Scout) scores it 1–5 on `DESIGN_RUBRIC`: fidelity, hierarchy, rhythm, spacing, readability, mobile.
+    - **The table** gains "Failed checks/turn" and "Design score".
+    - **`--look`** lets the built model see its render first, as Build chat does.
+  - **`@cloudhal/api`'s `design-pass.ts`.** Holds `lookAt`, `lookMessage`, `rubricMessages`, `parseRubric` and `scoreDesign`. `AiMessage` content may now be text plus `image_url` parts (OpenAI's shape; checked on Workers AI with Llama 4 Scout and Mistral Small 3.1, about 2,000 input tokens per screenshot).
+- **Deviations (21c).**
+  - **Look round.** Build chat's look is one extra round after the refusal rounds (not counted in `maxRounds`). Refusals in it are reported, not retried.
+  - **The eval renders the preview HTML,** not the theme's route: eval pages are never stored. The judge sees the same markup and Cloudhal's preview styles for every model, which is what a comparison needs.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |

@@ -437,6 +437,8 @@ export type BuildTurnEvent =
   | { type: "round"; round: number }
   | { type: "say"; text: string }
   | { type: "writing"; components: string[] }
+  /** RFC-0021 21c: the page was rendered and the model looks at it (failed check ids). */
+  | { type: "look"; failed: string[]; images: number }
   | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
   | { type: "step"; ok: false; issues: string[] }
   | {
