@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "term_01HZX8K3QAU1",
+  "siteId": "site_01HZX8K3Q9EF",
+  "taxonomyId": "tax_01HZX8K3Q9AU",
+  "slug": "ayse-yilmaz",
+  "status": "active",
+  "visibility": "public",
+  "labels": {
+    "en": {
+      "name": "Ayşe Yılmaz",
+      "description": "Covers archaeology and travel in Anatolia.",
+      "role": "Senior reporter"
+    },
+    "tr": { "name": "Ayşe Yılmaz", "role": "Kıdemli muhabir" }
+  },
+  "image": {
+    "assetId": "ast_01HZX8K3QPOR",
+    "src": "/media/0123456789abcdef/ayse.jpg",
+    "alt": "Ayşe Yılmaz"
+  },
+  "links": [
+    { "label": "Mastodon", "href": "https://mastodon.social/@ayse", "external": true },
+    { "label": "Website", "href": "https://ayse.example" }
+  ],
+  "rev": 0,
+  "createdAt": "2026-10-15T09:00:00Z",
+  "updatedAt": "2026-10-15T09:00:00Z"
+}

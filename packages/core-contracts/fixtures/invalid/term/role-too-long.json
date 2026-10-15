@@ -1,0 +1,21 @@
+{
+  "reason": "a term's role is a short title (at most 120 characters)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "term_01HZX8K3QAU2",
+    "siteId": "site_01HZX8K3Q9EF",
+    "taxonomyId": "tax_01HZX8K3Q9AU",
+    "slug": "long",
+    "status": "active",
+    "visibility": "public",
+    "labels": {
+      "en": {
+        "name": "Long",
+        "role": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+      }
+    },
+    "rev": 0,
+    "createdAt": "2026-10-15T09:00:00Z",
+    "updatedAt": "2026-10-15T09:00:00Z"
+  }
+}

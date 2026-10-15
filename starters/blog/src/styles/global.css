@@ -200,6 +200,9 @@ a.ch-kicker:hover {
 .ch-richtext :is(h2, h3)[id] {
   scroll-margin-top: 1.5rem;
 }
+.ch-byline__author a {
+  @apply underline-offset-4 hover:underline;
+}
 /* Article lists as cards: cover thumbnail, title, summary, date and reading time. */
 .ch-card-entry {
   @apply flex gap-4;
@@ -267,6 +270,19 @@ a.ch-chip {
 }
 .ch-archive-image {
   @apply mt-4 w-full rounded;
+}
+/* Author pages (RFC-0019 §1): round portrait, role and profile links. */
+.ch-archive[data-taxonomy="author"] .ch-archive-image {
+  @apply h-24 w-24 rounded-full object-cover;
+}
+.ch-archive-role {
+  @apply text-lg text-zinc-600;
+}
+.ch-archive-links {
+  @apply flex flex-wrap gap-3 text-sm;
+}
+.ch-archive-links a {
+  @apply font-medium underline underline-offset-4;
 }
 .ch-entrylist {
   @apply space-y-6 py-6;

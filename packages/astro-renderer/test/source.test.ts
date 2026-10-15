@@ -91,7 +91,11 @@ describe("GraphSource", () => {
       ],
     });
     for (const source of [live, frozen]) {
-      expect((await source.taxonomies()).map((t) => t.key).sort()).toEqual(["category", "tag"]);
+      expect((await source.taxonomies()).map((t) => t.key).sort()).toEqual([
+        "author",
+        "category",
+        "tag",
+      ]);
       expect((await source.terms("category")).map((t) => t.slug)).toEqual(["news"]);
       expect((await source.termBySlug("tag", "cloudhal"))?.labels.en?.name).toBe("Cloudhal");
       expect(await source.termBySlug("tag", "nope")).toBeUndefined();

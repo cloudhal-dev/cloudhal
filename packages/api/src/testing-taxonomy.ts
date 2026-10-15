@@ -73,6 +73,7 @@ export function describeTaxonomyApi(label: string, factory: ApiStoreFactory): vo
     it("taxonomies: list, create (one snapshot), update, reserved key 400, path conflict 409", async () => {
       const list = await call(`${base()}/taxonomies`);
       expect((list.body as unknown as Taxonomy[]).map((t) => t.key).sort()).toEqual([
+        "author",
         "category",
         "tag",
       ]);

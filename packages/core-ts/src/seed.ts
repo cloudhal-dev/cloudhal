@@ -11,6 +11,7 @@ export interface SeedOptions {
 /**
  * Creates a project, a site, a home page with a hero + content list, an about page, the default
  * taxonomies (`category` required, `tag`; RFC-0002 §1) with a "News" category and a "Cloudhal" tag,
+ * an empty `author` taxonomy (RFC-0019 §1),
  * and a first post filed under both. Returns the site (after the page append).
  */
 export async function seedStarterSite(store: SiteGraphStore, options: SeedOptions): Promise<Site> {
@@ -72,6 +73,8 @@ export async function seedStarterSite(store: SiteGraphStore, options: SeedOption
     ],
   }));
   const [category, tag] = (await store.createDefaultTaxonomies(site)) as [Taxonomy, Taxonomy];
+  // RFC-0019 §1: every new site has an (empty) author taxonomy for bylines.
+  await store.createAuthorTaxonomy(site);
   const news = await store.createTerm({
     siteId: site.id,
     taxonomyId: category.id,

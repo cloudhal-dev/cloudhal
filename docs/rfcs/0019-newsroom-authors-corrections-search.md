@@ -125,6 +125,16 @@ Invariants:
 | 19b | Corrections: contract, store invariants, `add_correction`, rendering, Studio list in the entry editor |
 | 19c | Search: migration, index on publish/rollback, `/search` route, starter form and results page |
 
+### Status
+- **19a shipped.**
+  - **Contract.** `TermLabel.role` (≤ 120) and `Term.links` (≤ 10 `Link`s), both optional, with fixtures.
+  - **Store.** `createAuthorTaxonomy(site)` creates the `author` taxonomy when it is missing and returns the existing one otherwise. `seedStarterSite`, and so `cloudhal init`, gives every new site an empty one (open question 1 settled on its default).
+  - **Renderer.** `entryTaxonomy(...).authors` lists the byline, primary first. `entryHead` credits one `Person` per author (`name`, `jobTitle`, `url`, `image`, https `sameAs`); without a byline it keeps the old fallback. An author archive is a `CollectionPage` + `ProfilePage` whose `mainEntity` is the `Person`, with its list under `hasPart`.
+  - **Starter.** The article byline links each author. The author archive shows portrait, role, bio and profile links (unsafe hrefs dropped). Post term chips skip the author group.
+- **Deviations.**
+  - `createDefaultTaxonomies` still returns `[category, tag]`; the author taxonomy has its own call, so existing callers keep their types.
+  - Linking a Studio member to an author term (`cloudhal.memberId`) and an author editor in Studio are not in 19a. Authors are added with the existing term tools and screens.
+
 ## Open questions
 1. **Default taxonomy.** Should `cloudhal init` create the `author` taxonomy for every new site, or only newsroom presets? Default: every new site, empty. An empty taxonomy shows nothing.
 2. **Correction approval in `auto` mode.** Should a correction wait for a person even in `auto`, where ordinary publishes do not? Default: yes. Corrections are editorial statements.

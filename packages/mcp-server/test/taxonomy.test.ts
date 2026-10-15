@@ -205,7 +205,7 @@ describe("RFC-0002 over MCP", () => {
     });
     await expect(edit({ series: { add: ["x"] } })).rejects.toMatchObject({
       code: "unknown_taxonomy",
-      message: expect.stringContaining("it has: category, tag"),
+      message: expect.stringContaining("it has: author, category, tag"),
     });
     // limits come from the taxonomy (category: 3 per entry)
     await w.store.createTerm({
@@ -276,6 +276,7 @@ describe("RFC-0002 over MCP", () => {
     const taxonomies = (await call("list_taxonomies", { siteId: w.site.id })).out
       .taxonomies as unknown as { key: string; required: boolean; allowNewTerms: string }[];
     expect(taxonomies.map((x) => [x.key, x.required, x.allowNewTerms])).toEqual([
+      ["author", false, "none"],
       ["category", true, "none"],
       ["tag", false, "propose"],
     ]);

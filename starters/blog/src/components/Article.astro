@@ -33,7 +33,10 @@ const updated =
   published && Date.parse(entry.updatedAt) - Date.parse(published) > 24 * 3600 * 1000
     ? entry.updatedAt
     : undefined;
-const author = entry.author.kind === "human" ? entry.author.name : undefined;
+// RFC-0019 §1: the byline's authors link to their pages; without one, a person who wrote it.
+const authors = terms.authors;
+const author =
+  authors.length === 0 && entry.author.kind === "human" ? entry.author.name : undefined;
 ---
 <article class="ch-article" data-entry-id={entry.id}>
   <header class="ch-article-head">
@@ -47,6 +50,17 @@ const author = entry.author.kind === "human" ? entry.author.name : undefined;
     <h1>{entry.title}</h1>
     {entry.summary && <p class="ch-dek">{entry.summary}</p>}
     <p class="ch-byline">
+      {authors.length > 0 && (
+        <span class="ch-byline__author">
+          {t.byPrefix}
+          {authors.map((a, i) => (
+            <Fragment>
+              {i > 0 && (i === authors.length - 1 ? t.and : ", ")}
+              {a.href ? <a href={a.href} rel="author">{a.name}</a> : a.name}
+            </Fragment>
+          ))}
+        </span>
+      )}
       {author && <span class="ch-byline__author">{t.by(author)}</span>}
       {published && <time datetime={published}>{date(published)}</time>}
       {updated && <span>{t.updated(date(updated))}</span>}

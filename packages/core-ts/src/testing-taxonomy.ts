@@ -152,6 +152,41 @@ export function taxonomySuite(ctx: SuiteContext): void {
       category: { ids: ids as [string, ...string[]], primary: ids[0] as string },
     });
 
+    it("RFC-0019 §1: bylines are author terms, kept in order, with roles and profile links", async () => {
+      const w = await setup();
+      const store = ctx.store();
+      const author = await store.createAuthorTaxonomy(w.site);
+      expect(await store.createAuthorTaxonomy(w.site)).toEqual(author);
+      expect(author).toMatchObject({
+        key: "author",
+        allowNewTerms: "none",
+        archive: { enabled: true, basePath: "/author" },
+        labels: { en: { singular: "Author" }, tr: { singular: "Yazar" } },
+      });
+      const ayse = await store.createTerm({
+        siteId: w.site.id,
+        taxonomyId: author.id,
+        slug: "ayse-yilmaz",
+        status: "active",
+        visibility: "public",
+        labels: { en: { name: "Ayşe Yılmaz", role: "Senior reporter" } },
+        links: [{ label: "Mastodon", href: "https://mastodon.social/@ayse" }],
+      });
+      const can = await store.createTerm({
+        siteId: w.site.id,
+        taxonomyId: author.id,
+        slug: "can-demir",
+        status: "active",
+        visibility: "public",
+        labels: { en: { name: "Can Demir" } },
+      });
+      expect(ayse.labels.en?.role).toBe("Senior reporter");
+      const e = await entry(w, {
+        terms: { ...cat(w.news.id), author: { ids: [can.id, ayse.id], primary: ayse.id } },
+      });
+      expect(e.terms?.author).toEqual({ ids: [can.id, ayse.id], primary: ayse.id });
+    });
+
     it("invariant 15: node kinds are explicit — registry, prefixes, keys and snapshot refs", async () => {
       const w = await setup();
       const store = ctx.store();

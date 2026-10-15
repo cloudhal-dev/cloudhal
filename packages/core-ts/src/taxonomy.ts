@@ -113,19 +113,21 @@ export interface DefaultTaxonomyOptions {
 
 const DEFAULT_LABELS: Record<
   string,
-  Record<"category" | "tag", { singular: string; plural: string }>
+  Record<"category" | "tag" | "author", { singular: string; plural: string }>
 > = {
   en: {
     category: { singular: "Category", plural: "Categories" },
     tag: { singular: "Tag", plural: "Tags" },
+    author: { singular: "Author", plural: "Authors" },
   },
   tr: {
     category: { singular: "Kategori", plural: "Kategoriler" },
     tag: { singular: "Etiket", plural: "Etiketler" },
+    author: { singular: "Yazar", plural: "Yazarlar" },
   },
 };
 
-function taxonomyLabels(site: Site, key: "category" | "tag"): Taxonomy["labels"] {
+function taxonomyLabels(site: Site, key: "category" | "tag" | "author"): Taxonomy["labels"] {
   const labels: Taxonomy["labels"] = {};
   for (const loc of new Set([site.defaultLocale, ...site.locales])) {
     const lang = loc.split("-")[0] ?? loc;
@@ -430,6 +432,29 @@ export class TaxonomyEngine {
     }
     const all = [...existing, ...created];
     return (["category", "tag"] as const).map((k) => all.find((t) => t.key === k) as Taxonomy);
+  }
+
+  /**
+   * The `author` taxonomy (RFC-0019 §1) when it is missing: bylines as terms, with archives at
+   * `/author/<slug>` and feeds; only people add authors (`allowNewTerms: "none"`), so an agent
+   * cannot invent a reporter. Returns the taxonomy, new or existing.
+   */
+  async createAuthorTaxonomy(site: Site): Promise<Taxonomy> {
+    const existing = (await this.listTaxonomies(site.id)).find((t) => t.key === "author");
+    if (existing) return existing;
+    return this.createTaxonomy({
+      siteId: site.id,
+      key: "author",
+      labels: taxonomyLabels(site, "author"),
+      hierarchical: false,
+      allowNewTerms: "none",
+      required: false,
+      maxPerEntry: 5,
+      collections: ["posts"],
+      archive: { enabled: true, basePath: "/author" },
+      feed: true,
+      minEntriesToIndex: 1,
+    });
   }
 
   /** CAS update. The key is immutable; moving an enabled archive leaves a prefix redirect behind. */

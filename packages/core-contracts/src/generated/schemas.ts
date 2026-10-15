@@ -2160,6 +2160,14 @@ export const TermSchema = {
     "image": {
       "$ref": "#/$defs/ImageRef"
     },
+    "links": {
+      "type": "array",
+      "description": "Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1).",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/Link"
+      }
+    },
     "slugHistory": {
       "type": "array",
       "description": "Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.",
@@ -2259,6 +2267,29 @@ export const TermSchema = {
         }
       }
     },
+    "Link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "href"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "external": {
+          "type": "boolean"
+        }
+      }
+    },
     "Locale": {
       "type": "string",
       "description": "BCP 47 language tag, e.g. en, tr, en-US.",
@@ -2343,6 +2374,12 @@ export const TermSchema = {
           "type": "string",
           "description": "Markdown introduction shown at the top of the archive.",
           "maxLength": 20000
+        },
+        "role": {
+          "type": "string",
+          "description": "A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).",
+          "minLength": 1,
+          "maxLength": 120
         },
         "seo": {
           "$ref": "#/$defs/Seo"

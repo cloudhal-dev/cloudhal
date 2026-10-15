@@ -143,6 +143,8 @@ export interface EntryTaxonomy {
   readonly trail: ShownTerm[];
   /** Public `tag` terms. */
   readonly tags: ShownTerm[];
+  /** The byline (RFC-0019 §1): public `author` terms, the primary author first. */
+  readonly authors: ShownTerm[];
   /**
    * Keyword names (`article:tag`, JSON-LD `keywords`, RSS categories): the names of `tags`, or the
    * deprecated `ContentEntry.tags` slugs for an entry that has no `terms.tag` yet (un-migrated).
@@ -150,7 +152,7 @@ export interface EntryTaxonomy {
   readonly keywords: string[];
 }
 
-const EMPTY: EntryTaxonomy = { groups: [], trail: [], tags: [], keywords: [] };
+const EMPTY: EntryTaxonomy = { groups: [], trail: [], tags: [], authors: [], keywords: [] };
 
 export function entryTaxonomy(
   index: TaxonomyIndex | undefined,
@@ -161,6 +163,7 @@ export function entryTaxonomy(
   const groups: { taxonomy: Taxonomy; terms: ShownTerm[] }[] = [];
   let section: ShownTerm | undefined;
   let tags: ShownTerm[] = [];
+  let authors: ShownTerm[] = [];
   const sectionTax = sectionTaxonomy(index);
   for (const taxonomy of index.taxonomies) {
     const assignment = entry.terms?.[taxonomy.key];
@@ -173,11 +176,15 @@ export function entryTaxonomy(
     if (taxonomy === sectionTax && assignment.primary)
       section = shown.find((t) => t.id === assignment.primary);
     if (taxonomy.key === "tag") tags = shown;
+    if (taxonomy.key === "author")
+      authors = [...shown].sort(
+        (a, b) => Number(b.id === assignment.primary) - Number(a.id === assignment.primary),
+      );
     if (shown.length > 0) groups.push({ taxonomy, terms: shown });
   }
   const trail = section ? [...publicTrail(index, section.term), section] : [];
   const keywords = entry.terms?.tag ? tags.map((t) => t.name) : legacy;
-  return { groups, ...(section ? { section } : {}), trail, tags, keywords };
+  return { groups, ...(section ? { section } : {}), trail, tags, authors, keywords };
 }
 
 /** Term ids an entry belongs to for archives: its assignments plus, in hierarchical taxonomies, their ancestors. */

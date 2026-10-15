@@ -299,6 +299,121 @@ impl<'de> ::serde::Deserialize<'de> for ImageRefSrc {
             })
     }
 }
+#[doc = "`Link`"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Link {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub external: ::std::option::Option<bool>,
+    pub href: LinkHref,
+    pub label: LinkLabel,
+}
+#[doc = "`LinkHref`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct LinkHref(::std::string::String);
+impl ::std::ops::Deref for LinkHref {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<LinkHref> for ::std::string::String {
+    fn from(value: LinkHref) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for LinkHref {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 2048usize {
+            return Err("longer than 2048 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for LinkHref {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LinkHref {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for LinkHref {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`LinkLabel`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct LinkLabel(::std::string::String);
+impl ::std::ops::Deref for LinkLabel {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<LinkLabel> for ::std::string::String {
+    fn from(value: LinkLabel) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for LinkLabel {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 200usize {
+            return Err("longer than 200 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for LinkLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LinkLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for LinkLabel {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "BCP 47 language tag, e.g. en, tr, en-US."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
@@ -695,6 +810,9 @@ pub struct Term {
     pub image: ::std::option::Option<ImageRef>,
     #[doc = "Names per locale. Must contain the site's default locale."]
     pub labels: ::std::collections::HashMap<Locale, TermLabel>,
+    #[doc = "Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1)."]
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub links: ::std::vec::Vec<Link>,
     #[doc = "Set when this term was merged into another active term of the same taxonomy; status is then 'retired'."]
     #[serde(
         rename = "mergedInto",
@@ -753,6 +871,9 @@ pub struct TermLabel {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub description: ::std::option::Option<TermLabelDescription>,
     pub name: TermLabelName,
+    #[doc = "A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1)."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub role: ::std::option::Option<TermLabelRole>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub seo: ::std::option::Option<Seo>,
 }
@@ -901,6 +1022,59 @@ impl ::std::convert::TryFrom<::std::string::String> for TermLabelName {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for TermLabelName {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct TermLabelRole(::std::string::String);
+impl ::std::ops::Deref for TermLabelRole {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<TermLabelRole> for ::std::string::String {
+    fn from(value: TermLabelRole) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for TermLabelRole {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 120usize {
+            return Err("longer than 120 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for TermLabelRole {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TermLabelRole {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TermLabelRole {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
