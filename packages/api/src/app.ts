@@ -11,6 +11,7 @@ import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
+import { createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
@@ -105,6 +106,8 @@ export function createApi(deps: ApiDeps) {
 
   // CSRF: state-changing requests that may carry a session cookie must come from this origin (or a
   // trusted one). Better Auth checks its own routes; /api/admin uses a bearer token, not cookies.
+  // RFC-0020 §6: page changes for Studio's Build view (MCP tools and Studio saves report here).
+  const build = deps.build ?? createBuildHub(deps.now);
   const trusted = new Set(deps.trustedOrigins ?? []);
   app.use("/api/*", async (c, next) => {
     const method = c.req.method;
@@ -124,6 +127,7 @@ export function createApi(deps: ApiDeps) {
 
   app.use("*", async (c, next) => {
     c.set("store", deps.store);
+    c.set("build", build);
     c.set("audit", deps.audit ?? deps.mcp?.audit);
     c.set("previewSecret", deps.preview?.secret);
     c.set("approvals", deps.mcp?.approvals);
@@ -212,6 +216,7 @@ export function createApi(deps: ApiDeps) {
   if (deps.mcp) {
     const mcp = createCloudhalMcpHandler({
       store: deps.store,
+      build,
       ...deps.mcp,
       previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
       now: deps.now,

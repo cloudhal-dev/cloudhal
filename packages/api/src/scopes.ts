@@ -101,6 +101,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // the editors' draft previews: the unsaved form rendered, nothing written (RFC-0014 phase 1c)
   ["POST", `${S}/pages/:pageId/preview`, "content:read"],
   ["GET", `${S}/pages/:pageId`, "content:read"],
+  // RFC-0020 §6: Studio's Build view follows a page's changes (server-sent events).
+  ["GET", `${S}/pages/:pageId/build/events`, "content:read"],
   ["PUT", `${S}/pages/:pageId`, "content:write"],
   ["DELETE", `${S}/pages/:pageId`, "content:write"],
   // RFC-0014 §4: block operations on a page's markdown rich-text section

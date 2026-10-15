@@ -15,6 +15,7 @@ import type { SchedulesDeps } from "@cloudhal/mcp-server/schedules";
 import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
+import type { BuildHub } from "./build.ts";
 import type { MailSender } from "./mail.ts";
 import type { AiDeps } from "./routes/ai.ts";
 import type { UploadSecret } from "./uploads.ts";
@@ -42,6 +43,8 @@ export interface McpMountOptions {
 
 export interface ApiDeps {
   readonly store: SiteGraphStore;
+  /** Studio's Build view (RFC-0020 §6): where page changes are reported; in-process by default. */
+  readonly build?: BuildHub;
   /** Auth is pluggable; when absent, every request is anonymous (tests, local scripts). */
   readonly resolveActor?: ActorResolver;
   /** When absent, principals derive from `resolveActor` with the actor kind's default scopes. */
@@ -126,6 +129,8 @@ export type Env = {
     /** Resolved once per request (API-key verification counts against the key's rate limit). */
     principal: Principal | undefined;
     store: SiteGraphStore;
+    /** Build events (RFC-0020 §6). */
+    build: BuildHub;
     audit: AuditLog | undefined;
     previewSecret: string | undefined;
     approvals: ApprovalStore | undefined;
