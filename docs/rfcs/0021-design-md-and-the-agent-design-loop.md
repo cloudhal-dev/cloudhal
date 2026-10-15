@@ -234,6 +234,7 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
     - Node (`@cloudhal/cli`): the local Chrome, started on the first render and stopped after a minute idle. `CHROME_PATH` picks it; `CLOUDHAL_RENDER=off` turns it off.
     - Workers (`@cloudhal/cloudflare`): the `BROWSER` binding. The browser is acquired per call and driven over the binding's chunked socket.
   - **Deploy.** `cloudhal deploy` binds Browser Rendering to the admin Worker unless `cloudhal.json` says `"render": false`, and logs which applies.
+  - **Verified live.** On the newsroom deployment through Browser Rendering: the home page at 1440 and 390 px took about 11 s (8 screenshots, all checks passed). The binding delivers binary messages as Blobs on current compatibility dates, so the socket asks for ArrayBuffers and reads any Blob in order. Timeouts name the stage they stopped in.
   - **Limits.** As specified, in memory per process or isolate. Errors are `render_unavailable`, `render_limited` and `render_failed`, each pointing to `preview_page`.
 - **Deviations (21b).**
   - **Screenshots.** One JPEG per viewport (up to 4 per width, quality 60), not one tall PNG per width: tall images are scaled down by models until text is unreadable. A phone page that overflows sideways does not scroll, so its screenshots stop after the first and are marked truncated.

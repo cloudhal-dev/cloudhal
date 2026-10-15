@@ -104,6 +104,8 @@ export async function renderPage(
   let session: RenderSession | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let done = false;
+  // Where a slow render was when it timed out, for the error.
+  let stage = "starting a browser";
   const work = (async () => {
     const opened = await renderer.session();
     if (done) {
@@ -116,14 +118,17 @@ export async function renderPage(
     for (const width of options.widths) {
       if (done) throw new RenderError("timed out");
       const vh = VIEWPORT_HEIGHT[width];
+      stage = `opening the page at ${width} px`;
       const tab = await session.open(url, { width, height: vh });
       try {
+        stage = `checking the page at ${width} px`;
         const checks = await tab.evaluate<PageCheck[]>(RENDER_CHECK_SCRIPT);
         perWidth.push({ width, checks: Array.isArray(checks) ? checks : [] });
         const height = Math.max(vh, Math.ceil((await tab.evaluate<number>(PAGE_HEIGHT)) ?? vh));
         const max = Math.max(1, options.maxImages ?? 4);
         const count = options.fullPage ? Math.min(max, Math.ceil(height / vh)) : 1;
         const images: Uint8Array[] = [];
+        stage = `taking screenshots at ${width} px`;
         for (let i = 0; i < count; i++) {
           // The last viewport ends at the page's end, so nothing is cut in half there.
           const y = i === count - 1 && count * vh >= height ? Math.max(0, height - vh) : i * vh;
@@ -143,7 +148,8 @@ export async function renderPage(
   })();
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(
-      () => reject(new RenderError(`the page did not render within ${timeoutMs / 1000} s`)),
+      () =>
+        reject(new RenderError(`the page did not render within ${timeoutMs / 1000} s (${stage})`)),
       timeoutMs,
     );
   });

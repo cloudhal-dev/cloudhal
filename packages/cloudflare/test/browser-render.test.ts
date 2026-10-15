@@ -1,6 +1,6 @@
 /** RFC-0021 §4: Browser Rendering's DevTools socket carries messages in length-prefixed chunks. */
 import { describe, expect, it } from "vitest";
-import { chunksToMessage, messageToChunks } from "../src/browser-render.ts";
+import { bindingSocket, chunksToMessage, messageToChunks } from "../src/browser-render.ts";
 
 describe("Browser Rendering chunks", () => {
   it("round-trips small and multi-chunk messages, waiting for the rest of a message", () => {
@@ -23,5 +23,37 @@ describe("Browser Rendering chunks", () => {
     // the next message stays queued
     expect(chunksToMessage(inbox)).toBe(small);
     expect(inbox).toHaveLength(0);
+  });
+});
+
+describe("Browser Rendering socket", () => {
+  it("reads binary messages delivered as Blobs, in order, and asks for ArrayBuffers", async () => {
+    const listeners: Record<string, ((e: { data?: unknown }) => void)[]> = {};
+    const ws = {
+      binaryType: "blob",
+      sent: [] as unknown[],
+      send(m: unknown) {
+        this.sent.push(m);
+      },
+      close() {},
+      addEventListener(type: string, l: (e: { data?: unknown }) => void) {
+        listeners[type] = [...(listeners[type] ?? []), l];
+      },
+    };
+    const socket = bindingSocket(ws as unknown as WebSocket);
+    expect(ws.binaryType).toBe("arraybuffer");
+    const got: string[] = [];
+    socket.onMessage((m) => got.push(m));
+    const one = JSON.stringify({ id: 1, result: {} });
+    const two = JSON.stringify({ id: 2, result: { data: "x".repeat(2_000_000) } });
+    const parts = messageToChunks(two);
+    const emit = (data: unknown) => {
+      for (const l of listeners.message ?? []) l({ data });
+    };
+    emit(new Blob(messageToChunks(one) as unknown as ArrayBuffer[]));
+    for (const p of parts) emit(new Blob([p as unknown as ArrayBuffer]));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(got).toEqual([one, two]);
+    socket.close();
   });
 });
