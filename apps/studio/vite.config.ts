@@ -20,6 +20,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": { target: process.env.CLOUDHAL_API ?? "http://localhost:8787", changeOrigin: true },
+      // Agents use the same origin's /mcp (the Build view and Agents page show it).
+      "/mcp": { target: process.env.CLOUDHAL_API ?? "http://localhost:8787", changeOrigin: true },
     },
   },
   build: {

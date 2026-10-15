@@ -2690,6 +2690,9 @@ export const api = {
   /** Draft previews are whole HTML documents for a sandboxed `<iframe>`, not JSON. */
   preview: {
     page: (siteId: string, pageId: string) => `/api/sites/${siteId}/pages/${pageId}/preview`,
+    /** Server-sent build events for Studio's Build view (RFC-0020 §6). */
+    buildEvents: (siteId: string, pageId: string) =>
+      `/api/sites/${siteId}/pages/${pageId}/build/events`,
     entry: (siteId: string, entryId: string) => `/api/sites/${siteId}/entries/${entryId}/preview`,
     /** A term's archive page as saved (the editor shows the unsaved draft via `terms.previewDraft`). */
     term: (siteId: string, termId: string) =>

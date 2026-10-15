@@ -56,6 +56,8 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/SiteSettingsPage.tsx": "settings",
   "routes/AccountPage.tsx": "settings",
   "routes/PageEditorPage.tsx": "editor",
+  // RFC-0020 §6: the live Build view of a page.
+  "routes/BuildPage.tsx": "editor",
   "routes/ArticleEditorPage.tsx": "editor",
   "routes/TaxonomyPage.tsx": "list",
   "routes/TermEditorPage.tsx": "editor",

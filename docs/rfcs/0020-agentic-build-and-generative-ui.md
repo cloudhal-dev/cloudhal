@@ -213,6 +213,22 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **The `catalog` id is recorded, not enforced.** Surfaces are checked against the deployed catalog whatever `catalog` says. Component names are one global vocabulary, as block names are (ADR-0030).
   - **Previews ignore source filters.** A preview of an entry source shows the collection's newest entries without applying the filter. The site applies it.
 
+- **20b, first part, shipped** (live build view on one server):
+  - **Build events.** `BuildObserver` in `@cloudhal/mcp-server`: `patch_draft` and `update_page` report applied changes, and `patch_draft` reports refused operations. Studio saves report too.
+  - **Hub and stream.** The API's in-process `BuildHub` streams events at `GET /api/sites/:siteId/pages/:pageId/build/events` (`content:read`, at most 20 viewers per page) as server-sent events. The stream is AG-UI-shaped:
+    - `STATE_SNAPSHOT` on connect;
+    - `STATE_DELTA` carrying the rendered preview, the ops, the repairs and the changed section ids;
+    - `CUSTOM` `validation_failed` with the refused parts' JSON Pointers.
+  - **Studio Build view** (`/sites/:siteId/pages/:pageId/build`, DESIGN.md §2ac): an activity feed (`BuildActivity`), "Connect an agent", and `PreviewPanel morph`. The panel merges each version into the shown document by `data-section-id`, outlines what changed and keeps scroll and open tabs. The frame is `sandbox="allow-same-origin"`; scripts never run.
+  - **Previews** style the primitives.
+  - **Demo:** `apps/demo-newsroom/scripts/build-agent.ts`, a scripted MCP agent that builds a landing page step by step, including a refused step it then fixes and a repaired typo.
+- **Deviations in 20b so far:**
+  - **No checkpoints yet.** Each `patch_draft` call is still one store write and one snapshot; checkpoints (§6) come with 20c, where a model streams many small operations.
+  - **Cloudflare:** the hub is per isolate. 20b part 2 moves it into a Durable Object per page.
+  - **No ghosts yet.** They need partial tool input, which an MCP server never sees; they come with Studio's own model loop (20c).
+  - **No undo history yet.** Snapshots cover rollback; per-operation undo comes with checkpoints.
+  - **Fragments are whole documents.** The preview is the framework-free preview document, merged in place, not the theme's server-rendered fragments. The theme's look in the Build view follows the site preview work in 20b part 2.
+
 ## Open questions
 1. **Session runtime on Cloudflare.** Use the Agents SDK (`agents` 0.28, pre-1.0) or a plain Durable Object with our own WebSocket protocol? Default: a plain Durable Object speaking AG-UI events. The Agents SDK stays an option once it reaches 1.0.
 2. **Checkpoint cadence.** Is 2 seconds of quiet, 50 ops or the end of a turn right? Default: yes, tuned after measurement.

@@ -870,7 +870,7 @@ describe("design rules (DESIGN.md)", () => {
     expect(missing).toEqual([]);
   });
 
-  it("every iframe is fully sandboxed (previews include drafts)", () => {
+  it("every iframe is fully sandboxed (previews include drafts); only the Build view merges", () => {
     const UI_BLOCKS = path.resolve(here, "../../../packages/ui/src/blocks");
     const sources = [
       ...files,
@@ -878,10 +878,20 @@ describe("design rules (DESIGN.md)", () => {
     ];
     const unsandboxed = sources.flatMap((f) =>
       [...f.text.matchAll(/<iframe\b[^>]*>/g)]
-        .filter((m) => !/\bsandbox=""/.test(m[0]))
+        // DESIGN.md §2ac: a morphing panel needs same-origin access for itself; scripts never run.
+        .filter(
+          (m) =>
+            !/\bsandbox=""/.test(m[0]) &&
+            !/\bsandbox=\{morph \? "allow-same-origin" : ""\}/.test(m[0]),
+        )
         .map(() => path.basename(f.file)),
     );
     expect(unsandboxed, 'use sandbox="" (no scripts, no same-origin)').toEqual([]);
+    const scripted = sources.filter((f) => /allow-scripts|allow-top-navigation/.test(f.text));
+    expect(
+      scripted.map((f) => path.basename(f.file)),
+      "frames never run scripts",
+    ).toEqual([]);
   });
 
   it("chart and map tooltips are never HTML formatters (RFC-0006 §10.1)", () => {

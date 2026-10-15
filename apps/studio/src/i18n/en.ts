@@ -354,6 +354,8 @@ export const en = {
       component: "Block",
       surface: "Generated UI",
     },
+    buildLive: "Build live",
+    buildLiveHint: "Watch agents build this page as it happens",
     surface: {
       title: "Generated UI · {count} components",
       hint: "Built by an agent from the theme's catalog. Change it by asking the agent; Studio shows it read-only for now.",
