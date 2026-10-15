@@ -330,6 +330,8 @@ function invariantHint(e: InvariantError): string | undefined {
       return "paths under /media/<16 hex digits>/ belong to media files";
     case "retry":
       return "call the tool again in a few seconds";
+    case "invalid_surface":
+      return "fix the parts named by the JSON Pointers in details.issues; get_catalog lists every component, its props and the binding rules";
     default:
       return undefined;
   }

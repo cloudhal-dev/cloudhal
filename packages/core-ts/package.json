@@ -26,6 +26,7 @@
     "./automations": "./src/automations.ts",
     "./body-blocks": "./src/body-blocks.ts",
     "./blocks": "./src/blocks.ts",
+    "./surfaces": "./src/surfaces.ts",
     "./directives": "./src/directives.ts"
   },
   "files": [
@@ -129,6 +130,10 @@
       "./blocks": {
         "types": "./dist/src/blocks.d.ts",
         "default": "./dist/src/blocks.js"
+      },
+      "./surfaces": {
+        "types": "./dist/src/surfaces.d.ts",
+        "default": "./dist/src/surfaces.js"
       },
       "./directives": {
         "types": "./dist/src/directives.d.ts",

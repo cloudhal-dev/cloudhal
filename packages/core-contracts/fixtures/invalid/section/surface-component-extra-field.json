@@ -1,0 +1,9 @@
+{
+  "reason": "a surface component has only id, component, children, props and visible; values go in props",
+  "data": {
+    "id": "sec_surface0005",
+    "kind": "surface",
+    "catalog": "blog@1",
+    "components": [{ "id": "root", "component": "Text", "text": "Hello" }]
+  }
+}

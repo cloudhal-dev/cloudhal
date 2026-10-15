@@ -21,6 +21,7 @@ import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } fro
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { archiveHead, siteOrigin } from "./seo.ts";
+import { pickEntries, renderSurface, surfaceSources } from "./surfaces.ts";
 import {
   archiveFeedPath,
   archiveMembers,
@@ -59,6 +60,21 @@ function sectionImage(image: ImageRef, media: MediaContext | undefined): string 
   }
   const src = safeSrc(image.src);
   return src ? `<img src="${esc(src)}" alt="${esc(image.alt)}">` : "";
+}
+
+/** The collections a page's sections list: content lists and surfaces' entry sources. */
+export function previewCollections(sections: readonly Section[]): string[] {
+  return [
+    ...new Set(
+      sections.flatMap((s) =>
+        s.kind === "contentList"
+          ? [s.collection]
+          : s.kind === "surface"
+            ? surfaceSources(s).map((q) => q.collection)
+            : [],
+      ),
+    ),
+  ];
 }
 
 /**
@@ -122,6 +138,14 @@ export function renderSectionHtml(
     // RFC-0015: previews show unknown or misfitting blocks as a labelled placeholder.
     case "component":
       return renderComponentSection(section, { ...(media ? { media } : {}), preview: true });
+    // RFC-0020: a surface's entry sources come from the collections the caller loaded (the
+    // filter is applied on the site; a preview shows the collection's newest).
+    case "surface": {
+      const sources = Object.fromEntries(
+        surfaceSources(section).map((q) => [q.key, pickEntries(entries[q.collection] ?? [], q)]),
+      );
+      return renderSurface(section, { ...(media ? { media } : {}), sources, preview: true });
+    }
   }
 }
 

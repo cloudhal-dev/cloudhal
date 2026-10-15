@@ -737,6 +737,47 @@ export const PageSchema = {
               "additionalProperties": true
             }
           }
+        },
+        {
+          "type": "object",
+          "title": "SurfaceSection",
+          "description": "A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "catalog",
+            "components"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "surface"
+              ]
+            },
+            "catalog": {
+              "type": "string",
+              "description": "The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).",
+              "pattern": "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"
+            },
+            "components": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/SurfaceComponent"
+              }
+            },
+            "data": {
+              "type": "object",
+              "description": "The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).",
+              "additionalProperties": true
+            }
+          }
         }
       ]
     },
@@ -771,6 +812,46 @@ export const PageSchema = {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "minLength": 1,
       "maxLength": 128
+    },
+    "SurfaceComponent": {
+      "type": "object",
+      "description": "One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "component"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SurfaceComponentId"
+        },
+        "component": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/SurfaceComponentId"
+          }
+        },
+        "props": {
+          "type": "object",
+          "description": "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.",
+          "additionalProperties": true
+        },
+        "visible": {
+          "type": "object",
+          "description": "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "SurfaceComponentId": {
+      "type": "string",
+      "description": "A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).",
+      "pattern": "^[a-z][a-z0-9-]{0,40}$"
     },
     "Timestamp": {
       "type": "string",
@@ -966,6 +1047,47 @@ export const SectionSchema = {
           "additionalProperties": true
         }
       }
+    },
+    {
+      "type": "object",
+      "title": "SurfaceSection",
+      "description": "A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "catalog",
+        "components"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "surface"
+          ]
+        },
+        "catalog": {
+          "type": "string",
+          "description": "The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).",
+          "pattern": "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/SurfaceComponent"
+          }
+        },
+        "data": {
+          "type": "object",
+          "description": "The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).",
+          "additionalProperties": true
+        }
+      }
     }
   ],
   "$defs": {
@@ -1120,6 +1242,46 @@ export const SectionSchema = {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "minLength": 1,
       "maxLength": 128
+    },
+    "SurfaceComponent": {
+      "type": "object",
+      "description": "One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "component"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SurfaceComponentId"
+        },
+        "component": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/SurfaceComponentId"
+          }
+        },
+        "props": {
+          "type": "object",
+          "description": "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.",
+          "additionalProperties": true
+        },
+        "visible": {
+          "type": "object",
+          "description": "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "SurfaceComponentId": {
+      "type": "string",
+      "description": "A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).",
+      "pattern": "^[a-z][a-z0-9-]{0,40}$"
     },
     "Timestamp": {
       "type": "string",

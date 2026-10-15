@@ -8,3 +8,5 @@ export { default as Image } from "./Image.astro";
 export { default as RichText } from "./RichText.astro";
 export { default as Sections } from "./Sections.astro";
 export { default as SeoHead } from "./SeoHead.astro";
+export { default as Surface } from "./Surface.astro";
+export { default as SurfaceNode } from "./SurfaceNode.astro";

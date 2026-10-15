@@ -72,7 +72,7 @@ describe("MCP client ↔ Cloudhal server", () => {
     const { client } = await connect({ store, audit, elicitation: true });
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).slice(0, 3)).toEqual(["list_sites", "get_site", "list_pages"]);
-    expect(tools).toHaveLength(84);
+    expect(tools).toHaveLength(86);
     const publish = tools.find((t) => t.name === "publish");
     expect(publish?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });
     expect(publish?.inputSchema).toMatchObject({ type: "object" });

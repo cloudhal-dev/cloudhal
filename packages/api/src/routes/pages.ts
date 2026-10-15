@@ -1,4 +1,4 @@
-import { renderPagePreview } from "@cloudhal/astro-renderer/preview";
+import { previewCollections, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { Page, Site } from "@cloudhal/core-contracts";
 import { type Context, Hono } from "hono";
 import { patchBody } from "../body.ts";
@@ -25,9 +25,7 @@ async function loadPage(c: Context<Env>) {
 /** A page as the site renders it, with the entries its content lists show. */
 async function pagePreview(c: Context<Env>, site: Site, page: Page): Promise<string> {
   const store = c.get("store");
-  const collections = [
-    ...new Set(page.sections.flatMap((s) => (s.kind === "contentList" ? [s.collection] : []))),
-  ];
+  const collections = previewCollections(page.sections);
   const entries = Object.fromEntries(
     await Promise.all(
       collections.map(async (col) => [col, await store.listContentEntries(site.id, col)]),

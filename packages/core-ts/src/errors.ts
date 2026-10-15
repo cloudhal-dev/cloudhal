@@ -141,7 +141,10 @@ export type InvariantCode =
   | "scheduled_locked"
   // ── RFC-0015 (block registry) ──
   /** A component section's props break its block type's schema (`details.issues`). */
-  | "invalid_props";
+  | "invalid_props"
+  // ── RFC-0020 (surfaces) ──
+  /** A surface breaks its tree, catalog, bindings or limits (`details.issues`, JSON Pointers). */
+  | "invalid_surface";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

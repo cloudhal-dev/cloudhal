@@ -91,6 +91,7 @@ import {
   type PublishReleaseResult,
   publishRelease,
 } from "./release-apply.ts";
+import { checkPageSurfaces, createCatalog } from "./surfaces.ts";
 import {
   migrateTagsToTerms,
   revertTagsToTerms,
@@ -1648,6 +1649,16 @@ function checkBodyDirectives(blocks: BlockRegistry, markdown: string, where: str
 }
 
 function checkComponentSections(blocks: BlockRegistry, page: Page): void {
+  // RFC-0020 §1: surfaces must hold together; unknown components are kept, not refused.
+  const surfaceIssues = page.sections.some((s) => s.kind === "surface")
+    ? checkPageSurfaces(page.sections, createCatalog({ blocks }))
+    : [];
+  if (surfaceIssues.length)
+    throw new InvariantError(
+      "invalid_surface",
+      `page ${page.id}: ${surfaceIssues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
+      { issues: surfaceIssues },
+    );
   for (const section of page.sections) {
     if (section.kind === "richText" && section.format === "markdown")
       checkBodyDirectives(blocks, section.body, `section ${section.id}`);

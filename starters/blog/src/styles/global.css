@@ -1,9 +1,12 @@
-@import "tailwindcss";
+/* Scan `src/` only: automatic detection may walk up the file system (docs/design/starter-references.md §6). */
+@import "tailwindcss" source("..");
 
 /* Design settings (src/settings.ts, RFC-0017): CSS variables and data-ch-* attributes on <html>. */
 .ch-body {
   background: var(--ch-surface, #ffffff);
   color: var(--ch-text, #18181b);
+  /* Full-width bands (RFC-0020) use 100vw, which counts a classic scrollbar: never scroll sideways. */
+  overflow-x: clip;
 }
 [data-ch-font="serif"] .ch-body {
   font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
@@ -303,6 +306,307 @@ footer .ch-nav-menu > ul {
 }
 .cloudhal-comments-pages a {
   @apply text-sm underline underline-offset-4;
+}
+
+/* Generated UI (RFC-0020): surfaces built by agents from the catalog's primitives. Values arrive
+   as data-* attributes from closed sets; nothing a model wrote reaches this file. */
+.ch-surface {
+  @apply py-6;
+}
+.ch-stack {
+  @apply flex flex-col gap-4;
+}
+.ch-row {
+  @apply flex flex-wrap items-center gap-4;
+}
+.ch-row[data-wrap="no"] {
+  @apply flex-nowrap;
+}
+.ch-grid {
+  @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+}
+.ch-grid[data-cols="1"] {
+  @apply sm:grid-cols-1;
+}
+@media (min-width: 48rem) {
+  .ch-grid[data-cols="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="5"] {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="6"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.ch-columns {
+  @apply grid grid-cols-1 gap-6 md:grid-cols-2;
+}
+@media (min-width: 48rem) {
+  .ch-columns[data-ratio="2-1"] {
+    grid-template-columns: 2fr 1fr;
+  }
+  .ch-columns[data-ratio="1-2"] {
+    grid-template-columns: 1fr 2fr;
+  }
+  .ch-columns[data-ratio="1-1-1"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ch-columns[data-ratio="1-2-1"] {
+    grid-template-columns: 1fr 2fr 1fr;
+  }
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="none"] {
+  gap: 0;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="s"] {
+  gap: 0.5rem;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="l"] {
+  gap: 2rem;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="xl"] {
+  gap: 3rem;
+}
+:is(.ch-stack, .ch-row)[data-align="center"] {
+  @apply items-center text-center;
+}
+:is(.ch-stack, .ch-row)[data-align="end"] {
+  @apply items-end;
+}
+.ch-row[data-justify="center"] {
+  @apply justify-center;
+}
+.ch-row[data-justify="end"] {
+  @apply justify-end;
+}
+.ch-row[data-justify="between"] {
+  @apply justify-between;
+}
+/* A band leaves the reading column: full width, or wider than the text. */
+.ch-band {
+  @apply relative py-12;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(1rem, calc(50vw - 36rem));
+}
+.ch-band[data-width="narrow"] .ch-band__inner {
+  @apply mx-auto max-w-2xl;
+}
+.ch-band[data-width="wide"] .ch-band__inner,
+.ch-band:not([data-width]) .ch-band__inner {
+  @apply mx-auto max-w-6xl;
+}
+.ch-band[data-spacing="s"] {
+  @apply py-6;
+}
+.ch-band[data-spacing="l"] {
+  @apply py-16;
+}
+.ch-band[data-spacing="xl"] {
+  @apply py-24;
+}
+[data-tone="muted"]:is(.ch-band, .ch-card) {
+  @apply bg-zinc-50;
+}
+[data-tone="brand"]:is(.ch-band, .ch-card) {
+  background: var(--ch-brand, #18181b);
+  @apply text-white;
+}
+[data-tone="inverse"]:is(.ch-band, .ch-card) {
+  @apply bg-zinc-900 text-white;
+}
+[data-tone="brand"] :is(.ch-text, .ch-stat__label, .ch-stat__detail),
+[data-tone="inverse"] :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
+  color: inherit;
+  opacity: 0.85;
+}
+/* Buttons on a dark band or card keep their contrast. */
+:is([data-tone="brand"], [data-tone="inverse"]) .ch-button--primary {
+  @apply bg-white text-zinc-900;
+}
+:is([data-tone="brand"], [data-tone="inverse"]) .ch-button--secondary {
+  @apply border-white/60 text-white;
+}
+:is([data-tone="brand"], [data-tone="inverse"]) .ch-link {
+  color: inherit;
+}
+.ch-card {
+  @apply flex flex-col gap-3 rounded-lg border border-zinc-200 p-5 no-underline;
+}
+a.ch-card {
+  @apply hover:border-zinc-400;
+}
+.ch-spacer {
+  @apply h-8;
+}
+.ch-spacer[data-size="s"] {
+  @apply h-4;
+}
+.ch-spacer[data-size="l"] {
+  @apply h-16;
+}
+.ch-spacer[data-size="xl"] {
+  @apply h-24;
+}
+.ch-divider {
+  @apply my-2 border-zinc-200;
+}
+.ch-heading {
+  @apply font-bold tracking-tight;
+}
+h1.ch-heading {
+  @apply text-4xl sm:text-5xl;
+}
+h2.ch-heading {
+  @apply text-3xl;
+}
+h3.ch-heading {
+  @apply text-xl;
+}
+h4.ch-heading {
+  @apply text-lg;
+}
+.ch-text {
+  @apply space-y-2 leading-relaxed;
+}
+.ch-text[data-size="s"] {
+  @apply text-sm;
+}
+.ch-text[data-size="l"] {
+  @apply text-xl;
+}
+.ch-text[data-muted="yes"] {
+  @apply text-zinc-600;
+}
+[data-align="center"]:is(.ch-heading, .ch-text) {
+  @apply text-center;
+}
+[data-align="end"]:is(.ch-heading, .ch-text) {
+  @apply text-right;
+}
+.ch-figure img {
+  @apply w-full rounded-lg object-cover;
+}
+.ch-figure[data-ratio="16:9"] img {
+  aspect-ratio: 16 / 9;
+}
+.ch-figure[data-ratio="4:3"] img {
+  aspect-ratio: 4 / 3;
+}
+.ch-figure[data-ratio="1:1"] img {
+  aspect-ratio: 1;
+}
+.ch-figure[data-ratio="3:4"] img {
+  aspect-ratio: 3 / 4;
+}
+.ch-figure figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-button--ghost {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-link {
+  @apply font-medium underline underline-offset-4;
+}
+.ch-badge {
+  @apply inline-block w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700;
+}
+.ch-badge[data-tone="info"] {
+  @apply bg-sky-100 text-sky-800;
+}
+.ch-badge[data-tone="success"] {
+  @apply bg-emerald-100 text-emerald-800;
+}
+.ch-badge[data-tone="warning"] {
+  @apply bg-amber-100 text-amber-900;
+}
+.ch-badge[data-tone="danger"] {
+  @apply bg-red-100 text-red-800;
+}
+.ch-stat {
+  @apply flex flex-col gap-1;
+}
+.ch-stat__value {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-stat__label {
+  @apply text-sm font-medium text-zinc-700;
+}
+.ch-stat__detail {
+  @apply text-sm text-zinc-500;
+}
+.ch-quote blockquote {
+  @apply border-l-4 border-zinc-300 pl-4 text-lg italic;
+}
+.ch-quote figcaption {
+  @apply mt-2 text-sm text-zinc-600;
+}
+.ch-quote cite {
+  @apply font-medium not-italic text-zinc-900;
+}
+.ch-list {
+  @apply space-y-2 pl-5;
+}
+ul.ch-list {
+  @apply list-disc;
+}
+ol.ch-list {
+  @apply list-decimal;
+}
+.ch-list[data-marker="none"] {
+  @apply list-none pl-0;
+}
+.ch-list[data-marker="check"] {
+  @apply list-none pl-0;
+}
+.ch-list[data-marker="check"] li::before {
+  content: "✓";
+  @apply mr-2 font-bold;
+  color: var(--ch-brand, #18181b);
+}
+/* Tabs without JavaScript: the n-th checked radio shows the n-th panel. */
+.ch-tabs {
+  @apply flex flex-wrap gap-x-1;
+}
+.ch-tabs__radio {
+  @apply sr-only;
+}
+.ch-tabs__tab {
+  @apply cursor-pointer rounded-t border-b-2 border-transparent px-4 py-2 text-sm font-medium text-zinc-600;
+}
+.ch-tabs__radio:checked + .ch-tabs__tab {
+  @apply border-current text-zinc-900;
+}
+.ch-tabs__radio:focus-visible + .ch-tabs__tab {
+  @apply outline-2 outline-offset-2;
+}
+.ch-tabs__panels {
+  @apply w-full border-t border-zinc-200 pt-4;
+}
+.ch-tabs__panel {
+  @apply hidden;
+}
+.ch-tabs__radio:nth-of-type(1):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(1),
+.ch-tabs__radio:nth-of-type(2):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(2),
+.ch-tabs__radio:nth-of-type(3):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(3),
+.ch-tabs__radio:nth-of-type(4):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(4),
+.ch-tabs__radio:nth-of-type(5):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(5),
+.ch-tabs__radio:nth-of-type(6):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(6),
+.ch-tabs__radio:nth-of-type(7):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(7),
+.ch-tabs__radio:nth-of-type(8):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(8) {
+  @apply flex flex-col gap-4;
+}
+.ch-accordion {
+  @apply divide-y divide-zinc-200 border-y border-zinc-200;
+}
+.ch-disclosure summary {
+  @apply cursor-pointer py-3 font-medium;
+}
+.ch-disclosure__body {
+  @apply flex flex-col gap-3 pb-4;
 }
 
 /* Corners (src/settings.ts `radius`): after the base rules, so they win. */

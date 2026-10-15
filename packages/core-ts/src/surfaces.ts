@@ -1,0 +1,1310 @@
+/**
+ * Generative UI surfaces (RFC-0020): the catalog a surface may use, the checks the store and the
+ * build pipeline run on it, bindings and named functions, deterministic repairs, RFC 6902 patches
+ * and the model prompt generated from the catalog. Data only, no `eval`: Worker-safe.
+ */
+import type { Page, Section, SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
+import {
+  BLOCK_LIMITS,
+  type BlockRegistry,
+  type BlockType,
+  createBlockRegistry,
+  defineBlockTypes,
+  type Localized,
+  localized,
+  type PropSchema,
+  type PropsIssue,
+  type PropsSchema,
+  sectionSchema,
+  validateProps,
+} from "./blocks.ts";
+import { parseFilter } from "./filter.ts";
+
+// ── limits ───────────────────────────────────────────────────────────────────────────────────
+
+/** RFC-0020 §1 and §Security. */
+export const SURFACE_LIMITS = {
+  components: 200,
+  depth: 8,
+  dataBytes: 65_536,
+  surfacesPerPage: 30,
+  pointerLength: 200,
+  pointerSegments: 16,
+  conditionDepth: 4,
+  conditionItems: 10,
+  functionArgs: 8,
+  listArgItems: 20,
+  opsPerCall: 500,
+  sourceLimit: 50,
+} as const;
+
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const isScalar = (v: unknown) =>
+  v === null || typeof v === "string" || typeof v === "boolean" || Number.isFinite(v);
+
+// ── primitives ───────────────────────────────────────────────────────────────────────────────
+
+/** A built-in catalog component (RFC-0020 §2): PascalCase, rendered by the theme. */
+export interface PrimitiveType {
+  name: string;
+  title: Localized;
+  description?: Localized;
+  category: "layout" | "content" | "interactive";
+  props: PropsSchema;
+  /** `none`: a leaf; `any`: any components; a list: only those components. */
+  children: "none" | "any" | readonly string[];
+  example: { props: Readonly<Record<string, unknown>> };
+}
+
+const SPACE = ["none", "s", "m", "l", "xl"] as const;
+const TONE = ["surface", "muted", "brand", "inverse"] as const;
+const ALIGN = ["start", "center", "end", "stretch"] as const;
+const space = (title: Localized) => ({ type: "string" as const, enum: SPACE, title });
+const tone = { type: "string" as const, enum: TONE, title: { en: "Tone", tr: "Ton" } };
+const align = { type: "string" as const, enum: ALIGN, title: { en: "Align", tr: "Hizalama" } };
+const label = (max: number) => ({
+  type: "string" as const,
+  minLength: 1,
+  maxLength: max,
+  title: { en: "Label", tr: "Etiket" },
+});
+const href = { type: "string" as const, format: "url" as const, maxLength: 2048 };
+const schema = (
+  properties: Record<string, PropSchema>,
+  required: readonly string[] = [],
+): PropsSchema => ({
+  type: "object",
+  additionalProperties: false,
+  properties,
+  ...(required.length ? { required } : {}),
+});
+
+/** Cloudhal's primitives (RFC-0020 §2). Interactive ones here work without JavaScript. */
+export const PRIMITIVES: readonly PrimitiveType[] = [
+  {
+    name: "Stack",
+    title: { en: "Stack", tr: "Yığın" },
+    description: { en: "Children one under another.", tr: "Alt alta öğeler." },
+    category: "layout",
+    props: schema({ gap: space({ en: "Gap", tr: "Boşluk" }), align }),
+    children: "any",
+    example: { props: { gap: "m" } },
+  },
+  {
+    name: "Row",
+    title: { en: "Row", tr: "Satır" },
+    description: { en: "Children side by side; wraps on small screens.", tr: "Yan yana öğeler." },
+    category: "layout",
+    props: schema({
+      gap: space({ en: "Gap", tr: "Boşluk" }),
+      align,
+      justify: { type: "string", enum: ["start", "center", "end", "between"] },
+      wrap: { type: "boolean" },
+    }),
+    children: "any",
+    example: { props: { gap: "s", justify: "start", wrap: true } },
+  },
+  {
+    name: "Grid",
+    title: { en: "Grid", tr: "Izgara" },
+    description: {
+      en: "Children in equal columns (fewer on small screens).",
+      tr: "Eşit sütunlarda öğeler.",
+    },
+    category: "layout",
+    props: schema({
+      columns: { type: "integer", minimum: 1, maximum: 6 },
+      gap: space({ en: "Gap", tr: "Boşluk" }),
+    }),
+    children: "any",
+    example: { props: { columns: 3, gap: "m" } },
+  },
+  {
+    name: "Columns",
+    title: { en: "Columns", tr: "Sütunlar" },
+    description: { en: "Each child is a column, sized by the ratio.", tr: "Her öğe bir sütun." },
+    category: "layout",
+    props: schema({
+      ratio: { type: "string", enum: ["1-1", "2-1", "1-2", "1-1-1", "1-2-1"] },
+      gap: space({ en: "Gap", tr: "Boşluk" }),
+    }),
+    children: "any",
+    example: { props: { ratio: "2-1", gap: "l" } },
+  },
+  {
+    name: "Band",
+    title: { en: "Band", tr: "Bant" },
+    description: {
+      en: "A full-width band with a tone: the building block of landing pages.",
+      tr: "Tonlu, tam genişlikte bir bant.",
+    },
+    category: "layout",
+    props: schema({
+      tone,
+      width: { type: "string", enum: ["narrow", "wide", "full"] },
+      spacing: space({ en: "Spacing", tr: "Boşluk" }),
+    }),
+    children: "any",
+    example: { props: { tone: "muted", width: "wide", spacing: "xl" } },
+  },
+  {
+    name: "Card",
+    title: { en: "Card", tr: "Kart" },
+    description: { en: "A framed group; a link when `href` is set.", tr: "Çerçeveli bir grup." },
+    category: "layout",
+    props: schema({ tone, href }),
+    children: "any",
+    example: { props: { tone: "surface" } },
+  },
+  {
+    name: "Spacer",
+    title: { en: "Spacer", tr: "Boşluk" },
+    category: "layout",
+    props: schema({ size: space({ en: "Size", tr: "Boyut" }) }),
+    children: "none",
+    example: { props: { size: "l" } },
+  },
+  {
+    name: "Divider",
+    title: { en: "Divider", tr: "Ayraç" },
+    category: "layout",
+    props: schema({}),
+    children: "none",
+    example: { props: {} },
+  },
+  {
+    name: "Heading",
+    title: { en: "Heading", tr: "Başlık" },
+    category: "content",
+    props: schema(
+      {
+        text: { type: "string", minLength: 1, maxLength: 300 },
+        level: { type: "integer", minimum: 1, maximum: 4 },
+        align,
+      },
+      ["text"],
+    ),
+    children: "none",
+    example: { props: { text: "Plans for every team", level: 2 } },
+  },
+  {
+    name: "Text",
+    title: { en: "Text", tr: "Metin" },
+    description: { en: "A paragraph; inline markdown.", tr: "Bir paragraf." },
+    category: "content",
+    props: schema(
+      {
+        text: { type: "string", format: "markdown", minLength: 1, maxLength: 4000 },
+        size: { type: "string", enum: ["s", "m", "l"] },
+        muted: { type: "boolean" },
+        align,
+      },
+      ["text"],
+    ),
+    children: "none",
+    example: { props: { text: "Start free, upgrade when you grow.", size: "l" } },
+  },
+  {
+    name: "Markdown",
+    title: { en: "Markdown", tr: "Markdown" },
+    description: { en: "Longer text with headings and lists.", tr: "Uzun metin." },
+    category: "content",
+    props: schema({ content: { type: "string", format: "markdown", minLength: 1 } }, ["content"]),
+    children: "none",
+    example: { props: { content: "## Why\n\n- Fast\n- Safe" } },
+  },
+  {
+    name: "Image",
+    title: { en: "Image", tr: "Görsel" },
+    description: { en: "An image from the media library.", tr: "Medya kitaplığından görsel." },
+    category: "content",
+    props: schema(
+      {
+        asset: { type: "string", format: "asset" },
+        alt: { type: "string", maxLength: 300 },
+        caption: { type: "string", maxLength: 300 },
+        ratio: { type: "string", enum: ["auto", "16:9", "4:3", "1:1", "3:4"] },
+      },
+      ["asset"],
+    ),
+    children: "none",
+    example: { props: { asset: "asset:ast_example01", alt: "", ratio: "16:9" } },
+  },
+  {
+    name: "Button",
+    title: { en: "Button", tr: "Düğme" },
+    category: "content",
+    props: schema(
+      {
+        label: label(60),
+        href,
+        variant: { type: "string", enum: ["primary", "secondary", "ghost"] },
+      },
+      ["label", "href"],
+    ),
+    children: "none",
+    example: { props: { label: "Get started", href: "/start", variant: "primary" } },
+  },
+  {
+    name: "Link",
+    title: { en: "Link", tr: "Bağlantı" },
+    category: "content",
+    props: schema({ label: label(120), href }, ["label", "href"]),
+    children: "none",
+    example: { props: { label: "Read the guide", href: "/guide" } },
+  },
+  {
+    name: "Badge",
+    title: { en: "Badge", tr: "Rozet" },
+    category: "content",
+    props: schema(
+      {
+        label: label(40),
+        tone: { type: "string", enum: ["neutral", "info", "success", "warning", "danger"] },
+      },
+      ["label"],
+    ),
+    children: "none",
+    example: { props: { label: "New", tone: "info" } },
+  },
+  {
+    name: "Stat",
+    title: { en: "Statistic", tr: "İstatistik" },
+    description: { en: "A big number with a label.", tr: "Etiketli büyük bir sayı." },
+    category: "content",
+    props: schema(
+      {
+        value: { type: "string", minLength: 1, maxLength: 40 },
+        label: label(80),
+        detail: { type: "string", maxLength: 160 },
+      },
+      ["value", "label"],
+    ),
+    children: "none",
+    example: { props: { value: "99.9%", label: "Uptime" } },
+  },
+  {
+    name: "Quote",
+    title: { en: "Quote", tr: "Alıntı" },
+    category: "content",
+    props: schema(
+      {
+        text: { type: "string", format: "markdown", minLength: 1, maxLength: 2000 },
+        cite: { type: "string", maxLength: 120 },
+        role: { type: "string", maxLength: 120 },
+      },
+      ["text"],
+    ),
+    children: "none",
+    example: { props: { text: "It just works.", cite: "Ayşe Yılmaz", role: "Editor" } },
+  },
+  {
+    name: "List",
+    title: { en: "List", tr: "Liste" },
+    category: "content",
+    props: schema(
+      {
+        items: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 500 },
+          minItems: 1,
+          maxItems: 50,
+        },
+        ordered: { type: "boolean" },
+        marker: { type: "string", enum: ["bullet", "check", "none"] },
+      },
+      ["items"],
+    ),
+    children: "none",
+    example: { props: { items: ["Unlimited pages", "Agent access"], marker: "check" } },
+  },
+  {
+    name: "Tabs",
+    title: { en: "Tabs", tr: "Sekmeler" },
+    description: {
+      en: "One panel shown at a time; works without JavaScript.",
+      tr: "Bir seferde bir panel.",
+    },
+    category: "interactive",
+    props: schema({}),
+    children: ["TabPanel"],
+    example: { props: {} },
+  },
+  {
+    name: "TabPanel",
+    title: { en: "Tab", tr: "Sekme" },
+    category: "interactive",
+    props: schema({ label: label(60) }, ["label"]),
+    children: "any",
+    example: { props: { label: "Monthly" } },
+  },
+  {
+    name: "Accordion",
+    title: { en: "Accordion", tr: "Akordeon" },
+    category: "interactive",
+    props: schema({}),
+    children: ["Disclosure"],
+    example: { props: {} },
+  },
+  {
+    name: "Disclosure",
+    title: { en: "Disclosure", tr: "Açılır bölüm" },
+    description: { en: "A summary that opens to show its children.", tr: "Açılan bir özet." },
+    category: "interactive",
+    props: schema({ summary: label(200), open: { type: "boolean" } }, ["summary"]),
+    children: "any",
+    example: { props: { summary: "Can I cancel any time?" } },
+  },
+];
+
+// Primitive props follow the same subset as block props; checked once at load.
+defineBlockTypes(
+  PRIMITIVES.map((p) => ({
+    name: p.name.toLowerCase(),
+    title: p.title,
+    where: ["section"] as const,
+    props: p.props,
+    example: p.example,
+  })) as BlockType[],
+);
+
+// ── the catalog ──────────────────────────────────────────────────────────────────────────────
+
+export type CatalogEntry =
+  | { kind: "primitive"; name: string; type: PrimitiveType; schema: PropsSchema }
+  | { kind: "block"; name: string; type: BlockType; schema: PropsSchema };
+
+export interface Catalog {
+  /** `<theme>@<major>` (RFC-0018). */
+  readonly id: string;
+  get(name: string): CatalogEntry | undefined;
+  /** Every component name, primitives first. */
+  names(): string[];
+  entries(): CatalogEntry[];
+  readonly blocks: BlockRegistry;
+}
+
+export interface CatalogOptions {
+  /** The theme's name; `Site.theme.name`. */
+  readonly name?: string;
+  readonly major?: number;
+  /** The deployment's block registry (built-ins and the theme's types). */
+  readonly blocks?: BlockRegistry;
+  /** Primitives the theme does not render (RFC-0018 `catalog`). */
+  readonly omit?: readonly string[];
+}
+
+/** The catalog surfaces are written for: Cloudhal's primitives plus the registry's section blocks. */
+export function createCatalog(options: CatalogOptions = {}): Catalog {
+  const blocks = options.blocks ?? createBlockRegistry();
+  const omit = new Set(options.omit ?? []);
+  const entries: CatalogEntry[] = [
+    ...PRIMITIVES.filter((p) => !omit.has(p.name)).map(
+      (type): CatalogEntry => ({ kind: "primitive", name: type.name, type, schema: type.props }),
+    ),
+    ...blocks.list("section").map(
+      (type): CatalogEntry => ({
+        kind: "block",
+        name: type.name,
+        type,
+        schema: sectionSchema(type),
+      }),
+    ),
+  ];
+  const byName = new Map(entries.map((e) => [e.name, e]));
+  return {
+    id: `${options.name ?? "cloudhal"}@${options.major ?? 1}`,
+    get: (name) => byName.get(name),
+    names: () => entries.map((e) => e.name),
+    entries: () => [...entries],
+    blocks,
+  };
+}
+
+const childRule = (e: CatalogEntry): PrimitiveType["children"] =>
+  e.kind === "primitive" ? e.type.children : "none";
+
+// ── bindings, functions, conditions ──────────────────────────────────────────────────────────
+
+/** A value bound to the surface's data: `{ "path": "/json/pointer" }`. */
+export interface PathValue {
+  path: string;
+}
+/** A named function Cloudhal implements: `{ "call": "formatDate", "args": { … } }`. */
+export interface CallValue {
+  call: SurfaceFunction;
+  args?: Record<string, unknown>;
+}
+
+export const SURFACE_FUNCTIONS = [
+  "formatDate",
+  "formatNumber",
+  "formatCurrency",
+  "pluralize",
+  "concat",
+  "length",
+  "required",
+  "minLength",
+  "maxLength",
+  "email",
+  "range",
+] as const;
+export type SurfaceFunction = (typeof SURFACE_FUNCTIONS)[number];
+const FUNCTIONS = new Set<string>(SURFACE_FUNCTIONS);
+
+export const isPathValue = (v: unknown): v is PathValue =>
+  isObj(v) && typeof v.path === "string" && Object.keys(v).length === 1;
+export const isCallValue = (v: unknown): v is CallValue =>
+  isObj(v) &&
+  typeof v.call === "string" &&
+  Object.keys(v).every((k) => k === "call" || k === "args");
+const isDynamic = (v: unknown) => isPathValue(v) || isCallValue(v);
+
+/** RFC 6901 pointer segments (`/a/b~1c` → `["a", "b/c"]`); `undefined` when malformed. */
+export function pointerSegments(pointer: string): string[] | undefined {
+  if (pointer === "") return [];
+  if (!pointer.startsWith("/")) return undefined;
+  const parts = pointer.slice(1).split("/");
+  if (parts.some((p) => /~[^01]|~$/.test(p))) return undefined;
+  return parts.map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
+}
+
+function checkPointer(pointer: unknown, path: string, out: PropsIssue[]): void {
+  const segments = typeof pointer === "string" ? pointerSegments(pointer) : undefined;
+  if (
+    typeof pointer !== "string" ||
+    !pointer.startsWith("/") ||
+    pointer.length > SURFACE_LIMITS.pointerLength ||
+    !segments ||
+    segments.length > SURFACE_LIMITS.pointerSegments
+  )
+    out.push({ path, message: "a JSON Pointer into the surface's data, such as /plans/0/price" });
+}
+
+function checkOperand(v: unknown, path: string, out: PropsIssue[]): void {
+  if (isPathValue(v)) checkPointer(v.path, `${path}/path`, out);
+  else if (!isScalar(v)) out.push({ path, message: "a text, number, true/false or {path}" });
+}
+
+function checkCall(v: CallValue, path: string, out: PropsIssue[]): void {
+  if (!FUNCTIONS.has(v.call)) {
+    out.push({ path: `${path}/call`, message: `one of ${SURFACE_FUNCTIONS.join(", ")}` });
+    return;
+  }
+  if (v.args === undefined) return;
+  if (!isObj(v.args) || Object.keys(v.args).length > SURFACE_LIMITS.functionArgs) {
+    out.push({
+      path: `${path}/args`,
+      message: `an object of at most ${SURFACE_LIMITS.functionArgs} values`,
+    });
+    return;
+  }
+  for (const [k, a] of Object.entries(v.args)) {
+    if (Array.isArray(a)) {
+      if (a.length > SURFACE_LIMITS.listArgItems)
+        out.push({
+          path: `${path}/args/${k}`,
+          message: `at most ${SURFACE_LIMITS.listArgItems} items`,
+        });
+      a.forEach((x, i) => {
+        checkOperand(x, `${path}/args/${k}/${i}`, out);
+      });
+    } else checkOperand(a, `${path}/args/${k}`, out);
+  }
+}
+
+/** A value that is a binding or a call: problems with its shape (not with what it resolves to). */
+function checkDynamic(v: unknown, path: string, out: PropsIssue[]): void {
+  if (isPathValue(v)) checkPointer(v.path, `${path}/path`, out);
+  else if (isCallValue(v)) checkCall(v, path, out);
+}
+
+const COMPARE = ["eq", "ne", "gt", "lt"] as const;
+
+/** A visibility condition (RFC-0020 §3): `{path}`, `eq|ne|gt|lt: [a, b]`, `and|or: [...]`, `not`. */
+export function checkCondition(c: unknown, path: string, out: PropsIssue[], depth = 0): void {
+  if (depth > SURFACE_LIMITS.conditionDepth) {
+    out.push({ path, message: `nested at most ${SURFACE_LIMITS.conditionDepth} deep` });
+    return;
+  }
+  if (isPathValue(c)) {
+    checkPointer(c.path, `${path}/path`, out);
+    return;
+  }
+  if (!isObj(c) || Object.keys(c).length !== 1) {
+    out.push({ path, message: "one of {path}, eq, ne, gt, lt, and, or, not" });
+    return;
+  }
+  const [op, arg] = Object.entries(c)[0] as [string, unknown];
+  if ((COMPARE as readonly string[]).includes(op)) {
+    if (!Array.isArray(arg) || arg.length !== 2)
+      out.push({ path: `${path}/${op}`, message: "two operands" });
+    else
+      arg.forEach((x, i) => {
+        checkOperand(x, `${path}/${op}/${i}`, out);
+      });
+  } else if (op === "and" || op === "or") {
+    if (!Array.isArray(arg) || arg.length === 0 || arg.length > SURFACE_LIMITS.conditionItems)
+      out.push({
+        path: `${path}/${op}`,
+        message: `1 to ${SURFACE_LIMITS.conditionItems} conditions`,
+      });
+    else
+      arg.forEach((x, i) => {
+        checkCondition(x, `${path}/${op}/${i}`, out, depth + 1);
+      });
+  } else if (op === "not") checkCondition(arg, `${path}/not`, out, depth + 1);
+  else out.push({ path, message: "one of {path}, eq, ne, gt, lt, and, or, not" });
+}
+
+/** The value at a pointer in `data`, or `undefined`. */
+export function getPointer(data: unknown, pointer: string): unknown {
+  const segments = pointerSegments(pointer);
+  if (!segments) return undefined;
+  let cur: unknown = data;
+  for (const s of segments) {
+    if (Array.isArray(cur)) cur = /^\d+$/.test(s) ? cur[Number(s)] : undefined;
+    else if (isObj(cur)) cur = Object.hasOwn(cur, s) ? cur[s] : undefined;
+    else return undefined;
+  }
+  return cur;
+}
+
+export interface ResolveContext {
+  readonly locale: string;
+}
+
+const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN);
+const text = (v: unknown) => (v === undefined || v === null ? "" : String(v));
+
+function runFunction(
+  name: SurfaceFunction,
+  args: Record<string, unknown>,
+  ctx: ResolveContext,
+): unknown {
+  const value = args.value;
+  switch (name) {
+    case "formatDate": {
+      const d = new Date(text(value));
+      if (Number.isNaN(d.getTime())) return "";
+      const style = ["short", "medium", "long", "full"].includes(text(args.style))
+        ? (text(args.style) as "short" | "medium" | "long" | "full")
+        : "medium";
+      return new Intl.DateTimeFormat(ctx.locale, { dateStyle: style, timeZone: "UTC" }).format(d);
+    }
+    case "formatNumber": {
+      const n = num(value);
+      if (!Number.isFinite(n)) return "";
+      const digits = Math.min(Math.max(0, Math.trunc(num(args.digits ?? 2)) || 0), 6);
+      return new Intl.NumberFormat(ctx.locale, { maximumFractionDigits: digits }).format(n);
+    }
+    case "formatCurrency": {
+      const n = num(value);
+      const currency = text(args.currency).toUpperCase();
+      if (!Number.isFinite(n) || !/^[A-Z]{3}$/.test(currency)) return "";
+      try {
+        return new Intl.NumberFormat(ctx.locale, { style: "currency", currency }).format(n);
+      } catch {
+        return "";
+      }
+    }
+    case "pluralize": {
+      const n = num(args.count);
+      const word = n === 1 ? text(args.one) : text(args.other);
+      return word.replace(/#/g, Number.isFinite(n) ? String(n) : "");
+    }
+    case "concat":
+      return (Array.isArray(args.parts) ? args.parts : []).map(text).join("");
+    case "length":
+      return Array.isArray(value) || typeof value === "string" ? value.length : 0;
+    case "required":
+      return !(
+        value === undefined ||
+        value === null ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0)
+      );
+    case "minLength":
+      return text(value).length >= num(args.min);
+    case "maxLength":
+      return text(value).length <= num(args.max);
+    case "email":
+      return /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,63}$/.test(text(value));
+    case "range": {
+      const n = num(value);
+      return Number.isFinite(n) && n >= num(args.min) && n <= num(args.max);
+    }
+  }
+}
+
+/** A prop value with its bindings and calls resolved against `data`. */
+export function resolveValue(v: unknown, data: unknown, ctx: ResolveContext): unknown {
+  if (isPathValue(v)) return getPointer(data, v.path);
+  if (isCallValue(v) && FUNCTIONS.has(v.call)) {
+    const args: Record<string, unknown> = {};
+    for (const [k, a] of Object.entries(v.args ?? {}))
+      args[k] = Array.isArray(a)
+        ? a.map((x) => resolveValue(x, data, ctx))
+        : resolveValue(a, data, ctx);
+    return runFunction(v.call, args, ctx);
+  }
+  return v;
+}
+
+export function resolveProps(
+  props: Readonly<Record<string, unknown>> | undefined,
+  data: unknown,
+  ctx: ResolveContext,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props ?? {})) out[k] = resolveValue(v, data, ctx);
+  return out;
+}
+
+const truthy = (v: unknown) =>
+  !(
+    v === undefined ||
+    v === null ||
+    v === false ||
+    v === 0 ||
+    v === "" ||
+    (Array.isArray(v) && v.length === 0)
+  );
+
+/** Whether a visibility condition holds for `data`; no condition is visible. */
+export function evaluateCondition(c: unknown, data: unknown): boolean {
+  if (c === undefined) return true;
+  if (isPathValue(c)) return truthy(getPointer(data, c.path));
+  if (!isObj(c)) return false;
+  const [op, arg] = (Object.entries(c)[0] ?? []) as [string, unknown];
+  const operand = (x: unknown) => (isPathValue(x) ? getPointer(data, x.path) : x);
+  if ((COMPARE as readonly string[]).includes(op) && Array.isArray(arg)) {
+    const a = operand(arg[0]);
+    const b = operand(arg[1]);
+    if (op === "eq") return a === b;
+    if (op === "ne") return a !== b;
+    if (typeof a !== typeof b || (typeof a !== "number" && typeof a !== "string")) return false;
+    return op === "gt" ? (a as number) > (b as number) : (a as number) < (b as number);
+  }
+  if (op === "and" && Array.isArray(arg)) return arg.every((x) => evaluateCondition(x, data));
+  if (op === "or" && Array.isArray(arg)) return arg.some((x) => evaluateCondition(x, data));
+  if (op === "not") return !evaluateCondition(arg, data);
+  return false;
+}
+
+// ── checking a surface ───────────────────────────────────────────────────────────────────────
+
+export interface SurfaceCheck {
+  /** Problems that make the surface invalid (paths are JSON Pointers into the section). */
+  issues: PropsIssue[];
+  /** Ids of components whose `component` the catalog does not have: kept, flagged, not rendered. */
+  unknown: string[];
+  /** Ids no path from `root` reaches (still arriving while streaming): kept, not rendered. */
+  unreachable: string[];
+}
+
+const SOURCE_SORT = new Set(["newest", "oldest", "title"]);
+const COLLECTION = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function checkData(data: unknown, out: PropsIssue[]): void {
+  if (data === undefined) return;
+  if (!isObj(data)) {
+    out.push({ path: "/data", message: "an object" });
+    return;
+  }
+  const size = new TextEncoder().encode(JSON.stringify(data)).length;
+  if (size > SURFACE_LIMITS.dataBytes)
+    out.push({ path: "/data", message: `at most ${SURFACE_LIMITS.dataBytes} bytes of JSON` });
+  for (const [key, value] of Object.entries(data)) {
+    if (!isObj(value) || !("$source" in value)) continue;
+    const at = `/data/${key}`;
+    if (value.$source !== "entries") {
+      out.push({ path: `${at}/$source`, message: "entries" });
+      continue;
+    }
+    const q = value.query;
+    if (!isObj(q) || Object.keys(value).some((k) => k !== "$source" && k !== "query")) {
+      out.push({
+        path: at,
+        message: "{ $source: entries, query: { collection, filter?, sort?, limit } }",
+      });
+      continue;
+    }
+    for (const k of Object.keys(q))
+      if (!["collection", "filter", "sort", "limit"].includes(k))
+        out.push({ path: `${at}/query/${k}`, message: "not a query field" });
+    if (typeof q.collection !== "string" || !COLLECTION.test(q.collection))
+      out.push({ path: `${at}/query/collection`, message: "a collection slug, such as posts" });
+    if (q.filter !== undefined)
+      try {
+        if (typeof q.filter !== "string" || q.filter.length > 512) throw new Error("too long");
+        parseFilter(q.filter);
+      } catch (e) {
+        out.push({
+          path: `${at}/query/filter`,
+          message: `not a valid filter (${(e as Error).message})`,
+        });
+      }
+    if (q.sort !== undefined && !SOURCE_SORT.has(q.sort as string))
+      out.push({ path: `${at}/query/sort`, message: "newest, oldest or title" });
+    if (
+      typeof q.limit !== "number" ||
+      !Number.isInteger(q.limit) ||
+      q.limit < 1 ||
+      q.limit > SURFACE_LIMITS.sourceLimit
+    )
+      out.push({
+        path: `${at}/query/limit`,
+        message: `a whole number from 1 to ${SURFACE_LIMITS.sourceLimit}`,
+      });
+  }
+}
+
+/** Props problems with bindings allowed: bound props are checked as bindings, the rest as values. */
+function checkProps(entry: CatalogEntry, props: unknown, path: string, out: PropsIssue[]): void {
+  if (entry.kind === "block" && !entry.type.where.includes("section")) {
+    out.push({ path, message: `${entry.name} is a body block, not a surface component` });
+    return;
+  }
+  const given = isObj(props) ? props : props === undefined ? {} : props;
+  if (!isObj(given)) {
+    out.push({ path, message: "an object" });
+    return;
+  }
+  const literal: Record<string, unknown> = {};
+  const bound = new Set<string>();
+  for (const [k, v] of Object.entries(given)) {
+    if (isDynamic(v) && k in entry.schema.properties) {
+      bound.add(k);
+      checkDynamic(v, `${path}/${k}`, out);
+    } else literal[k] = v;
+  }
+  for (const issue of validateProps(entry.schema, literal)) {
+    const key = issue.path.split("/")[0] ?? "";
+    if (bound.has(key) && issue.message === "required") continue;
+    out.push({ path: issue.path ? `${path}/${issue.path}` : path, message: issue.message });
+  }
+}
+
+/**
+ * Checks a surface against a catalog (RFC-0020 §1): ids, the tree, child rules, props, bindings,
+ * conditions, data and limits. Unknown components and unreachable ones are reported, not refused.
+ */
+export function checkSurface(surface: SurfaceSection, catalog: Catalog): SurfaceCheck {
+  const issues: PropsIssue[] = [];
+  const unknown: string[] = [];
+  const components = surface.components ?? [];
+  if (components.length > SURFACE_LIMITS.components)
+    issues.push({
+      path: "/components",
+      message: `at most ${SURFACE_LIMITS.components} components`,
+    });
+  const byId = new Map<string, { c: SurfaceComponent; i: number }>();
+  components.forEach((c, i) => {
+    if (byId.has(c.id))
+      issues.push({ path: `/components/${i}/id`, message: `"${c.id}" is used twice` });
+    else byId.set(c.id, { c, i });
+  });
+  if (!byId.has("root"))
+    issues.push({ path: "/components", message: 'one component has id "root"' });
+  const parentOf = new Map<string, string>();
+  components.forEach((c, i) => {
+    const at = `/components/${i}`;
+    const entry = catalog.get(c.component);
+    if (!entry) unknown.push(c.id);
+    (c.children ?? []).forEach((child, j) => {
+      const target = byId.get(child);
+      if (!target) issues.push({ path: `${at}/children/${j}`, message: `no component "${child}"` });
+      else if (child === "root" || child === c.id)
+        issues.push({ path: `${at}/children/${j}`, message: `"${child}" cannot be a child here` });
+      else if (parentOf.has(child))
+        issues.push({
+          path: `${at}/children/${j}`,
+          message: `"${child}" already belongs to "${parentOf.get(child)}"`,
+        });
+      else parentOf.set(child, c.id);
+    });
+    if (!entry) return;
+    const rule = childRule(entry);
+    const kids = c.children ?? [];
+    if (rule === "none" && kids.length)
+      issues.push({ path: `${at}/children`, message: `${c.component} has no children` });
+    else if (Array.isArray(rule))
+      kids.forEach((child, j) => {
+        const k = byId.get(child)?.c.component;
+        if (k && !rule.includes(k))
+          issues.push({
+            path: `${at}/children/${j}`,
+            message: `${c.component} holds only ${rule.join(", ")}`,
+          });
+      });
+    checkProps(entry, c.props, `${at}/props`, issues);
+    if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
+  });
+  // Reachability and depth from the root; `parentOf` already rules out shared children.
+  const reached = new Set<string>();
+  const walk = (id: string, depth: number, trail: Set<string>) => {
+    if (trail.has(id)) return;
+    reached.add(id);
+    if (depth > SURFACE_LIMITS.depth) {
+      const i = byId.get(id)?.i;
+      issues.push({
+        path: `/components/${i}`,
+        message: `nested deeper than ${SURFACE_LIMITS.depth}`,
+      });
+      return;
+    }
+    const next = new Set(trail).add(id);
+    for (const child of byId.get(id)?.c.children ?? [])
+      if (byId.has(child)) walk(child, depth + 1, next);
+  };
+  if (byId.has("root")) walk("root", 1, new Set());
+  const unreachable = components.map((c) => c.id).filter((id) => !reached.has(id));
+  checkData(surface.data, issues);
+  return { issues, unknown, unreachable };
+}
+
+/** Problems with every surface on a page, paths prefixed with the section's place. */
+export function checkPageSurfaces(sections: readonly Section[], catalog: Catalog): PropsIssue[] {
+  const out: PropsIssue[] = [];
+  const surfaces = sections.filter((s): s is SurfaceSection => s.kind === "surface");
+  if (surfaces.length > SURFACE_LIMITS.surfacesPerPage)
+    out.push({
+      path: "/sections",
+      message: `at most ${SURFACE_LIMITS.surfacesPerPage} surfaces per page`,
+    });
+  sections.forEach((s, i) => {
+    if (s.kind !== "surface") return;
+    for (const issue of checkSurface(s, catalog).issues)
+      out.push({ path: `/sections/${i}${issue.path}`, message: issue.message });
+  });
+  return out;
+}
+
+// ── repair (RFC-0020 §6, step 2) ─────────────────────────────────────────────────────────────
+
+function distance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++)
+      cur[j] = Math.min(
+        (prev[j] as number) + 1,
+        (cur[j - 1] as number) + 1,
+        (prev[j - 1] as number) + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    prev = cur;
+  }
+  return prev[n] as number;
+}
+
+/** The catalog name a misspelt one most likely means: same letters ignoring case, else ≤ 2 edits. */
+export function nearestComponent(name: string, catalog: Catalog): string | undefined {
+  if (catalog.get(name)) return name;
+  const names = catalog.names();
+  const folded = names.find((n) => n.toLowerCase() === name.toLowerCase());
+  if (folded) return folded;
+  let best: string | undefined;
+  let bestD = 3;
+  let tie = false;
+  for (const n of names) {
+    const d = distance(n.toLowerCase(), name.toLowerCase());
+    if (d < bestD) {
+      best = n;
+      bestD = d;
+      tie = false;
+    } else if (d === bestD) tie = true;
+  }
+  return tie ? undefined : best;
+}
+
+const isComponentLike = (v: unknown): v is SurfaceComponent =>
+  isObj(v) && typeof v.id === "string" && typeof v.component === "string";
+
+/**
+ * Deterministic repairs of one component a model wrote: the nearest catalog name, unknown props
+ * dropped, missing required props from the type's example. Every repair is reported.
+ */
+export function repairComponent(
+  c: SurfaceComponent,
+  catalog: Catalog,
+): { component: SurfaceComponent; notes: string[] } {
+  const notes: string[] = [];
+  let next: SurfaceComponent = c;
+  const name = nearestComponent(c.component, catalog);
+  if (name && name !== c.component) {
+    notes.push(`${c.id}: component "${c.component}" → "${name}"`);
+    next = { ...next, component: name };
+  }
+  const entry = catalog.get(next.component);
+  if (!entry || (next.props !== undefined && !isObj(next.props))) return { component: next, notes };
+  const props: Record<string, unknown> = { ...(next.props ?? {}) };
+  let changed = false;
+  for (const key of Object.keys(props))
+    if (!(key in entry.schema.properties)) {
+      delete props[key];
+      changed = true;
+      notes.push(`${c.id}: dropped unknown prop "${key}"`);
+    }
+  const example = entry.type.example.props as Record<string, unknown>;
+  for (const key of entry.schema.required ?? [])
+    if (props[key] === undefined && example[key] !== undefined) {
+      props[key] = example[key];
+      changed = true;
+      notes.push(`${c.id}: filled required prop "${key}" from the example`);
+    }
+  if (changed) next = { ...next, props };
+  return { component: next, notes };
+}
+
+/** Repairs every component inside a value an operation carries (a component, a list, a surface). */
+export function repairValue(value: unknown, catalog: Catalog): { value: unknown; notes: string[] } {
+  if (isComponentLike(value)) {
+    const r = repairComponent(value, catalog);
+    return { value: r.component, notes: r.notes };
+  }
+  if (Array.isArray(value)) {
+    const notes: string[] = [];
+    const out = value.map((v) => {
+      const r = repairValue(v, catalog);
+      notes.push(...r.notes);
+      return r.value;
+    });
+    return { value: out, notes };
+  }
+  if (isObj(value) && value.kind === "surface" && Array.isArray(value.components)) {
+    const r = repairValue(value.components, catalog);
+    return { value: { ...value, components: r.value }, notes: r.notes };
+  }
+  return { value, notes: [] };
+}
+
+// ── RFC 6902 JSON Patch ──────────────────────────────────────────────────────────────────────
+
+export interface PatchOp {
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  value?: unknown;
+  from?: string;
+}
+
+export class PatchError extends Error {
+  override readonly name = "PatchError";
+  /** The operation's place in the list. */
+  readonly index: number;
+  readonly path: string;
+  constructor(index: number, path: string, message: string) {
+    super(`op ${index} (${path}): ${message}`);
+    this.index = index;
+    this.path = path;
+  }
+}
+
+const OPS = new Set(["add", "remove", "replace", "move", "copy", "test"]);
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function container(doc: unknown, segments: string[], index: number, path: string): unknown {
+  let cur = doc;
+  for (const s of segments) {
+    if (Array.isArray(cur) && /^(0|[1-9]\d*)$/.test(s) && Number(s) < cur.length)
+      cur = cur[Number(s)];
+    else if (isObj(cur) && Object.hasOwn(cur, s)) cur = cur[s];
+    else throw new PatchError(index, path, "the path does not exist");
+  }
+  return cur;
+}
+
+function split(path: string, index: number): { parent: string[]; key: string } {
+  const segments = pointerSegments(path);
+  if (!segments || segments.length === 0)
+    throw new PatchError(index, path, "not a JSON Pointer to a member");
+  if (segments.some((s) => FORBIDDEN_KEYS.has(s)))
+    throw new PatchError(index, path, "reserved key");
+  return { parent: segments.slice(0, -1), key: segments[segments.length - 1] as string };
+}
+
+function read(doc: unknown, path: string, index: number): unknown {
+  const segments = pointerSegments(path);
+  if (!segments) throw new PatchError(index, path, "not a JSON Pointer");
+  return container(doc, segments, index, path);
+}
+
+function put(doc: unknown, path: string, value: unknown, index: number, replace: boolean): void {
+  const { parent, key } = split(path, index);
+  const target = container(doc, parent, index, path);
+  if (Array.isArray(target)) {
+    if (key === "-" && !replace) {
+      target.push(value);
+      return;
+    }
+    if (!/^(0|[1-9]\d*)$/.test(key)) throw new PatchError(index, path, "not an array index");
+    const i = Number(key);
+    if (replace ? i >= target.length : i > target.length)
+      throw new PatchError(index, path, "index out of range");
+    if (replace) target[i] = value;
+    else target.splice(i, 0, value);
+    return;
+  }
+  if (!isObj(target)) throw new PatchError(index, path, "the parent is not an object or array");
+  if (replace && !Object.hasOwn(target, key))
+    throw new PatchError(index, path, "the path does not exist");
+  target[key] = value;
+}
+
+function remove(doc: unknown, path: string, index: number): unknown {
+  const { parent, key } = split(path, index);
+  const target = container(doc, parent, index, path);
+  if (Array.isArray(target)) {
+    if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= target.length)
+      throw new PatchError(index, path, "index out of range");
+    return target.splice(Number(key), 1)[0];
+  }
+  if (!isObj(target) || !Object.hasOwn(target, key))
+    throw new PatchError(index, path, "the path does not exist");
+  const old = target[key];
+  delete target[key];
+  return old;
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Applies RFC 6902 operations to a copy of `doc`; all or nothing. */
+export function applyPatch<T>(doc: T, ops: readonly PatchOp[]): T {
+  if (ops.length > SURFACE_LIMITS.opsPerCall)
+    throw new PatchError(
+      ops.length - 1,
+      "",
+      `at most ${SURFACE_LIMITS.opsPerCall} operations per call`,
+    );
+  const out = structuredClone(doc) as unknown;
+  ops.forEach((o, i) => {
+    if (!isObj(o) || !OPS.has(o.op as string) || typeof o.path !== "string")
+      throw new PatchError(
+        i,
+        String((o as { path?: unknown })?.path ?? ""),
+        "an op with op and path",
+      );
+    switch (o.op) {
+      case "add":
+        if (!("value" in o)) throw new PatchError(i, o.path, "add needs a value");
+        put(out, o.path, structuredClone(o.value), i, false);
+        return;
+      case "replace":
+        if (!("value" in o)) throw new PatchError(i, o.path, "replace needs a value");
+        put(out, o.path, structuredClone(o.value), i, true);
+        return;
+      case "remove":
+        remove(out, o.path, i);
+        return;
+      case "move": {
+        if (typeof o.from !== "string") throw new PatchError(i, o.path, "move needs from");
+        if (o.path.startsWith(`${o.from}/`))
+          throw new PatchError(i, o.path, "cannot move into itself");
+        const v = remove(out, o.from, i);
+        put(out, o.path, v, i, false);
+        return;
+      }
+      case "copy":
+        if (typeof o.from !== "string") throw new PatchError(i, o.path, "copy needs from");
+        put(out, o.path, structuredClone(read(out, o.from, i)), i, false);
+        return;
+      case "test":
+        if (!same(read(out, o.path, i), o.value)) throw new PatchError(i, o.path, "test failed");
+        return;
+    }
+  });
+  return out as T;
+}
+
+// ── patching a page draft ────────────────────────────────────────────────────────────────────
+
+/** What a build may change on a page: its title, sections and SEO (RFC-0020 §6). */
+const PAGE_PATHS = /^\/(?:title|sections|seo)(?:\/|$)/;
+
+export interface PatchResult<T> {
+  value: T;
+  /** Repairs made to what the operations carried. */
+  notes: string[];
+}
+
+export interface PatchIssue {
+  code: "VALIDATION_FAILED";
+  /** JSON Pointer into the page. */
+  path: string;
+  message: string;
+  /** The operation it came from, when known. */
+  op?: number;
+}
+
+export class SurfacePatchError extends Error {
+  override readonly name = "SurfacePatchError";
+  readonly issues: readonly PatchIssue[];
+  constructor(issues: readonly PatchIssue[]) {
+    super(issues.map((i) => `${i.path || "/"}: ${i.message}`).join("; "));
+    this.issues = issues;
+  }
+}
+
+/**
+ * The build pipeline for a page (RFC-0020 §6, steps 2–4): repair what the operations carry, apply
+ * them, then check every surface on the result. Throws `SurfacePatchError` with A2UI-style
+ * `VALIDATION_FAILED` issues; the caller writes the result through the store (policy, contract,
+ * CAS).
+ */
+export function patchPage(
+  page: Page,
+  ops: readonly PatchOp[],
+  catalog: Catalog,
+): PatchResult<Page> {
+  const notes: string[] = [];
+  const repaired = ops.map((o, i) => {
+    if (!isObj(o) || typeof o.path !== "string" || !PAGE_PATHS.test(o.path))
+      throw new SurfacePatchError([
+        {
+          code: "VALIDATION_FAILED",
+          path: typeof o?.path === "string" ? o.path : "",
+          message: "a build may change /title, /sections and /seo only",
+          op: i,
+        },
+      ]);
+    if (typeof o.from === "string" && !PAGE_PATHS.test(o.from))
+      throw new SurfacePatchError([
+        {
+          code: "VALIDATION_FAILED",
+          path: o.from,
+          message: "from must be under /title, /sections or /seo",
+          op: i,
+        },
+      ]);
+    if (!("value" in o)) return o;
+    const r = repairValue(o.value, catalog);
+    notes.push(...r.notes);
+    return { ...o, value: r.value };
+  });
+  let value: Page;
+  try {
+    value = applyPatch(page, repaired);
+  } catch (e) {
+    if (e instanceof PatchError)
+      throw new SurfacePatchError([
+        { code: "VALIDATION_FAILED", path: e.path, message: e.message, op: e.index },
+      ]);
+    throw e;
+  }
+  const issues = checkPageSurfaces(value.sections ?? [], catalog).map(
+    (i): PatchIssue => ({ code: "VALIDATION_FAILED", path: i.path, message: i.message }),
+  );
+  // Surfaces a build writes may not use components the catalog lacks: the store keeps those
+  // (they may come from another theme), but a model writing them now has made a mistake.
+  value.sections?.forEach((s, i) => {
+    if (s.kind !== "surface") return;
+    for (const id of checkSurface(s, catalog).unknown) {
+      const j = s.components.findIndex((c) => c.id === id);
+      issues.push({
+        code: "VALIDATION_FAILED",
+        path: `/sections/${i}/components/${j}/component`,
+        message: `"${s.components[j]?.component}" is not in the catalog (${catalog.id})`,
+      });
+    }
+  });
+  if (issues.length) throw new SurfacePatchError(issues);
+  return { value, notes };
+}
+
+// ── the model prompt (RFC-0020 §2) ───────────────────────────────────────────────────────────
+
+function describeProp(name: string, s: PropSchema, required: boolean): string {
+  const req = required ? " (required)" : "";
+  switch (s.type) {
+    case "string": {
+      const parts = s.enum ? s.enum.join("|") : s.format ? `${s.format}` : "text";
+      const max = s.maxLength ? `, ≤${s.maxLength}` : "";
+      return `${name}: ${parts}${s.enum ? "" : max}${req}`;
+    }
+    case "integer":
+    case "number": {
+      const range =
+        s.minimum !== undefined || s.maximum !== undefined
+          ? ` ${s.minimum ?? ""}..${s.maximum ?? ""}`
+          : "";
+      return `${name}: ${s.type}${range}${req}`;
+    }
+    case "boolean":
+      return `${name}: true|false${req}`;
+    case "array": {
+      const item =
+        s.items.type === "object"
+          ? `{ ${Object.entries(s.items.properties)
+              .map(([k, v]) =>
+                describeProp(
+                  k,
+                  v,
+                  (s.items as { required?: readonly string[] }).required?.includes(k) ?? false,
+                ),
+              )
+              .join("; ")} }`
+          : describeProp("item", s.items, false).replace(/^item: /, "");
+      return `${name}: list of ${item}, ≤${s.maxItems ?? BLOCK_LIMITS.arrayItems}${req}`;
+    }
+    case "object":
+      return `${name}: { ${Object.entries(s.properties)
+        .map(([k, v]) => describeProp(k, v, s.required?.includes(k) ?? false))
+        .join("; ")} }${req}`;
+  }
+}
+
+/**
+ * Instructions for a model writing surfaces against this catalog: the format, bindings, limits
+ * and every component with its props and an example. The same catalog validates what it writes.
+ */
+export function catalogPrompt(catalog: Catalog, locale = "en"): string {
+  const lines: string[] = [
+    `# Cloudhal surfaces — catalog ${catalog.id}`,
+    "",
+    "A surface is a page section that describes UI as data, never code:",
+    `{"id":"sec_<6-32 letters or digits>","kind":"surface","catalog":"${catalog.id}","components":[…],"data":{…}}`,
+    "",
+    "## Rules",
+    '- `components` is a flat list. One component has id "root". Ids match [a-z][a-z0-9-]{0,40} and are unique in the surface.',
+    "- `children` lists ids of other components in the same surface; each component has at most one parent. Nest at most " +
+      `${SURFACE_LIMITS.depth} deep; at most ${SURFACE_LIMITS.components} components.`,
+    "- `props` follow the component's props below. Any prop may instead be bound to the data model: " +
+      '{"path":"/json/pointer"}, or computed by a named function: {"call":"formatDate","args":{"value":{"path":"/d"},"style":"long"}}.',
+    `- Functions: ${SURFACE_FUNCTIONS.join(", ")}.`,
+    '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
+    `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
+    "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",
+    "- Text props take markdown where marked `markdown`; never HTML.",
+    "",
+    "## Editing",
+    "Change a page with RFC 6902 JSON Patch operations on /title, /sections and /seo, e.g.",
+    '{"op":"add","path":"/sections/-","value":{…surface…}} or {"op":"add","path":"/sections/0/components/-","value":{…component…}} then add its id to a parent\'s children.',
+    "Failed operations come back as VALIDATION_FAILED with a JSON Pointer; fix that part and send again.",
+    "",
+    "## Components",
+  ];
+  for (const e of catalog.entries()) {
+    const rule = childRule(e);
+    const kids =
+      rule === "none"
+        ? "no children"
+        : rule === "any"
+          ? "children: any"
+          : `children: ${rule.join(", ")}`;
+    const desc = localized(e.type.description, locale);
+    lines.push(
+      `### ${e.name} (${e.kind === "primitive" ? e.type.category : "block"}; ${kids})${desc ? ` — ${desc}` : ""}`,
+    );
+    const props = Object.entries(e.schema.properties).map(([k, v]) =>
+      describeProp(k, v, e.schema.required?.includes(k) ?? false),
+    );
+    lines.push(props.length ? `props: ${props.join("; ")}` : "props: none");
+    lines.push(
+      `example: ${JSON.stringify({ id: e.name.toLowerCase(), component: e.name, props: e.type.example.props })}`,
+    );
+  }
+  return lines.join("\n");
+}
