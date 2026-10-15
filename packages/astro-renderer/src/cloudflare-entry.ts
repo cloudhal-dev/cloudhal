@@ -56,6 +56,7 @@ import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
+import { isSearchPath, SearchLimiter } from "./search-limit.ts";
 
 interface Env {
   CLOUDHAL_SITE_ID?: string;
@@ -381,6 +382,7 @@ function withSecurityHeaders(response: Response): Response {
 }
 
 export function createSiteWorker(options: { siteId?: string } = {}) {
+  const searchLimiter = new SearchLimiter();
   return {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(request.url);
@@ -413,6 +415,19 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
         return (await siteComments(env, siteId).handle(request, {
           clientAddress: request.headers.get("cf-connecting-ip") ?? undefined,
         })) as Response;
+      }
+      // Site search (RFC-0019 §3): per-client limit before anything renders.
+      if (isSearchPath(url.pathname)) {
+        const wait = searchLimiter.take(request.headers.get("cf-connecting-ip") ?? undefined);
+        if (wait > 0)
+          return new Response("Too many searches; try again in a minute.", {
+            status: 429,
+            headers: {
+              "retry-after": String(wait),
+              "cache-control": "no-store",
+              "content-type": "text/plain; charset=utf-8",
+            },
+          });
       }
       const started = Date.now();
       const media = siteId ? await serveMedia(request, { siteId }) : undefined;

@@ -13,6 +13,7 @@
     ".": "./src/index.ts",
     "./source": "./src/source.ts",
     "./routing": "./src/routing.ts",
+    "./search": "./src/search.ts",
     "./seo": "./src/seo.ts",
     "./feeds": "./src/feeds.ts",
     "./taxonomy": "./src/taxonomy.ts",
@@ -100,6 +101,10 @@
       "./routing": {
         "types": "./dist/src/routing.d.ts",
         "default": "./dist/src/routing.js"
+      },
+      "./search": {
+        "types": "./dist/src/search.d.ts",
+        "default": "./dist/src/search.js"
       },
       "./seo": {
         "types": "./dist/src/seo.d.ts",

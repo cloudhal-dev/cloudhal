@@ -30,6 +30,7 @@ import {
   schedulesRunDue,
   schedulesStatus,
 } from "./commands/schedules.ts";
+import { describeReindex, searchReindex } from "./commands/search.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 import { pullSite, pushSite } from "./commands/sync.ts";
@@ -88,6 +89,8 @@ Usage:
   cloudhal schedules list [--remote] [--limit <n>]        the site's releases
   cloudhal schedules run-due [--remote]                   one scheduler tick now (self-hosting: run it from
                                                           the system's cron every minute)
+  cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
+                                                          (publishing keeps it current; for restored backups)
   cloudhal --help
 `;
 
@@ -422,6 +425,17 @@ export async function main(argv: string[]): Promise<number> {
         return r.failed > 0 ? 1 : 0;
       }
       throw new Error("usage: cloudhal schedules status|list|run-due [--remote]");
+    }
+    case "search": {
+      const [what] = rest;
+      if (what !== "reindex") throw new Error("usage: cloudhal search reindex [--remote]");
+      const report = await searchReindex({
+        projectDir,
+        ...(values.remote ? { remote: true } : {}),
+        ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+      });
+      console.log(describeReindex(report));
+      return 0;
     }
     case "comments": {
       const [what] = rest;

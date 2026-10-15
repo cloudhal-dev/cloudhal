@@ -6,6 +6,7 @@ import { describeSiteGraphStore } from "../src/testing.ts";
 import { correctionsSuite } from "../src/testing-corrections.ts";
 import { gatesSuite } from "../src/testing-gates.ts";
 import { releasesSuite } from "../src/testing-releases.ts";
+import { searchSuite, searchTextCases } from "../src/testing-search.ts";
 
 const sqlite = {
   create: async () => ({
@@ -17,6 +18,8 @@ describeSiteGraphStore("better-sqlite3 + memory blobs", sqlite);
 gatesSuite("better-sqlite3 + memory blobs", sqlite);
 releasesSuite("better-sqlite3 + memory blobs", sqlite);
 correctionsSuite("better-sqlite3 + memory blobs", sqlite);
+searchSuite("better-sqlite3 + memory blobs", sqlite);
+searchTextCases();
 
 let d1: Awaited<ReturnType<typeof createMiniflareD1>> | undefined;
 const miniflare = {
@@ -33,3 +36,4 @@ describeSiteGraphStore("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 gatesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 releasesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 correctionsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
+searchSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);

@@ -6,6 +6,8 @@
  * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
  * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
  * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
+ * `/search?q=` is the site search (RFC-0019 §3) where the deployment answers it: never cached,
+ * never indexed, and its form sits in the header.
  */
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
@@ -30,7 +32,14 @@ import {
 } from "@cloudhal/astro-renderer/navigation";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
-import { archiveHead, entryHead, pageHead, siteOrigin } from "@cloudhal/astro-renderer/seo";
+import { searchAvailable } from "@cloudhal/astro-renderer/search";
+import {
+  archiveHead,
+  entryHead,
+  pageHead,
+  searchHead,
+  siteOrigin,
+} from "@cloudhal/astro-renderer/seo";
 import { loadSurfaceSources, surfaceSources } from "@cloudhal/astro-renderer/surfaces";
 import {
   entryTaxonomy,
@@ -45,6 +54,7 @@ import Article from "../components/Article.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
+import Search from "../components/Search.astro";
 import Base from "../layouts/Base.astro";
 import {
   ARCHIVE_PAGE_SIZE,
@@ -77,6 +87,12 @@ if (route.kind === "redirect")
 if (route.kind === "gone") return new Response(null, { status: 410 });
 if (route.kind === "not-found" || route.kind === "feed") return new Response(null, { status: 404 });
 
+// Search results (RFC-0019 §3) are per query: never in the edge cache, never in search engines.
+if (route.kind === "search") {
+  Astro.response.headers.set("cache-control", "no-store");
+  Astro.response.headers.set("cloudflare-cdn-cache-control", "no-store");
+  Astro.response.headers.set("x-robots-tag", "noindex");
+}
 const origin = siteOrigin(site, Astro.url);
 const locale = site.defaultLocale;
 // Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
@@ -170,7 +186,7 @@ if (route.kind === "page") {
     ...terms.groups.flatMap((g) => g.terms.map((s) => termCacheTag(s.id))),
     ...terms.trail.map((s) => termCacheTag(s.id)),
   );
-} else {
+} else if (route.kind === "archive") {
   tags.push(
     // which entries the archive lists (and how many pages it has) changes with its membership
     listCacheTag(route.archive.term.id),
@@ -206,9 +222,19 @@ const meta =
     ? pageHead(site, route.page, origin, media)
     : route.kind === "entry"
       ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
-      : archiveHead(site, route.archive, origin, media);
+      : route.kind === "archive"
+        ? archiveHead(site, route.archive, origin, media)
+        : searchHead(site, route.search.query, origin);
+const searchForm = searchAvailable(config, source)
+  ? {
+      label: t.searchLabel,
+      placeholder: t.searchPlaceholder,
+      button: t.search,
+      ...(route.kind === "search" ? { query: route.search.query } : {}),
+    }
+  : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm}>
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
   )}
@@ -229,4 +255,5 @@ const meta =
     </Fragment>
   )}
   {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}
+  {route.kind === "search" && <Search search={route.search} locale={locale} t={t} />}
 </Base>

@@ -18,8 +18,10 @@ interface Props {
   footer?: ActiveNavItem[] | undefined;
   /** A preview of an embargoed or expired page or entry says so above it (RFC-0008 §7.3). */
   notice?: { state: string; at: string; text: string } | undefined;
+  /** RFC-0019 §3: the header's search form, where the deployment answers searches. */
+  search?: { label: string; placeholder: string; button: string; query?: string } | undefined;
 }
-const { site, meta, nav, footer, notice } = Astro.props;
+const { site, meta, nav, footer, notice, search } = Astro.props;
 // The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
 const look = themeVariables(site, themeSettings);
 const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
@@ -50,6 +52,13 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
             ),
           )}
         </nav>
+      )}
+      {search && (
+        <form class="ch-header-search" method="get" action="/search" role="search">
+          <label for="ch-header-q" class="sr-only">{search.label}</label>
+          <input id="ch-header-q" type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
+          <button type="submit" class="sr-only">{search.button}</button>
+        </form>
       )}
     </header>
     <main class="mx-auto max-w-3xl px-4 pb-16">

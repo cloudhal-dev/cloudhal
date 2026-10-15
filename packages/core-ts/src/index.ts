@@ -59,6 +59,7 @@ export type {
   PublishReleaseResult,
   ReleasePurge,
 } from "./release-apply.ts";
+export * from "./search.ts";
 export * from "./seed.ts";
 export * from "./store.ts";
 export * from "./sync.ts";

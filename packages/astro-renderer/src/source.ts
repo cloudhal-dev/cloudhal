@@ -10,8 +10,8 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import type { RedirectMatch, SiteGraphStore } from "@cloudhal/core-ts";
-import { matchRedirect, termName } from "@cloudhal/core-ts";
+import type { RedirectMatch, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
+import { matchRedirect, searchRowOf, searchRows, termName } from "@cloudhal/core-ts";
 import {
   gateInstants,
   hasGates,
@@ -100,6 +100,19 @@ export interface GraphSource {
    * Optional for sources that predate gates.
    */
   nextGate?(): Promise<number | undefined>;
+  /**
+   * RFC-0019 §3: articles matching a reader's query, best first. Snapshot mode reads the search
+   * index (it matches the live snapshot; `stale` says when it is behind); live mode searches the
+   * entries it shows, drafts included. Optional for sources that predate search.
+   */
+  search?(query: string, options?: SourceSearchOptions): Promise<SearchResults>;
+}
+
+export interface SourceSearchOptions {
+  page?: number;
+  perPage?: number;
+  /** Default: the site's default locale. */
+  locale?: string;
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -219,6 +232,16 @@ export class LiveSource implements GraphSource {
     return this.#visible(await this.#store.listContentEntries(this.#siteId))
       .filter((e) => e.locale === loc)
       .sort(byNewest);
+  }
+
+  async search(query: string, options: SourceSearchOptions = {}): Promise<SearchResults> {
+    const locale = options.locale ?? (await this.site()).defaultLocale;
+    // The entries this source shows decided visibility and gates already.
+    const rows = (await this.allEntries(locale)).flatMap((e) => {
+      const row = searchRowOf(e, { drafts: true });
+      return row ? [{ ...row, gateFrom: undefined, gateUntil: undefined }] : [];
+    });
+    return searchRows(rows, query, { ...options, locale, now: this.#now() });
   }
 
   async entryById(id: string): Promise<ContentEntry | undefined> {
@@ -637,6 +660,16 @@ export class SnapshotSource implements GraphSource {
     const { site, entries } = await this.#current();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  async search(query: string, options: SourceSearchOptions = {}): Promise<SearchResults> {
+    const locale = options.locale ?? (await this.site()).defaultLocale;
+    return this.#store.search(this.#snapshot.siteId, query, {
+      ...options,
+      locale,
+      now: this.#clock?.() ?? Date.now(),
+      snapshotId: this.#snapshot.id,
+    });
   }
 
   /** A published entry of this snapshot by id (any locale), if its gates are open. */

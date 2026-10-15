@@ -430,3 +430,30 @@ function breadcrumbs(items: Array<{ name: string; url: string }>): object {
     })),
   };
 }
+
+const SEARCH_WORDS: Record<string, { search: string; results: (q: string) => string }> = {
+  en: { search: "Search", results: (q) => `Search: ${q}` },
+  tr: { search: "Ara", results: (q) => `Arama: ${q}` },
+};
+
+/**
+ * `<head>` for the search page (RFC-0019 §3): always `noindex,follow`, canonical without the
+ * query (results are not documents), no cards or structured data.
+ */
+export function searchHead(site: Site, query: string, origin: string): HeadMeta {
+  const locale = site.defaultLocale;
+  const words =
+    SEARCH_WORDS[locale.split("-")[0] ?? locale] ??
+    (SEARCH_WORDS.en as (typeof SEARCH_WORDS)["en"]);
+  const q = query.trim().slice(0, 80);
+  return {
+    title: `${q ? words.results(q) : words.search} · ${site.name}`,
+    canonical: `${origin}/search`,
+    robots: "noindex,follow",
+    lang: locale,
+    openGraph: [],
+    twitter: [],
+    jsonLd: [],
+    feeds: siteFeeds(site, origin),
+  };
+}

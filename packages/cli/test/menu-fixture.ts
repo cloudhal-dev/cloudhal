@@ -94,15 +94,20 @@ export function footerOf(html: string): string {
  * Today's derived header (no menu), byte for byte: the top-level pages, then the served top-level
  * categories; `current` names the item whose href is the path or a prefix of it.
  */
+/** The header's search form, rendered where the deployment answers searches (RFC-0019 §3). */
+export const HEADER_SEARCH =
+  '<form class="ch-header-search" method="get" action="/search" role="search"><label for="ch-header-q" class="sr-only">Search this site</label><input id="ch-header-q" type="search" name="q" value maxlength="200" placeholder="Search articles…"><button type="submit" class="sr-only">Search</button></form>';
+
 export function derivedHeader(
   siteName: string,
   links: ReadonlyArray<{ href: string; label: string; current?: boolean }>,
+  options: { search?: boolean } = {},
 ): string {
   const a = (l: { href: string; label: string; current?: boolean }) =>
     l.current
       ? `<a href="${l.href}" aria-current="page" class="text-zinc-900">${l.label}</a>`
       : `<a href="${l.href}" class="hover:text-zinc-900">${l.label}</a>`;
-  return `<header class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6"><a href="/" class="text-lg font-semibold">${siteName}</a><nav class="flex flex-wrap gap-4 text-sm text-zinc-600" aria-label="Main">${links.map(a).join("")}</nav></header>`;
+  return `<header class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6"><a href="/" class="text-lg font-semibold">${siteName}</a><nav class="flex flex-wrap gap-4 text-sm text-zinc-600" aria-label="Main">${links.map(a).join("")}</nav>${options.search ? HEADER_SEARCH : ""}</header>`;
 }
 
 export const DEFAULT_FOOTER =

@@ -58,6 +58,36 @@ describe("admin domains endpoint", () => {
   });
 });
 
+describe("admin search reindex (RFC-0019 §3)", () => {
+  it("rebuilds the index from the live snapshot behind the deploy token", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Search", slug: "search" });
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const reindex = (token = TOKEN, siteId = site.id) =>
+      app.request(`/api/admin/sites/${siteId}/search/reindex`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+    expect((await reindex("nope")).status).toBe(401);
+    expect((await reindex(TOKEN, "site_missing000001")).status).toBe(404);
+    expect(await (await reindex()).json()).toEqual({ published: null, index: null });
+    const snap = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
+    await b.store.publish(site, snap.id);
+    // a restored backup has no index rows: the reindex brings them back
+    await b.sql.run("DELETE FROM search_index");
+    await b.sql.run("DELETE FROM search_state");
+    const res = await reindex();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      published: snap.id,
+      index: { snapshotId: snap.id, entries: 1 },
+    });
+    expect((await b.store.search(site.id, "hello", { locale: "en", now: Date.now() })).total).toBe(
+      1,
+    );
+  });
+});
+
 describe("admin media endpoints (RFC-0004 §4.7)", () => {
   it("moves verified bytes before the bundle, which refuses to import without them", async () => {
     const a = await backend();
