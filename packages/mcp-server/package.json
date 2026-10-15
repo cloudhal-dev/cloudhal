@@ -16,6 +16,7 @@
     "./analytics": "./src/analytics-reports.ts",
     "./comments": "./src/comments.ts",
     "./schedules": "./src/schedules.ts",
+    "./render": "./src/render.ts",
     "./stdio": "./src/stdio.ts",
     "./http": "./src/http.ts"
   },
@@ -77,6 +78,10 @@
       "./schedules": {
         "types": "./dist/src/schedules.d.ts",
         "default": "./dist/src/schedules.js"
+      },
+      "./render": {
+        "types": "./dist/src/render.d.ts",
+        "default": "./dist/src/render.js"
       },
       "./stdio": {
         "types": "./dist/src/stdio.d.ts",

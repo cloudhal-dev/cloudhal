@@ -31,6 +31,7 @@ import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 import type { FetchTransport } from "@cloudhal/core-ts/media";
 import { ScheduleConflictError, ScheduleError } from "@cloudhal/schedules";
 import type { CommentsDeps } from "./comments.ts";
+import type { PageRenderer, RenderLimiter } from "./render.ts";
 import { type RunContext, ScheduleRequestError, type SchedulesDeps } from "./schedules.ts";
 
 export type JsonSchema = Record<string, unknown>;
@@ -97,6 +98,14 @@ export interface ToolDefinition {
    * inside labelled untrusted blocks (RFC-0007 §11.2).
    */
   renderText?: (result: unknown) => string;
+  /**
+   * Rich content for a result (RFC-0021 §4: `render_page`'s screenshots): the blocks a client
+   * shows, and the structured result without the bytes. Takes precedence over `renderText`.
+   */
+  renderContent?: (result: unknown) => {
+    content: ToolContent[];
+    structured: Record<string, unknown>;
+  };
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
   /**
    * What the audit log keeps of the arguments (default: all of them, truncated). `upload_asset`
@@ -104,6 +113,11 @@ export interface ToolDefinition {
    */
   auditArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 }
+
+/** A content block of a tool result (the MCP shapes Cloudhal uses). */
+export type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
 
 /** Media settings of a deployment for the asset tools (RFC-0004 §5.6–§5.7). */
 export interface MediaToolOptions {
@@ -119,6 +133,15 @@ export interface MediaToolOptions {
   /** Per agent key per day (default 100 assets and 500 MB; audited as a denial when exceeded). */
   agentDailyAssets?: number | undefined;
   agentDailyBytes?: number | undefined;
+}
+
+/** What `render_page` renders with (RFC-0021 §4). */
+export interface RenderDeps {
+  readonly renderer: PageRenderer;
+  /** Defaults to one shared per process: 10 a minute per key, 200 a day per site. */
+  readonly limiter?: RenderLimiter | undefined;
+  /** Per call (default 20 s). */
+  readonly timeoutMs?: number | undefined;
 }
 
 /**
@@ -203,6 +226,8 @@ export interface ToolContext {
   approval?: { readonly id: string; readonly requestedBy: Actor } | undefined;
   /** Schedules (RFC-0008): the schedule tools answer `schedules_disabled` without them. */
   schedules?: SchedulesDeps | undefined;
+  /** A browser for `render_page` (RFC-0021 §4); without it the tool answers `render_unavailable`. */
+  render?: RenderDeps | undefined;
   /** Set by the server for an automation key's call: its open run (RFC-0008 §11.2). */
   run?: RunContext | undefined;
   /**
@@ -274,7 +299,11 @@ export type ToolErrorCode =
   | "tainted"
   | "no_egress_in_runs"
   | "budget_exceeded"
-  | "run";
+  | "run"
+  // RFC-0021 §4: render_page
+  | "render_unavailable"
+  | "render_limited"
+  | "render_failed";
 
 /** What an approval request would change (RFC-0014 §5): a body, block by block. */
 export interface ApprovalChanges {

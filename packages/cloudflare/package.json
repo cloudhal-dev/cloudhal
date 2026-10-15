@@ -32,6 +32,7 @@
     "@cloudhal/api": "workspace:*",
     "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/mcp-server": "workspace:*",
     "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "zod": "catalog:"

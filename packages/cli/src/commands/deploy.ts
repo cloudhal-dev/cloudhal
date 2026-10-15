@@ -738,6 +738,12 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     log(
       "ai: Workers AI is bound to the admin Worker; turn AI on per site in Studio › Settings › AI (billed per use, 10,000 free neurons a day)",
     );
+  // RFC-0021 §4: agents check pages with render_page in Browser Rendering.
+  log(
+    cfg.render === false
+      ? "render: off (cloudhal.json `render: false`); agents check pages with preview_page only"
+      : "render: Browser Rendering is bound for render_page (agents only, 10 a minute per key, 200 a day per site; browser time is billed past the plan's allowance; `render: false` in cloudhal.json turns it off)",
+  );
   if (!schedules.automations)
     log(
       "automations: off for this deployment (cloudhal.json `schedules.automations`); releases and time gates go on",
@@ -790,6 +796,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       schedules,
       mail: cfg.mail,
       ai: Boolean(cfg.ai),
+      browser: cfg.render !== false,
       observability,
       placement: cfg.placement,
     });

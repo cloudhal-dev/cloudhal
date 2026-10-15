@@ -86,6 +86,8 @@ export async function prepareAdminWorker(options: {
   mail?: MailDeployment | undefined;
   /** In-editor AI (RFC-0016): the Workers AI binding. */
   ai?: boolean | undefined;
+  /** Browser Rendering for `render_page` (RFC-0021 §4). */
+  browser?: boolean | undefined;
   /** The theme's `src/blocks.ts` (RFC-0015 §6), bundled into the Worker with it. */
   blockTypes?: string | undefined;
   /** The theme's `src/settings.ts` (RFC-0017 §1), bundled the same way. */
@@ -138,6 +140,7 @@ export async function prepareAdminWorker(options: {
       ...(options.schedules ? { schedules: options.schedules } : {}),
       ...(options.mail ? { mail: options.mail } : {}),
       ...(options.ai ? { ai: true } : {}),
+      ...(options.browser ? { browser: true } : {}),
       ...(options.observability ? { observability: options.observability } : {}),
       ...(options.placement ? { placement: options.placement } : {}),
     }),

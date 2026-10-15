@@ -731,6 +731,9 @@ importers:
       '@cloudhal/core-ts':
         specifier: workspace:*
         version: link:../core-ts
+      '@cloudhal/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
       '@cloudhal/schedules':
         specifier: workspace:*
         version: link:../schedules

@@ -56,6 +56,7 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import { type BrowserBinding, browserRenderingRenderer } from "./browser-render.ts";
 import { type BuildRoomsEnv, buildRoomClass, createDurableBuildHub } from "./build-rooms.ts";
 import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
 import { siteGateSupport } from "./features.ts";
@@ -96,6 +97,10 @@ export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRooms
   CLOUDHAL_ANALYTICS_BUDGET?: string;
   /** Deployment defaults for sites without a settings row (compact JSON from cloudhal.json). */
   CLOUDHAL_ANALYTICS_DEFAULTS?: string;
+  /** Cloudflare Browser Rendering for `render_page` (RFC-0021 §4); absent: `render_unavailable`. */
+  BROWSER?: BrowserBinding;
+  /** `off` keeps `render_page` unavailable even with a `BROWSER` binding. */
+  CLOUDHAL_RENDER?: string;
 }
 
 /** Default daily budget of uncached live queries: 80 % of WAE Free's 10,000 (§7.7, A2). */
@@ -421,6 +426,10 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           // fetch_asset_url never reaches this Worker's own host (Studio, API, purge); each site's
           // domains are refused too. Workers cannot pin DNS: see `workersTransport` (RFC-0004 §5.7).
           media: { blockedHosts: [url.hostname] },
+          // RFC-0021 §4: render_page opens the preview link in Browser Rendering.
+          ...(env.BROWSER && env.CLOUDHAL_RENDER !== "off"
+            ? { render: { renderer: browserRenderingRenderer(env.BROWSER) } }
+            : {}),
         },
         ...(env.CLOUDHAL_PREVIEW_SECRET
           ? { preview: { secret: env.CLOUDHAL_PREVIEW_SECRET } }

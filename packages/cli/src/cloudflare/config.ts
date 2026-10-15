@@ -280,6 +280,8 @@ export function adminWorkerConfig(
     mail?: MailDeployment;
     /** In-editor AI (RFC-0016): the Workers AI binding. */
     ai?: boolean;
+    /** Browser Rendering for `render_page` (RFC-0021 §4; `cloudhal deploy` binds it by default). */
+    browser?: boolean;
     /** Logs sampling and opt-in traces (default: every log, no traces). */
     observability?: ObservabilityDeployment;
     /** Smart Placement: run next to D1 rather than next to the person (default: off). */
@@ -333,6 +335,8 @@ export function adminWorkerConfig(
     // RFC-0016: Workers AI for in-editor commands; billed per use, nothing runs until a site's
     // owner turns AI on.
     ...(n.ai ? { ai: { binding: "AI" } } : {}),
+    // RFC-0021 §4: render_page opens previews in Browser Rendering (agents only, rate-limited).
+    ...(n.browser ? { browser: { binding: "BROWSER" } } : {}),
     vars,
     // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
     // switching between the cron trigger and the alarm never needs a migration (§8.3).

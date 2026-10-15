@@ -42,7 +42,7 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { type CommentsDeps, isBoundState } from "./comments.ts";
-import type { BuildObserver, MediaToolOptions } from "./common.ts";
+import type { BuildObserver, MediaToolOptions, RenderDeps } from "./common.ts";
 import { MCP_APP_MIME, PREVIEW_UI_URI, PREVIEW_VIEW_HTML } from "./preview-view.ts";
 import { type RunContext, resolveRun, runPrincipal, type SchedulesDeps } from "./schedules.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
@@ -67,6 +67,8 @@ export interface CloudhalMcpOptions {
   comments?: CommentsDeps | undefined;
   /** Schedules for the schedule tools and automation runs (RFC-0008 §12). */
   schedules?: SchedulesDeps | undefined;
+  /** A browser for `render_page` (RFC-0021 §4). */
+  render?: RenderDeps | undefined;
   /**
    * HMAC key (≥ 32 bytes) for the approval state. Every instance that may receive a retried round
    * must share it: a random per-process key is fine for stdio, a configured secret for HTTP.
@@ -372,6 +374,7 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           analytics: options.analytics,
           comments: options.comments,
           schedules: options.schedules,
+          render: options.render,
           run,
         };
         // Approvals are bound to the content the person saw, not just to the arguments: the site
@@ -557,6 +560,10 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           return errorResult(
             `approval required: ${prompt}\nAsk the person. If (and only if) they approve, call ${def.name} again with the same arguments plus confirmToken: "${state}" (valid ${Math.round((options.approvalTtlSeconds ?? 600) / 60)} minutes).`,
           );
+        }
+        if (def.renderContent) {
+          const { content, structured } = def.renderContent(outcome.result);
+          return { content, structuredContent: structured };
         }
         return def.renderText
           ? {

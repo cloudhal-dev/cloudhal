@@ -21,6 +21,7 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
 import { loadBlockRegistry, loadThemeDesign, loadThemeSettings } from "../blocks.ts";
 import { readProjectConfig } from "../config.ts";
+import { localRender } from "../render-chrome.ts";
 import { localAnalytics } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
@@ -87,6 +88,8 @@ export async function mcp(options: McpOptions): Promise<{ stop(): Promise<void> 
     previewBaseUrl: options.previewUrl,
     // fetch_asset_url resolves, checks and pins every address on Node (RFC-0004 §5.7).
     media: { fetchTransport: nodeTransport() },
+    // RFC-0021 §4: render_page with the local Chrome, when there is one.
+    render: localRender(),
     // The analytics tools read the project's SQLite (RFC-0006 L3).
     analytics: localAnalytics(local.sql, cfg),
     comments,
