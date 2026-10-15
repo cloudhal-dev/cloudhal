@@ -58,6 +58,19 @@ export interface PrimitiveType {
 }
 
 const SPACE = ["none", "s", "m", "l", "xl"] as const;
+/** What a Button's `onClick` may do (RFC-0020 §4); Cloudhal's runtime implements each. */
+export const SURFACE_ACTIONS = [
+  "set",
+  "toggle",
+  "increment",
+  "reset",
+  "navigate",
+  "copy",
+  "share",
+  "scrollTo",
+] as const;
+/** Components whose values a reader changes: their surface loads the interaction runtime. */
+export const INPUT_COMPONENTS = new Set(["Toggle", "Select", "Slider"]);
 const TONE = ["surface", "muted", "brand", "inverse"] as const;
 const ALIGN = ["start", "center", "end", "stretch"] as const;
 const space = (title: Localized) => ({ type: "string" as const, enum: SPACE, title });
@@ -234,14 +247,31 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
   {
     name: "Button",
     title: { en: "Button", tr: "Düğme" },
+    description: {
+      en: "A link (href), or an action on the surface's data (onClick).",
+      tr: "Bir bağlantı (href) ya da verideki bir işlem (onClick).",
+    },
     category: "content",
     props: schema(
       {
         label: label(60),
         href,
         variant: { type: "string", enum: ["primary", "secondary", "ghost"] },
+        onClick: {
+          type: "object",
+          additionalProperties: false,
+          required: ["action"],
+          properties: {
+            action: { type: "string", enum: SURFACE_ACTIONS },
+            path: { type: "string", pattern: "^/[^\\s]{0,199}$" },
+            value: { type: "string", maxLength: 500 },
+            by: { type: "number", minimum: -1000000, maximum: 1000000 },
+            href: { type: "string", format: "url", maxLength: 2048 },
+            anchor: { type: "string", pattern: "^[a-z][a-z0-9-]{0,40}$" },
+          },
+        },
       },
-      ["label", "href"],
+      ["label"],
     ),
     children: "none",
     example: { props: { label: "Get started", href: "/start", variant: "primary" } },
@@ -318,6 +348,67 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     ),
     children: "none",
     example: { props: { items: ["Unlimited pages", "Agent access"], marker: "check" } },
+  },
+  {
+    name: "Toggle",
+    title: { en: "Toggle", tr: "Seçici" },
+    description: {
+      en: "A row of choices; the chosen one is written to `value`'s path (bind it: {path}).",
+      tr: "Seçenekler; seçilen, value'nun yoluna yazılır.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        options: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 60 },
+          minItems: 2,
+          maxItems: 8,
+        },
+        value: { type: "string", maxLength: 60 },
+      },
+      ["options", "value"],
+    ),
+    children: "none",
+    example: { props: { label: "Billing", options: ["monthly", "yearly"], value: "monthly" } },
+  },
+  {
+    name: "Select",
+    title: { en: "Select", tr: "Açılır liste" },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        options: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 80 },
+          minItems: 1,
+          maxItems: 50,
+        },
+        value: { type: "string", maxLength: 80 },
+      },
+      ["label", "options", "value"],
+    ),
+    children: "none",
+    example: { props: { label: "Team size", options: ["1–5", "6–20", "21+"], value: "1–5" } },
+  },
+  {
+    name: "Slider",
+    title: { en: "Slider", tr: "Kaydırıcı" },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        min: { type: "number" },
+        max: { type: "number" },
+        step: { type: "number", minimum: 0 },
+        value: { type: "number" },
+      },
+      ["label", "min", "max", "value"],
+    ),
+    children: "none",
+    example: { props: { label: "Seats", min: 1, max: 50, step: 1, value: 5 } },
   },
   {
     name: "Tabs",
@@ -693,6 +784,24 @@ export function evaluateCondition(c: unknown, data: unknown): boolean {
   return false;
 }
 
+/** What each action needs besides its name (RFC-0020 §4). */
+const ACTION_NEEDS: Record<string, readonly string[]> = {
+  set: ["path", "value"],
+  toggle: ["path"],
+  increment: ["path"],
+  reset: [],
+  navigate: ["href"],
+  copy: ["value"],
+  share: [],
+  scrollTo: ["anchor"],
+};
+
+function checkAction(a: Record<string, unknown>, path: string, out: PropsIssue[]): void {
+  for (const key of ACTION_NEEDS[String(a.action)] ?? [])
+    if (a[key] === undefined)
+      out.push({ path: `${path}/${key}`, message: `${a.action} needs ${key}` });
+}
+
 // ── checking a surface ───────────────────────────────────────────────────────────────────────
 
 export interface SurfaceCheck {
@@ -840,6 +949,8 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
           });
       });
     checkProps(entry, c.props, `${at}/props`, issues);
+    if (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick))
+      checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
   });
   // Reachability and depth from the root; `parentOf` already rules out shared children.
@@ -1297,6 +1408,18 @@ export function parseSurfaceFence(
     ...(Object.keys(data).length ? { data } : {}),
   } as unknown as SurfaceSection;
   return { id, catalog, section, issues, complete, line };
+}
+
+/**
+ * Whether a surface needs the interaction runtime (RFC-0020 §4): it has an input, or a button
+ * with an action. Everything else is complete as server-rendered HTML.
+ */
+export function isInteractive(surface: Pick<SurfaceSection, "components">): boolean {
+  return surface.components.some(
+    (c) =>
+      INPUT_COMPONENTS.has(c.component) ||
+      (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick)),
+  );
 }
 
 /** Every ```surface fence of a markdown body, in order; fences inside other code blocks are not. */

@@ -13,11 +13,13 @@ import {
   checkSurface,
   createCatalog,
   evaluateCondition,
+  isInteractive,
   resolveProps,
 } from "@cloudhal/core-ts/surfaces";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
 import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
+import { SURFACE_SCRIPT, scriptJson } from "./surface-client.ts";
 
 /** One component of a surface, ready to draw. */
 export interface SurfaceNode {
@@ -26,6 +28,13 @@ export interface SurfaceNode {
   entry: CatalogEntry;
   /** Props with bindings and functions resolved against the surface's data. */
   props: Record<string, unknown>;
+  /** The props as written (bindings kept), for the interaction runtime's attributes. */
+  raw: Record<string, unknown>;
+  /** In a live surface: the node's visibility condition, and whether it starts hidden. */
+  visible?: unknown;
+  hidden?: boolean;
+  /** The surface loads the interaction runtime (RFC-0020 §4). */
+  live?: boolean;
   children: SurfaceNode[];
 }
 
@@ -33,6 +42,8 @@ export interface SurfaceTree {
   section: SurfaceSection;
   /** `undefined` when the surface has no root yet (still arriving) or the root is hidden. */
   root: SurfaceNode | undefined;
+  /** It has inputs or button actions: the page carries its data and the interaction runtime. */
+  live: boolean;
   /** Ids of components the catalog does not know: kept, not drawn (a preview labels them). */
   unknown: string[];
   data: Record<string, unknown>;
@@ -132,9 +143,10 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
   const locale = ctx.media?.locale ?? "en";
   const byId = new Map(section.components.map((c) => [c.id, c]));
   const unknown = new Set(check.unknown);
+  const live = isInteractive(section);
   // A surface with structural problems (a stored one never has them) draws nothing.
   if (check.issues.some((i) => !i.path.includes("/props/") && !i.path.includes("/visible")))
-    return { section, root: undefined, unknown: check.unknown, data };
+    return { section, root: undefined, unknown: check.unknown, data, live: false };
   const invalidProps = new Set(
     check.issues.map((i) => /^\/components\/(\d+)\//.exec(i.path)?.[1]).filter(Boolean),
   );
@@ -143,7 +155,9 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
     if (!c || unknown.has(id) || depth > 8) return undefined;
     const index = section.components.indexOf(c);
     if (invalidProps.has(String(index))) return undefined;
-    if (!evaluateCondition(c.visible, data)) return undefined;
+    // A live surface keeps hidden components (the runtime shows them when their condition holds).
+    const shown = evaluateCondition(c.visible, data);
+    if (!shown && !live) return undefined;
     const entry = catalog.get(c.component);
     if (!entry) return undefined;
     return {
@@ -151,12 +165,15 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       component: c.component,
       entry,
       props: resolveProps(c.props, data, { locale }),
+      raw: { ...(c.props ?? {}) },
+      ...(live ? { live: true } : {}),
+      ...(live && c.visible !== undefined ? { visible: c.visible, hidden: !shown } : {}),
       children: (c.children ?? [])
         .map((k) => node(k, depth + 1))
         .filter((n): n is SurfaceNode => n !== undefined),
     };
   };
-  return { section, root: node("root", 1), unknown: check.unknown, data };
+  return { section, root: node("root", 1), unknown: check.unknown, data, live };
 }
 
 // ── markup ───────────────────────────────────────────────────────────────────────────────────
@@ -171,6 +188,27 @@ const SPACE = ["none", "s", "m", "l", "xl"];
 const TONE = ["surface", "muted", "brand", "inverse"];
 const ALIGN = ["start", "center", "end", "stretch"];
 
+const isBinding = (v: unknown) =>
+  typeof v === "object" && v !== null && !Array.isArray(v) && ("path" in v || "call" in v);
+const json = (v: unknown) => escapeHtml(JSON.stringify(v));
+
+/** A text prop: escaped, and kept live by the runtime when it is bound in a live surface. */
+function text(
+  node: Pick<SurfaceNode, "props"> & Partial<Pick<SurfaceNode, "raw" | "live">>,
+  name: string,
+): string {
+  const value = escapeHtml(str(node.props[name]));
+  return node.live && isBinding(node.raw?.[name])
+    ? `<span data-ch-text="${json(node.raw?.[name])}">${value}</span>`
+    : value;
+}
+
+/** The pointer an input writes to (its `value` bound with {path}), in a live surface. */
+function model(node: Partial<Pick<SurfaceNode, "raw" | "live">>): string {
+  const v = node.raw?.value as { path?: unknown } | undefined;
+  return node.live && typeof v?.path === "string" ? ` data-ch-model="${escapeHtml(v.path)}"` : "";
+}
+
 /** Where a primitive's children go in its markup. */
 export const CHILDREN = "<!--ch-children-->";
 
@@ -179,7 +217,8 @@ export const CHILDREN = "<!--ch-children-->";
  * children's labels for the tab buttons.
  */
 export function primitiveHtml(
-  node: Pick<SurfaceNode, "id" | "component" | "props" | "children">,
+  node: Pick<SurfaceNode, "id" | "component" | "props" | "children"> &
+    Partial<Pick<SurfaceNode, "raw" | "live">>,
   scope: string,
   media?: MediaContext,
 ): string {
@@ -208,7 +247,7 @@ export function primitiveHtml(
       return `<hr class="ch-divider">`;
     case "Heading": {
       const level = [1, 2, 3, 4].includes(Number(p.level)) ? Number(p.level) : 2;
-      return `<h${level} class="ch-heading"${attr("align", p.align, ALIGN)}>${escapeHtml(str(p.text))}</h${level}>`;
+      return `<h${level} class="ch-heading"${attr("align", p.align, ALIGN)}>${text(node, "text")}</h${level}>`;
     }
     case "Text":
       return `<div class="ch-text"${attr("size", p.size, ["s", "m", "l"])}${p.muted === true ? ' data-muted="yes"' : ""}${attr("align", p.align, ALIGN)}>${renderMarkdown(str(p.text), media)}</div>`;
@@ -240,18 +279,48 @@ export function primitiveHtml(
     }
     case "Button":
     case "Link": {
-      const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
-      if (!href) return "";
       const cls =
         node.component === "Link"
           ? "ch-link"
           : `ch-button ch-button--${["primary", "secondary", "ghost"].includes(str(p.variant)) ? str(p.variant) : "primary"}`;
-      return `<a class="${cls}" href="${escapeHtml(href)}">${escapeHtml(str(p.label))}</a>`;
+      // An action (RFC-0020 §4): a button the runtime acts on; without JavaScript it does nothing.
+      const action = node.component === "Button" ? p.onClick : undefined;
+      if (action && typeof action === "object" && !Array.isArray(action)) {
+        const a = action as Record<string, unknown>;
+        const safe = a.action !== "navigate" || (typeof a.href === "string" && safeHref(a.href));
+        if (!safe) return "";
+        return `<button type="button" class="${cls}" data-ch-action="${json(a)}">${text(node, "label")}</button>`;
+      }
+      const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
+      if (!href) return "";
+      return `<a class="${cls}" href="${escapeHtml(href)}">${text(node, "label")}</a>`;
     }
     case "Badge":
-      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${escapeHtml(str(p.label))}</span>`;
+      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${text(node, "label")}</span>`;
     case "Stat":
-      return `<div class="ch-stat"><span class="ch-stat__value">${escapeHtml(str(p.value))}</span><span class="ch-stat__label">${escapeHtml(str(p.label))}</span>${p.detail ? `<span class="ch-stat__detail">${escapeHtml(str(p.detail))}</span>` : ""}</div>`;
+      return `<div class="ch-stat"><span class="ch-stat__value">${text(node, "value")}</span><span class="ch-stat__label">${text(node, "label")}</span>${p.detail ? `<span class="ch-stat__detail">${text(node, "detail")}</span>` : ""}</div>`;
+    case "Toggle": {
+      const options = Array.isArray(p.options) ? p.options.slice(0, 8).map(str) : [];
+      const radios = options
+        .map(
+          (o) =>
+            `<label class="ch-toggle__option"><input type="radio" name="${id}" value="${escapeHtml(o)}"${model(node)}${o === str(p.value) ? " checked" : ""}><span>${escapeHtml(o)}</span></label>`,
+        )
+        .join("");
+      return `<div class="ch-toggle" role="radiogroup"${p.label ? ` aria-label="${escapeHtml(str(p.label))}"` : ""}>${radios}</div>`;
+    }
+    case "Select": {
+      const options = Array.isArray(p.options) ? p.options.slice(0, 50).map(str) : [];
+      return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><select class="ch-select"${model(node)}>${options.map((o) => `<option value="${escapeHtml(o)}"${o === str(p.value) ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select></label>`;
+    }
+    case "Slider": {
+      const n = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d);
+      const out =
+        node.live && isBinding(node.raw?.value)
+          ? `<output class="ch-slider__value" data-ch-text="${json(node.raw?.value)}">${escapeHtml(str(p.value))}</output>`
+          : `<output class="ch-slider__value">${escapeHtml(str(p.value))}</output>`;
+      return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><span class="ch-slider"><input type="range" min="${n(p.min, 0)}" max="${n(p.max, 100)}" step="${n(p.step, 1) || "any"}" value="${n(p.value, 0)}"${model(node)}>${out}</span></label>`;
+    }
     case "Quote": {
       const cite = str(p.cite);
       const role = str(p.role);
@@ -299,10 +368,24 @@ export function blockNodeHtml(node: SurfaceNode, media?: MediaContext, preview?:
     : "";
 }
 
+/**
+ * In a live surface, a component with a visibility condition sits in a `display: contents`
+ * wrapper the runtime hides and shows (`hidden` while the condition is false).
+ */
+export function visibilityWrapper(node: Pick<SurfaceNode, "visible" | "hidden">): [string, string] {
+  if (node.visible === undefined) return ["", ""];
+  return [
+    `<div class="ch-node" data-ch-visible="${json(node.visible)}"${node.hidden ? " hidden" : ""}>`,
+    "</div>",
+  ];
+}
+
 function nodeHtml(node: SurfaceNode, scope: string, ctx: SurfaceContext): string {
-  if (node.entry.kind === "block") return blockNodeHtml(node, ctx.media, ctx.preview);
+  const [open, close] = visibilityWrapper(node);
+  if (node.entry.kind === "block")
+    return open + blockNodeHtml(node, ctx.media, ctx.preview) + close;
   const inner = node.children.map((c) => nodeHtml(c, scope, ctx)).join("");
-  return primitiveHtml(node, scope, ctx.media).replace(CHILDREN, inner);
+  return open + primitiveHtml(node, scope, ctx.media).replace(CHILDREN, inner) + close;
 }
 
 /** What a page's source offers for entry sources (`GraphSource`). */
@@ -341,10 +424,17 @@ export async function loadSurfaceSources(
 export const surfaceScope = (section: SurfaceSection) => `ch-${section.id}`;
 
 /** Opening and closing markup of the surface's wrapper. */
-export function surfaceWrapper(section: SurfaceSection): [string, string] {
+export function surfaceWrapper(
+  section: SurfaceSection,
+  live?: { data: Record<string, unknown> },
+): [string, string] {
+  const scope = surfaceScope(section);
   return [
-    `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}">`,
-    "</section>",
+    `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,
+    live
+      ? // RFC-0020 §4: the data as inert JSON, then Cloudhal's runtime (one module per page).
+        `<script type="application/json" data-ch-state>${scriptJson(live.data)}</script><script type="module" src="${SURFACE_SCRIPT.path}"></script></section>`
+      : "</section>",
   ];
 }
 
@@ -354,7 +444,7 @@ export function surfaceWrapper(section: SurfaceSection): [string, string] {
  */
 export function renderSurface(section: SurfaceSection, ctx: SurfaceContext = {}): string {
   const tree = surfaceTree(section, ctx);
-  const [open, close] = surfaceWrapper(section);
+  const [open, close] = surfaceWrapper(section, tree.live ? { data: tree.data } : undefined);
   const body = tree.root ? nodeHtml(tree.root, surfaceScope(section), ctx) : "";
   const missing = ctx.preview
     ? tree.unknown

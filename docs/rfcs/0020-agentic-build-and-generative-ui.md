@@ -243,6 +243,28 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **The renderer** draws fences everywhere bodies render: site, previews and feeds. With the theme's components, a fence becomes a body slot that `Body.astro` fills with `Surface.astro`, so theme blocks draw inside articles too.
   - **Studio's editor** keeps fences verbatim as source blocks (a code block would cut the info string).
   - **`catalogPrompt`** teaches the fence syntax.
+- **20e shipped** (the interaction runtime):
+  - **Components.**
+    - **Primitives:** `Toggle`, `Select` and `Slider`. A `{path}` binding on `value` makes the input write to that path.
+    - **Button actions:** `Button.onClick` takes `set`, `toggle`, `increment`, `reset`, `navigate`, `copy`, `share` or `scrollTo`. The store checks what each action needs. `href` is optional when an action is set.
+    - **Gate:** `isInteractive` decides which surfaces load the runtime.
+  - **Rendering a live surface.**
+    - The data model goes in an inert, escaped `<script type="application/json" data-ch-state>`.
+    - Bound text carries `data-ch-text`, inputs `data-ch-model`, actions `data-ch-action`.
+    - Conditional components are rendered hidden inside a `display: contents` wrapper (`data-ch-visible`).
+    - Only those surfaces load `/_cloudhal/surface.1.js`.
+  - **The runtime.**
+    - It is a constant module: about 5.7 KB, versioned and pinned by hash in a test.
+    - It is served by `cloudhal dev`, always written for the Site Worker, and written by static builds only when a page has a live surface.
+    - Its functions and conditions are tested against core-ts's.
+    - It refuses prototype paths and unsafe navigation.
+  - **The threat model's promise 4** lists the runtime and the video player.
+  - **The blog theme** styles the inputs and action buttons.
+- **Deviations in 20e:**
+  - **No server actions.** `submit`, forms, polls and newsletter signup each wait for their own RFC.
+  - **Not shipped yet:** `Carousel` and `Counter` (a `Stat` plus an `increment` button covers counters).
+  - **Plain-text updates.** Bound `Text` updates as plain text in the browser; the server renders its markdown first.
+  - **Previews stay static.** Previews render live surfaces with their initial state only, because the preview frame runs no scripts.
 - **Deviations in 20d:**
   - **No live editor node view.** Fences show as source blocks, edited in Markdown mode.
   - **No healing renderer yet.** The healing pass for partially streamed prose has no consumer until Build chat writes article bodies; `parseSurfaceFence` already supports partial fences.

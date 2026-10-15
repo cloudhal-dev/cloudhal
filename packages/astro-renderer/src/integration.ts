@@ -97,7 +97,8 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             entrypoint: "@cloudhal/astro-renderer/analytics-middleware",
             order: "pre",
           });
-        // The click-to-load video player (RFC-0015 §4): served here in dev, written by builds.
+        // The click-to-load video player (RFC-0015 §4) and the interaction runtime (RFC-0020 §4):
+        // served here in dev, written by builds.
         if (!cloudflare && command === "dev")
           addMiddleware({ entrypoint: "@cloudhal/astro-renderer/embed-middleware", order: "pre" });
         // Reader comments (RFC-0007 §8.2, §15.2), on the same targets: the Site Worker build ships
@@ -162,8 +163,10 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
             await writeCommentsClient(comments, dir);
             logger.info(`wrote ${comments.module.path} and ${comments.solver.path}`);
           }
-          const { writeEmbedClient } = await import("./static-headers.ts");
+          const { writeEmbedClient, writeSurfaceClient } = await import("./static-headers.ts");
           await writeEmbedClient(dir);
+          // RFC-0020 §4: pages render per request, so the runtime is always there.
+          await writeSurfaceClient(dir);
           const { writeCloudhalAssetHeaders } = await import("./static-headers.ts");
           await writeCloudhalAssetHeaders(dir);
           return;
@@ -175,6 +178,8 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
         );
         const embeds = await buildShowsEmbeds(dir);
         if (embeds) await writeEmbedClient(dir);
+        const { buildShowsLiveSurfaces, writeSurfaceClient } = await import("./static-headers.ts");
+        if (await buildShowsLiveSurfaces(dir)) await writeSurfaceClient(dir);
         if (await writeStaticSecurityHeaders(dir, { embeds }))
           logger.info(
             `wrote _headers (security headers${embeds ? ", video players allowed" : ""})`,

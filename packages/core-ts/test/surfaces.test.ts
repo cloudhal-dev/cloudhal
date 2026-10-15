@@ -9,6 +9,7 @@ import {
   checkSurface,
   createCatalog,
   evaluateCondition,
+  isInteractive,
   nearestComponent,
   PatchError,
   parseSurfaceFence,
@@ -564,5 +565,54 @@ describe("store: surfaces in entry bodies", () => {
       code: "invalid_surface",
       details: { issues: [{ path: "/surface/box/components/0/props/text", message: "required" }] },
     });
+  });
+});
+
+describe("interactive components (RFC-0020 §4)", () => {
+  it("accepts inputs bound to the data and buttons with actions, and says which surfaces are interactive", () => {
+    const s = surface(
+      [
+        { id: "root", component: "Stack", children: ["t", "s", "b", "l"] },
+        {
+          id: "t",
+          component: "Toggle",
+          props: { options: ["monthly", "yearly"], value: { path: "/billing" } },
+        },
+        {
+          id: "s",
+          component: "Slider",
+          props: { label: "Seats", min: 1, max: 50, value: { path: "/seats" } },
+        },
+        {
+          id: "b",
+          component: "Button",
+          props: { label: "+1", onClick: { action: "increment", path: "/seats", by: 1 } },
+        },
+        { id: "l", component: "Button", props: { label: "Docs", href: "/docs" } },
+      ],
+      { billing: "monthly", seats: 5 },
+    );
+    expect(checkSurface(s, catalog).issues).toEqual([]);
+    expect(isInteractive(s)).toBe(true);
+    expect(
+      isInteractive(
+        surface([{ id: "root", component: "Button", props: { label: "x", href: "/x" } }]),
+      ),
+    ).toBe(false);
+  });
+
+  it("asks each action for what it needs", () => {
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["a", "b"] },
+          { id: "a", component: "Button", props: { label: "Go", onClick: { action: "navigate" } } },
+          { id: "b", component: "Button", props: { label: "?", onClick: { action: "explode" } } },
+        ]),
+      ),
+    ).toEqual([
+      "/components/1/props/onClick/href navigate needs href",
+      "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo",
+    ]);
   });
 });

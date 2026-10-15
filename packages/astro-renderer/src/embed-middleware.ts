@@ -1,8 +1,15 @@
 /**
- * Serves the click-to-load player module in `cloudhal dev` (RFC-0015 §4); builds write it as a
- * static asset (`integration.ts`).
+ * Serves Cloudhal's constant modules in `cloudhal dev`: the click-to-load player (RFC-0015 §4)
+ * and the interaction runtime (RFC-0020 §4); builds write them as static assets (`integration.ts`).
  */
 import { EMBED_SCRIPT } from "./embed-client.ts";
+import { SURFACE_SCRIPT } from "./surface-client.ts";
+
+/** Cloudhal's constant first-party modules `cloudhal dev` serves (builds write them as files). */
+const SCRIPTS = new Map<string, string>([
+  [EMBED_SCRIPT.path, EMBED_SCRIPT.code],
+  [SURFACE_SCRIPT.path, SURFACE_SCRIPT.code],
+]);
 
 interface MiddlewareContext {
   request: Request;
@@ -12,8 +19,9 @@ export async function onRequest(
   context: MiddlewareContext,
   next: () => Promise<Response>,
 ): Promise<Response> {
-  if (new URL(context.request.url).pathname !== EMBED_SCRIPT.path) return next();
-  return new Response(EMBED_SCRIPT.code, {
+  const code = SCRIPTS.get(new URL(context.request.url).pathname);
+  if (code === undefined) return next();
+  return new Response(code, {
     headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" },
   });
 }
