@@ -171,6 +171,9 @@ describe("design pass (RFC-0021 21c)", () => {
     const shown = lookRequest?.messages.at(-1)?.content as AiContentPart[];
     expect(shown.filter((p) => p.type === "image_url")).toHaveLength(4);
     expect(transport.requests[2]?.model).toBe(DESIGN_JUDGE_MODEL);
+    // the judge runs at temperature 0, the builder at the model's default
+    expect(transport.requests[2]?.temperature).toBe(0);
+    expect(transport.requests[0]?.temperature).toBeUndefined();
     expect(run.design).toEqual({
       failed: ["contrast"],
       look: { failed: ["contrast"], images: 4, round: true, steps: 1 },
