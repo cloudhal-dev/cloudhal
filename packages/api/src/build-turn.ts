@@ -178,7 +178,7 @@ export function buildSystemPrompt(
     "",
     "How to work:",
     "- Start with one say line that tells the person what you will build.",
-    "- Then build in small steps: one ops line adds a few components (one to five), so the person sees the page grow.",
+    "- Then build in small steps: one ops line adds a few components (one to five), so the person sees the page grow. Never put a whole section in one line: a long line breaks easily, and a broken line loses everything in it.",
     '- Add a new surface section with {"op":"add","path":"/sections/-","value":{…}}; later lines add components to it by index (/sections/<i>/components/-) and link them into a parent\'s children.',
     '- A new surface section already contains its "root" component (a layout such as Stack or Band) in the same ops line; add a component before you list its id in a parent\'s children.',
     "- Section ids look like sec_ followed by 6 to 32 letters or digits; component ids are lower-case words with hyphens.",
@@ -208,7 +208,12 @@ export function componentsIn(partial: string): string[] {
   );
 }
 
-type Line = { say: string } | { ops: PatchOp[] } | { done: true } | { invalid: string };
+type Line =
+  | { say: string }
+  /** `repaired`: what Cloudhal fixed to read the line (reported with the step's repairs). */
+  | { ops: PatchOp[]; repaired?: string }
+  | { done: true }
+  | { invalid: string };
 
 /**
  * A model's answer split into JSON objects as they complete, wherever its line breaks fall: an
@@ -216,7 +221,8 @@ type Line = { say: string } | { ops: PatchOp[] } | { done: true } | { invalid: s
  * prose between them are set aside instead of being refused one line at a time.
  */
 export class JsonObjectReader {
-  #depth = 0;
+  /** The closers the open brackets need; an object ends when the last one closes (any closer). */
+  #open: string[] = [];
   #inString = false;
   #escape = false;
   #current = "";
@@ -226,10 +232,10 @@ export class JsonObjectReader {
   push(text: string): Array<{ object: string } | { prose: string }> {
     const out: Array<{ object: string } | { prose: string }> = [];
     for (const ch of text) {
-      if (this.#depth === 0) {
+      if (this.#open.length === 0) {
         if (ch === "{") {
           this.#flushOutside(out);
-          this.#depth = 1;
+          this.#open = ["}"];
           this.#current = "{";
         } else if (ch === "\n") this.#flushOutside(out);
         else this.#outside += ch;
@@ -241,8 +247,11 @@ export class JsonObjectReader {
         else if (ch === "\\") this.#escape = true;
         else if (ch === '"') this.#inString = false;
       } else if (ch === '"') this.#inString = true;
-      else if (ch === "{") this.#depth++;
-      else if (ch === "}" && --this.#depth === 0) {
+      else if (ch === "{") this.#open.push("}");
+      else if (ch === "[") this.#open.push("]");
+      // A wrong closer still closes (`parseLine` puts the brackets in order), so one slip at the
+      // end of a long step does not swallow the lines after it.
+      else if ((ch === "}" || ch === "]") && this.#open.pop() && this.#open.length === 0) {
         out.push({ object: this.#current });
         this.#current = "";
       }
@@ -261,7 +270,7 @@ export class JsonObjectReader {
     this.#flushOutside(out);
     if (this.#current.trim()) out.push({ object: this.#current });
     this.#current = "";
-    this.#depth = 0;
+    this.#open = [];
     this.#inString = false;
     return out;
   }
@@ -336,25 +345,93 @@ export function componentPaths(
   };
 }
 
+/**
+ * Closing brackets matched to what is open (outside strings): a wrong closer becomes the right
+ * one, a stray one is dropped and missing ones are added at the end. Models writing a long step
+ * often slip on the last few (`}}}]]` for `}}]}`). Undefined when nothing needed changing.
+ */
+export function closeBrackets(text: string): string | undefined {
+  const open: string[] = [];
+  let out = "";
+  let changed = false;
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") open.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      const want = open.pop();
+      if (want === undefined) {
+        changed = true;
+        continue;
+      }
+      if (want !== ch) changed = true;
+      out += want;
+      continue;
+    }
+    out += ch;
+  }
+  if (inString) return undefined;
+  if (open.length) {
+    changed = true;
+    out += open.reverse().join("");
+  }
+  return changed ? out : undefined;
+}
+
+/** Where JSON.parse gave up, with a little of the text there, for the model to find its slip. */
+function parseFailure(text: string): string {
+  try {
+    JSON.parse(text);
+    return "";
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const at = /position (\d+)/.exec(message);
+    const reason = message.replace(/ in JSON at position.*$/, "").replace(/^.*?: /, "");
+    if (!at) return reason;
+    const i = Number(at[1]);
+    return `${reason} at character ${i}, near ${JSON.stringify(text.slice(Math.max(0, i - 40), i + 10))}`;
+  }
+}
+
 export function parseLine(line: string): Line | undefined {
   const text = line.trim();
   if (!text || text.startsWith("```")) return undefined;
   let value: unknown;
+  let repaired: string | undefined;
   try {
     value = JSON.parse(text);
   } catch {
     // Two common slips: raw line breaks or tabs inside strings, and trailing commas.
+    const lenient = lenientJson(text);
     try {
-      value = JSON.parse(lenientJson(text));
+      value = JSON.parse(lenient);
     } catch {
-      return { invalid: `not one JSON object: ${text.slice(0, 80)}` };
+      // A third: closing brackets in the wrong order at the end of a long step.
+      const closed = closeBrackets(lenient);
+      try {
+        if (closed === undefined) throw new Error("no change");
+        value = JSON.parse(closed);
+        repaired = "closing brackets put in order";
+      } catch {
+        return {
+          invalid: `not one JSON object (${parseFailure(lenient)}); nothing in it was applied. Send it again in smaller steps: a new surface with its root and at most five components, then more steps that add the rest`,
+        };
+      }
     }
   }
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return { invalid: "each line must be one JSON object" };
   const v = value as Record<string, unknown>;
   if (typeof v.say === "string") return { say: v.say.slice(0, 500) };
-  if (Array.isArray(v.ops)) return { ops: v.ops as PatchOp[] };
+  if (Array.isArray(v.ops)) return { ops: v.ops as PatchOp[], ...(repaired ? { repaired } : {}) };
   // Common slips, read as meant: one operation instead of a list, or a bare operation.
   if (v.ops && typeof v.ops === "object") return { ops: [v.ops as PatchOp] };
   if (typeof v.op === "string" && typeof v.path === "string")
@@ -387,13 +464,13 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
   let heldSteps = 0;
 
   /** Writes `ops` on the page (with Cloudhal's repairs); throws what the checks refuse. */
-  const write = async (raw: PatchOp[]) => {
+  const write = async (raw: PatchOp[], read: string[] = []) => {
     const addressed = componentPaths(page, raw);
     const ops = addressed.ops;
     const patched = patchPage(page, ops, deps.catalog);
     page = await deps.write(patched.value);
     steps++;
-    const repairs = [...addressed.notes, ...patched.notes];
+    const repairs = [...read, ...addressed.notes, ...patched.notes];
     deps.emit({ type: "step", ok: true, rev: page.rev, ops: ops.length, repairs });
     await notifyBuild(() =>
       deps.build?.pageChanged({
@@ -409,11 +486,11 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
   const waits = (e: unknown) =>
     e instanceof SurfacePatchError && e.issues.every((i) => WAITING.test(i.message));
 
-  const applyStep = async (ops: PatchOp[]): Promise<string[]> => {
+  const applyStep = async (ops: PatchOp[], read: string[] = []): Promise<string[]> => {
     let together: unknown;
     try {
       // With steps held back: first all together, as the model meant them.
-      await write([...held, ...ops]);
+      await write([...held, ...ops], read);
       held = [];
       heldSteps = 0;
       return [];
@@ -424,7 +501,7 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
     if (held.length > 0)
       try {
         // A held step may never become valid: the new step on its own; the held keep waiting.
-        await write(ops);
+        await write(ops, read);
         return [];
       } catch (e) {
         alone = e;
@@ -488,7 +565,13 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
         else if ("invalid" in parsed) {
           refused.push(parsed.invalid);
           deps.emit({ type: "step", ok: false, issues: [parsed.invalid] });
-        } else refused.push(...(await applyStep(parsed.ops)));
+        } else
+          refused.push(
+            ...(await applyStep(
+              parsed.ops,
+              "repaired" in parsed && parsed.repaired ? [parsed.repaired] : [],
+            )),
+          );
       };
       for await (const event of deps.transport.stream({
         model: deps.model,
