@@ -14,7 +14,7 @@ import type { AnalyticsService } from "@cloudhal/analytics/service";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 import type { CommentsDeps } from "./comments.ts";
-import type { BuildObserver, MediaToolOptions } from "./common.ts";
+import type { BuildObserver, MediaToolOptions, RenderDeps } from "./common.ts";
 import type { SchedulesDeps } from "./schedules.ts";
 import { createCloudhalMcpServer } from "./server.ts";
 
@@ -34,6 +34,8 @@ export interface HttpOptions {
   comments?: CommentsDeps | undefined;
   /** Schedules for the schedule tools and automation runs (RFC-0008 §12). */
   schedules?: SchedulesDeps | undefined;
+  /** A browser for `render_page` (RFC-0021 §4). */
+  render?: RenderDeps | undefined;
   /** Shared secret (≥ 32 bytes) so approval state survives across instances/requests. */
   stateKey: Uint8Array | string;
   /** Told about page writes and refused builds (RFC-0020 §6, Studio's Build view). */
@@ -71,6 +73,7 @@ export function createCloudhalMcpHandler(options: HttpOptions): CloudhalMcpHttp 
         analytics: options.analytics,
         comments: options.comments,
         schedules: options.schedules,
+        render: options.render,
         now: options.now,
         stateKey: options.stateKey,
         confirmTokenFallback: options.confirmTokenFallback,

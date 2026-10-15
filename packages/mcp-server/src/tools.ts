@@ -105,6 +105,7 @@ import {
   publishMenuLines,
 } from "./menu-tools.ts";
 import { PREVIEW_UI_URI } from "./preview-view.ts";
+import { renderTools } from "./render-tools.ts";
 import { scheduleTools } from "./schedule-tools.ts";
 import { RUN_COUNTS, type RunContext } from "./schedules.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
@@ -135,6 +136,7 @@ export {
   type JsonSchema,
   type MediaToolOptions,
   notifyBuild,
+  type RenderDeps,
   type ToolContext,
   type ToolDefinition,
   ToolError,
@@ -160,6 +162,52 @@ const COVER_INPUT: JsonSchema = {
 };
 
 /** The media-library assets a page or article refers to, by id, so previews render them (RFC-0004). */
+/** A page or article rendered as the site would show it, with its preview link (when there is one). */
+export async function previewDoc(
+  a: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<{ title: string; path: string; html: string; url: string | null }> {
+  const site = await requireSite(ctx, a.siteId as string);
+  let doc: { title: string; path: string; html: string };
+  if (a.entryId) {
+    const entry = await ctx.store.getContentEntry(a.entryId as string);
+    if (!entry || entry.siteId !== site.id)
+      throw new ToolError("not_found", `entry ${a.entryId} not found`);
+    doc = renderEntryPreview(site, entry, {
+      assets: await assetsOf(ctx, "contentEntry", entry),
+      blocks: ctx.store.blocks,
+    });
+  } else if (a.pageId) {
+    const page = await ctx.store.getPage(a.pageId as string);
+    if (!page || page.siteId !== site.id)
+      throw new ToolError("not_found", `page ${a.pageId} not found`);
+    const collections = previewCollections(page.sections);
+    const entries = Object.fromEntries(
+      await Promise.all(
+        collections.map(async (c) => [c, await ctx.store.listContentEntries(site.id, c)]),
+      ),
+    );
+    doc = renderPagePreview(site, page, entries, {
+      assets: await assetsOf(ctx, "page", page),
+      blocks: ctx.store.blocks,
+    });
+  } else {
+    throw new ToolError("invalid", "pass pageId or entryId");
+  }
+  // Prefer a signed link to the deployed site (drafts visible); fall back to `cloudhal dev`.
+  if (ctx.previewSecret && primaryOrigin(site)) {
+    const token = await mintPreviewToken(ctx.previewSecret, {
+      site: site.id,
+      target: "live",
+    });
+    return { ...doc, url: previewUrl(site, doc.path, token) ?? null };
+  }
+  return {
+    ...doc,
+    url: ctx.previewBaseUrl ? new URL(doc.path, ctx.previewBaseUrl).toString() : null,
+  };
+}
+
 async function assetsOf(
   ctx: ToolContext,
   kind: "page" | "contentEntry",
@@ -411,6 +459,7 @@ export function defineTools(): ToolDefinition[] {
     ...bodyTools(),
     // RFC-0021 §2: DESIGN.md
     ...designTools(),
+    ...renderTools(previewDoc),
     ...taxonomyTools(),
     ...menuTools(),
     ...assetTools(),
@@ -1363,7 +1412,7 @@ function rawTools(): ToolDefinition[] {
       name: "preview_page",
       title: "Preview page",
       description:
-        "Render a page (or an article by entryId) to HTML as the site would show it, plus a dev-server URL when `cloudhal dev` is running.",
+        "Render a page (or an article by entryId) to HTML as the site would show it, plus a preview link (signed, to the deployed site, or the `cloudhal dev` URL). To see how it looks in a browser, with screenshots and automatic checks, use render_page.",
       inputSchema: obj({ siteId: id, pageId: id, entryId: id }, ["siteId"]),
       outputSchema: obj(
         {
@@ -1383,47 +1432,7 @@ function rawTools(): ToolDefinition[] {
       scopes: ["preview:create"],
       // RFC-0020 §6: MCP Apps hosts show the rendered page in Cloudhal's View.
       ui: { resourceUri: PREVIEW_UI_URI },
-      handler: async (a, ctx) => {
-        const site = await requireSite(ctx, a.siteId as string);
-        let doc: { title: string; path: string; html: string };
-        if (a.entryId) {
-          const entry = await ctx.store.getContentEntry(a.entryId as string);
-          if (!entry || entry.siteId !== site.id)
-            throw new ToolError("not_found", `entry ${a.entryId} not found`);
-          doc = renderEntryPreview(site, entry, {
-            assets: await assetsOf(ctx, "contentEntry", entry),
-            blocks: ctx.store.blocks,
-          });
-        } else if (a.pageId) {
-          const page = await ctx.store.getPage(a.pageId as string);
-          if (!page || page.siteId !== site.id)
-            throw new ToolError("not_found", `page ${a.pageId} not found`);
-          const collections = previewCollections(page.sections);
-          const entries = Object.fromEntries(
-            await Promise.all(
-              collections.map(async (c) => [c, await ctx.store.listContentEntries(site.id, c)]),
-            ),
-          );
-          doc = renderPagePreview(site, page, entries, {
-            assets: await assetsOf(ctx, "page", page),
-            blocks: ctx.store.blocks,
-          });
-        } else {
-          throw new ToolError("invalid", "pass pageId or entryId");
-        }
-        // Prefer a signed link to the deployed site (drafts visible); fall back to `cloudhal dev`.
-        if (ctx.previewSecret && primaryOrigin(site)) {
-          const token = await mintPreviewToken(ctx.previewSecret, {
-            site: site.id,
-            target: "live",
-          });
-          return { ...doc, url: previewUrl(site, doc.path, token) ?? null };
-        }
-        return {
-          ...doc,
-          url: ctx.previewBaseUrl ? new URL(doc.path, ctx.previewBaseUrl).toString() : null,
-        };
-      },
+      handler: (a, ctx) => previewDoc(a, ctx),
     },
     {
       name: "publish",

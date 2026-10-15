@@ -117,6 +117,11 @@ export interface ProjectConfig {
   readonly mail?: MailConfig;
   /** In-editor AI through Workers AI (RFC-0016); absent = no `AI` binding. */
   readonly ai?: AiConfig;
+  /**
+   * `false` (RFC-0021 §4): no Browser Rendering binding, so `render_page` is unavailable on the
+   * deployment. Absent = bound (agents render pages to check them; billed per browser time).
+   */
+  readonly render?: false;
   /** Workers Logs sampling and opt-in Traces for both Workers; absent = every log, no traces. */
   readonly observability?: ObservabilityConfig;
   /**
@@ -287,6 +292,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
     ...(schedules ? { schedules } : {}),
     ...(mail ? { mail } : {}),
     ...(ai ? { ai: {} } : {}),
+    ...(cfg.render === false ? { render: false as const } : {}),
     ...(observability ? { observability } : {}),
     ...(cfg.placement === "smart" ? { placement: "smart" as const } : {}),
   };

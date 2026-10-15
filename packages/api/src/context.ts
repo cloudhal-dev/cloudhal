@@ -12,7 +12,7 @@ import type { SiteGraphStore, StoragePair } from "@cloudhal/core-ts";
 import type { SchedulerControl } from "@cloudhal/core-ts/releases";
 import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import type { SchedulesDeps } from "@cloudhal/mcp-server/schedules";
-import type { MediaToolOptions } from "@cloudhal/mcp-server/tools";
+import type { MediaToolOptions, RenderDeps } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { BuildHub } from "./build.ts";
@@ -39,6 +39,8 @@ export interface McpMountOptions {
   readonly previewSecret?: string | undefined;
   /** Media settings for the asset tools (fetch transport, host lists; RFC-0004). */
   readonly media?: MediaToolOptions | undefined;
+  /** A browser for `render_page` (RFC-0021 §4). */
+  readonly render?: RenderDeps | undefined;
 }
 
 export interface ApiDeps {

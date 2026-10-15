@@ -1,5 +1,5 @@
 # RFC-0021: DESIGN.md and the agent design loop
-- Status: Draft
+- Status: Draft (21a and 21b shipped)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-15
 - Related:
   - `docs/design/agent-built-sites-gap-analysis.md` (G1, G2; the evidence behind this RFC);
@@ -227,6 +227,22 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
   - `design_lint` checks PascalCase names in backticks only: lowercase block names in prose are too ambiguous to flag.
   - The server instructions as a whole are about 4,900 characters, over Claude Code's 4,096. The design paragraph sits within the first 4,096; trimming the rest is still to do.
   - Build chat says nothing yet when a site has no DESIGN.md (§5): Studio's Settings section covers it.
+- **21b shipped.**
+  - **Tool.** `render_page` (`preview:create`, read-only) opens the page's signed preview link (or the `cloudhal dev` URL) at each width. It returns a text summary, then JPEG screenshots, then `structuredContent` `{url, path, widths[{width,height,truncated,images}], checks[{id,ok,count,examples,widths}]}`. The bytes never enter `structuredContent` or the audit log: a new `renderContent` hook on tool definitions turns a result into content blocks.
+  - **Checks.** All eight run in the page (`RENDER_CHECK_SCRIPT`). Each example names the section and component (`section sec_… component c_…`), or `theme header`/`footer`/`nav` for theme chrome. Checks are merged across widths, and `widths` says where each one failed.
+  - **One DevTools client for both runtimes** (`@cloudhal/mcp-server/render`). A browser context per call and a page per width.
+    - Node (`@cloudhal/cli`): the local Chrome, started on the first render and stopped after a minute idle. `CHROME_PATH` picks it; `CLOUDHAL_RENDER=off` turns it off.
+    - Workers (`@cloudhal/cloudflare`): the `BROWSER` binding. The browser is acquired per call and driven over the binding's chunked socket.
+  - **Deploy.** `cloudhal deploy` binds Browser Rendering to the admin Worker unless `cloudhal.json` says `"render": false`, and logs which applies.
+  - **Limits.** As specified, in memory per process or isolate. Errors are `render_unavailable`, `render_limited` and `render_failed`, each pointing to `preview_page`.
+- **Deviations (21b).**
+  - **Screenshots.** One JPEG per viewport (up to 4 per width, quality 60), not one tall PNG per width: tall images are scaled down by models until text is unreadable. A phone page that overflows sideways does not scroll, so its screenshots stop after the first and are marked truncated.
+  - **No `@cloudflare/puppeteer`.** A small DevTools client serves Node and Workers alike, so there is no new package and nothing to load lazily.
+  - **Articles too.** `entryId` is accepted like `preview_page`'s.
+  - **`img-alt`** fails on a missing `alt` attribute; `alt=""` marks a decorative image and passes.
+  - **`empty-section`** also fails on a section with no text or media.
+  - **`tap-target`** applies WCAG 2.5.8's spacing exception: a small target fails only when a 24 px circle on it touches another target. Links inside sentences are exempt.
+  - **`heading-order`** also fails on a page with no level-1 heading.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |

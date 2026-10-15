@@ -64,6 +64,7 @@ describe("Cloudhal tools (SDK-independent)", () => {
       // RFC-0021 §2
       "get_design",
       "set_design",
+      "render_page",
       "list_taxonomies",
       "list_terms",
       "resolve_terms",

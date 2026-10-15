@@ -33,6 +33,9 @@ describe("in-editor AI (RFC-0016)", () => {
     const admin = { name: "news", studioDir: "studio", main: "./worker.ts" };
     expect(adminWorkerConfig(admin)).not.toHaveProperty("ai");
     expect(adminWorkerConfig({ ...admin, ai: true }).ai).toEqual({ binding: "AI" });
+    // RFC-0021 §4: Browser Rendering only when deploy asks for it (default on, `render: false` off).
+    expect(adminWorkerConfig(admin)).not.toHaveProperty("browser");
+    expect(adminWorkerConfig({ ...admin, browser: true }).browser).toEqual({ binding: "BROWSER" });
   });
 
   it("cloudhal studio reaches Workers AI over REST only with both variables", () => {

@@ -9,6 +9,7 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
 import { loadBlockRegistry, loadThemeDesign, loadThemeSettings } from "../blocks.ts";
 import { readProjectConfig } from "../config.ts";
+import { localRender } from "../render-chrome.ts";
 import { localAnalytics, startLocalRollups } from "./analytics.ts";
 import { localComments } from "./comments-local.ts";
 import { terminalMailSender } from "./mail-local.ts";
@@ -114,6 +115,8 @@ export async function studio(
       approvals: new ApprovalStore(local.sql),
       skills: skillsDir ? await loadSkills(skillsDir) : [],
       media: { fetchTransport: nodeTransport() },
+      // RFC-0021 §4: render_page with the local Chrome, when there is one.
+      render: localRender(),
     },
   };
   if (!options.noAuth) {
