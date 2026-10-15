@@ -156,8 +156,16 @@ describe("the scheduler on workerd (RFC-0008 step 6)", () => {
     ) as Record<string, unknown>;
     expect(cfg).toMatchObject({
       triggers: { crons: ["* * * * *"] },
-      durable_objects: { bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }] },
-      migrations: [{ tag: "v1", new_sqlite_classes: ["SchedulerClock"] }],
+      durable_objects: {
+        bindings: [
+          { name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" },
+          { name: "BUILD_ROOMS", class_name: "BuildRoom" },
+        ],
+      },
+      migrations: [
+        { tag: "v1", new_sqlite_classes: ["SchedulerClock"] },
+        { tag: "v2", new_sqlite_classes: ["BuildRoom"] },
+      ],
     });
   });
 

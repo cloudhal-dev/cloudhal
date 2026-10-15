@@ -14,6 +14,15 @@ export {
 } from "./ai/client.ts";
 export { AiStore, DEFAULT_AI_MODEL } from "./ai/store.ts";
 export { type CloudhalApi, createApi } from "./app.ts";
+export {
+  BUILD_VIEWER_LIMIT,
+  type BuildChange,
+  type BuildHub,
+  BuildViewerLimitError,
+  buildChange,
+  createBuildHub,
+  type LocalBuildHub,
+} from "./build.ts";
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";
 export { MailError, type MailMessage, type MailSender } from "./mail.ts";

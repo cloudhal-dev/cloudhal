@@ -130,8 +130,8 @@ describe("build events", () => {
 
   it("refuses more than the viewer limit on one page", async () => {
     const { site, home, build, app } = await setup();
-    const offs = Array.from({ length: BUILD_VIEWER_LIMIT }, () =>
-      build.subscribe(home.id, () => {}),
+    const offs = await Promise.all(
+      Array.from({ length: BUILD_VIEWER_LIMIT }, () => build.subscribe(home.id, () => {})),
     );
     const res = await app.request(`/api/sites/${site.id}/pages/${home.id}/build/events`, {
       headers: { "x-test-user": "1" },

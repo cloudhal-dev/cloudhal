@@ -56,6 +56,7 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import { type BuildRoomsEnv, buildRoomClass, createDurableBuildHub } from "./build-rooms.ts";
 import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
 import { siteGateSupport } from "./features.ts";
 import { adminMail, type MailEnv } from "./mail.ts";
@@ -71,7 +72,7 @@ import {
   schedulerRuntime,
 } from "./scheduler.ts";
 
-export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv {
+export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRoomsEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   /** Workers AI (RFC-0016), bound when cloudhal.json has an `ai` key. */
@@ -404,6 +405,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         // RFC-0011: emailed invites and reset links when `cloudhal deploy` bound a sender.
         ...(mail ? { mail } : {}),
         defer: (task) => ctx.waitUntil(task),
+        // RFC-0020 §6: build events cross isolates through one Durable Object per page.
+        ...(env.BUILD_ROOMS ? { build: createDurableBuildHub(env.BUILD_ROOMS) } : {}),
         mcp: {
           stateKey: required(env, "MCP_STATE_KEY"),
           audit,
@@ -489,6 +492,13 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
     },
   };
 }
+
+/**
+ * Build rooms (RFC-0020 §6): one Durable Object per page carrying Studio's Build view events
+ * between isolates (`BUILD_ROOMS`, SQLite-backed, hibernatable WebSockets). The generated admin
+ * entry re-exports it.
+ */
+export const BuildRoom = buildRoomClass();
 
 /** Migrations applied by this isolate's clock (a plain value, like the Worker's own flag). */
 let clockMigrated = false;

@@ -108,8 +108,16 @@ describe("cloudhal.json comments and the generated configs", () => {
     });
     // the clock is declared in every config, with its SQLite migration
     expect(alarm).toMatchObject({
-      durable_objects: { bindings: [{ name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" }] },
-      migrations: [{ tag: "v1", new_sqlite_classes: ["SchedulerClock"] }],
+      durable_objects: {
+        bindings: [
+          { name: "SCHEDULER_CLOCK", class_name: "SchedulerClock" },
+          { name: "BUILD_ROOMS", class_name: "BuildRoom" },
+        ],
+      },
+      migrations: [
+        { tag: "v1", new_sqlite_classes: ["SchedulerClock"] },
+        { tag: "v2", new_sqlite_classes: ["BuildRoom"] },
+      ],
     });
   });
 });

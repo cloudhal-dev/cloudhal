@@ -1,9 +1,10 @@
 import { previewCollections, renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { Page, Site } from "@cloudhal/core-contracts";
+import { notifyBuild } from "@cloudhal/mcp-server";
 import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { patchBody } from "../body.ts";
-import { BUILD_VIEWER_LIMIT, type BuildChange } from "../build.ts";
+import { type BuildChange, BuildViewerLimitError } from "../build.ts";
 import type { Env } from "../context.ts";
 import { pageDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
@@ -71,15 +72,21 @@ function changedSections(before: Page | undefined, after: Page): string[] {
 async function buildEvents(c: Context<Env>) {
   const { site, page } = await loadPage(c);
   const hub = c.get("build");
-  if (hub.viewers(page.id) >= BUILD_VIEWER_LIMIT)
-    return c.json({ error: "too_many_viewers", message: "too many viewers on this page" }, 429);
-  return streamSSE(c, async (stream) => {
-    const queue: BuildChange[] = [];
-    let wake: (() => void) | undefined;
-    const off = hub.subscribe(page.id, (change) => {
+  const queue: BuildChange[] = [];
+  let wake: (() => void) | undefined;
+  let off: () => void;
+  try {
+    // Following starts before the snapshot is read, so no change between the two is missed.
+    off = await hub.subscribe(page.id, (change) => {
       queue.push(change);
       wake?.();
     });
+  } catch (e) {
+    if (e instanceof BuildViewerLimitError)
+      return c.json({ error: "too_many_viewers", message: e.message }, 429);
+    throw e;
+  }
+  return streamSSE(c, async (stream) => {
     stream.onAbort(() => {
       off();
       wake?.();
@@ -178,12 +185,14 @@ export const pages: Hono<Env> = new Hono<Env>()
     if (body.id !== param(c, "pageId") || body.siteId !== param(c, "siteId"))
       throw badRequest("ids must match the URL");
     const saved = await c.get("store").updatePage(body, { writer: writerOf(c) });
-    c.get("build").pageChanged({
-      siteId: saved.siteId,
-      page: saved,
-      tool: "studio",
-      actor: c.get("actor") ?? { kind: "system", id: "sys_studio" },
-    });
+    await notifyBuild(() =>
+      c.get("build").pageChanged({
+        siteId: saved.siteId,
+        page: saved,
+        tool: "studio",
+        actor: c.get("actor") ?? { kind: "system", id: "sys_studio" },
+      }),
+    );
     return c.json(saved);
   })
   // RFC-0014 §4: operations on a markdown rich-text section's blocks.
