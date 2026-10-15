@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { createBlockRegistry, defineBlockTypes } from "../src/blocks.ts";
 import {
   applyPatch,
+  bodySurfaces,
   catalogPrompt,
+  checkBodySurfaces,
   checkSurface,
   createCatalog,
   evaluateCondition,
   nearestComponent,
   PatchError,
+  parseSurfaceFence,
   patchPage,
   repairComponent,
   resolveProps,
@@ -475,5 +478,91 @@ describe("store: surface sections (RFC-0020 §1)", () => {
       sections: [...home.sections, surface([{ id: "root", component: "hologram" }])],
     });
     expect(kept.sections.at(-1)).toMatchObject({ kind: "surface" });
+  });
+});
+
+describe("surfaces in bodies (RFC-0020 §5)", () => {
+  const body = [
+    "Our plans changed this year.",
+    "",
+    '```surface {"id":"pricing","catalog":"blog@1"}',
+    '{"data":{"billing":"monthly"}}',
+    '{"id":"root","component":"Stack","children":["t"]}',
+    '{"id":"t","component":"Text","props":{"text":{"path":"/billing"}}}',
+    "```",
+    "",
+    "```js",
+    '```surface {"id":"not-a-fence","catalog":"blog@1"}',
+    "```",
+  ].join("\n");
+
+  it("finds fences, merges data lines and skips fences inside other code blocks", () => {
+    const fences = bodySurfaces(body);
+    expect(fences).toHaveLength(1);
+    expect(fences[0]).toMatchObject({ id: "pricing", catalog: "blog@1", complete: true, line: 2 });
+    expect(fences[0]?.section.data).toEqual({ billing: "monthly" });
+    expect(fences[0]?.section.components.map((c) => c.id)).toEqual(["root", "t"]);
+    expect(checkBodySurfaces(body, catalog)).toEqual([]);
+  });
+
+  it("reports unclosed fences, bad lines, duplicate ids, entry sources and component problems", () => {
+    const bad = [
+      '```surface {"id":"a","catalog":"blog@1"}',
+      '{"id":"root","component":"Heading","props":{"level":9}}',
+      "not json",
+      "```",
+      '```surface {"id":"a","catalog":"blog@1"}',
+      '{"data":{"latest":{"$source":"entries","query":{"collection":"posts","limit":3}}}}',
+      '{"id":"root","component":"Divider"}',
+    ].join("\n");
+    expect(checkBodySurfaces(bad, catalog).map((i) => `${i.path} ${i.message}`)).toEqual([
+      "/surface/a/lines/1 not one JSON object",
+      "/surface/a/components/0/props/text required",
+      "/surface/a/components/0/props/level at most 4",
+      "/surface/a the fence is not closed",
+      "/surface/a/info/id used by another fence",
+      "/surface/a/lines/0/data/latest entry sources work in page surfaces only",
+    ]);
+  });
+
+  it("parses only whole lines while a body streams", () => {
+    const partial = parseSurfaceFence(
+      '{"id":"live","catalog":"blog@1"}',
+      ['{"id":"root","component":"Divider"}'],
+      false,
+    );
+    expect(partial).toMatchObject({ complete: false, issues: [] });
+    expect(partial.section.components).toHaveLength(1);
+  });
+
+  it("teaches models the fence syntax", () => {
+    expect(catalogPrompt(catalog)).toContain('```surface {"id":"pricing","catalog":"blog@1"}');
+  });
+});
+
+describe("store: surfaces in entry bodies", () => {
+  it("refuses a broken fence and keeps a good one", async () => {
+    const { MemoryBlobStore } = await import("@cloudhal/storage");
+    const { BetterSqlite3Driver } = await import("@cloudhal/storage/sqlite");
+    const { SiteGraphStore, seedStarterSite } = await import("../src/index.ts");
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    await store.init();
+    const site = await seedStarterSite(store, { name: "Fences", slug: "fences" });
+    const [entry] = await store.listContentEntries(site.id, "posts");
+    if (!entry) throw new Error("no entry");
+    const fence = (component: string) =>
+      `Intro\n\n\`\`\`surface {"id":"box","catalog":"blog@1"}\n{"id":"root","component":"${component}"}\n\`\`\`\n`;
+    const saved = await store.updateContentEntry({
+      ...entry,
+      body: { format: "markdown", value: fence("Divider") },
+    });
+    expect(saved.body.value).toContain("```surface");
+    await expect(
+      store.updateContentEntry({ ...saved, body: { format: "markdown", value: fence("Heading") } }),
+    ).rejects.toMatchObject({
+      code: "invalid_surface",
+      details: { issues: [{ path: "/surface/box/components/0/props/text", message: "required" }] },
+    });
   });
 });

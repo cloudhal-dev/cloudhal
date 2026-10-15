@@ -176,3 +176,42 @@ describe("entry sources", () => {
     expect((tree.data.latest as unknown[]).length).toBe(2);
   });
 });
+
+describe("surfaces in markdown bodies (RFC-0020 §5)", () => {
+  const md = [
+    "Before",
+    "",
+    '```surface {"id":"box","catalog":"blog@1"}',
+    '{"data":{"word":"Hello <b>"}}',
+    '{"id":"root","component":"Stack","children":["t"]}',
+    '{"id":"t","component":"Text","props":{"text":{"path":"/word"}}}',
+    "```",
+    "",
+    "```js",
+    "const x = 1;",
+    "```",
+  ].join("\n");
+
+  it("renders a fence as a surface and leaves other fences as code", async () => {
+    const { renderMarkdown } = await import("../src/markdown.ts");
+    const html = renderMarkdown(md);
+    expect(html).toContain('data-kind="surface"');
+    expect(html).toContain("Hello &lt;b&gt;");
+    expect(html).toContain('<code class="language-js">const x = 1;');
+    expect(html).not.toContain("```surface");
+  });
+
+  it("hands a fence to the theme as a slot when the theme draws components", async () => {
+    const { createBlockRegistry } = await import("@cloudhal/core-ts/blocks");
+    const { renderBodyParts, SURFACE_SLOT } = await import("../src/markdown.ts");
+    const parts = renderBodyParts({ format: "markdown", value: md }, undefined, {
+      registry: createBlockRegistry(),
+      components: new Set(["testimonial"]),
+    });
+    const slot = parts.find((p) => "slot" in p);
+    expect(slot && "slot" in slot ? slot.slot.type : undefined).toBe(SURFACE_SLOT);
+    expect(
+      slot && "slot" in slot ? (slot.slot.props.surface as SurfaceSection).components : [],
+    ).toHaveLength(2);
+  });
+});

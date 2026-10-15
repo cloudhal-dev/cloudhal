@@ -3,6 +3,7 @@ import { type BlockRegistry, createBlockRegistry } from "@cloudhal/core-ts/block
 import { type DirectiveToken, directiveExtension } from "@cloudhal/core-ts/body-blocks";
 import { checkDirective, directiveProps } from "@cloudhal/core-ts/directives";
 import { ASSET_HREF, assetUrl, mediaPath } from "@cloudhal/core-ts/media";
+import { parseSurfaceFence } from "@cloudhal/core-ts/surfaces";
 import { Marked } from "marked";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
 import {
@@ -16,6 +17,7 @@ import {
 } from "./media.ts";
 import { safeHref, safeSrc } from "./safe-urls.ts";
 import { sanitizeHtml } from "./sanitize.ts";
+import { renderSurface } from "./surfaces.ts";
 
 export type { MediaContext } from "./media.ts";
 
@@ -128,6 +130,9 @@ const builtInTypes = createBlockRegistry();
 /** A theme's blocks in the body being rendered right now (`renderBodyParts`). */
 let themed: { registry: BlockRegistry; names: ReadonlySet<string>; slots: BlockSlot[] } | undefined;
 
+/** A body slot holding a ```surface fence (RFC-0020 §5); not a block type name (those are kebab). */
+export const SURFACE_SLOT = "@surface";
+
 /** Where a theme component goes in a body's HTML (`renderBodyParts`); escaped text never matches. */
 const SLOT = (i: number) => `<!--ch-block-slot:${i}-->`;
 const SLOT_RE = /<!--ch-block-slot:(\d+)-->/;
@@ -183,6 +188,22 @@ md.use({
   renderer: {
     html({ text }) {
       return escapeHtml(text);
+    },
+    // RFC-0020 §5: a ```surface fence is generative UI. With the theme's components it becomes a
+    // slot `Body.astro` fills with `Surface.astro`; otherwise Cloudhal's own markup. Any other
+    // fence is ordinary code.
+    code({ text, lang }) {
+      const info = /^surface(?:\s+(.*))?$/s.exec(lang ?? "");
+      if (!info) return false;
+      const fence = parseSurfaceFence(info[1] ?? "", text.split("\n"));
+      if (themed) {
+        themed.slots.push({ type: SURFACE_SLOT, props: { surface: fence.section } });
+        return SLOT(themed.slots.length - 1);
+      }
+      return renderSurface(fence.section, {
+        ...(current ? { media: current } : {}),
+        ...(current?.preview ? { preview: true } : {}),
+      });
     },
     // h2–h6 get ids for a table of contents and deep links; the h1 is the article's own title.
     heading({ tokens, depth }) {
@@ -291,7 +312,11 @@ export function renderBodyParts(
   ctx: MediaContext | undefined,
   blocks: { registry: BlockRegistry; components: ReadonlySet<string> } | undefined,
 ): BodyPart[] {
-  if (body.format !== "markdown" || !blocks || !body.value.includes("::"))
+  if (
+    body.format !== "markdown" ||
+    !blocks ||
+    (!body.value.includes("::") && !body.value.includes("surface"))
+  )
     return [{ html: renderBody(body, ctx) }];
   const previous = themed;
   const slots: BlockSlot[] = [];

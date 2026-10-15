@@ -14,6 +14,11 @@ import { isLossy, mergeBlocks, type SplitMarkdown, splitMarkdown } from "./markd
 
 /** Block types the editor never models: kept verbatim as source blocks. */
 const SOURCE_ONLY = new Set(["html", "def"]);
+/**
+ * A ```surface fence (RFC-0020 §5): generative UI whose info string carries its id and catalog.
+ * A code block would keep only the first word of that string, so the fence stays verbatim.
+ */
+const SURFACE_FENCE = /^ {0,3}(?:`{3,}|~{3,})[ \t]*surface(?:\s|$)/;
 
 /** What `load` returns: the editor document, and what `save` needs to keep untouched blocks. */
 export interface LoadedMarkdown {
@@ -73,7 +78,7 @@ export function createMarkdownCodec(extensions: AnyExtension[]): MarkdownCodec {
         normalized.push(block(node));
         continue;
       }
-      if (SOURCE_ONLY.has(unit.type)) {
+      if (SOURCE_ONLY.has(unit.type) || (unit.type === "code" && SURFACE_FENCE.test(source))) {
         content.push(sourceNode);
         normalized.push(source);
         continue;
