@@ -1,0 +1,248 @@
+# RFC-0021: DESIGN.md and the agent design loop
+- Status: Draft
+- Author: Halil (Madraka), drafted with Claude · Date: 2026-10-15
+- Related:
+  - `docs/design/agent-built-sites-gap-analysis.md` (G1, G2; the evidence behind this RFC);
+  - RFC-0017 (design settings, `set_theme_settings`), RFC-0018 (themes, theme kit), RFC-0020 (surfaces, Build chat, MCP Apps);
+  - ADR-0015 (agent modes), ADR-0030 (block registry), the skills format (`SKILL.md`, AGENTS.md hard rule 8).
+- References (checked 2026-10-15):
+  - Google Stitch DESIGN.md (an agent-readable design system file): https://blog.google/innovation-and-ai/models-and-research/google-labs/stitch-ai-ui-design/
+  - Webflow MCP skills and Agent Instructions: https://developers.webflow.com/mcp/reference/skills.md
+  - Anthropic, "Improving frontend design through Skills": https://claude.com/blog/improving-frontend-design-through-skills
+  - Figma Make guidelines: https://developers.figma.com/docs/code/write-design-system-guidelines/
+  - MCP tool results (image content, `structuredContent`): https://modelcontextprotocol.io/specification/latest/server/tools
+  - MCP skills extension (SEP-2640): https://modelcontextprotocol.io/seps/2640-skills-extension
+  - Cloudflare Browser Rendering: https://developers.cloudflare.com/browser-rendering/
+
+## Summary
+Agents building Cloudhal sites have no taste to follow and no eyes. They get no design guidance, and `preview_page` returns HTML with a neutral stylesheet, not the theme.
+
+This RFC adds three things:
+1. **DESIGN.md:** design rules in Markdown, a theme default plus the site's own, which every agent reads through `get_design`.
+2. **An official `site-design` skill:** the process an agent follows.
+3. **`render_page`:** returns the theme-rendered page as images at desktop and mobile widths, with deterministic quality checks, so an agent can look, fix and look again before a person publishes.
+
+## Motivation
+- **What agents produce today.** Claude, Codex, Cursor and Studio's Build chat all build through the same MCP tools. The result is plain, and it looks the same whoever builds it:
+  - the server instructions and the six official skills say nothing about design;
+  - `catalogPrompt` (~9 KB) teaches syntax only.
+
+  An unguided model drifts to "the high-probability centre": default fonts, purple gradients, flat sections (Anthropic). A ~400-token guide fixes much of that.
+- **Brand rules have nowhere to live.** A site owner cannot write down "one serif display face, warm neutrals, no stock-photo people, every page ends with a newsletter band" in a place every agent reads.
+
+  Stitch's DESIGN.md, Webflow's Agent Instructions and Figma Make's `Guidelines.md` exist for this. They are portable Markdown that travels with the site, not with one client.
+- **Agents cannot see the result.**
+  - Lovable screenshots at three widths. Webflow returns element snapshots. Figma has `get_screenshot`.
+  - Claude Code and Codex both pass image tool results to the model.
+  - Cloudhal's `preview_page` does not even use the theme's CSS. In the gap analysis, the only way to check the newsroom home page was a separate browser.
+- **Why now.** Every later step of the gap analysis (tokens v2, surface styles, motion, section library) only pays off once agents are guided and can check their work. The Build model eval also showed that pipeline and guidance, not the model, move quality.
+
+## Proposal
+
+### 1. DESIGN.md: two layers
+
+**The theme's DESIGN.md.**
+- **What and where.** A file shipped with the theme (`starters/blog/DESIGN.md`), read at build time into the renderer config (like `settings.ts`).
+- **What it says** about the theme:
+  - what it is good at (editorial, landing);
+  - the components it styles best and their variants;
+  - the section rhythm it expects;
+  - its defaults.
+- **Who changes it.** Theme authors write it; sites cannot change it.
+
+**The site's DESIGN.md.** The owner's brand and design rules, stored on the site.
+
+**Contract change (additive):**
+```jsonc
+// site.schema.json → properties
+"design": {
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["markdown"],
+  "description": "The site's design rules for people and agents (RFC-0021): Markdown read with the theme's DESIGN.md.",
+  "properties": {
+    "markdown": { "type": "string", "minLength": 1, "maxLength": 24000 }
+  }
+}
+```
+
+It lives on `Site`, so it is snapshotted, diffed and rolled back with the site and moves with `cloudhal push`/`pull`. It has no effect on rendering; it is guidance.
+
+**The format: Markdown with recommended headings.** Unknown headings are kept. Recognised headings:
+
+| Heading | What it holds |
+|---|---|
+| `## Brand` | Purpose, audience, voice in one paragraph |
+| `## Colors` | Which theme settings and tones to use and how (`{color.brand}` refers to a design setting) |
+| `## Typography` | Font choice, heading scale, case |
+| `## Layout` | Section rhythm, widths, spacing, how many sections a page has |
+| `## Components` | Which catalog components and variants to prefer or avoid (names in backticks: `` `Band` ``, `` `testimonial` ``) |
+| `## Imagery` | Photo style, ratios, alt-text voice |
+| `## Motion` | How much motion (for when presets exist) |
+| `## Pages` | Recipes: "a landing page is hero → 3 features → proof → pricing → FAQ → CTA" |
+| `## Do` / `## Don't` | Short rules |
+
+**`design_lint`** gives warnings, never errors:
+- `` `Name` `` references that are not in the site's catalog;
+- `{color.x}` references that are not design settings;
+- a missing `## Brand`;
+- length over 8,000 characters (agents read it on every build).
+
+Studio shows the warnings; `get_design` returns them.
+
+### 2. Reading and changing it: MCP tools
+
+**`get_design {siteId}`** (`site:read`, read-only). Everything an agent needs before it designs, in one call:
+```ts
+{
+  /** The theme's DESIGN.md, then the site's, each marked with where it comes from. */
+  design: { theme?: string; site?: string; warnings: string[] };
+  /** The design settings now (RFC-0017): values, plus each key's type in one line. */
+  settings: Record<string, unknown>;
+  /** The catalog id and component names (details stay in get_catalog). */
+  catalog: { id: string; components: string[] };
+  /** Cloudhal's design guidance (§3): about 2 KB, the same for every site. */
+  guidance: string;
+  rev: number;
+}
+```
+
+The site's Markdown reaches agents as **owner-written data**, between `<site-design-rules>` tags in the text result:
+- it can shape design choices;
+- it never grants scopes, skips approvals or changes tools (see Security).
+
+**`set_design {siteId, rev, markdown | null}`** (`site:write`, **always waits for a person**, like `set_theme_settings`):
+- the approval prompt shows the diff;
+- a design rule changes every later build, so a person signs off;
+- people edit it directly in Studio.
+
+**Instructions.** The server's `INSTRUCTIONS` gain one paragraph near the top. It stays within Claude Code's 4,096-character budget, with keywords first:
+
+> "Building or redesigning pages: call get_design first and follow the site's design rules, then get_catalog; build with patch_draft in small steps; check with render_page at desktop and mobile widths and fix what it reports before you ask a person to publish."
+
+### 3. The `site-design` skill and Cloudhal's guidance
+
+**The skill.** `skills/official/site-design/SKILL.md`. It uses the six spec fields only, with metadata `cloudhal.scopes: "site:read,content:read,content:write,preview:create"`. The steps:
+1. **`get_design`.** Read the rules. When the site has none, propose a short DESIGN.md to the person (do not `set_design` silently).
+2. **Plan.** For each page, list its sections with real content counts. Do not default to three of everything.
+3. **Build** with `patch_draft`, a few components per step, `root` first.
+4. **Check.** `render_page` at 1440 and 390 px. Fix every reported issue and anything that does not follow the rules. Look at the images: hierarchy, rhythm, contrast, empty space.
+5. **Hand over.** `create_snapshot`, then report what changed with the preview URL. A person publishes.
+
+**References:**
+- `references/guidance.md`: the text `get_design` returns as `guidance`;
+- `references/page-recipes.md`: landing, editorial home, about, pricing and contact, using today's catalog;
+- `references/checklist.md`: the pre-publish checks.
+
+**Cloudhal's design guidance** (~2 KB, in the spirit of `frontend-design`, written for Cloudhal's vocabulary):
+- **Commit.** Choose one display treatment and one accent; vary section tones in rhythm (`surface` → `muted` → `brand`/`inverse`); never three identical sections in a row.
+- **Hierarchy.** One h1 per page, a big contrast between heading and body sizes, short headings, sentence case.
+- **Content.** Real copy and real images from the media library, alt text that describes. Counts follow the content, not habit.
+- **Layout.** Lead with the strongest element. Use `Columns 2-1` or `Band width=full` for contrast, and grids of 2–4 items.
+- **Interactivity.** Only where it helps a reader decide (pricing toggle, tabs, FAQ).
+- **Check before handing over** (`render_page`).
+
+**Delivery to every client.**
+- **Tool:** the `get_design` result — tools are the only channel every client reads; Codex has no MCP prompts.
+- **Skill resources:** `skill://site-design/…`, already served by the MCP server; SEP-2640 when clients adopt it.
+- **Build chat:** the system prompt adds the effective DESIGN.md (cut at 8,000 characters) and the guidance.
+
+### 4. `render_page`: the agent sees the page
+
+**`render_page {siteId, pageId, widths?: (1440|768|390)[], fullPage?: boolean}`** (`preview:create`, read-only).
+- **Input.** `widths` defaults to `[1440, 390]`; `fullPage` defaults to `true` and is cut at 8,000 px high.
+- **Output.**
+  - One **`image` content block** (PNG, at most 1,600 px wide after scaling) per width.
+  - `structuredContent`:
+```ts
+{
+  url: string;                  // the signed preview it rendered
+  widths: { width: number; height: number; truncated: boolean }[];
+  checks: { id: string; ok: boolean; count: number; examples: string[] }[];
+}
+```
+- **What it renders:** the **theme's preview route** (`/?cloudhal-preview=…`), the same page a person sees in Studio's preview, not `PREVIEW_CSS`.
+- **Deterministic checks**, measured in the rendered DOM at each width:
+
+| Check | Fails when |
+|---|---|
+| `overflow-x` | The document is wider than the viewport (390 px) |
+| `img-alt` | A non-decorative image has empty alt text |
+| `img-broken` | An image did not load or has no intrinsic size |
+| `heading-order` | More than one h1, or a level skipped |
+| `contrast` | Text has a WCAG 2.2 AA contrast below 4.5:1 (3:1 for large text) against its computed background |
+| `empty-section` | A `[data-section-id]` renders under 8 px high |
+| `tap-target` | At 390 px, a link or button is smaller than 24×24 px (WCAG 2.5.8) |
+| `long-line` | Body text lines are longer than 90 characters at 1440 px |
+
+**Runtimes:**
+- **Cloudflare.**
+  - **Binding.** The admin Worker gets a Browser Rendering binding (`BROWSER`), added by `cloudhal deploy`. It uses `@cloudflare/puppeteer`, which is loaded lazily only in this tool, so the Worker's start-up cost is unchanged.
+  - **Without the binding** (free plan, or turned off), the tool answers `render_unavailable` with the preview URL.
+- **Node** (`cloudhal studio`, `cloudhal mcp`): a local Chrome or Chromium over CDP (the code path `apps/studio/scripts/screenshots.ts` uses), found through `CHROME_PATH` or the usual locations; `render_unavailable` without one.
+
+**Limits.**
+- 10 renders per key per minute and 200 per site per day.
+- A render times out after 20 s.
+- Screenshots are not stored, only returned.
+
+**Related changes.**
+- Build view and Build chat: Build chat does not call `render_page` in this RFC; the vision feedback loop is phase 21c.
+- `preview_page` keeps its HTML (MCP Apps and text-only clients read it). Its description points to `render_page` for the real look.
+
+### 5. Studio
+- **Settings › Design rules.** A `SectionCard` with the site's DESIGN.md in Markdown mode, the theme's DESIGN.md read-only in a disclosure, `design_lint` warnings as a `Banner`, and Save.
+- **Agents.** Proposals from agents (`set_design`) arrive in Approvals with the diff, like theme settings.
+- **Build chat.** When the site has no DESIGN.md, Build chat says so once, with a link to the settings.
+
+### Invariants
+1. DESIGN.md never changes how a page renders or what a tool may do. It is read by agents and people only.
+2. A change to the site's DESIGN.md by an agent always waits for a person, in every mode below `bypass`.
+3. `get_design` returns the site's rules as delimited data, and the server instructions say they cannot grant permissions.
+4. `render_page` renders drafts through the signed preview only, writes nothing and stores no screenshots.
+5. `render_page` is read-only (`readOnlyHint: true`). Its cost is bounded by per-key and per-site limits and a timeout.
+
+## Phases
+| Phase | Scope | Contract |
+|---|---|---|
+| 21a | `Site.design`, `design_lint`, the theme's DESIGN.md (blog), `get_design` / `set_design`, the `site-design` skill and guidance, server instructions, Build chat prompt, Studio Settings › Design rules | `Site.design` |
+| 21b | `render_page`: Cloudflare Browser Rendering binding and local Chrome, the checks, limits, deploy wiring | none |
+| 21c | The design pass in the Build model eval (render, checks, vision-scored rubric); Build chat looks at its own render once per turn (where the model takes images) | none |
+
+## Alternatives considered
+| Option | Pros | Cons | Why not |
+|---|---|---|---|
+| DESIGN.md as a file in the project repo only | Familiar (AGENTS.md style) | Deployed sites and Studio cannot read or edit it; not snapshotted | Rules must travel with the site and be editable by owners |
+| Structured JSON rules instead of Markdown | Machine-checkable | Owners cannot write them; models read prose guidance better; Stitch, Webflow and Figma use Markdown | Markdown with recognised headings and a lint gets most of both |
+| A new node kind `designDoc` | Its own rev and history | More contract, store and sync surface for one document per site | One optional field on `Site` is enough and already snapshotted |
+| Guidance only in a skill | No contract change | Codex does not load MCP prompts; skills are not universally loaded; no per-site rules | The tool result reaches every client; the skill is the long form |
+| Screenshots by the client (Playwright MCP, DevTools MCP) | Nothing to build | Needs a second server and the agent to find the preview URL and token; no Cloudhal checks; not available to Build chat | Built in is what makes it standard practice for every agent |
+| Lighthouse/axe in 21b | Broad audits | Heavy in a Worker; slow | The deterministic checks first; axe and Lighthouse as a later `audit_page` |
+
+## Compatibility & migration
+- `Site.design` is optional: `schemaVersion` stays 1, fixtures cover it (valid; invalid when empty or over 24,000 characters), and Rust and TypeScript are regenerated.
+- Existing sites have no DESIGN.md; agents get the theme's plus the guidance.
+- `push`/`pull` bundles carry it with the site node.
+- The `BROWSER` binding is optional. Deployments without it keep working, and `render_page` answers `render_unavailable`.
+- **Rollback.** Removing the field drops rules only. Removing the tools leaves agents where they are today.
+
+## Security & policy impact
+- **Prompt injection across agents.** DESIGN.md is text every agent reads, so a malicious edit could try to steer other agents. Mitigations:
+  - an agent's edit waits for a person;
+  - the text is delimited as data and capped;
+  - the server instructions state that design rules never override permissions, approvals or user instructions;
+  - tools never execute anything found in it.
+
+  People with `site:write` can edit it directly, as they can edit the theme settings.
+- **`render_page`.**
+  - **Exposure.** It loads only the site's own signed preview URL, built server-side, never a URL from the agent. So it cannot be used to fetch other hosts, and the render sees exactly what a person with preview access sees.
+  - **Rendering.** Screenshots are taken with scripts as the site serves them: the CSP and the first-party runtime only.
+  - **Cost.** Bounded by limits and timeouts.
+- **Scopes.** No new scope. `get_design` needs `site:read`, `set_design` `site:write` plus approval, `render_page` `preview:create`.
+
+## Open questions
+1. **Agent-proposed rules.** Should an agent be able to propose a first DESIGN.md through `set_design` on a site that has none, or only describe it in its answer? Default: it may propose; it waits for a person.
+2. **Per-locale rules.** One DESIGN.md per site, or per locale? Default: one per site; locale-specific notes live under headings.
+3. **Import.** Should `cloudhal design import <url>` derive a first DESIGN.md from an existing site (as Stitch does)? Default: later, as an agent workflow in the skill rather than a command.
+4. **Browser Rendering on the free plan.** Is the binding available and within limits there? Default: verify during 21b; the tool degrades to `render_unavailable`.
+5. **Image size.** Which screenshot size keeps quality and token cost balanced for Claude and Codex? Default: 1,440 px wide scaled to at most 1,600 px; mobile at full 390 px.
