@@ -100,6 +100,11 @@ export {
   type BuildActivityProps,
 } from "./blocks/BuildActivity.tsx";
 export {
+  type BuildChatItem,
+  BuildChatLog,
+  type BuildChatLogProps,
+} from "./blocks/BuildChatLog.tsx";
+export {
   type BulkAction,
   BulkActionBar,
   type BulkActionBarLabels,

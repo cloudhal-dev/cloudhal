@@ -17,6 +17,7 @@ import {
 } from "@cloudhal/ui";
 import { ArrowLeft, Plug, Pulse } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
+import { BuildChat } from "../components/BuildChat.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { EditorLayout } from "../components/EditorLayout.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
@@ -118,18 +119,21 @@ export function BuildPage() {
           />
         }
         main={
-          <SectionCard title={t("build.activity.title")} icon={<Pulse />}>
-            <BuildActivity
-              items={items}
-              labels={{
-                empty: t("build.activity.empty"),
-                emptyDescription: t("build.activity.emptyDescription"),
-                applied: t("build.activity.applied"),
-                rejected: t("build.activity.rejected"),
-              }}
-              renderTime={(iso) => <RelativeTime iso={iso} />}
-            />
-          </SectionCard>
+          <>
+            <BuildChat siteId={siteId} pageId={pageId} />
+            <SectionCard title={t("build.activity.title")} icon={<Pulse />}>
+              <BuildActivity
+                items={items}
+                labels={{
+                  empty: t("build.activity.empty"),
+                  emptyDescription: t("build.activity.emptyDescription"),
+                  applied: t("build.activity.applied"),
+                  rejected: t("build.activity.rejected"),
+                }}
+                renderTime={(iso) => <RelativeTime iso={iso} />}
+              />
+            </SectionCard>
+          </>
         }
         aside={
           <SectionCard
