@@ -82,6 +82,19 @@ describe("MCP client ↔ Cloudhal server", () => {
     expect(tools.find((t) => t.name === "get_page")?.outputSchema).toMatchObject({
       type: "object",
     });
+    // RFC-0020 §6: MCP Apps hosts show these tools' results in Cloudhal's View.
+    for (const name of ["preview_page", "patch_draft"])
+      expect(tools.find((t) => t.name === name)?._meta).toEqual({
+        ui: { resourceUri: "ui://cloudhal/preview" },
+      });
+    expect(tools.find((t) => t.name === "get_page")?._meta).toBeUndefined();
+    const view = await client.readResource({ uri: "ui://cloudhal/preview" });
+    expect(view.contents[0]).toMatchObject({
+      uri: "ui://cloudhal/preview",
+      mimeType: "text/html;profile=mcp-app",
+      _meta: { ui: { prefersBorder: true } },
+    });
+    expect(String((view.contents[0] as { text?: string }).text)).toContain('"ui/initialize"');
 
     const { resources } = await client.listResources();
     const uris = resources.map((r) => r.uri).sort();

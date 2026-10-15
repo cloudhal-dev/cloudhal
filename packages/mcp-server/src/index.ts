@@ -4,6 +4,7 @@
  * `stdio.ts` / `http.ts` are the transports.
  */
 export * from "./http.ts";
+export * from "./preview-view.ts";
 export * from "./server.ts";
 export * from "./stdio.ts";
 export * from "./tools.ts";
