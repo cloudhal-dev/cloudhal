@@ -5,7 +5,7 @@
  * page's posts and real `<a>` pagination links (every page is its own canonical URL).
  */
 import { type ArchiveView, viewPagePath } from "@cloudhal/astro-renderer/archive";
-import { renderMarkdown, safeSrc } from "@cloudhal/astro-renderer/markdown";
+import { renderMarkdown, safeHref, safeSrc } from "@cloudhal/astro-renderer/markdown";
 import { imageAttributes, type MediaContext } from "@cloudhal/astro-renderer/media";
 import type { ThemeStrings } from "../theme.ts";
 import Breadcrumbs from "./Breadcrumbs.astro";
@@ -38,6 +38,12 @@ const attrs =
       })
     : undefined;
 const imageSrc = image && !attrs ? safeSrc(image.src) : undefined;
+// An author's page (RFC-0019 §1): their role and profile links (safe schemes only).
+const role = label?.role;
+const links = (archive.term.links ?? []).flatMap((l) => {
+  const href = safeHref(l.href);
+  return href ? [{ ...l, href }] : [];
+});
 const crumbs = [
   { name: t.home, href: "/" },
   ...archive.trail.map((s) => ({ name: s.name, href: s.href })),
@@ -49,6 +55,14 @@ const crumbs = [
   <header class="ch-archive-header">
     {kind && <p class="ch-archive-kind">{kind}</p>}
     <h1>{archive.shown.name}</h1>
+    {role && <p class="ch-archive-role">{role}</p>}
+    {links.length > 0 && (
+      <ul class="ch-archive-links">
+        {links.map((l) => (
+          <li><a href={l.href} rel={l.external ? "me noopener noreferrer" : "me"}>{l.label}</a></li>
+        ))}
+      </ul>
+    )}
     <p class="ch-archive-meta">
       <span>{t.posts(archive.total)}</span>
       {archive.feedPath && <a href={archive.feedPath}>{t.feed}</a>}

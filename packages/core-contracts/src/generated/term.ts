@@ -91,6 +91,23 @@ export interface Term {
   position?: number;
   image?: ImageRef;
   /**
+   * Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1).
+   *
+   * @maxItems 10
+   */
+  links?:
+    | []
+    | [Link]
+    | [Link, Link]
+    | [Link, Link, Link]
+    | [Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link, Link, Link, Link, Link]
+    | [Link, Link, Link, Link, Link, Link, Link, Link, Link, Link];
+  /**
    * Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.
    *
    * @minItems 1
@@ -124,6 +141,10 @@ export interface TermLabel {
    * Markdown introduction shown at the top of the archive.
    */
   description?: string;
+  /**
+   * A short role or title shown with the term, such as an author's "Senior reporter" (RFC-0019 §1).
+   */
+  role?: string;
   seo?: Seo;
 }
 /**
@@ -154,6 +175,15 @@ export interface ImageRef {
   alt: string;
   width?: number;
   height?: number;
+}
+/**
+ * This interface was referenced by `Term`'s JSON-Schema
+ * via the `definition` "Link".
+ */
+export interface Link {
+  label: string;
+  href: string;
+  external?: boolean;
 }
 /**
  * This interface was referenced by `Term`'s JSON-Schema

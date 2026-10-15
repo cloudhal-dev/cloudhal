@@ -248,11 +248,14 @@ export function entryHead(
       ? taxonomy.keywords.join(", ")
       : undefined;
   const publisher = { "@type": "Organization", name: site.name, url: `${origin}/` };
-  // A person's byline is a Person; work done by an agent or the system is credited to the site.
+  // RFC-0019 §1: the byline's authors, each a Person with their archive and profiles; without a
+  // byline, a person who wrote it is the author, and work by an agent or the system is the site's.
   const author =
-    entry.author.kind === "human" && entry.author.name
-      ? { "@type": "Person", name: entry.author.name }
-      : publisher;
+    taxonomy.authors.length > 0
+      ? taxonomy.authors.map((a) => personOf(a, origin, entry.locale))
+      : entry.author.kind === "human" && entry.author.name
+        ? { "@type": "Person", name: entry.author.name }
+        : publisher;
   return {
     title,
     ...(description ? { description } : {}),
@@ -305,6 +308,26 @@ export function pageLabel(locale: string, page: number): string {
  * the term as a `DefinedTerm`, its `ItemList`, and a `BreadcrumbList` through the ancestors), and
  * later pages get a "Page n" title and neither. Thin archives are `noindex,follow`.
  */
+/** An author term as a schema.org Person: name, role, archive URL, portrait, profiles. */
+function personOf(a: ShownTerm, origin: string, locale: string): Record<string, unknown> {
+  const label = a.term.labels[locale] ?? Object.values(a.term.labels)[0];
+  const sameAs = (a.term.links ?? []).map((l) => l.href).filter((h) => /^https:\/\//.test(h));
+  return {
+    "@type": "Person",
+    name: a.name,
+    ...(label?.role ? { jobTitle: label.role } : {}),
+    ...(a.href ? { url: `${origin}${a.href}` } : {}),
+    ...(a.term.image?.src && /^(https:\/\/|\/)/.test(a.term.image.src)
+      ? {
+          image: a.term.image.src.startsWith("/")
+            ? `${origin}${a.term.image.src}`
+            : a.term.image.src,
+        }
+      : {}),
+    ...(sameAs.length ? { sameAs } : {}),
+  };
+}
+
 export function archiveHead(
   site: Site,
   view: ArchiveView,
@@ -327,11 +350,14 @@ export function archiveHead(
     : undefined;
   const image = cardImage(label?.seo?.ogImage ?? view.term.image, origin, locale, media);
   const root = `${origin}${view.root}`;
+  const isAuthor = view.taxonomy.key === "author";
   const jsonLd: object[] = first
     ? [
         {
           "@context": "https://schema.org",
-          "@type": "CollectionPage",
+          // RFC-0019 §1: an author's archive is their profile page.
+          "@type": isAuthor ? ["CollectionPage", "ProfilePage"] : "CollectionPage",
+          ...(isAuthor ? { mainEntity: personOf(shown, origin, locale) } : {}),
           name: shown.name,
           url: own,
           ...(description ? { description } : {}),
@@ -339,7 +365,7 @@ export function archiveHead(
           inLanguage: locale,
           isPartOf: { "@type": "WebSite", name: site.name, url: `${origin}/` },
           about: definedTerm(shown, origin, locale),
-          mainEntity: {
+          [isAuthor ? "hasPart" : "mainEntity"]: {
             "@type": "ItemList",
             numberOfItems: view.total,
             itemListElement: view.entries.map((e, i) => ({

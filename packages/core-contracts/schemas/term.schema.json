@@ -55,6 +55,12 @@
       "maximum": 100000
     },
     "image": { "$ref": "common.schema.json#/$defs/ImageRef" },
+    "links": {
+      "type": "array",
+      "description": "Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1).",
+      "maxItems": 10,
+      "items": { "$ref": "common.schema.json#/$defs/Link" }
+    },
     "slugHistory": {
       "type": "array",
       "description": "Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.",
@@ -92,6 +98,12 @@
           "type": "string",
           "description": "Markdown introduction shown at the top of the archive.",
           "maxLength": 20000
+        },
+        "role": {
+          "type": "string",
+          "description": "A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).",
+          "minLength": 1,
+          "maxLength": 120
         },
         "seo": { "$ref": "common.schema.json#/$defs/Seo" }
       }

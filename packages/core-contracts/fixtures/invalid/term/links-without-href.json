@@ -1,0 +1,17 @@
+{
+  "reason": "every profile link has a label and an href",
+  "data": {
+    "schemaVersion": 1,
+    "id": "term_01HZX8K3QAU3",
+    "siteId": "site_01HZX8K3Q9EF",
+    "taxonomyId": "tax_01HZX8K3Q9AU",
+    "slug": "nolink",
+    "status": "active",
+    "visibility": "public",
+    "labels": { "en": { "name": "No link" } },
+    "links": [{ "label": "Website" }],
+    "rev": 0,
+    "createdAt": "2026-10-15T09:00:00Z",
+    "updatedAt": "2026-10-15T09:00:00Z"
+  }
+}

@@ -818,6 +818,11 @@ export class SiteGraphStore {
     return this.#tax.createDefaultTaxonomies(site, options);
   }
 
+  /** RFC-0019 §1: the `author` taxonomy for bylines, created when missing. */
+  createAuthorTaxonomy(site: Site): Promise<Taxonomy> {
+    return this.#tax.createAuthorTaxonomy(site);
+  }
+
   getTaxonomy(id: string): Promise<Taxonomy | undefined> {
     return this.#tax.getTaxonomy(id);
   }
