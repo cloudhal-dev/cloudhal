@@ -353,6 +353,12 @@ export const tr: Messages = {
       image: "Görsel",
       contentList: "İçerik listesi",
       component: "Blok",
+      surface: "Üretilmiş arayüz",
+    },
+    surface: {
+      title: "Üretilmiş arayüz · {count} bileşen",
+      hint: "Bir ajan temanın kataloğundan kurdu. Değiştirmek için ajandan isteyin; Studio şimdilik salt okunur gösteriyor.",
+      json: "Veri olarak üretilmiş arayüz",
     },
     blocks: {
       menu: "Bloklar",

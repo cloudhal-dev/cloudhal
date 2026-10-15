@@ -3,6 +3,7 @@ import type { BlockType } from "@cloudhal/core-ts/blocks";
 import {
   ApprovalDialog,
   Badge,
+  Banner,
   Button,
   DeleteResource,
   DropdownMenu,
@@ -30,6 +31,7 @@ import {
   ListBullets,
   Plus,
   Rows,
+  Sparkle,
   TextAlignLeft,
   TextHOne,
   Trash,
@@ -86,6 +88,7 @@ const KIND_ICON: Record<Section["kind"], Icon> = {
   image: ImageIcon,
   contentList: ListBullets,
   component: Cube,
+  surface: Sparkle,
 };
 
 const sectionId = () => `sec_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -105,6 +108,9 @@ function newSection(kind: Section["kind"], heading: string): Section {
     case "component":
       // Component sections start from a block type (`newBlockSection`), not from here.
       return { id, kind, type: "callout", props: {} };
+    case "surface":
+      // Surfaces are built by agents (RFC-0020); Studio does not offer an empty one.
+      return { id, kind, catalog: "cloudhal@1", components: [{ id: "root", component: "Stack" }] };
   }
 }
 
@@ -151,6 +157,30 @@ function SectionForm({
 }) {
   const t = useT();
   switch (section.kind) {
+    // RFC-0020 phase 20a: surfaces are built and changed by agents (`patch_draft`); Studio shows
+    // them read-only until the Build view (20b).
+    case "surface":
+      return (
+        <div className="grid min-w-0 gap-3" data-surface={section.id}>
+          <Banner
+            icon={<Sparkle weight="fill" />}
+            title={t("editor.surface.title", { count: section.components.length })}
+            description={t("editor.surface.hint")}
+          />
+          <InputArea
+            aria-label={t("editor.surface.json")}
+            value={JSON.stringify(
+              { components: section.components, data: section.data ?? {} },
+              null,
+              2,
+            )}
+            readOnly
+            autoResize
+            maxRows={16}
+            className="w-full font-mono"
+          />
+        </div>
+      );
     case "component":
       return (
         <ComponentSectionForm

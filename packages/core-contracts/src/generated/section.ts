@@ -9,7 +9,12 @@
  * A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.
  */
 export type Section =
-  HeroSection | RichTextSection | ImageSection | ContentListSection | ComponentSection;
+  | HeroSection
+  | RichTextSection
+  | ImageSection
+  | ContentListSection
+  | ComponentSection
+  | SurfaceSection;
 /**
  * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
  */
@@ -36,6 +41,10 @@ export type BodyBlocks = BodyBlock[];
  * Lower-case URL segment.
  */
 export type Slug = string;
+/**
+ * A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).
+ */
+export type SurfaceComponentId = string;
 
 export interface HeroSection {
   id: Id;
@@ -126,6 +135,51 @@ export interface ComponentSection {
    * Validated against the type's props schema by the store, not by this contract.
    */
   props: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.
+ */
+export interface SurfaceSection {
+  id: Id;
+  kind: "surface";
+  /**
+   * The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).
+   */
+  catalog: string;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  components: [SurfaceComponent, ...SurfaceComponent[]];
+  /**
+   * The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).
+   */
+  data?: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.
+ */
+export interface SurfaceComponent {
+  id: SurfaceComponentId;
+  component: string;
+  /**
+   * @maxItems 200
+   */
+  children?: SurfaceComponentId[];
+  /**
+   * Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.
+   */
+  props?: {
+    [k: string]: unknown | undefined;
+  };
+  /**
+   * A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.
+   */
+  visible?: {
     [k: string]: unknown | undefined;
   };
 }

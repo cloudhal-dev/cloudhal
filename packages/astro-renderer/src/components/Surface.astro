@@ -1,0 +1,32 @@
+---
+/**
+ * A surface section (RFC-0020): its tree drawn with the theme's components where it has them and
+ * Cloudhal's markup elsewhere. `sources` are the page's loaded entry sources for this surface
+ * (`loadSurfaceSources`); unknown, hidden and still-arriving components are left out.
+ */
+import type { SurfaceSection } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import { themeRegistry } from "../blocks.ts";
+import type { MediaContext } from "../media.ts";
+import { type SurfaceEntryCard, surfaceScope, surfaceTree, surfaceWrapper } from "../surfaces.ts";
+import SurfaceNode from "./SurfaceNode.astro";
+
+interface Props {
+  section: SurfaceSection;
+  blocks?: Record<string, unknown>;
+  blockTypes?: readonly BlockType[];
+  media?: MediaContext;
+  sources?: Record<string, SurfaceEntryCard[]>;
+}
+const { section, blocks = {}, blockTypes, media, sources } = Astro.props;
+const preview = media?.preview === true;
+const tree = surfaceTree(section, { registry: themeRegistry(blockTypes), media, sources, preview });
+const [open, close] = surfaceWrapper(section);
+---
+{tree.root && (
+  <Fragment>
+    <Fragment set:html={open} />
+    <SurfaceNode node={tree.root} scope={surfaceScope(section)} blocks={blocks} media={media} preview={preview} />
+    <Fragment set:html={close} />
+  </Fragment>
+)}

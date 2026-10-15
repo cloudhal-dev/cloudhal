@@ -1,0 +1,25 @@
+{
+  "id": "sec_surface0001",
+  "kind": "surface",
+  "catalog": "blog@1",
+  "components": [
+    { "id": "root", "component": "Stack", "children": ["title", "switch", "table"] },
+    {
+      "id": "title",
+      "component": "Heading",
+      "props": { "level": 2, "text": { "path": "/headline" } }
+    },
+    {
+      "id": "switch",
+      "component": "Toggle",
+      "props": { "options": ["monthly", "yearly"], "value": { "path": "/billing" } }
+    },
+    {
+      "id": "table",
+      "component": "pricing-table",
+      "props": { "period": { "path": "/billing" } },
+      "visible": { "ne": [{ "path": "/billing" }, ""] }
+    }
+  ],
+  "data": { "headline": "Pricing", "billing": "monthly" }
+}

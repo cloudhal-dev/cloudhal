@@ -1,0 +1,54 @@
+---
+/**
+ * One node of a surface (RFC-0020 §1): the theme's own component when its `blocks` map names the
+ * component (primitives included, e.g. `Card`), given `{ props, node, content, contentHtml, media }`
+ * with the children in its slot; else Cloudhal's markup around the children.
+ */
+import { renderMarkdown } from "../markdown.ts";
+import type { MediaContext } from "../media.ts";
+import { blockNodeHtml, CHILDREN, primitiveHtml, type SurfaceNode } from "../surfaces.ts";
+
+interface Props {
+  node: SurfaceNode;
+  scope: string;
+  blocks?: Record<string, unknown>;
+  media?: MediaContext;
+  preview?: boolean;
+}
+const { node, scope, blocks = {}, media, preview } = Astro.props;
+type AnyComponent = (props: never) => unknown;
+const Own = blocks[node.component] as AnyComponent | undefined;
+const content = typeof node.props.content === "string" ? node.props.content : undefined;
+const contentHtml = Own && content !== undefined ? renderMarkdown(content, media) : undefined;
+let leaf = "";
+let open = "";
+let close = "";
+if (!Own) {
+  const html =
+    node.entry.kind === "block"
+      ? blockNodeHtml(node, media, preview)
+      : primitiveHtml(node, scope, media);
+  const at = html.indexOf(CHILDREN);
+  if (at < 0) leaf = html;
+  else {
+    open = html.slice(0, at);
+    close = html.slice(at + CHILDREN.length);
+  }
+}
+const Self = Astro.self;
+---
+{Own ? (
+  <Own props={node.props} node={node} content={content} contentHtml={contentHtml} media={media}>
+    {node.children.map((child) => <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />)}
+  </Own>
+) : leaf ? (
+  <Fragment set:html={leaf} />
+) : (
+  open && (
+    <Fragment>
+      <Fragment set:html={open} />
+      {node.children.map((child) => <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />)}
+      <Fragment set:html={close} />
+    </Fragment>
+  )
+)}

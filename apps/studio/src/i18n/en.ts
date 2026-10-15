@@ -352,6 +352,12 @@ export const en = {
       image: "Image",
       contentList: "Content list",
       component: "Block",
+      surface: "Generated UI",
+    },
+    surface: {
+      title: "Generated UI · {count} components",
+      hint: "Built by an agent from the theme's catalog. Change it by asking the agent; Studio shows it read-only for now.",
+      json: "Generated UI as data",
     },
     blocks: {
       menu: "Blocks",

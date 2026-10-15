@@ -1,0 +1,9 @@
+{
+  "reason": "component names are PascalCase primitives or kebab-case block types, never markup",
+  "data": {
+    "id": "sec_surface0004",
+    "kind": "surface",
+    "catalog": "blog@1",
+    "components": [{ "id": "root", "component": "<script>" }]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "reason": "a surface names the catalog it was written for",
+  "data": {
+    "id": "sec_surface0002",
+    "kind": "surface",
+    "components": [{ "id": "root", "component": "Stack" }]
+  }
+}

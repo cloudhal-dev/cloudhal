@@ -10,13 +10,17 @@
 import type { ContentEntry, Section } from "@cloudhal/core-contracts";
 import type { BlockType } from "@cloudhal/core-ts/blocks";
 import type { MediaContext } from "../media.ts";
+import type { SurfaceEntryCard } from "../surfaces.ts";
 import Block from "./Block.astro";
 import ContentList from "./ContentList.astro";
 import Hero from "./Hero.astro";
 import Image from "./Image.astro";
 import RichText from "./RichText.astro";
+import Surface from "./Surface.astro";
 
-export type SectionComponents = Partial<Record<Exclude<Section["kind"], "component">, unknown>>;
+export type SectionComponents = Partial<
+  Record<Exclude<Section["kind"], "component" | "surface">, unknown>
+>;
 /** A theme's components for block types (RFC-0015), by type name. */
 export type BlockComponents = Record<string, unknown>;
 
@@ -28,18 +32,30 @@ interface Props {
   /** The theme's block types (`src/blocks.ts`): checked before its components render them. */
   blockTypes?: readonly BlockType[];
   media?: MediaContext;
+  /** Surfaces' entry sources by section id, then data key (`loadSurfaceSources`, RFC-0020 §3). */
+  surfaceSources?: Record<string, Record<string, SurfaceEntryCard[]>>;
 }
-const { sections, entries = {}, components = {}, blocks = {}, blockTypes, media } = Astro.props;
+const {
+  sections,
+  entries = {},
+  components = {},
+  blocks = {},
+  blockTypes,
+  media,
+  surfaceSources = {},
+} = Astro.props;
 const defaults = { hero: Hero, richText: RichText, image: Image, contentList: ContentList };
 type AnyComponent = (props: never) => unknown;
 const resolved = { ...defaults, ...components } as Record<
-  Exclude<Section["kind"], "component">,
+  Exclude<Section["kind"], "component" | "surface">,
   AnyComponent | undefined
 >;
 ---
 {sections.map((section) => {
   if (section.kind === "component")
     return <Block section={section} blocks={blocks} blockTypes={blockTypes} {...(media ? { media } : {})} />;
+  if (section.kind === "surface")
+    return <Surface section={section} blocks={blocks} blockTypes={blockTypes} sources={surfaceSources[section.id]} {...(media ? { media } : {})} />;
   const Component = resolved[section.kind];
   if (!Component) return <div data-unknown-section={section.kind} />;
   return section.kind === "contentList"

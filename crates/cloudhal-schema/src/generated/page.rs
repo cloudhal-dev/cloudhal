@@ -1077,6 +1077,17 @@ pub enum Section {
         #[serde(rename = "type")]
         type_: SectionType,
     },
+    #[doc = "SurfaceSection\n\nA generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits."]
+    #[serde(rename = "surface")]
+    Surface {
+        #[doc = "The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest)."]
+        catalog: SectionCatalog,
+        components: ::std::vec::Vec<SurfaceComponent>,
+        #[doc = "The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size)."]
+        #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+        data: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+        id: Id,
+    },
 }
 #[doc = "`SectionBody`"]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -1167,6 +1178,60 @@ impl ::std::convert::TryFrom<::std::string::String> for SectionCaption {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for SectionCaption {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct SectionCatalog(::std::string::String);
+impl ::std::ops::Deref for SectionCatalog {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<SectionCatalog> for ::std::string::String {
+    fn from(value: SectionCatalog) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for SectionCatalog {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for SectionCatalog {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for SectionCatalog {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SectionCatalog {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,
@@ -1709,6 +1774,130 @@ impl ::std::convert::TryFrom<::std::string::String> for Slug {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for Slug {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SurfaceComponent {
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub children: ::std::vec::Vec<SurfaceComponentId>,
+    pub component: SurfaceComponentComponent,
+    pub id: SurfaceComponentId,
+    #[doc = "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract."]
+    #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+    pub props: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+    #[doc = "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store."]
+    #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+    pub visible: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+}
+#[doc = "`SurfaceComponentComponent`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct SurfaceComponentComponent(::std::string::String);
+impl ::std::ops::Deref for SurfaceComponentComponent {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<SurfaceComponentComponent> for ::std::string::String {
+    fn from(value: SurfaceComponentComponent) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for SurfaceComponentComponent {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err(
+                "doesn't match pattern \"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$\""
+                    .into(),
+            );
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for SurfaceComponentComponent {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for SurfaceComponentComponent {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SurfaceComponentComponent {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct SurfaceComponentId(::std::string::String);
+impl ::std::ops::Deref for SurfaceComponentId {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<SurfaceComponentId> for ::std::string::String {
+    fn from(value: SurfaceComponentId) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for SurfaceComponentId {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z][a-z0-9-]{0,40}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][a-z0-9-]{0,40}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for SurfaceComponentId {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for SurfaceComponentId {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SurfaceComponentId {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

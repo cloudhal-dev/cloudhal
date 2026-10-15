@@ -23,7 +23,11 @@ import {
   effectiveMode,
   ownOnlyChangeSet,
 } from "@cloudhal/agent-runtime";
-import { renderEntryPreview, renderPagePreview } from "@cloudhal/astro-renderer/preview";
+import {
+  previewCollections,
+  renderEntryPreview,
+  renderPagePreview,
+} from "@cloudhal/astro-renderer/preview";
 import type { Actor, Asset, ContentEntry, Page, Section, Site } from "@cloudhal/core-contracts";
 import {
   ContentEntrySchema,
@@ -40,7 +44,17 @@ import {
   termName,
   unknownBlockTypes,
 } from "@cloudhal/core-ts";
+import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
+import {
+  type Catalog,
+  catalogPrompt,
+  createCatalog,
+  type PatchOp,
+  patchPage,
+  SURFACE_LIMITS,
+  SurfacePatchError,
+} from "@cloudhal/core-ts/surfaces";
 import {
   afterRunCall,
   checkRunBudget,
@@ -93,6 +107,11 @@ import {
 } from "./terms.ts";
 
 /** Body blocks an agent changes carry it and the MCP channel (RFC-0014 §3). */
+/** The catalog surfaces on this site are written against: the theme's name and its block types. */
+function siteCatalog(site: Site, ctx: { store: { blocks: BlockRegistry } }): Catalog {
+  return createCatalog({ name: site.theme.name, blocks: ctx.store.blocks });
+}
+
 function mcpWriter(ctx: { principal: { actor: Actor } }): BlockWriter {
   return { actor: ctx.principal.actor, via: "mcp" };
 }
@@ -579,6 +598,117 @@ function rawTools(): ToolDefinition[] {
           const saved = await ctx.store.updatePage(next, { writer: mcpWriter(ctx) });
           const snapshot = await autoSnapshot(ctx, page.siteId, "update_page");
           return { page: saved, snapshot, ...unknownBlocksOf(ctx, { sections: saved.sections }) };
+        } catch (e) {
+          mapError(e);
+        }
+      },
+    },
+    {
+      name: "get_catalog",
+      title: "Get the UI catalog",
+      description:
+        "The components a page surface may use on this site (RFC-0020): Cloudhal's layout, content and interactive primitives plus the theme's block types, with their props, child rules, bindings ({path}), named functions, visibility conditions and limits, as instructions to follow. Read it before building or changing surfaces with patch_draft.",
+      inputSchema: obj({ siteId: id }, ["siteId"]),
+      outputSchema: obj(
+        {
+          catalog: { type: "string" },
+          components: { type: "array", items: { type: "string" } },
+          instructions: { type: "string" },
+        },
+        ["catalog", "components", "instructions"],
+      ),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      scopes: ["content:read"],
+      handler: async (a, ctx) => {
+        const site = await requireSite(ctx, a.siteId as string);
+        const catalog = siteCatalog(site, ctx);
+        return {
+          catalog: catalog.id,
+          components: catalog.names(),
+          instructions: catalogPrompt(catalog, site.defaultLocale),
+        };
+      },
+    },
+    {
+      name: "patch_draft",
+      title: "Patch a page draft",
+      description:
+        'Build or change a page step by step with RFC 6902 JSON Patch operations on /title, /sections and /seo, e.g. {"op":"add","path":"/sections/-","value":{…a surface…}}. Every call is checked as a whole: misspelt component names are snapped to the catalog, unknown props dropped and missing required ones filled from the example (all listed in `repairs`), then every surface is validated. Failures come back as `invalid_surface` with VALIDATION_FAILED issues carrying JSON Pointers: fix those parts and send again. Requires the page\'s current `rev`; writes the draft and snapshots afterwards. Never publishes. Read get_catalog first.',
+      inputSchema: obj(
+        {
+          siteId: id,
+          pageId: id,
+          rev: { type: "integer", minimum: 0 },
+          ops: {
+            type: "array",
+            minItems: 1,
+            maxItems: SURFACE_LIMITS.opsPerCall,
+            items: obj(
+              {
+                op: { type: "string", enum: ["add", "remove", "replace", "move", "copy", "test"] },
+                path: str("JSON Pointer into the page, under /title, /sections or /seo"),
+                from: str("For move and copy: JSON Pointer of the source"),
+                value: {},
+              },
+              ["op", "path"],
+            ),
+          },
+        },
+        ["siteId", "pageId", "rev", "ops"],
+      ),
+      outputSchema: obj(
+        {
+          page: PAGE,
+          snapshot: SNAPSHOT,
+          repairs: { type: "array", items: { type: "string" } },
+          unknownBlocks,
+        },
+        ["page", "snapshot", "repairs"],
+      ),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      scopes: ["content:write"],
+      handler: async (a, ctx) => {
+        const site = await requireSite(ctx, a.siteId as string);
+        const page = await ctx.store.getPage(a.pageId as string);
+        if (!page || page.siteId !== site.id)
+          throw new ToolError("not_found", `page ${a.pageId} not found`);
+        if (page.rev !== a.rev)
+          throw new ToolError(
+            "conflict",
+            `page ${page.id} is at rev ${page.rev}, you sent ${a.rev}; reload with get_page and retry`,
+          );
+        let patched: { value: Page; notes: string[] };
+        try {
+          patched = patchPage(page, a.ops as PatchOp[], siteCatalog(site, ctx));
+        } catch (e) {
+          if (e instanceof SurfacePatchError)
+            throw new ToolError(
+              "invalid_surface",
+              `${e.message}. Fix the parts at these JSON Pointers and send the operations again; get_catalog lists every component and its props`,
+              { issues: e.issues },
+            );
+          throw e;
+        }
+        assertNoHtmlSections(patched.value.sections);
+        try {
+          const saved = await ctx.store.updatePage(patched.value, { writer: mcpWriter(ctx) });
+          const snapshot = await autoSnapshot(ctx, page.siteId, "patch_draft");
+          return {
+            page: saved,
+            snapshot,
+            repairs: patched.notes,
+            ...unknownBlocksOf(ctx, { sections: saved.sections }),
+          };
         } catch (e) {
           mapError(e);
         }
@@ -1078,13 +1208,7 @@ function rawTools(): ToolDefinition[] {
           const page = await ctx.store.getPage(a.pageId as string);
           if (!page || page.siteId !== site.id)
             throw new ToolError("not_found", `page ${a.pageId} not found`);
-          const collections = [
-            ...new Set(
-              page.sections
-                .filter((s) => s.kind === "contentList")
-                .map((s) => (s as { collection: string }).collection),
-            ),
-          ];
+          const collections = previewCollections(page.sections);
           const entries = Object.fromEntries(
             await Promise.all(
               collections.map(async (c) => [c, await ctx.store.listContentEntries(site.id, c)]),

@@ -31,6 +31,7 @@ import {
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { archiveHead, entryHead, pageHead, siteOrigin } from "@cloudhal/astro-renderer/seo";
+import { loadSurfaceSources, surfaceSources } from "@cloudhal/astro-renderer/surfaces";
 import {
   entryTaxonomy,
   loadTaxonomyIndex,
@@ -127,12 +128,20 @@ const footer = footerMenu
 const tags: string[] = [];
 
 let entries: Record<string, ContentEntry[]> = {};
+let surfaces: Awaited<ReturnType<typeof loadSurfaceSources>> = {};
 let terms = entryTaxonomy(undefined, { tags: [] });
 let related: ContentEntry[] = [];
 if (route.kind === "page") {
   tags.push(nodeCacheTag(route.page.id));
   // Lists of the site's entries change with any entry: the site's list tag covers them.
-  if (route.page.sections.some((s) => s.kind === "contentList")) tags.push(listCacheTag(site.id));
+  if (
+    route.page.sections.some(
+      (s) => s.kind === "contentList" || (s.kind === "surface" && surfaceSources(s).length > 0),
+    )
+  )
+    tags.push(listCacheTag(site.id));
+  // Generated UI (RFC-0020 §3): entry sources load from the same source as the page.
+  surfaces = await loadSurfaceSources(source, route.page.sections);
   const collections = [
     ...new Set(
       route.page.sections.filter((s) => s.kind === "contentList").map((s) => s.collection),
@@ -200,7 +209,7 @@ const meta =
 ---
 <Base site={site} meta={meta} nav={nav} footer={footer} notice={notice}>
   {route.kind === "page" && (
-    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} />
+    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
   )}
   {route.kind === "entry" && (
     <Fragment>

@@ -40,7 +40,9 @@
     "./comments-middleware": "./src/comments-middleware.ts",
     "./embed-middleware": "./src/embed-middleware.ts",
     "./embeds": "./src/embed-client.ts",
-    "./theme-settings": "./src/theme-settings.ts"
+    "./theme-settings": "./src/theme-settings.ts",
+    "./kit": "./src/kit.ts",
+    "./surfaces": "./src/surfaces.ts"
   },
   "files": [
     "dist",
@@ -200,6 +202,14 @@
       "./theme-settings": {
         "types": "./dist/src/theme-settings.d.ts",
         "default": "./dist/src/theme-settings.js"
+      },
+      "./kit": {
+        "types": "./dist/src/kit.d.ts",
+        "default": "./dist/src/kit.js"
+      },
+      "./surfaces": {
+        "types": "./dist/src/surfaces.d.ts",
+        "default": "./dist/src/surfaces.js"
       }
     }
   }
