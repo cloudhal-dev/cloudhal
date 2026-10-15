@@ -188,6 +188,13 @@ export {
   type CommentThreadProps,
 } from "./blocks/CommentThread.tsx";
 export {
+  type CorrectionKind,
+  CorrectionList,
+  type CorrectionListItem,
+  type CorrectionListLabels,
+  type CorrectionListProps,
+} from "./blocks/CorrectionList.tsx";
+export {
   type CalendarLabels,
   calendarLocaleProps,
   firstDayOfWeek,

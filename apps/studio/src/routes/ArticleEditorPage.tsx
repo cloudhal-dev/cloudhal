@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
+import { ArticleCorrectionsCard } from "../components/ArticleCorrections.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { BodyEditor } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
@@ -491,6 +492,11 @@ export function ArticleEditorPage() {
                 />
               )}
             </SectionCard>
+            <ArticleCorrectionsCard
+              entry={draft}
+              onChange={setDraft}
+              disabled={readOnlyReason !== undefined || locked}
+            />
           </fieldset>
         }
         aside={

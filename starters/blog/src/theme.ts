@@ -62,6 +62,10 @@ const STRINGS = {
     updated: (when: string) => `Updated ${when}`,
     minRead: (n: number) => `${n} min read`,
     onThisPage: "On this page",
+    /** RFC-0019 §2: the corrections list at the end of an article, and the note under the byline. */
+    corrections: "Corrections and updates",
+    correctionKind: { correction: "Correction", clarification: "Clarification", update: "Update" },
+    appended: (kind: string) => `${kind} appended`,
     /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
     embargoed: (when: string) => `Embargoed until ${when}. Only previews show it until then.`,
     expired: (when: string) => `Expired on ${when}. Only previews show it now.`,
@@ -82,6 +86,9 @@ const STRINGS = {
     updated: (when: string) => `Güncellendi: ${when}`,
     minRead: (n: number) => `${n} dk okuma`,
     onThisPage: "Bu sayfada",
+    corrections: "Düzeltmeler ve güncellemeler",
+    correctionKind: { correction: "Düzeltme", clarification: "Açıklama", update: "Güncelleme" },
+    appended: (kind: string) => `${kind} eklendi`,
     embargoed: (when: string) =>
       `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
     expired: (when: string) =>

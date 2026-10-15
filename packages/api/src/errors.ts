@@ -48,6 +48,8 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   invalid_props: 422,
   // RFC-0020 (surfaces)
   invalid_surface: 422,
+  // RFC-0019 (corrections)
+  correction_locked: 422,
   // RFC-0008 (time gates)
   invalid_availability: 400,
   gates_unsupported: 409,

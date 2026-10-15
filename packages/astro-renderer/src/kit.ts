@@ -1,10 +1,10 @@
 /**
  * The theme kit (RFC-0018 §3): what every theme's templates read about an article, computed once
- * by Cloudhal so themes only draw it. This first part is the outline: the table of contents and
- * the reading time. Worker-safe.
+ * by Cloudhal so themes only draw it: the outline (table of contents, reading time) and the
+ * corrections (RFC-0019 §2). Worker-safe.
  */
-import type { ContentEntry } from "@cloudhal/core-contracts";
-import { htmlText, renderBody } from "./markdown.ts";
+import type { ContentEntry, Correction } from "@cloudhal/core-contracts";
+import { htmlText, renderBody, renderInlineMarkdown } from "./markdown.ts";
 
 /** One heading of an article's table of contents; `id` is the anchor the rendered body carries. */
 export interface TocItem {
@@ -58,4 +58,26 @@ export function articleOutline(
 ): ArticleOutline {
   const html = renderBody(entry.body);
   return { toc: tableOfContents(html), readingMinutes: readingMinutes(html, wordsPerMinute) };
+}
+
+/** One correction as an article shows it (RFC-0019 §2): the note rendered as inline markdown. */
+export interface ArticleCorrection {
+  id: string;
+  kind: Correction["kind"];
+  at: string;
+  html: string;
+}
+
+/** An article's corrections: newest first, and the time of the latest (its "Updated" date). */
+export interface ArticleCorrections {
+  items: ArticleCorrection[];
+  latest?: string;
+}
+
+/** The corrections an article shows, newest first; notes go through the safe inline renderer. */
+export function articleCorrections(entry: Pick<ContentEntry, "corrections">): ArticleCorrections {
+  const items = (entry.corrections ?? [])
+    .map((c) => ({ id: c.id, kind: c.kind, at: c.at, html: renderInlineMarkdown(c.note) }))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  return items[0] ? { items, latest: items[0].at } : { items };
 }

@@ -1399,6 +1399,14 @@ export const ContentEntrySchema = {
     },
     "metadata": {
       "$ref": "#/$defs/Metadata"
+    },
+    "corrections": {
+      "type": "array",
+      "description": "Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note.",
+      "items": {
+        "$ref": "#/$defs/Correction"
+      },
+      "maxItems": 100
     }
   },
   "$defs": {
@@ -1525,6 +1533,44 @@ export const ContentEntrySchema = {
         1
       ],
       "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
+    },
+    "Correction": {
+      "type": "object",
+      "description": "One correction notice (RFC-0019 §2).",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "at",
+        "note"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "correction",
+            "clarification",
+            "update"
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp",
+          "description": "When it was written; set by the store, never by the caller."
+        },
+        "note": {
+          "type": "string",
+          "description": "What changed, in markdown (inline).",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "snapshotId": {
+          "$ref": "#/$defs/Id",
+          "description": "The snapshot it was first published in."
+        }
+      }
     },
     "Id": {
       "type": "string",

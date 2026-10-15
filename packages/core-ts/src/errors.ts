@@ -144,7 +144,10 @@ export type InvariantCode =
   | "invalid_props"
   // ── RFC-0020 (surfaces) ──
   /** A surface breaks its tree, catalog, bindings or limits (`details.issues`, JSON Pointers). */
-  | "invalid_surface";
+  | "invalid_surface"
+  // ── RFC-0019 (corrections) ──
+  /** §2: a correction that has been live was removed, or its kind or (by an agent) its note changed. */
+  | "correction_locked";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

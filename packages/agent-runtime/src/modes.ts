@@ -66,7 +66,9 @@ export type AutoCheckCode =
   /** RFC-0004 §6.3: media that does not ride along with an article change. */
   | "media"
   /** RFC-0008 §10.7 (D9): the release would run after the key's window (elevation end or 24 h). */
-  | "outside-window";
+  | "outside-window"
+  /** RFC-0019 §2.4: an article gains a correction, an editorial statement a person signs off. */
+  | "correction";
 
 /** The `auto`-mode check behind a publish (stored on audit rows and approvals, ADR-0015). */
 export interface AutoCheck {
@@ -89,6 +91,7 @@ const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
   media: () => "it adds or changes media that is not part of an article change",
   "outside-window": () =>
     "it would run after your autonomy ends (the elevation's end, or 24 hours from now)",
+  correction: () => "it adds a correction to a published article",
 };
 
 /** English wording of a check, for agents and audit reasons. */
@@ -104,6 +107,9 @@ export function describeAutoCheck(check: AutoCheck): string {
  * Media (RFC-0004 §6.3, answer 1): an added asset whose id is in `ridingAssets` (a new raster
  * image used only by articles in the same publish; the store decides) goes out with them and does
  * not count toward the limit. Any other asset change is `media` and waits for a person.
+ *
+ * Corrections (RFC-0019 §2.4): an entry in `corrections` (it adds a correction to its live
+ * version; the store decides) makes the publish wait for a person.
  */
 export function checkAutoPublish(
   diff: {
@@ -111,9 +117,10 @@ export function checkAutoPublish(
     changed: { after: PendingChange }[];
     removed: PendingChange[];
   },
-  options: { ridingAssets?: ReadonlySet<string> } = {},
+  options: { ridingAssets?: ReadonlySet<string>; corrections?: ReadonlySet<string> } = {},
 ): AutoCheck {
   const riding = options.ridingAssets ?? new Set<string>();
+  const corrects = options.corrections ?? new Set<string>();
   const rides = (n: PendingChange) => n.kind === "asset" && riding.has(n.id);
   const added = diff.added.filter((n) => !rides(n));
   const touched = [...added, ...diff.changed.map((c) => c.after)];
@@ -132,9 +139,11 @@ export function checkAutoPublish(
           ? "structure"
           : media
             ? "media"
-            : touched.length > AUTO_PUBLISH_LIMIT
-              ? "too-many"
-              : "low-risk";
+            : touched.some((n) => corrects.has(n.id))
+              ? "correction"
+              : touched.length > AUTO_PUBLISH_LIMIT
+                ? "too-many"
+                : "low-risk";
   return { ...base, code, lowRisk: code === "low-risk" };
 }
 
@@ -224,6 +233,8 @@ export interface ReleaseItemRisk {
   live: boolean;
   /** Ids the target references (assets that ride with an article). */
   deps?: readonly string[];
+  /** RFC-0019 §2.4: the target adds a correction to the live version. */
+  corrects?: boolean;
 }
 
 /**
@@ -250,6 +261,7 @@ export function checkAutoRelease(items: readonly ReleaseItemRisk[]): AutoCheck {
           .filter((i) => i.nodeKind === "asset" && !i.live && riding.has(i.nodeId))
           .map((i) => i.nodeId),
       ),
+      corrections: new Set(set.filter((i) => i.corrects).map((i) => i.nodeId)),
     },
   );
   return { ...check, rule: "low-risk-release" };

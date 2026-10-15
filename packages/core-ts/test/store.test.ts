@@ -3,6 +3,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { createMiniflareD1 } from "@cloudhal/storage/testing";
 import { describeSiteGraphStore } from "../src/testing.ts";
+import { correctionsSuite } from "../src/testing-corrections.ts";
 import { gatesSuite } from "../src/testing-gates.ts";
 import { releasesSuite } from "../src/testing-releases.ts";
 
@@ -15,6 +16,7 @@ const sqlite = {
 describeSiteGraphStore("better-sqlite3 + memory blobs", sqlite);
 gatesSuite("better-sqlite3 + memory blobs", sqlite);
 releasesSuite("better-sqlite3 + memory blobs", sqlite);
+correctionsSuite("better-sqlite3 + memory blobs", sqlite);
 
 let d1: Awaited<ReturnType<typeof createMiniflareD1>> | undefined;
 const miniflare = {
@@ -30,3 +32,4 @@ const miniflare = {
 describeSiteGraphStore("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 gatesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 releasesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
+correctionsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);

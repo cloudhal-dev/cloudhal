@@ -30,6 +30,8 @@ export { safeHref, safeSrc };
 let current: MediaContext | undefined;
 /** Heading ids already given out in the document being rendered (nested renders share them). */
 let headingIds: Map<string, number> | undefined;
+/** While true (`renderInlineMarkdown`), images render as their text. */
+let inlineOnly = false;
 
 const TURKISH: Record<string, string> = { ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g" };
 /**
@@ -223,6 +225,7 @@ md.use({
       return `<a href="${escapeHtml(safe)}"${title ? ` title="${escapeHtml(title)}"` : ""}>${label}</a>`;
     },
     image({ href, title, text }) {
+      if (inlineOnly) return escapeHtml(text);
       if (/^\s*asset:/i.test(href)) {
         const asset = resolveAsset(href);
         return asset ? assetEmbed(asset, text, title) : escapeHtml(text);
@@ -251,6 +254,20 @@ export function renderMarkdown(source: string, ctx?: MediaContext): string {
   }
 }
 
+/**
+ * Inline markdown, for short notes such as corrections (RFC-0019 §2): emphasis, code and safe
+ * links; images become their text, and nothing block-level is produced.
+ */
+export function renderInlineMarkdown(source: string): string {
+  const previous = inlineOnly;
+  inlineOnly = true;
+  try {
+    return md.parseInline(source) as string;
+  } finally {
+    inlineOnly = previous;
+  }
+}
+
 const ENTITIES: Record<string, string> = {
   "&amp;": "&",
   "&lt;": "<",
@@ -262,6 +279,11 @@ const ENTITIES: Record<string, string> = {
 /** Markdown as plain text (meta descriptions): rendered safely, then tags dropped and entities decoded. */
 export function markdownText(source: string): string {
   return htmlText(renderMarkdown(source));
+}
+
+/** Inline markdown as plain text: inline tags go without leaving gaps ("**537**," → "537,"). */
+export function inlineMarkdownText(source: string): string {
+  return htmlText(renderInlineMarkdown(source).replace(/<[^>]*>/g, ""));
 }
 
 /** Text of HTML this module produced: tags dropped, entities decoded, whitespace collapsed. */

@@ -185,6 +185,48 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
       expect(bad.status).toBe(400);
     });
 
+    it("corrections (RFC-0019 §2): stamped by the server, locked once live, a person fixes the note", async () => {
+      const entry = (await store.listContentEntries(siteId, "posts"))[0] as ContentEntry;
+      const url = `/api/sites/${siteId}/entries/${entry.id}`;
+      const added = await call(url, {
+        ...auth,
+        method: "PUT",
+        body: JSON.stringify({
+          ...entry,
+          corrections: [{ kind: "correction", note: "The date was wrong." }],
+        }),
+      });
+      expect(added.status).toBe(200);
+      const saved = added.body as ContentEntry;
+      const item = saved.corrections?.[0];
+      expect(item).toMatchObject({ id: expect.stringMatching(/^crx_/), kind: "correction" });
+      expect(Date.parse(item?.at ?? "")).not.toBeNaN();
+      await call(`/api/sites/${siteId}/snapshots`, {
+        ...auth,
+        method: "POST",
+        body: JSON.stringify({ publish: true }),
+      });
+      const removed = await call(url, {
+        ...auth,
+        method: "PUT",
+        body: JSON.stringify({ ...saved, corrections: [] }),
+      });
+      expect(removed.status).toBe(422);
+      expect((removed.body as { error: string }).error).toBe("correction_locked");
+      const fixed = await call(url, {
+        ...auth,
+        method: "PUT",
+        body: JSON.stringify({
+          ...saved,
+          corrections: [{ ...item, note: "The date was wrong: it is 16 October." }],
+        }),
+      });
+      expect(fixed.status).toBe(200);
+      expect((fixed.body as ContentEntry).corrections).toEqual([
+        { ...item, note: "The date was wrong: it is 16 October." },
+      ]);
+    });
+
     it("unknown routes and ids are 404", async () => {
       expect((await call("/api/nope", auth)).status).toBe(404);
       expect((await call(`/api/sites/site_doesnotexist1`, auth)).status).toBe(404);

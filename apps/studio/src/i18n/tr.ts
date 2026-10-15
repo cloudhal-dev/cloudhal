@@ -247,6 +247,21 @@ export const tr: Messages = {
       emptyDescription: "Başka bir kategori ya da etiket dene veya süzgeçleri temizle.",
     },
   },
+  articleCorrections: {
+    title: "Düzeltmeler",
+    description:
+      "Okurlar bunları makalenin sonunda, en yenisi üstte görür; en sonuncusu makalenin Güncellendi tarihidir. Yayımlanan bir düzeltme kalır: yayımlama yetkisi olan biri yeniden yazabilir, kimse silemez.",
+    empty: "Düzeltme yok",
+    emptyDescription: "Yayımlanmış bir haber esaslı biçimde değiştiğinde ekleyin.",
+    kind: "Tür",
+    kinds: { correction: "Düzeltme", clarification: "Açıklama", update: "Güncelleme" },
+    note: "Ne değişti",
+    noteHint: "Bir iki cümle. Markdown bağlantıları ve vurgu çalışır.",
+    add: "Düzeltme ekle",
+    unsaved: "Kaydedilmedi",
+    remove: "Düzeltmeyi kaldır",
+    pending: "Eklemek için makaleyi kaydedin; bir sonraki yayında canlıya çıkar.",
+  },
   articleTerms: {
     title: "Kategoriler ve etiketler",
     description:
@@ -1415,6 +1430,8 @@ export const tr: Messages = {
         "sayfaları, menüleri, site ayarlarını, sınıflandırmaları ya da yönlendirmeleri değiştiriyor",
       "too-many": "{changes} değişiklik içeriyor ve otomatik modun sınırı {limit}",
       media: "bir makale değişikliğine ait olmayan medya ekliyor ya da değiştiriyor",
+      "outside-window": "ajanın özerkliği bittikten sonra çalışacak",
+      correction: "yayımlanmış bir makaleye düzeltme ekliyor",
     },
     noHistory: "Henüz karar yok",
     noHistoryDescription:
@@ -1532,6 +1549,7 @@ export const tr: Messages = {
     get_entry: "Makaleyi oku",
     create_entry: "Makale oluştur",
     update_entry: "Makaleyi güncelle",
+    add_correction: "Düzeltme ekle",
     delete_entry: "Makaleyi sil",
     get_theme_settings: "Tasarım ayarlarını oku",
     set_theme_settings: "Tasarım ayarlarını değiştir",

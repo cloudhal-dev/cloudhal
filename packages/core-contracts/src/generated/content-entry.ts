@@ -119,6 +119,12 @@ export interface ContentEntry {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   metadata?: Metadata;
+  /**
+   * Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note.
+   *
+   * @maxItems 100
+   */
+  corrections?: Correction[];
 }
 /**
  * This interface was referenced by `ContentEntry`'s JSON-Schema
@@ -212,4 +218,26 @@ export interface Availability {
  */
 export interface Metadata {
   [k: string]: string | undefined;
+}
+/**
+ * One correction notice (RFC-0019 §2).
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "Correction".
+ */
+export interface Correction {
+  id: Id;
+  kind: "correction" | "clarification" | "update";
+  /**
+   * RFC 3339 / ISO 8601 instant in UTC.
+   */
+  at: string;
+  /**
+   * What changed, in markdown (inline).
+   */
+  note: string;
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  snapshotId?: string;
 }
