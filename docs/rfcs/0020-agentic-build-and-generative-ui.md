@@ -268,7 +268,26 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
     - prose and code fences are set aside, not refused, and an answer with no object at all gets one clear refusal;
     - a bare operation, or `ops` holding one operation, is read as a step.
 
-    Runs now keep up to five refusal reasons (`samples`) to show why a model's steps fail. The recommendation waits for a second run on the tolerant reader.
+    Runs now keep up to five refusal reasons (`samples`) to show why a model's steps fail.
+  - **Second run** (2026-10-15, on the tolerant reader, the four models that finished anything, 4 × 5 briefs):
+
+    | Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |
+    |---|---|---|---|---|---|---|---|---|
+    | `@cf/openai/gpt-oss-120b` | 5/5 | 10% | 0 | 13.2 | 2 | 47.3 s | 47.4 s | 2862 |
+    | `@cf/openai/gpt-oss-20b` | 4/5 | 24% | 0 | 3.8 | 2.2 | 33.5 s | 47.5 s | 3594 |
+    | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | 4/5 | 16% | 0.6 | 14.6 | 2.4 | 20.9 s | 38.4 s | 1088 |
+    | `@cf/zai-org/glm-4.7-flash` | 3/5 | 7% | 0 | 16.2 | 2.2 | 165.9 s | 166.0 s | 5930 |
+
+    - **What the reader fixed.** gpt-oss-120b went from 3/5 to 5/5 finished and gpt-oss-20b from 2/5 to 4/5. GLM-4.7-Flash's landing page went from 21 refusals to none. GLM stays the slowest (166 s median).
+    - **What the refusals still were** (the run's 48 samples):
+      - 18 were "path does not exist" and 12 a surface without `root`. These are one chain: a new surface sent before its root, then components added to the section that was refused.
+      - 8 were objects that did not parse (raw line breaks in strings, trailing commas).
+      - A few addressed a component by id instead of position.
+  - **Fixed after the second run.**
+    - **Held steps.** A step refused only because it waits for something a later step adds (`root`, a child id) is held, at most 3, and written together with the step that completes it. A held step that never becomes valid does not block the next one. What still waits at the end of a round is refused.
+    - **Forgiving input.** JSON with raw control characters in strings or trailing commas is read. `/sections/<i>/components/<id>/…` is rewritten to the component's position, and each rewrite is reported as a repair.
+    - **The prompt** says a new surface carries its `root` in the same step.
+  - **Recommendation.** Build recommends `@cf/openai/gpt-oss-120b`: the only model that finished every brief, at a median of 47 s. The site keeps its own model (ADR-0029: one model for AI commands and Build). Build chat says which model it recommends when the site uses another, with the way to Settings › AI. Acceptance on the new rules will be measured on the next run.
 - **20d shipped** (markdown surfaces):
   - **core-ts.**
     - `bodySurfaces` finds ```` ```surface ```` fences; ```` ``` ```` and `~~~` both open one, and fences inside other code blocks do not count.

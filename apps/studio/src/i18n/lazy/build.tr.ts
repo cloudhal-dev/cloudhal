@@ -55,6 +55,8 @@ export const messages: NamespaceMessages<"build"> = {
       scopeSection: "{index}. bölüm",
       scopeComponent: "{index}. bölümdeki {component} “{id}”",
       clearScope: "Bunun yerine tüm sayfayı değiştir",
+      modelHint:
+        "Build en iyi {model} ile çalışıyor: Cloudhal'ın model karşılaştırmasında her isteği tamamladı. Bir Yönetici bunu Ayarlar › AI bölümünden seçebilir.",
       errors: {
         ai_budget:
           "Bu sitenin bugünkü AI hakları bitti. Bir Yönetici, Ayarlar › AI bölümünden günlük sınırı artırabilir.",

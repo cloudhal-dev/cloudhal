@@ -15,12 +15,19 @@ import {
   SectionCard,
   SectionEmpty,
   SkeletonLine,
+  Text,
 } from "@cloudhal/ui";
 import { GearSix, Sparkle, StopCircle, Target, WarningCircle, X } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api, errorCode } from "../lib/api.ts";
+
+/**
+ * The model Build recommends (RFC-0020 open question 7): it finished every brief of the Build
+ * model eval on Workers AI (2026-10-15). The site keeps its own choice; Build chat suggests this one.
+ */
+export const BUILD_RECOMMENDED_MODEL = "@cf/openai/gpt-oss-120b";
 
 /** A part of the page picked in the preview, with the words that name it. */
 export interface BuildScope {
@@ -152,6 +159,11 @@ export function BuildChat({
         />
       ) : (
         <div className="grid gap-6">
+          {ai.settings.model !== BUILD_RECOMMENDED_MODEL && (
+            <Text variant="secondary" size="sm" data-testid="build-model-hint">
+              {t("build.chat.modelHint", { model: BUILD_RECOMMENDED_MODEL })}
+            </Text>
+          )}
           {items.length > 0 && <BuildChatLog items={items} label={t("build.chat.label")} />}
           {settings.error && (
             <Banner

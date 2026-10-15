@@ -140,4 +140,26 @@ describe("Build chat", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change the whole page instead" }));
     expect(cleared).toHaveBeenCalledOnce();
   });
+
+  it("suggests the model the Build eval recommends, unless the site uses it", async () => {
+    serve(() => new Response(null, { status: 404 }));
+    const { unmount } = render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
+    expect(await screen.findByTestId("build-model-hint")).toHaveTextContent(
+      "Build works best with @cf/openai/gpt-oss-120b",
+    );
+    unmount();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          settings: { enabled: true, model: "@cf/openai/gpt-oss-120b", dailyLimit: 100, rev: 1 },
+          usage: { requests: 0 },
+          transport: "binding",
+        }),
+      ),
+    );
+    render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
+    expect(await screen.findByLabelText("What should the page have?")).toBeInTheDocument();
+    expect(screen.queryByTestId("build-model-hint")).toBeNull();
+  });
 });
