@@ -78,7 +78,7 @@ const crumbs = [
     )}
     {intro && <div class="ch-richtext" set:html={intro} />}
   </header>
-  <EntryList entries={archive.entries} locale={archive.locale} />
+  <EntryList entries={archive.entries} locale={archive.locale} media={media} />
   {archive.pages > 1 && (
     <nav aria-label={t.pagination} class="ch-pagination">
       {archive.page > 1 ? (
