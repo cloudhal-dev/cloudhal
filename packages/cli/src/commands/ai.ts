@@ -46,47 +46,39 @@ export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalRep
     throw new Error(`--briefs: choose from ${BUILD_EVAL_BRIEFS.map((b) => b.id).join(", ")}`);
   if (options.remote) {
     const { cfg, adminUrl, token, fetch: f } = await deployment(options);
-    const res = await f(new URL(`/api/admin/sites/${cfg.siteId}/ai/build-eval`, adminUrl), {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ models, briefs: briefs.map((b) => b.id) }),
-    });
-    if (!res.ok || !res.body) {
-      const text = await res.text();
-      if (res.status === 404 && !text.includes("site not found"))
-        throw new Error("the deployment has no build eval yet (deploy this version first)");
-      throw new Error(`the deployment answered ${res.status}: ${briefText(text)}`);
-    }
     const runs: BuildEvalRun[] = [];
-    let summary: BuildEvalSummary[] = [];
-    let table = "";
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
-      let nl = buffer.indexOf("\n");
-      while (nl >= 0) {
-        const line = buffer.slice(0, nl).trim();
-        buffer = buffer.slice(nl + 1);
-        if (line) {
-          const msg = JSON.parse(line) as
-            | { type: "run"; run: BuildEvalRun }
-            | { type: "summary"; summary: BuildEvalSummary[]; table: string };
-          if (msg.type === "run") {
-            runs.push(msg.run);
-            options.onRun?.(msg.run);
-          } else {
-            summary = msg.summary;
-            table = msg.table;
-          }
+    // One request per run: a dropped connection loses that run only, and it is recorded as one.
+    for (const model of models)
+      for (const brief of briefs) {
+        const one = await remoteRuns(
+          f,
+          new URL(`/api/admin/sites/${cfg.siteId}/ai/build-eval`, adminUrl),
+          token,
+          model,
+          brief.id,
+        ).catch((e: unknown): BuildEvalRun[] => [
+          {
+            model,
+            brief: brief.id,
+            finished: false,
+            steps: 0,
+            refused: 0,
+            repairs: 0,
+            rounds: 0,
+            components: 0,
+            totalMs: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            error: e instanceof Error ? e.message.slice(0, 200) : "failed",
+          },
+        ]);
+        for (const run of one) {
+          runs.push(run);
+          options.onRun?.(run);
         }
-        nl = buffer.indexOf("\n");
       }
-      if (done) break;
-    }
-    return { where: "remote", runs, summary, table };
+    const summary = summariseBuildEval(runs);
+    return { where: "remote", runs, summary, table: buildEvalTable(summary) };
   }
   const { transport } = localAiTransport(options.env ?? process.env);
   if (!transport)
@@ -111,6 +103,48 @@ export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalRep
   } finally {
     await local.close();
   }
+}
+
+/** One remote run (NDJSON: start, progress lines, the run, then a summary of one). */
+async function remoteRuns(
+  f: typeof fetch,
+  url: URL,
+  token: string,
+  model: string,
+  brief: string,
+): Promise<BuildEvalRun[]> {
+  const res = await f(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ models: [model], briefs: [brief] }),
+  });
+  if (!res.ok || !res.body) {
+    const text = await res.text();
+    if (res.status === 404 && !text.includes("site not found"))
+      throw new Error("the deployment has no build eval yet (deploy this version first)");
+    throw new Error(`the deployment answered ${res.status}: ${briefText(text)}`);
+  }
+  const runs: BuildEvalRun[] = [];
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+    let nl = buffer.indexOf("\n");
+    while (nl >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line) {
+        const msg = JSON.parse(line) as { type: string; run?: BuildEvalRun };
+        if (msg.type === "run" && msg.run) runs.push(msg.run);
+      }
+      nl = buffer.indexOf("\n");
+    }
+    if (done) break;
+  }
+  if (runs.length === 0) throw new Error("the deployment ended the stream before the run");
+  return runs;
 }
 
 export function describeRun(r: BuildEvalRun): string {

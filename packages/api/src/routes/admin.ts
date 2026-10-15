@@ -436,9 +436,17 @@ export function adminRoutes(
               }
             };
             const runs: BuildEvalRun[] = [];
+            // Cloudflare closes a response that sends nothing for about 100 s, and one run can
+            // take that long: a progress line every 15 s keeps the stream open.
+            let current: { model: string; brief: string } | undefined;
+            const beat = setInterval(() => {
+              if (current) send({ type: "progress", ...current });
+            }, 15_000);
             for (const model of models)
               for (const brief of briefs) {
                 if (signal.aborted) break;
+                current = { model, brief: brief.id };
+                send({ type: "start", ...current });
                 const run = await runBuildEvalOnce({
                   transport: aiTransport,
                   model,
@@ -465,6 +473,7 @@ export function adminRoutes(
                 runs.push(run);
                 send({ type: "run", run });
               }
+            clearInterval(beat);
             const summary = summariseBuildEval(runs);
             send({ type: "summary", summary, table: buildEvalTable(summary) });
             controller.close();
