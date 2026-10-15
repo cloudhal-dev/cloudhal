@@ -7,14 +7,29 @@
  * - **repairs** and **refusals** per turn, and the **rounds** a turn needed;
  * - **first step** and **total** time, and tokens.
  *
+ * With `design` (RFC-0021 21c), each result is also rendered in a browser: the automatic checks
+ * that failed, and a vision model's rubric score (`DESIGN_RUBRIC`, 1–5). With `design.look`, the
+ * model sees its own render once, as in Build chat, before it is scored.
+ *
  * Nothing is stored: each run builds an in-memory copy of a page (the store's checks still apply
  * through `patchPage`). Runs go one at a time so latency is comparable. Worker-safe.
  */
-import type { Page } from "@cloudhal/core-contracts";
+import { renderPagePreview } from "@cloudhal/astro-renderer/preview";
+import type { Page, Site } from "@cloudhal/core-contracts";
+import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import type { Catalog } from "@cloudhal/core-ts/surfaces";
+import type { PageRenderer } from "@cloudhal/mcp-server/render";
 import type { AiTransport } from "./ai/client.ts";
 import { DEFAULT_AI_MODEL } from "./ai/store.ts";
 import { type BuildTurnEvent, runBuildTurn } from "./build-turn.ts";
+import {
+  acceptsImages,
+  DESIGN_JUDGE_MODEL,
+  type DesignCriterion,
+  htmlDataUrl,
+  lookAt,
+  scoreDesign,
+} from "./design-pass.ts";
 
 /** Models compared by default: Workers AI text models that can follow a structured format. */
 export const BUILD_EVAL_MODELS: readonly string[] = [
@@ -107,6 +122,32 @@ export interface BuildEvalRun {
   inputTokens: number;
   outputTokens: number;
   error?: string | undefined;
+  /** RFC-0021 21c: the rendered result. */
+  design?: BuildEvalDesign | undefined;
+}
+
+export interface BuildEvalDesign {
+  /** Ids of the automatic checks that failed. */
+  failed: string[];
+  /** The judge's mean score, 1–5. */
+  score?: number | undefined;
+  scores?: Partial<Record<DesignCriterion, number>> | undefined;
+  note?: string | undefined;
+  /** The model looked at its render and changed the page (design.look). */
+  looked?: boolean | undefined;
+  error?: string | undefined;
+}
+
+/** The design pass of a run: the browser, and the judge for the score. */
+export interface BuildEvalDesignOptions {
+  readonly renderer: PageRenderer;
+  /** The site the page renders as (theme name, settings, design). */
+  readonly site: Site;
+  readonly blocks?: BlockRegistry | undefined;
+  /** A vision model; default `DESIGN_JUDGE_MODEL`. `false`: checks only. */
+  readonly judge?: string | false | undefined;
+  /** The model sees its render once before it is scored, as in Build chat. */
+  readonly look?: boolean | undefined;
 }
 
 export interface BuildEvalSummary {
@@ -122,6 +163,9 @@ export interface BuildEvalSummary {
   medianTotalMs: number;
   outputTokensPerTurn: number;
   errors: number;
+  /** RFC-0021 21c, when the runs had a design pass. */
+  checksFailedPerTurn?: number | undefined;
+  medianDesignScore?: number | undefined;
 }
 
 const median = (xs: number[]): number | undefined => {
@@ -143,6 +187,7 @@ export async function runBuildEvalOnce(input: {
   siteId: string;
   now?: () => number;
   signal?: AbortSignal | undefined;
+  design?: BuildEvalDesignOptions | undefined;
 }): Promise<BuildEvalRun> {
   const now = input.now ?? Date.now;
   const started = now();
@@ -174,10 +219,17 @@ export async function runBuildEvalOnce(input: {
     inputTokens: 0,
     outputTokens: 0,
   };
+  const design = input.design as BuildEvalDesignOptions;
+  const urlOf = (p: Page) =>
+    htmlDataUrl(renderPagePreview(design.site, p, {}, { blocks: design.blocks }).html);
+  let looked = false;
+  let stepsAfterLook = 0;
   const emit = (e: BuildTurnEvent) => {
+    if (e.type === "look") looked = true;
     if (e.type === "round") run.rounds = e.round;
     else if (e.type === "step" && e.ok) {
       run.firstStepMs ??= now() - started;
+      if (looked) stepsAfterLook++;
       run.repairs += e.repairs.length;
     } else if (e.type === "step") {
       run.refused++;
@@ -200,6 +252,12 @@ export async function runBuildEvalOnce(input: {
     locale: "en",
     ...(input.brief.scope ? { scope: input.brief.scope } : {}),
     ...(input.signal ? { signal: input.signal } : {}),
+    ...(input.design?.look
+      ? {
+          images: acceptsImages(input.model),
+          look: (p: Page) => lookAt(design.renderer, urlOf(p)),
+        }
+      : {}),
     load: async () => page,
     write: async (next) => {
       page = { ...next, rev: page.rev + 1 };
@@ -209,11 +267,37 @@ export async function runBuildEvalOnce(input: {
     emit,
   });
   run.totalMs = now() - started;
+  if (input.design && run.finished) run.design = await designPass(page);
   run.components = page.sections.reduce(
     (n, s) => n + (s.kind === "surface" ? s.components.length : 0),
     0,
   );
   return run;
+
+  /** Renders the result, then asks the judge (RFC-0021 21c). */
+  async function designPass(built: Page): Promise<BuildEvalDesign> {
+    const out: BuildEvalDesign = { failed: [] };
+    if (looked) out.looked = stepsAfterLook > 0;
+    try {
+      const look = await lookAt(design.renderer, urlOf(built));
+      out.failed = look.failed.map((c) => c.id);
+      if (design.judge !== false) {
+        const judged = await scoreDesign({
+          transport: input.transport,
+          model: design.judge ?? DESIGN_JUDGE_MODEL,
+          brief: input.brief.brief,
+          look,
+          signal: input.signal,
+        });
+        out.score = judged.score;
+        out.scores = judged.scores;
+        if (judged.note) out.note = judged.note;
+      }
+    } catch (e) {
+      out.error = e instanceof Error ? e.message.slice(0, 200) : String(e);
+    }
+    return out;
+  }
 }
 
 /** The runs per model, summarised and ranked: finished turns, then acceptance, then speed. */
@@ -240,6 +324,17 @@ export function summariseBuildEval(runs: readonly BuildEvalRun[]): BuildEvalSumm
         medianTotalMs: median(rs.map((r) => r.totalMs)) ?? 0,
         outputTokensPerTurn: per((r) => r.outputTokens),
         errors: rs.filter((r) => r.error).length,
+        ...(rs.some((r) => r.design)
+          ? {
+              checksFailedPerTurn: round2(
+                rs.reduce((n, r) => n + (r.design?.failed.length ?? 0), 0) /
+                  Math.max(1, rs.filter((r) => r.design).length),
+              ),
+              medianDesignScore: median(
+                rs.flatMap((r) => (r.design?.score === undefined ? [] : [r.design.score])),
+              ),
+            }
+          : {}),
       };
     })
     .sort(
@@ -253,12 +348,14 @@ export function summariseBuildEval(runs: readonly BuildEvalRun[]): BuildEvalSumm
 /** A Markdown table of the summary (for the RFC and the CLI). */
 export function buildEvalTable(summary: readonly BuildEvalSummary[]): string {
   const s = (ms: number | undefined) => (ms === undefined ? "–" : `${(ms / 1000).toFixed(1)} s`);
+  // RFC-0021 21c: two more columns when the runs had a design pass.
+  const design = summary.some((m) => m.checksFailedPerTurn !== undefined);
   return [
-    "| Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |",
-    "|---|---|---|---|---|---|---|---|---|",
+    `| Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |${design ? " Failed checks/turn | Design score |" : ""}`,
+    `|---|---|---|---|---|---|---|---|---|${design ? "---|---|" : ""}`,
     ...summary.map(
       (m) =>
-        `| \`${m.model}\` | ${m.finished}/${m.runs} | ${Math.round(m.acceptance * 100)}% | ${m.repairsPerTurn} | ${m.refusalsPerTurn} | ${m.roundsPerTurn} | ${s(m.medianFirstStepMs)} | ${s(m.medianTotalMs)} | ${Math.round(m.outputTokensPerTurn)} |`,
+        `| \`${m.model}\` | ${m.finished}/${m.runs} | ${Math.round(m.acceptance * 100)}% | ${m.repairsPerTurn} | ${m.refusalsPerTurn} | ${m.roundsPerTurn} | ${s(m.medianFirstStepMs)} | ${s(m.medianTotalMs)} | ${Math.round(m.outputTokensPerTurn)} |${design ? ` ${m.checksFailedPerTurn ?? "–"} | ${m.medianDesignScore ?? "–"} |` : ""}`,
     ),
   ].join("\n");
 }

@@ -9,8 +9,14 @@
 
 export interface AiMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  /** Text, or text and images for models that take images (RFC-0021 §4, OpenAI's shape). */
+  content: string | AiContentPart[];
 }
+
+export type AiContentPart =
+  | { type: "text"; text: string }
+  /** A `data:image/jpeg;base64,…` URL. */
+  | { type: "image_url"; image_url: { url: string } };
 
 export interface AiRunRequest {
   /** A Workers AI id (`@cf/…`) or, through a gateway, `provider/model`. */

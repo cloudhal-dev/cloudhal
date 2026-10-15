@@ -18,6 +18,7 @@ import {
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { createCatalog } from "@cloudhal/core-ts/surfaces";
 import { readProjectConfig } from "../config.ts";
+import { localRender } from "../render-chrome.ts";
 import { localAiTransport } from "./studio.ts";
 import { brief as briefText, deployment, type SyncOptions } from "./sync.ts";
 
@@ -25,6 +26,8 @@ export interface BuildEvalOptions extends SyncOptions {
   readonly remote?: boolean;
   readonly models?: readonly string[];
   readonly briefs?: readonly string[];
+  /** RFC-0021 21c: render each result (checks, the judge's score; `look`: the model sees it first). */
+  readonly design?: { readonly judge?: string | false; readonly look?: boolean } | undefined;
   /** Each run as it finishes. */
   readonly onRun?: (run: BuildEvalRun) => void;
   readonly env?: Record<string, string | undefined>;
@@ -56,6 +59,7 @@ export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalRep
           token,
           model,
           brief.id,
+          options.design,
         ).catch((e: unknown): BuildEvalRun[] => [
           {
             model,
@@ -92,10 +96,25 @@ export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalRep
     const site = await local.store.getSite(cfg.siteId);
     if (!site) throw new Error(`site ${cfg.siteId} not found`);
     const catalog = createCatalog({ name: site.theme.name, blocks: local.store.blocks });
+    // RFC-0021 21c: the local Chrome renders each result.
+    const render = options.design ? localRender(options.env ?? process.env) : undefined;
+    if (options.design && !render)
+      throw new Error("--design needs a local Chrome (set CHROME_PATH), or use --remote");
+    const design =
+      options.design && render
+        ? { ...options.design, renderer: render.renderer, site, blocks: local.store.blocks }
+        : undefined;
     const runs: BuildEvalRun[] = [];
     for (const model of models)
       for (const brief of briefs) {
-        const run = await runBuildEvalOnce({ transport, model, brief, catalog, siteId: site.id });
+        const run = await runBuildEvalOnce({
+          transport,
+          model,
+          brief,
+          catalog,
+          siteId: site.id,
+          ...(design ? { design } : {}),
+        });
         runs.push(run);
         options.onRun?.(run);
       }
@@ -113,11 +132,12 @@ async function remoteRuns(
   token: string,
   model: string,
   brief: string,
+  design?: BuildEvalOptions["design"],
 ): Promise<BuildEvalRun[]> {
   const res = await f(url, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ models: [model], briefs: [brief] }),
+    body: JSON.stringify({ models: [model], briefs: [brief], ...(design ? { design } : {}) }),
   });
   if (!res.ok || !res.body) {
     const text = await res.text();
@@ -150,5 +170,9 @@ async function remoteRuns(
 
 export function describeRun(r: BuildEvalRun): string {
   const time = `${(r.totalMs / 1000).toFixed(1)} s`;
-  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}`;
+  const d = r.design;
+  const design = d
+    ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.looked !== undefined ? `, ${d.looked ? "changed after looking" : "kept after looking"}` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
+    : "";
+  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
 }

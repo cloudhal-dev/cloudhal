@@ -19,6 +19,7 @@
 
 import { effectiveDesign } from "@cloudhal/core-ts/design";
 import { createCatalog } from "@cloudhal/core-ts/surfaces";
+import { previewDoc, type RenderDeps } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
 import { AiError, type AiEvent, type AiTransport } from "../ai/client.ts";
 import {
@@ -37,6 +38,7 @@ import {
   runBuildTurn,
 } from "../build-turn.ts";
 import type { Env } from "../context.ts";
+import { acceptsImages, htmlDataUrl, lookAt } from "../design-pass.ts";
 import { apiError, notFound } from "../errors.ts";
 import { API_ACTOR, writerOf } from "../governance.ts";
 import { personOf } from "../own.ts";
@@ -46,6 +48,8 @@ import { param } from "../params.ts";
 export interface AiDeps {
   readonly store: AiStore;
   readonly transport?: AiTransport | undefined;
+  /** A browser (RFC-0021 21c): Build chat looks at the page it built once per turn. */
+  readonly render?: RenderDeps | undefined;
 }
 
 /** The longest a command may run before it is aborted. */
@@ -311,6 +315,7 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
         throw apiError(429, "ai_budget", "today's AI commands for this site are used up");
       running.add(who);
 
+      const renderer = deps?.render?.renderer;
       const started = Date.now();
       const encoder = new TextEncoder();
       const writer = writerOf(c);
@@ -340,6 +345,26 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
               locale: first.locale,
               ...(scope ? { scope } : {}),
               design: effectiveDesign(graph.themeDesign, site.design?.markdown),
+              // RFC-0021 21c: the draft through its signed preview (or as HTML), once per turn.
+              ...(renderer
+                ? {
+                    images: acceptsImages(settings.model),
+                    look: async () => {
+                      const doc = await previewDoc(
+                        { siteId, pageId },
+                        {
+                          store: graph,
+                          principal: { actor, scopes: [] },
+                          previewSecret: c.get("previewSecret"),
+                        },
+                      );
+                      return lookAt(
+                        renderer,
+                        doc.url ?? htmlDataUrl(doc.html, `${new URL(c.req.url).origin}/`),
+                      );
+                    },
+                  }
+                : {}),
               signal,
               build: c.get("build"),
               load: async () => {

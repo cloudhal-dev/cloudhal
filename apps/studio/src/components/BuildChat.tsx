@@ -46,6 +46,18 @@ const ERRORS = new Set([
   "ai_failed",
 ]);
 
+/** `render_page`'s check ids (RFC-0021 §4), named in the chat in the person's language. */
+const RENDER_CHECKS = [
+  "overflow-x",
+  "img-alt",
+  "img-broken",
+  "heading-order",
+  "contrast",
+  "empty-section",
+  "tap-target",
+  "long-line",
+] as const;
+
 export function BuildChat({
   siteId,
   pageId,
@@ -92,6 +104,7 @@ export function BuildChat({
     const controller = new AbortController();
     abort.current = controller;
     const repairs: string[] = [];
+    let looked = false;
     try {
       const target = scope
         ? {
@@ -105,7 +118,24 @@ export function BuildChat({
           progress(t("build.chat.thinking"));
         } else if (e.type === "writing")
           progress(t("build.chat.writing", { components: e.components.join(", ") }));
-        else if (e.type === "round" && e.round > 1) progress(t("build.chat.fixing"));
+        else if (e.type === "look") {
+          looked = true;
+          add({
+            role: "result",
+            text: e.failed.length
+              ? t("build.chat.lookedIssues", {
+                  checks: e.failed
+                    .map((id) =>
+                      (RENDER_CHECKS as readonly string[]).includes(id)
+                        ? t(`build.chat.checks.${id as (typeof RENDER_CHECKS)[number]}`)
+                        : id,
+                    )
+                    .join(", "),
+                })
+              : t("build.chat.lookedClean"),
+          });
+        } else if (e.type === "round" && e.round > 1)
+          progress(t(looked ? "build.chat.improving" : "build.chat.fixing"));
         else if (e.type === "step" && e.ok) repairs.push(...e.repairs);
         else if (e.type === "done")
           add({

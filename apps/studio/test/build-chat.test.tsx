@@ -90,6 +90,30 @@ describe("Build chat", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Build" })).toBeDisabled());
   });
 
+  it("says what the model saw when it looked at the page (RFC-0021 21c)", async () => {
+    serve(() =>
+      ndjson([
+        { type: "round", round: 1 },
+        { type: "step", ok: true, rev: 2, ops: 2, repairs: [] },
+        { type: "look", failed: ["contrast", "tap-target"], images: 4 },
+        { type: "round", round: 4 },
+        { type: "step", ok: true, rev: 3, ops: 1, repairs: [] },
+        { type: "done", rev: 3, steps: 2, refused: 0, usage: { inputTokens: 1, outputTokens: 1 } },
+      ]),
+    );
+    render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
+    fireEvent.change(await screen.findByLabelText("What should the page have?"), {
+      target: { value: "A pricing page" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    expect(
+      await screen.findByText(
+        "Looked at the page in a browser: text contrast, small tap targets to fix",
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("2 steps applied to the draft")).toBeInTheDocument();
+  });
+
   it("words a refusal before the stream starts", async () => {
     serve(() => Response.json({ error: "ai_budget", message: "used up" }, { status: 429 }));
     render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));

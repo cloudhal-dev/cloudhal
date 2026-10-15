@@ -285,7 +285,7 @@ describe("build chat", () => {
     });
     expect(res.status).toBe(200);
     await lines(res);
-    const brief = model.requests[0]?.messages.find((m) => m.role === "user")?.content ?? "";
+    const brief = String(model.requests[0]?.messages.find((m) => m.role === "user")?.content ?? "");
     expect(brief).toContain(
       'The person picked the Stack "root" in section sec_chatbuild001 in the preview, at /sections/1/components/0.',
     );
