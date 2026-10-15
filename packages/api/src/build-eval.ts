@@ -133,9 +133,21 @@ export interface BuildEvalDesign {
   score?: number | undefined;
   scores?: Partial<Record<DesignCriterion, number>> | undefined;
   note?: string | undefined;
-  /** The model looked at its render and changed the page (design.look). */
-  looked?: boolean | undefined;
+  /** With design.look: what the model saw, and what it did about it. */
+  look?: BuildEvalLook | undefined;
   error?: string | undefined;
+}
+
+/** What a model saw when it looked at its render during the turn (RFC-0021 21c). */
+export interface BuildEvalLook {
+  /** Ids of the checks that failed when it looked. */
+  failed: string[];
+  /** Screenshots it was shown (0: a text-only model, checks only). */
+  images: number;
+  /** It got a round to fix what it saw (images, or failed checks). */
+  round: boolean;
+  /** Steps it wrote in that round. */
+  steps: number;
 }
 
 /** The design pass of a run: the browser, and the judge for the score. */
@@ -222,14 +234,14 @@ export async function runBuildEvalOnce(input: {
   const design = input.design as BuildEvalDesignOptions;
   const urlOf = (p: Page) =>
     htmlDataUrl(renderPagePreview(design.site, p, {}, { blocks: design.blocks }).html);
-  let looked = false;
-  let stepsAfterLook = 0;
+  let look: BuildEvalLook | undefined;
   const emit = (e: BuildTurnEvent) => {
-    if (e.type === "look") looked = true;
+    if (e.type === "look") look = { failed: e.failed, images: e.images, round: false, steps: 0 };
+    else if (e.type === "round" && look) look.round = true;
     if (e.type === "round") run.rounds = e.round;
     else if (e.type === "step" && e.ok) {
       run.firstStepMs ??= now() - started;
-      if (looked) stepsAfterLook++;
+      if (look) look.steps++;
       run.repairs += e.repairs.length;
     } else if (e.type === "step") {
       run.refused++;
@@ -277,7 +289,7 @@ export async function runBuildEvalOnce(input: {
   /** Renders the result, then asks the judge (RFC-0021 21c). */
   async function designPass(built: Page): Promise<BuildEvalDesign> {
     const out: BuildEvalDesign = { failed: [] };
-    if (looked) out.looked = stepsAfterLook > 0;
+    if (look) out.look = look;
     try {
       const look = await lookAt(design.renderer, urlOf(built));
       out.failed = look.failed.map((c) => c.id);
