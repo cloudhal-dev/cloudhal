@@ -104,7 +104,7 @@ describe("Build model eval", () => {
     });
     // prose is set aside; the broken step is refused, the misspelt component repaired
     expect(sloppy).toMatchObject({ finished: true, steps: 1, refused: 1, repairs: 1, rounds: 2 });
-    expect(sloppy.samples[0]).toMatch(/^\/sections\/0/);
+    expect(sloppy.samples[0]).toMatch(/one component has id "root"/);
     const broken = await runBuildEvalOnce({
       transport,
       model: "broken",
@@ -119,6 +119,70 @@ describe("Build model eval", () => {
     expect(summary.map((s) => s.model)).toEqual(["good", "sloppy", "broken"]);
     expect(summary[1]).toMatchObject({ acceptance: 0.5, refusalsPerTurn: 1, repairsPerTurn: 1 });
     expect(buildEvalTable(summary)).toContain("| `good` | 1/1 | 100% |");
+  });
+
+  it("holds a step that waits for a later one, and writes them together", async () => {
+    const section = {
+      id: "sec_order00001",
+      kind: "surface",
+      catalog: "blog@1",
+      components: [{ id: "title", component: "Heading", props: { text: "Hi", level: 2 } }],
+    };
+    const reordered: AiTransport = {
+      kind: "binding",
+      async *stream(r) {
+        const first = !r.messages.some((m) => m.role === "assistant");
+        const lines = first
+          ? [
+              // no root yet: waits
+              JSON.stringify({ ops: [{ op: "add", path: "/sections/-", value: section }] }),
+              // links a child before adding it: still waits
+              JSON.stringify({
+                ops: [
+                  {
+                    op: "add",
+                    path: "/sections/0/components/-",
+                    value: { id: "root", component: "Stack", children: ["title", "cta"] },
+                  },
+                ],
+              }),
+              // the missing child arrives: all three steps are written together
+              JSON.stringify({
+                ops: [
+                  {
+                    op: "add",
+                    path: "/sections/0/components/-",
+                    value: { id: "cta", component: "Button", props: { label: "Go", href: "/go" } },
+                  },
+                ],
+              }),
+              JSON.stringify({
+                ops: [
+                  {
+                    op: "add",
+                    path: "/sections/0/components/-",
+                    value: { id: "orphan", component: "Text", props: { text: "x" } },
+                  },
+                  { op: "add", path: "/sections/0/components/1/children/-", value: "missing" },
+                ],
+              }),
+              '{"done":true}',
+            ]
+          : ['{"done":true}'];
+        yield { type: "text", text: `${lines.join("\n")}\n` };
+      },
+      models: async () => [],
+    };
+    const run = await runBuildEvalOnce({
+      transport: reordered,
+      model: "reordered",
+      brief: BUILD_EVAL_BRIEFS[0] as (typeof BUILD_EVAL_BRIEFS)[number],
+      catalog,
+      siteId: "site_eval000001",
+    });
+    // one step written (three held lines together); the last still waited at the end: refused
+    expect(run).toMatchObject({ steps: 1, refused: 1, components: 3 });
+    expect(run.samples[0]).toMatch(/no component "missing"/);
   });
 
   it("starts edits from a valid page and scopes the scoped brief", async () => {

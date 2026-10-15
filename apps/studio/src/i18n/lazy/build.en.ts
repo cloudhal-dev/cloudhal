@@ -58,6 +58,9 @@ export const messages = {
       scopeSection: "section {index}",
       scopeComponent: "{component} “{id}” in section {index}",
       clearScope: "Change the whole page instead",
+      /** RFC-0020 open question 7: the eval's pick for Build. */
+      modelHint:
+        "Build works best with {model}: it finished every brief in Cloudhal's model eval. An Administrator can choose it in Settings › AI.",
       errors: {
         ai_budget:
           "Today's AI commands for this site are used up. An Administrator can raise the daily limit in Settings › AI.",

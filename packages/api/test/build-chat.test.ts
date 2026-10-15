@@ -9,7 +9,7 @@ import type { AiRunRequest, AiTransport } from "../src/ai/client.ts";
 import { AiStore } from "../src/ai/store.ts";
 import { createApi } from "../src/app.ts";
 import { type BuildChange, createBuildHub } from "../src/build.ts";
-import { componentsIn, JsonObjectReader, parseLine } from "../src/build-turn.ts";
+import { componentPaths, componentsIn, JsonObjectReader, parseLine } from "../src/build-turn.ts";
 
 const human = { kind: "human" as const, id: "user_builder0001", name: "Halil" };
 
@@ -112,6 +112,41 @@ describe("build chat", () => {
     expect(cut.push('{"ops":[{"op":"add"')).toEqual([]);
     expect(cut.partial).toBe('{"ops":[{"op":"add"');
     expect(cut.end()).toEqual([{ object: '{"ops":[{"op":"add"' }]);
+  });
+
+  it("forgives raw line breaks in strings and trailing commas, and finds components by id", () => {
+    expect(parseLine('{"say":"two\nlines\there",}')).toEqual({ say: "two\nlines\there" });
+    expect(parseLine('{"ops":[{"op":"remove","path":"/sections/0"},],}')).toEqual({
+      ops: [{ op: "remove", path: "/sections/0" }],
+    });
+    expect(parseLine('{"say":"a, }"')).toMatchObject({ invalid: expect.any(String) });
+    const page = {
+      sections: [
+        { id: "sec_a00000001", kind: "richText" },
+        {
+          id: "sec_b00000001",
+          kind: "surface",
+          components: [{ id: "root" }, { id: "tabs" }],
+        },
+      ],
+    } as unknown as Page;
+    expect(
+      componentPaths(page, [
+        { op: "add", path: "/sections/1/components/tabs/children/-", value: "x" },
+        { op: "move", from: "/sections/1/components/root", path: "/sections/1/components/0" },
+        { op: "add", path: "/sections/1/components/nope/children/-", value: "y" },
+      ]),
+    ).toEqual({
+      ops: [
+        { op: "add", path: "/sections/1/components/1/children/-", value: "x" },
+        { op: "move", from: "/sections/1/components/0", path: "/sections/1/components/0" },
+        { op: "add", path: "/sections/1/components/nope/children/-", value: "y" },
+      ],
+      notes: [
+        "/sections/1/components/tabs → /sections/1/components/1",
+        "/sections/1/components/root → /sections/1/components/0",
+      ],
+    });
   });
 
   it("parses one JSON object per line and names the components being written", () => {
