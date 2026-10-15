@@ -5,10 +5,12 @@
  * They get `{ props, content, contentHtml, media }`: `content` is a container's inner markdown,
  * `contentHtml` the same rendered safely. Props were checked against the type first.
  */
+import type { SurfaceSection } from "@cloudhal/core-contracts";
 import type { BlockType } from "@cloudhal/core-ts/blocks";
 import { themeRegistry } from "../blocks.ts";
-import { renderBodyParts } from "../markdown.ts";
+import { renderBodyParts, SURFACE_SLOT } from "../markdown.ts";
 import type { MediaContext } from "../media.ts";
+import Surface from "./Surface.astro";
 
 interface Props {
   body: { format: "markdown" | "html"; value: string };
@@ -29,6 +31,9 @@ const parts = renderBodyParts(
 ---
 {parts.map((part) => {
   if ("html" in part) return <Fragment set:html={part.html} />;
+  // RFC-0020 §5: a ```surface fence, drawn with the theme's components where it has them.
+  if (part.slot.type === SURFACE_SLOT)
+    return <Surface section={part.slot.props.surface as SurfaceSection} blocks={blocks} blockTypes={blockTypes} media={media} />;
   const Own = blocks[part.slot.type] as AnyComponent;
   return (
     <div class="ch-block" data-block-type={part.slot.type}>

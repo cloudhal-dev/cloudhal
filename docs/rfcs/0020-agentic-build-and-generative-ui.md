@@ -234,6 +234,19 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **One turn, one unit.** A turn is one AI command against the daily cap, one AI job per person, and one snapshot (`reason: manual`). It is audited as `build_chat` without the brief, and it runs at most 5 minutes with 8,192 output tokens per round.
   - **Progress.** Progress streams to Studio as NDJSON: `round`, `say`, `writing` (the components named in the line being written, a lightweight ghost), `step`, `done` and `error`.
   - **Studio.** "Build with AI" sits at the top of the Build view (`BuildChat`, `BuildChatLog`): the brief, Build / Stop, and the transcript with repairs and outcomes. When AI is off or unreachable, the card says so and how to change it.
+- **20d shipped** (markdown surfaces):
+  - **core-ts.**
+    - `bodySurfaces` finds ```` ```surface ```` fences; ```` ``` ```` and `~~~` both open one, and fences inside other code blocks do not count.
+    - `parseSurfaceFence` reads one line at a time: each line is a component or a `{"data":…}` merge, and `complete: false` marks a fence still streaming.
+    - `checkBodySurfaces` checks the fences with the page-surface rules.
+  - **The store** checks article bodies and rich-text sections. It refuses an unclosed fence, a duplicate fence id or an entry source (`$source` works in page surfaces only) with `invalid_surface`, keeps unknown components, and leaves the markdown unchanged.
+  - **The renderer** draws fences everywhere bodies render: site, previews and feeds. With the theme's components, a fence becomes a body slot that `Body.astro` fills with `Surface.astro`, so theme blocks draw inside articles too.
+  - **Studio's editor** keeps fences verbatim as source blocks (a code block would cut the info string).
+  - **`catalogPrompt`** teaches the fence syntax.
+- **Deviations in 20d:**
+  - **No live editor node view.** Fences show as source blocks, edited in Markdown mode.
+  - **No healing renderer yet.** The healing pass for partially streamed prose has no consumer until Build chat writes article bodies; `parseSurfaceFence` already supports partial fences.
+  - **No body block operations.** Body surfaces are edited through the body (`update_entry`, `edit_body`), not through `patch_draft` operations by block id.
 - **Deviations in 20c:**
   - **Text, not tool calls.** The model answers in JSON Lines over plain text streaming, instead of tool calls through the AI SDK. This works with every Workers AI text model and adds nothing to the admin Worker's bundle.
   - **Ghosts are names.** A ghost shows the component names in the line being written, not an outline in the preview.

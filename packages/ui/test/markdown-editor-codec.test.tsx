@@ -114,3 +114,23 @@ describe("markdown blocks", () => {
     expect(mergeBlocks(splitMarkdown(""), [], ["# Title", "", "Text"])).toBe("# Title\n\nText\n");
   });
 });
+
+describe("surface fences (RFC-0020 §5)", () => {
+  it("keeps a ```surface fence verbatim, info string included, and saves it unchanged", () => {
+    const md = [
+      "Intro",
+      "",
+      '```surface {"id":"pricing","catalog":"blog@1"}',
+      '{"id":"root","component":"Divider"}',
+      "```",
+      "",
+      "```js",
+      "const x = 1;",
+      "```",
+    ].join("\n");
+    const loaded = codec.load(md);
+    const kinds = (loaded.doc.content ?? []).map((n) => n.type);
+    expect(kinds).toEqual(["paragraph", "sourceBlock", "codeBlock"]);
+    expect(codec.save(loaded.doc, loaded.base)).toBe(md);
+  });
+});

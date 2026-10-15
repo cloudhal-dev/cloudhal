@@ -91,7 +91,7 @@ import {
   type PublishReleaseResult,
   publishRelease,
 } from "./release-apply.ts";
-import { checkPageSurfaces, createCatalog } from "./surfaces.ts";
+import { checkBodySurfaces, checkPageSurfaces, createCatalog } from "./surfaces.ts";
 import {
   migrateTagsToTerms,
   revertTagsToTerms,
@@ -1635,7 +1635,20 @@ function checkThemeConfig(
 }
 
 /** Body directives of known types must fit them (RFC-0015 §7); unknown ones are kept. */
+/** RFC-0020 §5: a body's ```surface fences follow the same rules as page surfaces. */
+function checkBodyFences(blocks: BlockRegistry, markdown: string, where: string): void {
+  if (!markdown.includes("surface")) return;
+  const issues = checkBodySurfaces(markdown, createCatalog({ blocks }));
+  if (issues.length)
+    throw new InvariantError(
+      "invalid_surface",
+      `${where}: ${issues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
+      { issues },
+    );
+}
+
 function checkBodyDirectives(blocks: BlockRegistry, markdown: string, where: string): void {
+  checkBodyFences(blocks, markdown, where);
   if (!markdown.includes("::")) return;
   for (const d of bodyDirectives(markdown)) {
     const issues = checkDirective(blocks, d);
