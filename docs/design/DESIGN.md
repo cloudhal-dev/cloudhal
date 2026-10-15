@@ -418,6 +418,10 @@ Site › Settings gets an **Appearance** section after Domains (`components/Appe
 `/sites/:siteId/pages/:pageId/build` (`routes/BuildPage.tsx`, template `editor`, lazy namespace `build`): a page while agents build it. The page editor's header has a secondary "Build live" `LinkButton` (`Lightning`, `Tooltip`) that opens it.
 - **Header.** The title is "Build · {page title}". The actions are a connection `Badge` (`success` dot "Live", `warning` dot "Connecting…" / "Reconnecting…") and a secondary "Back to editor" `LinkButton`.
 - **Body.** `EditorLayout` with the preview always shown.
+  - Main, first: `SectionCard` "Build with AI" (`components/BuildChat.tsx`, phase 20c).
+    - Transcript: `BuildChatLog`, oldest first. It shows the person's brief in bold, the model's notes with a `Sparkle`, a live `Loader` line ("Writing Band, Heading…"), the outcome with `CheckCircle` and repairs in mono, and errors with `WarningCircle`.
+    - Composer: an `InputArea` "What should the page have?" and a primary "Build" button, which becomes a secondary "Stop" while the turn runs.
+    - When AI is off: a `SectionEmpty` with "Open settings". When the deployment cannot reach Workers AI: a `SectionEmpty` saying how to connect it.
   - Main: `SectionCard` "Activity" holding `BuildActivity` (`@cloudhal/ui`). The list is newest first. Each entry shows the actor icon and name, the tool in mono, an "Applied" (`success`) or "Refused" (`warning`) dot `Badge` and a relative time. Below that: a summary line ("2 sections changed · 3 operations"), then Cloudhal's repairs or the refused parts with their JSON Pointers, in mono. The list is `aria-live="polite"`. With nothing yet it shows a `SectionEmpty`.
   - Aside: `SectionCard` "Connect an agent", with the MCP endpoint and the page id as `InlineCopyText` and three numbered steps (`get_catalog`, `patch_draft`, fix `VALIDATION_FAILED`).
 - **Preview.** `PreviewPanel live morph`:

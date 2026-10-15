@@ -227,6 +227,19 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
   - **Same API on both runtimes.** `createDurableBuildHub` implements the API's `BuildHub`, so the server-sent events route and Studio are unchanged.
   - **Async observers.** `BuildObserver` methods may be async. Tools and Studio saves await them through `notifyBuild`, which waits at most 2 seconds and never fails the write.
   - **Verified on workerd:** an agent's `patch_draft` over MCP reaches a Build view stream through the room.
+- **20c shipped** (Studio's Build chat):
+  - **The turn.** `POST /api/sites/:siteId/ai/build/:pageId` (`content:write`) `{ message }`. It runs on the site's model through RFC-0016's transport, with no new dependency.
+  - **JSON Lines.** The model writes one JSON object per line: `say` (a note to the person), `ops` (one step) or `done`. A line is whole or not, like ` ```surface ` fences (§5). Each finished step is repaired, validated, written to the draft and shown in the Build view while the model writes the next one.
+  - **Refusals go back.** Refused steps return to the model with their JSON Pointers, for at most 3 rounds.
+  - **One turn, one unit.** A turn is one AI command against the daily cap, one AI job per person, and one snapshot (`reason: manual`). It is audited as `build_chat` without the brief, and it runs at most 5 minutes with 8,192 output tokens per round.
+  - **Progress.** Progress streams to Studio as NDJSON: `round`, `say`, `writing` (the components named in the line being written, a lightweight ghost), `step`, `done` and `error`.
+  - **Studio.** "Build with AI" sits at the top of the Build view (`BuildChat`, `BuildChatLog`): the brief, Build / Stop, and the transcript with repairs and outcomes. When AI is off or unreachable, the card says so and how to change it.
+- **Deviations in 20c:**
+  - **Text, not tool calls.** The model answers in JSON Lines over plain text streaming, instead of tool calls through the AI SDK. This works with every Workers AI text model and adds nothing to the admin Worker's bundle.
+  - **Ghosts are names.** A ghost shows the component names in the line being written, not an outline in the preview.
+  - **No click-to-scope yet.** Selecting a preview element to scope the next brief is not in this phase.
+  - **The transcript is per browser.** It is not kept; the draft and its snapshot are what last.
+  - **Model choice is open.** The model eval (open question 7) is still to be done. Build uses the site's chosen model.
 - **Deviations in 20b so far:**
   - **No checkpoints yet.** Each `patch_draft` call is still one store write and one snapshot; checkpoints (§6) come with 20c, where a model streams many small operations.
   - **No ghosts yet.** They need partial tool input, which an MCP server never sees; they come with Studio's own model loop (20c).

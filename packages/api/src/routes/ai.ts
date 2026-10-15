@@ -10,7 +10,14 @@
  *   400 `invalid`, 404, 409 `ai_off`, 429 `ai_budget` | `ai_busy` | `ai_rate_limited`,
  *   502 `ai_failed` | `ai_model_unavailable`, 503 `ai_unavailable`. A failure after the first
  *   chunk aborts the stream. Each command is audited (`ai_command`) without its text.
+ * - `POST /build/:pageId` (`content:write`) `{ message }` → Studio's Build chat (RFC-0020 §6,
+ *   phase 20c): the model changes the page draft step by step; progress streams as NDJSON
+ *   (`BuildTurnEvent`s), every step lands in the Build view, and the turn ends with one snapshot.
+ *   The same checks as a command (AI on, the daily cap counts one turn as one command, one AI job
+ *   per person); audited as `build_chat` without the brief.
  */
+
+import { createCatalog } from "@cloudhal/core-ts/surfaces";
 import { Hono } from "hono";
 import { AiError, type AiEvent, type AiTransport } from "../ai/client.ts";
 import {
@@ -21,9 +28,10 @@ import {
 } from "../ai/commands.ts";
 import { modelPicker } from "../ai/models.ts";
 import { AiSettingsError, type AiStore, checkAiSettings, isWorkersAiModel } from "../ai/store.ts";
+import { BUILD_BRIEF_LIMIT, type BuildTurnEvent, runBuildTurn } from "../build-turn.ts";
 import type { Env } from "../context.ts";
 import { apiError, notFound } from "../errors.ts";
-import { API_ACTOR } from "../governance.ts";
+import { API_ACTOR, writerOf } from "../governance.ts";
 import { personOf } from "../own.ts";
 import { param } from "../params.ts";
 
@@ -35,6 +43,8 @@ export interface AiDeps {
 
 /** The longest a command may run before it is aborted. */
 const COMMAND_TIMEOUT_MS = 120_000;
+/** A build turn writes a whole page in small steps: it may run longer. */
+const BUILD_TIMEOUT_MS = 300_000;
 
 /** People with a command running (one each; per isolate on Workers, per process on Node). */
 const running = new Set<string>();
@@ -234,6 +244,118 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
       return new Response(body, {
         headers: {
           "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    })
+    .post("/build/:pageId", async (c) => {
+      const siteId = param(c, "siteId");
+      const t = deps?.transport;
+      if (!t) throw apiError(503, "ai_unavailable", "this deployment cannot reach Workers AI");
+      const settings = await store().settings(siteId);
+      if (!settings.enabled) throw apiError(409, "ai_off", "AI is off for this site");
+      if (!isWorkersAiModel(settings.model) && !settings.gateway)
+        throw apiError(409, "ai_off", "the chosen model needs an AI Gateway; check the settings");
+      const body = (await c.req.json().catch(() => ({}))) as { message?: unknown };
+      const message = typeof body.message === "string" ? body.message.trim() : "";
+      if (!message || message.length > BUILD_BRIEF_LIMIT)
+        throw apiError(400, "invalid", `message: 1 to ${BUILD_BRIEF_LIMIT} characters`, {
+          field: "message",
+        });
+      const graph = c.get("store");
+      const site = await graph.getSite(siteId);
+      const pageId = param(c, "pageId");
+      const first = await graph.getPage(pageId);
+      if (!site || !first || first.siteId !== siteId) throw notFound("page not found");
+
+      const actor = c.get("actor") ?? API_ACTOR;
+      const who = personOf(c) ?? actor.id;
+      if (running.has(who))
+        throw apiError(429, "ai_busy", "one AI job at a time; wait for the one running");
+      const now = c.get("now");
+      const day = today(now());
+      if (!(await store().reserve(siteId, day, settings.dailyLimit)))
+        throw apiError(429, "ai_budget", "today's AI commands for this site are used up");
+      running.add(who);
+
+      const started = Date.now();
+      const encoder = new TextEncoder();
+      const writer = writerOf(c);
+      let summary: Extract<BuildTurnEvent, { type: "done" }> | undefined;
+      let failure: string | undefined;
+      const signal = AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(BUILD_TIMEOUT_MS)]);
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const emit = (event: BuildTurnEvent) => {
+            if (event.type === "done") summary = event;
+            if (event.type === "error") failure = event.code;
+            try {
+              controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+            } catch {
+              // Studio went away; the turn still finishes its current step and its snapshot.
+            }
+          };
+          try {
+            await runBuildTurn(message, {
+              transport: t,
+              model: settings.model,
+              gateway: settings.gateway,
+              catalog: createCatalog({ name: site.theme.name, blocks: graph.blocks }),
+              siteId,
+              pageId,
+              actor,
+              locale: first.locale,
+              signal,
+              build: c.get("build"),
+              load: async () => {
+                const page = await graph.getPage(pageId);
+                if (!page) throw notFound("page not found");
+                return page;
+              },
+              write: (page) => graph.updatePage(page, { writer }),
+              snapshot: (label) => graph.createSnapshot(siteId, { actor, reason: "manual", label }),
+              emit,
+            });
+          } finally {
+            running.delete(who);
+            if (summary)
+              await store()
+                .addTokens(siteId, day, summary.usage.inputTokens, summary.usage.outputTokens)
+                .catch(() => {});
+            await c
+              .get("audit")
+              ?.record({
+                at: now().toISOString(),
+                actor,
+                siteId,
+                tool: "build_chat",
+                decision: "allow",
+                outcome: failure ? "error" : "ok",
+                durationMs: Date.now() - started,
+                ...(failure ? { reason: failure } : {}),
+                input: {
+                  pageId,
+                  model: settings.model,
+                  chars: message.length,
+                  steps: summary?.steps ?? 0,
+                  refused: summary?.refused ?? 0,
+                  inputTokens: summary?.usage.inputTokens ?? 0,
+                  outputTokens: summary?.usage.outputTokens ?? 0,
+                },
+              })
+              .catch(() => {});
+            try {
+              controller.close();
+            } catch {
+              // Already cancelled.
+            }
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "content-type": "application/x-ndjson; charset=utf-8",
           "cache-control": "no-store",
           "x-content-type-options": "nosniff",
         },

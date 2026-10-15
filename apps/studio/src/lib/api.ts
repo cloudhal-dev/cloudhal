@@ -420,6 +420,23 @@ export interface ApprovalChanges {
 }
 
 /** `POST …/entries/:id/preview`, `POST …/pages/:id/preview`: the unsaved form, rendered. */
+/** One progress event of a Build chat turn (`@cloudhal/api` `BuildTurnEvent`, RFC-0020 §6). */
+export type BuildTurnEvent =
+  | { type: "round"; round: number }
+  | { type: "say"; text: string }
+  | { type: "writing"; components: string[] }
+  | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
+  | { type: "step"; ok: false; issues: string[] }
+  | {
+      type: "done";
+      rev: number;
+      steps: number;
+      refused: number;
+      snapshotId?: string;
+      usage: { inputTokens: number; outputTokens: number };
+    }
+  | { type: "error"; code: string; message: string };
+
 export interface DraftPreview {
   html: string;
 }
@@ -2063,6 +2080,50 @@ export const api = {
         }
         const rest = decoder.decode();
         if (rest) yield rest;
+      } finally {
+        reader.releaseLock();
+      }
+    },
+    /**
+     * Studio's Build chat (RFC-0020 §6): the site's model changes the page step by step; yields
+     * each progress event as it arrives (NDJSON). An error before the stream starts is an
+     * `ApiRequestError` with the code (`ai_off`, `ai_budget`, `ai_busy`, …).
+     */
+    build: async function* (
+      siteId: string,
+      pageId: string,
+      message: string,
+      signal?: AbortSignal,
+    ): AsyncGenerator<BuildTurnEvent, void, undefined> {
+      const res = await fetch(`/api/sites/${siteId}/ai/build/${pageId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message }),
+        ...(signal ? { signal } : {}),
+      });
+      if (!res.ok || !res.body) {
+        const error = (await res
+          .json()
+          .catch(() => ({ error: "ai_failed", message: res.statusText }))) as ApiError;
+        throw new ApiRequestError(res.status, error);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+          let nl = buffer.indexOf("\n");
+          while (nl >= 0) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (line) yield JSON.parse(line) as BuildTurnEvent;
+            nl = buffer.indexOf("\n");
+          }
+          if (done) break;
+        }
       } finally {
         reader.releaseLock();
       }

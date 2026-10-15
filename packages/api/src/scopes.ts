@@ -130,6 +130,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["PUT", `${S}/ai/settings`, "site:settings"],
   ["GET", `${S}/ai/models`, "site:settings"],
   ["POST", `${S}/ai/commands`, "ai:invoke"],
+  // RFC-0020 §6: Studio's Build chat changes a page draft (and counts as an AI command).
+  ["POST", `${S}/ai/build/:pageId`, "content:write"],
   ["POST", `${S}/proposals/:proposalId/accept`, "content:draft:own"],
   ["POST", `${S}/proposals/:proposalId/reject`, "content:draft:own"],
   ["GET", `${S}/snapshots`, "site:read"],
