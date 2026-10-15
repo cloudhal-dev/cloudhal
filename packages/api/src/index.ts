@@ -23,6 +23,16 @@ export {
   createBuildHub,
   type LocalBuildHub,
 } from "./build.ts";
+export {
+  BUILD_EVAL_BRIEFS,
+  BUILD_EVAL_MODELS,
+  type BuildEvalBrief,
+  type BuildEvalRun,
+  type BuildEvalSummary,
+  buildEvalTable,
+  runBuildEvalOnce,
+  summariseBuildEval,
+} from "./build-eval.ts";
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";
 export { MailError, type MailMessage, type MailSender } from "./mail.ts";

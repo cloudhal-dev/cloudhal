@@ -178,7 +178,10 @@ export function createApi(deps: ApiDeps) {
   if (deps.admin) {
     if (deps.admin.deployToken.length < 32)
       throw new Error("admin.deployToken must be at least 32 characters");
-    app.route("/api/admin", adminRoutes(deps.admin.deployToken, deps.admin.storage));
+    app.route(
+      "/api/admin",
+      adminRoutes(deps.admin.deployToken, deps.admin.storage, deps.ai?.transport),
+    );
   }
 
   /**

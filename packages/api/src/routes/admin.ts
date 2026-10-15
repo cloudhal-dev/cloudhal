@@ -31,6 +31,8 @@
  *   (`cloudhal schedules list --remote`)
  * - `POST /api/admin/schedules/run-due` → one tick now, the operator's (`cloudhal schedules
  *   run-due --remote`)
+ * - `POST /api/admin/sites/:siteId/ai/build-eval` ← {models?, briefs?} → NDJSON: one line per
+ *   run, then the summary (RFC-0020 open question 7, `cloudhal ai build-eval --remote`); in memory
  * - `POST /api/admin/sites/:siteId/search/reindex` → rebuilds the search index from the live
  *   snapshot (RFC-0019 §3, `cloudhal search reindex --remote`)
  * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
@@ -66,9 +68,19 @@ import {
   SCHEDULES_ENGINE_LEVEL,
   schedulerHealthReport,
 } from "@cloudhal/core-ts/releases";
+import { createCatalog } from "@cloudhal/core-ts/surfaces";
 import { type CommentsDeps, commentsAvailable } from "@cloudhal/mcp-server/comments";
 import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
+import type { AiTransport } from "../ai/client.ts";
+import {
+  BUILD_EVAL_BRIEFS,
+  BUILD_EVAL_MODELS,
+  type BuildEvalRun,
+  buildEvalTable,
+  runBuildEvalOnce,
+  summariseBuildEval,
+} from "../build-eval.ts";
 import type { Env } from "../context.ts";
 import { badRequest } from "../errors.ts";
 import { param } from "../params.ts";
@@ -123,7 +135,11 @@ const RELEASE_STATES = new Set([
   "canceled",
 ]);
 
-export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env> {
+export function adminRoutes(
+  deployToken: string,
+  storage: StoragePair,
+  aiTransport?: AiTransport,
+): Hono<Env> {
   return (
     new Hono<Env>()
       .use("*", async (c, next) => {
@@ -379,6 +395,84 @@ export function adminRoutes(deployToken: string, storage: StoragePair): Hono<Env
           limit: Number.isInteger(limit) ? limit : 50,
         });
         return c.json({ releases: list.map(releaseSummary) }, 200, NO_STORE);
+      })
+      // RFC-0020 open question 7: `cloudhal ai build-eval --remote` compares models on the build
+      // turn, in memory (nothing is stored). Streams one NDJSON line per run, then the summary.
+      .post("/sites/:siteId/ai/build-eval", async (c) => {
+        const store = c.get("store");
+        const site = await store.getSite(param(c, "siteId"));
+        if (!site) return c.json({ error: "not_found", message: "site not found" }, 404, NO_STORE);
+        if (!aiTransport)
+          return c.json(
+            { error: "ai_unavailable", message: "this deployment cannot reach Workers AI" },
+            503,
+            NO_STORE,
+          );
+        const body = (await c.req.json().catch(() => ({}))) as {
+          models?: unknown;
+          briefs?: unknown;
+        };
+        const list = (v: unknown) =>
+          Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
+        const models = (list(body.models) ?? [...BUILD_EVAL_MODELS]).slice(0, 12);
+        const wanted = list(body.briefs);
+        const briefs = BUILD_EVAL_BRIEFS.filter((b) => !wanted || wanted.includes(b.id));
+        if (models.length === 0 || briefs.length === 0)
+          return c.json(
+            { error: "invalid", message: "models and briefs: at least one each" },
+            400,
+            NO_STORE,
+          );
+        const catalog = createCatalog({ name: site.theme.name, blocks: store.blocks });
+        const encoder = new TextEncoder();
+        const signal = c.req.raw.signal;
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const send = (line: unknown) => {
+              try {
+                controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+              } catch {
+                // the operator went away; the runs stop at the next check
+              }
+            };
+            const runs: BuildEvalRun[] = [];
+            for (const model of models)
+              for (const brief of briefs) {
+                if (signal.aborted) break;
+                const run = await runBuildEvalOnce({
+                  transport: aiTransport,
+                  model,
+                  brief,
+                  catalog,
+                  siteId: site.id,
+                  signal,
+                }).catch(
+                  (e: unknown): BuildEvalRun => ({
+                    model,
+                    brief: brief.id,
+                    finished: false,
+                    steps: 0,
+                    refused: 0,
+                    repairs: 0,
+                    rounds: 0,
+                    components: 0,
+                    totalMs: 0,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    error: e instanceof Error ? e.message.slice(0, 200) : "failed",
+                  }),
+                );
+                runs.push(run);
+                send({ type: "run", run });
+              }
+            const summary = summariseBuildEval(runs);
+            send({ type: "summary", summary, table: buildEvalTable(summary) });
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" },
+        });
       })
       // RFC-0019 §3: `cloudhal search reindex --remote` rebuilds the index from the live snapshot.
       .post("/sites/:siteId/search/reindex", async (c) => {
