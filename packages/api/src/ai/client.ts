@@ -23,6 +23,8 @@ export interface AiRunRequest {
   model: string;
   messages: AiMessage[];
   maxTokens: number;
+  /** Sampling temperature (the model's default when absent); 0 for judging. */
+  temperature?: number | undefined;
   /** An AI Gateway id. */
   gateway?: string | undefined;
   signal?: AbortSignal | undefined;
@@ -151,6 +153,7 @@ const bodyOf = (r: AiRunRequest) => ({
   messages: r.messages,
   stream: true,
   max_tokens: r.maxTokens,
+  ...(r.temperature !== undefined ? { temperature: r.temperature } : {}),
 });
 
 // ── the catalogue ─────────────────────────────────────────────────────────────────────────────

@@ -196,6 +196,7 @@ export function rubricMessages(brief: string, look: PageLook): AiMessage[] {
       role: "system",
       content: [
         "You are a strict senior web designer reviewing a page an AI built from a site's components. Judge only what the screenshots show.",
+        "A page that shows no content is a 1 on every criterion: there is nothing to read, space or stack.",
         "Use the whole scale. Most AI-built pages deserve 2 or 3 on most criteria. Give 4 only to work you would ship after small changes, and 5 only to work a senior designer would be proud of. A page that is a plain column of headings and paragraphs is a 2 on rhythm and spacing, however complete it is.",
         DESIGN_GUIDANCE,
       ].join("\n"),
@@ -252,6 +253,8 @@ export async function scoreDesign(input: {
     model: input.model,
     messages: rubricMessages(input.brief, input.look),
     maxTokens: 700,
+    // The same page should get the same score.
+    temperature: 0,
     signal: input.signal,
   })) {
     if (e.type === "text") text += e.text;
