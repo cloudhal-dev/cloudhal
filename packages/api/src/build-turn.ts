@@ -173,6 +173,69 @@ export function componentsIn(partial: string): string[] {
 
 type Line = { say: string } | { ops: PatchOp[] } | { done: true } | { invalid: string };
 
+/**
+ * A model's answer split into JSON objects as they complete, wherever its line breaks fall: an
+ * object may be pretty-printed over several lines, several may share a line, and code fences or
+ * prose between them are set aside instead of being refused one line at a time.
+ */
+export class JsonObjectReader {
+  #depth = 0;
+  #inString = false;
+  #escape = false;
+  #current = "";
+  #outside = "";
+
+  /** Feeds text; returns the objects (as text) and the prose lines it completed. */
+  push(text: string): Array<{ object: string } | { prose: string }> {
+    const out: Array<{ object: string } | { prose: string }> = [];
+    for (const ch of text) {
+      if (this.#depth === 0) {
+        if (ch === "{") {
+          this.#flushOutside(out);
+          this.#depth = 1;
+          this.#current = "{";
+        } else if (ch === "\n") this.#flushOutside(out);
+        else this.#outside += ch;
+        continue;
+      }
+      this.#current += ch;
+      if (this.#inString) {
+        if (this.#escape) this.#escape = false;
+        else if (ch === "\\") this.#escape = true;
+        else if (ch === '"') this.#inString = false;
+      } else if (ch === '"') this.#inString = true;
+      else if (ch === "{") this.#depth++;
+      else if (ch === "}" && --this.#depth === 0) {
+        out.push({ object: this.#current });
+        this.#current = "";
+      }
+    }
+    return out;
+  }
+
+  /** The object being written now (for ghosts). */
+  get partial(): string {
+    return this.#current;
+  }
+
+  /** The end of the answer: an unclosed object is returned as it is (it will not parse). */
+  end(): Array<{ object: string } | { prose: string }> {
+    const out: Array<{ object: string } | { prose: string }> = [];
+    this.#flushOutside(out);
+    if (this.#current.trim()) out.push({ object: this.#current });
+    this.#current = "";
+    this.#depth = 0;
+    this.#inString = false;
+    return out;
+  }
+
+  #flushOutside(out: Array<{ object: string } | { prose: string }>): void {
+    const text = this.#outside.trim();
+    this.#outside = "";
+    if (text && !text.startsWith("```")) out.push({ prose: text.slice(0, 200) });
+  }
+}
+
 export function parseLine(line: string): Line | undefined {
   const text = line.trim();
   if (!text || text.startsWith("```")) return undefined;
@@ -187,6 +250,10 @@ export function parseLine(line: string): Line | undefined {
   const v = value as Record<string, unknown>;
   if (typeof v.say === "string") return { say: v.say.slice(0, 500) };
   if (Array.isArray(v.ops)) return { ops: v.ops as PatchOp[] };
+  // Common slips, read as meant: one operation instead of a list, or a bare operation.
+  if (v.ops && typeof v.ops === "object") return { ops: [v.ops as PatchOp] };
+  if (typeof v.op === "string" && typeof v.path === "string")
+    return { ops: [v as unknown as PatchOp] };
   if (v.done === true) return { done: true };
   return { invalid: 'a line has "say", "ops" or "done"' };
 }
@@ -249,7 +316,8 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
       deps.emit({ type: "round", round });
       const refused: string[] = [];
       let output = "";
-      let buffer = "";
+      const reader = new JsonObjectReader();
+      let objects = 0;
       let done = false;
       let lastGhost = "";
       const handle = async (line: string) => {
@@ -276,21 +344,27 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
           continue;
         }
         output += event.text;
-        buffer += event.text;
-        let nl = buffer.indexOf("\n");
-        while (nl >= 0) {
-          const line = buffer.slice(0, nl);
-          buffer = buffer.slice(nl + 1);
-          await handle(line);
-          nl = buffer.indexOf("\n");
-        }
-        const ghost = done ? "" : componentsIn(buffer).join(",");
+        for (const item of reader.push(event.text))
+          if ("object" in item) {
+            objects++;
+            await handle(item.object);
+          }
+        const ghost = done ? "" : componentsIn(reader.partial).join(",");
         if (ghost && ghost !== lastGhost) {
           lastGhost = ghost;
           deps.emit({ type: "writing", components: ghost.split(",") });
         }
       }
-      if (!done && buffer.trim()) await handle(buffer);
+      for (const item of reader.end())
+        if ("object" in item && !done) {
+          objects++;
+          await handle(item.object);
+        }
+      // Prose alone is not a step: say once what Build reads.
+      if (objects === 0 && !done)
+        refused.push(
+          'no JSON object in the answer: write only JSON Lines ({"say"}, {"ops"}, {"done"})',
+        );
       refusedTotal += refused.length;
       if (refused.length === 0 || round === maxRounds) break;
       messages.push(

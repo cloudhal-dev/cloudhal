@@ -96,6 +96,8 @@ export interface BuildEvalRun {
   finished: boolean;
   steps: number;
   refused: number;
+  /** The first few refusal reasons, to see why a model's steps fail. */
+  samples: string[];
   repairs: number;
   rounds: number;
   /** Components on the page at the end (built or kept). */
@@ -129,6 +131,8 @@ const median = (xs: number[]): number | undefined => {
   return s.length % 2 ? s[m] : ((s[m - 1] as number) + (s[m] as number)) / 2;
 };
 const round2 = (n: number) => Math.round(n * 100) / 100;
+/** Refusal reasons kept per run. */
+const SAMPLES = 5;
 
 /** One brief on one model, in memory. */
 export async function runBuildEvalOnce(input: {
@@ -162,6 +166,7 @@ export async function runBuildEvalOnce(input: {
     finished: false,
     steps: 0,
     refused: 0,
+    samples: [],
     repairs: 0,
     rounds: 0,
     components: 0,
@@ -174,8 +179,11 @@ export async function runBuildEvalOnce(input: {
     else if (e.type === "step" && e.ok) {
       run.firstStepMs ??= now() - started;
       run.repairs += e.repairs.length;
-    } else if (e.type === "step") run.refused++;
-    else if (e.type === "done") {
+    } else if (e.type === "step") {
+      run.refused++;
+      for (const issue of e.issues)
+        if (run.samples.length < SAMPLES) run.samples.push(issue.slice(0, 200));
+    } else if (e.type === "done") {
       run.steps = e.steps;
       run.finished = e.steps > 0;
       run.inputTokens = e.usage.inputTokens;
