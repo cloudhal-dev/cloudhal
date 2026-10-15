@@ -143,6 +143,115 @@ describe("surface tools", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid_surface" });
   });
+
+  it("import_surface brings A2UI messages and json-render specs in; export_surface takes them out", async () => {
+    const v = "v0.9";
+    const catalogId = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
+    const a2ui = [
+      { version: v, createSurface: { surfaceId: "promo", catalogId } },
+      {
+        version: v,
+        updateComponents: {
+          surfaceId: "promo",
+          components: [
+            { id: "root", component: "Column", children: ["title", "email", "cta"] },
+            { id: "title", component: "Text", text: { path: "/title" }, variant: "h2" },
+            { id: "email", component: "TextField", label: "Email", value: { path: "/email" } },
+            {
+              id: "cta",
+              component: "Button",
+              child: "cta-label",
+              variant: "primary",
+              action: { functionCall: { call: "openUrl", args: { url: "/start" } } },
+            },
+            { id: "cta-label", component: "Text", text: "Start" },
+          ],
+        },
+      },
+      { version: v, updateDataModel: { surfaceId: "promo", value: { title: "Try it free" } } },
+    ];
+    const imported = (await call("import_surface", {
+      siteId,
+      pageId: home.id,
+      rev: home.rev,
+      format: "a2ui",
+      // JSON Lines, as A2UI streams them
+      document: a2ui.map((m) => JSON.stringify(m)).join("\n"),
+    })) as { page: Page; sectionId: string; notes: string[]; repairs: string[] };
+    expect(imported.sectionId).toMatch(/^sec_/);
+    const section = imported.page.sections.at(-1) as SurfaceSection;
+    expect(section).toMatchObject({
+      id: imported.sectionId,
+      kind: "surface",
+      catalog: "blog@1",
+      data: { title: "Try it free" },
+    });
+    expect(section.components.map((c) => c.component)).toEqual(["Stack", "Heading", "Button"]);
+    expect(imported.notes.join("\n")).toMatch(/TextField components were left out/);
+
+    const exported = (await call("export_surface", {
+      siteId,
+      pageId: home.id,
+      sectionId: imported.sectionId,
+      format: "a2ui",
+    })) as { document: Record<string, unknown>[]; notes: string[] };
+    expect(exported.document[0]).toEqual({
+      version: v,
+      createSurface: { surfaceId: imported.sectionId, catalogId },
+    });
+    const spec = (await call("export_surface", {
+      siteId,
+      pageId: home.id,
+      sectionId: imported.sectionId,
+      format: "json-render",
+    })) as { document: { root: string; elements: Record<string, { type: string }> } };
+    expect(spec.document.elements.root?.type).toBe("Stack");
+
+    // the spec comes back in, replacing the section; a broken document is refused, not stored
+    const replaced = (await call("import_surface", {
+      siteId,
+      pageId: home.id,
+      rev: imported.page.rev,
+      format: "json-render",
+      document: {
+        ...spec.document,
+        elements: {
+          ...spec.document.elements,
+          root: { type: "Stack", props: { gap: "xl" }, children: ["title"] },
+        },
+      },
+      replaceSectionId: imported.sectionId,
+    })) as { page: Page; sectionId: string };
+    expect(replaced.sectionId).toBe(imported.sectionId);
+    expect((replaced.page.sections.at(-1) as SurfaceSection).components.map((c) => c.id)).toEqual([
+      "root",
+      "title",
+    ]);
+    await expect(
+      call("import_surface", {
+        siteId,
+        pageId: home.id,
+        rev: replaced.page.rev,
+        format: "json-render",
+        document: "{nope",
+      }),
+    ).rejects.toMatchObject({ code: "invalid" });
+    await expect(
+      call("import_surface", {
+        siteId,
+        pageId: home.id,
+        rev: replaced.page.rev,
+        format: "json-render",
+        document: {
+          root: "x",
+          elements: {
+            x: { type: "Tabs", children: ["h"] },
+            h: { type: "Heading", props: { text: "Not a tab" } },
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_surface" });
+  });
 });
 
 describe("build observer (RFC-0020 §6)", () => {

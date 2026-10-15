@@ -43,6 +43,9 @@ describe("Cloudhal tools (SDK-independent)", () => {
       // RFC-0020 §2, §6
       "get_catalog",
       "patch_draft",
+      // RFC-0020 §9
+      "import_surface",
+      "export_surface",
       "delete_page",
       "list_entries",
       "get_entry",
