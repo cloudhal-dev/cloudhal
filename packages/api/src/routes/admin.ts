@@ -79,6 +79,8 @@ import {
   BUILD_EVAL_MODELS,
   type BuildEvalRun,
   buildEvalTable,
+  judgeCheck,
+  judgeCheckTable,
   runBuildEvalOnce,
   summariseBuildEval,
 } from "../build-eval.ts";
@@ -501,6 +503,50 @@ export function adminRoutes(
             clearInterval(beat);
             const summary = summariseBuildEval(runs);
             send({ type: "summary", summary, table: buildEvalTable(summary) });
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" },
+        });
+      })
+      // RFC-0021 21c: `cloudhal ai judge-check --remote` scores the reference pages with the judge.
+      .post("/sites/:siteId/ai/judge-check", async (c) => {
+        const store = c.get("store");
+        const site = await store.getSite(param(c, "siteId"));
+        if (!site) return c.json({ error: "not_found", message: "site not found" }, 404, NO_STORE);
+        if (!aiTransport || !render)
+          return c.json(
+            {
+              error: !aiTransport ? "ai_unavailable" : "render_unavailable",
+              message: "the judge check needs Workers AI and a browser (BROWSER)",
+            },
+            503,
+            NO_STORE,
+          );
+        const body = (await c.req.json().catch(() => ({}))) as { judge?: unknown };
+        const judge = typeof body.judge === "string" ? body.judge.slice(0, 120) : undefined;
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const send = (line: unknown) => {
+              try {
+                controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+              } catch {
+                // the operator went away
+              }
+            };
+            const beat = setInterval(() => send({ type: "progress" }), 15_000);
+            const result = await judgeCheck({
+              transport: aiTransport,
+              renderer: render.renderer,
+              site,
+              judge,
+              signal: c.req.raw.signal,
+              onRow: (row) => send({ type: "row", row }),
+            });
+            clearInterval(beat);
+            send({ type: "result", ordered: result.ordered, table: judgeCheckTable(result.rows) });
             controller.close();
           },
         });

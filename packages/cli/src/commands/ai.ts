@@ -12,6 +12,9 @@ import {
   type BuildEvalRun,
   type BuildEvalSummary,
   buildEvalTable,
+  type JudgeCheckRow,
+  judgeCheck,
+  judgeCheckTable,
   runBuildEvalOnce,
   summariseBuildEval,
 } from "@cloudhal/api";
@@ -182,4 +185,78 @@ export function describeRun(r: BuildEvalRun): string {
     ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.look ? `, ${lookText(d.look)}` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
     : "";
   return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
+}
+
+export interface JudgeCheckOptions extends SyncOptions {
+  readonly remote?: boolean;
+  /** The judge model (default Llama 4 Scout). */
+  readonly judge?: string | undefined;
+  readonly onRow?: (row: JudgeCheckRow) => void;
+  readonly env?: Record<string, string | undefined>;
+}
+
+/**
+ * `cloudhal ai judge-check` (RFC-0021 21c): the judge scores the reference pages (empty, bare,
+ * plain, strong); it is worth using when it ranks them in that order.
+ */
+export async function judgeCheckCommand(
+  options: JudgeCheckOptions,
+): Promise<{ ordered: boolean; table: string }> {
+  if (options.remote) {
+    const { cfg, adminUrl, token, fetch: f } = await deployment(options);
+    const res = await f(new URL(`/api/admin/sites/${cfg.siteId}/ai/judge-check`, adminUrl), {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(options.judge ? { judge: options.judge } : {}),
+    });
+    if (!res.ok || !res.body) {
+      const text = await res.text();
+      if (res.status === 404 && !text.includes("site not found"))
+        throw new Error("the deployment has no judge check yet (deploy this version first)");
+      throw new Error(`the deployment answered ${res.status}: ${briefText(text)}`);
+    }
+    let result: { ordered: boolean; table: string } | undefined;
+    for (const line of (await res.text()).split("\n")) {
+      if (!line.trim()) continue;
+      const msg = JSON.parse(line) as {
+        type: string;
+        row?: JudgeCheckRow;
+        ordered?: boolean;
+        table?: string;
+      };
+      if (msg.type === "row" && msg.row) options.onRow?.(msg.row);
+      if (msg.type === "result") result = { ordered: Boolean(msg.ordered), table: msg.table ?? "" };
+    }
+    if (!result) throw new Error("the deployment ended the stream before the result");
+    return result;
+  }
+  const env = options.env ?? process.env;
+  const { transport } = localAiTransport(env);
+  if (!transport)
+    throw new Error(
+      "set CLOUDFLARE_ACCOUNT_ID and CLOUDHAL_AI_TOKEN to reach Workers AI, or use --remote",
+    );
+  const render = localRender(env);
+  if (!render)
+    throw new Error("the judge check needs a local Chrome (set CHROME_PATH), or use --remote");
+  const cfg = await readProjectConfig(options.projectDir);
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
+  try {
+    const site = await local.store.getSite(cfg.siteId);
+    if (!site) throw new Error(`site ${cfg.siteId} not found`);
+    const r = await judgeCheck({
+      transport,
+      renderer: render.renderer,
+      site,
+      judge: options.judge,
+      onRow: options.onRow,
+    });
+    return { ordered: r.ordered, table: judgeCheckTable(r.rows) };
+  } finally {
+    await local.close();
+  }
+}
+
+export function describeJudgeRow(r: JudgeCheckRow): string {
+  return `${r.id}: ${r.score ?? "no score"} (expected ${r.expected[0]}–${r.expected[1]}${r.inRange ? "" : ", out of range"})${r.error ? ` — ${r.error}` : ""}${r.problems?.length ? `\n    ${r.problems.join("\n    ")}` : ""}`;
 }

@@ -26,10 +26,12 @@ import {
   acceptsImages,
   DESIGN_JUDGE_MODEL,
   type DesignCriterion,
+  type DesignScore,
   htmlDataUrl,
   lookAt,
   scoreDesign,
 } from "./design-pass.ts";
+import { DESIGN_REFERENCES, type DesignReference, REFERENCE_BRIEF } from "./design-references.ts";
 
 /** Models compared by default: Workers AI text models that can follow a structured format. */
 export const BUILD_EVAL_MODELS: readonly string[] = [
@@ -390,6 +392,89 @@ export function buildEvalTable(summary: readonly BuildEvalSummary[]): string {
     ...summary.map(
       (m) =>
         `| \`${m.model}\` | ${m.finished}/${m.runs} | ${Math.round(m.acceptance * 100)}% | ${m.repairsPerTurn} | ${m.refusalsPerTurn} | ${m.roundsPerTurn} | ${s(m.medianFirstStepMs)} | ${s(m.medianTotalMs)} | ${Math.round(m.outputTokensPerTurn)} |${design ? ` ${m.checksFailedPerTurn ?? "–"} | ${m.medianDesignScore ?? "–"} |` : ""}`,
+    ),
+  ].join("\n");
+}
+
+// ── the judge check (RFC-0021 21c) ───────────────────────────────────────────────────────────
+
+/** One reference page as the judge scored it. */
+export interface JudgeCheckRow {
+  id: DesignReference["id"];
+  expected: readonly [number, number];
+  score?: number | undefined;
+  scores?: DesignScore["scores"] | undefined;
+  problems?: string[] | undefined;
+  inRange: boolean;
+  error?: string | undefined;
+}
+
+/**
+ * Scores the reference pages (empty, bare, plain, strong) with the judge: a judge worth using
+ * ranks them in that order, with room between them. Run it after changing the judge or its prompt.
+ */
+export async function judgeCheck(input: {
+  transport: AiTransport;
+  renderer: PageRenderer;
+  site: Site;
+  judge?: string | undefined;
+  signal?: AbortSignal | undefined;
+  onRow?: ((row: JudgeCheckRow) => void) | undefined;
+}): Promise<{ rows: JudgeCheckRow[]; ordered: boolean }> {
+  const rows: JudgeCheckRow[] = [];
+  const ts = new Date(0).toISOString();
+  for (const ref of DESIGN_REFERENCES) {
+    const row: JudgeCheckRow = { id: ref.id, expected: ref.expected, inRange: false };
+    try {
+      const page: Page = {
+        schemaVersion: 1,
+        id: "page_reference01",
+        siteId: input.site.id,
+        path: "/reference",
+        title: "Reference",
+        locale: "en",
+        status: "draft",
+        sections: ref.sections,
+        rev: 0,
+        createdAt: ts,
+        updatedAt: ts,
+      };
+      const look = await lookAt(
+        input.renderer,
+        htmlDataUrl(renderPagePreview(input.site, page, {}, {}).html),
+      );
+      const judged = await scoreDesign({
+        transport: input.transport,
+        model: input.judge ?? DESIGN_JUDGE_MODEL,
+        brief: REFERENCE_BRIEF,
+        look,
+        signal: input.signal,
+      });
+      row.score = judged.score;
+      row.scores = judged.scores;
+      if (judged.problems) row.problems = judged.problems;
+      row.inRange = judged.score >= ref.expected[0] && judged.score <= ref.expected[1];
+    } catch (e) {
+      row.error = e instanceof Error ? e.message.slice(0, 200) : String(e);
+    }
+    rows.push(row);
+    input.onRow?.(row);
+  }
+  const scored = rows.map((r) => r.score);
+  const ordered = scored.every(
+    (s, i) => s !== undefined && (i === 0 || s > (scored[i - 1] as number)),
+  );
+  return { rows, ordered };
+}
+
+/** A Markdown table of a judge check. */
+export function judgeCheckTable(rows: readonly JudgeCheckRow[]): string {
+  return [
+    "| Reference | Expected | Score | In range |",
+    "|---|---|---|---|",
+    ...rows.map(
+      (r) =>
+        `| ${r.id} | ${r.expected[0]}–${r.expected[1]} | ${r.score ?? (r.error ? `error: ${r.error}` : "–")} | ${r.inRange ? "yes" : "no"} |`,
     ),
   ].join("\n");
 }

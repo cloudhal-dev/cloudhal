@@ -103,30 +103,64 @@ export function lookMessage(look: PageLook, images: boolean): AiMessage {
 
 // ── the rubric (the eval's design score) ─────────────────────────────────────────────────────
 
-/** What the judge scores, 1 (poor) to 5 (excellent). */
+/**
+ * What the judge scores, 1 (poor) to 5 (excellent), with what a 1, a 3 and a 5 look like: without
+ * anchors a judge gives every complete page about the same score (RFC-0021 21c calibration).
+ */
 export const DESIGN_RUBRIC = [
-  { id: "fidelity", question: "Does the page do what the brief asked, with nothing missing?" },
+  {
+    id: "fidelity",
+    question: "Does the page do what the brief asked?",
+    anchors: [
+      "the brief's main parts are missing",
+      "most of the brief, with a notable part missing or wrong",
+      "every part of the brief, with specific, believable content",
+    ],
+  },
   {
     id: "hierarchy",
-    question:
-      "Is it clear what matters most: one main heading, strong contrast between headings and text, one primary action per section?",
+    question: "Is it clear what matters most?",
+    anchors: [
+      "everything has the same weight, or there is no main heading",
+      "a main heading, but sections and buttons compete for attention",
+      "one obvious main heading, clear section headings, one primary action per section",
+    ],
   },
   {
     id: "rhythm",
-    question:
-      "Do sections vary in tone, width and layout, without three identical blocks in a row?",
+    question: "Do the sections vary and lead the eye down the page?",
+    anchors: [
+      "one undifferentiated block, or nothing",
+      "separate sections, but they look alike (same tone, width and layout)",
+      "sections alternate tone, width and layout (a full-width hero, grids, a contrasting band)",
+    ],
   },
   {
     id: "spacing",
-    question: "Is spacing even and generous, with nothing cramped, overlapping or awkwardly empty?",
+    question: "Is the spacing deliberate?",
+    anchors: [
+      "cramped, overlapping or with large accidental gaps",
+      "acceptable but uniform or uneven, like a plain document",
+      "consistent and generous, grouping related things and separating sections",
+    ],
   },
   {
     id: "readability",
-    question: "Is all text easy to read at both widths (size, contrast, line length)?",
+    question: "Is all text easy to read at both widths?",
+    anchors: [
+      "hard to read: low contrast, tiny or overlong lines",
+      "readable with some strain somewhere",
+      "effortless everywhere",
+    ],
   },
   {
     id: "mobile",
-    question: "Does the phone layout work: stacked sensibly, nothing cut off or too small?",
+    question: "Does the phone layout work?",
+    anchors: [
+      "broken: content cut off, overflowing or too small",
+      "works, but stacks awkwardly or wastes the screen",
+      "feels designed for the phone",
+    ],
   },
 ] as const;
 
@@ -136,6 +170,8 @@ export interface DesignScore {
   /** The mean of the criteria, 1–5, to two decimals. */
   score: number;
   scores: Partial<Record<DesignCriterion, number>>;
+  /** What the judge saw wrong, before scoring (at most five). */
+  problems?: string[] | undefined;
   /** The judge's one-line summary. */
   note?: string | undefined;
   usage: AiUsage;
@@ -146,16 +182,23 @@ export function rubricMessages(brief: string, look: PageLook): AiMessage[] {
     `The brief the page was built from: ${brief}`,
     `Screenshots: ${look.images.map((i) => `${i.width} px`).join(", ")} (top of the page first).`,
     ...checkLines(look.failed),
-    "Score each criterion from 1 (poor) to 5 (excellent):",
-    ...DESIGN_RUBRIC.map((c) => `- ${c.id}: ${c.question}`),
-    `Answer with one JSON object and nothing else: {${DESIGN_RUBRIC.map((c) => `"${c.id}": n`).join(", ")}, "note": "one sentence"}`,
+    "First list the most important design problems you see (at most five, concrete: which part, what is wrong). Then score each criterion from 1 to 5 against its anchors (2 and 4 are between them):",
+    ...DESIGN_RUBRIC.map(
+      (c) =>
+        `- ${c.id}: ${c.question} 1 = ${c.anchors[0]}; 3 = ${c.anchors[1]}; 5 = ${c.anchors[2]}.`,
+    ),
+    `Answer with one JSON object and nothing else: {"problems": ["…"], ${DESIGN_RUBRIC.map((c) => `"${c.id}": n`).join(", ")}, "note": "one sentence"}`,
   ].join("\n");
   const parts: AiContentPart[] = [{ type: "text", text }];
   for (const i of look.images) parts.push({ type: "image_url", image_url: { url: i.url } });
   return [
     {
       role: "system",
-      content: `You are a strict senior web designer reviewing a page an AI built with a site's components. Judge only what the screenshots show. Use the whole scale: 3 is acceptable, 5 is work you would ship unchanged.\n${DESIGN_GUIDANCE}`,
+      content: [
+        "You are a strict senior web designer reviewing a page an AI built from a site's components. Judge only what the screenshots show.",
+        "Use the whole scale. Most AI-built pages deserve 2 or 3 on most criteria. Give 4 only to work you would ship after small changes, and 5 only to work a senior designer would be proud of. A page that is a plain column of headings and paragraphs is a 2 on rhythm and spacing, however complete it is.",
+        DESIGN_GUIDANCE,
+      ].join("\n"),
     },
     { role: "user", content: parts },
   ];
@@ -164,7 +207,7 @@ export function rubricMessages(brief: string, look: PageLook): AiMessage[] {
 /** The judge's answer as scores; undefined when it has none. */
 export function parseRubric(
   text: string,
-): Pick<DesignScore, "score" | "scores" | "note"> | undefined {
+): Pick<DesignScore, "score" | "scores" | "problems" | "note"> | undefined {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return undefined;
@@ -181,9 +224,16 @@ export function parseRubric(
   }
   const values = Object.values(scores) as number[];
   if (values.length === 0) return undefined;
+  const problems = Array.isArray(raw.problems)
+    ? raw.problems
+        .filter((p): p is string => typeof p === "string" && p.trim() !== "")
+        .slice(0, 5)
+        .map((p) => p.slice(0, 200))
+    : [];
   return {
     score: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100,
     scores,
+    ...(problems.length ? { problems } : {}),
     ...(typeof raw.note === "string" ? { note: raw.note.slice(0, 300) } : {}),
   };
 }
@@ -201,7 +251,7 @@ export async function scoreDesign(input: {
   for await (const e of input.transport.stream({
     model: input.model,
     messages: rubricMessages(input.brief, input.look),
-    maxTokens: 400,
+    maxTokens: 700,
     signal: input.signal,
   })) {
     if (e.type === "text") text += e.text;

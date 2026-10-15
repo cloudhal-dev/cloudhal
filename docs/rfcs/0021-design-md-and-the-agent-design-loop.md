@@ -285,7 +285,14 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
     - After each round, Build now names the components the model added but no parent lists, with the path to link them, and asks for one more round. Components that were already loose before the turn are left alone.
     - Studio shows "Placing the parts it added…".
     - The eval counts a page with nothing a reader would see as not finished, and records how many components were reported unlinked.
-  - **Still open.** The judge needs calibrated examples per score.
+    - **Measured** (Llama 3.3 and GLM, landing and pricing, two runs each). Before, 7 of their 8 pages in the earlier runs rendered empty. After, 6 of 8 have content: Llama's four all do (2.5–2.67, old judge), and GLM's landing scored 4.17, its best yet. GLM's pricing stayed weak: one step that would not parse, one empty page, now counted as not finished.
+  - **The judge, calibrated.**
+    - **Reference pages** (`design-references.ts`): four builds of the landing brief, from empty to strong, from catalog primitives only.
+    - **The old rubric** scored them 1 / 3 / 4.5 / 4.6, so a plain column of headings tied with a designed page.
+    - **The new rubric** gives each criterion what a 1, a 3 and a 5 look like, and asks for the problems first (kept with the score). The system prompt says most AI-built pages deserve 2 or 3. It scores the references 1 / 2.33 / 2.6 / 3.6, the same in three samples each.
+    - **`cloudhal ai judge-check [--remote]`** repeats this and fails when the judge stops ranking the references in order; run it before comparing models with a changed judge.
+    - **Known limit.** The judge still invents a detail now and then (it reported overlapping text on a phone screenshot that has none). Its problems are hints, not facts; the automatic checks are the facts.
+    - **Light colors.** `render_page` now always renders in the light color scheme. A Mac's dark mode had changed the local renders.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |

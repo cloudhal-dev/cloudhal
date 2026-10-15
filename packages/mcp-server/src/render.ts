@@ -551,6 +551,10 @@ export async function cdpSession(
         mobile: viewport.width < 768,
       });
       if (viewport.width < 768) await s("Emulation.setTouchEmulationEnabled", { enabled: true });
+      // The same render on every machine: the light scheme, whatever the host prefers.
+      await s("Emulation.setEmulatedMedia", {
+        features: [{ name: "prefers-color-scheme", value: "light" }],
+      });
       const loaded = cdp.waitFor("Page.loadEventFired", sessionId, options.loadTimeoutMs ?? 12_000);
       const nav = await s("Page.navigate", { url });
       if (typeof nav.errorText === "string" && nav.errorText)
