@@ -209,6 +209,25 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
 | 21b | `render_page`: Cloudflare Browser Rendering binding and local Chrome, the checks, limits, deploy wiring | none |
 | 21c | The design pass in the Build model eval (render, checks, vision-scored rubric); Build chat looks at its own render once per turn (where the model takes images) | none |
 
+### Status
+- **21a shipped.**
+  - **Contract.** `Site.design { markdown }` (1–24,000 characters), with valid and invalid fixtures, regenerated for TS and Rust.
+  - **`@cloudhal/core-ts/design`.** `designLint`, `effectiveDesign` and `DESIGN_GUIDANCE`. The store takes `themeDesign`. The CLI reads the theme's `src/DESIGN.md` for `studio`, `mcp` and `deploy`; deploy bundles it into the admin Worker as text.
+  - **Blog theme.** Ships `src/DESIGN.md` (brand, colors, typography, layout, components, imagery, page recipes, don'ts).
+  - **MCP.**
+    - `get_design` (`site:read`): rules, settings, catalog names and guidance. The site's rules sit inside `<site-design-rules>` in the text, with the note that they never change permissions.
+    - `set_design` (`site:write`, always approval, with a line diff in the prompt).
+    - The server instructions gained the design paragraph as their second paragraph, inside Claude Code's first 4,096 characters.
+  - **Skill.** `skills/official/site-design`: SKILL.md, references (guidance, page recipes, checklist) and an eval.
+  - **Build chat.** Its system prompt adds the effective rules (cut at 8,000 characters) and the guidance before the catalog.
+  - **REST and Studio.**
+    - `GET`/`PUT /api/sites/:siteId/design` (`content:read` / `site:settings`).
+    - Studio Settings › Design rules: Markdown, the theme's rules in a `Collapsible`, warnings, a headings template, and read-only below Administrator.
+- **Deviations.**
+  - `design_lint` checks PascalCase names in backticks only: lowercase block names in prose are too ambiguous to flag.
+  - The server instructions as a whole are about 4,900 characters, over Claude Code's 4,096. The design paragraph sits within the first 4,096; trimming the rest is still to do.
+  - Build chat says nothing yet when a site has no DESIGN.md (§5): Studio's Settings section covers it.
+
 ## Alternatives considered
 | Option | Pros | Cons | Why not |
 |---|---|---|---|

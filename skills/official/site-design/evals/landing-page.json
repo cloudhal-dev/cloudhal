@@ -1,0 +1,12 @@
+{
+  "task": "Design a landing page at /launch for a weekly newsletter about Turkish food; the site's DESIGN.md asks for warm, editorial pages with a serif voice.",
+  "expect": {
+    "calledFirst": "get_design",
+    "pagesCreated": ["/launch"],
+    "sectionKinds": ["surface"],
+    "noPlaceholderLinks": true,
+    "checkedAt": [1440, 390],
+    "snapshotLabelStartsWith": "Design:",
+    "published": false
+  }
+}

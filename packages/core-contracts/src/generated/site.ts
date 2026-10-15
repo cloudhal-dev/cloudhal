@@ -76,6 +76,7 @@ export interface Site {
   pageIds: Id[];
   homePageId?: Id;
   theme: ThemeRef;
+  design?: Design;
   /**
    * The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC.
    */
@@ -109,6 +110,15 @@ export interface ThemeRef {
   config?: {
     [k: string]: unknown | undefined;
   };
+}
+/**
+ * The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "Design".
+ */
+export interface Design {
+  markdown: string;
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

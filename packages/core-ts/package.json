@@ -27,6 +27,7 @@
     "./body-blocks": "./src/body-blocks.ts",
     "./blocks": "./src/blocks.ts",
     "./surfaces": "./src/surfaces.ts",
+    "./design": "./src/design.ts",
     "./interop": "./src/surface-interop.ts",
     "./directives": "./src/directives.ts"
   },
@@ -135,6 +136,10 @@
       "./surfaces": {
         "types": "./dist/src/surfaces.d.ts",
         "default": "./dist/src/surfaces.js"
+      },
+      "./design": {
+        "types": "./dist/src/design.d.ts",
+        "default": "./dist/src/design.js"
       },
       "./interop": {
         "types": "./dist/src/surface-interop.d.ts",

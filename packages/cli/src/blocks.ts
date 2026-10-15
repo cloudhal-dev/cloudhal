@@ -3,7 +3,7 @@
  * `blockTypes` (type imports only, so it loads without the project's dependencies). `cloudhal studio`, `mcp` and `deploy` load it so the
  * store validates, Studio offers and agents list the theme's types next to the built-ins.
  */
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -14,11 +14,14 @@ import {
   createBlockRegistry,
   type PropsSchema,
 } from "@cloudhal/core-ts/blocks";
+import { DESIGN_MAX_LENGTH } from "@cloudhal/core-ts/design";
 
 /** Where a project declares its block types. */
 export const BLOCK_TYPES_FILE = path.join("src", "blocks.ts");
 /** Where a theme declares its design settings (RFC-0017 §1). */
 export const THEME_SETTINGS_FILE = path.join("src", "settings.ts");
+/** Where a theme writes its design rules for agents (RFC-0021 §1). */
+export const THEME_DESIGN_FILE = path.join("src", "DESIGN.md");
 
 const exists = (file: string) =>
   stat(file).then(
@@ -36,6 +39,20 @@ export async function blockTypesFile(projectDir: string): Promise<string | undef
 export async function themeSettingsFile(projectDir: string): Promise<string | undefined> {
   const file = path.join(projectDir, THEME_SETTINGS_FILE);
   return (await exists(file)) ? file : undefined;
+}
+
+/** The theme's DESIGN.md, when it ships one (RFC-0021 §1). */
+export async function themeDesignFile(projectDir: string): Promise<string | undefined> {
+  const file = path.join(projectDir, THEME_DESIGN_FILE);
+  return (await exists(file)) ? file : undefined;
+}
+
+/** The theme's DESIGN.md text, cut at the site rules' limit; `undefined` when there is none. */
+export async function loadThemeDesign(projectDir: string): Promise<string | undefined> {
+  const file = await themeDesignFile(projectDir);
+  if (!file) return undefined;
+  const text = (await readFile(file, "utf8")).trim();
+  return text ? text.slice(0, DESIGN_MAX_LENGTH) : undefined;
 }
 
 /** A project file's exports, naming the file when it does not load. */

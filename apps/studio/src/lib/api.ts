@@ -372,6 +372,16 @@ export interface ProposalItem {
 /** How the server reaches Workers AI: the Worker binding, the REST API, or not at all. */
 export type AiTransportKind = "binding" | "rest" | "none";
 
+/** RFC-0021: design rules for people and agents. */
+export interface DesignRules {
+  /** The theme's DESIGN.md (read-only), when it ships one. */
+  theme: string | null;
+  /** The site's own rules. */
+  site: string | null;
+  warnings: string[];
+  rev: number;
+}
+
 export interface AiSettings {
   enabled: boolean;
   /** A Workers AI id (`@cf/…`) or, through a gateway, `provider/model`. */
@@ -2026,6 +2036,16 @@ export const api = {
       }),
   },
   /** The theme's design settings (RFC-0017 §1): its schema and the site's values. */
+  /** RFC-0021: the theme's and the site's design rules (DESIGN.md). */
+  design: {
+    get: (siteId: string) => request<DesignRules>(`/api/sites/${siteId}/design`),
+    /** Saves the site's rules read at `rev` (null removes them); 409 when the site changed. */
+    save: (siteId: string, input: { rev: number; markdown: string | null }) =>
+      request<{ site: string | null; warnings: string[]; rev: number }>(
+        `/api/sites/${siteId}/design`,
+        { method: "PUT", ...json(input) },
+      ),
+  },
   themeSettings: {
     get: (siteId: string) => request<ThemeSettings>(`/api/sites/${siteId}/theme-settings`),
     /** Saves values read at `rev`; 409 when the site changed in between, 422 when they misfit. */

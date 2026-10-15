@@ -17,6 +17,7 @@
  *   per person); audited as `build_chat` without the brief.
  */
 
+import { effectiveDesign } from "@cloudhal/core-ts/design";
 import { createCatalog } from "@cloudhal/core-ts/surfaces";
 import { Hono } from "hono";
 import { AiError, type AiEvent, type AiTransport } from "../ai/client.ts";
@@ -338,6 +339,7 @@ export function aiRoutes(deps: AiDeps | undefined): Hono<Env> {
               actor,
               locale: first.locale,
               ...(scope ? { scope } : {}),
+              design: effectiveDesign(graph.themeDesign, site.design?.markdown),
               signal,
               build: c.get("build"),
               load: async () => {

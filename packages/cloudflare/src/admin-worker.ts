@@ -193,6 +193,8 @@ export interface AdminWorkerOptions {
   blockTypes?: readonly BlockType[];
   /** The theme's design settings (`src/settings.ts`, RFC-0017 §1), bundled at deploy time. */
   themeSettings?: PropsSchema;
+  /** The theme's DESIGN.md (RFC-0021 §1), bundled at deploy time. */
+  themeDesign?: string;
   log?: (line: string) => void;
 }
 
@@ -332,6 +334,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         blobs,
         blocks,
         ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
+        ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),
         // S15: `availability` is refused until the site Worker says it enforces gates.
         gates: siteGateSupport({
           fetch: siteBinding

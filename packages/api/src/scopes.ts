@@ -128,6 +128,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/block-types`, "content:read"],
   ["GET", `${S}/theme-settings`, "content:read"],
   ["PUT", `${S}/theme-settings`, "site:settings"],
+  // RFC-0021: the site's design rules
+  ["GET", `${S}/design`, "content:read"],
+  ["PUT", `${S}/design`, "site:settings"],
   // RFC-0016: in-editor AI — everyone who reads content sees whether it is on; Administrators
   // change it; commands need ai:invoke (every role holds it; the site's switch and cap limit it)
   ["GET", `${S}/ai/settings`, "content:read"],

@@ -440,6 +440,13 @@ Site › Settings gets an **Appearance** section after Domains (`components/Appe
 - The list is `CorrectionList` (`@cloudhal/ui`): rows in a `divide-y` list, newest first. Each row has a kind `Badge` (correction `warning`, clarification `info`, update `neutral`), the time or "Not saved", and the note as text. Only unsaved rows have an icon-only "Remove correction" button. With none, it shows a `SectionEmpty`.
 - The form: a `Select` "Kind", an `InputArea` "What changed" (≤ 2,000) and a secondary "Add correction" button that appends to the draft. A line says it goes live with the next publish. The store stamps the time on save, and the `auto` mode check makes that publish wait for a person.
 
+### 2ae. Design rules in Site settings (RFC-0021 §5, phase 21a)
+`components/DesignRulesSettings.tsx`, a `SettingsSection` after Appearance (`#design`, "Design rules").
+- **Editor.** An `InputArea` in mono for the site's DESIGN.md, with a character count against 24,000. While empty, a secondary "Start from the headings" button fills in the recommended headings.
+- **Theme rules.** The theme's DESIGN.md sits read-only inside a `Collapsible` ("The blog theme's rules"), with a line saying the site's rules win.
+- **Feedback.** `design_lint` warnings show as an `alert` `Banner` ("Worth a look"). A conflict on save shows the shared conflict wording.
+- **Hints.** A secondary line says agents propose changes that wait in Approvals. Below Administrator the section is read-only, with the gate's reason.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>

@@ -55,6 +55,7 @@ import { assetDir, monorepoRoot } from "../assets.ts";
 import {
   blockTypesFile,
   loadBlockRegistry,
+  loadThemeDesign,
   loadThemeSettings,
   themeSettingsFile,
 } from "../blocks.ts";
@@ -760,6 +761,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   await loadThemeSettings(options.projectDir);
   const blockTypes = await blockTypesFile(options.projectDir);
   const themeSettings = await themeSettingsFile(options.projectDir);
+  // RFC-0021 §1: the theme's DESIGN.md goes to the admin Worker as text.
+  const themeDesign = await loadThemeDesign(options.projectDir);
   log("building the site Worker");
   const siteConfig = await buildSiteWorker(options.projectDir, (l) => log(`  ${l}`));
 
@@ -779,6 +782,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       skillsDir,
       blockTypes,
       themeSettings,
+      themeDesign,
       domain: cfg.domains?.studio,
       analytics: a,
       comments: c,

@@ -28,6 +28,7 @@ describe("skill loader", () => {
       "rollback",
       "safe-edit",
       "site-bootstrap",
+      "site-design",
       "stale-review",
     ]);
     const publish = skills.find(
