@@ -41,11 +41,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
     "better-sqlite3": "catalog:",
+    "happy-dom": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@modelcontextprotocol/client": "catalog:"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24"

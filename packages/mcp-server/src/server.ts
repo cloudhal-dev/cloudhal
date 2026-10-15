@@ -43,6 +43,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { type CommentsDeps, isBoundState } from "./comments.ts";
 import type { BuildObserver, MediaToolOptions } from "./common.ts";
+import { MCP_APP_MIME, PREVIEW_UI_URI, PREVIEW_VIEW_HTML } from "./preview-view.ts";
 import { type RunContext, resolveRun, runPrincipal, type SchedulesDeps } from "./schedules.ts";
 import { defineTools, runTool, type ToolDefinition, ToolError, toolPolicies } from "./tools.ts";
 
@@ -307,6 +308,8 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
           def.outputSchema as Parameters<typeof fromJsonSchema>[0],
         ),
         annotations: { ...def.annotations, title: def.title },
+        // MCP Apps: hosts that render UI show the tool's results in Cloudhal's View; others ignore it.
+        ...(def.ui ? { _meta: { ui: { ...def.ui } } } : {}),
       },
       async (rawArgs, ctx): Promise<CallToolResult | InputRequiredResult> => {
         const { confirmToken, approvalId, ...args } = rawArgs as Record<string, unknown> & {
@@ -560,6 +563,27 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
       },
     );
   }
+
+  // RFC-0020 §6: the MCP Apps View behind `preview_page` and `patch_draft` (our own HTML).
+  server.registerResource(
+    "cloudhal-preview",
+    PREVIEW_UI_URI,
+    {
+      title: "Cloudhal preview",
+      description: "Shows the page an agent is building, inside the conversation (MCP Apps).",
+      mimeType: MCP_APP_MIME,
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: MCP_APP_MIME,
+          text: PREVIEW_VIEW_HTML,
+          _meta: { ui: { prefersBorder: true } },
+        },
+      ],
+    }),
+  );
 
   for (const skill of skills.values()) {
     const name = skill.manifest.name;

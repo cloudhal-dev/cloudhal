@@ -43,6 +43,11 @@ export interface ToolDefinition {
   outputSchema: JsonSchema;
   annotations: ToolAnnotations;
   scopes: Scope[];
+  /**
+   * MCP Apps (RFC-0020 §6): the View a host shows with this tool's results
+   * (`_meta.ui.resourceUri`); `visibility` defaults to the model and the View.
+   */
+  ui?: { readonly resourceUri: string; readonly visibility?: readonly ("model" | "app")[] };
   requiresApproval?: boolean;
   /** Human-readable question shown in the approval gate. */
   approvalPrompt?: (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;

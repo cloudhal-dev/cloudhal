@@ -93,6 +93,7 @@ import {
   menuTools,
   publishMenuLines,
 } from "./menu-tools.ts";
+import { PREVIEW_UI_URI } from "./preview-view.ts";
 import { scheduleTools } from "./schedule-tools.ts";
 import { RUN_COUNTS, type RunContext } from "./schedules.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
@@ -647,6 +648,7 @@ function rawTools(): ToolDefinition[] {
     },
     {
       name: "patch_draft",
+      ui: { resourceUri: PREVIEW_UI_URI },
       title: "Patch a page draft",
       description:
         'Build or change a page step by step with RFC 6902 JSON Patch operations on /title, /sections and /seo, e.g. {"op":"add","path":"/sections/-","value":{…a surface…}}. Every call is checked as a whole: misspelt component names are snapped to the catalog, unknown props dropped and missing required ones filled from the example (all listed in `repairs`), then every surface is validated. Failures come back as `invalid_surface` with VALIDATION_FAILED issues carrying JSON Pointers: fix those parts and send again. Requires the page\'s current `rev`; writes the draft and snapshots afterwards. Never publishes. Read get_catalog first.',
@@ -1224,6 +1226,8 @@ function rawTools(): ToolDefinition[] {
         openWorldHint: false,
       },
       scopes: ["preview:create"],
+      // RFC-0020 §6: MCP Apps hosts show the rendered page in Cloudhal's View.
+      ui: { resourceUri: PREVIEW_UI_URI },
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
         let doc: { title: string; path: string; html: string };

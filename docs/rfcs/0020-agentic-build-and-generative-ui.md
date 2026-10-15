@@ -260,6 +260,20 @@ RFC-0017's Kumo panels become surfaces whose catalog is `kumo@2` (Kumo's `UITree
     - It refuses prototype paths and unsafe navigation.
   - **The threat model's promise 4** lists the runtime and the video player.
   - **The blog theme** styles the inputs and action buttons.
+- **20f, first part, shipped** (MCP Apps preview, per the MCP Apps extension 2026-01-26):
+  - **Tools.** `preview_page` and `patch_draft` carry `_meta.ui.resourceUri: "ui://cloudhal/preview"`.
+  - **Resource.** The server serves `ui://cloudhal/preview` as `text/html;profile=mcp-app`: Cloudhal's own constant View, with `prefersBorder`.
+  - **View behaviour.**
+    - It sends `ui/initialize`, then `ui/notifications/initialized`.
+    - It shows `preview_page`'s HTML in a shadow root, with scripts, frames, forms and links removed.
+    - After `patch_draft` it calls `tools/call preview_page` through the host for the new version. A refused step shows the refusal.
+    - It reports `size-changed`, answers `ui/resource-teardown`, and ignores messages not from its host.
+  - **Clients without UI support** ignore the metadata and get the same text and structured results.
+  - **Tests.** A real MCP client sees the metadata and reads the resource; the View runs in happy-dom against a fake host.
+- **Deviations in 20f so far:**
+  - **Images.** Images in the MCP Apps preview do not load: the default MCP Apps CSP allows no image hosts, and preview media paths are relative to the deployment.
+  - **No capability check.** The `ui` metadata is not gated on the client advertising `io.modelcontextprotocol/ui` (the stateless HTTP transport sees capabilities per request). Hosts without it ignore the metadata.
+  - **Still to do.** A2UI and json-render import/export, and Kumo panels as surfaces (which needs RFC-0017 phase 7c).
 - **Deviations in 20e:**
   - **No server actions.** `submit`, forms, polls and newsletter signup each wait for their own RFC.
   - **Not shipped yet:** `Carousel` and `Counter` (a `Stat` plus an `increment` button covers counters).
