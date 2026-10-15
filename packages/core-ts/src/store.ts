@@ -3,6 +3,7 @@ import {
   type Asset,
   assertValid,
   type ContentEntry,
+  type Correction,
   type Menu,
   type NodeRef,
   type Page,
@@ -52,6 +53,7 @@ import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { BLOB_CONCURRENCY, eachLimited } from "./concurrency.ts";
+import { addedCorrections, type CorrectionInput, prepareCorrections } from "./corrections.ts";
 import { checkDirective } from "./directives.ts";
 import {
   ConflictError,
@@ -179,6 +181,11 @@ export interface NodeWriteOptions {
   readonly releaseEdit?: string;
   /** Who is writing: the provenance of body blocks this write changes (RFC-0014 §3). */
   readonly writer?: BlockWriter;
+  /**
+   * RFC-0019 §2: a person with `site:publish` may edit the note of a correction that has been live
+   * (the caller checks and audits). Agents never set it.
+   */
+  readonly correctionEdit?: boolean;
 }
 
 export interface SnapshotInput {
@@ -306,12 +313,17 @@ export class SiteGraphStore {
    * its embargo, if any, has passed. One snapshot row and one body read; only asked when a write
    * moves an embargo.
    */
-  async #shownLive(site: Site, id: string): Promise<boolean> {
-    if (!site.publishedSnapshotId) return false;
+  /** The live version of an entry (in the published snapshot), if any. */
+  async #liveEntry(site: Site, id: string): Promise<ContentEntry | undefined> {
+    if (!site.publishedSnapshotId) return undefined;
     const live = await this.getSnapshot(site.publishedSnapshotId);
-    const ref = live?.nodes.find((n) => n.id === id);
-    if (!ref) return false;
-    const node = await this.readSnapshotNode<ContentEntry>(ref);
+    const ref = live?.nodes.find((n) => n.id === id && n.kind === "contentEntry");
+    return ref ? this.readSnapshotNode<ContentEntry>(ref) : undefined;
+  }
+
+  async #shownLive(site: Site, id: string): Promise<boolean> {
+    const node = await this.#liveEntry(site, id);
+    if (!node) return false;
     const from = node.availability?.from;
     return (
       node.status === "published" &&
@@ -669,6 +681,45 @@ export class SiteGraphStore {
     return this.#writeEntry(entry, next, ts, options);
   }
 
+  /**
+   * RFC-0019 §2: appends a correction to the entry's working version (CAS on `entry.rev`). The
+   * store sets its id and time; it goes live with the next publish.
+   */
+  async addCorrection(
+    entry: ContentEntry,
+    correction: Pick<CorrectionInput, "kind" | "note">,
+    options: NodeWriteOptions = {},
+  ): Promise<ContentEntry> {
+    const item = { kind: correction.kind, note: correction.note } as CorrectionInput;
+    return this.updateContentEntry(
+      {
+        ...entry,
+        corrections: [...(entry.corrections ?? []), item] as Correction[],
+      },
+      options,
+    );
+  }
+
+  /**
+   * RFC-0019 §2.4: the entries in a pending publish that add a correction to their live version.
+   * Such a publish waits for a person even in `auto` mode.
+   */
+  async correctingEntries(siteId: string, diff: SnapshotDiff): Promise<Set<string>> {
+    const site = await this.getSite(siteId);
+    if (!site) throw new NotFoundError("site", siteId);
+    const out = new Set<string>();
+    const refs = [...diff.added, ...diff.changed.map((c) => c.after)].filter(
+      (r) => r.kind === "contentEntry",
+    );
+    for (const ref of refs) {
+      const working = await this.getContentEntry(ref.id);
+      if (!working?.corrections?.length) continue;
+      if (addedCorrections(await this.#liveEntry(site, ref.id), working).length > 0)
+        out.add(ref.id);
+    }
+    return out;
+  }
+
   /** A page with its markdown rich-text sections indexed against `stored`'s (RFC-0014 §3). */
   async #indexSections(
     page: Page,
@@ -707,7 +758,6 @@ export class SiteGraphStore {
     fillMissingSrc("contentEntry", draft);
     // The block index is the store's (RFC-0014 §3): a client's is dropped before validation.
     draft = { ...draft, body: withoutIndex(draft.body) };
-    assertValid("content-entry", canonicalTerms(draft));
     const site = await this.getSite(draft.siteId);
     if (!site) throw new NotFoundError("site", draft.siteId);
     let stored: ContentEntry | undefined;
@@ -715,8 +765,24 @@ export class SiteGraphStore {
       stored = await this.getContentEntry(prev.id);
       if (!stored || stored.rev !== prev.rev)
         throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
-      await assertUnlocked(this.#sql, stored.siteId, [prev.id], options.releaseEdit);
     }
+    // RFC-0019 §2: the store stamps new corrections and keeps live ones as they are.
+    if (draft.corrections !== undefined || stored?.corrections !== undefined) {
+      const { corrections: _c, ...rest } = draft;
+      const corrections = prepareCorrections(draft.corrections, stored?.corrections, {
+        live: new Set(
+          stored?.corrections
+            ? (await this.#liveEntry(site, draft.id))?.corrections?.map((c) => c.id)
+            : [],
+        ),
+        at: ts,
+        personEdit: options.correctionEdit === true,
+        newId: () => this.#newId(ID_PREFIX.correction),
+      });
+      draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
+    }
+    assertValid("content-entry", canonicalTerms(draft));
+    if (stored) await assertUnlocked(this.#sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {
       checkBodyDirectives(this.blocks, draft.body.value, "body");
       const previous = stored?.body.format === "markdown" ? stored.body : undefined;

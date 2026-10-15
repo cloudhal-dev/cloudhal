@@ -7,7 +7,7 @@ import type { Env } from "../context.ts";
 import { entryDraft } from "../drafts.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { API_ACTOR, writerOf } from "../governance.ts";
-import { entryLimit, personOf } from "../own.ts";
+import { editsLiveCorrections, entryLimit, personOf } from "../own.ts";
 import { param } from "../params.ts";
 import { type DraftPreview, previewResponse } from "../preview.ts";
 
@@ -116,7 +116,12 @@ export const entries: Hono<Env> = new Hono<Env>()
           409,
         );
     }
-    return c.json(await c.get("store").updateContentEntry(body, { writer: writerOf(c) }));
+    return c.json(
+      await c.get("store").updateContentEntry(body, {
+        writer: writerOf(c),
+        ...(editsLiveCorrections(c) ? { correctionEdit: true } : {}),
+      }),
+    );
   })
   // RFC-0014 §4: operations on the body's blocks instead of the whole entry.
   .patch("/:entryId/body", (c) => patchBody(c, { entryId: param(c, "entryId") }))

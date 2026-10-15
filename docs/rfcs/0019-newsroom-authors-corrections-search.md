@@ -134,6 +134,21 @@ Invariants:
 - **Deviations.**
   - `createDefaultTaxonomies` still returns `[category, tag]`; the author taxonomy has its own call, so existing callers keep their types.
   - Linking a Studio member to an author term (`cloudhal.memberId`) and an author editor in Studio are not in 19a. Authors are added with the existing term tools and screens.
+- **19b shipped.**
+  - **Contract.** `ContentEntry.corrections` (≤ 100 `Correction`s: `id` `crx_…`, `kind`, `at`, `note` ≤ 2,000, optional `snapshotId`), with valid and invalid fixtures.
+  - **Store** (`@cloudhal/core-ts` `corrections.ts`, invariants 1 and 2):
+    - A new item gets the store's id and the write's time, whatever the caller sent. An existing item keeps its time.
+    - An item in the live version of the entry cannot be removed or change kind (`422 correction_locked`). Its note changes only with `correctionEdit`, which the REST API sets for a signed-in person with `site:publish` (never for an API key or MCP).
+    - `addCorrection` appends one. `correctingEntries(siteId, diff)` names the pending entries that add one.
+  - **Policy** (invariant 4). `checkAutoPublish` and `checkAutoRelease` answer `correction` ("it adds a correction to a published article") when an article in the publish or release adds one, so `auto` mode waits for a person. Every lower mode already asks for publishing.
+  - **MCP.** `add_correction {siteId, entryId, rev, kind, note}` (`content:write`, own limits as `update_entry`) appends to the draft and snapshots. The server instructions tell agents to use it instead of silent edits.
+  - **Renderer** (invariant 3). The theme kit's `articleCorrections(entry)` lists the corrections newest first with notes through `renderInlineMarkdown` (escaped HTML, safe links, no images or blocks), plus the latest time. `entryHead` adds `correction` as `CorrectionComment`s and uses the latest correction's time as `dateModified`.
+  - **Starter.** Under the byline: "Updated <date> · Correction appended", linking to the list. At the end of the article: "Corrections and updates", newest first, with the kind as a label.
+  - **Studio.** The article editor has a "Corrections" card for published articles (`CorrectionList` in `@cloudhal/ui`, DESIGN.md §2ad). It lists the corrections, and a form appends one to the draft; it is saved with the article.
+- **Deviations.**
+  - `snapshotId` is not filled in yet. Whether an item is live is read from the live snapshot instead.
+  - Without corrections, the visible "Updated" date keeps its earlier rule (an edit more than a day after publication). The JSON-LD `dateModified` keeps `updatedAt`. Only a correction moves the date as the RFC describes.
+  - A person's edit of a live note shows in snapshot history. REST writes by people have no audit row of their own yet. Studio does not offer that edit yet; the API does.
 
 ## Open questions
 1. **Default taxonomy.** Should `cloudhal init` create the `author` taxonomy for every new site, or only newsroom presets? Default: every new site, empty. An empty taxonomy shows nothing.

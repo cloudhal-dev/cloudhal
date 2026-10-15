@@ -93,6 +93,58 @@ describe("agent modes over MCP", () => {
     expect(rbApproval?.autoCheck).toBeUndefined();
   });
 
+  it("auto: a publish that adds a correction waits for a person (RFC-0019 §2.4)", async () => {
+    const { store, site, approvals, audit, call } = await setup("auto");
+    const owner = { kind: "human" as const, id: "user_owner000001" };
+    const publishAsPerson = async () => {
+      const s = await store.createSnapshot(site.id, { actor: owner, reason: "publish" });
+      await store.publish(
+        (await store.getSite(site.id)) as NonNullable<Awaited<ReturnType<typeof store.getSite>>>,
+        s.id,
+      );
+    };
+    const created = (await call("create_entry", article(site.id, "corrected")))
+      .structuredContent as {
+      entry: { id: string; rev: number };
+    };
+    await publishAsPerson();
+    const added = await call("add_correction", {
+      siteId: site.id,
+      entryId: created.entry.id,
+      rev: created.entry.rev,
+      kind: "correction",
+      note: "An earlier version misspelled the mayor's name.",
+      // a forged time is not part of the tool: the store stamps it
+    });
+    expect(added.isError, added.text).toBeFalsy();
+    const entry = (added.structuredContent as { entry: { rev: number; corrections: unknown[] } })
+      .entry;
+    expect(entry.corrections).toEqual([
+      {
+        id: expect.stringMatching(/^crx_/),
+        kind: "correction",
+        at: expect.any(String),
+        note: "An earlier version misspelled the mayor's name.",
+      },
+    ]);
+    const publish = await call("publish", { siteId: site.id });
+    expect(publish.text).toMatch(/^approval pending:/);
+    const [waiting] = await approvals.list({ siteId: site.id, status: "pending" });
+    expect(waiting?.autoCheck).toMatchObject({ lowRisk: false, code: "correction" });
+    const held = (await audit.list({ siteId: site.id })).find((r) => r.tool === "publish");
+    expect(held?.reason).toMatch(/auto mode waits for a person: it adds a correction/);
+
+    // once live, the agent cannot take it back
+    await publishAsPerson();
+    const live = (await store.getContentEntry(created.entry.id)) as NonNullable<
+      Awaited<ReturnType<typeof store.getContentEntry>>
+    >;
+    const { corrections: _gone, ...rest } = live;
+    await expect(store.updateContentEntry(rest as typeof live)).rejects.toMatchObject({
+      code: "correction_locked",
+    });
+  });
+
   it("plan: read and preview only", async () => {
     const { site, client, call } = await setup("plan");
     expect(client.getInstructions()).toContain("PLAN mode");

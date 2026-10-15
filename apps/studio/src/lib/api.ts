@@ -148,7 +148,9 @@ export type AutoCheckCode =
   | "nothing"
   | "structure"
   | "too-many"
-  | "media";
+  | "media"
+  | "outside-window"
+  | "correction";
 export interface AutoCheck {
   rule: "low-risk-publish";
   lowRisk: boolean;

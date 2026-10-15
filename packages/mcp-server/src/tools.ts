@@ -36,7 +36,7 @@ import {
   SiteSchema,
   SnapshotSchema,
 } from "@cloudhal/core-contracts";
-import type { BlockWriter, EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
+import type { BlockWriter, CorrectionKind, EntryQuery, SnapshotDiff } from "@cloudhal/core-ts";
 import {
   mintPreviewToken,
   previewUrl,
@@ -1068,6 +1068,76 @@ function rawTools(): ToolDefinition[] {
       },
     },
     {
+      name: "add_correction",
+      title: "Add correction",
+      description:
+        "Append a correction, clarification or update notice to an article (RFC-0019 §2) when a published story changed in substance. Cloudhal sets its time. It goes live with the next publish, which then waits for a person in every mode. Once live, a notice cannot be removed or reworded by an agent. Snapshots afterwards.",
+      inputSchema: obj(
+        {
+          siteId: id,
+          entryId: id,
+          rev: { type: "integer", minimum: 0 },
+          kind: {
+            type: "string",
+            enum: ["correction", "clarification", "update"],
+            description:
+              "correction: something was wrong; clarification: something was unclear; update: new facts since publication",
+          },
+          note: str("What changed, in one or two sentences of markdown", {
+            minLength: 1,
+            maxLength: 2000,
+          }),
+        },
+        ["siteId", "entryId", "rev", "kind", "note"],
+      ),
+      outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT }, ["entry", "snapshot"]),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      scopes: ["content:write"],
+      own: "entry",
+      precheck: async (a, ctx) => {
+        if (!ctx.limit) return;
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        if (entry && entry.siteId === a.siteId)
+          await entryLimitCheck(ctx, "update", entry, {
+            author: entry.author,
+            status: entry.status,
+          });
+      },
+      approvalPrompt: async (a, ctx) => {
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        return `Add a ${a.kind as string} to "${quote(entry?.title ?? (a.entryId as string))}": "${quote(a.note as string)}"?`;
+      },
+      handler: async (a, ctx) => {
+        const entry = await ctx.store.getContentEntry(a.entryId as string);
+        if (!entry || entry.siteId !== a.siteId)
+          throw new ToolError("not_found", `entry ${a.entryId} not found`);
+        if (entry.rev !== a.rev)
+          throw new ToolError(
+            "conflict",
+            `entry ${entry.id} is at rev ${entry.rev}, you sent ${a.rev}; reload and retry`,
+          );
+        await entryLimitCheck(ctx, "update", entry, { author: entry.author, status: entry.status });
+        try {
+          const saved = await ctx.store.addCorrection(
+            entry,
+            { kind: a.kind as CorrectionKind, note: a.note as string },
+            { writer: mcpWriter(ctx) },
+          );
+          return {
+            entry: saved,
+            snapshot: await autoSnapshot(ctx, entry.siteId, "add_correction"),
+          };
+        } catch (e) {
+          mapError(e);
+        }
+      },
+    },
+    {
       name: "delete_entry",
       title: "Delete article",
       description: "Delete a content entry. Destructive: requires approval. Snapshots afterwards.",
@@ -1501,6 +1571,7 @@ export async function runTool(
     // New raster images used only by the articles in this publish ride along (RFC-0004 §6.3).
     autoCheck = checkAutoPublish(pending, {
       ridingAssets: await ctx.store.ridingAssets(siteId, pending),
+      corrections: await ctx.store.correctingEntries(siteId, pending),
     });
     if (autoCheck.lowRisk)
       autoNote = `auto mode: published without approval (${describeAutoCheck(autoCheck)})`;

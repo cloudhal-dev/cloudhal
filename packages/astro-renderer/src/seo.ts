@@ -5,7 +5,7 @@
  */
 import type { ContentEntry, ImageRef, Page, Site } from "@cloudhal/core-contracts";
 import type { ArchiveView } from "./archive.ts";
-import { markdownText, safeSrc } from "./markdown.ts";
+import { inlineMarkdownText, markdownText, safeSrc } from "./markdown.ts";
 import { assetAlt, imageObject, type MediaContext, socialImageUrl } from "./media.ts";
 import { entryPath } from "./routing.ts";
 import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
@@ -248,6 +248,13 @@ export function entryHead(
       ? taxonomy.keywords.join(", ")
       : undefined;
   const publisher = { "@type": "Organization", name: site.name, url: `${origin}/` };
+  const corrections = [...(entry.corrections ?? [])]
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .map((c) => ({
+      "@type": "CorrectionComment",
+      text: inlineMarkdownText(c.note),
+      datePublished: c.at,
+    }));
   // RFC-0019 §1: the byline's authors, each a Person with their archive and profiles; without a
   // byline, a person who wrote it is the author, and work by an agent or the system is the site's.
   const author =
@@ -272,7 +279,9 @@ export function entryHead(
         mainEntityOfPage: url,
         ...(image ? { image: image.object ? [image.object] : [image.url] } : {}),
         ...(entry.publishedAt ? { datePublished: entry.publishedAt } : {}),
-        dateModified: entry.updatedAt,
+        // RFC-0019 §2: a correction is the visible update; ordinary edits do not move it.
+        dateModified: corrections[0]?.datePublished ?? entry.updatedAt,
+        ...(corrections.length > 0 ? { correction: corrections } : {}),
         inLanguage: entry.locale,
         ...(taxonomy.section
           ? {

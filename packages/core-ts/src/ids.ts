@@ -34,6 +34,8 @@ export const ID_PREFIX = {
   operation: "op",
   /** RFC-0014 body blocks (`BodyBlock.id`). */
   block: "blk",
+  /** RFC-0019 §2 correction notices (`ContentEntry.corrections[].id`). */
+  correction: "crx",
   /** RFC-0014 body proposals (`body_proposals.id`). */
   proposal: "prop",
 } as const;

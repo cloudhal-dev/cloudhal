@@ -175,6 +175,13 @@ describe("agent modes", () => {
       }),
     ).toMatchObject({ code: "too-many", lowRisk: false, text: "it changes more than 20 articles" });
     expect(check({ added: [], changed: [], removed: [] }).code).toBe("nothing");
+    // RFC-0019 §2.4: an article that adds a correction is an editorial statement for a person
+    const corrected = checkAutoPublish(
+      { added: [entry("e1")], changed: [{ after: entry("e2") }], removed: [] },
+      { corrections: new Set(["e2"]) },
+    );
+    expect(corrected).toMatchObject({ code: "correction", lowRisk: false, changes: 2 });
+    expect(describeAutoCheck(corrected)).toBe("it adds a correction to a published article");
   });
 
   it("media rides along with its article only when the store says so (RFC-0004 §6.3)", () => {

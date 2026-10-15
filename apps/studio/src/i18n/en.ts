@@ -247,6 +247,21 @@ export const en = {
       emptyDescription: "Try another category or tag, or clear the filters.",
     },
   },
+  articleCorrections: {
+    title: "Corrections",
+    description:
+      "Readers see these at the end of the article, newest first, and the latest is its Updated date. Once published, a correction stays: someone who can publish may reword it, nobody removes it.",
+    empty: "No corrections",
+    emptyDescription: "Add one when a published story changes in substance.",
+    kind: "Kind",
+    kinds: { correction: "Correction", clarification: "Clarification", update: "Update" },
+    note: "What changed",
+    noteHint: "One or two sentences. Markdown links and emphasis work.",
+    add: "Add correction",
+    unsaved: "Not saved",
+    remove: "Remove correction",
+    pending: "Save the article to add it; it goes live with the next publish.",
+  },
   articleTerms: {
     title: "Categories and tags",
     description:
@@ -1391,6 +1406,8 @@ export const en = {
       structure: "it changes pages, menus, site settings, taxonomies or redirects",
       "too-many": "it carries {changes} changes and auto mode stops at {limit}",
       media: "it adds or changes media that is not part of an article change",
+      "outside-window": "it would run after the agent's autonomy ends",
+      correction: "it adds a correction to a published article",
     },
     noHistory: "No decisions yet",
     noHistoryDescription: "Approved, denied, used and expired requests are listed here.",
@@ -1505,6 +1522,7 @@ export const en = {
     get_entry: "Get article",
     create_entry: "Create article",
     update_entry: "Update article",
+    add_correction: "Add correction",
     delete_entry: "Delete article",
     get_theme_settings: "Read design settings",
     set_theme_settings: "Change design settings",

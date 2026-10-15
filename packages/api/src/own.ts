@@ -29,6 +29,19 @@ export function publishesAnything(principal: Principal | undefined): boolean {
   return !principal || holds(principal.scopes, "site:publish");
 }
 
+/**
+ * RFC-0019 §2: a person who may publish — signed in, not through an API key — may fix the note of
+ * a correction that has been live. Agents never can.
+ */
+export function editsLiveCorrections(c: Context<Env>): boolean {
+  const principal = c.get("principal");
+  return (
+    c.get("actor")?.kind === "human" &&
+    principal?.keyId === undefined &&
+    publishesAnything(principal)
+  );
+}
+
 /** The person (actor id) behind a REST caller. */
 export function personOf(c: Context<Env>): string | undefined {
   const p = c.get("principal");

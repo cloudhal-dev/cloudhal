@@ -203,6 +203,32 @@ a.ch-kicker:hover {
 .ch-byline__author a {
   @apply underline-offset-4 hover:underline;
 }
+.ch-byline a[href="#ch-corrections"] {
+  @apply font-medium text-amber-800 underline underline-offset-4;
+}
+/* Corrections (RFC-0019 §2): newest first, the kind as a label. */
+.ch-corrections {
+  @apply mt-10 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4;
+  scroll-margin-top: 1.5rem;
+}
+.ch-corrections h2 {
+  @apply text-lg font-semibold;
+}
+.ch-corrections ol {
+  @apply mt-3 space-y-3;
+}
+.ch-correction__meta {
+  @apply flex flex-wrap gap-x-2 text-sm text-zinc-600;
+}
+.ch-correction__meta strong {
+  @apply font-semibold text-amber-900;
+}
+.ch-correction__note {
+  @apply mt-1 text-zinc-800;
+}
+.ch-correction__note a {
+  @apply underline underline-offset-4;
+}
 /* Article lists as cards: cover thumbnail, title, summary, date and reading time. */
 .ch-card-entry {
   @apply flex gap-4;

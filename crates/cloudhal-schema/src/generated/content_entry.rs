@@ -492,6 +492,9 @@ pub struct ContentEntry {
     pub availability: ::std::option::Option<Availability>,
     pub body: Body,
     pub collection: Slug,
+    #[doc = "Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note."]
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub corrections: ::std::vec::Vec<Correction>,
     #[serde(
         rename = "coverImage",
         skip_serializing_if = "::std::option::Option::is_none"
@@ -623,6 +626,131 @@ impl ::std::convert::TryFrom<::std::string::String> for ContentEntryTitle {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for ContentEntryTitle {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "One correction notice (RFC-0019 §2)."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Correction {
+    #[doc = "When it was written; set by the store, never by the caller."]
+    pub at: Timestamp,
+    pub id: Id,
+    pub kind: CorrectionKind,
+    #[doc = "What changed, in markdown (inline)."]
+    pub note: CorrectionNote,
+    #[doc = "The snapshot it was first published in."]
+    #[serde(
+        rename = "snapshotId",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub snapshot_id: ::std::option::Option<Id>,
+}
+#[doc = "`CorrectionKind`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum CorrectionKind {
+    #[serde(rename = "correction")]
+    Correction,
+    #[serde(rename = "clarification")]
+    Clarification,
+    #[serde(rename = "update")]
+    Update,
+}
+impl ::std::fmt::Display for CorrectionKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Correction => f.write_str("correction"),
+            Self::Clarification => f.write_str("clarification"),
+            Self::Update => f.write_str("update"),
+        }
+    }
+}
+impl ::std::str::FromStr for CorrectionKind {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "correction" => Ok(Self::Correction),
+            "clarification" => Ok(Self::Clarification),
+            "update" => Ok(Self::Update),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for CorrectionKind {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CorrectionKind {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "What changed, in markdown (inline)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CorrectionNote(::std::string::String);
+impl ::std::ops::Deref for CorrectionNote {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CorrectionNote> for ::std::string::String {
+    fn from(value: CorrectionNote) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CorrectionNote {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 2000usize {
+            return Err("longer than 2000 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CorrectionNote {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CorrectionNote {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CorrectionNote {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

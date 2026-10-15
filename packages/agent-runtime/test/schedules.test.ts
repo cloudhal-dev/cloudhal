@@ -227,6 +227,13 @@ describe("auto-mode releases (RFC-0008 §10.7, D9)", () => {
     expect(
       checkAutoRelease([{ kind: "set", nodeId: "page_a000001", nodeKind: "page", live: true }]),
     ).toMatchObject({ lowRisk: false, code: "structure" });
+    // RFC-0019 §2.4: an article that adds a correction waits for a person
+    expect(
+      checkAutoRelease([
+        entry("entry_a00001", true),
+        { ...entry("entry_b00001", true), corrects: true },
+      ]),
+    ).toMatchObject({ lowRisk: false, code: "correction" });
   });
 
   it("the window ends at the elevation's end or after 24 hours, whichever is first", () => {

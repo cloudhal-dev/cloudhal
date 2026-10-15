@@ -429,6 +429,12 @@ Site › Settings gets an **Appearance** section after Domains (`components/Appe
   - To merge, the frame is `sandbox="allow-same-origin"`. Scripts stay off. The document is Cloudhal's own escaped preview HTML under the preview CSP.
 - **No editing here.** People edit in the page editor; agents change the draft through MCP.
 
+### 2ad. Corrections in the article editor (RFC-0019 §2, phase 19b)
+`components/ArticleCorrections.tsx`, in the article editor's main column after the body. It is absent until the article has been published.
+- `SectionCard` "Corrections" with `Megaphone`. Its description says readers see these at the end, newest first, and that a published correction is reworded, never removed.
+- The list is `CorrectionList` (`@cloudhal/ui`): rows in a `divide-y` list, newest first. Each row has a kind `Badge` (correction `warning`, clarification `info`, update `neutral`), the time or "Not saved", and the note as text. Only unsaved rows have an icon-only "Remove correction" button. With none, it shows a `SectionEmpty`.
+- The form: a `Select` "Kind", an `InputArea` "What changed" (≤ 2,000) and a secondary "Add correction" button that appends to the draft. A line says it goes live with the next publish. The store stamps the time on save, and the `auto` mode check makes that publish wait for a person.
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
