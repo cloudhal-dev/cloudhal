@@ -75,6 +75,7 @@ import { BlobIntegrityError, readAllBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
 import type { AiTransport } from "../ai/client.ts";
 import {
+  ALL_EVAL_BRIEFS,
   BUILD_EVAL_BRIEFS,
   BUILD_EVAL_MODELS,
   type BuildEvalRun,
@@ -422,7 +423,10 @@ export function adminRoutes(
           Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
         const models = (list(body.models) ?? [...BUILD_EVAL_MODELS]).slice(0, 12);
         const wanted = list(body.briefs);
-        const briefs = BUILD_EVAL_BRIEFS.filter((b) => !wanted || wanted.includes(b.id));
+        // RFC-0022 §6: named briefs may be tool briefs too; the default stays the build set.
+        const briefs = wanted
+          ? ALL_EVAL_BRIEFS.filter((b) => wanted.includes(b.id))
+          : [...BUILD_EVAL_BRIEFS];
         if (models.length === 0 || briefs.length === 0)
           return c.json(
             { error: "invalid", message: "models and briefs: at least one each" },

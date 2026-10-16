@@ -47,6 +47,7 @@ New names in `SURFACE_FUNCTIONS`, in the same shape as today: `{"call": "<name>"
 | `abs` | `value` | absolute value |
 | `min` / `max` | `values: [n…]` | smallest / largest |
 | `clamp` | `value`, `min`, `max` | value kept within |
+| `power` | `base`, `exponent` (at most ±1000) | base to the exponent (added in 22e for loan payments) |
 | `number` | `value`, `fallback?` | a typed string as a number |
 | `if` | `cond` (a `visible` condition), `ifTrue`, `ifFalse` | one of two values (not `then`/`else`: an object with a `then` key is treated as a promise by `await`) |
 | `choose` | `value`, `cases: {key: v}`, `default?` | the case for a key (a select's choice → a factor) |

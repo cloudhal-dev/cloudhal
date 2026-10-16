@@ -17,7 +17,7 @@
 import { renderPagePreview } from "@cloudhal/astro-renderer/preview";
 import type { Page, Site } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
-import { type Catalog, checkSurface } from "@cloudhal/core-ts/surfaces";
+import { type Catalog, checkSurface, resolveValue } from "@cloudhal/core-ts/surfaces";
 import type { PageRenderer } from "@cloudhal/mcp-server/render";
 import type { AiTransport } from "./ai/client.ts";
 import { DEFAULT_AI_MODEL } from "./ai/store.ts";
@@ -107,6 +107,39 @@ export const BUILD_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
   },
 ];
 
+/**
+ * RFC-0022 §6: tools — briefs that need computing, inputs, a chart or a table. Run with
+ * `--briefs calories,loan,chart,compare`; the design pass fills sample inputs before it looks.
+ */
+export const TOOL_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
+  {
+    id: "calories",
+    brief:
+      "A daily calorie calculator: the reader enters age, height in cm and weight in kg, picks female or male and an activity level (low, light, high), and sees the calories a day (Mifflin–St Jeor times the activity factor).",
+  },
+  {
+    id: "loan",
+    brief:
+      "A loan calculator: amount, yearly interest rate in percent and years; show the monthly payment and the total paid. Monthly payment = amount × r ÷ (1 − (1 + r)^−n), with r the monthly rate and n the number of months.",
+  },
+  {
+    id: "chart",
+    brief:
+      "A short section on our readership: a heading, one sentence, and a bar chart of readers for the last six months (Apr 1,200; May 1,450; Jun 1,700; Jul 1,650; Aug 2,100; Sep 2,600).",
+  },
+  {
+    id: "compare",
+    brief:
+      "A comparison of three plans (Free $0, Pro $12, Team $30 a month) across price, seats (1, 5, 50), storage (1 GB, 50 GB, 1 TB) and support (community, email, priority), with Pro highlighted as recommended.",
+  },
+];
+
+/** Every brief the eval knows, for `--briefs`. */
+export const ALL_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
+  ...BUILD_EVAL_BRIEFS,
+  ...TOOL_EVAL_BRIEFS,
+];
+
 export interface BuildEvalRun {
   model: string;
   brief: string;
@@ -139,6 +172,11 @@ export interface BuildEvalDesign {
   note?: string | undefined;
   /** With design.look: what the model saw, and what it did about it. */
   look?: BuildEvalLook | undefined;
+  /**
+   * RFC-0022 §6: for a page with inputs, whether its computed results show once sample values
+   * are filled in (`results` computed values, `empty` of them still blank).
+   */
+  tool?: { inputs: number; results: number; empty: number } | undefined;
   error?: string | undefined;
 }
 
@@ -182,6 +220,8 @@ export interface BuildEvalSummary {
   /** RFC-0021 21c, when the runs had a design pass. */
   checksFailedPerTurn?: number | undefined;
   medianDesignScore?: number | undefined;
+  /** RFC-0022 §6: tool briefs whose results all showed with sample inputs / tool briefs built. */
+  toolsWorking?: string | undefined;
 }
 
 const median = (xs: number[]): number | undefined => {
@@ -298,7 +338,11 @@ export async function runBuildEvalOnce(input: {
     const out: BuildEvalDesign = { failed: [] };
     if (look) out.look = look;
     try {
-      const look = await lookAt(design.renderer, urlOf(built));
+      // RFC-0022 §6: fill empty inputs with sample values, so a tool is judged working.
+      const sampled = withSampleInputs(built);
+      const tool = toolResults(sampled.page, sampled.inputs);
+      if (tool) out.tool = tool;
+      const look = await lookAt(design.renderer, urlOf(sampled.page));
       out.failed = look.failed.map((c) => c.id);
       if (design.judge !== false) {
         const judged = await scoreDesign({
@@ -317,6 +361,70 @@ export async function runBuildEvalOnce(input: {
     }
     return out;
   }
+}
+
+/**
+ * The page with each empty NumberField's data filled with a sample (the middle of min–max, else
+ * min, else 10), and empty RadioGroups with their first option: a calculator then shows a result.
+ */
+export function withSampleInputs(page: Page): { page: Page; inputs: number } {
+  let inputs = 0;
+  const sections = (page.sections ?? []).map((section) => {
+    if (section.kind !== "surface") return section;
+    const data = structuredClone(section.data ?? {}) as Record<string, unknown>;
+    for (const c of section.components) {
+      const props = (c.props ?? {}) as Record<string, unknown>;
+      const bound = props.value as { path?: unknown } | undefined;
+      if (typeof bound?.path !== "string") continue;
+      if (c.component !== "NumberField" && c.component !== "RadioGroup") continue;
+      inputs++;
+      const keys = bound.path.split("/").slice(1);
+      let at: Record<string, unknown> = data;
+      for (const k of keys.slice(0, -1)) {
+        if (typeof at[k] !== "object" || at[k] === null) at[k] = {};
+        at = at[k] as Record<string, unknown>;
+      }
+      const last = keys[keys.length - 1] as string;
+      if (at[last] !== undefined && at[last] !== "") continue;
+      if (c.component === "RadioGroup") {
+        const first = Array.isArray(props.options)
+          ? (props.options[0] as { value?: unknown })
+          : undefined;
+        if (first?.value !== undefined) at[last] = first.value;
+        continue;
+      }
+      const lo = typeof props.min === "number" ? props.min : undefined;
+      const hi = typeof props.max === "number" ? props.max : undefined;
+      at[last] = lo !== undefined && hi !== undefined ? Math.round((lo + hi) / 2) : (lo ?? 10);
+    }
+    return { ...section, data };
+  });
+  return { page: { ...page, sections }, inputs };
+}
+
+/** For a page with inputs: its computed results (calls in Stat and Text) and how many are blank. */
+function toolResults(
+  page: Page,
+  inputs: number,
+): { inputs: number; results: number; empty: number } | undefined {
+  if (inputs === 0) return undefined;
+  let results = 0;
+  let empty = 0;
+  for (const section of page.sections ?? []) {
+    if (section.kind !== "surface") continue;
+    for (const c of section.components) {
+      if (c.component !== "Stat" && c.component !== "Text") continue;
+      const props = (c.props ?? {}) as Record<string, unknown>;
+      for (const key of ["value", "text"]) {
+        const v = props[key];
+        if (typeof v !== "object" || v === null || !("call" in v)) continue;
+        results++;
+        const got = resolveValue(v, section.data ?? {}, { locale: "en" });
+        if (got === "" || got === undefined || got === null) empty++;
+      }
+    }
+  }
+  return { inputs, results, empty };
 }
 
 /**
@@ -369,6 +477,11 @@ export function summariseBuildEval(runs: readonly BuildEvalRun[]): BuildEvalSumm
               medianDesignScore: median(
                 rs.flatMap((r) => (r.design?.score === undefined ? [] : [r.design.score])),
               ),
+              ...(rs.some((r) => r.design?.tool)
+                ? {
+                    toolsWorking: `${rs.filter((r) => r.design?.tool && r.design.tool.results > 0 && r.design.tool.empty === 0).length}/${rs.filter((r) => r.design?.tool).length}`,
+                  }
+                : {}),
             }
           : {}),
       };
@@ -386,12 +499,13 @@ export function buildEvalTable(summary: readonly BuildEvalSummary[]): string {
   const s = (ms: number | undefined) => (ms === undefined ? "–" : `${(ms / 1000).toFixed(1)} s`);
   // RFC-0021 21c: two more columns when the runs had a design pass.
   const design = summary.some((m) => m.checksFailedPerTurn !== undefined);
+  const tools = summary.some((m) => m.toolsWorking !== undefined);
   return [
-    `| Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |${design ? " Failed checks/turn | Design score |" : ""}`,
-    `|---|---|---|---|---|---|---|---|---|${design ? "---|---|" : ""}`,
+    `| Model | Finished | Acceptance | Repairs/turn | Refusals/turn | Rounds/turn | First step | Total | Output tokens/turn |${design ? " Failed checks/turn | Design score |" : ""}${tools ? " Tools working |" : ""}`,
+    `|---|---|---|---|---|---|---|---|---|${design ? "---|---|" : ""}${tools ? "---|" : ""}`,
     ...summary.map(
       (m) =>
-        `| \`${m.model}\` | ${m.finished}/${m.runs} | ${Math.round(m.acceptance * 100)}% | ${m.repairsPerTurn} | ${m.refusalsPerTurn} | ${m.roundsPerTurn} | ${s(m.medianFirstStepMs)} | ${s(m.medianTotalMs)} | ${Math.round(m.outputTokensPerTurn)} |${design ? ` ${m.checksFailedPerTurn ?? "–"} | ${m.medianDesignScore ?? "–"} |` : ""}`,
+        `| \`${m.model}\` | ${m.finished}/${m.runs} | ${Math.round(m.acceptance * 100)}% | ${m.repairsPerTurn} | ${m.refusalsPerTurn} | ${m.roundsPerTurn} | ${s(m.medianFirstStepMs)} | ${s(m.medianTotalMs)} | ${Math.round(m.outputTokensPerTurn)} |${design ? ` ${m.checksFailedPerTurn ?? "–"} | ${m.medianDesignScore ?? "–"} |` : ""}${tools ? ` ${m.toolsWorking ?? "–"} |` : ""}`,
     ),
   ].join("\n");
 }

@@ -804,6 +804,7 @@ export const SURFACE_FUNCTIONS = [
   "min",
   "max",
   "clamp",
+  "power",
   "number",
   "if",
   "choose",
@@ -1082,6 +1083,11 @@ function runFunction(
     case "number": {
       const n = operand(value);
       return n === undefined ? (args.fallback ?? "") : finite(n);
+    }
+    case "power": {
+      const b = operand(args.base);
+      const e = operand(args.exponent);
+      return b === undefined || e === undefined || Math.abs(e) > 1000 ? "" : finite(b ** e);
     }
     case "sum":
     case "average":
@@ -2063,7 +2069,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     '- Charts: a Chart draws rows from the surface\'s data, e.g. {"id":"c","component":"Chart","props":{"kind":"bar","title":"Readers per month","data":{"path":"/months"},"x":"month","series":[{"field":"readers","label":"Readers"}]}} with "data":{"months":[{"month":"Jan","readers":1200},…]}. Use one only when the numbers are the point; bar for comparing, line or area for change over time, donut for parts of a whole (one series, at most six parts).',
     '- Tables: a Table shows rows from the surface\'s data, e.g. {"id":"t","component":"Table","props":{"caption":"Plans compared","rows":{"path":"/plans"},"columns":[{"field":"name","label":"Plan"},{"field":"price","label":"Price","align":"end","format":"currency","currency":"USD"}],"highlight":{"field":"name","equals":"Pro"}}}. Formats: text, number, currency, percent, date. At most 8 columns; on phones each row becomes a card.',
     "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
-      '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
+      '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `power` takes {"base","exponent"} (a loan: amount × r ÷ (1 − power(1 + r, −n))); `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
       'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',
     '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,

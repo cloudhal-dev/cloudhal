@@ -23,4 +23,12 @@ Starting points, not templates: adapt them to the site's rules and real content.
 4. Contact call to action.
 
 ## Pricing page
-Hero with one sentence of value → plans (as above) → comparison as a `List` per plan (no wide tables) → FAQ about billing → call to action.
+Hero with one sentence of value → plans (as above) → a comparison `Table` (at most 8 columns, `highlight` the recommended plan; it stacks into cards on phones) → FAQ about billing → call to action.
+
+## Tools (RFC-0022)
+Compute, don't promise: a result is a function call over the inputs, never text such as "calculated at checkout".
+- **Calculator** (calories, loan, savings, price × seats): a `Card` holding a `Heading`, the inputs (`NumberField` with `unit`, `min`, `max`; `RadioGroup` `variant: buttons` for two to four choices; `Checkbox` for yes/no), two or three to a `Grid` row, then the result as a `Stat` right below. Start every number input as `""` in `data`; bind each input's `value` with `{path}`; compute with `add`/`multiply`/`divide`/`choose`/`round` and show with `formatNumber` or `formatCurrency`. A loan payment uses `power`: amount × r ÷ (1 − power(1 + r, −n)), with r the monthly rate (`divide` the yearly percent by 1200) and n the months.
+- **Keypad calculator:** a `Text` bound to `/display`, a `Grid` of `Button`s with `append` (digits and operators), `C` as `set` "" and `=` as `set` with `calculate` over `/display`.
+- **Chart:** a `Chart` bound to rows in `data` (`x` the label field, `series` the number fields), titled with what it shows, with a `caption` naming the source. Bar to compare, line over time, donut for parts of a whole.
+- **Comparison:** a `Table` bound to rows, the first column naming the row, numbers aligned `end` with a `format`.
+Check with `render_page`: no `input-label`, `chart-empty` or `overflow-x`, and the result shows a number with the sample values.
