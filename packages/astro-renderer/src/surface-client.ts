@@ -37,11 +37,14 @@ const op=(v)=>{if(blank(v))return undefined;const n=tn(v);return Number.isFinite
 const ns=(v)=>{const l=Array.isArray(v)?v:[];if(!l.length)return undefined;const r=l.map(op);return r.every((n)=>n!==undefined)?r:undefined;};
 const fin=(n)=>Number.isFinite(n)?Number(n.toPrecision(10)):"";
 const dg=(x)=>Math.min(Math.max(0,Math.trunc(num(x===undefined||x===null?0:x))||0),6);
-const calc=(src)=>{if(src.length>200)return"";const s=src.replace(/×/g,"*").replace(/÷/g,"/").replace(/\s+/g,"");if(!s)return"";let i=0,z=0;const no=()=>{throw 0;};
-const fa=()=>{if(++z>32)no();let v;if(s[i]==="-"){i++;v=-fa();}else if(s[i]==="("){i++;v=ex();if(s[i++]!==")")no();}else{const m=/^\d+(?:\.\d+)?/.exec(s.slice(i));if(!m)no();i+=m[0].length;v=Number(m[0]);}z--;return v;};
-const te=()=>{let v=fa();while(s[i]==="*"||s[i]==="/"||s[i]==="%"){const o=s[i++];const r=fa();v=o==="*"?v*r:o==="/"?v/r:v%r;}return v;};
-const ex=()=>{let v=te();while(s[i]==="+"||s[i]==="-"){const o=s[i++];const r=te();v=o==="+"?v+r:v-r;}return v;};
-try{const v=ex();return i===s.length?fin(v):"";}catch{return"";}};
+const calc=(src,vars)=>{if(src.length>200)return"";const s=src.replace(/×/g,"*").replace(/÷/g,"/");const V=obj(vars)?vars:{};let i=0,z=0;const no=()=>{throw 0;};
+const pk=()=>{while(s[i]===" "||s[i]==="\t"||s[i]==="\n")i++;return s[i];};
+const at=()=>{if(++z>32)no();let v;if(pk()==="("){i++;v=ex();if(pk()!==")")no();i++;}else{const r=s.slice(i);const n=/^\d+(?:\.\d+)?/.exec(r);const m=n?null:/^[A-Za-z_][A-Za-z0-9_]{0,31}/.exec(r);if(n){i+=n[0].length;v=Number(n[0]);}else if(m&&own(V,m[0])){i+=m[0].length;const g=op(V[m[0]]);if(g===undefined)no();v=g;}else no();}z--;return v;};
+const un=()=>{if(pk()==="-"){i++;return-un();}return pw();};
+const pw=()=>{const b=at();if(pk()!=="^")return b;i++;const e=un();if(Math.abs(e)>1000)no();return b**e;};
+const te=()=>{let v=un();for(let c=pk();c==="*"||c==="/"||c==="%";c=pk()){i++;const r=un();v=c==="*"?v*r:c==="/"?v/r:v%r;}return v;};
+const ex=()=>{let v=te();for(let c=pk();c==="+"||c==="-";c=pk()){i++;const r=te();v=c==="+"?v+r:v-r;}return v;};
+try{if(!pk())return"";const v=ex();return pk()===undefined?fin(v):"";}catch{return"";}};
 const fn=(name,a,loc)=>{const v=a.value;switch(name){
 case"formatDate":{const d=new Date(txt(v));if(Number.isNaN(d.getTime()))return"";const st=["short","medium","long","full"].includes(txt(a.style))?txt(a.style):"medium";return new Intl.DateTimeFormat(loc,{dateStyle:st,timeZone:"UTC"}).format(d);}
 case"formatNumber":{if(blank(v))return"";const n=num(v);if(!Number.isFinite(n))return"";const g=Math.min(Math.max(0,Math.trunc(num(a.digits===undefined?2:a.digits))||0),6);return new Intl.NumberFormat(loc,{maximumFractionDigits:g}).format(n);}
@@ -64,11 +67,12 @@ case"power":{const b=op(a.base),e=op(a.exponent);return b===undefined||e===undef
 case"number":{const n=op(v);return n===undefined?(a.fallback===undefined||a.fallback===null?"":a.fallback):fin(n);}
 case"sum":case"average":case"count":{const f=typeof a.field==="string"?a.field:undefined;const p=(Array.isArray(a.list)?a.list:[]).slice(0,1000).map((x)=>f===undefined?x:obj(x)?x[f]:undefined).filter((x)=>!blank(x));if(name==="count")return p.length;const l=p.map(tn).filter((n)=>Number.isFinite(n));if(!l.length)return name==="sum"?0:"";const t=l.reduce((x,y)=>x+y,0);return fin(name==="sum"?t:t/l.length);}
 case"formatPercent":{const n=op(v);if(n===undefined)return"";return new Intl.NumberFormat(loc,{style:"percent",maximumFractionDigits:dg(a.digits)}).format(n);}
-case"calculate":return calc(txt(a.expression));}
+case"calculate":return calc(txt(a.expression),a.vars);}
 return"";};
 const nil=(o)=>o===undefined||o===null?"":o;
 const val=(v,d,loc,z=0)=>{if(isPath(v))return get(d,v.path);if(isCall(v)){if(z>=8)return"";const r=obj(v.args)?v.args:{};const at=(x)=>val(x,d,loc,z+1);
 if(v.call==="if")return nil(cond(r.cond,d)?at(r.ifTrue):at(r.ifFalse));
+if(v.call==="calculate"&&obj(r.vars)){const vs={};for(const[k,x]of Object.entries(r.vars))vs[k]=at(x);return calc(txt(at(r.expression)),vs);}
 if(v.call==="choose"){const k=txt(at(r.value));const c=obj(r.cases)?r.cases:{};return nil(own(c,k)?at(c[k]):at(r.default));}
 const a={};for(const[k,x]of Object.entries(r))a[k]=Array.isArray(x)?x.map(at):at(x);return fn(v.call,a,loc);}return v;};
 const truthy=(v)=>!(v===undefined||v===null||v===false||v===0||v===""||(Array.isArray(v)&&v.length===0));
@@ -107,7 +111,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.6.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.7.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -119,6 +123,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.3.js",
   "/_cloudhal/surface.4.js",
   "/_cloudhal/surface.5.js",
+  "/_cloudhal/surface.6.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.6.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.7.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -378,6 +378,12 @@ describe("interaction runtime", () => {
       call("formatPercent", { value: 0.256, digits: 1 }),
       call("calculate", { expression: { path: "/expr" } }),
       call("calculate", { expression: "alert(1)" }),
+      call("calculate", {
+        expression: "a * 2^b - (n / 1000)",
+        vars: { a: 3, b: 3, n: { path: "/n" } },
+      }),
+      call("calculate", { expression: "x + 1", vars: { x: { path: "/blank" } } }),
+      call("calculate", { expression: "2 ^ -2 + unknown", vars: {} }),
       call("formatNumber", {
         digits: 0,
         value: call("multiply", { values: [call("add", { values: [1, 2] }), 1.5] }),
@@ -411,9 +417,9 @@ describe("interaction runtime", () => {
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "c6cfc03c7dfe",
+      "f93567503824",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.6.js");
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.7.js");
     // RFC-0022: pages cached with the first name get the same (compatible) code
     expect(SURFACE_SCRIPT_ALIASES).toEqual([
       "/_cloudhal/surface.1.js",
@@ -421,6 +427,7 @@ describe("interaction runtime", () => {
       "/_cloudhal/surface.3.js",
       "/_cloudhal/surface.4.js",
       "/_cloudhal/surface.5.js",
+      "/_cloudhal/surface.6.js",
     ]);
     // live charts load the drawer from its own versioned file
     expect(SURFACE_SCRIPT.code).toContain('import("/_cloudhal/chart.1.js")');

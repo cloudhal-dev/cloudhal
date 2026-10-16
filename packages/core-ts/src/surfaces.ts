@@ -887,6 +887,17 @@ function checkCall(v: CallValue, path: string, out: PropsIssue[], depth = 1): vo
       else
         for (const [key, x] of Object.entries(a))
           checkArg(x, `${at}/${escapePointer(key)}`, out, depth);
+    } else if (v.call === "calculate" && k === "vars") {
+      if (
+        !isObj(a) ||
+        Object.keys(a).length > SURFACE_LIMITS.chooseCases ||
+        Object.keys(a).some((key) => !/^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(key))
+      )
+        out.push({
+          path: at,
+          message: `an object of at most ${SURFACE_LIMITS.chooseCases} names (letters, digits, _) and their values`,
+        });
+      else for (const [key, x] of Object.entries(a)) checkArg(x, `${at}/${key}`, out, depth);
     } else if (Array.isArray(a)) {
       if (a.length > SURFACE_LIMITS.listArgItems)
         out.push({ path: at, message: `at most ${SURFACE_LIMITS.listArgItems} items` });
@@ -1119,7 +1130,7 @@ function runFunction(
       }).format(n);
     }
     case "calculate":
-      return calculateExpression(text(args.expression));
+      return calculateExpression(text(args.expression), isObj(args.vars) ? args.vars : {});
     // Resolved by `resolveValue`, which needs the data.
     case "if":
     case "choose":
@@ -1150,59 +1161,93 @@ const numbers = (v: unknown): number[] | undefined => {
 const finite = (n: number): number | "" => (Number.isFinite(n) ? Number(n.toPrecision(10)) : "");
 
 /**
- * `calculate` (RFC-0022 §1.1): a typed arithmetic expression, read by a small grammar, never
- * evaluated as code. `+ - * / %`, parentheses, unary minus and decimals; `×` and `÷` too.
- * Anything else, or a result that is not finite, is "".
+ * `calculate` (RFC-0022 §1.1): an arithmetic expression, read by a small grammar, never
+ * evaluated as code: `+ - * / %`, `^` (power, exponent at most ±1000), parentheses, unary minus,
+ * decimals, `×` and `÷`, and names bound in `vars` (a formula over the surface's data:
+ * "10*w + 6.25*h"). A blank or non-numeric variable, an unknown name or a result that is not
+ * finite gives "".
  */
-export function calculateExpression(source: string): number | "" {
+export function calculateExpression(
+  source: string,
+  vars: Readonly<Record<string, unknown>> = {},
+): number | "" {
   if (source.length > SURFACE_LIMITS.expressionLength) return "";
-  const s = source.replace(/×/g, "*").replace(/÷/g, "/").replace(/\s+/g, "");
-  if (!s) return "";
+  const s = source.replace(/×/g, "*").replace(/÷/g, "/");
   let i = 0;
   let depth = 0;
   const fail = (): never => {
     throw new Error("calculate");
   };
-  const factor = (): number => {
+  const skip = () => {
+    while (s[i] === " " || s[i] === "\t" || s[i] === "\n") i++;
+  };
+  const peek = () => {
+    skip();
+    return s[i];
+  };
+  const atom = (): number => {
     if (++depth > 32) fail();
     let v: number;
-    if (s[i] === "-") {
-      i++;
-      v = -factor();
-    } else if (s[i] === "(") {
+    const c = peek();
+    if (c === "(") {
       i++;
       v = expr();
-      if (s[i++] !== ")") fail();
+      if (peek() !== ")") fail();
+      i++;
     } else {
-      const m = /^\d+(?:\.\d+)?/.exec(s.slice(i));
-      if (!m) return fail();
-      i += m[0].length;
-      v = Number(m[0]);
+      const rest = s.slice(i);
+      const n = /^\d+(?:\.\d+)?/.exec(rest);
+      const name = n ? null : /^[A-Za-z_][A-Za-z0-9_]{0,31}/.exec(rest);
+      if (n) {
+        i += n[0].length;
+        v = Number(n[0]);
+      } else if (name && Object.hasOwn(vars, name[0])) {
+        i += name[0].length;
+        const got = operand(vars[name[0]]);
+        if (got === undefined) return fail();
+        v = got;
+      } else return fail();
     }
     depth--;
     return v;
   };
+  const unary = (): number => {
+    if (peek() === "-") {
+      i++;
+      return -unary();
+    }
+    return power();
+  };
+  const power = (): number => {
+    const base = atom();
+    if (peek() !== "^") return base;
+    i++;
+    const exponent = unary();
+    if (Math.abs(exponent) > 1000) fail();
+    return base ** exponent;
+  };
   const term = (): number => {
-    let v = factor();
-    while (s[i] === "*" || s[i] === "/" || s[i] === "%") {
-      const op = s[i++];
-      const r = factor();
-      v = op === "*" ? v * r : op === "/" ? v / r : v % r;
+    let v = unary();
+    for (let c = peek(); c === "*" || c === "/" || c === "%"; c = peek()) {
+      i++;
+      const r = unary();
+      v = c === "*" ? v * r : c === "/" ? v / r : v % r;
     }
     return v;
   };
   const expr = (): number => {
     let v = term();
-    while (s[i] === "+" || s[i] === "-") {
-      const op = s[i++];
+    for (let c = peek(); c === "+" || c === "-"; c = peek()) {
+      i++;
       const r = term();
-      v = op === "+" ? v + r : v - r;
+      v = c === "+" ? v + r : v - r;
     }
     return v;
   };
   try {
+    if (!peek()) return "";
     const v = expr();
-    return i === s.length ? finite(v) : "";
+    return peek() === undefined ? finite(v) : "";
   } catch {
     return "";
   }
@@ -1218,6 +1263,12 @@ export function resolveValue(v: unknown, data: unknown, ctx: ResolveContext, dep
     const at = (x: unknown) => resolveValue(x, data, ctx, depth + 1);
     if (v.call === "if")
       return (evaluateCondition(raw.cond, data) ? at(raw.ifTrue) : at(raw.ifFalse)) ?? "";
+    // RFC-0022: a formula's variables are values, bindings or calls, resolved first.
+    if (v.call === "calculate" && isObj(raw.vars)) {
+      const vars: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(raw.vars)) vars[k] = at(x);
+      return calculateExpression(text(at(raw.expression)), vars);
+    }
     if (v.call === "choose") {
       const key = text(at(raw.value));
       const cases = isObj(raw.cases) ? raw.cases : {};
@@ -2071,9 +2122,14 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     '- Inputs (NumberField, TextField, Checkbox, RadioGroup) write only to the surface\'s data in the reader\'s browser: bind value (checked for Checkbox) with {"path"}, start it in `data` ("" for an empty number), give every input a label, and show the computed result next to it. Buttons may `append` text to a value (keypads) or `set` a computed value, e.g. {"action":"set","path":"/display","value":{"call":"calculate","args":{"expression":{"path":"/display"}}}}.',
     '- Charts: a Chart draws rows from the surface\'s data, e.g. {"id":"c","component":"Chart","props":{"kind":"bar","title":"Readers per month","data":{"path":"/months"},"x":"month","series":[{"field":"readers","label":"Readers"}]}} with "data":{"months":[{"month":"Jan","readers":1200},…]}. Use one only when the numbers are the point; bar for comparing, line or area for change over time, donut for parts of a whole (one series, at most six parts).',
     '- Tables: a Table shows rows from the surface\'s data, e.g. {"id":"t","component":"Table","props":{"caption":"Plans compared","rows":{"path":"/plans"},"columns":[{"field":"name","label":"Plan"},{"field":"price","label":"Price","align":"end","format":"currency","currency":"USD"}],"highlight":{"field":"name","equals":"Pro"}}}. Formats: text, number, currency, percent, date. At most 8 columns; on phones each row becomes a card.',
-    "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
-      '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `power` takes {"base","exponent"} (a loan: amount × r ÷ (1 − power(1 + r, −n))); `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
-      'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',
+    "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". " +
+      "For any result with more than one step, write the formula with `calculate` and name its inputs in `vars` (paths into the data, numbers, or a `choose`): " +
+      '{"call":"calculate","args":{"expression":"seats * price * (1 + vat)","vars":{"seats":{"path":"/seats"},"price":{"call":"choose","args":{"value":{"path":"/plan"},"cases":{"basic":9,"pro":19}}},"vat":0.2}}}. ' +
+      "Formulas use + - * / % ^ and parentheses; names are letters, digits and _. Wrap the result in formatNumber or formatCurrency to show it: " +
+      '{"call":"formatCurrency","args":{"currency":"USD","value":{"call":"calculate","args":{…}}}}. A blank input leaves the result empty until it is filled. ' +
+      'A whole calculator: data {"kg":"","cm":""}; NumberFields {"label":"Weight","value":{"path":"/kg"},"unit":"kg"} and {"label":"Height","value":{"path":"/cm"},"unit":"cm"}; ' +
+      'a Stat {"label":"BMI","value":{"call":"formatNumber","args":{"digits":1,"value":{"call":"calculate","args":{"expression":"kg / (cm/100)^2","vars":{"kg":{"path":"/kg"},"cm":{"path":"/cm"}}}}}}}. ' +
+      "Other functions: add/multiply/min/max {values}, subtract/divide {a,b}, round/floor/ceil {value,digits}, power {base,exponent}, if {cond,ifTrue,ifFalse}, sum/average/count {list,field}.",
     '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
     "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",
