@@ -56,6 +56,10 @@ export const LAZY_ONLY: readonly RegExp[] = [
   // CodeMirror (Markdown mode) only with the first switch to it.
   /[\\/]node_modules[\\/].*[\\/](@tiptap|prosemirror-[a-z-]+|linkifyjs|orderedmap|rope-sequence|w3c-keyname|@codemirror|@lezer|@marijn|crelt|style-mod)[\\/]/,
   /[\\/]packages[\\/]ui[\\/]src[\\/](editor\.ts|blocks[\\/]MarkdownEditor\.tsx|blocks[\\/]editor[\\/])/,
+  // Color tokens (RFC-0023): the expansion and the swatches load with the lazy site settings route.
+  /[\\/]packages[\\/]core-ts[\\/]src[\\/]tokens\.ts$/,
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/]ColorRolePreview\.tsx$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]AppearanceColors\.tsx$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
 ];
