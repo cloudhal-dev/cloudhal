@@ -284,7 +284,7 @@ describe("motion presets (RFC-0024 24a)", () => {
       '<div data-ch-reveal="fade" data-ch-speed="slow" data-ch-d="1" class="ch-card">',
     );
     expect(html).toContain(
-      '<script type="module" src="/_cloudhal/motion.3.js"></script></section>',
+      '<script type="module" src="/_cloudhal/motion.4.js"></script></section>',
     );
   });
 
@@ -346,7 +346,7 @@ describe("scroll effects and scroll stories (RFC-0024 24b)", () => {
     expect(html).toContain('data-ch-scroll="parallax" data-ch-dep="-2"');
     // the story writes into the data, so the surface is live, and the motion module observes it
     expect(html).toContain('data-ch-surface="ch-sec_surface0001"');
-    expect(html).toContain('<script type="module" src="/_cloudhal/motion.3.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/motion.4.js"></script>');
   });
 });
 
@@ -423,7 +423,7 @@ describe("kinetic type, marquees, counters and loops (RFC-0024 24c)", () => {
     );
     expect(html).toContain('data-ch-loop="float"');
     expect(html).toContain(
-      '<button type="button" class="ch-motion-toggle" data-ch-motion-toggle aria-pressed="false">Pause motion</button><script type="module" src="/_cloudhal/motion.3.js"></script>',
+      '<button type="button" class="ch-motion-toggle" data-ch-motion-toggle aria-pressed="false">Pause motion</button><script type="module" src="/_cloudhal/motion.4.js"></script>',
     );
     // in Turkish, and no control where nothing loops
     const tr = renderSurface(
@@ -436,5 +436,47 @@ describe("kinetic type, marquees, counters and loops (RFC-0024 24c)", () => {
     expect(
       renderSurface(surface([{ id: "root", component: "Counter", props: { value: 3 } }])),
     ).not.toContain("ch-motion-toggle");
+  });
+});
+
+describe("ambient backgrounds (RFC-0024 24d)", () => {
+  it("marks a band's ambient background, gives particles a hidden canvas, and adds the pause control", () => {
+    const html = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Band",
+          props: {
+            surface: "inverse",
+            ambient: {
+              kind: "particles",
+              preset: "links",
+              density: "low",
+              colors: "brand-accent",
+              interactive: true,
+            },
+          },
+          children: ["h"],
+        },
+        { id: "h", component: "Heading", props: { text: "Hello", level: 1 } },
+      ]),
+    );
+    expect(html).toContain(
+      '<div class="ch-band" data-surface="inverse" data-ch-ambient="particles" data-ch-preset="links" data-ch-density="low" data-ch-colors="brand-accent" data-ch-interactive><canvas class="ch-ambient" aria-hidden="true"></canvas><div class="ch-band__inner">',
+    );
+    expect(html).toContain('data-ch-motion-toggle aria-pressed="false">Pause motion</button>');
+    // a card takes the CSS kinds, never a canvas
+    const card = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Card",
+          props: { ambient: { kind: "beams", colors: "accent" } },
+          children: [],
+        },
+      ]),
+    );
+    expect(card).toContain('<div class="ch-card" data-ch-ambient="beams" data-ch-colors="accent">');
+    expect(card).not.toContain("<canvas");
   });
 });

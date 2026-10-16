@@ -740,6 +740,8 @@ export function toA2ui(
           ...(typeof p.align === "string" ? { align: p.align } : {}),
         });
         if (c.component === "Band") notes.add("band tones and widths have no A2UI equivalent");
+        if (isObj(p.ambient))
+          notes.add("ambient backgrounds have no A2UI equivalent (RFC-0024); left out");
         break;
       case "Row":
       case "Grid":

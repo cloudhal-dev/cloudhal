@@ -3,6 +3,7 @@
  * and the interaction runtime (RFC-0020 §4); builds write them as static assets (`integration.ts`).
  */
 
+import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
 import { EMBED_SCRIPT } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
@@ -16,6 +17,7 @@ const SCRIPTS = new Map<string, string>([
   [CHART_SCRIPT.path, CHART_SCRIPT.code],
   [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
   ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
+  [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
 ]);
 
 interface MiddlewareContext {
