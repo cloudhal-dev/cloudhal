@@ -4,6 +4,7 @@ import { createBlockRegistry, defineBlockTypes } from "../src/blocks.ts";
 import {
   applyPatch,
   bodySurfaces,
+  calculateExpression,
   catalogPrompt,
   checkBodySurfaces,
   checkSurface,
@@ -16,6 +17,8 @@ import {
   patchPage,
   repairComponent,
   resolveProps,
+  resolveValue,
+  SURFACE_FUNCTIONS,
   SURFACE_LIMITS,
   type SurfacePatchError,
 } from "../src/surfaces.ts";
@@ -206,9 +209,7 @@ describe("checkSurface", () => {
       messages(
         surface([{ id: "root", component: "Text", props: { text: { call: "eval", args: {} } } }]),
       ),
-    ).toEqual([
-      "/components/0/props/text/call one of formatDate, formatNumber, formatCurrency, pluralize, concat, length, required, minLength, maxLength, email, range",
-    ]);
+    ).toEqual([`/components/0/props/text/call one of ${SURFACE_FUNCTIONS.join(", ")}`]);
   });
 
   it("refuses unsafe links and non-asset images", () => {
@@ -229,7 +230,7 @@ describe("checkSurface", () => {
   it("checks conditions", () => {
     expect(
       messages(surface([{ id: "root", component: "Divider", visible: { xor: [1, 2] } as never }])),
-    ).toEqual(["/components/0/visible one of {path}, eq, ne, gt, lt, and, or, not"]);
+    ).toEqual(["/components/0/visible one of {path}, eq, ne, gt, lt, gte, lte, and, or, not"]);
   });
 
   it("checks data: size and entry sources", () => {
@@ -663,5 +664,145 @@ describe("interactive components (RFC-0020 §4)", () => {
       "/components/1/props/onClick/href navigate needs href",
       "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo",
     ]);
+  });
+});
+
+describe("computed values (RFC-0022 22a)", () => {
+  const ctx = { locale: "en" };
+  const v = (value: unknown, data: unknown = {}) => resolveValue(value, data, ctx);
+  const call = (name: string, args: Record<string, unknown>) => ({ call: name, args });
+
+  it("does arithmetic, leaves blanks empty and shows 0.1 + 0.2 as 0.3", () => {
+    expect(v(call("add", { values: [0.1, 0.2] }))).toBe(0.3);
+    expect(v(call("multiply", { values: [{ path: "/seats" }, 9] }), { seats: 12 })).toBe(108);
+    expect(v(call("subtract", { a: 10, b: "2,5" }))).toBe(7.5);
+    expect(v(call("divide", { a: 1, b: 3 }))).toBe(0.3333333333);
+    expect(v(call("divide", { a: 1, b: 0, fallback: "–" }))).toBe("–");
+    expect(v(call("divide", { a: 1, b: 0 }))).toBe("");
+    expect(v(call("add", { values: [1, { path: "/blank" }] }), { blank: "" })).toBe("");
+    expect(v(call("add", { values: [1, "x"] }))).toBe("");
+    expect(v(call("round", { value: 1.005, digits: 2 }))).toBe(1.01);
+    expect(v(call("floor", { value: -1.5 }))).toBe(-2);
+    expect(v(call("ceil", { value: 1.01, digits: 1 }))).toBe(1.1);
+    expect(v(call("abs", { value: -3 }))).toBe(3);
+    expect(v(call("min", { values: [3, 1, 2] }))).toBe(1);
+    expect(v(call("max", { values: [3, 1, 2] }))).toBe(3);
+    expect(v(call("clamp", { value: 70, min: 1, max: 50 }))).toBe(50);
+    expect(v(call("number", { value: " 42 " }))).toBe(42);
+    expect(v(call("number", { value: "", fallback: 0 }))).toBe(0);
+    expect(v(call("formatPercent", { value: 0.256, digits: 1 }))).toBe("25.6%");
+  });
+
+  it("chooses and branches with the data, and aggregates lists", () => {
+    const data = { activity: "light", n: 7, plans: [{ price: 9 }, { price: 19 }, { price: "" }] };
+    const factor = call("choose", {
+      value: { path: "/activity" },
+      cases: { low: 1.2, light: 1.375 },
+      default: 1,
+    });
+    expect(v(factor, data)).toBe(1.375);
+    expect(v(factor, { activity: "other" })).toBe(1);
+    expect(
+      v(
+        call("if", { cond: { gte: [{ path: "/n" }, 7] }, ifTrue: "a week", ifFalse: "days" }),
+        data,
+      ),
+    ).toBe("a week");
+    expect(v(call("if", { cond: { lt: [{ path: "/n" }, 7] }, ifTrue: "x" }), data)).toBe("");
+    expect(v(call("sum", { list: { path: "/plans" }, field: "price" }), data)).toBe(28);
+    expect(v(call("average", { list: { path: "/plans" }, field: "price" }), data)).toBe(14);
+    expect(v(call("count", { list: { path: "/plans" }, field: "price" }), data)).toBe(2);
+    expect(v(call("average", { list: [] }))).toBe("");
+  });
+
+  it("computes the RFC's calorie example from nested calls", () => {
+    const kcal = call("multiply", {
+      values: [
+        call("add", {
+          values: [
+            call("multiply", { values: [10, { path: "/weight" }] }),
+            call("multiply", { values: [6.25, { path: "/height" }] }),
+            call("multiply", { values: [-5, { path: "/age" }] }),
+            call("choose", { value: { path: "/sex" }, cases: { male: 5, female: -161 } }),
+          ],
+        }),
+        call("choose", { value: { path: "/activity" }, cases: { low: 1.2, light: 1.375 } }),
+      ],
+    });
+    const data = { sex: "female", age: 30, height: 165, weight: 60, activity: "light" };
+    expect(v(call("formatNumber", { value: kcal, digits: 0 }), data)).toBe("1,815");
+    expect(v(kcal, { ...data, weight: "" })).toBe("");
+    // the checks accept nested calls, maps and conditions as arguments
+    expect(
+      messages(surface([{ id: "root", component: "Stat", props: { label: "kcal", value: kcal } }])),
+    ).toEqual([]);
+  });
+
+  it("reads typed expressions by grammar only", () => {
+    expect(calculateExpression("12+3*4")).toBe(24);
+    expect(calculateExpression("(1 + 2) × 3 ÷ 4")).toBe(2.25);
+    expect(calculateExpression("-2*-3")).toBe(6);
+    expect(calculateExpression("10 % 4")).toBe(2);
+    expect(calculateExpression("0.1+0.2")).toBe(0.3);
+    expect(calculateExpression("1/0")).toBe("");
+    expect(calculateExpression("2+")).toBe("");
+    expect(calculateExpression("alert(1)")).toBe("");
+    expect(calculateExpression("constructor")).toBe("");
+    expect(calculateExpression("(".repeat(40) + "1" + ")".repeat(40))).toBe("");
+    expect(calculateExpression("1+".repeat(120) + "1")).toBe("");
+    expect(v(call("calculate", { expression: { path: "/display" } }), { display: "7*6" })).toBe(42);
+  });
+
+  it("checks depth, call counts, cases and conditions in calls", () => {
+    let deep: unknown = 1;
+    for (let i = 0; i < 9; i++) deep = call("abs", { value: deep });
+    expect(messages(surface([{ id: "root", component: "Text", props: { text: deep } }]))).toEqual([
+      "/components/0/props/text/args/value/args/value/args/value/args/value/args/value/args/value/args/value/args/value calls nest at most 8 deep",
+    ]);
+    // past the limit the value is empty, not computed
+    expect(v(deep)).toBe("");
+    const many = Array.from({ length: 26 }, (_, i) => ({
+      id: `t${i}`,
+      component: "Text",
+      props: {
+        text: call("add", { values: Array.from({ length: 20 }, () => call("abs", { value: 1 })) }),
+      },
+    }));
+    expect(
+      messages(
+        surface([{ id: "root", component: "Stack", children: many.map((c) => c.id) }, ...many]),
+      ),
+    ).toContain("/components at most 500 function calls (this surface has 546)");
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Text",
+            props: {
+              text: call("if", {
+                cond: { gte: [{ path: "/n" }] },
+                ifTrue: "a",
+                ifFalse: call("choose", { value: 1, cases: "x" }),
+              }),
+            },
+          },
+        ]),
+      ),
+    ).toEqual([
+      "/components/0/props/text/args/cond/gte two operands",
+      "/components/0/props/text/args/ifFalse/args/cases an object of at most 20 keys and their values",
+    ]);
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Text",
+            props: { text: call("calculate", { expression: "1".repeat(201) }) },
+          },
+        ]),
+      ),
+    ).toEqual(["/components/0/props/text/args/expression at most 200 characters"]);
   });
 });

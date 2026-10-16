@@ -898,7 +898,7 @@ function fromJrValue(v: unknown, notes: Notes): unknown {
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fromJrValue(x, notes)]));
 }
 
-/** A json-render visibility condition → a Cloudhal condition (gte/lte via `not`). */
+/** A json-render visibility condition → a Cloudhal condition (gte/lte since RFC-0022). */
 function fromJrCondition(c: unknown, notes: Notes): unknown {
   if (c === true || c === undefined) return undefined;
   if (c === false) return { eq: [1, 2] };
@@ -920,9 +920,9 @@ function fromJrCondition(c: unknown, notes: Notes): unknown {
   if ("eq" in c) cond = { eq: [subject, other(c.eq)] };
   else if ("neq" in c) cond = { ne: [subject, other(c.neq)] };
   else if ("gt" in c) cond = { gt: [subject, other(c.gt)] };
-  else if ("gte" in c) cond = { not: { lt: [subject, other(c.gte)] } };
+  else if ("gte" in c) cond = { gte: [subject, other(c.gte)] };
   else if ("lt" in c) cond = { lt: [subject, other(c.lt)] };
-  else if ("lte" in c) cond = { not: { gt: [subject, other(c.lte)] } };
+  else if ("lte" in c) cond = { lte: [subject, other(c.lte)] };
   return c.not === true ? { not: cond } : cond;
 }
 

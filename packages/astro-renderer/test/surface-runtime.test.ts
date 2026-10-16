@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { evaluateCondition, resolveValue } from "@cloudhal/core-ts/surfaces";
 import { afterEach, describe, expect, it } from "vitest";
-import { SURFACE_SCRIPT, scriptJson } from "../src/surface-client.ts";
+import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES, scriptJson } from "../src/surface-client.ts";
 import { renderSurface } from "../src/surfaces.ts";
 
 /** The bits of the happy-dom globals these tests use (the package's types have no DOM lib). */
@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.1.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.2.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -205,7 +205,18 @@ describe("interaction runtime", () => {
   });
 
   it("matches the server's functions and conditions", () => {
-    const data = { n: 1234.5, d: "2026-10-15T00:00:00Z", s: "hello", list: [1, 2], b: "yearly" };
+    const data = {
+      n: 1234.5,
+      d: "2026-10-15T00:00:00Z",
+      s: "hello",
+      list: [1, 2],
+      b: "yearly",
+      blank: "",
+      comma: "2,5",
+      rows: [{ p: 9 }, { p: 19 }, { p: "" }],
+      expr: "(1 + 2) × 3 ÷ 4",
+    };
+    const call = (name: string, args: Record<string, unknown>) => ({ call: name, args });
     const values: unknown[] = [
       { call: "formatNumber", args: { value: { path: "/n" }, digits: 1 } },
       { call: "formatCurrency", args: { value: { path: "/n" }, currency: "EUR" } },
@@ -215,12 +226,42 @@ describe("interaction runtime", () => {
       { call: "length", args: { value: { path: "/list" } } },
       { call: "email", args: { value: "a@b.co" } },
       { call: "range", args: { value: { path: "/n" }, min: 0, max: 10 } },
+      // RFC-0022 §1
+      call("add", { values: [0.1, 0.2] }),
+      call("add", { values: [1, { path: "/blank" }] }),
+      call("subtract", { a: { path: "/n" }, b: { path: "/comma" } }),
+      call("multiply", { values: [{ path: "/n" }, 3] }),
+      call("divide", { a: 1, b: 3 }),
+      call("divide", { a: 1, b: 0, fallback: "–" }),
+      call("round", { value: 1.005, digits: 2 }),
+      call("floor", { value: -1.5 }),
+      call("ceil", { value: 1.01, digits: 1 }),
+      call("abs", { value: -3 }),
+      call("min", { values: [3, 1, 2] }),
+      call("max", { values: [3, 1, 2] }),
+      call("clamp", { value: 70, min: 1, max: 50 }),
+      call("number", { value: "", fallback: 0 }),
+      call("if", { cond: { gte: [{ path: "/n" }, 1000] }, ifTrue: "big", ifFalse: "small" }),
+      call("if", { cond: { lte: [{ path: "/n" }, 1000] }, ifTrue: "x" }),
+      call("choose", { value: { path: "/b" }, cases: { monthly: 9, yearly: 90 }, default: 0 }),
+      call("sum", { list: { path: "/rows" }, field: "p" }),
+      call("average", { list: { path: "/rows" }, field: "p" }),
+      call("count", { list: { path: "/rows" }, field: "p" }),
+      call("formatPercent", { value: 0.256, digits: 1 }),
+      call("calculate", { expression: { path: "/expr" } }),
+      call("calculate", { expression: "alert(1)" }),
+      call("formatNumber", {
+        digits: 0,
+        value: call("multiply", { values: [call("add", { values: [1, 2] }), 1.5] }),
+      }),
     ];
     const conditions: unknown[] = [
       { eq: [{ path: "/b" }, "yearly"] },
       { gt: [{ path: "/n" }, 1000] },
       { and: [{ path: "/s" }, { not: { path: "/missing" } }] },
       { or: [{ lt: [{ path: "/n" }, 0] }, { ne: [{ path: "/s" }, "hello"] }] },
+      { gte: [{ path: "/n" }, 1234.5] },
+      { lte: [{ path: "/n" }, 1000] },
     ];
     const html = `<section data-ch-surface="x"><script type="application/json" data-ch-state>${scriptJson(data)}</script>${values
       .map((v, i) => `<span id="v${i}" data-ch-text='${JSON.stringify(v)}'></span>`)
@@ -242,9 +283,11 @@ describe("interaction runtime", () => {
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "7ad7ec695bda",
+      "926b14b25d36",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.1.js");
-    expect(SURFACE_SCRIPT.code.length).toBeLessThan(6_500);
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.2.js");
+    // RFC-0022: pages cached with the first name get the same (compatible) code
+    expect(SURFACE_SCRIPT_ALIASES).toEqual(["/_cloudhal/surface.1.js"]);
+    expect(SURFACE_SCRIPT.code.length).toBeLessThan(10_000);
   });
 });

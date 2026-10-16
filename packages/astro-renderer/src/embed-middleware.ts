@@ -3,12 +3,13 @@
  * and the interaction runtime (RFC-0020 §4); builds write them as static assets (`integration.ts`).
  */
 import { EMBED_SCRIPT } from "./embed-client.ts";
-import { SURFACE_SCRIPT } from "./surface-client.ts";
+import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Cloudhal's constant first-party modules `cloudhal dev` serves (builds write them as files). */
 const SCRIPTS = new Map<string, string>([
   [EMBED_SCRIPT.path, EMBED_SCRIPT.code],
   [SURFACE_SCRIPT.path, SURFACE_SCRIPT.code],
+  ...SURFACE_SCRIPT_ALIASES.map((alias) => [alias, SURFACE_SCRIPT.code] as [string, string]),
 ]);
 
 interface MiddlewareContext {
