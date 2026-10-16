@@ -16,12 +16,14 @@ import {
   INPUT_MODEL,
   isInteractive,
   MOTION_HOVERS,
+  MOTION_LOOPS,
   MOTION_REVEALS,
   MOTION_SCROLLS,
   MOTION_SPEEDS,
   MOTION_STAGGER,
   resolveProps,
   SURFACE_STYLES,
+  surfaceLoops,
   TONE_SURFACE,
   usesMotion,
 } from "@cloudhal/core-ts/surfaces";
@@ -48,6 +50,8 @@ export interface SurfaceNode {
   live?: boolean;
   /** RFC-0024: the node's motion as `data-ch-*` attributes for its outer element (or ""). */
   motion?: string;
+  /** RFC-0024 24c: a Heading or Text revealed piece by piece. */
+  split?: "words" | "chars" | "lines";
   children: SurfaceNode[];
 }
 
@@ -201,6 +205,14 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       )
       .filter((n): n is SurfaceNode => n !== undefined);
     const attrs = motionAttrs(staggers ? { ...motion, reveal: undefined } : motion, stagger);
+    const reveal = motion?.reveal;
+    const split =
+      typeof reveal === "string" &&
+      reveal.startsWith("split-") &&
+      (c.component === "Heading" || c.component === "Text") &&
+      typeof c.props?.text === "string"
+        ? (reveal.slice(6) as "words" | "chars" | "lines")
+        : undefined;
     return {
       id,
       component: c.component,
@@ -210,6 +222,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       ...(live ? { live: true } : {}),
       ...(live && c.visible !== undefined ? { visible: c.visible, hidden: !shown } : {}),
       ...(attrs ? { motion: attrs } : {}),
+      ...(split ? { split } : {}),
       children,
     };
   };
@@ -222,6 +235,7 @@ interface MotionFields {
   reveal?: string | undefined;
   scroll?: string;
   depth?: number;
+  loop?: string;
   hover?: string;
   speed?: string;
   delay?: number;
@@ -258,7 +272,69 @@ export function motionAttrs(
     if (Number.isInteger(depth) && depth !== 0 && Math.abs(depth as number) <= 3)
       out.push(` data-ch-dep="${depth}"`);
   }
+  // RFC-0024 24c: a loop decorates on its own (never with a reveal or a scroll effect).
+  if (
+    !reveal &&
+    !motion?.scroll &&
+    motion?.loop &&
+    (MOTION_LOOPS as readonly string[]).includes(motion.loop)
+  )
+    out.push(` data-ch-loop="${motion.loop}"`);
   return out.join("");
+}
+
+/**
+ * RFC-0024 24c: a text split into pieces for kinetic type: words (or, for `chars`, words of
+ * characters), each with its place in the sequence as `--ch-i`, hidden from screen readers,
+ * which read the whole text once from a visually hidden copy. `lines` are numbered in the page,
+ * once the line breaks are known (the motion module).
+ */
+export function splitHtml(text: string, mode: "words" | "chars" | "lines"): string {
+  const words = text.split(/\s+/).filter(Boolean);
+  let i = 0;
+  const pieces = words.map((w) => {
+    if (mode !== "chars")
+      return `<span class="ch-w"${mode === "words" ? ` style="--ch-i:${i++}"` : ""}>${escapeHtml(w)}</span>`;
+    const chars = Array.from(w)
+      .map((c) => `<span class="ch-c" style="--ch-i:${i++}">${escapeHtml(c)}</span>`)
+      .join("");
+    return `<span class="ch-w">${chars}</span>`;
+  });
+  return `<span class="sr-only">${escapeHtml(text)}</span><span class="ch-split" data-mode="${mode}" aria-hidden="true">${pieces.join(" ")}</span>`;
+}
+
+/** RFC-0024 24c: a heading's text with its effect (highlight, gradient text or rotating words). */
+function headingInner(
+  node: Pick<SurfaceNode, "props"> & Partial<Pick<SurfaceNode, "raw" | "live" | "split">>,
+): string {
+  const p = node.props;
+  const raw = str(p.text);
+  if (node.split) return splitHtml(raw.replace(/\*/g, ""), node.split);
+  const words = Array.isArray(p.words) ? p.words.slice(0, 6).map(str).filter(Boolean) : [];
+  if (p.effect === "rotate-words" && words.length >= 2) {
+    const [before, after = ""] = raw.includes("{words}")
+      ? raw.split("{words}", 2)
+      : [`${raw} `, ""];
+    const turns = words
+      .map(
+        (w, i) =>
+          `<span class="ch-rotate__word"${i === 0 ? " data-active" : ""}>${escapeHtml(w)}</span>`,
+      )
+      .join("");
+    return `${escapeHtml(before ?? "")}<span class="sr-only">${escapeHtml(words.join(", "))}</span><span class="ch-rotate" data-ch-rotate aria-hidden="true">${turns}</span>${escapeHtml(after)}`;
+  }
+  if (p.effect === "highlight") {
+    const marked = /\*([^*]+)\*/.exec(raw);
+    if (marked)
+      return `${escapeHtml(raw.slice(0, marked.index))}<span class="ch-hl">${escapeHtml(marked[1] as string)}</span>${escapeHtml(raw.slice(marked.index + marked[0].length).replace(/\*/g, ""))}`;
+    const at = raw.trimEnd().lastIndexOf(" ");
+    return at < 0
+      ? `<span class="ch-hl">${escapeHtml(raw)}</span>`
+      : `${escapeHtml(raw.slice(0, at + 1))}<span class="ch-hl">${escapeHtml(raw.slice(at + 1))}</span>`;
+  }
+  if (p.effect === "gradient-text")
+    return `<span class="ch-gradient-text">${escapeHtml(raw)}</span>`;
+  return text(node, "text");
 }
 
 /** The node's motion attributes on the outer element of its markup. */
@@ -346,7 +422,7 @@ export const CHILDREN = "<!--ch-children-->";
  */
 export function primitiveHtml(
   node: Pick<SurfaceNode, "id" | "component" | "props" | "children"> &
-    Partial<Pick<SurfaceNode, "raw" | "live">>,
+    Partial<Pick<SurfaceNode, "raw" | "live" | "split">>,
   scope: string,
   media?: MediaContext,
 ): string {
@@ -375,13 +451,18 @@ export function primitiveHtml(
       return `<hr class="ch-divider">`;
     case "Heading": {
       const level = [1, 2, 3, 4].includes(Number(p.level)) ? Number(p.level) : 2;
-      return `<h${level} class="ch-heading"${attr("align", p.align, ALIGN)}>${text(node, "text")}</h${level}>`;
+      return `<h${level} class="ch-heading"${attr("align", p.align, ALIGN)}>${headingInner(node)}</h${level}>`;
     }
     case "Text": {
       // A bound or computed text in a live surface is plain text the runtime keeps in step
       // (RFC-0022: a keypad's display, a result); otherwise it is markdown.
       const live = node.live && isBinding(node.raw?.text);
-      return `<div class="ch-text"${attr("size", p.size, ["s", "m", "l"])}${p.muted === true ? ' data-muted="yes"' : ""}${attr("align", p.align, ALIGN)}>${live ? `<p>${text(node, "text")}</p>` : renderMarkdown(str(p.text), media)}</div>`;
+      const body = node.split
+        ? `<p>${splitHtml(str(p.text).replace(/[*_`#>]+/g, ""), node.split)}</p>`
+        : live
+          ? `<p>${text(node, "text")}</p>`
+          : renderMarkdown(str(p.text), media);
+      return `<div class="ch-text"${attr("size", p.size, ["s", "m", "l"])}${p.muted === true ? ' data-muted="yes"' : ""}${attr("align", p.align, ALIGN)}>${body}</div>`;
     }
     case "Markdown":
       return `<div class="ch-markdown ch-richtext">${renderMarkdown(str(p.content), media)}</div>`;
@@ -577,6 +658,32 @@ export function primitiveHtml(
       return `<div class="ch-tabs__panel" role="group" aria-label="${escapeHtml(str(p.label))}">${CHILDREN}</div>`;
     case "Accordion":
       return `<div class="ch-accordion" data-group="${id}">${CHILDREN}</div>`;
+    // RFC-0024 24c: a row the motion module sets moving (a still, wrapping row until then).
+    case "Marquee":
+      return `<div class="ch-marquee"${attr("speed", p.speed, ["slow", "normal", "fast"])}${attr("direction", p.direction, ["start", "end"])}${p.pauseOnHover === false ? "" : " data-hover-pause"}${attr("gap", p.gap, SPACE)}><div class="ch-marquee__track">${CHILDREN}</div></div>`;
+    // RFC-0024 24c: the final number is in the page; the motion module counts up to it once.
+    case "Counter": {
+      const bound = node.live && isBinding(node.raw?.value);
+      const to = Number(p.value);
+      const decimals = Number.isInteger(p.decimals)
+        ? Math.min(3, Math.max(0, p.decimals as number))
+        : 0;
+      const shown = Number.isFinite(to)
+        ? new Intl.NumberFormat(media?.locale ?? "en", {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+          }).format(to)
+        : "";
+      const from = Number.isFinite(Number(p.from)) ? Number(p.from) : 0;
+      const prefix = escapeHtml(str(p.prefix));
+      const suffix = escapeHtml(str(p.suffix));
+      const value = bound
+        ? text(node, "value")
+        : // The final number twice in one grid cell: a hidden copy holds the width while the
+          // other counts (no layout shift, whatever the font's digits and separators).
+          `<span class="sr-only">${escapeHtml(shown)}</span><span class="ch-counter__num" aria-hidden="true"><span class="ch-counter__hold">${escapeHtml(shown)}</span><span class="ch-counter__live"${Number.isFinite(to) ? ` data-ch-count="${to}" data-ch-from="${from}" data-ch-decimals="${decimals}"` : ""}${attr("ch-speed", p.duration, ["fast", "normal", "slow"])}>${escapeHtml(shown)}</span></span>`;
+      return `<div class="ch-counter"><span class="ch-counter__value">${prefix}${value}${suffix}</span>${p.label ? `<span class="ch-counter__label">${text(node, "label")}</span>` : ""}</div>`;
+    }
     // RFC-0024 §3: scroll storytelling; the motion module writes the step being read to `step`.
     case "Scrolly": {
       const bound = node.raw?.step as { path?: unknown } | undefined;
@@ -693,6 +800,7 @@ export const surfaceScope = (section: SurfaceSection) => `ch-${section.id}`;
 export function surfaceWrapper(
   section: SurfaceSection,
   live?: { data: Record<string, unknown>; locale?: string | undefined },
+  locale?: string,
 ): [string, string] {
   const scope = surfaceScope(section);
   // RFC-0022 §2: fields need the runtime to compute; say so only when it cannot run.
@@ -705,8 +813,14 @@ export function surfaceWrapper(
       }</p></noscript>`
     : "";
   // RFC-0024 §7: the motion module, only for surfaces that move (a module runs once per page).
+  // RFC-0024 §1: anything that moves on its own for long gets the reader's pause control (WCAG
+  // 2.2.2); it shows only where motion plays.
+  const lang = locale ?? live?.locale ?? "en";
+  const pause = surfaceLoops(section)
+    ? `<button type="button" class="ch-motion-toggle" data-ch-motion-toggle aria-pressed="false">${lang.startsWith("tr") ? "Hareketi duraklat" : "Pause motion"}</button>`
+    : "";
   const motion = usesMotion(section)
-    ? `<script type="module" src="${MOTION_SCRIPT.path}"></script>`
+    ? `${pause}<script type="module" src="${MOTION_SCRIPT.path}"></script>`
     : "";
   return [
     `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,
@@ -726,6 +840,7 @@ export function renderSurface(section: SurfaceSection, ctx: SurfaceContext = {})
   const [open, close] = surfaceWrapper(
     section,
     tree.live ? { data: tree.data, locale: ctx.media?.locale } : undefined,
+    ctx.media?.locale,
   );
   const body = tree.root ? nodeHtml(tree.root, surfaceScope(section), ctx) : "";
   const missing = ctx.preview

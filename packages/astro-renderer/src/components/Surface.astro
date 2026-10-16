@@ -24,6 +24,7 @@ const tree = surfaceTree(section, { registry: themeRegistry(blockTypes), media, 
 const [open, close] = surfaceWrapper(
   section,
   tree.live ? { data: tree.data, locale: media?.locale } : undefined,
+  media?.locale,
 );
 ---
 {tree.root && (

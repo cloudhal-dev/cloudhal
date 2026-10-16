@@ -19,10 +19,10 @@ Set the site's `motion` level with `set_theme_settings`, and give components mot
 | Kind of site | motion | Presets that fit |
 |---|---|---|
 | Editorial | subtle (data stories standard) | `fade` on section headings; `underline` on story links; a `Scrolly` for an explainer whose chart changes as the reader goes |
-| SaaS or product | standard (landing pages expressive) | hero heading `rise`, its buttons a `delay` later; feature grid `stagger`; cards `lift`; one `spotlight` card; a `Scrolly` "how it works"; a hero image with `parallax` depth 1–2 |
+| SaaS or product | standard (landing pages expressive) | hero heading `rise`, its buttons a `delay` later; feature grid `stagger`; cards `lift`; one `spotlight` card; a `Scrolly` "how it works"; a hero image with `parallax` depth 1–2; a hero Heading with `rotate-words`; customer logos in a `Marquee`; proof as `Counter`s |
 | Developer tool or docs | subtle | `fade`; `underline` on links |
-| Portfolio or studio | expressive | `mask-rise` or `wipe-up` on headings; image cards `zoom-media` or `tilt` |
-| Local business | standard | `rise` on sections; menu cards `lift` |
+| Portfolio or studio | expressive | `split-words` or `split-chars` on the hero heading; `mask-rise` or `wipe-up` on section headings; image cards `zoom-media` or `tilt`; a `highlight` on the key phrase |
+| Local business | standard | `rise` on sections; menu cards `lift`; a `Counter` for years open or customers served |
 | Institution | subtle | `fade` only |
 
 Scroll story: `Scrolly` with `step` bound to `/step` (start it at 1 in the data), the first child a `Chart`, `Stat` or a `Stack` of images shown by `visible` conditions on `/step`, then 2–12 `Step`s with short text. Check it with `render_page` `frames: 4`.

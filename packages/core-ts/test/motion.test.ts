@@ -8,6 +8,7 @@ import {
   createCatalog,
   repairComponent,
   repairMotion,
+  surfaceLoops,
   usesMotion,
 } from "../src/surfaces.ts";
 import { MOTION_LEVELS, motionCss } from "../src/tokens.ts";
@@ -67,7 +68,7 @@ describe("motion on components (RFC-0024 §2)", () => {
         "/components/0/motion/hover zoom-media fits Card, Image",
         "/components/0/motion/stagger only on Stack, Row, Grid, Columns, Band, Card",
         "/components/0/motion/delay steps of the stagger, 0 to 4",
-        "/components/0/motion/loop not available yet (RFC-0024 phase 24c)",
+        "/components/0/motion/loop float fits Image, Badge, Stat, Card",
       ]),
     );
   });
@@ -196,6 +197,92 @@ describe("scroll effects and scroll stories (RFC-0024 24b)", () => {
       ]),
     );
     expect(catalogPrompt(catalog, "en")).toContain("Scroll story: a Scrolly holds one child");
+  });
+});
+
+describe("kinetic type, marquees, counters and loops (RFC-0024 24c)", () => {
+  it("splits only short written headings and texts, and loops only decoration", () => {
+    expect(
+      issues([
+        { id: "root", component: "Stack", children: ["h", "c", "b"] },
+        {
+          id: "h",
+          component: "Heading",
+          props: { text: "Ship faster", level: 1 },
+          motion: { reveal: "split-chars" },
+        },
+        { id: "c", component: "Card", children: [], motion: { loop: "gradient-shift" } },
+        { id: "b", component: "Badge", props: { label: "New" }, motion: { loop: "pulse" } },
+      ] as SurfaceComponent[]),
+    ).toEqual([]);
+    const out = issues([
+      { id: "root", component: "Stack", children: ["h", "i", "t"] },
+      {
+        id: "h",
+        component: "Heading",
+        props: {
+          text: "A headline far too long to animate letter by letter, sixty characters and more",
+          level: 2,
+        },
+        motion: { reveal: "split-chars" },
+      },
+      {
+        id: "i",
+        component: "Image",
+        props: { asset: "asset:ast_example01", alt: "x" },
+        motion: { reveal: "split-words", loop: "float" },
+      },
+      { id: "t", component: "Text", props: { text: "Read me" }, motion: { loop: "spin-slow" } },
+    ] as SurfaceComponent[]);
+    expect(out).toEqual(
+      expect.arrayContaining([
+        "/components/1/motion/reveal split text is at most 60 characters",
+        "/components/2/motion/reveal split-words fits Heading and Text",
+        "/components/2/motion/loop a loop goes alone: no reveal or scroll with it",
+        "/components/3/motion/loop spin-slow fits Image, Badge",
+      ]),
+    );
+    expect(repairMotion({ loop: "bob", reveal: "typewriter" }, "x").motion).toEqual({
+      loop: "float",
+      reveal: "split-chars",
+    });
+  });
+
+  it("checks marquees and rotating words, and knows which surfaces loop", () => {
+    const looping = [
+      { id: "root", component: "Stack", children: ["h", "m", "n"] },
+      {
+        id: "h",
+        component: "Heading",
+        props: {
+          text: "Invoices that {words}",
+          level: 1,
+          effect: "rotate-words",
+          words: ["chase", "close"],
+        },
+      },
+      { id: "m", component: "Marquee", props: { speed: "slow" }, children: ["a", "b", "c"] },
+      { id: "a", component: "Badge", props: { label: "A" } },
+      { id: "b", component: "Badge", props: { label: "B" } },
+      { id: "c", component: "Badge", props: { label: "C" } },
+      { id: "n", component: "Counter", props: { value: 38000, suffix: "+", label: "Freelancers" } },
+    ] as SurfaceComponent[];
+    expect(issues(looping)).toEqual([]);
+    expect(surfaceLoops(surface(looping))).toBe(true);
+    expect(usesMotion(surface([looping[0], looping[6]] as SurfaceComponent[]))).toBe(true);
+    expect(
+      issues([
+        { id: "root", component: "Stack", children: ["h", "m"] },
+        { id: "h", component: "Heading", props: { text: "Hi {words}", effect: "rotate-words" } },
+        { id: "m", component: "Marquee", children: [] },
+      ] as SurfaceComponent[]),
+    ).toEqual(
+      expect.arrayContaining([
+        "/components/1/props/words 2 to 6 words that take turns where {words} stands",
+        "/components/2/children at least 3 children to scroll",
+      ]),
+    );
+    expect(catalogPrompt(catalog, "en")).toContain("Kinetic headings: Heading");
   });
 });
 

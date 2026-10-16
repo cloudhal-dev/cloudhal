@@ -254,6 +254,15 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         text: { type: "string", minLength: 1, maxLength: 300 },
         level: { type: "integer", minimum: 1, maximum: 4 },
         align,
+        // RFC-0024 24c: a highlighted phrase (*between asterisks*, else the last word), the text
+        // in the brand gradient, or words that take turns where {words} stands.
+        effect: { type: "string", enum: ["highlight", "gradient-text", "rotate-words"] },
+        words: {
+          type: "array",
+          minItems: 2,
+          maxItems: 6,
+          items: { type: "string", minLength: 1, maxLength: 40 },
+        },
       },
       ["text"],
     ),
@@ -769,6 +778,47 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     }),
     children: "none",
     example: { props: { placement: "page", tone: "brand" } },
+  },
+  // RFC-0024 §3: moving rows and counting numbers.
+  {
+    name: "Marquee",
+    title: { en: "Marquee", tr: "Kayan şerit" },
+    description: {
+      en: "A row that scrolls by itself (logos, quotes, tags); at least 3 children. Readers can pause it; at low motion levels it is a still row.",
+      tr: "Kendiliğinden kayan bir sıra (logolar, alıntılar); en az 3 öğe.",
+    },
+    category: "layout",
+    props: schema({
+      speed: { type: "string", enum: ["slow", "normal", "fast"] },
+      direction: { type: "string", enum: ["start", "end"] },
+      pauseOnHover: { type: "boolean" },
+      gap: space({ en: "Gap", tr: "Boşluk" }),
+    }),
+    children: "any",
+    example: { props: { speed: "slow", direction: "start", pauseOnHover: true, gap: "l" } },
+  },
+  {
+    name: "Counter",
+    title: { en: "Counter", tr: "Sayaç" },
+    description: {
+      en: "A number that counts up once as it comes into view; the final number is in the page.",
+      tr: "Görünür olunca bir kez sayan bir sayı; son değer sayfada yazılıdır.",
+    },
+    category: "content",
+    props: schema(
+      {
+        value: { type: "number", minimum: -1e12, maximum: 1e12 },
+        from: { type: "number", minimum: -1e12, maximum: 1e12 },
+        decimals: { type: "integer", minimum: 0, maximum: 3 },
+        prefix: { type: "string", maxLength: 8 },
+        suffix: { type: "string", maxLength: 16 },
+        label: label(80),
+        duration: { type: "string", enum: ["fast", "normal", "slow"] },
+      },
+      ["value"],
+    ),
+    children: "none",
+    example: { props: { value: 38000, prefix: "", suffix: "+", label: "Freelancers" } },
   },
 ];
 
@@ -1545,6 +1595,10 @@ export const MOTION_REVEALS = [
   "wipe-up",
   "wipe-start",
   "mask-rise",
+  // RFC-0024 24c: kinetic type, on headings and short texts only.
+  "split-words",
+  "split-chars",
+  "split-lines",
 ] as const;
 /** Hover and focus effects; the pointer ones (`tilt`, `magnetic`, `spotlight`) need a fine pointer. */
 export const MOTION_HOVERS = [
@@ -1576,10 +1630,17 @@ export const MOTION_SCROLLS = [
   "rotate-through",
   "pan",
 ] as const;
-/** Fields later phases add: written now, they are refused with when they arrive. */
-const MOTION_LATER: Record<string, string> = {
-  loop: "RFC-0024 phase 24c",
+/** Loops: decorative, slow, paused by the reader's pause control (RFC-0024 24c). */
+export const MOTION_LOOPS = ["float", "pulse", "gradient-shift", "spin-slow"] as const;
+/** Components a loop may decorate: never text people read. */
+const LOOP_FITS: Record<(typeof MOTION_LOOPS)[number], readonly string[]> = {
+  float: ["Image", "Badge", "Stat", "Card"],
+  pulse: ["Badge", "Button", "Stat"],
+  "gradient-shift": ["Card", "Band"],
+  "spin-slow": ["Image", "Badge"],
 };
+/** Fields later phases add: written now, they are refused with when they arrive. */
+const MOTION_LATER: Record<string, string> = {};
 /** Names models often write for a preset, and the preset they mean. */
 const MOTION_ALIASES: Record<string, string> = {
   fadein: "fade",
@@ -1627,6 +1688,19 @@ const MOTION_ALIASES: Record<string, string> = {
   rotate: "rotate-through",
   "horizontal-scroll": "pan",
   slide: "pan",
+  "split-text": "split-words",
+  words: "split-words",
+  letters: "split-chars",
+  chars: "split-chars",
+  typewriter: "split-chars",
+  lines: "split-lines",
+  bob: "float",
+  floating: "float",
+  breathe: "pulse",
+  heartbeat: "pulse",
+  spin: "spin-slow",
+  rotating: "spin-slow",
+  "gradient-animation": "gradient-shift",
 };
 /** Field names models write for a `motion` field. */
 const MOTION_FIELD_ALIASES: Record<string, string> = {
@@ -1655,7 +1729,17 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
     if (MOTION_LATER[key])
       issues.push({ path: `${at}/${key}`, message: `not available yet (${MOTION_LATER[key]})` });
     else if (
-      !["reveal", "hover", "speed", "delay", "stagger", "replay", "scroll", "depth"].includes(key)
+      ![
+        "reveal",
+        "hover",
+        "speed",
+        "delay",
+        "stagger",
+        "replay",
+        "scroll",
+        "depth",
+        "loop",
+      ].includes(key)
     )
       issues.push({ path: `${at}/${key}`, message: "unknown motion field" });
   }
@@ -1663,6 +1747,15 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
   oneOf("hover", MOTION_HOVERS);
   oneOf("speed", MOTION_SPEEDS);
   oneOf("scroll", MOTION_SCROLLS);
+  oneOf("loop", MOTION_LOOPS);
+  const loop = motion.loop as (typeof MOTION_LOOPS)[number] | undefined;
+  if (loop && LOOP_FITS[loop] && !LOOP_FITS[loop].includes(component))
+    issues.push({ path: `${at}/loop`, message: `${loop} fits ${LOOP_FITS[loop].join(", ")}` });
+  if (loop && (motion.reveal !== undefined || motion.scroll !== undefined))
+    issues.push({ path: `${at}/loop`, message: "a loop goes alone: no reveal or scroll with it" });
+  const reveal = typeof motion.reveal === "string" ? motion.reveal : "";
+  if (reveal.startsWith("split-") && component !== "Heading" && component !== "Text")
+    issues.push({ path: `${at}/reveal`, message: `${reveal} fits Heading and Text` });
   // A component either reveals once or moves with the scroll: both would fight over the same
   // properties.
   if (motion.scroll !== undefined && motion.reveal !== undefined)
@@ -1700,7 +1793,23 @@ export function usesMotion(section: Pick<SurfaceSection, "components">): boolean
     (c) =>
       (isObj(c.motion) && Object.keys(c.motion).length > 0) ||
       c.component === "Scrolly" ||
-      c.component === "ScrollProgress",
+      c.component === "ScrollProgress" ||
+      c.component === "Marquee" ||
+      c.component === "Counter" ||
+      (c.component === "Heading" && isObj(c.props) && c.props.effect === "rotate-words"),
+  );
+}
+
+/**
+ * Whether a surface moves on its own for more than 5 seconds (a marquee, rotating words, a loop),
+ * so the renderer adds the reader's pause control next to it (RFC-0024 §1, WCAG 2.2.2).
+ */
+export function surfaceLoops(section: Pick<SurfaceSection, "components">): boolean {
+  return section.components.some(
+    (c) =>
+      c.component === "Marquee" ||
+      (c.component === "Heading" && isObj(c.props) && c.props.effect === "rotate-words") ||
+      (isObj(c.motion) && typeof c.motion.loop === "string"),
   );
 }
 
@@ -1737,6 +1846,7 @@ export function repairMotion(motion: unknown, id: string): { motion: unknown; no
     else if (key === "hover") v = snap(value, MOTION_HOVERS);
     else if (key === "speed") v = snap(value, MOTION_SPEEDS);
     else if (key === "scroll") v = snap(value, MOTION_SCROLLS);
+    else if (key === "loop") v = snap(value, MOTION_LOOPS);
     else if (key === "depth" && typeof value === "number" && Number.isFinite(value) && value !== 0)
       v = Math.max(-3, Math.min(3, Math.round(value) || Math.sign(value)));
     else if (key === "delay" && typeof value === "number" && value > 4)
@@ -1840,6 +1950,37 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
     if (c.motion !== undefined) checkMotion(c.motion, c.component, `${at}/motion`, issues);
+    // RFC-0024 24c: a marquee needs enough to move; rotating words need words; split text is short.
+    if (c.component === "Marquee" && kidsOf(c).length < 3)
+      issues.push({ path: `${at}/children`, message: "at least 3 children to scroll" });
+    if (
+      c.component === "Heading" &&
+      isObj(c.props) &&
+      c.props.effect === "rotate-words" &&
+      !Array.isArray(c.props.words)
+    )
+      issues.push({
+        path: `${at}/props/words`,
+        message: "2 to 6 words that take turns where {words} stands",
+      });
+    if (
+      isObj(c.motion) &&
+      typeof c.motion.reveal === "string" &&
+      c.motion.reveal.startsWith("split-")
+    ) {
+      const t = isObj(c.props) ? c.props.text : undefined;
+      const max = c.motion.reveal === "split-chars" ? 60 : 300;
+      if (typeof t !== "string")
+        issues.push({
+          path: `${at}/motion/reveal`,
+          message: "split text needs a written text, not a binding",
+        });
+      else if (t.length > max)
+        issues.push({
+          path: `${at}/motion/reveal`,
+          message: `split text is at most ${max} characters`,
+        });
+    }
     // RFC-0024 §3: a scroll story is one sticky child, then 2–12 steps; it writes the step read.
     if (c.component === "Scrolly") {
       if (!(isObj(c.props) && isPathValue(c.props.step)))
@@ -2468,7 +2609,8 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
       "Other functions: add/multiply/min/max {values}, subtract/divide {a,b}, round/floor/ceil {value,digits}, power {base,exponent}, if {cond,ifTrue,ifFalse}, sum/average/count {list,field}.",
     '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
     // RFC-0024 §2: motion as presets, next to `visible`.
-    `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry. "scroll" moves it with the page instead (not with "reveal"): parallax or pan with "depth" -3…3 (negative moves the other way), fade-through, scale-through, rotate-through — for images, cards and decorative parts, never for text people read.`,
+    `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry. "scroll" moves it with the page instead (not with "reveal"): parallax or pan with "depth" -3…3 (negative moves the other way), fade-through, scale-through, rotate-through — for images, cards and decorative parts, never for text people read. split-words, split-chars and split-lines reveal a Heading or a short Text piece by piece (once, as kinetic type). "loop" (alone, decorative only): float (Image, Badge, Stat, Card), pulse (Badge, Button, Stat), gradient-shift (Card, Band), spin-slow (Image, Badge).`,
+    'Kinetic headings: Heading "effect" highlight (marks the words *between asterisks*, else the last word), gradient-text, or rotate-words with "words" (2–6) taking turns where {words} stands in the text ("Invoices that {words}" with ["chase themselves","never get lost"]). Marquee scrolls a row of 3+ children by itself (logos, quotes); Counter counts up to "value" once as it comes into view. Anything that loops gets a pause control from the renderer; use at most two per page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
