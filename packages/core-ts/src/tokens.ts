@@ -454,3 +454,53 @@ export function colorPairs(
     dark: round(contrastRatio(tokens.dark[p.foreground], tokens.dark[p.background])),
   }));
 }
+
+// ── type (RFC-0023 §2) ─────────────────────────────────────────────────────────────────────
+
+/** Curated pairings; the theme maps each to font families it ships (`system` loads nothing). */
+export const TYPE_PAIRINGS = [
+  "system",
+  "editorial",
+  "modern",
+  "humanist",
+  "technical",
+  "classic",
+] as const;
+export type TypePairing = (typeof TYPE_PAIRINGS)[number];
+export const TYPE_SCALES = ["compact", "balanced", "dramatic"] as const;
+export type TypeScale = (typeof TYPE_SCALES)[number];
+
+/** The fluid steps, `--ch-step--1` (small print) to `--ch-step-6` (the largest display size). */
+export const TYPE_STEPS = [-1, 0, 1, 2, 3, 4, 5, 6] as const;
+
+/**
+ * Utopia's method: each step grows from its phone size at 390 px to its desktop size at 1440 px.
+ * The body is 16 px on phones and 17 px on desktops; the ratio is gentler on phones so headings
+ * shrink more than body text, without breakpoints.
+ */
+const SCALE: Record<TypeScale, { min: number; max: number }> = {
+  compact: { min: 1.125, max: 1.2 },
+  balanced: { min: 1.15, max: 1.25 },
+  dramatic: { min: 1.2, max: 1.333 },
+};
+const VIEW = { min: 390, max: 1440 };
+const BODY = { min: 16, max: 17 };
+
+/** One step as `clamp(min, preferred, max)`, in rem and vw (the reader's font size still applies). */
+export function typeStep(scale: TypeScale, step: number): string {
+  const r = SCALE[scale];
+  const min = BODY.min * r.min ** step;
+  const max = BODY.max * r.max ** step;
+  const slope = (max - min) / (VIEW.max - VIEW.min);
+  const intercept = min - slope * VIEW.min;
+  const n = (v: number) => Number(v.toFixed(4)).toString();
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  const vw = slope * 100;
+  return `clamp(${n(lo / 16)}rem,${n(intercept / 16)}rem ${vw < 0 ? "-" : "+"} ${n(Math.abs(vw))}vw,${n(hi / 16)}rem)`;
+}
+
+/** The steps as CSS declarations for `:root`. */
+export function typeScaleCss(scale: TypeScale): string {
+  return TYPE_STEPS.map((s) => `--ch-step-${s}:${typeStep(scale, s)}`).join(";");
+}

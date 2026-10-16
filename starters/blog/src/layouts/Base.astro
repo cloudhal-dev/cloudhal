@@ -6,6 +6,7 @@ import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
+import { PAIRING_PRELOADS } from "../fonts.ts";
 import { themeSettings } from "../settings.ts";
 import "../styles/global.css";
 
@@ -24,6 +25,7 @@ interface Props {
 const { site, meta, nav, footer, notice, search } = Astro.props;
 // The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
 const look = themeVariables(site, themeSettings);
+const fonts = PAIRING_PRELOADS[look.attributes["data-ch-type-pairing"] ?? ""] ?? [];
 const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
@@ -37,6 +39,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="generator" content="Cloudhal" />
+    {fonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
     {look.style && <style set:html={look.style} />}
   </head>
   <body class="ch-body min-h-screen antialiased">

@@ -31,6 +31,12 @@ describe("design tools (RFC-0021)", () => {
           seed: { type: "string", format: "color" },
           scheme: { type: "string", enum: ["tonal", "vibrant", "neutral", "mono"] },
           mode: { type: "string", enum: ["light", "dark", "auto"] },
+          typePairing: {
+            type: "string",
+            enum: ["system", "editorial", "modern", "humanist", "technical", "classic"],
+            default: "system",
+          },
+          typeScale: { type: "string", enum: ["compact", "balanced", "dramatic"] },
           brand: { type: "string", format: "color", default: "#18181b" },
         },
       },
@@ -76,9 +82,13 @@ describe("design tools (RFC-0021)", () => {
     await run("set_theme_settings", {
       siteId,
       rev: before.rev,
-      values: { seed: "#0f766e", scheme: "vibrant", mode: "auto" },
+      values: { seed: "#0f766e", scheme: "vibrant", mode: "auto", typePairing: "editorial" },
     });
-    const after = (await run("get_design", { siteId })).result as { colors: Colors };
+    const after = (await run("get_design", { siteId })).result as {
+      colors: Colors;
+      type: unknown;
+    };
+    expect(after.type).toEqual({ pairing: "editorial", scale: null });
     expect(after.colors).toMatchObject({ source: "seed", mode: "auto" });
     expect(after.colors.light.brand).toBe("#0f766e");
     for (const p of after.colors.pairs)
@@ -87,6 +97,7 @@ describe("design tools (RFC-0021)", () => {
     expect(text).toContain('Colors (RFC-0023): expanded from {"seed":"#0f766e"');
     expect(text).toContain("Dark roles: surface #");
     expect(text).toContain("Render the page with scheme dark too.");
+    expect(text).toContain("Type (RFC-0023): pairing editorial, scale none (fixed sizes).");
   });
 
   it("changes the site's rules only with a person's approval, and warns without refusing", async () => {
@@ -107,7 +118,7 @@ describe("design tools (RFC-0021)", () => {
     ).result as { rev: number; warnings: string[] };
     expect(set.warnings).toEqual([
       "Not in this site's catalog: Hero",
-      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, brand)",
+      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, typePairing, typeScale, brand)",
       "No “## Brand” section: say what the site is for, who reads it and its voice.",
     ]);
     const got = (await run("get_design", { siteId })).result as {

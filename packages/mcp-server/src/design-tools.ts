@@ -21,6 +21,8 @@ import {
   CONTRAST_LEVELS,
   type SiteColorTokens,
   siteColorTokens,
+  TYPE_PAIRINGS,
+  TYPE_SCALES,
 } from "@cloudhal/core-ts/tokens";
 import { id, mapError, obj, type ToolDefinition, ToolError } from "./common.ts";
 
@@ -68,8 +70,25 @@ interface DesignResult {
   catalog: { id: string; components: string[] };
   /** RFC-0023: the site's color roles, light and dark, and their contrast; null without a theme schema. */
   colors: SiteColorTokens | null;
+  /** RFC-0023 §2: the font pairing and type scale, when the theme offers them. */
+  type: { pairing: string; scale: string | null } | null;
   guidance: string;
   rev: number;
+}
+
+/** The site's pairing (default system) and scale (none until chosen). */
+function typeOf(config: Readonly<Record<string, unknown>>): {
+  pairing: string;
+  scale: string | null;
+} {
+  const pairing = config.typePairing;
+  const scale = config.typeScale;
+  return {
+    pairing: (TYPE_PAIRINGS as readonly unknown[]).includes(pairing)
+      ? (pairing as string)
+      : "system",
+    scale: (TYPE_SCALES as readonly unknown[]).includes(scale) ? (scale as string) : null,
+  };
 }
 
 /** A few lines on the colors: what they come from, the choices, failing pairs, the repair notes. */
@@ -105,6 +124,9 @@ function designText(r: DesignResult): string {
     `Design settings (rev ${r.rev}): ${JSON.stringify(r.settings)}`,
     `Catalog ${r.catalog.id}: ${r.catalog.components.join(", ")} (props: get_catalog)`,
     colorsText(r.colors),
+    r.type
+      ? `Type (RFC-0023): pairing ${r.type.pairing}, scale ${r.type.scale ?? "none (fixed sizes)"}. Change them with set_theme_settings: typePairing (${TYPE_PAIRINGS.join(" | ")}), typeScale (${TYPE_SCALES.join(" | ")}); pick a pairing that fits the brand, dramatic only for short, bold headlines.`
+      : "",
     r.guidance,
     ...(r.design.warnings.length
       ? [`Warnings about the site's rules: ${r.design.warnings.join("; ")}`]
@@ -142,10 +164,14 @@ export function designTools(): ToolDefinition[] {
             description:
               "The color roles (RFC-0023): source seed or legacy, the token settings, light and dark roles, every checked pair's contrast and what the repair changed",
           },
+          type: {
+            type: ["object", "null"],
+            description: "The font pairing and type scale (RFC-0023), when the theme offers them",
+          },
           guidance: { type: "string" },
           rev: { type: "integer" },
         },
-        ["design", "settings", "catalog", "colors", "guidance", "rev"],
+        ["design", "settings", "catalog", "colors", "type", "guidance", "rev"],
       ),
       annotations: {
         readOnlyHint: true,
@@ -171,6 +197,7 @@ export function designTools(): ToolDefinition[] {
           settings: site.theme.config ?? {},
           catalog: { id: catalog.id, components: catalog.names() },
           colors: themeProps ? siteColorTokens(site.theme.config ?? {}, themeProps) : null,
+          type: themeProps && "typePairing" in themeProps ? typeOf(site.theme.config ?? {}) : null,
           guidance: DESIGN_GUIDANCE,
           rev: site.rev,
         };

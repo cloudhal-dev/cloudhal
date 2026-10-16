@@ -8,7 +8,13 @@
  */
 import type { Site } from "@cloudhal/core-contracts";
 import type { PropsSchema } from "@cloudhal/core-ts/blocks";
-import { colorRolesCss, siteColorTokens } from "@cloudhal/core-ts/tokens";
+import {
+  colorRolesCss,
+  siteColorTokens,
+  TYPE_SCALES,
+  type TypeScale,
+  typeScaleCss,
+} from "@cloudhal/core-ts/tokens";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 const kebab = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -62,6 +68,11 @@ export function themeVariables(
   // RFC-0023 §1: the color roles every theme can use (`--ch-color-<role>`).
   const roles = colorRoleCss(config, schema);
   if (roles) vars.push(roles);
+  // RFC-0023 §2: the fluid type steps (`--ch-step-<n>`), once the site chose a scale; until then
+  // the theme's fixed sizes stay, so a site that never opts in looks the same.
+  const scale = config.typeScale;
+  if ("typeScale" in schema.properties && TYPE_SCALES.includes(scale as TypeScale))
+    vars.push(typeScaleCss(scale as TypeScale));
   return { style: vars.length ? `:root{${vars.join(";")}}` : "", attributes };
 }
 

@@ -88,7 +88,7 @@ export function effectiveDesign(theme: string | undefined, site: string | undefi
  * Agents get it from `get_design`, the `site-design` skill and Build chat.
  */
 export const DESIGN_GUIDANCE = `Cloudhal design guidance (follow the site's design rules first; they win where they differ):
-1. Commit to a direction. Read the brand, pick one display treatment and one accent, and keep to them. When the theme offers color tokens (get_design shows them), choose a seed, a scheme and a mode that fit the brand with set_theme_settings, never colors per role. Generic is the failure mode: no filler copy, no "Lorem", no placeholder links ("#"), no repeated stock image.
+1. Commit to a direction. Read the brand, pick one display treatment and one accent, and keep to them. When the theme offers color tokens (get_design shows them), choose a seed, a scheme, a mode and a font pairing that fit the brand with set_theme_settings, never colors per role. Generic is the failure mode: no filler copy, no "Lorem", no placeholder links ("#"), no repeated stock image.
 2. Rhythm. Alternate section tones (surface, muted, brand or inverse Bands) and widths (narrow text, wide grids, full-bleed bands). Never three identical sections in a row; vary layouts (Columns 2-1, Grid, Stack).
 3. Hierarchy. One level-1 heading per page, then level 2 per section. Big contrast between headings and body text; short headings in sentence case; one primary Button per section, secondary ones for the rest.
 4. Real content. Use the site's own entries and media library images with descriptive alt text. Counts follow the content: two plans if there are two, five FAQs if there are five, not three of everything.

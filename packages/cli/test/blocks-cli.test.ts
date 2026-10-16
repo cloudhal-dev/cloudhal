@@ -55,6 +55,8 @@ describe("theme block types", () => {
       "link",
       "surface",
       "text",
+      "typePairing",
+      "typeScale",
       "font",
       "radius",
     ]);
