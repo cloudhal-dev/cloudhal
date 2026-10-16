@@ -97,6 +97,13 @@ export type SurfaceComponentId = string;
  * via the `definition` "Revision".
  */
 export type Revision = number;
+/**
+ * How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "MotionLevel".
+ */
+export type MotionLevel = "none" | "subtle" | "standard" | "expressive";
 
 /**
  * A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.
@@ -115,6 +122,10 @@ export interface Page {
   sections: Section[];
   seo?: Seo;
   availability?: Availability;
+  /**
+   * Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site.
+   */
+  motion?: "none" | "subtle" | "standard" | "expressive";
   rev: Revision;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -271,6 +282,12 @@ export interface SurfaceComponent {
    * A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.
    */
   visible?: {
+    [k: string]: unknown | undefined;
+  };
+  /**
+   * Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.
+   */
+  motion?: {
     [k: string]: unknown | undefined;
   };
 }

@@ -1,0 +1,35 @@
+{
+  "reason": "motion must be one of none, subtle, standard, expressive (RFC-0024)",
+  "data": {
+    "schemaVersion": 1,
+    "id": "page_01HZX8K3Q9GH",
+    "siteId": "site_01HZX8K3Q9EF",
+    "path": "/",
+    "title": "Home",
+    "locale": "en",
+    "status": "published",
+    "sections": [
+      {
+        "id": "sec_01HZX8K3Q9OP",
+        "kind": "hero",
+        "heading": "The morning briefing, written by an agent"
+      },
+      {
+        "id": "sec_01HZX8K3Q9ST",
+        "kind": "contentList",
+        "collection": "posts",
+        "limit": 5,
+        "sort": "newest"
+      }
+    ],
+    "seo": {
+      "title": "Demo Newsroom",
+      "description": "Agent-operated news site",
+      "noindex": false
+    },
+    "rev": 7,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T21:00:00Z",
+    "motion": "wild"
+  }
+}

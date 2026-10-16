@@ -1206,6 +1206,9 @@ pub struct SurfaceComponent {
     pub children: ::std::vec::Vec<SurfaceComponentId>,
     pub component: SurfaceComponentComponent,
     pub id: SurfaceComponentId,
+    #[doc = "Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS."]
+    #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+    pub motion: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
     #[doc = "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract."]
     #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
     pub props: ::serde_json::Map<::std::string::String, ::serde_json::Value>,

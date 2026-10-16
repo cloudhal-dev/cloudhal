@@ -104,14 +104,14 @@ case"reset":d=structuredClone(init);break;
 case"navigate":if(safe(a.href))location.assign(a.href);return;
 case"copy":navigator.clipboard?.writeText(txt(a.value)).catch(()=>{});return;
 case"share":if(navigator.share)navigator.share({title:document.title,url:location.href}).catch(()=>{});else navigator.clipboard?.writeText(location.href).catch(()=>{});return;
-case"scrollTo":document.getElementById(txt(a.anchor))?.scrollIntoView({behavior:"smooth",block:"start"});return;
+case"scrollTo":document.getElementById(txt(a.anchor))?.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});return;
 default:return;}
 render();});
 render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.7.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.8.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -124,6 +124,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.4.js",
   "/_cloudhal/surface.5.js",
   "/_cloudhal/surface.6.js",
+  "/_cloudhal/surface.7.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

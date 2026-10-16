@@ -165,6 +165,25 @@ export const themeSettings: PropsSchema = {
         tr: "Bölümlerin, kartların ve düğmelerin ne kadar yer kapladığı.",
       },
     },
+    // RFC-0024 §1: how much the site moves; a page can set its own level, and readers who ask for
+    // reduced motion always get less.
+    motion: {
+      type: "string",
+      enum: ["none", "subtle", "standard", "expressive"],
+      "x-labels": {
+        none: { en: "Still", tr: "Durağan" },
+        subtle: { en: "Subtle", tr: "İnce" },
+        standard: { en: "Standard", tr: "Standart" },
+        expressive: { en: "Expressive", tr: "Etkileyici" },
+      },
+      default: "none",
+      "x-widget": "radio",
+      title: { en: "Motion", tr: "Hareket" },
+      description: {
+        en: "How much sections move as people scroll and point. Readers who ask for reduced motion always see less.",
+        tr: "Bölümlerin kaydırırken ve üzerine gelirken ne kadar hareket ettiği. Daha az hareket isteyen okurlar her zaman daha azını görür.",
+      },
+    },
   },
   // WCAG 2.2 AA: body text 4.5:1, links 4.5:1, buttons and other UI parts 3:1 against the page.
   "x-contrast": [

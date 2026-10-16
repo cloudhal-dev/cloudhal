@@ -42,6 +42,11 @@ describe("design tools (RFC-0021)", () => {
             enum: ["none", "small", "medium", "large", "full"],
             default: "small",
           },
+          motion: {
+            type: "string",
+            enum: ["none", "subtle", "standard", "expressive"],
+            default: "none",
+          },
           brand: { type: "string", format: "color", default: "#18181b" },
         },
       },
@@ -93,6 +98,7 @@ describe("design tools (RFC-0021)", () => {
         mode: "auto",
         typePairing: "editorial",
         radius: "full",
+        motion: "standard",
       },
     });
     const after = (await run("get_design", { siteId })).result as {
@@ -101,6 +107,7 @@ describe("design tools (RFC-0021)", () => {
       shape: unknown;
     };
     expect(after.shape).toEqual({ radius: "full", density: "cozy" });
+    expect((after as unknown as { motion: string }).motion).toBe("standard");
     expect(after.type).toEqual({ pairing: "editorial", scale: null });
     expect(after.colors).toMatchObject({ source: "seed", mode: "auto" });
     expect(after.colors.light.brand).toBe("#0f766e");
@@ -112,6 +119,7 @@ describe("design tools (RFC-0021)", () => {
     expect(text).toContain("Render the page with scheme dark too.");
     expect(text).toContain("Type (RFC-0023): pairing editorial, scale none (fixed sizes).");
     expect(text).toContain("Shape (RFC-0023): radius full, density cozy.");
+    expect(text).toContain("Motion (RFC-0024): the site's level is standard.");
   });
 
   it("exports the tokens as a DTCG file (RFC-0023 §5)", async () => {
@@ -141,7 +149,7 @@ describe("design tools (RFC-0021)", () => {
     ).result as { rev: number; warnings: string[] };
     expect(set.warnings).toEqual([
       "Not in this site's catalog: Hero",
-      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, typePairing, typeScale, radius, brand)",
+      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, typePairing, typeScale, radius, motion, brand)",
       "No “## Brand” section: say what the site is for, who reads it and its voice.",
     ]);
     const got = (await run("get_design", { siteId })).result as {

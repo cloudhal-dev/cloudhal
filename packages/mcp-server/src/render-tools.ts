@@ -16,11 +16,13 @@ import {
 import {
   bytesToBase64,
   RENDER_CHECK_IDS,
+  RENDER_MOTIONS,
   RENDER_SCHEMES,
   RENDER_WIDTHS,
   type RenderCheck,
   RenderError,
   RenderLimiter,
+  type RenderMotion,
   type RenderScheme,
   type RenderWidth,
   renderPage,
@@ -38,6 +40,7 @@ interface RenderPageResult {
   url: string;
   path: string;
   scheme: RenderScheme;
+  motion: RenderMotion;
   widths: { width: number; height: number; truncated: boolean; images: number }[];
   checks: RenderCheck[];
   /** The screenshots, per width; moved into image content, never into structured content. */
@@ -55,12 +58,14 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "long-line": "long lines",
   "input-label": "unlabelled inputs",
   "chart-empty": "empty charts",
+  "reduced-motion": "motion under reduced motion",
+  "motion-cls": "layout shift",
 };
 
 function summary(r: RenderPageResult): string {
   const failed = r.checks.filter((c) => !c.ok);
   return [
-    `Rendered ${r.path} (the draft) at ${r.widths.map((w) => `${w.width}`).join(", ")} px, ${r.scheme} scheme.`,
+    `Rendered ${r.path} (the draft) at ${r.widths.map((w) => `${w.width}`).join(", ")} px, ${r.scheme} scheme, motion ${r.motion}.`,
     ...r.widths.map(
       (w) =>
         `${w.width} px: ${w.images} screenshot(s) of a ${w.height} px page${w.truncated ? " (truncated: the screenshots stop there; preview_page has the whole page as HTML)" : ""}.`,
@@ -112,7 +117,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
       name: "render_page",
       title: "Render a page in a browser",
       description:
-        "Look at a page's draft as people will see it: renders it in a real browser at desktop (1440), tablet (768) and phone (390) widths and returns screenshots plus automatic checks (sideways scrolling, alt text, broken images, heading order, text contrast, empty sections, tap targets, line length) that name the section and component behind each problem. Use it after building or changing a page and before asking a person to publish; fix what it finds and render again. Read-only. Rate-limited (about 10 a minute); when no browser is available, use preview_page.",
+        "Look at a page's draft as people will see it: renders it in a real browser at desktop (1440), tablet (768) and phone (390) widths and returns screenshots plus automatic checks (sideways scrolling, alt text, broken images, heading order, text contrast, empty sections, tap targets, line length, motion under reduced motion, layout shift) that name the section and component behind each problem. Use it after building or changing a page and before asking a person to publish; fix what it finds and render again. Read-only. Rate-limited (about 10 a minute); when no browser is available, use preview_page.",
       inputSchema: obj(
         {
           siteId: id,
@@ -130,6 +135,12 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             type: "boolean",
             description: "Screenshots down the page, up to 4 per width (default true)",
           },
+          motion: {
+            type: "string",
+            enum: [...RENDER_MOTIONS],
+            description:
+              "static (default): the reader asks for reduced motion, so screenshots show final states and the reduced-motion check runs; full: every motion preset plays, for the motion-cls check (RFC-0024).",
+          },
           scheme: {
             type: "string",
             enum: [...RENDER_SCHEMES],
@@ -144,6 +155,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
           url: { type: "string" },
           path: { type: "string" },
           scheme: { type: "string", enum: [...RENDER_SCHEMES] },
+          motion: { type: "string", enum: [...RENDER_MOTIONS] },
           widths: {
             type: "array",
             items: obj(
@@ -227,12 +239,15 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
               ? "dark"
               : "light";
         const other: RenderScheme = scheme === "light" ? "dark" : "light";
+        const motion: RenderMotion =
+          a.motion === "full" || a.motion === "reduce" ? a.motion : "static";
         const checkOther = mode === "auto" || (mode === "dark" && scheme === "light");
         try {
           const r = await renderPage(ctx.render.renderer, doc.url, {
             widths,
             fullPage: a.fullPage !== false,
             scheme,
+            motion,
             timeoutMs: ctx.render.timeoutMs ?? 20_000,
           });
           if (checkOther) {
@@ -248,6 +263,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             url: doc.url,
             path: doc.path,
             scheme,
+            motion,
             widths: r.shots.map((s) => ({
               width: s.width,
               height: s.height,

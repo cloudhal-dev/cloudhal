@@ -21,10 +21,19 @@ interface Props {
   notice?: { state: string; at: string; text: string } | undefined;
   /** RFC-0019 §3: the header's search form, where the deployment answers searches. */
   search?: { label: string; placeholder: string; button: string; query?: string } | undefined;
+  /** RFC-0024 §1: the page's own motion level, over the site's. */
+  motion?: string | undefined;
 }
-const { site, meta, nav, footer, notice, search } = Astro.props;
+const { site, meta, nav, footer, notice, search, motion } = Astro.props;
 // The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
 const look = themeVariables(site, themeSettings);
+// A page's own motion level wins over the site's (RFC-0024 §1).
+if (
+  motion &&
+  ["none", "subtle", "standard", "expressive"].includes(motion) &&
+  look.attributes["data-ch-motion"]
+)
+  look.attributes["data-ch-motion"] = motion;
 const fonts = PAIRING_PRELOADS[look.attributes["data-ch-type-pairing"] ?? ""] ?? [];
 const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { CHART_SCRIPT } from "./chart.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
+import { MOTION_SCRIPT } from "./motion-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
@@ -74,6 +75,8 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     ...SURFACE_SCRIPT_ALIASES.map((alias) => [alias, SURFACE_SCRIPT.code] as [string, string]),
     // RFC-0022 §3: the chart drawer, loaded by the runtime for live charts only.
     [CHART_SCRIPT.path, CHART_SCRIPT.code],
+    // RFC-0024 §7: the motion module, loaded by pages whose surfaces move.
+    [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
@@ -82,15 +85,15 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
   }
 }
 
-/** Whether any page of a static build has a live surface (its HTML marks one). */
+/** Whether any page of a static build has a live surface or motion (its HTML marks one). */
 export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean> {
   const entries = await readdir(rootOf(dir), { recursive: true, withFileTypes: true }).catch(
     () => [],
   );
   for (const e of entries) {
     if (!e.isFile() || !e.name.endsWith(".html")) continue;
-    if ((await readFile(path.join(e.parentPath, e.name), "utf8")).includes("data-ch-surface="))
-      return true;
+    const html = await readFile(path.join(e.parentPath, e.name), "utf8");
+    if (html.includes("data-ch-surface=") || html.includes(MOTION_SCRIPT.path)) return true;
   }
   return false;
 }

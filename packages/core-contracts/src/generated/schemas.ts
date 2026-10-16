@@ -364,6 +364,10 @@ export const PageSchema = {
     "availability": {
       "$ref": "#/$defs/Availability"
     },
+    "motion": {
+      "$ref": "#/$defs/MotionLevel",
+      "description": "Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site."
+    },
     "rev": {
       "$ref": "#/$defs/Revision"
     },
@@ -548,6 +552,16 @@ export const PageSchema = {
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "MotionLevel": {
+      "type": "string",
+      "description": "How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.",
+      "enum": [
+        "none",
+        "subtle",
+        "standard",
+        "expressive"
+      ]
     },
     "PublishStatus": {
       "type": "string",
@@ -862,6 +876,11 @@ export const PageSchema = {
         "visible": {
           "type": "object",
           "description": "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.",
+          "additionalProperties": true
+        },
+        "motion": {
+          "type": "object",
+          "description": "Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.",
           "additionalProperties": true
         }
       }
@@ -1292,6 +1311,11 @@ export const SectionSchema = {
         "visible": {
           "type": "object",
           "description": "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.",
+          "additionalProperties": true
+        },
+        "motion": {
+          "type": "object",
+          "description": "Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.",
           "additionalProperties": true
         }
       }

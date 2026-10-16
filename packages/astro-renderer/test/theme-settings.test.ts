@@ -141,3 +141,28 @@ describe("shape and density (RFC-0023 §3)", () => {
     ).not.toContain("--ch-radius");
   });
 });
+
+describe("motion level (RFC-0024 §1)", () => {
+  const motion: PropsSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      motion: {
+        type: "string",
+        enum: ["none", "subtle", "standard", "expressive"],
+        default: "none",
+      },
+    },
+  };
+  it("names the level on <html> and writes every level's tokens", () => {
+    const off = themeVariables(site({}), motion);
+    expect(off.attributes["data-ch-motion"]).toBe("none");
+    const on = themeVariables(site({ motion: "standard" }), motion);
+    expect(on.attributes["data-ch-motion"]).toBe("standard");
+    expect(on.style).toContain(':root[data-ch-motion="standard"]{--ch-dur-fast:150ms');
+    // a theme without the setting gets none of it
+    expect(
+      themeVariables(site({ motion: "standard" }), { ...motion, properties: {} }).style,
+    ).not.toContain("data-ch-motion");
+  });
+});

@@ -60,6 +60,7 @@ describe("theme block types", () => {
       "font",
       "radius",
       "density",
+      "motion",
     ]);
     const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-settings-"));
     try {

@@ -15,14 +15,20 @@ import {
   evaluateCondition,
   INPUT_MODEL,
   isInteractive,
+  MOTION_HOVERS,
+  MOTION_REVEALS,
+  MOTION_SPEEDS,
+  MOTION_STAGGER,
   resolveProps,
   SURFACE_STYLES,
   TONE_SURFACE,
+  usesMotion,
 } from "@cloudhal/core-ts/surfaces";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
 import { chartInner } from "./chart.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
 import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
+import { MOTION_SCRIPT } from "./motion-client.ts";
 import { SURFACE_SCRIPT, scriptJson } from "./surface-client.ts";
 
 /** One component of a surface, ready to draw. */
@@ -39,6 +45,8 @@ export interface SurfaceNode {
   hidden?: boolean;
   /** The surface loads the interaction runtime (RFC-0020 §4). */
   live?: boolean;
+  /** RFC-0024: the node's motion as `data-ch-*` attributes for its outer element (or ""). */
+  motion?: string;
   children: SurfaceNode[];
 }
 
@@ -149,12 +157,23 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
   const unknown = new Set(check.unknown);
   const live = isInteractive(section);
   // A surface with structural problems (a stored one never has them) draws nothing.
-  if (check.issues.some((i) => !i.path.includes("/props/") && !i.path.includes("/visible")))
+  // A component's motion that does not check is left out; the component still draws.
+  const issues = check.issues.filter((i) => !i.path.includes("/motion"));
+  if (issues.some((i) => !i.path.includes("/props/") && !i.path.includes("/visible")))
     return { section, root: undefined, unknown: check.unknown, data, live: false };
   const invalidProps = new Set(
-    check.issues.map((i) => /^\/components\/(\d+)\//.exec(i.path)?.[1]).filter(Boolean),
+    issues.map((i) => /^\/components\/(\d+)\//.exec(i.path)?.[1]).filter(Boolean),
   );
-  const node = (id: string, depth: number): SurfaceNode | undefined => {
+  const badMotion = new Set(
+    check.issues
+      .filter((i) => i.path.includes("/motion"))
+      .map((i) => /^\/components\/(\d+)\//.exec(i.path)?.[1]),
+  );
+  const node = (
+    id: string,
+    depth: number,
+    stagger?: { reveal: string; index: number },
+  ): SurfaceNode | undefined => {
     const c = byId.get(id);
     if (!c || unknown.has(id) || depth > 8) return undefined;
     const index = section.components.indexOf(c);
@@ -164,6 +183,23 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
     if (!shown && !live) return undefined;
     const entry = catalog.get(c.component);
     if (!entry) return undefined;
+    const motion = badMotion.has(String(index))
+      ? undefined
+      : (c.motion as MotionFields | undefined);
+    // RFC-0024 §2: a staggered parent hands its reveal to its children, each a step later.
+    const staggers =
+      motion?.stagger === true && (MOTION_STAGGER as readonly string[]).includes(c.component);
+    let i = 0;
+    const children = (c.children ?? [])
+      .map((k) =>
+        node(
+          k,
+          depth + 1,
+          staggers ? { reveal: motion?.reveal ?? "rise", index: Math.min(i++, 12) } : undefined,
+        ),
+      )
+      .filter((n): n is SurfaceNode => n !== undefined);
+    const attrs = motionAttrs(staggers ? { ...motion, reveal: undefined } : motion, stagger);
     return {
       id,
       component: c.component,
@@ -172,12 +208,53 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       raw: { ...(c.props ?? {}) },
       ...(live ? { live: true } : {}),
       ...(live && c.visible !== undefined ? { visible: c.visible, hidden: !shown } : {}),
-      children: (c.children ?? [])
-        .map((k) => node(k, depth + 1))
-        .filter((n): n is SurfaceNode => n !== undefined),
+      ...(attrs ? { motion: attrs } : {}),
+      children,
     };
   };
   return { section, root: node("root", 1), unknown: check.unknown, data, live };
+}
+
+// ── motion (RFC-0024 §2, §7) ─────────────────────────────────────────────────────────────────
+
+interface MotionFields {
+  reveal?: string | undefined;
+  hover?: string;
+  speed?: string;
+  delay?: number;
+  stagger?: boolean;
+  replay?: boolean;
+}
+
+/**
+ * A component's motion as attributes the theme's motion layer styles: the reveal (its own, or
+ * the one a staggered parent hands down), speed, delay in stagger steps (`data-ch-d`), hover and
+ * replay. Only known values pass, so nothing a model wrote reaches the page as free text.
+ */
+export function motionAttrs(
+  motion: MotionFields | undefined,
+  stagger?: { reveal: string; index: number },
+): string {
+  const out: string[] = [];
+  const reveal = motion?.reveal ?? stagger?.reveal;
+  if (reveal && (MOTION_REVEALS as readonly string[]).includes(reveal))
+    out.push(` data-ch-reveal="${reveal}"`);
+  if (motion?.speed && (MOTION_SPEEDS as readonly string[]).includes(motion.speed))
+    out.push(` data-ch-speed="${motion.speed}"`);
+  const delay =
+    (Number.isInteger(motion?.delay) ? Math.min(4, Math.max(0, motion?.delay as number)) : 0) +
+    (stagger?.index ?? 0);
+  if (reveal && delay > 0) out.push(` data-ch-d="${Math.min(delay, 16)}"`);
+  if (motion?.hover && (MOTION_HOVERS as readonly string[]).includes(motion.hover))
+    out.push(` data-ch-hover="${motion.hover}"`);
+  if (reveal && motion?.replay === true) out.push(" data-ch-replay");
+  return out.join("");
+}
+
+/** The node's motion attributes on the outer element of its markup. */
+export function withMotion(html: string, motion: string | undefined): string {
+  if (!motion) return html;
+  return html.replace(/^<([a-z][a-z0-9-]*)(?=[\s>/])/, `<$1${motion}`);
 }
 
 // ── markup ───────────────────────────────────────────────────────────────────────────────────
@@ -536,11 +613,23 @@ function markComponent(html: string, id: string, ctx: SurfaceContext): string {
 function nodeHtml(node: SurfaceNode, scope: string, ctx: SurfaceContext): string {
   const [open, close] = visibilityWrapper(node);
   if (node.entry.kind === "block")
-    return open + markComponent(blockNodeHtml(node, ctx.media, ctx.preview), node.id, ctx) + close;
+    return (
+      open +
+      markComponent(
+        withMotion(blockNodeHtml(node, ctx.media, ctx.preview), node.motion),
+        node.id,
+        ctx,
+      ) +
+      close
+    );
   const inner = node.children.map((c) => nodeHtml(c, scope, ctx)).join("");
   return (
     open +
-    markComponent(primitiveHtml(node, scope, ctx.media), node.id, ctx).replace(CHILDREN, inner) +
+    markComponent(
+      withMotion(primitiveHtml(node, scope, ctx.media), node.motion),
+      node.id,
+      ctx,
+    ).replace(CHILDREN, inner) +
     close
   );
 }
@@ -595,12 +684,16 @@ export function surfaceWrapper(
           : "This tool needs JavaScript to calculate."
       }</p></noscript>`
     : "";
+  // RFC-0024 §7: the motion module, only for surfaces that move (a module runs once per page).
+  const motion = usesMotion(section)
+    ? `<script type="module" src="${MOTION_SCRIPT.path}"></script>`
+    : "";
   return [
     `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,
     live
       ? // RFC-0020 §4: the data as inert JSON, then Cloudhal's runtime (one module per page).
-        `${noscript}<script type="application/json" data-ch-state>${scriptJson(live.data)}</script><script type="module" src="${SURFACE_SCRIPT.path}"></script></section>`
-      : "</section>",
+        `${noscript}<script type="application/json" data-ch-state>${scriptJson(live.data)}</script><script type="module" src="${SURFACE_SCRIPT.path}"></script>${motion}</section>`
+      : `${motion}</section>`,
   ];
 }
 

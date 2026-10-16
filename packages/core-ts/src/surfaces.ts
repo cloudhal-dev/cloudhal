@@ -1478,6 +1478,181 @@ function checkProps(entry: CatalogEntry, props: unknown, path: string, out: Prop
   }
 }
 
+// ── motion (RFC-0024 §2) ─────────────────────────────────────────────────────────────────────
+
+/** Reveals: once, as a component enters the viewport. */
+export const MOTION_REVEALS = [
+  "fade",
+  "rise",
+  "sink",
+  "slide-start",
+  "slide-end",
+  "scale-in",
+  "blur-in",
+  "wipe-up",
+  "wipe-start",
+  "mask-rise",
+] as const;
+/** Hover and focus effects; the pointer ones (`tilt`, `magnetic`, `spotlight`) need a fine pointer. */
+export const MOTION_HOVERS = [
+  "lift",
+  "scale",
+  "glow",
+  "underline",
+  "zoom-media",
+  "tilt",
+  "magnetic",
+  "spotlight",
+] as const;
+export const MOTION_SPEEDS = ["fast", "normal", "slow"] as const;
+/** Components that lay out children: `stagger` reveals their children one after another. */
+export const MOTION_STAGGER = ["Stack", "Row", "Grid", "Columns", "Band", "Card"] as const;
+/** Hover effects that only fit some components; the rest fit any. */
+const HOVER_FITS: Partial<Record<(typeof MOTION_HOVERS)[number], readonly string[]>> = {
+  underline: ["Link", "Button", "Card", "Heading"],
+  "zoom-media": ["Card", "Image"],
+  tilt: ["Card", "Image"],
+  magnetic: ["Button", "Link"],
+  spotlight: ["Card", "Band"],
+};
+/** Fields later phases add: written now, they are refused with when they arrive. */
+const MOTION_LATER: Record<string, string> = {
+  scroll: "RFC-0024 phase 24b",
+  depth: "RFC-0024 phase 24b",
+  loop: "RFC-0024 phase 24c",
+};
+/** Names models often write for a preset, and the preset they mean. */
+const MOTION_ALIASES: Record<string, string> = {
+  fadein: "fade",
+  "fade-in": "fade",
+  fadeinup: "rise",
+  "fade-up": "rise",
+  "fade-in-up": "rise",
+  slideup: "rise",
+  "slide-up": "rise",
+  up: "rise",
+  fadeindown: "sink",
+  "fade-down": "sink",
+  "slide-down": "sink",
+  slideinleft: "slide-start",
+  "slide-left": "slide-start",
+  "slide-in-left": "slide-start",
+  slideinright: "slide-end",
+  "slide-right": "slide-end",
+  "slide-in-right": "slide-end",
+  zoomin: "scale-in",
+  "zoom-in": "scale-in",
+  zoom: "scale-in",
+  blur: "blur-in",
+  reveal: "wipe-up",
+  wipe: "wipe-up",
+  mask: "mask-rise",
+  grow: "scale",
+  raise: "lift",
+  float: "lift",
+  shadow: "lift",
+  shine: "glow",
+  "image-zoom": "zoom-media",
+  "zoom-image": "zoom-media",
+  "3d": "tilt",
+  medium: "normal",
+  quick: "fast",
+};
+/** Field names models write for a `motion` field. */
+const MOTION_FIELD_ALIASES: Record<string, string> = {
+  entrance: "reveal",
+  enter: "reveal",
+  appear: "reveal",
+  animation: "reveal",
+  animate: "reveal",
+  onhover: "hover",
+  hovereffect: "hover",
+  duration: "speed",
+};
+
+/** The motion fields a component may have, and what each takes. */
+function checkMotion(motion: unknown, component: string, at: string, issues: PropsIssue[]): void {
+  if (!isObj(motion)) {
+    issues.push({ path: at, message: 'an object of presets, e.g. {"reveal":"rise"}' });
+    return;
+  }
+  const oneOf = (key: string, allowed: readonly string[]) => {
+    const v = motion[key];
+    if (v !== undefined && !(typeof v === "string" && allowed.includes(v)))
+      issues.push({ path: `${at}/${key}`, message: `one of ${allowed.join(", ")}` });
+  };
+  for (const key of Object.keys(motion)) {
+    if (MOTION_LATER[key])
+      issues.push({ path: `${at}/${key}`, message: `not available yet (${MOTION_LATER[key]})` });
+    else if (!["reveal", "hover", "speed", "delay", "stagger", "replay"].includes(key))
+      issues.push({ path: `${at}/${key}`, message: "unknown motion field" });
+  }
+  oneOf("reveal", MOTION_REVEALS);
+  oneOf("hover", MOTION_HOVERS);
+  oneOf("speed", MOTION_SPEEDS);
+  const hover = motion.hover as (typeof MOTION_HOVERS)[number] | undefined;
+  const fits = hover ? HOVER_FITS[hover] : undefined;
+  if (fits && !fits.includes(component))
+    issues.push({ path: `${at}/hover`, message: `${hover} fits ${fits.join(", ")}` });
+  const delay = motion.delay;
+  if (
+    delay !== undefined &&
+    !(Number.isInteger(delay) && (delay as number) >= 0 && (delay as number) <= 4)
+  )
+    issues.push({ path: `${at}/delay`, message: "steps of the stagger, 0 to 4" });
+  for (const key of ["stagger", "replay"])
+    if (motion[key] !== undefined && typeof motion[key] !== "boolean")
+      issues.push({ path: `${at}/${key}`, message: "true or false" });
+  if (motion.stagger === true && !(MOTION_STAGGER as readonly string[]).includes(component))
+    issues.push({ path: `${at}/stagger`, message: `only on ${MOTION_STAGGER.join(", ")}` });
+}
+
+/** Whether a surface uses motion, so its page loads the motion module (RFC-0024 §7). */
+export function usesMotion(section: SurfaceSection): boolean {
+  return section.components.some((c) => isObj(c.motion) && Object.keys(c.motion).length > 0);
+}
+
+/**
+ * Deterministic repairs of a component's `motion`: preset and field names snapped to the nearest
+ * known one (`"fadeInUp"` → `rise`), a delay in milliseconds turned into stagger steps, fields
+ * that are not motion dropped. Every repair is reported.
+ */
+export function repairMotion(motion: unknown, id: string): { motion: unknown; notes: string[] } {
+  if (!isObj(motion)) return { motion, notes: [] };
+  const notes: string[] = [];
+  const out: Record<string, unknown> = {};
+  const snap = (value: unknown, allowed: readonly string[]): unknown => {
+    if (typeof value !== "string" || allowed.includes(value)) return value;
+    const key = value.toLowerCase().replace(/[\s_]+/g, "-");
+    const alias = MOTION_ALIASES[key] ?? MOTION_ALIASES[key.replace(/-/g, "")];
+    if (alias && allowed.includes(alias)) return alias;
+    let best: string | undefined;
+    let bestD = 3;
+    for (const a of allowed) {
+      const d = distance(a, key);
+      if (d < bestD) {
+        best = a;
+        bestD = d;
+      }
+    }
+    return best ?? value;
+  };
+  for (const [rawKey, value] of Object.entries(motion)) {
+    const key = MOTION_FIELD_ALIASES[rawKey.toLowerCase()] ?? rawKey;
+    if (key !== rawKey) notes.push(`${id}: motion "${rawKey}" → "${key}"`);
+    let v: unknown = value;
+    if (key === "reveal") v = snap(value, MOTION_REVEALS);
+    else if (key === "hover") v = snap(value, MOTION_HOVERS);
+    else if (key === "speed") v = snap(value, MOTION_SPEEDS);
+    else if (key === "delay" && typeof value === "number" && value > 4)
+      v = Math.min(4, Math.max(0, Math.round(value / 100)));
+    if (v !== value)
+      notes.push(`${id}: motion.${key} ${JSON.stringify(value)} → ${JSON.stringify(v)}`);
+    out[key] = v;
+  }
+  return { motion: out, notes };
+}
+
 /**
  * Checks a surface against a catalog (RFC-0020 §1): ids, the tree, child rules, props, bindings,
  * conditions, data and limits. Unknown components and unreachable ones are reported, not refused.
@@ -1569,6 +1744,7 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     if (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick))
       checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
+    if (c.motion !== undefined) checkMotion(c.motion, c.component, `${at}/motion`, issues);
   });
   // Reachability and depth from the root; `parentOf` already rules out shared children.
   const reached = new Set<string>();
@@ -1666,6 +1842,13 @@ export function repairComponent(
   if (typeof (c.children as unknown) === "string") {
     next = { ...next, children: [c.children as unknown as string] };
     notes.push(`${c.id}: children "${c.children}" made a list`);
+  }
+  if (c.motion !== undefined) {
+    const m = repairMotion(c.motion, c.id);
+    if (m.notes.length) {
+      next = { ...next, motion: m.motion as Record<string, unknown> };
+      notes.push(...m.notes);
+    }
   }
   const name = nearestComponent(c.component, catalog);
   if (name && name !== c.component) {
@@ -2163,6 +2346,9 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
       'a Stat {"label":"BMI","value":{"call":"formatNumber","args":{"digits":1,"value":{"call":"calculate","args":{"expression":"kg / (cm/100)^2","vars":{"kg":{"path":"/kg"},"cm":{"path":"/cm"}}}}}}}. ' +
       "Other functions: add/multiply/min/max {values}, subtract/divide {a,b}, round/floor/ceil {value,digits}, power {base,exponent}, if {cond,ifTrue,ifFalse}, sum/average/count {list,field}.",
     '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
+    // RFC-0024 §2: motion as presets, next to `visible`.
+    `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry.`,
+    "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
     "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",
     "- Text props take markdown where marked `markdown`; never HTML.",

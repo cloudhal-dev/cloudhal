@@ -10,6 +10,7 @@ import type { Site } from "@cloudhal/core-contracts";
 import type { PropsSchema } from "@cloudhal/core-ts/blocks";
 import {
   colorRolesCss,
+  motionCss,
   shapeCss,
   siteColorTokens,
   TYPE_SCALES,
@@ -83,7 +84,11 @@ export function themeVariables(
         density: config.density ?? schema.properties.density?.default,
       }),
     );
-  return { style: vars.length ? `:root{${vars.join(";")}}` : "", attributes };
+  // RFC-0024 §6: the motion tokens for every level; `data-ch-motion` (the `motion` setting, or a
+  // page's own level) picks one.
+  const rules = "motion" in schema.properties ? motionCss() : "";
+  const root = vars.length ? `:root{${vars.join(";")}}` : "";
+  return { style: root + rules, attributes };
 }
 
 /**

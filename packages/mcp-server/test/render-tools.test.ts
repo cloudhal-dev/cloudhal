@@ -27,7 +27,9 @@ function fakeRenderer(log: string[], options: { hang?: boolean } = {}): PageRend
       return {
         async open(url, viewport) {
           if (options.hang) await new Promise(() => {});
-          log.push(`open ${viewport.width}x${viewport.height} ${viewport.scheme} ${url}`);
+          log.push(
+            `open ${viewport.width}x${viewport.height} ${viewport.scheme}${viewport.reducedMotion === false ? " full" : ""} ${url}`,
+          );
           let y = 0;
           return {
             async evaluate<T>(expression: string): Promise<T> {
@@ -140,7 +142,9 @@ describe("render_page (RFC-0021 §4)", () => {
     expect(structured).not.toHaveProperty("images");
     expect(content[0]).toMatchObject({ type: "text" });
     const text = (content[0] as { text: string }).text;
-    expect(text).toContain("Rendered /about (the draft) at 1440, 390 px, light scheme.");
+    expect(text).toContain(
+      "Rendered /about (the draft) at 1440, 390 px, light scheme, motion static.",
+    );
     expect(text).toContain("✗ contrast (text contrast): 2 at 390 px");
     expect(content.filter((c) => c.type === "image")).toHaveLength(6);
     expect(content[2]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
@@ -198,6 +202,31 @@ describe("render_page (RFC-0021 §4)", () => {
     );
     expect((dark.result as { scheme: string }).scheme).toBe("dark");
     expect(log.filter((l) => l.startsWith("open")).length).toBe(3);
+  });
+
+  it("renders with reduced motion unless motion full is asked for (RFC-0024)", async () => {
+    const log: string[] = [];
+    const render = { renderer: fakeRenderer(log), limiter: new RenderLimiter() };
+    const still = await runTool(
+      def,
+      { siteId, pageId, widths: [390], fullPage: false },
+      ctx({ render }),
+      {
+        policy,
+      },
+    );
+    expect((still.result as { motion: string }).motion).toBe("static");
+    const full = await runTool(
+      def,
+      { siteId, pageId, widths: [390], fullPage: false, motion: "full" },
+      ctx({ render }),
+      { policy },
+    );
+    expect((full.result as { motion: string }).motion).toBe("full");
+    expect(log.filter((l) => l.startsWith("open"))).toEqual([
+      expect.stringMatching(/^open 390x\d+ light http/),
+      expect.stringMatching(/^open 390x\d+ light full http/),
+    ]);
   });
 
   it("is rate-limited per key, and a browser that hangs fails within the timeout", async () => {
