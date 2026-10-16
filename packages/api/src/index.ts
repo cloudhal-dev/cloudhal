@@ -24,6 +24,7 @@ export {
   type LocalBuildHub,
 } from "./build.ts";
 export {
+  ALL_EVAL_BRIEFS,
   BUILD_EVAL_BRIEFS,
   BUILD_EVAL_MODELS,
   type BuildEvalBrief,
@@ -35,6 +36,7 @@ export {
   judgeCheckTable,
   runBuildEvalOnce,
   summariseBuildEval,
+  TOOL_EVAL_BRIEFS,
 } from "./build-eval.ts";
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";

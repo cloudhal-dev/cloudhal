@@ -25,6 +25,6 @@ Build pages that look intentional, not generic: follow the site's design rules, 
 
 ## Rules
 - Never use placeholder copy, `#` links, or the same image twice on a page.
-- Interactivity only where it helps someone decide or find (tabs, pricing toggle, FAQ), bound to data.
+- Interactivity only where it helps someone decide or find (tabs, pricing toggle, FAQ, a calculator, a chart, a comparison table), bound to data. Results are computed with functions, never promised in text (`references/page-recipes.md` › Tools).
 - Everything must work at 390 px wide.
 - Run the checklist in `references/checklist.md` before step 6.

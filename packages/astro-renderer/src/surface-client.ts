@@ -60,6 +60,7 @@ case"divide":{const x=op(a.a),y=op(a.b);if(x===undefined||y===undefined)return""
 case"round":case"floor":case"ceil":{const n=op(v);if(n===undefined)return"";const f=10**dg(a.digits);return fin(Math[name](Number((n*f).toPrecision(12)))/f);}
 case"abs":{const n=op(v);return n===undefined?"":fin(Math.abs(n));}
 case"clamp":{const n=op(v),lo=op(a.min),hi=op(a.max);return n===undefined||lo===undefined||hi===undefined?"":fin(Math.min(Math.max(n,lo),hi));}
+case"power":{const b=op(a.base),e=op(a.exponent);return b===undefined||e===undefined||Math.abs(e)>1000?"":fin(b**e);}
 case"number":{const n=op(v);return n===undefined?(a.fallback===undefined||a.fallback===null?"":a.fallback):fin(n);}
 case"sum":case"average":case"count":{const f=typeof a.field==="string"?a.field:undefined;const p=(Array.isArray(a.list)?a.list:[]).slice(0,1000).map((x)=>f===undefined?x:obj(x)?x[f]:undefined).filter((x)=>!blank(x));if(name==="count")return p.length;const l=p.map(tn).filter((n)=>Number.isFinite(n));if(!l.length)return name==="sum"?0:"";const t=l.reduce((x,y)=>x+y,0);return fin(name==="sum"?t:t/l.length);}
 case"formatPercent":{const n=op(v);if(n===undefined)return"";return new Intl.NumberFormat(loc,{style:"percent",maximumFractionDigits:dg(a.digits)}).format(n);}
@@ -106,7 +107,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.4.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.5.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -116,6 +117,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.1.js",
   "/_cloudhal/surface.2.js",
   "/_cloudhal/surface.3.js",
+  "/_cloudhal/surface.4.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

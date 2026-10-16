@@ -7,6 +7,7 @@
  */
 import path from "node:path";
 import {
+  ALL_EVAL_BRIEFS,
   BUILD_EVAL_BRIEFS,
   BUILD_EVAL_MODELS,
   type BuildEvalRun,
@@ -45,11 +46,12 @@ export interface BuildEvalReport {
 
 export async function buildEval(options: BuildEvalOptions): Promise<BuildEvalReport> {
   const models = options.models?.length ? options.models : BUILD_EVAL_MODELS;
-  const briefs = BUILD_EVAL_BRIEFS.filter(
-    (b) => !options.briefs?.length || options.briefs.includes(b.id),
-  );
+  // RFC-0022 §6: `--briefs` may name tool briefs too (calories, loan, chart, compare).
+  const briefs = options.briefs?.length
+    ? ALL_EVAL_BRIEFS.filter((b) => options.briefs?.includes(b.id))
+    : [...BUILD_EVAL_BRIEFS];
   if (briefs.length === 0)
-    throw new Error(`--briefs: choose from ${BUILD_EVAL_BRIEFS.map((b) => b.id).join(", ")}`);
+    throw new Error(`--briefs: choose from ${ALL_EVAL_BRIEFS.map((b) => b.id).join(", ")}`);
   if (options.remote) {
     const { cfg, adminUrl, token, fetch: f } = await deployment(options);
     const runs: BuildEvalRun[] = [];
@@ -182,7 +184,7 @@ export function describeRun(r: BuildEvalRun): string {
   const time = `${(r.totalMs / 1000).toFixed(1)} s`;
   const d = r.design;
   const design = d
-    ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.look ? `, ${lookText(d.look)}` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
+    ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.look ? `, ${lookText(d.look)}` : ""}${d.tool ? `, tool: ${d.tool.results - d.tool.empty}/${d.tool.results} results show with ${d.tool.inputs} sample inputs` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
     : "";
   return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
 }

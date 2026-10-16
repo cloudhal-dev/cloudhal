@@ -688,6 +688,18 @@ describe("computed values (RFC-0022 22a)", () => {
     expect(v(call("min", { values: [3, 1, 2] }))).toBe(1);
     expect(v(call("max", { values: [3, 1, 2] }))).toBe(3);
     expect(v(call("clamp", { value: 70, min: 1, max: 50 }))).toBe(50);
+    expect(v(call("power", { base: 2, exponent: 10 }))).toBe(1024);
+    expect(v(call("power", { base: 2, exponent: 1001 }))).toBe("");
+    // a 30-year loan of 200,000 at 6 %: about 1,199.10 a month
+    const r = call("divide", { a: 6, b: 1200 });
+    const payment = call("divide", {
+      a: call("multiply", { values: [200000, r] }),
+      b: call("subtract", {
+        a: 1,
+        b: call("power", { base: call("add", { values: [1, r] }), exponent: -360 }),
+      }),
+    });
+    expect(v(call("round", { value: payment, digits: 2 }))).toBe(1199.1);
     expect(v(call("number", { value: " 42 " }))).toBe(42);
     expect(v(call("number", { value: "", fallback: 0 }))).toBe(0);
     expect(v(call("formatPercent", { value: 0.256, digits: 1 }))).toBe("25.6%");

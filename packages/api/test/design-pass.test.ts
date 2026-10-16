@@ -339,3 +339,98 @@ describe("the judge check (RFC-0021 21c calibration)", () => {
     expect(flat.ordered).toBe(false);
   });
 });
+
+describe("tool briefs (RFC-0022 22e)", () => {
+  it("fills sample inputs before looking, and reports whether the tool's results show", async () => {
+    const { TOOL_EVAL_BRIEFS, withSampleInputs } = await import("../src/build-eval.ts");
+    expect(TOOL_EVAL_BRIEFS.map((b) => b.id)).toEqual(["calories", "loan", "chart", "compare"]);
+    const tool = JSON.stringify({
+      ops: [
+        {
+          op: "add",
+          path: "/sections/-",
+          value: {
+            id: "sec_toolbuilt01",
+            kind: "surface",
+            catalog: "blog@1",
+            data: { kg: "", unit: "" },
+            components: [
+              { id: "root", component: "Stack", children: ["kg", "unit", "out", "broken"] },
+              {
+                id: "kg",
+                component: "NumberField",
+                props: { label: "Weight", value: { path: "/kg" }, min: 40, max: 120 },
+              },
+              {
+                id: "unit",
+                component: "RadioGroup",
+                props: {
+                  label: "Unit",
+                  value: { path: "/unit" },
+                  options: [
+                    { value: "kg", label: "kg" },
+                    { value: "lb", label: "lb" },
+                  ],
+                },
+              },
+              {
+                id: "out",
+                component: "Stat",
+                props: {
+                  label: "Pounds",
+                  value: { call: "multiply", args: { values: [{ path: "/kg" }, 2.2] } },
+                },
+              },
+              {
+                id: "broken",
+                component: "Text",
+                props: { text: { call: "multiply", args: { values: [{ path: "/missing" }, 2] } } },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const transport: AiTransport = {
+      kind: "binding",
+      async *stream() {
+        yield { type: "text", text: `${tool}\n{"done":true}\n` };
+      },
+      models: async () => [],
+    };
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    await migrate(sql, migrations);
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    const site = await seedStarterSite(store, { name: "Tool", slug: "tool" });
+    const opened: string[] = [];
+    const run = await runBuildEvalOnce({
+      transport,
+      model: "m",
+      brief: TOOL_EVAL_BRIEFS[0] as (typeof TOOL_EVAL_BRIEFS)[number],
+      catalog,
+      siteId: site.id,
+      design: { renderer: browser(opened, false), site, judge: false },
+    });
+    // the weight became the middle of 40–120, the radio its first option; one result shows, one stays blank
+    expect(run.design?.tool).toEqual({ inputs: 2, results: 2, empty: 1 });
+    expect(atob((opened[0] as string).split(",")[1] as string)).toContain("176");
+    const summary = summariseBuildEval([run]);
+    expect(summary[0]?.toolsWorking).toBe("0/1");
+    expect(buildEvalTable(summary)).toContain("| Tools working |");
+    // a filled value is kept
+    const kept = withSampleInputs({
+      sections: [
+        {
+          id: "sec_x0000001",
+          kind: "surface",
+          catalog: "blog@1",
+          data: { kg: 70 },
+          components: [
+            { id: "root", component: "NumberField", props: { label: "W", value: { path: "/kg" } } },
+          ],
+        },
+      ],
+    } as never);
+    expect((kept.page.sections[0] as { data: unknown }).data).toEqual({ kg: 70 });
+  });
+});
