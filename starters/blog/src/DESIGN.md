@@ -2,11 +2,13 @@
 The blog theme is an editorial theme: articles first, set in a calm reading column, with full-bleed bands for landing moments. It suits publications, newsrooms, journals and small company sites that publish.
 
 ## Colors
-- The theme has four design settings: `{color.brand}` (buttons, the brand band, accents), `{color.link}`, `{color.surface}` (the page) and `{color.text}`. They always meet WCAG contrast; change them with set_theme_settings, never by hand.
+- Prefer the color tokens: `seed` (one color the palette is built from), `scheme` (tonal, vibrant, neutral, mono), `contrast` and `mode` (light, dark, or auto to follow the reader). The roles, light and dark, are derived and always meet WCAG contrast; get_design shows them.
+- Without a seed, four settings apply: `{color.brand}` (buttons, the brand band, accents), `{color.link}`, `{color.surface}` (the page) and `{color.text}`. Change colors with set_theme_settings, never by hand.
 - Bands take a tone: `surface` (the page), `muted` (a soft grey step), `brand` (the brand color, white text) and `inverse` (near-black, white text). Use `brand` or `inverse` at most twice a page; they are the loud moments.
 
 ## Typography
-- The `font` setting chooses the family for the whole site (system, serif, humanist or mono). Serif reads as editorial, humanist as friendly, mono as technical.
+- `typePairing` sets headings and text in fonts that go together: editorial (Fraunces and Inter) for publications, modern (Space Grotesk and Inter) for products, humanist (Source Sans) for friendly sites, technical (JetBrains Mono headings) for developer tools, classic (Source Serif) for literary or institutional sites. With `system`, the `font` setting chooses one family (system, serif, humanist or mono).
+- `typeScale` makes sizes fluid between phone and desktop: compact for dense, text-heavy sites; balanced for most; dramatic for landing pages with short, bold headlines.
 - Headings: one level-1 per page; level 2 for sections; level 3 inside cards. Keep headings under about 60 characters, in sentence case.
 
 ## Layout

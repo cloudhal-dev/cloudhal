@@ -84,6 +84,44 @@ export const themeSettings: PropsSchema = {
       default: "#18181b",
       title: { en: "Text", tr: "Metin" },
     },
+    // RFC-0023 §2: a curated font pairing (self-hosted in public/fonts) and a fluid type scale.
+    // Without a pairing the typeface below applies; without a scale the sizes stay fixed.
+    typePairing: {
+      type: "string",
+      enum: ["system", "editorial", "modern", "humanist", "technical", "classic"],
+      "x-labels": {
+        system: { en: "System", tr: "Sistem" },
+        editorial: { en: "Editorial (Fraunces and Inter)", tr: "Editoryal (Fraunces ve Inter)" },
+        modern: { en: "Modern (Space Grotesk and Inter)", tr: "Modern (Space Grotesk ve Inter)" },
+        humanist: { en: "Humanist (Source Sans)", tr: "Hümanist (Source Sans)" },
+        technical: {
+          en: "Technical (JetBrains Mono and Inter)",
+          tr: "Teknik (JetBrains Mono ve Inter)",
+        },
+        classic: { en: "Classic (Source Serif)", tr: "Klasik (Source Serif)" },
+      },
+      default: "system",
+      title: { en: "Font pairing", tr: "Yazı tipi eşleşmesi" },
+      description: {
+        en: "Headings and text set in fonts that go together. System uses the typeface below.",
+        tr: "Başlıklar ve metin birbirine uyan yazı tipleriyle. Sistem, aşağıdaki yazı tipini kullanır.",
+      },
+    },
+    typeScale: {
+      type: "string",
+      enum: ["compact", "balanced", "dramatic"],
+      "x-labels": {
+        compact: { en: "Compact", tr: "Sıkı" },
+        balanced: { en: "Balanced", tr: "Dengeli" },
+        dramatic: { en: "Dramatic", tr: "Çarpıcı" },
+      },
+      "x-widget": "radio",
+      title: { en: "Type scale", tr: "Yazı ölçeği" },
+      description: {
+        en: "How much bigger headings are than text; sizes adapt to the screen.",
+        tr: "Başlıkların metinden ne kadar büyük olduğu; boyutlar ekrana uyar.",
+      },
+    },
     font: {
       type: "string",
       enum: ["system", "serif", "humanist", "mono"],

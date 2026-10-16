@@ -82,3 +82,31 @@ describe("color roles (RFC-0023 §1)", () => {
     ).toContain("--ch-color-surface:#ffffff");
   });
 });
+
+describe("type pairing and scale (RFC-0023 §2)", () => {
+  const type: PropsSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      typePairing: {
+        type: "string",
+        enum: ["system", "editorial", "modern", "humanist", "technical", "classic"],
+        default: "system",
+      },
+      typeScale: { type: "string", enum: ["compact", "balanced", "dramatic"] },
+    },
+  };
+  it("keeps fixed sizes until a scale is chosen, and names the pairing for the theme's CSS", () => {
+    const before = themeVariables(site({}), type);
+    expect(before.style).not.toContain("--ch-step");
+    expect(before.attributes["data-ch-type-pairing"]).toBe("system");
+    const after = themeVariables(site({ typePairing: "editorial", typeScale: "dramatic" }), type);
+    expect(after.attributes).toMatchObject({
+      "data-ch-type-pairing": "editorial",
+      "data-ch-type-scale": "dramatic",
+    });
+    expect(after.style).toMatch(/--ch-step--1:clamp\(.*--ch-step-6:clamp\([^)]*\)/);
+    // a value the theme does not offer writes nothing
+    expect(themeVariables(site({ typeScale: "huge" }), type).style).not.toContain("--ch-step");
+  });
+});

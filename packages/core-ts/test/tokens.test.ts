@@ -8,6 +8,10 @@ import {
   expandColorTokens,
   legacyColorRoles,
   siteColorTokens,
+  TYPE_SCALES,
+  TYPE_STEPS,
+  typeScaleCss,
+  typeStep,
 } from "../src/tokens.ts";
 
 const PAIRS: [string, string, number, number][] = [
@@ -142,5 +146,47 @@ describe("siteColorTokens", () => {
     const dark = siteColorTokens({ mode: "dark", contrast: "high", scheme: "bogus" }, properties);
     expect(dark.settings).toMatchObject({ seed: "#18181b", scheme: "tonal", contrast: "high" });
     expect(dark.pairs.find((p) => p.foreground === "text")?.needs).toBe(7);
+  });
+});
+
+describe("type scale (RFC-0023 §2)", () => {
+  const px = (clamp: string) => {
+    const m = /^clamp\(([\d.]+)rem,(-?[\d.]+)rem ([+-]) ([\d.]+)vw,([\d.]+)rem\)$/.exec(clamp);
+    if (!m) throw new Error(`not a clamp: ${clamp}`);
+    const [lo, intercept, , slope, hi] = m.slice(1).map(Number) as number[] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    const vw = m[3] === "-" ? -slope : slope;
+    const at = (width: number) =>
+      Math.min(hi * 16, Math.max(lo * 16, intercept * 16 + (vw * width) / 100));
+    return { phone: at(390), desktop: at(1440) };
+  };
+
+  it("grows every step from its phone size to its desktop size, headings more than text", () => {
+    for (const scale of TYPE_SCALES) {
+      const sizes = TYPE_STEPS.map((s) => px(typeStep(scale, s)));
+      expect(sizes[1]).toEqual({ phone: expect.closeTo(16, 2), desktop: expect.closeTo(17, 2) });
+      for (let i = 1; i < sizes.length; i++) {
+        expect(sizes[i]?.phone).toBeGreaterThan(sizes[i - 1]?.phone ?? 0);
+        expect(sizes[i]?.desktop).toBeGreaterThan(sizes[i - 1]?.desktop ?? 0);
+      }
+      const h1 = sizes[6] as { phone: number; desktop: number };
+      expect(h1.desktop / h1.phone).toBeGreaterThan(1.3);
+    }
+    // the scales differ where it shows: the largest headings
+    expect(px(typeStep("compact", 5)).desktop).toBeCloseTo(42, 0);
+    expect(px(typeStep("dramatic", 5)).desktop).toBeCloseTo(72, 0);
+  });
+
+  it("writes one declaration per step, deterministically", () => {
+    const css = typeScaleCss("balanced");
+    expect(css.split(";").map((d) => d.split(":")[0])).toEqual(
+      TYPE_STEPS.map((s) => `--ch-step-${s}`),
+    );
+    expect(typeScaleCss("balanced")).toBe(css);
   });
 });

@@ -1,5 +1,5 @@
 # RFC-0023: Design tokens v2 and surface styles
-- Status: Accepted; 23a shipped
+- Status: Accepted; 23a and 23b shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0017 (theme settings, `set_theme_settings`, `x-contrast`), RFC-0018 (theme kit, CSS layers, 18d section styles), RFC-0021 (DESIGN.md, `render_page`, the design judge), RFC-0022 (surface tools);
@@ -152,3 +152,21 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
   - **Agents.** `get_design` returns `colors`: source, settings, both role sets, every pair's ratio and the repairs. Its text says which settings to change and to render dark when the mode is dark or auto. `render_page` takes `scheme: light | dark`, and DESIGN guidance points 1 and 8 say so.
   - **Studio.** The Appearance form shows `ColorRolePreview` under the fields: a sample and swatches for light, and for dark once a seed is set. The repairs appear in the person's language, and it works out live as the fields change.
   - **Moved to later phases.** The dark-mode `contrast` check run automatically by the site's mode, and the site-design skill recipes, move to 23e.
+- **23b shipped.**
+  - **Pairings.** The blog theme gains `typePairing` (default `system`, which keeps the older `font` setting):
+    - `editorial`: Fraunces and Inter;
+    - `modern`: Space Grotesk and Inter;
+    - `humanist`: Source Sans 3;
+    - `technical`: JetBrains Mono headings and code, Inter text;
+    - `classic`: Source Serif 4.
+  - **Font files.** They are self-hosted in the theme's `public/fonts`: Fontsource 5.3 variable files, upright, weight axis only, latin and latin-ext (Turkish), with their OFL-1.1 licences. That is 12 files, 0.48 MB in the deploy.
+    - `fonts.css` declares them with unicode ranges, so a page downloads only its pairing's families and the subsets its text needs.
+    - `Base.astro` preloads the pairing's latin files (`src/fonts.ts`).
+    - This answers open question 1: every pairing ships with the theme, and readers download only what is used.
+  - **Scale.** `typeScale` (`compact`, `balanced`, `dramatic`; no default) writes fluid steps `--ch-step--1 … --ch-step-6` with Utopia's method.
+    - Body text runs from 16 px at 390 px wide to 17 px at 1440 px. The ratio is gentler on phones (1.125, 1.15 or 1.2) than on desktops (1.2, 1.25 or 1.333).
+    - A step 6 was added for the theme's largest hero size.
+    - Tailwind's `text-base` to `text-5xl` read the steps, with their fixed sizes as fallbacks. Until a site chooses a scale nothing is written, so live sites keep their sizes.
+  - **Wrapping.** Headings get `text-wrap: balance`; paragraphs, list items and quotes `pretty`.
+  - **Agents.** `get_design` returns `type` (pairing, scale) and says how to change them. DESIGN guidance point 1 and the theme's DESIGN.md say which pairing fits which kind of site.
+  - **Checked.** Every pairing rendered with `render_page` at 1440 and 390 px passes every check, including dramatic headings on phones.
