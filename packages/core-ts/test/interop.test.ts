@@ -87,6 +87,37 @@ const byId = (r: ReturnType<typeof fromA2ui>) =>
   new Map(r.surface.components.map((c) => [c.id, c]));
 
 describe("A2UI import", () => {
+  it("imports a Modal as a Dialog with the Button that opens it, and exports it back (RFC-0025)", () => {
+    const r = fromA2ui(
+      [
+        { version: v, createSurface: { surfaceId: "s", catalogId: A2UI_BASIC_CATALOG } },
+        {
+          version: v,
+          updateComponents: {
+            surfaceId: "s",
+            components: [
+              { id: "root", component: "Column", children: ["terms"] },
+              { id: "terms", component: "Modal", trigger: "t", content: "body" },
+              { id: "t", component: "Button", child: "t-label", action: { event: { name: "x" } } },
+              { id: "t-label", component: "Text", text: "Read the terms" },
+              { id: "body", component: "Text", text: "Fine print." },
+            ],
+          },
+        },
+      ],
+      { sectionId: "sec_terms0001", catalog: catalog.id },
+    );
+    expect(checkSurface(r.surface, catalog).issues).toEqual([]);
+    const dialog = r.surface.components.find((c) => c.component === "Dialog");
+    expect(dialog?.props).toEqual({ title: "Read the terms" });
+    expect(r.surface.components.find((c) => c.component === "Button")?.props?.onClick).toEqual({
+      action: "open",
+      target: dialog?.id,
+    });
+    const back = toA2ui(r.surface);
+    expect(JSON.stringify(back.messages)).toContain('"component":"Modal"');
+  });
+
   it("turns the product card into a valid surface and says what it left out", () => {
     const r = fromA2ui(productCard, { sectionId: "sec_product01", catalog: catalog.id });
     expect(checkSurface(r.surface, catalog).issues).toEqual([]);

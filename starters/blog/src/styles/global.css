@@ -2469,12 +2469,16 @@ button.ch-button--secondary {
 }
 /* Drawers and the full-screen menu: a modal dialog (the browser traps focus, Escape closes it). */
 .ch-menu__dialog {
-  @apply m-0 grid content-start gap-4 p-4;
+  @apply m-0 content-start gap-4 p-4;
   max-width: none;
   max-height: none;
   height: 100dvh;
   width: min(22rem, calc(100vw - 3rem));
   border: 0;
+}
+/* Only an open dialog is laid out: a display of its own would show a closed one. */
+.ch-menu__dialog[open] {
+  display: grid;
 }
 .ch-menu__dialog[data-style="drawer-end"] {
   margin-inline-start: auto;
@@ -2619,4 +2623,220 @@ button.ch-button--secondary {
 }
 .ch-menu-page h1 {
   @apply mb-6 text-3xl font-bold;
+}
+
+/*
+ * RFC-0025 §3: overlays (Dialog, Drawer, Popover, Tooltip, Lightbox). Native top-layer elements,
+ * painted from the color roles; the page behind a modal does not scroll.
+ */
+html:has(dialog:modal) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+.ch-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  width: 100%;
+  max-width: min(36rem, calc(100vw - 2rem));
+  max-height: min(85dvh, 48rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--ch-radius-l, 0.75rem);
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+  box-shadow: 0 24px 60px -16px rgb(0 0 0 / 0.4);
+}
+.ch-dialog[data-size="s"] {
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+.ch-dialog[data-size="l"] {
+  max-width: min(52rem, calc(100vw - 2rem));
+}
+.ch-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.ch-dialog__head {
+  @apply sticky top-0 z-10 flex items-center justify-between gap-4 px-5 py-4;
+  background: inherit;
+  border-bottom: 1px solid var(--ch-color-border);
+}
+.ch-dialog__title {
+  @apply text-lg font-semibold;
+}
+.ch-dialog__close {
+  @apply inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full;
+}
+.ch-dialog__close:hover,
+.ch-lightbox__nav button:hover {
+  background: color-mix(in oklab, currentColor 12%, transparent);
+}
+.ch-dialog__body {
+  @apply grid gap-4 px-5 py-5;
+}
+/* Drawers: the full height of an edge, or the bottom (a sheet on phones). */
+.ch-drawer {
+  margin: 0;
+  height: 100dvh;
+  max-height: none;
+  width: min(26rem, calc(100vw - 3rem));
+  border-radius: 0;
+}
+.ch-drawer[data-size="s"] {
+  width: min(20rem, calc(100vw - 3rem));
+}
+.ch-drawer[data-size="l"] {
+  width: min(36rem, calc(100vw - 3rem));
+}
+.ch-drawer[data-placement="end"] {
+  margin-inline-start: auto;
+}
+.ch-drawer[data-placement="bottom"] {
+  margin-block-start: auto;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: 85dvh;
+  border-radius: var(--ch-radius-l, 0.75rem) var(--ch-radius-l, 0.75rem) 0 0;
+}
+/* Popovers and tooltips sit next to their trigger (anchor positioning; the module elsewhere). */
+.ch-popover {
+  margin: 0;
+  inset: auto;
+  position-area: bottom span-right;
+  position-try-fallbacks: flip-block, flip-inline;
+  margin-block-start: 8px;
+  width: 18rem;
+  max-width: calc(100vw - 2rem);
+  padding: 1rem;
+  border: 1px solid var(--ch-color-border);
+  border-radius: var(--ch-radius-m, 0.5rem);
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.3);
+}
+.ch-popover[data-width="s"] {
+  width: 12rem;
+}
+.ch-popover[data-width="l"] {
+  width: 26rem;
+}
+.ch-popover[data-placement="top"] {
+  position-area: top span-right;
+  margin-block: 0 8px;
+}
+.ch-popover[data-placement="start"] {
+  position-area: left span-bottom;
+  margin: 0 8px 0 0;
+}
+.ch-popover[data-placement="end"] {
+  position-area: right span-bottom;
+  margin: 0 0 0 8px;
+}
+.ch-popover > * + * {
+  margin-block-start: 0.75rem;
+}
+.ch-tooltip {
+  margin: 0;
+  inset: auto;
+  position-area: top;
+  position-try-fallbacks: flip-block;
+  margin-block-end: 6px;
+  max-width: 16rem;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--ch-radius-s, 0.25rem);
+  background: var(--ch-color-surface-inverse);
+  color: var(--ch-color-text-inverse);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+/* Lightbox: thumbnails, then the images large on a dark stage. */
+.ch-lightbox__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
+.ch-lightbox__thumb {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--ch-radius-s, 0.25rem);
+}
+.ch-lightbox__thumb img {
+  aspect-ratio: 1;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+.ch-lightbox__dialog {
+  max-width: min(72rem, calc(100vw - 2rem));
+  background: #0b0b0c;
+  color: #f4f4f5;
+}
+.ch-lightbox__dialog .ch-dialog__head {
+  border-bottom-color: rgb(255 255 255 / 0.12);
+}
+.ch-lightbox__count {
+  @apply text-sm tabular-nums;
+}
+.ch-lightbox__stage {
+  @apply px-5 py-4;
+}
+.ch-lightbox__item img {
+  display: block;
+  margin-inline: auto;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 70dvh;
+  object-fit: contain;
+}
+.ch-lightbox__item figcaption {
+  @apply mt-3 text-center text-sm;
+  color: #d4d4d8;
+}
+.ch-lightbox__nav {
+  @apply flex justify-center gap-4 pb-5;
+}
+.ch-lightbox__nav button {
+  @apply inline-flex size-11 cursor-pointer items-center justify-center rounded-full text-2xl;
+}
+/* Entrances and exits at the site's motion level (RFC-0024); none under reduced motion. */
+:root:not([data-ch-motion="none"]) :is(.ch-dialog, .ch-popover, .ch-tooltip) {
+  transition:
+    opacity var(--ch-dur-2, 0.2s) ease-out,
+    translate var(--ch-dur-2, 0.2s) var(--ch-ease-out, ease-out),
+    display var(--ch-dur-2, 0.2s) allow-discrete,
+    overlay var(--ch-dur-2, 0.2s) allow-discrete;
+}
+:root:not([data-ch-motion="none"])
+  :is(.ch-dialog:not([open]), .ch-popover:not(:popover-open), .ch-tooltip:not(:popover-open)) {
+  opacity: 0;
+}
+@starting-style {
+  .ch-dialog[open] {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+  .ch-drawer[data-placement="end"][open] {
+    translate: 100% 0;
+  }
+  .ch-drawer[data-placement="start"][open] {
+    translate: -100% 0;
+  }
+  .ch-drawer[data-placement="bottom"][open] {
+    translate: 0 100%;
+  }
+  .ch-popover:popover-open {
+    opacity: 0;
+    translate: 0 -0.25rem;
+  }
+  .ch-tooltip:popover-open {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.ch-dialog, .ch-popover, .ch-tooltip) {
+    transition: none !important;
+  }
 }

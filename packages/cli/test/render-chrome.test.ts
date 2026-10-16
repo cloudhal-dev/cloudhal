@@ -107,6 +107,23 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     const g = await run("good.html", good);
     for (const id of ["skip-link", "landmarks", "header-contrast", "focus-obscured"])
       expect(g(id)).toMatchObject({ ok: true });
+    // RFC-0025 §3: overlays opened through their triggers.
+    const overlays = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<style>body{margin:0;font:16px/1.5 sans-serif}.ch-dialog,.ch-popover{background:#fff;color:#111}.pale{color:#ddd}</style></head><body>
+<a href="#main">Skip</a><header>h</header><main id="main"><h1>Overlays</h1><section data-section-id="sec_o">
+<button command="show-modal" commandfor="ok">Open</button>
+<dialog id="ok" class="ch-dialog" closedby="any"><h2>Fine</h2><button command="close" commandfor="ok">Close</button></dialog>
+<dialog id="lost" class="ch-dialog"><h2>Nobody opens me</h2></dialog>
+<button popovertarget="pop">More</button><div id="pop" popover="auto" class="ch-popover"><p class="pale">Pale text</p></div>
+</section></main><footer>f</footer></body></html>`;
+    const o = await run("overlays.html", overlays);
+    expect(o("overlay-open")?.examples).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/dialog#lost .* nothing on the page opens it/),
+        expect.stringMatching(/Pale text.* inside the overlay, needs 4\.5:1/),
+      ]),
+    );
+    expect(o("overlay-open")?.count).toBe(2);
   }, 90_000);
 });
 

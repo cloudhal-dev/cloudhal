@@ -8,6 +8,7 @@ import { CHART_SCRIPT } from "./chart.ts";
 import { CHROME_SCRIPT } from "./chrome-client.ts";
 import { EMBED_SCRIPT } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
+import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Cloudhal's constant first-party modules `cloudhal dev` serves (builds write them as files). */
@@ -20,6 +21,7 @@ const SCRIPTS = new Map<string, string>([
   ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
   [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
   [CHROME_SCRIPT.path, CHROME_SCRIPT.code],
+  [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
 ]);
 
 interface MiddlewareContext {

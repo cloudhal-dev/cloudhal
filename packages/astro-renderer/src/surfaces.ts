@@ -22,6 +22,7 @@ import {
   MOTION_SCROLLS,
   MOTION_SPEEDS,
   MOTION_STAGGER,
+  OVERLAY_COMPONENTS,
   PARTICLE_PRESETS,
   resolveProps,
   SURFACE_STYLES,
@@ -34,6 +35,7 @@ import { chartInner } from "./chart.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
 import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { MOTION_SCRIPT } from "./motion-client.ts";
+import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { SURFACE_SCRIPT, scriptJson } from "./surface-client.ts";
 
 /** One component of a surface, ready to draw. */
@@ -54,6 +56,12 @@ export interface SurfaceNode {
   motion?: string;
   /** RFC-0024 24c: a Heading or Text revealed piece by piece. */
   split?: "words" | "chars" | "lines";
+  /**
+   * RFC-0025 §3: the overlay a Button opens or closes (its component, and a Dialog's fallback
+   * page), and the tooltip a Button or Link shows (component ids).
+   */
+  overlay?: { target: string; kind: string; fallback?: string };
+  tip?: string;
   children: SurfaceNode[];
 }
 
@@ -176,10 +184,15 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       .filter((i) => i.path.includes("/motion"))
       .map((i) => /^\/components\/(\d+)\//.exec(i.path)?.[1]),
   );
+  // RFC-0025 §3: tooltips by the component they describe.
+  const tips = new Map<string, string>();
+  for (const c of section.components)
+    if (c.component === "Tooltip" && typeof c.props?.for === "string") tips.set(c.props.for, c.id);
   const node = (
     id: string,
     depth: number,
     stagger?: { reveal: string; index: number },
+    within?: string,
   ): SurfaceNode | undefined => {
     const c = byId.get(id);
     if (!c || unknown.has(id) || depth > 8) return undefined;
@@ -197,12 +210,14 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
     const staggers =
       motion?.stagger === true && (MOTION_STAGGER as readonly string[]).includes(c.component);
     let i = 0;
+    const inside = OVERLAY_COMPONENTS.has(c.component) && c.component !== "Tooltip" ? id : within;
     const children = (c.children ?? [])
       .map((k) =>
         node(
           k,
           depth + 1,
           staggers ? { reveal: motion?.reveal ?? "rise", index: Math.min(i++, 12) } : undefined,
+          inside,
         ),
       )
       .filter((n): n is SurfaceNode => n !== undefined);
@@ -215,10 +230,35 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       typeof c.props?.text === "string"
         ? (reveal.slice(6) as "words" | "chars" | "lines")
         : undefined;
+    // RFC-0025 §3: what a Button opens or closes (a close without target closes its own overlay).
+    const click =
+      c.component === "Button"
+        ? (c.props?.onClick as Record<string, unknown> | undefined)
+        : undefined;
+    const target =
+      click?.action === "open" || click?.action === "close"
+        ? typeof click.target === "string"
+          ? click.target
+          : click.action === "close"
+            ? within
+            : undefined
+        : undefined;
+    const targetC = target ? byId.get(target) : undefined;
+    const fallback = targetC?.component === "Dialog" ? targetC.props?.fallbackHref : undefined;
+    const overlay = targetC
+      ? {
+          target: targetC.id,
+          kind: targetC.component,
+          ...(typeof fallback === "string" ? { fallback } : {}),
+        }
+      : undefined;
+    const tip = c.component === "Button" || c.component === "Link" ? tips.get(id) : undefined;
     return {
       id,
       component: c.component,
       entry,
+      ...(overlay ? { overlay } : {}),
+      ...(tip ? { tip } : {}),
       props: resolveProps(c.props, data, { locale }),
       raw: { ...(c.props ?? {}) },
       ...(live ? { live: true } : {}),
@@ -446,6 +486,60 @@ function fieldExtras(
   };
 }
 
+/** An overlay's close button (Invoker Commands; the overlay module where they are missing). */
+function closeButton(id: string, tr: boolean): string {
+  return `<button type="button" class="ch-dialog__close" command="close" commandfor="${id}" aria-label="${tr ? "Kapat" : "Close"}"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6"/></svg></button>`;
+}
+
+/**
+ * RFC-0025 §3: a Lightbox's thumbnails, each a link to its image (the way in without JavaScript),
+ * and its modal dialog with every image, one shown at a time (the overlay module moves through them).
+ */
+function lightboxHtml(id: string, p: Record<string, unknown>, media?: MediaContext): string {
+  const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+  const locale = media?.locale ?? defaultLocale;
+  const tr = locale.startsWith("tr");
+  const opts = {
+    locale,
+    defaultLocale,
+    transform: media?.transform ?? "none",
+    ...(media?.preview ? { preview: true } : {}),
+  } as const;
+  const items = (Array.isArray(p.items) ? p.items : []).slice(0, 24).flatMap((raw) => {
+    const it = (raw ?? {}) as Record<string, unknown>;
+    const m = /^asset:([a-z]+_[A-Za-z0-9]{6,32})$/.exec(str(it.asset));
+    const asset = m ? media?.assets?.get(m[1] as string) : undefined;
+    if (!asset) {
+      if (m) media?.onMiss?.(m[1] as string);
+      return [];
+    }
+    return [{ asset, alt: str(it.alt), caption: str(it.caption) }];
+  });
+  if (items.length === 0) return "";
+  const start = Math.min(Math.max(Number(p.start) || 0, 0), items.length - 1);
+  const title = str(p.title) || (tr ? "Görseller" : "Images");
+  const thumbs = items
+    .map((it, i) => {
+      const full = imageAttributes(it.asset, { alt: it.alt }, { ...opts, sizes: "100vw" });
+      const thumb = imgHtml(
+        imageAttributes(it.asset, { alt: it.alt }, { ...opts, sizes: "12rem" }),
+      );
+      return `<li><a class="ch-lightbox__thumb" href="${escapeHtml(full.src)}" data-ch-lightbox="${id}" data-index="${i}">${thumb}</a></li>`;
+    })
+    .join("");
+  const figures = items
+    .map((it, i) => {
+      const img = imgHtml(imageAttributes(it.asset, { alt: it.alt }, { ...opts, sizes: "100vw" }));
+      return `<figure class="ch-lightbox__item" data-index="${i}"${i === start ? "" : " hidden"}>${img}${it.caption ? `<figcaption>${escapeHtml(it.caption)}</figcaption>` : ""}</figure>`;
+    })
+    .join("");
+  const nav =
+    items.length > 1
+      ? `<div class="ch-lightbox__nav"><button type="button" class="ch-lightbox__prev" command="--prev" commandfor="${id}" aria-label="${tr ? "Önceki" : "Previous"}">‹</button><button type="button" class="ch-lightbox__next" command="--next" commandfor="${id}" aria-label="${tr ? "Sonraki" : "Next"}">›</button></div>`
+      : "";
+  return `<div class="ch-lightbox"><ul class="ch-lightbox__grid" aria-label="${escapeHtml(title)}">${thumbs}</ul><dialog id="${id}" class="ch-dialog ch-lightbox__dialog" closedby="any" aria-label="${escapeHtml(title)}"><header class="ch-dialog__head"><span class="ch-lightbox__count" aria-live="polite">${start + 1} / ${items.length}</span>${closeButton(id, tr)}</header><div class="ch-lightbox__stage">${figures}</div>${nav}</dialog></div>`;
+}
+
 /** Where a primitive's children go in its markup. */
 export const CHILDREN = "<!--ch-children-->";
 
@@ -455,7 +549,7 @@ export const CHILDREN = "<!--ch-children-->";
  */
 export function primitiveHtml(
   node: Pick<SurfaceNode, "id" | "component" | "props" | "children"> &
-    Partial<Pick<SurfaceNode, "raw" | "live" | "split">>,
+    Partial<Pick<SurfaceNode, "raw" | "live" | "split" | "overlay" | "tip">>,
   scope: string,
   media?: MediaContext,
 ): string {
@@ -529,17 +623,37 @@ export function primitiveHtml(
         node.component === "Link"
           ? "ch-link"
           : `ch-button ch-button--${["primary", "secondary", "ghost"].includes(str(p.variant)) ? str(p.variant) : "primary"}`;
+      // RFC-0025 §3: a tooltip's trigger, described by it.
+      const tip = node.tip
+        ? ` interestfor="${escapeHtml(`${scope}-${node.tip}`)}" aria-describedby="${escapeHtml(`${scope}-${node.tip}`)}"`
+        : "";
+      // RFC-0025 §3: opening and closing overlays, the browser's own way (Invoker Commands; popovers
+      // through popovertarget); a Dialog with a fallback page opens from a real link.
+      if (node.component === "Button" && node.overlay) {
+        const o = node.overlay;
+        const dom = escapeHtml(`${scope}-${o.target}`);
+        const opens = (p.onClick as { action?: unknown } | undefined)?.action === "open";
+        const label = text(node, "label");
+        if (o.kind === "Popover")
+          return `<button type="button" class="${cls}" popovertarget="${dom}"${opens ? "" : ' popovertargetaction="hide"'}${tip}>${label}</button>`;
+        if (!opens)
+          return `<button type="button" class="${cls}" command="close" commandfor="${dom}"${tip}>${label}</button>`;
+        const fallback = o.fallback ? safeHref(o.fallback) : undefined;
+        if (fallback)
+          return `<a class="${cls}" href="${escapeHtml(fallback)}" data-ch-open="${dom}" aria-haspopup="dialog" aria-controls="${dom}"${tip}>${label}</a>`;
+        return `<button type="button" class="${cls}" command="show-modal" commandfor="${dom}" aria-haspopup="dialog" aria-controls="${dom}"${tip}>${label}</button>`;
+      }
       // An action (RFC-0020 §4): a button the runtime acts on; without JavaScript it does nothing.
       const action = node.component === "Button" ? p.onClick : undefined;
       if (action && typeof action === "object" && !Array.isArray(action)) {
         const a = action as Record<string, unknown>;
         const safe = a.action !== "navigate" || (typeof a.href === "string" && safeHref(a.href));
         if (!safe) return "";
-        return `<button type="button" class="${cls}" data-ch-action="${json(a)}">${text(node, "label")}</button>`;
+        return `<button type="button" class="${cls}" data-ch-action="${json(a)}"${tip}>${text(node, "label")}</button>`;
       }
       const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
       if (!href) return "";
-      return `<a class="${cls}" href="${escapeHtml(href)}">${text(node, "label")}</a>`;
+      return `<a class="${cls}" href="${escapeHtml(href)}"${tip}>${text(node, "label")}</a>`;
     }
     case "Badge":
       return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${text(node, "label")}</span>`;
@@ -727,6 +841,22 @@ export function primitiveHtml(
       return `<div class="ch-step">${CHILDREN}</div>`;
     case "ScrollProgress":
       return `<div class="ch-progress"${attr("placement", p.placement ?? "page", ["page", "section"])}${attr("tone", p.tone, ["brand", "accent", "neutral"])} aria-hidden="true"><span class="ch-progress__bar"></span></div>`;
+    // RFC-0025 §3: overlays, closed until the reader opens them (top layer when open).
+    case "Dialog":
+    case "Drawer": {
+      const tr = (media?.locale ?? "en").startsWith("tr");
+      const closedby = { any: "any", closerequest: "closerequest", explicit: "none" }[
+        str(p.dismiss) as "any"
+      ];
+      const drawer = node.component === "Drawer";
+      return `<dialog id="${id}" class="ch-dialog${drawer ? " ch-drawer" : ""}"${attr("size", p.size, ["s", "m", "l"])}${drawer ? attr("placement", p.placement ?? "end", ["start", "end", "bottom"]) : ""} closedby="${closedby ?? "any"}" aria-labelledby="${id}-title"><header class="ch-dialog__head"><h2 class="ch-dialog__title" id="${id}-title">${escapeHtml(str(p.title))}</h2>${closeButton(id, tr)}</header><div class="ch-dialog__body">${CHILDREN}</div></dialog>`;
+    }
+    case "Popover":
+      return `<div popover="auto" id="${id}" class="ch-popover"${attr("placement", p.placement ?? "bottom", ["bottom", "top", "start", "end"])}${attr("width", p.width, ["s", "m", "l"])}>${CHILDREN}</div>`;
+    case "Tooltip":
+      return `<div popover="hint" id="${id}" class="ch-tooltip" role="tooltip">${escapeHtml(str(p.text))}</div>`;
+    case "Lightbox":
+      return lightboxHtml(id, p, media);
     case "Disclosure":
       return `<details class="ch-disclosure"${p.open === true ? " open" : ""}><summary>${escapeHtml(str(p.summary))}</summary><div class="ch-disclosure__body">${CHILDREN}</div></details>`;
     default:
@@ -852,9 +982,14 @@ export function surfaceWrapper(
   const pause = surfaceLoops(section)
     ? `<button type="button" class="ch-motion-toggle" data-ch-motion-toggle aria-pressed="false">${lang.startsWith("tr") ? "Hareketi duraklat" : "Pause motion"}</button>`
     : "";
-  const motion = usesMotion(section)
-    ? `${pause}<script type="module" src="${MOTION_SCRIPT.path}"></script>`
-    : "";
+  const motion =
+    (usesMotion(section)
+      ? `${pause}<script type="module" src="${MOTION_SCRIPT.path}"></script>`
+      : "") +
+    // RFC-0025 §3: the overlay module, only for surfaces with an overlay.
+    (section.components.some((c) => OVERLAY_COMPONENTS.has(c.component))
+      ? `<script type="module" src="${OVERLAY_SCRIPT.path}"></script>`
+      : "");
   return [
     `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,
     live
