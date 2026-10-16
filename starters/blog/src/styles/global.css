@@ -30,6 +30,15 @@
   --text-3xl: var(--ch-step-4, 1.875rem);
   --text-4xl: var(--ch-step-5, 2.25rem);
   --text-5xl: var(--ch-step-6, 3rem);
+  /*
+   * RFC-0023 §3: corners and spacing follow the `radius` and `density` settings
+   * (`--ch-radius-*`, `--ch-space-unit`); the fallbacks are Tailwind's own values.
+   */
+  --radius: var(--ch-radius-s, 0.25rem);
+  --radius-sm: var(--ch-radius-s, 0.25rem);
+  --radius-md: var(--ch-radius-m, 0.375rem);
+  --radius-lg: var(--ch-radius-l, 0.5rem);
+  --spacing: var(--ch-space-unit, 0.25rem);
 }
 
 /* Design settings (src/settings.ts, RFC-0017): CSS variables and data-ch-* attributes on <html>. */
@@ -1032,16 +1041,17 @@ button.ch-button--secondary {
   }
 }
 
-/* Corners (src/settings.ts `radius`): after the base rules, so they win. */
-[data-ch-radius="none"] .ch-button,
-[data-ch-radius="none"] .ch-hero__cta,
-[data-ch-radius="none"] .ch-callout {
-  border-radius: 0;
-}
-[data-ch-radius="large"] .ch-button,
-[data-ch-radius="large"] .ch-hero__cta,
-[data-ch-radius="large"] .ch-callout {
-  border-radius: 0.75rem;
+/*
+ * Corners of controls (src/settings.ts `radius`, RFC-0023 §3): buttons and single-line fields
+ * take `--ch-radius-control`, a pill at `full`; cards and bands keep the smaller radii. After
+ * the base rules, so they win.
+ */
+.ch-button,
+.ch-hero__cta,
+.ch-body
+  :is(input[type="text"], input[type="search"], input[type="number"], input[type="email"], select),
+.ch-body form button[type="submit"]:not(.sr-only) {
+  border-radius: var(--ch-radius-control, 0.25rem);
 }
 /* Search (RFC-0019 §3): the header form, the page's form, results with highlighted snippets. */
 .ch-header-search input {

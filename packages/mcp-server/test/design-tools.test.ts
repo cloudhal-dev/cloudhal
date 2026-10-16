@@ -37,6 +37,11 @@ describe("design tools (RFC-0021)", () => {
             default: "system",
           },
           typeScale: { type: "string", enum: ["compact", "balanced", "dramatic"] },
+          radius: {
+            type: "string",
+            enum: ["none", "small", "medium", "large", "full"],
+            default: "small",
+          },
           brand: { type: "string", format: "color", default: "#18181b" },
         },
       },
@@ -82,12 +87,20 @@ describe("design tools (RFC-0021)", () => {
     await run("set_theme_settings", {
       siteId,
       rev: before.rev,
-      values: { seed: "#0f766e", scheme: "vibrant", mode: "auto", typePairing: "editorial" },
+      values: {
+        seed: "#0f766e",
+        scheme: "vibrant",
+        mode: "auto",
+        typePairing: "editorial",
+        radius: "full",
+      },
     });
     const after = (await run("get_design", { siteId })).result as {
       colors: Colors;
       type: unknown;
+      shape: unknown;
     };
+    expect(after.shape).toEqual({ radius: "full", density: "cozy" });
     expect(after.type).toEqual({ pairing: "editorial", scale: null });
     expect(after.colors).toMatchObject({ source: "seed", mode: "auto" });
     expect(after.colors.light.brand).toBe("#0f766e");
@@ -98,6 +111,7 @@ describe("design tools (RFC-0021)", () => {
     expect(text).toContain("Dark roles: surface #");
     expect(text).toContain("Render the page with scheme dark too.");
     expect(text).toContain("Type (RFC-0023): pairing editorial, scale none (fixed sizes).");
+    expect(text).toContain("Shape (RFC-0023): radius full, density cozy.");
   });
 
   it("changes the site's rules only with a person's approval, and warns without refusing", async () => {
@@ -118,7 +132,7 @@ describe("design tools (RFC-0021)", () => {
     ).result as { rev: number; warnings: string[] };
     expect(set.warnings).toEqual([
       "Not in this site's catalog: Hero",
-      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, typePairing, typeScale, brand)",
+      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, typePairing, typeScale, radius, brand)",
       "No “## Brand” section: say what the site is for, who reads it and its voice.",
     ]);
     const got = (await run("get_design", { siteId })).result as {

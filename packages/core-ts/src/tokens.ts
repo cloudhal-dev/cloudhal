@@ -504,3 +504,52 @@ export function typeStep(scale: TypeScale, step: number): string {
 export function typeScaleCss(scale: TypeScale): string {
   return TYPE_STEPS.map((s) => `--ch-step-${s}:${typeStep(scale, s)}`).join(";");
 }
+
+// ── shape and density (RFC-0023 §3) ────────────────────────────────────────────────────────
+
+export const RADII = ["none", "small", "medium", "large", "full"] as const;
+export type Radius = (typeof RADII)[number];
+export const DENSITIES = ["compact", "cozy", "airy"] as const;
+export type Density = (typeof DENSITIES)[number];
+
+/**
+ * Corner radii in rem: `control` for buttons and fields (a pill at `full`), `s`, `m` and `l` for
+ * small parts, cards and large surfaces. `small` is the blog theme's former look.
+ */
+const RADIUS: Record<Radius, { control: string; s: string; m: string; l: string }> = {
+  none: { control: "0", s: "0", m: "0", l: "0" },
+  small: { control: "0.25rem", s: "0.25rem", m: "0.375rem", l: "0.5rem" },
+  medium: { control: "0.375rem", s: "0.375rem", m: "0.5rem", l: "0.75rem" },
+  large: { control: "0.75rem", s: "0.5rem", m: "0.75rem", l: "1rem" },
+  full: { control: "9999px", s: "0.5rem", m: "0.75rem", l: "1.25rem" },
+};
+
+/** How much room things get: a factor on the spacing unit (Tailwind's 0.25rem at `cozy`). */
+const DENSITY: Record<Density, number> = { compact: 0.875, cozy: 1, airy: 1.2 };
+
+/** The named spaces, in units of 0.25rem at `cozy`: xs 0.5rem … xl 2.5rem. */
+const SPACES = { xs: 2, s: 3, m: 4, l: 6, xl: 10 } as const;
+
+/**
+ * The shape and density as CSS declarations for `:root`: `--ch-radius-{control,s,m,l}`,
+ * `--ch-space-unit` and `--ch-space-{xs,s,m,l,xl}`. Unknown values fall back to the defaults.
+ */
+export function shapeCss(settings: { radius?: unknown; density?: unknown } = {}): string {
+  const radius = (RADII as readonly unknown[]).includes(settings.radius)
+    ? (settings.radius as Radius)
+    : "small";
+  const density = (DENSITIES as readonly unknown[]).includes(settings.density)
+    ? (settings.density as Density)
+    : "cozy";
+  const r = RADIUS[radius];
+  const unit = 0.25 * DENSITY[density];
+  const rem = (v: number) => `${Number(v.toFixed(4))}rem`;
+  return [
+    `--ch-radius-control:${r.control}`,
+    `--ch-radius-s:${r.s}`,
+    `--ch-radius-m:${r.m}`,
+    `--ch-radius-l:${r.l}`,
+    `--ch-space-unit:${rem(unit)}`,
+    ...Object.entries(SPACES).map(([name, n]) => `--ch-space-${name}:${rem(unit * n)}`),
+  ].join(";");
+}

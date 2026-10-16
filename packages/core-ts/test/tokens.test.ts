@@ -7,6 +7,7 @@ import {
   contrastRatio,
   expandColorTokens,
   legacyColorRoles,
+  shapeCss,
   siteColorTokens,
   TYPE_SCALES,
   TYPE_STEPS,
@@ -188,5 +189,43 @@ describe("type scale (RFC-0023 §2)", () => {
       TYPE_STEPS.map((s) => `--ch-step-${s}`),
     );
     expect(typeScaleCss("balanced")).toBe(css);
+  });
+});
+
+describe("shape and density (RFC-0023 §3)", () => {
+  const decl = (css: string) => Object.fromEntries(css.split(";").map((d) => d.split(":")));
+
+  it("keeps the theme's former corners and Tailwind's spacing by default", () => {
+    expect(decl(shapeCss())).toEqual({
+      "--ch-radius-control": "0.25rem",
+      "--ch-radius-s": "0.25rem",
+      "--ch-radius-m": "0.375rem",
+      "--ch-radius-l": "0.5rem",
+      "--ch-space-unit": "0.25rem",
+      "--ch-space-xs": "0.5rem",
+      "--ch-space-s": "0.75rem",
+      "--ch-space-m": "1rem",
+      "--ch-space-l": "1.5rem",
+      "--ch-space-xl": "2.5rem",
+    });
+    // unknown values fall back, so nothing free-form reaches CSS
+    expect(shapeCss({ radius: "huge;}", density: 3 })).toBe(shapeCss());
+  });
+
+  it("makes pill controls without pill cards, and scales every space with the density", () => {
+    const pill = decl(shapeCss({ radius: "full", density: "airy" }));
+    expect(pill["--ch-radius-control"]).toBe("9999px");
+    expect(pill["--ch-radius-l"]).toBe("1.25rem");
+    expect(pill["--ch-space-unit"]).toBe("0.3rem");
+    expect(pill["--ch-space-xl"]).toBe("3rem");
+    const square = decl(shapeCss({ radius: "none", density: "compact" }));
+    expect(
+      new Set(
+        Object.entries(square)
+          .filter(([k]) => k.startsWith("--ch-radius"))
+          .map(([, v]) => v),
+      ),
+    ).toEqual(new Set(["0"]));
+    expect(square["--ch-space-m"]).toBe("0.875rem");
   });
 });

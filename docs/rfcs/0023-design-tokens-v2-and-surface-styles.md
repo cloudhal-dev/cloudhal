@@ -1,5 +1,5 @@
 # RFC-0023: Design tokens v2 and surface styles
-- Status: Accepted; 23a and 23b shipped
+- Status: Accepted; 23a–23c shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0017 (theme settings, `set_theme_settings`, `x-contrast`), RFC-0018 (theme kit, CSS layers, 18d section styles), RFC-0021 (DESIGN.md, `render_page`, the design judge), RFC-0022 (surface tools);
@@ -170,3 +170,14 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
   - **Wrapping.** Headings get `text-wrap: balance`; paragraphs, list items and quotes `pretty`.
   - **Agents.** `get_design` returns `type` (pairing, scale) and says how to change them. DESIGN guidance point 1 and the theme's DESIGN.md say which pairing fits which kind of site.
   - **Checked.** Every pairing rendered with `render_page` at 1440 and 390 px passes every check, including dramatic headings on phones.
+- **23c shipped.**
+  - **Settings.** The blog theme's `radius` grows to `none`, `small`, `medium`, `large` and `full` (its three old values keep their names), and `density` (`compact`, `cozy`, `airy`) is new.
+  - **Variables.** `shapeCss` (`@cloudhal/core-ts/tokens`) writes:
+    - `--ch-radius-control`, for buttons and single-line fields; it is a pill at `full`, while cards and bands keep the smaller radii;
+    - `--ch-radius-s`, `-m` and `-l`;
+    - `--ch-space-unit`, which is 0.875×, 1× or 1.2× Tailwind's 0.25rem;
+    - `--ch-space-xs` to `-xl`, for themes and custom CSS.
+  - **The theme.** It maps Tailwind's `rounded*` sizes and its spacing unit to these variables, so every padding, gap and band follows the density without class changes. Controls take the control radius; this replaces the old corner rules for buttons, CTAs and callouts.
+  - **Defaults.** `small` and `cozy` are Tailwind's own values, so existing sites keep their look. One exception: the header search field takes the control radius, 4 px instead of 6 px.
+  - **Agents.** `get_design` returns `shape`, and the theme's DESIGN.md says which corners and spacing fit which site.
+  - **Checked.** Pill and airy, and square and compact, both rendered with `render_page` at 1440 and 390 px and passed every check, the tap targets on compact included.
