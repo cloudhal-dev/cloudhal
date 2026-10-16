@@ -223,6 +223,15 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
   - **Interop.** A2UI TextField (`number` → NumberField) and CheckBox convert, with literal values moved into the data; password and date fields are refused with a note. The export maps the four inputs to TextField, CheckBox and ChoicePicker.
   - **`render_page`** checks `input-label`: a form control without an accessible name. Studio names it in the chat.
   - **Styles** in the blog theme (synced to the examples) and the preview. DESIGN guidance point 6 and the theme's DESIGN.md say how to lay out a tool.
+- **22c shipped.**
+  - **`Chart`** (bar, grouped or stacked; line; area; donut) is a primitive. Its `data` must be a `{path}` binding to a list of rows.
+  - **Drawing.** `chartInner` (astro-renderer `chart.ts`) draws it as SVG with nice ticks, at most 12 axis labels and a tooltip per point. A legend appears for several series or a donut, and the same numbers sit in a `<table>` under "Show the data" (localized). Every text is escaped; numbers are formatted in the page locale with the unit.
+  - **Live charts.** The same self-contained function ships as `/_cloudhal/chart.1.js`. The runtime (`surface.4.js`; 1–3 served as aliases) loads it only when a live surface has a chart, and redraws it from its bindings when the data changes. A test checks the browser copy draws exactly what the server does; under Node's own type stripping it was checked to be valid and identical too, with no bundler `__name` helpers.
+  - **Colors** are theme tokens `--ch-chart-1…6`: the brand color first, then five fixed hues that each reach 3:1 against white.
+  - **`render_page`** checks `chart-empty`; Studio names it. The catalog prompt, DESIGN guidance and the theme's DESIGN.md say when to use a chart and which kind.
+- **Deviations (22c).**
+  - **Colors:** the six fixed hues stand in for a theme palette (open question 3) until tokens v2.
+  - **Limits:** 500 rows per chart are drawn; the props check caps literal lists at 50, but chart data is always a binding.
 - **Deviations (22b).**
   - **A bound or computed `Text`** in a live surface now renders as plain text the runtime keeps in step. Before, it was markdown rendered once, so a keypad display or a computed sentence never changed.
   - **ChoicePicker imports stay as they were** (Toggle or Select, whose options are their values). RadioGroup is used when exporting and when agents build.

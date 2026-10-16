@@ -437,6 +437,53 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     children: "none",
     example: { props: { label: "Seats", min: 1, max: 50, step: 1, value: 5 } },
   },
+  // RFC-0022 §3: a chart drawn as SVG on the server, with its numbers as a table.
+  {
+    name: "Chart",
+    title: { en: "Chart", tr: "Grafik" },
+    description: {
+      en: "Bar, line, area or donut chart of rows in the surface's data: data {path} to a list of objects, x the category field, series the number fields.",
+      tr: "Yüzey verisindeki satırların çubuk, çizgi, alan veya halka grafiği.",
+    },
+    category: "content",
+    props: schema(
+      {
+        kind: { type: "string", enum: ["bar", "line", "area", "donut"] },
+        title: label(120),
+        data: { type: "array", items: { type: "string" }, maxItems: 50 },
+        x: { type: "string", minLength: 1, maxLength: 60 },
+        series: {
+          type: "array",
+          minItems: 1,
+          maxItems: 6,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["field"],
+            properties: {
+              field: { type: "string", minLength: 1, maxLength: 60 },
+              label: { type: "string", maxLength: 60 },
+            },
+          },
+        },
+        unit: { type: "string", maxLength: 20 },
+        stacked: { type: "boolean" },
+        height: { type: "string", enum: ["s", "m", "l"] },
+        caption: { type: "string", maxLength: 300 },
+      },
+      ["title", "data", "x", "series"],
+    ),
+    children: "none",
+    example: {
+      props: {
+        kind: "bar",
+        title: "Readers per month",
+        data: { path: "/months" },
+        x: "month",
+        series: [{ field: "readers", label: "Readers" }],
+      },
+    },
+  },
   // RFC-0022 §2: local inputs. They write only to the surface's data, in the reader's browser.
   {
     name: "NumberField",
@@ -1352,6 +1399,12 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       });
     checkProps(entry, c.props, `${at}/props`, issues);
     // RFC-0022 §2: a local input writes to the surface's data, so its value is a binding.
+    // RFC-0022 §3: a chart reads its rows from the surface's data.
+    if (c.component === "Chart" && !(isObj(c.props) && isPathValue(c.props.data)))
+      issues.push({
+        path: `${at}/props/data`,
+        message: 'bind it to a list in the surface\'s data: {"path":"/rows"}',
+      });
     const writes = INPUT_MODEL[c.component];
     if (writes && !(isObj(c.props) && isPathValue(c.props[writes])))
       issues.push({
@@ -1944,6 +1997,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
       '{"path":"/json/pointer"}, or computed by a named function: {"call":"formatDate","args":{"value":{"path":"/d"},"style":"long"}}.',
     `- Functions: ${SURFACE_FUNCTIONS.join(", ")}.`,
     '- Inputs (NumberField, TextField, Checkbox, RadioGroup) write only to the surface\'s data in the reader\'s browser: bind value (checked for Checkbox) with {"path"}, start it in `data` ("" for an empty number), give every input a label, and show the computed result next to it. Buttons may `append` text to a value (keypads) or `set` a computed value, e.g. {"action":"set","path":"/display","value":{"call":"calculate","args":{"expression":{"path":"/display"}}}}.',
+    '- Charts: a Chart draws rows from the surface\'s data, e.g. {"id":"c","component":"Chart","props":{"kind":"bar","title":"Readers per month","data":{"path":"/months"},"x":"month","series":[{"field":"readers","label":"Readers"}]}} with "data":{"months":[{"month":"Jan","readers":1200},…]}. Use one only when the numbers are the point; bar for comparing, line or area for change over time, donut for parts of a whole (one series, at most six parts).',
     "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
       '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
       'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',

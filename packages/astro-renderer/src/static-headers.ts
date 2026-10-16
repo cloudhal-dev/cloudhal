@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CHART_SCRIPT } from "./chart.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
@@ -68,10 +69,16 @@ export async function writeEmbedClient(dir: URL | string): Promise<void> {
 
 /** Writes the interaction runtime (RFC-0020 §4) into the build's `/_cloudhal/`. */
 export async function writeSurfaceClient(dir: URL | string): Promise<void> {
-  for (const name of [SURFACE_SCRIPT.path, ...SURFACE_SCRIPT_ALIASES]) {
+  const files: [string, string][] = [
+    [SURFACE_SCRIPT.path, SURFACE_SCRIPT.code],
+    ...SURFACE_SCRIPT_ALIASES.map((alias) => [alias, SURFACE_SCRIPT.code] as [string, string]),
+    // RFC-0022 §3: the chart drawer, loaded by the runtime for live charts only.
+    [CHART_SCRIPT.path, CHART_SCRIPT.code],
+  ];
+  for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
     await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, SURFACE_SCRIPT.code);
+    await writeFile(file, code);
   }
 }
 

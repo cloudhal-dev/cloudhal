@@ -51,6 +51,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "tap-target": "small tap targets",
   "long-line": "long lines",
   "input-label": "unlabelled inputs",
+  "chart-empty": "empty charts",
 };
 
 function summary(r: RenderPageResult): string {

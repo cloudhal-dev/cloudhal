@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.3.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.4.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -407,11 +407,17 @@ describe("interaction runtime", () => {
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "ca339b9ff5cf",
+      "44b6b1570bd8",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.3.js");
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.4.js");
     // RFC-0022: pages cached with the first name get the same (compatible) code
-    expect(SURFACE_SCRIPT_ALIASES).toEqual(["/_cloudhal/surface.1.js", "/_cloudhal/surface.2.js"]);
+    expect(SURFACE_SCRIPT_ALIASES).toEqual([
+      "/_cloudhal/surface.1.js",
+      "/_cloudhal/surface.2.js",
+      "/_cloudhal/surface.3.js",
+    ]);
+    // live charts load the drawer from its own versioned file
+    expect(SURFACE_SCRIPT.code).toContain('import("/_cloudhal/chart.1.js")');
     expect(SURFACE_SCRIPT.code.length).toBeLessThan(10_000);
   });
 });
