@@ -87,6 +87,34 @@ const byId = (r: ReturnType<typeof fromA2ui>) =>
   new Map(r.surface.components.map((c) => [c.id, c]));
 
 describe("A2UI import", () => {
+  it("imports A2UI icons by name into the set and exports them back (RFC-0026)", () => {
+    const r = fromA2ui(
+      [
+        { version: v, createSurface: { surfaceId: "s", catalogId: A2UI_BASIC_CATALOG } },
+        {
+          version: v,
+          updateComponents: {
+            surfaceId: "s",
+            components: [
+              { id: "root", component: "Row", children: ["a", "b"] },
+              { id: "a", component: "Icon", name: "locationOn" },
+              { id: "b", component: "Icon", name: "starHalf" },
+            ],
+          },
+        },
+      ],
+      { sectionId: "sec_icons0001", catalog: catalog.id },
+    );
+    expect(checkSurface(r.surface, catalog).issues).toEqual([]);
+    expect(r.surface.components.filter((c) => c.component === "Icon").map((c) => c.props)).toEqual([
+      { name: "map-pin" },
+    ]);
+    expect(r.notes.join("\n")).toMatch(/starHalf/);
+    expect(JSON.stringify(toA2ui(r.surface).messages)).toContain(
+      '"component":"Icon","name":"locationOn"',
+    );
+  });
+
   it("imports a Modal as a Dialog with the Button that opens it, and exports it back (RFC-0025)", () => {
     const r = fromA2ui(
       [

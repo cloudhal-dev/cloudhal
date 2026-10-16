@@ -12,6 +12,7 @@
  * any other; nothing here bypasses `checkSurface`. Worker-safe: pure functions.
  */
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
+import { nearestIcon } from "./icon-names.ts";
 
 export const A2UI_VERSION = "v0.9";
 export const A2UI_BASIC_CATALOG = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
@@ -535,15 +536,27 @@ export function fromA2ui(
         }
         break;
       }
+      // RFC-0026: A2UI's icon names (camelCase, Material-like) map onto the curated set.
+      case "Icon": {
+        const raw = typeof a.name === "string" ? a.name : undefined;
+        const named = nearestIcon(raw);
+        if (!named) {
+          notes.add(
+            `icons outside Cloudhal's set were left out (${String(raw ?? "a bound name")})`,
+          );
+          return undefined;
+        }
+        component = "Icon";
+        props = { name: named };
+        break;
+      }
       case "Image":
-      case "Icon":
       case "Video":
       case "AudioPlayer":
       case "DateTimeInput": {
         const why: Record<string, string> = {
           Image:
             "images come from the site's media library, not URLs; upload them and add an Image",
-          Icon: "Cloudhal has no icon component yet",
           Video: "videos are embedded with the video block, not URLs",
           AudioPlayer: "Cloudhal has no audio component",
           DateTimeInput: "Cloudhal has no date input yet",
@@ -704,6 +717,46 @@ const A2UI_JUSTIFY_OUT: Record<string, string> = {
  * `updateComponents` and, with data, `updateDataModel`. `assetUrl` turns `asset:` references into
  * URLs a renderer can load; without it images are left out.
  */
+/** RFC-0026: the curated names A2UI's basic catalog also has, by its spelling. */
+const A2UI_ICON: Readonly<Record<string, string>> = {
+  user: "person",
+  plus: "add",
+  "arrow-left": "arrowBack",
+  "arrow-right": "arrowForward",
+  calendar: "calendarToday",
+  phone: "phone",
+  check: "check",
+  close: "close",
+  trash: "delete",
+  download: "download",
+  edit: "edit",
+  error: "error",
+  heart: "favorite",
+  folder: "folder",
+  question: "help",
+  home: "home",
+  info: "info",
+  "map-pin": "locationOn",
+  lock: "lock",
+  unlock: "lockOpen",
+  mail: "mail",
+  menu: "menu",
+  more: "moreHoriz",
+  bell: "notifications",
+  "credit-card": "payment",
+  image: "photo",
+  print: "print",
+  refresh: "refresh",
+  search: "search",
+  settings: "settings",
+  share: "share",
+  cart: "shoppingCart",
+  star: "star",
+  upload: "upload",
+  eye: "visibility",
+  warning: "warning",
+};
+
 export function toA2ui(
   surface: Pick<SurfaceSection, "id" | "components" | "data">,
   options: { surfaceId?: string; assetUrl?: (ref: string) => string | undefined } = {},
@@ -950,6 +1003,14 @@ export function toA2ui(
       case "TabPanel":
         out.push({ id: c.id, component: "Column", children: kids });
         break;
+      // RFC-0026: an icon by A2UI's basic-catalog name, where it has one.
+      case "Icon": {
+        const name = A2UI_ICON[String(p.name)];
+        if (name) out.push({ id: c.id, component: "Icon", name });
+        else
+          notes.add(`icons without an A2UI basic-catalog name were left out (${String(p.name)})`);
+        break;
+      }
       // RFC-0025 §3: a Dialog or Drawer is A2UI's Modal, with a trigger of its own.
       case "Dialog":
       case "Drawer": {

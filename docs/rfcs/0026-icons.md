@@ -73,3 +73,12 @@ None; `docs/design/icons.md` decided them.
   - **Generator.** `scripts/gen-icons.ts` (`pnpm --filter @cloudhal/core-ts gen:icons`) reads `src/icon-names.ts` and Phosphor 2.1.1's regular weight (a dev dependency), plus the vendored Bluesky file (`icons/simple-icons/`, source and license in `SOURCE.md`). It writes `src/generated/icons-data.ts` (36 KB, 12 KB gzipped, Worker bundle only). `test/icons.test.ts` fails when that file drifts.
   - **Theme.** The header's menu and carets, the disclosure carets, the announcement's close, overlays' close buttons and the lightbox's arrows now use the set. Footer social links are icon links named by the network.
   - **CSS.** `.ch-icon` sits on the baseline; pointing icons flip under `[dir=rtl]`; forced colors keep icons visible.
+- **26b shipped.**
+  - **Catalog.**
+    - An `Icon` component: `name`; `label` only when it stands alone; `size` s–xl; a `tone`.
+    - `icon` on `Button` (with `iconPosition`), `Badge` and `Stat`.
+    - `List`'s `marker` takes any icon name, besides `bullet` and `none`; `check` is now the icon.
+  - **One list of names.** Icon props use a new schema format (`format: "icon"`, and `marker` for list bullets) rather than enums, so the 93 names appear once, in `catalogPrompt`, grouped. The PropsSchema subset allows 50 values per enum; this also keeps `get_catalog` small. Both formats are checked against the set (`@cloudhal/core-ts/blocks`).
+  - **Repair.** `repairComponent` maps model spellings to the set: 160 aliases (`envelope`, `hamburger`, `ArrowForward`, `fa-…`, `-outline`). An unknown optional icon is dropped; an unknown `Icon` name stays an error.
+  - **A2UI.** A basic-catalog `Icon` imports by name (`locationOn` → `map-pin`) and exports back where A2UI has the name.
+  - **Rendering.** Decorative SVG everywhere a label is beside it. A labelled `Icon` gets `role="img"`. Button icons sit before or after the label. List bullets are an icon on each item, in the brand color.

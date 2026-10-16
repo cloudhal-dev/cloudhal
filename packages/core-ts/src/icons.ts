@@ -8,9 +8,16 @@
  */
 
 import { ICON_DATA } from "./generated/icons-data.ts";
-import { ICON_GROUPS, ICON_NAMES, type IconName } from "./icon-names.ts";
+import {
+  ICON_ALIASES,
+  ICON_GROUPS,
+  ICON_NAMES,
+  type IconName,
+  nearestIcon,
+  normalizeIconName,
+} from "./icon-names.ts";
 
-export { ICON_GROUPS, ICON_NAMES, type IconName };
+export { ICON_ALIASES, ICON_GROUPS, ICON_NAMES, type IconName, nearestIcon, normalizeIconName };
 
 const NAMES = new Set<string>(ICON_NAMES);
 

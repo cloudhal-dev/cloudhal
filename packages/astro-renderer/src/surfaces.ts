@@ -620,6 +620,16 @@ export function primitiveHtml(
     }
     case "Button":
     case "Link": {
+      // RFC-0026: a button's icon, decorative (its label names it), before or after the label.
+      const glyph =
+        node.component === "Button"
+          ? renderIcon(str(p.icon), { className: "ch-button__icon" })
+          : "";
+      const label = glyph
+        ? p.iconPosition === "end"
+          ? `${text(node, "label")}${glyph}`
+          : `${glyph}${text(node, "label")}`
+        : text(node, "label");
       const cls =
         node.component === "Link"
           ? "ch-link"
@@ -634,7 +644,6 @@ export function primitiveHtml(
         const o = node.overlay;
         const dom = escapeHtml(`${scope}-${o.target}`);
         const opens = (p.onClick as { action?: unknown } | undefined)?.action === "open";
-        const label = text(node, "label");
         if (o.kind === "Popover")
           return `<button type="button" class="${cls}" popovertarget="${dom}"${opens ? "" : ' popovertargetaction="hide"'}${tip}>${label}</button>`;
         if (!opens)
@@ -650,16 +659,23 @@ export function primitiveHtml(
         const a = action as Record<string, unknown>;
         const safe = a.action !== "navigate" || (typeof a.href === "string" && safeHref(a.href));
         if (!safe) return "";
-        return `<button type="button" class="${cls}" data-ch-action="${json(a)}"${tip}>${text(node, "label")}</button>`;
+        return `<button type="button" class="${cls}" data-ch-action="${json(a)}"${tip}>${label}</button>`;
       }
       const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
       if (!href) return "";
-      return `<a class="${cls}" href="${escapeHtml(href)}"${tip}>${text(node, "label")}</a>`;
+      return `<a class="${cls}" href="${escapeHtml(href)}"${tip}>${label}</a>`;
     }
     case "Badge":
-      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${text(node, "label")}</span>`;
+      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${renderIcon(str(p.icon))}${text(node, "label")}</span>`;
+    // RFC-0026: an icon on its own; named only when it carries meaning alone.
+    case "Icon": {
+      const glyph = renderIcon(str(p.name), { label: str(p.label) || undefined });
+      return glyph
+        ? `<span class="ch-icon-box"${attr("size", p.size, ["s", "m", "l", "xl"])}${attr("tone", p.tone, ["neutral", "brand", "accent", "success", "warning", "danger"])}>${glyph}</span>`
+        : "";
+    }
     case "Stat":
-      return `<div class="ch-stat"><span class="ch-stat__value">${text(node, "value")}</span><span class="ch-stat__label">${text(node, "label")}</span>${p.detail ? `<span class="ch-stat__detail">${text(node, "detail")}</span>` : ""}</div>`;
+      return `<div class="ch-stat">${p.icon ? `<span class="ch-stat__icon">${renderIcon(str(p.icon))}</span>` : ""}<span class="ch-stat__value">${text(node, "value")}</span><span class="ch-stat__label">${text(node, "label")}</span>${p.detail ? `<span class="ch-stat__detail">${text(node, "detail")}</span>` : ""}</div>`;
     case "Toggle": {
       const options = Array.isArray(p.options) ? p.options.slice(0, 8).map(str) : [];
       const radios = options
@@ -789,7 +805,9 @@ export function primitiveHtml(
     case "List": {
       const items = Array.isArray(p.items) ? p.items.slice(0, 50) : [];
       const tag = p.ordered === true ? "ol" : "ul";
-      return `<${tag} class="ch-list"${attr("marker", p.marker, ["bullet", "check", "none"])}>${items.map((i) => `<li>${escapeHtml(str(i))}</li>`).join("")}</${tag}>`;
+      // RFC-0026: an icon of the set as the bullet (decorative), drawn on each item.
+      const glyph = renderIcon(str(p.marker), { className: "ch-list__marker" });
+      return `<${tag} class="ch-list"${glyph ? ' data-marker="icon"' : attr("marker", p.marker, ["bullet", "none"])}>${items.map((i) => `<li>${glyph}${escapeHtml(str(i))}</li>`).join("")}</${tag}>`;
     }
     case "Tabs": {
       // No JavaScript: one radio per panel; the theme's CSS shows the checked one's panel.
