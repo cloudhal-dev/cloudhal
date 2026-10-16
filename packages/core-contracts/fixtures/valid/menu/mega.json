@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "menu_01HZX8K3Q9MG",
+  "siteId": "site_01HZX8K3Q9EF",
+  "key": "primary",
+  "maxDepth": 3,
+  "items": [
+    {
+      "id": "item_01HZX8K3Q9P1",
+      "kind": "group",
+      "labels": {
+        "en": "Product"
+      },
+      "display": "mega",
+      "children": [
+        {
+          "id": "item_01HZX8K3Q9C1",
+          "kind": "group",
+          "labels": {
+            "en": "Features"
+          },
+          "children": [
+            {
+              "id": "item_01HZX8K3Q9L1",
+              "kind": "page",
+              "pageId": "page_01HZX8K3Q9HM"
+            }
+          ]
+        },
+        {
+          "id": "item_01HZX8K3Q9C2",
+          "kind": "group",
+          "labels": {
+            "en": "Resources"
+          },
+          "children": [
+            {
+              "id": "item_01HZX8K3Q9L2",
+              "kind": "url",
+              "href": "https://cloudhal.dev/docs",
+              "labels": {
+                "en": "Docs"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rev": 4,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T11:30:00Z"
+}

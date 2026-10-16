@@ -277,7 +277,7 @@ function useObjectUrl(file: File, enabled: boolean): string | undefined {
 }
 
 function StatusLine({ item }: { item: UploadItem }) {
-  const t = useT();
+  const t = useT("media");
   if (item.state === "uploading")
     return (
       <Meter
@@ -314,8 +314,8 @@ function StatusLine({ item }: { item: UploadItem }) {
 }
 
 function UploadRow({ item, upload }: { item: UploadItem; upload: MediaUpload }) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("media");
+  const { locale } = useI18n("media");
   const image = isImage(item);
   const preview = useObjectUrl(item.file, image && item.state !== "error");
   const editable = item.state === "ready" || item.state === "preparing";
@@ -446,7 +446,7 @@ export function UploadPanel({
   /** Show an "Upload" button under the queue (the picker, whose primary action picks). */
   inlineStart?: boolean;
 }) {
-  const t = useT();
+  const t = useT("media");
   const { items } = upload;
   const done = items.filter((i) => i.state === "done" || i.state === "existing").length;
   return (
@@ -519,7 +519,7 @@ export function UploadDialog({
   accept: string;
   disabledReason?: string | undefined;
 }) {
-  const t = useT();
+  const t = useT("media");
   const upload = useMediaUpload(siteId);
   const seeded = useRef<File[] | undefined>(undefined);
   useEffect(() => {

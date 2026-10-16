@@ -143,6 +143,53 @@ pub struct Menu {
     #[serde(rename = "updatedAt")]
     pub updated_at: Timestamp,
 }
+#[doc = "RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links)."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum MenuDisplay {
+    #[serde(rename = "mega")]
+    Mega,
+}
+impl ::std::fmt::Display for MenuDisplay {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Mega => f.write_str("mega"),
+        }
+    }
+}
+impl ::std::str::FromStr for MenuDisplay {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "mega" => Ok(Self::Mega),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for MenuDisplay {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for MenuDisplay {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
 #[doc = "One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "kind", deny_unknown_fields)]
@@ -152,6 +199,8 @@ pub enum MenuItem {
     Page {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         children: ::std::vec::Vec<MenuItem>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         id: Id,
         #[serde(skip_serializing_if = "::std::option::Option::is_none")]
         labels: ::std::option::Option<MenuLabels>,
@@ -163,6 +212,8 @@ pub enum MenuItem {
     ContentEntry {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         children: ::std::vec::Vec<MenuItem>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         #[serde(rename = "entryId")]
         entry_id: Id,
         id: Id,
@@ -174,6 +225,8 @@ pub enum MenuItem {
     Term {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         children: ::std::vec::Vec<MenuItem>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         id: Id,
         #[serde(skip_serializing_if = "::std::option::Option::is_none")]
         labels: ::std::option::Option<MenuLabels>,
@@ -186,6 +239,8 @@ pub enum MenuItem {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         children: ::std::vec::Vec<MenuItem>,
         collection: Slug,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         id: Id,
         labels: MenuLabels,
     },
@@ -194,6 +249,8 @@ pub enum MenuItem {
     Url {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         children: ::std::vec::Vec<MenuItem>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         href: MenuItemHref,
         id: Id,
         labels: MenuLabels,
@@ -208,6 +265,8 @@ pub enum MenuItem {
     #[serde(rename = "group")]
     Group {
         children: ::std::vec::Vec<MenuItem>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        display: ::std::option::Option<MenuDisplay>,
         id: Id,
         labels: MenuLabels,
     },

@@ -28,6 +28,13 @@ export type Id = string;
 export type MenuItem =
   PageMenuItem | EntryMenuItem | TermMenuItem | CollectionMenuItem | UrlMenuItem | GroupMenuItem;
 /**
+ * RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).
+ *
+ * This interface was referenced by `Menu`'s JSON-Schema
+ * via the `definition` "MenuDisplay".
+ */
+export type MenuDisplay = "mega";
+/**
  * Lower-case URL segment.
  *
  * This interface was referenced by `Menu`'s JSON-Schema
@@ -90,6 +97,7 @@ export interface PageMenuItem {
   kind: "page";
   pageId: Id;
   labels?: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100
@@ -113,6 +121,7 @@ export interface EntryMenuItem {
   kind: "contentEntry";
   entryId: Id;
   labels?: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100
@@ -127,6 +136,7 @@ export interface TermMenuItem {
   kind: "term";
   termId: Id;
   labels?: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100
@@ -141,6 +151,7 @@ export interface CollectionMenuItem {
   kind: "collection";
   collection: Slug;
   labels: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100
@@ -159,6 +170,7 @@ export interface UrlMenuItem {
    */
   newTab?: boolean;
   labels: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100
@@ -172,6 +184,7 @@ export interface GroupMenuItem {
   id: Id;
   kind: "group";
   labels: MenuLabels;
+  display?: MenuDisplay;
   /**
    * @minItems 1
    * @maxItems 100

@@ -35,7 +35,12 @@ const ApprovalsPage = lazyRouteComponent(
 );
 const ArticleEditorPage = lazyRouteComponent(
   () =>
-    withMessages(import("./routes/ArticleEditorPage.tsx"), ["readers", "comments", "bodyEditor"]),
+    withMessages(import("./routes/ArticleEditorPage.tsx"), [
+      "readers",
+      "comments",
+      "bodyEditor",
+      "media",
+    ]),
   "ArticleEditorPage",
 );
 const ArticlesPage = lazyRouteComponent(
@@ -66,7 +71,7 @@ const ForgotPasswordPage = lazyRouteComponent(
 );
 const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers", "bodyEditor"]),
+  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers", "bodyEditor", "media"]),
   "PageEditorPage",
 );
 const BuildPage = lazyRouteComponent(
@@ -86,7 +91,14 @@ const SiteSettingsPage = lazyRouteComponent(
   () =>
     withMessages(
       import("./routes/SiteSettingsPage.tsx"),
-      ["analyticsSettings", "commentsSettings", "scheduleSettings", "aiSettings", "appearance"],
+      [
+        "analyticsSettings",
+        "commentsSettings",
+        "scheduleSettings",
+        "aiSettings",
+        "appearance",
+        "media",
+      ],
       LOCALE_LIST,
     ),
   "SiteSettingsPage",
@@ -99,16 +111,19 @@ const SnapshotsPage = lazyRouteComponent(
 );
 const TaxonomyPage = lazyRouteComponent(() => import("./routes/TaxonomyPage.tsx"), "TaxonomyPage");
 const TermEditorPage = lazyRouteComponent(
-  () => import("./routes/TermEditorPage.tsx"),
+  () => withMessages(import("./routes/TermEditorPage.tsx"), ["media"]),
   "TermEditorPage",
 );
 const NavigationPage = lazyRouteComponent(
   () => import("./routes/NavigationPage.tsx"),
   "NavigationPage",
 );
-const MediaPage = lazyRouteComponent(() => import("./routes/MediaPage.tsx"), "MediaPage");
+const MediaPage = lazyRouteComponent(
+  () => withMessages(import("./routes/MediaPage.tsx"), ["media"]),
+  "MediaPage",
+);
 const AssetPage = lazyRouteComponent(
-  () => withMessages(import("./routes/AssetPage.tsx"), ["appearance"]),
+  () => withMessages(import("./routes/AssetPage.tsx"), ["media"]),
   "AssetPage",
 );
 const RedirectsPage = lazyRouteComponent(

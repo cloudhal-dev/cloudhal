@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9EF",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Demo Newsroom",
+  "slug": "demo-newsroom",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [
+    {
+      "hostname": "demo-newsroom.cloudhal.app",
+      "primary": false
+    },
+    {
+      "hostname": "news.example.com",
+      "primary": true
+    }
+  ],
+  "pageIds": ["page_01HZX8K3Q9GH", "page_01HZX8K3Q9IJ"],
+  "homePageId": "page_01HZX8K3Q9GH",
+  "theme": {
+    "name": "blog",
+    "version": "0.1.0",
+    "config": {
+      "accent": "#0f62fe"
+    }
+  },
+  "publishedSnapshotId": "snap_01HZX8K3Q9KL",
+  "rev": 12,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z",
+  "brand": {
+    "logo": {
+      "assetId": "asset_01HZX8K3Q9LG",
+      "src": "/media/0123456789abcdef/logo.svg",
+      "alt": "Ledgerly"
+    },
+    "logoHeight": "m",
+    "social": [
+      {
+        "network": "github",
+        "href": "https://github.com/ledgerly"
+      },
+      {
+        "network": "rss",
+        "href": "/feed.xml"
+      }
+    ]
+  },
+  "chrome": {
+    "header": {
+      "layout": "logo-left",
+      "behavior": "sticky",
+      "width": "wide",
+      "surface": "plain",
+      "mobileStyle": "drawer-end",
+      "collapseAt": "md",
+      "nav": "primary",
+      "actions": [
+        {
+          "kind": "search"
+        },
+        {
+          "kind": "button",
+          "label": "Start free",
+          "href": "/signup",
+          "variant": "primary"
+        }
+      ]
+    },
+    "footer": {
+      "layout": "columns",
+      "surface": "muted",
+      "tagline": "Invoices that chase themselves.",
+      "columns": [
+        {
+          "heading": "Product",
+          "menu": "footer-product"
+        },
+        {
+          "heading": "Company",
+          "menu": "footer-company"
+        }
+      ],
+      "social": true,
+      "copyright": "© {year} {site}",
+      "legal": "legal",
+      "extras": ["motion-toggle"],
+      "credit": true,
+      "region": {
+        "id": "sec_01HZX8K3Q9RG",
+        "kind": "surface",
+        "catalog": "blog@1",
+        "components": [
+          {
+            "id": "root",
+            "component": "Stack",
+            "children": ["t"]
+          },
+          {
+            "id": "t",
+            "component": "Text",
+            "props": {
+              "text": "Get the newsletter."
+            }
+          }
+        ]
+      }
+    },
+    "announcement": {
+      "id": "spring-2026",
+      "text": "New: recurring invoices",
+      "label": "See what's new",
+      "href": "/blog/recurring",
+      "tone": "brand",
+      "dismissible": true
+    },
+    "consent": {
+      "mode": "notice",
+      "policy": "/privacy"
+    }
+  }
+}

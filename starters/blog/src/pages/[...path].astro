@@ -220,6 +220,12 @@ tags.push(
   ...navigationCacheTags(footerMenu),
   ...extraMenus.flatMap(([, menu]) => navigationCacheTags(menu)),
 );
+// RFC-0025 §2: the footer's surface region loads its entry sources like a page's surfaces.
+const regionSources = chrome.footer.region
+  ? await loadSurfaceSources(source, [chrome.footer.region])
+  : {};
+if (chrome.footer.region && surfaceSources(chrome.footer.region).length > 0)
+  tags.push(listCacheTag(site.id));
 addCacheTags(Astro.response.headers, tags);
 
 // Video players (RFC-0015 §4): the Site Worker allows their frames on this page only.
@@ -260,7 +266,12 @@ const searchForm = searchAvailable(config, source)
     }
   : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }} barWords={{ announcement: t.announcement, dismiss: t.dismiss, privacy: t.privacy, consentNotice: t.consentNotice, consentChoices: t.consentChoices, consentOk: t.consentOk, consentAll: t.consentAll, consentEssential: t.consentEssential, privacyPolicy: t.privacyPolicy, copied: t.copied, linkCopied: t.linkCopied }}>
+  {chrome.footer.region && (
+    <Fragment slot="footer-region">
+      <Sections sections={[chrome.footer.region]} entries={{}} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={regionSources} />
+    </Fragment>
+  )}
   {isMenu && (
     <div class="ch-menu-page">
       <h1>{t.menu}</h1>

@@ -26,9 +26,11 @@ export const CHROME_SETTINGS_SECTION = "chrome";
 /** RFC-0025: the site's header, footer and brand (logos as `asset:<id>`), with their form schemas. */
 interface ChromeSettings {
   header: Record<string, unknown>;
+  announcement: Record<string, unknown>;
+  consent: Record<string, unknown>;
   footer: Record<string, unknown>;
   brand: Record<string, unknown>;
-  schemas: { brand: PropsSchema; header: PropsSchema; footer: PropsSchema };
+  schemas: Record<Part, PropsSchema>;
   /** The menu keys the header and footer may name. */
   menus: string[];
   rev: number;
@@ -42,7 +44,15 @@ const chromeApi = {
     request(`/api/sites/${siteId}/chrome`, { method: "PUT", ...json(input) }),
 };
 
-type Part = "brand" | "header" | "footer";
+type Part = "brand" | "header" | "footer" | "announcement" | "consent";
+/** The segments: the bars (announcement, consent) share one. */
+type Segment = "header" | "footer" | "bars" | "brand";
+const PARTS: Record<Segment, readonly Part[]> = {
+  header: ["header"],
+  footer: ["footer"],
+  bars: ["announcement", "consent"],
+  brand: ["brand"],
+};
 type Values = Record<Part, Record<string, unknown>>;
 const LOGOS = ["logo", "logoDark"] as const;
 const ASSET = /^asset:(.+)$/;
@@ -134,20 +144,32 @@ export function ChromeSettingsSection({
   const chrome = useQuery({ queryKey: key, queryFn: () => chromeApi.get(siteId) });
   const saved = chrome.data;
   const initial = useMemo<Values | undefined>(
-    () => (saved ? { brand: saved.brand, header: saved.header, footer: saved.footer } : undefined),
+    () =>
+      saved
+        ? {
+            brand: saved.brand,
+            header: saved.header,
+            footer: saved.footer,
+            announcement: saved.announcement,
+            consent: saved.consent,
+          }
+        : undefined,
     [saved],
   );
   const [values, setValues] = useState<Values | undefined>();
-  const [part, setPart] = useState<Part>("header");
+  const [segment, setSegment] = useState<Segment>("header");
   useEffect(() => {
     if (initial) setValues(initial);
   }, [initial]);
   const issues = useMemo(() => {
-    if (!saved || !values) return { brand: [], header: [], footer: [] };
+    if (!saved || !values)
+      return { brand: [], header: [], footer: [], announcement: [], consent: [] };
     return {
       brand: validateProps(without(saved.schemas.brand, LOGOS), values.brand),
       header: validateProps(saved.schemas.header, values.header),
       footer: validateProps(saved.schemas.footer, values.footer),
+      announcement: validateProps(saved.schemas.announcement, values.announcement),
+      consent: validateProps(saved.schemas.consent, values.consent),
     };
   }, [saved, values]);
   const save = useMutation({
@@ -167,7 +189,7 @@ export function ChromeSettingsSection({
       </SettingsSection>
     );
   const dirty = JSON.stringify(values) !== JSON.stringify(initial);
-  const invalid = issues.brand.length + issues.header.length + issues.footer.length > 0;
+  const invalid = Object.values(issues).some((list) => list.length > 0);
   const disabled = !gate.allowed;
   const set = (p: Part) => (next: Record<string, unknown>) =>
     setValues((v) => (v ? { ...v, [p]: next } : v));
@@ -223,15 +245,16 @@ export function ChromeSettingsSection({
       <div className="grid min-w-0 gap-4" data-chrome-form="">
         <Tabs
           variant="segmented"
-          value={part}
-          onValueChange={(v) => setPart(v as Part)}
+          value={segment}
+          onValueChange={(v) => setSegment(v as Segment)}
           tabs={[
             { value: "header", label: t("appearance.chrome.header") },
             { value: "footer", label: t("appearance.chrome.footer") },
+            { value: "bars", label: t("appearance.chrome.bars") },
             { value: "brand", label: t("appearance.chrome.brand") },
           ]}
         />
-        {part === "brand" &&
+        {segment === "brand" &&
           LOGOS.map((k) => (
             <LogoField
               key={k}
@@ -248,17 +271,29 @@ export function ChromeSettingsSection({
               }}
             />
           ))}
-        <BlockPropsForm
-          key={part}
-          schema={part === "brand" ? without(saved.schemas.brand, LOGOS) : saved.schemas[part]}
-          value={values[part]}
-          onChange={set(part)}
-          issues={issues[part]}
-          locale={locale}
-          disabled={disabled}
-          enumLabel={enumLabel}
-          labels={labels}
-        />
+        {PARTS[segment].map((part) => (
+          <div key={part} className="grid min-w-0 gap-4">
+            {segment === "bars" && (
+              <Text bold as="h3">
+                {t(
+                  part === "announcement"
+                    ? "appearance.chrome.announcement"
+                    : "appearance.chrome.consent",
+                )}
+              </Text>
+            )}
+            <BlockPropsForm
+              schema={part === "brand" ? without(saved.schemas.brand, LOGOS) : saved.schemas[part]}
+              value={values[part]}
+              onChange={set(part)}
+              issues={issues[part]}
+              locale={locale}
+              disabled={disabled}
+              enumLabel={enumLabel}
+              labels={labels}
+            />
+          </div>
+        ))}
         <Text variant="secondary" size="sm">
           {disabled && gate.reason
             ? gate.reason

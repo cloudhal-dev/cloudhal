@@ -12,10 +12,23 @@
  * - The menu link (`[data-ch-dialog]`) opens its modal dialog instead of `/menu`; a click on the
  *   backdrop or on a link inside closes it, and the browser returns focus to the link.
  * - An open disclosure menu closes on Escape or a click elsewhere.
- * - Submenu popovers sit under their button where CSS anchor positioning is missing.
+ * - Submenu popovers sit under their button where CSS anchor positioning is missing (a mega panel
+ *   spans the page under the header instead).
+ * - RFC-0025 25d: the announcement's close button and the consent bar's buttons, hidden without
+ *   JavaScript, write the reader's choice to a first-party cookie (a year, `SameSite=Lax`) and
+ *   mark the root as `prefs.1.js` does on the next page, so the bar goes at once and stays gone;
+ *   `--ch-consent-h` keeps focused content clear of the consent bar.
  */
 
 const code = String.raw`const d=document,h=d.documentElement,hd=d.querySelector(".ch-header");
+const keep=(k,v)=>{d.cookie=k+"="+encodeURIComponent(v)+"; Max-Age=31536000; Path=/; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"");};
+for(const b of d.querySelectorAll("[data-ch-dismiss]")){b.hidden=false;b.addEventListener("click",()=>{const id=b.getAttribute("data-ch-dismiss")||"";
+const m=/(?:^|;\s*)ch_dismiss=([^;]*)/.exec(d.cookie),old=m?decodeURIComponent(m[1]).split(",").filter(Boolean):[];
+keep("ch_dismiss",[...old.filter((x)=>x!==id),id].slice(-5).join(","));h.setAttribute("data-ch-announcement-dismissed","");const main=d.getElementById("main");if(main)main.focus({preventScroll:true});});}
+const bar=d.querySelector("[data-ch-consent-bar]");
+if(bar){const setC=()=>h.style.setProperty("--ch-consent-h",(h.hasAttribute("data-ch-consent")?0:bar.offsetHeight)+"px");setC();
+if("ResizeObserver"in window)new ResizeObserver(setC).observe(bar);
+for(const b of bar.querySelectorAll("[data-ch-consent-choice]")){b.hidden=false;b.addEventListener("click",()=>{const v=b.getAttribute("data-ch-consent-choice")||"ok";keep("ch_consent",v);h.setAttribute("data-ch-consent",v);setC();});}}
 if(hd){
 const setH=()=>h.style.setProperty("--ch-header-h",hd.offsetHeight+"px");
 setH();if("ResizeObserver"in window)new ResizeObserver(setH).observe(hd);
@@ -40,10 +53,12 @@ dlg.addEventListener("click",(e)=>{if(e.target===dlg||(e.target instanceof Eleme
 const menus=[...d.querySelectorAll("details.ch-menu")];
 if(menus.length){d.addEventListener("keydown",(e)=>{if(e.key!=="Escape")return;for(const m of menus)if(m.open){m.open=false;m.querySelector("summary")?.focus();}});
 d.addEventListener("click",(e)=>{for(const m of menus)if(m.open&&!(e.target instanceof Node&&m.contains(e.target)))m.open=false;});}
-if(!(window.CSS&&CSS.supports("anchor-name","--a"))){for(const p of d.querySelectorAll("[popover].ch-nav-menu__pop")){
+if(!(window.CSS&&CSS.supports("anchor-name","--a"))){for(const p of d.querySelectorAll("[popover].ch-nav-menu__pop:not(.ch-nav-menu__pop--mega)")){
 p.addEventListener("toggle",(e)=>{if(e.newState!=="open")return;const b=d.querySelector('[popovertarget="'+p.id+'"]');if(!b)return;
 const r=b.getBoundingClientRect();p.style.position="fixed";p.style.margin="0";p.style.top=Math.round(r.bottom+6)+"px";
 p.style.left=Math.round(Math.max(8,Math.min(r.left,innerWidth-p.offsetWidth-8)))+"px";});}}
 `;
 
-export const CHROME_SCRIPT = { path: "/_cloudhal/chrome.1.js", code } as const;
+export const CHROME_SCRIPT = { path: "/_cloudhal/chrome.2.js", code } as const;
+/** Earlier names, still asked for by cached pages: they get the current code. */
+export const CHROME_SCRIPT_ALIASES = ["/_cloudhal/chrome.1.js"] as const;

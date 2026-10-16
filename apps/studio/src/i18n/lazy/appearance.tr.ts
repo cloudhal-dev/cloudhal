@@ -40,7 +40,9 @@ export const messages: NamespaceMessages<"appearance"> = {
       gradient: "Geçiş sonu",
     },
     chrome: {
-      logoUse: "Site logosu",
+      bars: "Barlar",
+      announcement: "Duyuru",
+      consent: "Gizlilik barı",
       title: "Üst ve alt bilgi",
       description:
         "Her sayfada görünen logo, üst bilgi ve alt bilgi. Bir sayfa bunları gizleyebilir ya da üst bilgiyi ilk bandının üstünde saydam yapabilir.",

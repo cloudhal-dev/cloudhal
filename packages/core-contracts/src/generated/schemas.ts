@@ -205,6 +205,35 @@ export const SiteSchema = {
     }
   },
   "$defs": {
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ActorKind"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "ActorKind": {
+      "type": "string",
+      "description": "Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.",
+      "enum": [
+        "human",
+        "agent",
+        "system"
+      ]
+    },
     "Announcement": {
       "type": "object",
       "additionalProperties": false,
@@ -245,6 +274,60 @@ export const SiteSchema = {
           "type": "boolean"
         }
       }
+    },
+    "BodyBlock": {
+      "type": "object",
+      "description": "One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^blk_[0-9A-Za-z]{8,24}$",
+          "description": "Stable across writes that keep the block's content or its place among unchanged blocks."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 (hex) of the block's markdown without trailing whitespace."
+        },
+        "by": {
+          "$ref": "#/$defs/Actor"
+        },
+        "via": {
+          "type": "string",
+          "enum": [
+            "studio",
+            "mcp",
+            "api",
+            "import",
+            "ai-command",
+            "proposal"
+          ],
+          "description": "The channel of that change."
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      }
+    },
+    "BodyBlocks": {
+      "type": "array",
+      "description": "A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.",
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/BodyBlock"
+      }
+    },
+    "BodyProfile": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
     },
     "Brand": {
       "type": "object",
@@ -369,6 +452,10 @@ export const SiteSchema = {
         },
         "credit": {
           "type": "boolean"
+        },
+        "region": {
+          "$ref": "#/$defs/Section",
+          "description": "RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds."
         }
       }
     },
@@ -605,6 +692,29 @@ export const SiteSchema = {
         }
       }
     },
+    "Link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "href"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "external": {
+          "type": "boolean"
+        }
+      }
+    },
     "Locale": {
       "type": "string",
       "description": "BCP 47 language tag, e.g. en, tr, en-US.",
@@ -633,6 +743,234 @@ export const SiteSchema = {
       "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
       "enum": [
         1
+      ]
+    },
+    "Section": {
+      "title": "Section",
+      "description": "A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "HeroSection",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "heading"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "hero"
+              ]
+            },
+            "heading": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "subheading": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "image": {
+              "$ref": "#/$defs/ImageRef"
+            },
+            "cta": {
+              "$ref": "#/$defs/Link"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "RichTextSection",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "format",
+            "body"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "richText"
+              ]
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "html"
+              ]
+            },
+            "body": {
+              "type": "string",
+              "maxLength": 200000
+            },
+            "profile": {
+              "$ref": "#/$defs/BodyProfile"
+            },
+            "blocks": {
+              "$ref": "#/$defs/BodyBlocks"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ImageSection",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "image"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "image"
+              ]
+            },
+            "image": {
+              "$ref": "#/$defs/ImageRef"
+            },
+            "caption": {
+              "type": "string",
+              "maxLength": 1000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ContentListSection",
+          "description": "Renders the newest entries of a content collection (e.g. blog posts).",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "collection",
+            "limit",
+            "sort"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "contentList"
+              ]
+            },
+            "collection": {
+              "$ref": "#/$defs/Slug"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "sort": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest",
+                "title"
+              ]
+            },
+            "filter": {
+              "type": "string",
+              "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "ComponentSection",
+          "description": "A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "type",
+            "props"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
+            },
+            "props": {
+              "type": "object",
+              "description": "Validated against the type's props schema by the store, not by this contract.",
+              "additionalProperties": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "SurfaceSection",
+          "description": "A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "catalog",
+            "components"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "surface"
+              ]
+            },
+            "catalog": {
+              "type": "string",
+              "description": "The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).",
+              "pattern": "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"
+            },
+            "components": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/SurfaceComponent"
+              }
+            },
+            "data": {
+              "type": "object",
+              "description": "The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).",
+              "additionalProperties": true
+            }
+          }
+        }
       ]
     },
     "Slug": {
@@ -673,6 +1011,51 @@ export const SiteSchema = {
           "maxLength": 2048
         }
       }
+    },
+    "SurfaceComponent": {
+      "type": "object",
+      "description": "One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "component"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SurfaceComponentId"
+        },
+        "component": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/SurfaceComponentId"
+          }
+        },
+        "props": {
+          "type": "object",
+          "description": "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.",
+          "additionalProperties": true
+        },
+        "visible": {
+          "type": "object",
+          "description": "A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.",
+          "additionalProperties": true
+        },
+        "motion": {
+          "type": "object",
+          "description": "Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "SurfaceComponentId": {
+      "type": "string",
+      "description": "A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).",
+      "pattern": "^[a-z][a-z0-9-]{0,40}$"
     },
     "ThemeRef": {
       "type": "object",
@@ -3612,6 +3995,13 @@ export const MenuSchema = {
       "description": "BCP 47 language tag, e.g. en, tr, en-US.",
       "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
     },
+    "MenuDisplay": {
+      "type": "string",
+      "description": "RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).",
+      "enum": [
+        "mega"
+      ]
+    },
     "MenuItem": {
       "description": "One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.",
       "oneOf": [
@@ -3640,6 +4030,9 @@ export const MenuSchema = {
             },
             "labels": {
               "$ref": "#/$defs/MenuLabels"
+            },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
             },
             "children": {
               "type": "array",
@@ -3677,6 +4070,9 @@ export const MenuSchema = {
             "labels": {
               "$ref": "#/$defs/MenuLabels"
             },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
+            },
             "children": {
               "type": "array",
               "items": {
@@ -3712,6 +4108,9 @@ export const MenuSchema = {
             },
             "labels": {
               "$ref": "#/$defs/MenuLabels"
+            },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
             },
             "children": {
               "type": "array",
@@ -3749,6 +4148,9 @@ export const MenuSchema = {
             },
             "labels": {
               "$ref": "#/$defs/MenuLabels"
+            },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
             },
             "children": {
               "type": "array",
@@ -3793,6 +4195,9 @@ export const MenuSchema = {
             "labels": {
               "$ref": "#/$defs/MenuLabels"
             },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
+            },
             "children": {
               "type": "array",
               "items": {
@@ -3826,6 +4231,9 @@ export const MenuSchema = {
             },
             "labels": {
               "$ref": "#/$defs/MenuLabels"
+            },
+            "display": {
+              "$ref": "#/$defs/MenuDisplay"
             },
             "children": {
               "type": "array",

@@ -49,6 +49,8 @@ export interface ItemInput {
   readonly target: TargetInput | { readonly kind: "group" };
   readonly labels?: Readonly<Record<string, string>>;
   readonly newTab?: boolean;
+  /** RFC-0025 25d: a top-level item with children opens as a mega panel. */
+  readonly display?: "mega";
   readonly children?: readonly ItemInput[];
 }
 
@@ -76,6 +78,8 @@ export type MenuOp =
       readonly target?: TargetInput;
       /** URL items only; `null` clears it. */
       readonly newTab?: boolean | null;
+      /** RFC-0025 25d: `mega` for a top-level item with children; `null` clears it. */
+      readonly display?: "mega" | null;
     };
 
 const ITEM_ID = /^item_[A-Za-z0-9]{6,32}$/;
@@ -266,6 +270,13 @@ export function validateMenuTree(
           `${what} sits at level ${depth}, deeper than this menu's maxDepth ${menu.maxDepth}`,
           { itemId: item.id, depth, maxDepth: menu.maxDepth },
         );
+      // RFC-0025 25d: a mega panel is a top-level item's way of opening its children.
+      if (item.display === "mega" && (depth !== 1 || !item.children?.length))
+        throw new InvariantError(
+          "invalid_menu",
+          `${what}: display mega belongs to a top-level item with children (its columns)`,
+          { itemId: item.id },
+        );
       const target = itemTarget(item);
       if (target && !NODE_ID.test(target.id))
         throw new InvariantError("invalid_menu", `${what}: ${target.id} is not a node id`, {
@@ -401,6 +412,7 @@ export function buildMenuItem(input: ItemInput, newId: () => string): MenuItem {
     item.newTab = input.newTab;
   }
   if (input.labels && Object.keys(input.labels).length > 0) item.labels = { ...input.labels };
+  if (input.display === "mega") item.display = "mega";
   if (input.children && input.children.length > 0)
     item.children = input.children.map((c) => buildMenuItem(c, newId) as unknown as Mutable);
   return item as unknown as MenuItem;
@@ -525,6 +537,10 @@ export function applyMenuOps<T extends Pick<Menu, "items" | "maxDepth" | "siteId
                 { itemId: op.itemId },
               );
             else item.newTab = op.newTab;
+          }
+          if (op.display !== undefined) {
+            if (op.display === null) delete item.display;
+            else item.display = op.display;
           }
           break;
         }
@@ -779,6 +795,8 @@ export interface ResolvedMenuItem {
   readonly external: boolean;
   readonly newTab: boolean;
   readonly target?: TargetRef | { readonly kind: "collection"; readonly collection: string };
+  /** RFC-0025 25d: how a top-level item opens its children in a header (`mega`: columns). */
+  readonly display?: "mega";
   readonly children: ResolvedMenuItem[];
 }
 
@@ -876,6 +894,7 @@ export function resolveMenu(
       external: item.kind === "url",
       newTab: item.kind === "url" && item.newTab === true,
       ...(target ? { target } : {}),
+      ...(item.display === "mega" ? { display: "mega" as const } : {}),
       children,
     };
   };

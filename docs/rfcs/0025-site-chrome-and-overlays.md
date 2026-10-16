@@ -262,3 +262,19 @@ None; the report decided them:
   - **Theme.** The scroll lock is `html:has(dialog:modal)`. Entrances use `@starting-style` and follow the motion level; there are none under reduced motion.
   - **Check.** `render_page` adds `overlay-open`: each overlay is opened through its trigger, focus moves in, it closes, focus returns, and its text contrast is checked. An overlay nothing opens is reported. Screenshots of open overlays are left for later.
   - **25b fix.** The drawer and full-screen menu dialog showed when closed on wide screens; only an open one is now laid out.
+- **25d shipped.**
+  - **Contract.**
+    - `chrome.footer.region` is one section, refused unless it is a surface, and checked like a page's surfaces.
+    - Menu items gain `display: "mega"` (an RFC-0003 amendment), allowed only on a top-level item with children.
+    - The MCP menu tools and `update` operations carry it. Studio's menu editor does not edit it yet.
+  - **Announcement.** A bar above the header (`role=region`, a tone, an optional link). Its close button writes `ch_dismiss=<id>` (the last five ids, a year, `SameSite=Lax`). A new `id` shows a new bar.
+    - **Changed from the design:** the edge cache does not vary on cookies, so the server cannot leave a closed bar out. Instead, `/_cloudhal/prefs.1.js` (a 263 B classic script in `<head>`, loaded only with a dismissible bar or a consent bar) reads the cookies and marks the root (`data-ch-announcement-dismissed`, `data-ch-consent`). CSS hides the bar before the page paints, so nothing shifts.
+  - **Consent.** `notice` (OK) or `choices` (allow all, only essential): a fixed bottom bar with the privacy link that writes `ch_consent`. While it shows, the page keeps room below it (`scroll-padding-bottom`, body padding from `--ch-consent-h`) so it never covers what has focus.
+    - Cloudhal sites are cookieless and embeds load on a reader's click, so `choices` records the choice and exposes it on the root for later third-party features. The bars' buttons appear only with JavaScript; without it the bar still informs.
+  - **Toasts.** A live region (`role=status`) on every page. The interaction runtime (`surface.10.js`; `surface.9.js` is an alias) says "Copied" or "Link copied" there after `copy` and `share`. Toasts go after four seconds.
+  - **Mega menus.** One wide popover under the header, its groups as columns (loose links form a first column).
+  - **Footer region.** Drawn above the columns with the page's `Sections`, its entry sources loaded and cache-tagged like a page's.
+  - **Agents and people.**
+    - `set_chrome` takes `announcement`, `consent` and `footer.region`; `get_chrome` resolves the bars.
+    - Studio's Header and footer section gains a Bars segment.
+    - `chrome.2.js` (with `chrome.1.js` as an alias) handles the bars' buttons.
