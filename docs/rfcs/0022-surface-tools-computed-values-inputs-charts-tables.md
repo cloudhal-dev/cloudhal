@@ -53,7 +53,7 @@ New names in `SURFACE_FUNCTIONS`, in the same shape as today: `{"call": "<name>"
 | `choose` | `value`, `cases: {key: v}`, `default?` | the case for a key (a select's choice → a factor) |
 | `sum` / `average` / `count` | `list`, `field?` | an aggregate over an array in the data |
 | `formatPercent` | `value`, `digits?` | `0.25` → "25%" in the page locale |
-| `calculate` | `expression` (string, ≤ 200 characters) | a typed arithmetic expression's value (§1.1) |
+| `calculate` | `expression` (string, ≤ 200 characters), `vars?` (names → values, bindings or calls) | a typed expression or a formula over named values (§1.1) |
 
 **Semantics:**
 - **Pure and deterministic:** no time, randomness or I/O.
@@ -256,6 +256,11 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
       - A `Button` in a `Stack` stretched to the full width; theme and preview buttons now keep their own width.
   - **What it means.** The vocabulary works end to end, and an agent with a strong model builds working tools through MCP on the first try. Build chat on today's Workers AI models builds charts and tables but rarely calculators. Next steps: smaller calculator examples in the prompt (a two-input result) and a calculator block type that hides the nesting.
   - **Seen once, not reproduced.** The very first `render_page` after Chrome started cold on a dev server timed out on the client side (60 s), although the tool's own limit is 20 s. Every later call took 1–3 s.
+- **After 22e: formulas.**
+  - **The problem.** The tool eval showed open models failing at deeply nested calls.
+  - **The fix.** `calculate` takes `vars`, names bound to values, paths or calls, so a result is one formula: `(10*w + 6.25*h - 5*a + s) * f`. The grammar adds `^` (exponent at most ±1000, binding tighter than unary minus), and whitespace no longer runs names together.
+  - **Checks:** names are letters, digits and `_`, at most 20 of them. An unknown name or a blank variable gives `""`.
+  - **The catalog prompt and the skill** now lead with formulas, with a two-input calculator (BMI) as the worked example. The runtime is `surface.7.js`; 1–6 are aliases.
 - **Deviations (22e).**
   - **The chart brief builds a page section, not an article:** Build chat builds pages.
   - **No `computed-empty` check:** "Tools working" in the eval covers it, using sample inputs.

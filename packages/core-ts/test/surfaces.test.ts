@@ -768,6 +768,63 @@ describe("computed values (RFC-0022 22a)", () => {
     expect(v(call("calculate", { expression: { path: "/display" } }), { display: "7*6" })).toBe(42);
   });
 
+  it("computes formulas over named values (RFC-0022: what models write easily)", () => {
+    const data = {
+      sex: "female",
+      age: 30,
+      height: 165,
+      weight: 60,
+      activity: "light",
+      amount: 200000,
+      rate: 6,
+      years: 30,
+    };
+    const kcal = call("calculate", {
+      expression: "(10*w + 6.25*h - 5*a + s) * f",
+      vars: {
+        w: { path: "/weight" },
+        h: { path: "/height" },
+        a: { path: "/age" },
+        s: call("choose", { value: { path: "/sex" }, cases: { male: 5, female: -161 } }),
+        f: call("choose", { value: { path: "/activity" }, cases: { low: 1.2, light: 1.375 } }),
+      },
+    });
+    expect(v(call("round", { value: kcal }), data)).toBe(1815);
+    const payment = call("calculate", {
+      expression: "p * r / (1 - (1 + r)^(-12*y))",
+      vars: {
+        p: { path: "/amount" },
+        r: call("divide", { a: { path: "/rate" }, b: 1200 }),
+        y: { path: "/years" },
+      },
+    });
+    expect(v(call("round", { value: payment, digits: 2 }), data)).toBe(1199.1);
+    // a blank variable or an unknown name leaves the result empty; ^ binds tighter than unary minus
+    expect(v(call("calculate", { expression: "w + 1", vars: { w: "" } }))).toBe("");
+    expect(v(call("calculate", { expression: "w + 1", vars: {} }))).toBe("");
+    expect(calculateExpression("-2^2")).toBe(-4);
+    expect(calculateExpression("2^3^2")).toBe(512);
+    expect(calculateExpression("2 ^ 1001")).toBe("");
+    expect(calculateExpression("weight height", { weight: 1, height: 2 })).toBe("");
+    expect(calculateExpression("constructor", {})).toBe("");
+    expect(
+      messages(surface([{ id: "root", component: "Stat", props: { label: "kcal", value: kcal } }])),
+    ).toEqual([]);
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Text",
+            props: { text: call("calculate", { expression: "x", vars: { "bad name": 1 } }) },
+          },
+        ]),
+      ),
+    ).toEqual([
+      "/components/0/props/text/args/vars an object of at most 20 names (letters, digits, _) and their values",
+    ]);
+  });
+
   it("checks depth, call counts, cases and conditions in calls", () => {
     let deep: unknown = 1;
     for (let i = 0; i < 9; i++) deep = call("abs", { value: deep });
