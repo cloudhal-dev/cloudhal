@@ -10,6 +10,7 @@ import type { Site } from "@cloudhal/core-contracts";
 import type { PropsSchema } from "@cloudhal/core-ts/blocks";
 import {
   colorRolesCss,
+  shapeCss,
   siteColorTokens,
   TYPE_SCALES,
   type TypeScale,
@@ -73,6 +74,15 @@ export function themeVariables(
   const scale = config.typeScale;
   if ("typeScale" in schema.properties && TYPE_SCALES.includes(scale as TypeScale))
     vars.push(typeScaleCss(scale as TypeScale));
+  // RFC-0023 §3: corner radii and spacing, when the theme offers either (the defaults are the
+  // theme's former values, so a site that never chose them looks the same).
+  if ("radius" in schema.properties || "density" in schema.properties)
+    vars.push(
+      shapeCss({
+        radius: config.radius ?? schema.properties.radius?.default,
+        density: config.density ?? schema.properties.density?.default,
+      }),
+    );
   return { style: vars.length ? `:root{${vars.join(";")}}` : "", attributes };
 }
 

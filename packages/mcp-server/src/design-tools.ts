@@ -19,6 +19,8 @@ import {
   COLOR_ROLES,
   COLOR_SCHEMES,
   CONTRAST_LEVELS,
+  DENSITIES,
+  RADII,
   type SiteColorTokens,
   siteColorTokens,
   TYPE_PAIRINGS,
@@ -72,6 +74,8 @@ interface DesignResult {
   colors: SiteColorTokens | null;
   /** RFC-0023 §2: the font pairing and type scale, when the theme offers them. */
   type: { pairing: string; scale: string | null } | null;
+  /** RFC-0023 §3: corners and spacing, when the theme offers them. */
+  shape: { radius: string; density: string } | null;
   guidance: string;
   rev: number;
 }
@@ -89,6 +93,19 @@ function typeOf(config: Readonly<Record<string, unknown>>): {
       : "system",
     scale: (TYPE_SCALES as readonly unknown[]).includes(scale) ? (scale as string) : null,
   };
+}
+
+/** The site's corners and spacing, the theme's defaults where unset. */
+function shapeOf(
+  config: Readonly<Record<string, unknown>>,
+  props: Readonly<Record<string, { default?: unknown }>>,
+): { radius: string; density: string } {
+  const pick = (key: string, allowed: readonly string[], fallback: string) => {
+    for (const v of [config[key], props[key]?.default])
+      if (typeof v === "string" && allowed.includes(v)) return v;
+    return fallback;
+  };
+  return { radius: pick("radius", RADII, "small"), density: pick("density", DENSITIES, "cozy") };
 }
 
 /** A few lines on the colors: what they come from, the choices, failing pairs, the repair notes. */
@@ -126,6 +143,9 @@ function designText(r: DesignResult): string {
     colorsText(r.colors),
     r.type
       ? `Type (RFC-0023): pairing ${r.type.pairing}, scale ${r.type.scale ?? "none (fixed sizes)"}. Change them with set_theme_settings: typePairing (${TYPE_PAIRINGS.join(" | ")}), typeScale (${TYPE_SCALES.join(" | ")}); pick a pairing that fits the brand, dramatic only for short, bold headlines.`
+      : "",
+    r.shape
+      ? `Shape (RFC-0023): radius ${r.shape.radius}, density ${r.shape.density}. Change them with set_theme_settings: radius (${RADII.join(" | ")}; full makes pill buttons, cards stay modest), density (${DENSITIES.join(" | ")}).`
       : "",
     r.guidance,
     ...(r.design.warnings.length
@@ -168,10 +188,14 @@ export function designTools(): ToolDefinition[] {
             type: ["object", "null"],
             description: "The font pairing and type scale (RFC-0023), when the theme offers them",
           },
+          shape: {
+            type: ["object", "null"],
+            description: "Corners and spacing (RFC-0023), when the theme offers them",
+          },
           guidance: { type: "string" },
           rev: { type: "integer" },
         },
-        ["design", "settings", "catalog", "colors", "type", "guidance", "rev"],
+        ["design", "settings", "catalog", "colors", "type", "shape", "guidance", "rev"],
       ),
       annotations: {
         readOnlyHint: true,
@@ -198,6 +222,10 @@ export function designTools(): ToolDefinition[] {
           catalog: { id: catalog.id, components: catalog.names() },
           colors: themeProps ? siteColorTokens(site.theme.config ?? {}, themeProps) : null,
           type: themeProps && "typePairing" in themeProps ? typeOf(site.theme.config ?? {}) : null,
+          shape:
+            themeProps && ("radius" in themeProps || "density" in themeProps)
+              ? shapeOf(site.theme.config ?? {}, themeProps)
+              : null,
           guidance: DESIGN_GUIDANCE,
           rev: site.rev,
         };

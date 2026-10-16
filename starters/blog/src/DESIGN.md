@@ -12,6 +12,7 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 - Headings: one level-1 per page; level 2 for sections; level 3 inside cards. Keep headings under about 60 characters, in sentence case.
 
 ## Layout
+- `radius` sets the corners: none for sober, institutional sites; small or medium for most; large for friendly ones; full for pill buttons (cards stay modest). `density` sets the room: compact for dense, text-heavy sites, cozy for most, airy for landing pages and portfolios.
 - The reading column is narrow (about 48rem). A `Band` with `width: wide` or `full` leaves it: use bands for heroes, feature grids, proof and calls to action, and keep long text in the column.
 - Good rhythm on a landing page: hero band (`inverse` or `brand`) → plain section → `muted` band → plain section → `brand` band call to action. Use `spacing: xl` on hero bands and `l` elsewhere.
 - Grids: 2 or 3 columns for cards, 3 or 4 for stats. `Columns` with `ratio: 2-1` pairs text with an image or a quote.

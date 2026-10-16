@@ -135,16 +135,35 @@ export const themeSettings: PropsSchema = {
       "x-widget": "radio",
       title: { en: "Typeface", tr: "Yazı tipi" },
     },
+    // RFC-0023 §3: corners for buttons, fields, cards and bands, and how much room things get.
     radius: {
       type: "string",
-      enum: ["none", "small", "large"],
+      enum: ["none", "small", "medium", "large", "full"],
       "x-labels": {
         none: { en: "Square", tr: "Köşeli" },
         small: { en: "Slightly rounded", tr: "Hafif yuvarlak" },
+        medium: { en: "Medium", tr: "Orta" },
         large: { en: "Rounded", tr: "Yuvarlak" },
+        full: { en: "Pill buttons", tr: "Hap düğmeler" },
       },
       default: "small",
       title: { en: "Corners", tr: "Köşeler" },
+    },
+    density: {
+      type: "string",
+      enum: ["compact", "cozy", "airy"],
+      "x-labels": {
+        compact: { en: "Compact", tr: "Sıkı" },
+        cozy: { en: "Cozy", tr: "Rahat" },
+        airy: { en: "Airy", tr: "Ferah" },
+      },
+      default: "cozy",
+      "x-widget": "radio",
+      title: { en: "Spacing", tr: "Boşluk" },
+      description: {
+        en: "How much room sections, cards and buttons get.",
+        tr: "Bölümlerin, kartların ve düğmelerin ne kadar yer kapladığı.",
+      },
     },
   },
   // WCAG 2.2 AA: body text 4.5:1, links 4.5:1, buttons and other UI parts 3:1 against the page.

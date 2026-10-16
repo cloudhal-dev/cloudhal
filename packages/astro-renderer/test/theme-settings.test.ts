@@ -110,3 +110,34 @@ describe("type pairing and scale (RFC-0023 §2)", () => {
     expect(themeVariables(site({ typeScale: "huge" }), type).style).not.toContain("--ch-step");
   });
 });
+
+describe("shape and density (RFC-0023 §3)", () => {
+  const shape: PropsSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      radius: {
+        type: "string",
+        enum: ["none", "small", "medium", "large", "full"],
+        default: "small",
+      },
+      density: { type: "string", enum: ["compact", "cozy", "airy"], default: "cozy" },
+    },
+  };
+  it("writes the radii and spaces, the defaults when unset", () => {
+    expect(themeVariables(site({}), shape).style).toContain(
+      "--ch-radius-control:0.25rem;--ch-radius-s:0.25rem",
+    );
+    const pill = themeVariables(site({ radius: "full", density: "compact" }), shape);
+    expect(pill.style).toContain("--ch-radius-control:9999px");
+    expect(pill.style).toContain("--ch-space-unit:0.2188rem");
+    expect(pill.attributes).toMatchObject({
+      "data-ch-radius": "full",
+      "data-ch-density": "compact",
+    });
+    // a theme with neither setting gets none of it
+    expect(
+      themeVariables(site({ radius: "full" }), { ...shape, properties: {} }).style,
+    ).not.toContain("--ch-radius");
+  });
+});
