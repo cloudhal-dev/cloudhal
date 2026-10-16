@@ -22,7 +22,7 @@ import {
 } from "@cloudhal/ui";
 import { ArrowLeft, Plug, Pulse, Target } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BuildChat, type BuildScope } from "../components/BuildChat.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
@@ -67,7 +67,16 @@ export function BuildPage() {
   const title = build.title ?? "";
   // Click-to-scope (RFC-0020 §6): the picked part, named from the page as it is now.
   const [picking, setPicking] = useState(false);
-  const [target, setTarget] = useState<PreviewTarget | undefined>();
+  // Opened from the editor's "Change with AI": aimed at that part from the start.
+  const search = useSearch({ from: "/sites/$siteId/pages/$pageId/build" });
+  const [target, setTarget] = useState<PreviewTarget | undefined>(() =>
+    search.section
+      ? {
+          sectionId: search.section,
+          ...(search.component ? { componentId: search.component } : {}),
+        }
+      : undefined,
+  );
   const page = useQuery({
     queryKey: ["page", siteId, pageId, build.rev],
     queryFn: () => api.pages.get(siteId, pageId),
