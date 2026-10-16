@@ -656,7 +656,18 @@ export function designTokensDtcg(
       )
     : undefined;
   const settings = Object.fromEntries(
-    ["seed", "scheme", "contrast", "mode", "typePairing", "typeScale", "radius", "density"]
+    [
+      "seed",
+      "scheme",
+      "contrast",
+      "mode",
+      "typePairing",
+      "typeScale",
+      "radius",
+      "density",
+      "motion",
+      "pageTransition",
+    ]
       .filter((k) => k in properties && config[k] !== undefined)
       .map((k) => [k, config[k]]),
   );
@@ -675,6 +686,10 @@ export function designTokensDtcg(
     radius: { $type: "dimension", ...pick("--ch-radius-") },
     space: { $type: "dimension", ...pick("--ch-space-") },
     ...(steps ? { "type-step": { $type: "dimension", ...steps } } : {}),
+    // RFC-0024 §6: the site's motion level as durations and easing curves.
+    ...("motion" in properties
+      ? { motion: motionTokens(config.motion ?? properties.motion?.default) }
+      : {}),
     $extensions: {
       "dev.cloudhal": {
         settings,
@@ -702,6 +717,35 @@ const MOTION: Record<
   standard: { dur: [150, 320, 600], move: [8, 24, 48], stagger: 70 },
   expressive: { dur: [200, 480, 850], move: [12, 40, 88], stagger: 90 },
 };
+
+/** DTCG `duration` and `cubicBezier` tokens for one motion level (RFC-0024 §6, 24e). */
+function motionTokens(level: unknown): Record<string, unknown> {
+  const l = (MOTION_LEVELS as readonly unknown[]).includes(level) ? (level as MotionLevel) : "none";
+  const m = MOTION[l];
+  const ms = (value: number) => ({ $value: { value, unit: "ms" } });
+  return {
+    $description: `Motion at the "${l}" level; readers who ask for reduced motion get none.`,
+    duration: {
+      $type: "duration",
+      fast: ms(m.dur[0]),
+      normal: ms(m.dur[1]),
+      slow: ms(m.dur[2]),
+      stagger: ms(m.stagger),
+    },
+    easing: {
+      $type: "cubicBezier",
+      standard: { $value: [0.2, 0, 0, 1] },
+      emphasized: { $value: [0.3, 1.25, 0.55, 1] },
+      exit: { $value: [0.4, 0, 1, 1] },
+    },
+    distance: {
+      $type: "dimension",
+      s: { $value: { value: m.move[0], unit: "px" } },
+      m: { $value: { value: m.move[1], unit: "px" } },
+      l: { $value: { value: m.move[2], unit: "px" } },
+    },
+  };
+}
 
 /**
  * The motion tokens for every level, each scoped to `:root[data-ch-motion="<level>"]` so a page's

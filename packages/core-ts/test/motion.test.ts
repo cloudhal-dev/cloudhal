@@ -11,7 +11,7 @@ import {
   surfaceLoops,
   usesMotion,
 } from "../src/surfaces.ts";
-import { MOTION_LEVELS, motionCss } from "../src/tokens.ts";
+import { designTokensDtcg, MOTION_LEVELS, motionCss } from "../src/tokens.ts";
 
 const catalog = createCatalog();
 const surface = (components: SurfaceComponent[]): SurfaceSection => ({
@@ -332,6 +332,46 @@ describe("ambient backgrounds (RFC-0024 24d)", () => {
     expect(catalogPrompt(catalog, "en")).toContain(
       "Ambient backgrounds: Band (or Card, CSS kinds only)",
     );
+  });
+});
+
+describe("page transitions and motion tokens out (RFC-0024 24e)", () => {
+  it("takes a morph key once per section", () => {
+    expect(
+      issues([
+        { id: "root", component: "Stack", children: ["a", "b"] },
+        { id: "a", component: "Card", motion: { morph: "plan-pro" }, children: [] },
+        { id: "b", component: "Card", motion: { morph: "plan-pro" }, children: [] },
+      ] as SurfaceComponent[]),
+    ).toEqual(['/components/2/motion/morph "plan-pro" is already used by another component here']);
+    expect(
+      issues([
+        { id: "root", component: "Card", motion: { morph: "Plan Pro!" }, children: [] },
+      ] as SurfaceComponent[]),
+    ).toEqual([
+      "/components/0/motion/morph a key like plan-pro: lowercase letters, digits and hyphens",
+    ]);
+  });
+
+  it("exports the site's motion level as DTCG durations and easings", () => {
+    const t = designTokensDtcg(
+      { motion: "standard", pageTransition: "morph" },
+      {
+        motion: { default: "none" },
+        pageTransition: {},
+      },
+    ) as Record<string, Record<string, Record<string, unknown>>>;
+    expect(t.motion?.duration).toMatchObject({
+      $type: "duration",
+      normal: { $value: { value: 320, unit: "ms" } },
+    });
+    expect(t.motion?.easing).toMatchObject({
+      $type: "cubicBezier",
+      standard: { $value: [0.2, 0, 0, 1] },
+    });
+    expect(t.$extensions).toMatchObject({
+      "dev.cloudhal": { settings: { motion: "standard", pageTransition: "morph" } },
+    });
   });
 });
 

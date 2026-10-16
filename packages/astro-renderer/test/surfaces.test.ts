@@ -480,3 +480,21 @@ describe("ambient backgrounds (RFC-0024 24d)", () => {
     expect(card).not.toContain("<canvas");
   });
 });
+
+describe("page transitions (RFC-0024 24e)", () => {
+  it("names a morphing element for view transitions", () => {
+    const html = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Card",
+          motion: { morph: "plan-pro", hover: "lift" },
+          children: [],
+        },
+      ]),
+    );
+    expect(html).toContain(
+      '<div data-ch-hover="lift" style="view-transition-name:ch-m-plan-pro" class="ch-card">',
+    );
+  });
+});

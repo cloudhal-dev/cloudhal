@@ -87,8 +87,15 @@ export function themeVariables(
   // RFC-0024 §6: the motion tokens for every level; `data-ch-motion` (the `motion` setting, or a
   // page's own level) picks one.
   const rules = "motion" in schema.properties ? motionCss() : "";
+  // RFC-0024 §5: page transitions between pages of the site, once the site chose one.
+  const transition = config.pageTransition;
+  const transitions =
+    "pageTransition" in schema.properties &&
+    (transition === "crossfade" || transition === "slide" || transition === "morph")
+      ? `@view-transition{navigation:auto}`
+      : "";
   const root = vars.length ? `:root{${vars.join(";")}}` : "";
-  return { style: root + rules, attributes };
+  return { style: root + rules + transitions, attributes };
 }
 
 /**

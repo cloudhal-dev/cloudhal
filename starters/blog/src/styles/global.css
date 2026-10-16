@@ -2085,6 +2085,54 @@ button.ch-button--secondary {
     animation: ch-amb-pan 12s linear infinite alternate;
   }
 }
+/*
+ * Page transitions (RFC-0024 §5): themeVariables writes @view-transition when the site chose one;
+ * these shape it. Crossfade is the browser's own, at the level's pace; slide moves the old page
+ * out and the new one in (crossfade at "subtle"); morph moves elements with the same
+ * view-transition name between pages. Nothing animates at "none" or under reduced motion.
+ */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--ch-dur-normal, 250ms);
+  animation-timing-function: var(--ch-ease-standard, ease);
+}
+@keyframes ch-vt-out {
+  to {
+    opacity: 0;
+    translate: calc(var(--ch-move-l, 0px) * -0.5) 0;
+  }
+}
+@keyframes ch-vt-in {
+  from {
+    opacity: 0;
+    translate: calc(var(--ch-move-l, 0px) * 0.5) 0;
+  }
+}
+:root[data-ch-page-transition="slide"]:is(
+  [data-ch-motion="standard"],
+  [data-ch-motion="expressive"]
+)::view-transition-old(root) {
+  animation-name: ch-vt-out;
+}
+:root[data-ch-page-transition="slide"]:is(
+  [data-ch-motion="standard"],
+  [data-ch-motion="expressive"]
+)::view-transition-new(root) {
+  animation-name: ch-vt-in;
+}
+:root[data-ch-motion="none"]::view-transition-group(*),
+:root[data-ch-motion="none"]::view-transition-old(*),
+:root[data-ch-motion="none"]::view-transition-new(*) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
 /* Search (RFC-0019 §3): the header form, the page's form, results with highlighted snippets. */
 .ch-header-search input {
   @apply w-40 rounded-md border border-zinc-300 px-3 py-1.5 text-sm sm:w-48;

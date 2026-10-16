@@ -166,3 +166,23 @@ describe("motion level (RFC-0024 §1)", () => {
     ).not.toContain("data-ch-motion");
   });
 });
+
+describe("page transitions (RFC-0024 §5)", () => {
+  const schema: PropsSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      pageTransition: {
+        type: "string",
+        enum: ["none", "crossfade", "slide", "morph"],
+        default: "none",
+      },
+    },
+  };
+  it("turns on cross-document view transitions once the site chose one", () => {
+    expect(themeVariables(site({}), schema).style).not.toContain("@view-transition");
+    const on = themeVariables(site({ pageTransition: "slide" }), schema);
+    expect(on.style).toContain("@view-transition{navigation:auto}");
+    expect(on.attributes["data-ch-page-transition"]).toBe("slide");
+  });
+});

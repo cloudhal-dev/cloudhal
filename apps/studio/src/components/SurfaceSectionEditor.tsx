@@ -79,6 +79,19 @@ function summaryOf(
   return parts.length ? parts.join(" · ") : undefined;
 }
 
+/**
+ * RFC-0024: the motion a component asks for, as its preset names (data, like a prop's value): its
+ * reveal, scroll effect, hover, loop, morph key and ambient background.
+ */
+function motionOf(c: SurfaceComponent): string | undefined {
+  const m = isObj(c.motion) ? c.motion : {};
+  const props = isObj(c.props) ? c.props : {};
+  const names = [m.reveal, m.scroll, m.hover, m.loop, m.morph && `morph ${m.morph}`]
+    .concat(isObj(props.ambient) ? [props.ambient.kind] : [])
+    .filter((v): v is string => typeof v === "string" && v !== "");
+  return names.length ? `✦ ${names.join(", ")}` : undefined;
+}
+
 /** The editable texts of a component: its literal string props the catalog declares as text. */
 function fieldsOf(c: SurfaceComponent, locale: string): SurfaceOutlineField[] {
   const props = isObj(c.props) ? c.props : {};
@@ -125,7 +138,7 @@ export function SurfaceSectionEditor({
       const children = (Array.isArray(c.children) ? c.children : [])
         .map((k) => node(k, next))
         .filter((n): n is SurfaceOutlineNode => n !== undefined);
-      const summary = summaryOf(c, t);
+      const summary = [summaryOf(c, t), motionOf(c)].filter(Boolean).join(" · ");
       return {
         id: c.id,
         title: titleOf(c, locale),
@@ -139,7 +152,7 @@ export function SurfaceSectionEditor({
     const loose = section.components
       .filter((c) => !placed.has(c.id))
       .map((c) => {
-        const summary = summaryOf(c, t);
+        const summary = [summaryOf(c, t), motionOf(c)].filter(Boolean).join(" · ");
         return {
           id: c.id,
           title: titleOf(c, locale),

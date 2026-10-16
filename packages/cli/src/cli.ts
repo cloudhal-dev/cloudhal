@@ -22,7 +22,9 @@ import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "./commands/media.ts";
 import { describeMigration, migrateTags } from "./commands/migrate.ts";
+import { describeMotionAudit, motionAudit } from "./commands/motion.ts";
 import { transferOwner } from "./commands/owner.ts";
+import { describeRender, render } from "./commands/render.ts";
 import {
   describeRelease,
   describeSchedulesStatus,
@@ -100,6 +102,11 @@ Usage:
                                                           the model see its render first, as Build chat does
   cloudhal ai judge-check [--remote] [--judge <model>]   score the reference pages (empty → strong) with the
                                                           design judge; fails when it does not rank them
+  cloudhal render <path|url> [--width 1440,390] [--scheme dark] [--motion static|reduce|full]
+                        [--frames <n>] [--base <url>] [--out <dir>]
+                                                          screenshots and render_page's checks for a page
+                                                          (of cloudhal dev by default; RFC-0024)
+  cloudhal motion audit [--path <p>]                      the motion each page asks for, against its budgets
   cloudhal tokens export [--format dtcg] [--out <file>]   the site's design tokens as a W3C Design Tokens file
                                                           (Figma, Style Dictionary; RFC-0023)
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
@@ -154,6 +161,12 @@ export async function main(argv: string[]): Promise<number> {
       look: { type: "boolean" },
       judge: { type: "string" },
       format: { type: "string" },
+      width: { type: "string" },
+      scheme: { type: "string" },
+      motion: { type: "string" },
+      frames: { type: "string" },
+      base: { type: "string" },
+      path: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -501,6 +514,35 @@ export async function main(argv: string[]): Promise<number> {
         console.log(`\nwrote ${values.out}`);
       }
       return 0;
+    }
+    case "render": {
+      const [target] = rest;
+      if (!target)
+        throw new Error(
+          "usage: cloudhal render <path|url> [--width 1440,390] [--scheme dark] [--motion full] [--frames 4]",
+        );
+      const report = await render({
+        projectDir,
+        target,
+        ...(values.base ? { base: values.base } : {}),
+        ...(values.width ? { widths: values.width.split(",").map(Number) } : {}),
+        ...(values.scheme ? { scheme: values.scheme } : {}),
+        ...(values.motion ? { motion: values.motion } : {}),
+        ...(values.frames ? { frames: Number(values.frames) } : {}),
+        ...(values.out ? { out: values.out } : {}),
+      });
+      console.log(describeRender(report));
+      return report.checks.every((c) => c.ok) ? 0 : 2;
+    }
+    case "motion": {
+      const [what] = rest;
+      if (what !== "audit") throw new Error("usage: cloudhal motion audit [--path <p>]");
+      const audit = await motionAudit({
+        projectDir,
+        ...(values.path ? { path: values.path } : {}),
+      });
+      console.log(describeMotionAudit(audit));
+      return audit.pages.some((p) => p.warnings.length) ? 2 : 0;
     }
     case "tokens": {
       const [what] = rest;
