@@ -11,6 +11,7 @@ import {
   CHILDREN,
   primitiveHtml,
   type SurfaceNode,
+  slideWrapper,
   visibilityWrapper,
   withMotion,
 } from "../surfaces.ts";
@@ -63,7 +64,16 @@ const [motionOpen, motionClose] =
   open && (
     <Fragment>
       <Fragment set:html={open} />
-      {node.children.map((child) => <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />)}
+      {node.children.map((child, i) => {
+        const [slideOpen, slideClose] = slideWrapper(node, i, scope, media);
+        return (
+          <Fragment>
+            {slideOpen && <Fragment set:html={slideOpen} />}
+            <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />
+            {slideClose && <Fragment set:html={slideClose} />}
+          </Fragment>
+        );
+      })}
       <Fragment set:html={close} />
     </Fragment>
   )

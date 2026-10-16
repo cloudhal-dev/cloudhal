@@ -124,6 +124,26 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
       ]),
     );
     expect(o("overlay-open")?.count).toBe(2);
+    // RFC-0027: carousels named, a hero's first slide not lazy, the others lazy.
+    const carousels = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"></head><body>
+<a href="#main">Skip</a><header>h</header><main id="main"><h1>C</h1>
+<section role="region" aria-roledescription="carousel" aria-label="Our carousel" data-variant="hero">
+<div role="group" aria-roledescription="slide" aria-label="1 of 2"><img src="a.png" alt="A" loading="lazy" width="10" height="10"></div>
+<div role="group" aria-roledescription="slide"><img src="b.png" alt="B" width="10" height="10"></div></section>
+</main><footer>f</footer></body></html>`;
+    const k = await run("carousels.html", carousels);
+    expect(k("carousel-label")?.examples).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/its name says carousel/),
+        expect.stringMatching(/a slide without a name/),
+      ]),
+    );
+    expect(k("carousel-lcp")?.examples).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/the first hero slide's image is lazy/),
+        expect.stringMatching(/slide 2's image loads before anyone sees it/),
+      ]),
+    );
   }, 90_000);
 });
 

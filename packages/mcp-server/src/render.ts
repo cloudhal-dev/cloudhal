@@ -85,6 +85,10 @@ export const RENDER_CHECK_IDS = [
   "focus-obscured",
   // RFC-0025 §3: each overlay opens from its trigger, takes focus, closes and gives focus back.
   "overlay-open",
+  // RFC-0027: carousels and their slides are named (and not just "carousel").
+  "carousel-label",
+  // RFC-0027: a hero carousel's first slide loads first; the others wait.
+  "carousel-lcp",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -301,6 +305,8 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
 
   // Lazy images load first, so broken ones show and the screenshots are complete.
   const imgs = [...document.images];
+  // (which ones the page asked to be lazy is kept for carousel-lcp)
+  const wasLazy = new Set(imgs.filter((i) => i.loading === "lazy"));
   for (const img of imgs) if (img.loading === "lazy") img.loading = "eager";
   await Promise.race([
     Promise.all(imgs.map((i) => i.complete ? null : new Promise((r) => {
@@ -618,6 +624,23 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     window.scrollTo(0, 0);
+  }
+
+  // carousel-label and carousel-lcp: named carousels and slides; a hero's first slide not lazy.
+  for (const c of document.querySelectorAll('[aria-roledescription="carousel"], [aria-roledescription="kaydırmalı alan"]')) {
+    const name = (c.getAttribute("aria-label") || "").trim();
+    if (!name) add("carousel-label", c, "a carousel without a name (aria-label)");
+    else if (/carousel|karusel/i.test(name)) add("carousel-label", c, "its name says carousel; name what it shows");
+    const slides = [...c.querySelectorAll('[aria-roledescription="slide"], [aria-roledescription="slayt"]')];
+    for (const s of slides) if (!(s.getAttribute("aria-label") || "").trim()) add("carousel-label", s, "a slide without a name");
+    if (c.getAttribute("data-variant") === "hero")
+      slides.forEach((s, i) => {
+        for (const img of s.querySelectorAll("img")) {
+          const lazy = wasLazy.has(img);
+          if (i === 0 && lazy) add("carousel-lcp", img, "the first hero slide's image is lazy; it is what the reader sees first");
+          if (i > 0 && !lazy) add("carousel-lcp", img, "slide " + (i + 1) + "'s image loads before anyone sees it; make it lazy");
+        }
+      });
   }
 
   // overlay-open: every overlay of the page's sections, opened the way a reader would.

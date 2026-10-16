@@ -667,6 +667,65 @@ describe("interactive components (RFC-0020 §4)", () => {
   });
 });
 
+describe("carousels (RFC-0027)", () => {
+  const slides = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `s${i}`,
+      component: "Text",
+      props: { text: `Slide ${i}` },
+    }));
+  const carousel = (props: Record<string, unknown>, n: number) =>
+    surface([
+      { id: "root", component: "Carousel", props, children: slides(n).map((x) => x.id) },
+      ...slides(n),
+    ]);
+
+  it("accepts a rail and a hero within their limits", () => {
+    expect(
+      messages(carousel({ label: "Customer stories", peek: "s", controls: "none" }, 6)),
+    ).toEqual([]);
+    expect(
+      messages(carousel({ label: "Spring offers", variant: "hero", aspect: "21:9" }, 3)),
+    ).toEqual([]);
+  });
+
+  it("refuses too many hero slides, a hero without a frame, hidden controls without a peek and a vague label", () => {
+    expect(
+      messages(carousel({ label: "Our carousel", variant: "hero", controls: "none" }, 6)),
+    ).toEqual([
+      "/components/0/children a hero carousel has 2 to 5 slides",
+      "/components/0/props/aspect a hero carousel keeps one frame size: set aspect",
+      "/components/0/props/controls none only on a rail whose next slide peeks in",
+      '/components/0/props/label name what it shows ("Customer stories"); assistive technology already says carousel',
+    ]);
+    expect(messages(carousel({ label: "One" }, 1))).toEqual([
+      "/components/0/children a rail carousel has 2 to 12 slides",
+    ]);
+  });
+
+  it("never nests a carousel or takes an overlay as a slide", () => {
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Carousel",
+            props: { label: "Outer" },
+            children: ["inner", "dlg"],
+          },
+          { id: "inner", component: "Carousel", props: { label: "Inner" }, children: ["a", "b"] },
+          { id: "a", component: "Text", props: { text: "a" } },
+          { id: "b", component: "Text", props: { text: "b" } },
+          { id: "dlg", component: "Dialog", props: { title: "Hi" } },
+        ]),
+      ),
+    ).toEqual([
+      "/components/0/children a Dialog is not a slide; a slide's Button may open it",
+      "/components/1 a carousel never sits inside a Carousel",
+    ]);
+  });
+});
+
 describe("icons (RFC-0026)", () => {
   it("accepts names of the set on Icon, Button, Badge, Stat and List markers, and refuses others", () => {
     const ok = surface([
