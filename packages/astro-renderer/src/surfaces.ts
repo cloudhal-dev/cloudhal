@@ -358,6 +358,64 @@ export function primitiveHtml(
       const caption = str(p.caption);
       return `<figure class="ch-chart"${live}${rows.length === 0 ? " data-ch-chart-empty" : ""}><figcaption class="ch-chart__title">${escapeHtml(str(p.title))}</figcaption><div class="ch-chart__body">${chartInner(p, locale, { data: dataLabel })}</div>${caption ? `<p class="ch-chart__caption">${escapeHtml(caption)}</p>` : ""}</figure>`;
     }
+    // RFC-0022 §4: a real table; `data-label` lets the theme stack rows into cards on phones.
+    case "Table": {
+      const locale = media?.locale ?? "en";
+      const isRow = (r: unknown): r is Record<string, unknown> =>
+        typeof r === "object" && r !== null && !Array.isArray(r);
+      const rows = (Array.isArray(p.rows) ? p.rows : []).filter(isRow).slice(0, 200);
+      const columns = (Array.isArray(p.columns) ? p.columns : []).filter(isRow).slice(0, 8);
+      const cell = (v: unknown, c: Record<string, unknown>): string => {
+        if (v === undefined || v === null || v === "") return "";
+        const n = typeof v === "number" ? v : Number(v);
+        const digits = Number.isInteger(c.digits) ? Number(c.digits) : undefined;
+        try {
+          if (c.format === "number" && Number.isFinite(n))
+            return new Intl.NumberFormat(locale, { maximumFractionDigits: digits ?? 2 }).format(n);
+          if (c.format === "currency" && Number.isFinite(n) && /^[A-Z]{3}$/.test(str(c.currency)))
+            return new Intl.NumberFormat(locale, {
+              style: "currency",
+              currency: str(c.currency),
+              ...(digits !== undefined ? { maximumFractionDigits: digits } : {}),
+            }).format(n);
+          if (c.format === "percent" && Number.isFinite(n))
+            return new Intl.NumberFormat(locale, {
+              style: "percent",
+              maximumFractionDigits: digits ?? 0,
+            }).format(n);
+          if (c.format === "date") {
+            const d = new Date(str(v));
+            if (!Number.isNaN(d.getTime()))
+              return new Intl.DateTimeFormat(locale, {
+                dateStyle: "medium",
+                timeZone: "UTC",
+              }).format(d);
+          }
+        } catch {
+          // an unknown currency or locale: show the value as it is
+        }
+        return str(v);
+      };
+      const hl = isRow(p.highlight) ? p.highlight : undefined;
+      const head = columns
+        .map(
+          (c) =>
+            `<th scope="col"${c.align === "end" ? ' data-align="end"' : ""}>${escapeHtml(str(c.label))}</th>`,
+        )
+        .join("");
+      const body = rows
+        .map((r) => {
+          const marked = hl && str(r[str(hl.field)]) === str(hl.equals);
+          return `<tr${marked ? ' data-highlight="yes"' : ""}>${columns
+            .map(
+              (c) =>
+                `<td data-label="${escapeHtml(str(c.label))}"${c.align === "end" ? ' data-align="end"' : ""}>${escapeHtml(cell(r[str(c.field)], c))}</td>`,
+            )
+            .join("")}</tr>`;
+        })
+        .join("");
+      return `<div class="ch-table-wrap"><table class="ch-table"${p.striped === true ? ' data-striped="yes"' : ""}><caption>${escapeHtml(str(p.caption))}</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
     // RFC-0022 §2: local inputs; values stay in the reader's browser.
     case "NumberField": {
       const x = fieldExtras(node, id);

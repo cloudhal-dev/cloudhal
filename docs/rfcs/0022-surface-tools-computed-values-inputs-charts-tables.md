@@ -229,6 +229,14 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
   - **Live charts.** The same self-contained function ships as `/_cloudhal/chart.1.js`. The runtime (`surface.4.js`; 1–3 served as aliases) loads it only when a live surface has a chart, and redraws it from its bindings when the data changes. A test checks the browser copy draws exactly what the server does; under Node's own type stripping it was checked to be valid and identical too, with no bundler `__name` helpers.
   - **Colors** are theme tokens `--ch-chart-1…6`: the brand color first, then five fixed hues that each reach 3:1 against white.
   - **`render_page`** checks `chart-empty`; Studio names it. The catalog prompt, DESIGN guidance and the theme's DESIGN.md say when to use a chart and which kind.
+- **22d shipped.**
+  - **`Table`** is a primitive. `rows` must be a `{path}` binding; `columns` hold at most 8 fields with `label`, `align` and a `format` (text, number, currency with `currency`, percent, date, with `digits`); `highlight` marks a row where a field equals a value; `striped` is optional.
+  - **Rendering.** A real `<table>` with `<caption>` and `<th scope="col">`. Cells are formatted in the page locale and escaped. Each cell carries `data-label`, so below 480 px the theme shows every row as a card of label–value pairs, with no sideways scroll.
+  - **Checked in Chrome** with a calorie calculator, a bar chart and an 8-column table at 1440 and 390 px: no `overflow-x`. Two layout bugs found there were fixed: fields in one grid row now align when one has help text, and the caption no longer wraps narrow on phones.
+- **Deviations (22d).**
+  - **`format` is a named format,** not a function call per cell (props are flat objects in the catalog's schema subset). That is enough for the formats in §1.
+  - **`highlight` compares one field with one value,** not a full condition.
+  - **No live redraw:** tables render on the server only. A table bound to data that inputs change shows its first state; live tables wait for demand.
 - **Deviations (22c).**
   - **Colors:** the six fixed hues stand in for a theme palette (open question 3) until tokens v2.
   - **Limits:** 500 rows per chart are drawn; the props check caps literal lists at 50, but chart data is always a binding.

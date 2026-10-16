@@ -771,7 +771,7 @@ button.ch-button--secondary {
   @apply outline-2 outline-offset-2;
 }
 .ch-field {
-  @apply grid gap-1.5;
+  @apply grid content-start gap-1.5;
 }
 .ch-field__label {
   @apply text-sm font-medium;
@@ -900,6 +900,63 @@ button.ch-button--secondary {
 .ch-chart__data th,
 .ch-chart__data td {
   @apply border-b border-zinc-200 px-2 py-1 text-left;
+}
+
+/* RFC-0022 §4: tables. Below 480 px each row is a card whose cells carry their column's label. */
+.ch-table-wrap {
+  @apply w-full;
+}
+.ch-table {
+  @apply w-full border-collapse text-sm tabular-nums;
+}
+.ch-table caption {
+  @apply pb-2 text-left text-base font-semibold;
+}
+.ch-table th,
+.ch-table td {
+  @apply border-b border-zinc-200 px-3 py-2 text-left align-top;
+}
+.ch-table th {
+  @apply font-semibold text-zinc-600;
+}
+.ch-table [data-align="end"] {
+  @apply text-right;
+}
+.ch-table[data-striped="yes"] tbody tr:nth-child(even) {
+  @apply bg-zinc-50;
+}
+.ch-table tr[data-highlight="yes"] {
+  background: color-mix(in srgb, var(--ch-brand, #18181b) 8%, transparent);
+}
+.ch-table tr[data-highlight="yes"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ch-brand, #18181b);
+}
+@media (max-width: 480px) {
+  .ch-table thead {
+    @apply sr-only;
+  }
+  .ch-table caption {
+    @apply block w-full;
+  }
+  .ch-table,
+  .ch-table tbody,
+  .ch-table tr,
+  .ch-table td {
+    @apply block w-full;
+  }
+  .ch-table tr {
+    @apply mb-3 rounded-lg border border-zinc-200 px-3 py-1;
+  }
+  .ch-table td {
+    @apply flex justify-between gap-4 border-b border-zinc-100 px-0 text-right last:border-b-0;
+  }
+  .ch-table td::before {
+    @apply text-left font-medium text-zinc-600;
+    content: attr(data-label);
+  }
+  .ch-table tr[data-highlight="yes"] td:first-child {
+    box-shadow: none;
+  }
 }
 
 /* Corners (src/settings.ts `radius`): after the base rules, so they win. */
