@@ -469,7 +469,7 @@ const PREVIEW_CSS =
   ".ch-band{margin:0 -24px;padding:2.5rem 24px;border-radius:8px}.ch-card{display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.2rem;border:1px solid var(--line);border-radius:8px;color:inherit;text-decoration:none}" +
   "[data-tone=muted]{background:color-mix(in srgb,var(--fg) 5%,transparent)}[data-tone=brand],[data-tone=inverse]{background:var(--fg);color:var(--bg)}" +
   ".ch-heading{margin:0}.ch-text p:last-child,.ch-markdown p:last-child{margin-bottom:0}.ch-text[data-size=l]{font-size:1.2rem}.ch-text[data-size=s]{font-size:.9rem}.ch-text[data-muted=yes]{color:var(--muted)}" +
-  ".ch-button{display:inline-block;padding:.5rem 1rem;border-radius:6px;border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:500}.ch-button--primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}" +
+  ".ch-button{display:inline-block;width:fit-content;padding:.5rem 1rem;border-radius:6px;border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:500}.ch-button--primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}" +
   "[data-tone=brand] .ch-button--primary,[data-tone=inverse] .ch-button--primary{background:var(--bg);color:var(--fg)}" +
   ".ch-badge{display:inline-block;width:fit-content;padding:.1rem .6rem;border-radius:999px;border:1px solid var(--line);font-size:.8rem}" +
   ".ch-stat{display:flex;flex-direction:column}.ch-stat__value{font-size:2rem;font-weight:700;line-height:1.2}.ch-stat__detail{color:var(--muted);font-size:.9rem}" +

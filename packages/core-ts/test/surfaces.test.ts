@@ -689,6 +689,9 @@ describe("computed values (RFC-0022 22a)", () => {
     expect(v(call("max", { values: [3, 1, 2] }))).toBe(3);
     expect(v(call("clamp", { value: 70, min: 1, max: 50 }))).toBe(50);
     expect(v(call("power", { base: 2, exponent: 10 }))).toBe(1024);
+    // a blank result stays blank when formatted (a calculator before anything is typed)
+    expect(v(call("formatNumber", { value: "" }))).toBe("");
+    expect(v(call("formatCurrency", { value: "", currency: "USD" }))).toBe("");
     expect(v(call("power", { base: 2, exponent: 1001 }))).toBe("");
     // a 30-year loan of 200,000 at 6 %: about 1,199.10 a month
     const r = call("divide", { a: 6, b: 1200 });

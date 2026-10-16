@@ -44,8 +44,8 @@ const ex=()=>{let v=te();while(s[i]==="+"||s[i]==="-"){const o=s[i++];const r=te
 try{const v=ex();return i===s.length?fin(v):"";}catch{return"";}};
 const fn=(name,a,loc)=>{const v=a.value;switch(name){
 case"formatDate":{const d=new Date(txt(v));if(Number.isNaN(d.getTime()))return"";const st=["short","medium","long","full"].includes(txt(a.style))?txt(a.style):"medium";return new Intl.DateTimeFormat(loc,{dateStyle:st,timeZone:"UTC"}).format(d);}
-case"formatNumber":{const n=num(v);if(!Number.isFinite(n))return"";const g=Math.min(Math.max(0,Math.trunc(num(a.digits===undefined?2:a.digits))||0),6);return new Intl.NumberFormat(loc,{maximumFractionDigits:g}).format(n);}
-case"formatCurrency":{const n=num(v);const c=txt(a.currency).toUpperCase();if(!Number.isFinite(n)||!/^[A-Z]{3}$/.test(c))return"";try{return new Intl.NumberFormat(loc,{style:"currency",currency:c}).format(n);}catch{return"";}}
+case"formatNumber":{if(blank(v))return"";const n=num(v);if(!Number.isFinite(n))return"";const g=Math.min(Math.max(0,Math.trunc(num(a.digits===undefined?2:a.digits))||0),6);return new Intl.NumberFormat(loc,{maximumFractionDigits:g}).format(n);}
+case"formatCurrency":{if(blank(v))return"";const n=num(v);const c=txt(a.currency).toUpperCase();if(!Number.isFinite(n)||!/^[A-Z]{3}$/.test(c))return"";try{return new Intl.NumberFormat(loc,{style:"currency",currency:c}).format(n);}catch{return"";}}
 case"pluralize":{const n=num(a.count);return(n===1?txt(a.one):txt(a.other)).replace(/#/g,Number.isFinite(n)?String(n):"");}
 case"concat":return(Array.isArray(a.parts)?a.parts:[]).map(txt).join("");
 case"length":return Array.isArray(v)||typeof v==="string"?v.length:0;
@@ -107,7 +107,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.5.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.6.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -118,6 +118,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.2.js",
   "/_cloudhal/surface.3.js",
   "/_cloudhal/surface.4.js",
+  "/_cloudhal/surface.5.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */
