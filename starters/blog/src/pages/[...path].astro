@@ -1,14 +1,4 @@
 ---
-/**
- * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
- * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
- * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
- * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
- * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
- * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
- * `/search?q=` is the site search (RFC-0019 §3) where the deployment answers it: never cached,
- * never indexed, and its form sits in the header.
- */
 import config from "virtual:cloudhal/config";
 import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
 import {
@@ -23,6 +13,7 @@ import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
 import {
+  type ActiveNavItem,
   type ActiveRoute,
   activeItem,
   derivedNavigation,
@@ -48,6 +39,17 @@ import {
   termAncestors,
 } from "@cloudhal/astro-renderer/taxonomy";
 import type { ContentEntry } from "@cloudhal/core-contracts";
+/**
+ * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
+ * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
+ * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
+ * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
+ * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
+ * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
+ * `/search?q=` is the site search (RFC-0019 §3) where the deployment answers it: never cached,
+ * never indexed, and its form sits in the header.
+ */
+import { resolveChrome } from "@cloudhal/core-ts/chrome";
 import { blockTypes } from "../blocks.ts";
 import Archive from "../components/Archive.astro";
 import Article from "../components/Article.astro";
@@ -139,6 +141,16 @@ const nav = primary
 const footer = footerMenu
   ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
   : undefined;
+// RFC-0025: the page's header and footer, and the menus they name beyond primary and footer.
+const chrome = resolveChrome(site, route.kind === "page" ? route.page : undefined);
+const menus: Record<string, ActiveNavItem[] | undefined> = { primary: nav, footer };
+const extraMenus = await Promise.all(
+  chrome.menus
+    .filter((key) => !(key in menus))
+    .map(async (key) => [key, await source.navigation(key, locale, { collectionIndex })] as const),
+);
+for (const [key, menu] of extraMenus)
+  menus[key] = menu ? markActive(menu, activeItem(menu, activeRoute, ancestors)) : undefined;
 // Edge-cache tags next to the site tag (published responses on Cloudflare only), so a publish
 // purges only the responses that show what changed (`cache-tags.ts`). The tags a purge must reach
 // come first; the header's categories (names shown on every page) last.
@@ -199,6 +211,7 @@ tags.push(
   ...categories.map((a) => termCacheTag(a.term.id)),
   ...navigationCacheTags(primary),
   ...navigationCacheTags(footerMenu),
+  ...extraMenus.flatMap(([, menu]) => navigationCacheTags(menu)),
 );
 addCacheTags(Astro.response.headers, tags);
 
@@ -234,7 +247,7 @@ const searchForm = searchAvailable(config, source)
     }
   : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }}>
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
   )}

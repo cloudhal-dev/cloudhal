@@ -15,7 +15,7 @@ export function AppearanceColors({
   properties: Readonly<Record<string, { default?: unknown }>>;
   values: Readonly<Record<string, unknown>>;
 }) {
-  const t = useT("appearanceColors");
+  const t = useT("appearance");
   const colors = useMemo(() => siteColorTokens(values, properties), [values, properties]);
   return (
     <>
@@ -23,14 +23,14 @@ export function AppearanceColors({
         schemes={[
           {
             id: "light",
-            label: t("appearanceColors.light"),
+            label: t("appearance.light"),
             roles: colors.light,
           },
           ...(colors.source === "seed"
             ? [
                 {
                   id: "dark",
-                  label: t("appearanceColors.dark"),
+                  label: t("appearance.dark"),
                   roles: colors.dark,
                 },
               ]
@@ -38,31 +38,31 @@ export function AppearanceColors({
         ]}
         roles={COLOR_ROLES.map((role) => ({
           role,
-          label: t(`appearanceColors.roles.${role}`),
+          label: t(`appearance.roles.${role}`),
         }))}
         notes={colors.repairs.map((r) =>
-          t(r.kind === "pair" ? "appearanceColors.repairPair" : "appearanceColors.repairFill", {
-            scheme: t(`appearanceColors.${r.scheme}`),
-            role: t(`appearanceColors.roles.${r.role}`),
-            against: t(`appearanceColors.roles.${r.against}`),
-            direction: t(`appearanceColors.${r.direction}`),
+          t(r.kind === "pair" ? "appearance.repairPair" : "appearance.repairFill", {
+            scheme: t(`appearance.${r.scheme}`),
+            role: t(`appearance.roles.${r.role}`),
+            against: t(`appearance.roles.${r.against}`),
+            direction: t(`appearance.${r.direction}`),
             steps: String(r.steps),
             ratio: String(r.ratio),
           }),
         )}
         labels={{
-          preview: t("appearanceColors.preview"),
-          heading: t("appearanceColors.heading"),
-          body: t("appearanceColors.body"),
-          link: t("appearanceColors.link"),
-          button: t("appearanceColors.button"),
-          accent: t("appearanceColors.accent"),
-          notes: t("appearanceColors.notes"),
+          preview: t("appearance.preview"),
+          heading: t("appearance.heading"),
+          body: t("appearance.body"),
+          link: t("appearance.link"),
+          button: t("appearance.button"),
+          accent: t("appearance.accent"),
+          notes: t("appearance.notes"),
         }}
       />
       {colors.source === "legacy" && colors.seedAvailable && (
         <Text variant="secondary" size="sm">
-          {t("appearanceColors.legacy")}
+          {t("appearance.legacy")}
         </Text>
       )}
     </>

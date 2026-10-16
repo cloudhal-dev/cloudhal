@@ -74,6 +74,7 @@ import {
 import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools, describeAsset } from "./asset-tools.ts";
 import { bodyTools } from "./body-tools.ts";
+import { chromeTools } from "./chrome-tools.ts";
 import { commentTools } from "./comment-tools.ts";
 import {
   ACTOR_OWNERSHIP,
@@ -459,6 +460,8 @@ export function defineTools(): ToolDefinition[] {
     ...bodyTools(),
     // RFC-0021 §2: DESIGN.md
     ...designTools(),
+    // RFC-0025 §5: the header, footer and brand
+    ...chromeTools(),
     ...renderTools(previewDoc),
     ...taxonomyTools(),
     ...menuTools(),
@@ -622,7 +625,7 @@ function rawTools(): ToolDefinition[] {
       name: "update_page",
       title: "Update page",
       description:
-        "Replace a page's title, path, sections or seo. Requires the current `rev` (optimistic locking). Status changes are not allowed here. Snapshots afterwards.",
+        "Replace a page's title, path, sections or seo, or set its own motion level and chrome (RFC-0025: header default|transparent|hidden, footer default|minimal|hidden; null goes back to the site's). Requires the current `rev` (optimistic locking). Status changes are not allowed here. Snapshots afterwards.",
       inputSchema: obj(
         {
           siteId: id,
@@ -632,6 +635,20 @@ function rawTools(): ToolDefinition[] {
           path: str("New path"),
           sections: sectionInput,
           seo: { type: "object" },
+          motion: {
+            type: ["string", "null"],
+            enum: ["none", "subtle", "standard", "expressive", null],
+            description: "This page's motion level over the site's (RFC-0024); null removes it",
+          },
+          chrome: {
+            type: ["object", "null"],
+            properties: {
+              header: { type: "string", enum: ["default", "transparent", "hidden"] },
+              footer: { type: "string", enum: ["default", "minimal", "hidden"] },
+            },
+            additionalProperties: false,
+            description: "This page's header and footer (RFC-0025); null removes it",
+          },
         },
         ["siteId", "pageId", "rev"],
       ),
@@ -653,8 +670,23 @@ function rawTools(): ToolDefinition[] {
             "conflict",
             `page ${page.id} is at rev ${page.rev}, you sent ${a.rev}; reload and retry`,
           );
+        const { motion: _motion, chrome: _chrome, ...kept } = page;
         const next: Page = {
-          ...page,
+          ...kept,
+          ...(a.motion === undefined
+            ? page.motion
+              ? { motion: page.motion }
+              : {}
+            : a.motion
+              ? { motion: a.motion as NonNullable<Page["motion"]> }
+              : {}),
+          ...(a.chrome === undefined
+            ? page.chrome
+              ? { chrome: page.chrome }
+              : {}
+            : a.chrome
+              ? { chrome: a.chrome as NonNullable<Page["chrome"]> }
+              : {}),
           ...(a.title ? { title: a.title as string } : {}),
           ...(a.path ? { path: a.path as string } : {}),
           ...(a.sections ? { sections: a.sections as Section[] } : {}),

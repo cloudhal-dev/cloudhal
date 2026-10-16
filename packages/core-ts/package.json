@@ -30,7 +30,8 @@
     "./design": "./src/design.ts",
     "./interop": "./src/surface-interop.ts",
     "./directives": "./src/directives.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./chrome": "./src/chrome.ts"
   },
   "files": [
     "dist",
@@ -153,6 +154,10 @@
       "./tokens": {
         "types": "./dist/src/tokens.d.ts",
         "default": "./dist/src/tokens.js"
+      },
+      "./chrome": {
+        "types": "./dist/src/chrome.d.ts",
+        "default": "./dist/src/chrome.js"
       }
     }
   },

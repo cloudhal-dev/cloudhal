@@ -10,6 +10,7 @@ import {
   describeStatus,
 } from "./commands/analytics.ts";
 import { build, dev } from "./commands/astro.ts";
+import { chromeGet, chromeSet } from "./commands/chrome.ts";
 import {
   commentsExportCli,
   commentsImportCli,
@@ -109,6 +110,8 @@ Usage:
   cloudhal motion audit [--path <p>]                      the motion each page asks for, against its budgets
   cloudhal tokens export [--format dtcg] [--out <file>]   the site's design tokens as a W3C Design Tokens file
                                                           (Figma, Style Dictionary; RFC-0023)
+  cloudhal chrome get [--file <f>] | set --file <f>       the site's header, footer and brand as JSON
+                                                          (RFC-0025)
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
@@ -148,6 +151,7 @@ export async function main(argv: string[]): Promise<number> {
       out: { type: "string" },
       jurisdiction: { type: "string" },
       in: { type: "string" },
+      file: { type: "string" },
       "with-personal-data": { type: "boolean" },
       scheduler: { type: "string" },
       plan: { type: "string" },
@@ -543,6 +547,21 @@ export async function main(argv: string[]): Promise<number> {
       });
       console.log(describeMotionAudit(audit));
       return audit.pages.some((p) => p.warnings.length) ? 2 : 0;
+    }
+    case "chrome": {
+      const [what] = rest;
+      if (what === "get") {
+        const json = await chromeGet({ projectDir, ...(values.file ? { file: values.file } : {}) });
+        if (values.file) console.log(`wrote ${values.file}`);
+        else process.stdout.write(json);
+        return 0;
+      }
+      if (what === "set") {
+        await chromeSet({ projectDir, ...(values.file ? { file: values.file } : {}) });
+        console.log("chrome saved; publish to show it on the site");
+        return 0;
+      }
+      throw new Error("usage: cloudhal chrome get [--file <f>] | set --file <f>");
     }
     case "tokens": {
       const [what] = rest;

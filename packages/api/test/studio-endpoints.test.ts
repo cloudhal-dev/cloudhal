@@ -712,3 +712,49 @@ describe("theme settings (RFC-0017)", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("chrome (RFC-0025)", () => {
+  it("reads and replaces the header, footer and brand, with the checks the contract cannot make", async () => {
+    const { site, app } = await setup();
+    const url = `/api/sites/${site.id}/chrome`;
+    const headers = { "x-test-user": "1", "content-type": "application/json" };
+    const got = (await (await app.request(url, { headers })).json()) as {
+      header: object;
+      schemas: { header: { properties: Record<string, unknown> } };
+      menus: string[];
+      rev: number;
+    };
+    expect(got.header).toEqual({});
+    expect(got.menus).toContain("primary");
+    expect(Object.keys(got.schemas.header.properties)).toContain("layout");
+    const put = (body: Record<string, unknown>) =>
+      app.request(url, { method: "PUT", headers, body: JSON.stringify(body) });
+    const bad = await put({ rev: got.rev, header: { nav: "nowhere" } });
+    expect(bad.status).toBe(400);
+    expect((await put({ rev: got.rev, brand: { logo: "/logo.png" } })).status).toBe(400);
+    expect((await put({ rev: got.rev, header: { layout: "zigzag" } })).status).toBe(400);
+    const ok = await put({
+      rev: got.rev,
+      header: { behavior: "sticky", layout: "" },
+      footer: { layout: "minimal" },
+      brand: { social: [{ network: "github", href: "https://github.com/x" }] },
+    });
+    expect(ok.status).toBe(200);
+    const saved = (await ok.json()) as {
+      header: object;
+      footer: object;
+      brand: object;
+      rev: number;
+    };
+    expect(saved).toMatchObject({
+      header: { behavior: "sticky" },
+      footer: { layout: "minimal" },
+      brand: { social: [{ network: "github", href: "https://github.com/x" }] },
+    });
+    const cleared = (await (await put({ rev: saved.rev, footer: {} })).json()) as {
+      footer: object;
+    };
+    expect(cleared.footer).toEqual({});
+    expect((await put({ rev: saved.rev, footer: {} })).status).toBe(409);
+  });
+});

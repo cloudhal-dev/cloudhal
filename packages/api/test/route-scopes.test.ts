@@ -107,6 +107,8 @@ describe("ROUTE_SCOPES (I15)", () => {
     expect(requirementFor("GET", "/api/sites/site_x/block-types")).toBe("content:read");
     expect(requirementFor("GET", "/api/sites/site_x/theme-settings")).toBe("content:read");
     expect(requirementFor("PUT", "/api/sites/site_x/theme-settings")).toBe("site:settings");
+    expect(requirementFor("GET", "/api/sites/site_x/chrome")).toBe("content:read");
+    expect(requirementFor("PUT", "/api/sites/site_x/chrome")).toBe("site:settings");
     expect(requirementFor("GET", "/api/sites/site_x/ai/settings")).toBe("content:read");
     expect(requirementFor("PUT", "/api/sites/site_x/ai/settings")).toBe("site:settings");
     expect(requirementFor("GET", "/api/sites/site_x/ai/models")).toBe("site:settings");

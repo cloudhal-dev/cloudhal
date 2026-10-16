@@ -811,6 +811,8 @@ impl ::std::convert::TryFrom<::std::string::String> for MotionLevel {
 pub struct Page {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub availability: ::std::option::Option<Availability>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub chrome: ::std::option::Option<PageChrome>,
     #[serde(rename = "createdAt")]
     pub created_at: Timestamp,
     pub id: Id,
@@ -834,6 +836,125 @@ pub struct Page {
     pub title: PageTitle,
     #[serde(rename = "updatedAt")]
     pub updated_at: Timestamp,
+}
+#[doc = "This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PageChrome {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub footer: ::std::option::Option<PageChromeFooter>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub header: ::std::option::Option<PageChromeHeader>,
+}
+#[doc = "`PageChromeFooter`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum PageChromeFooter {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "minimal")]
+    Minimal,
+    #[serde(rename = "hidden")]
+    Hidden,
+}
+impl ::std::fmt::Display for PageChromeFooter {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Default => f.write_str("default"),
+            Self::Minimal => f.write_str("minimal"),
+            Self::Hidden => f.write_str("hidden"),
+        }
+    }
+}
+impl ::std::str::FromStr for PageChromeFooter {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "default" => Ok(Self::Default),
+            "minimal" => Ok(Self::Minimal),
+            "hidden" => Ok(Self::Hidden),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for PageChromeFooter {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for PageChromeFooter {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "`PageChromeHeader`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum PageChromeHeader {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "transparent")]
+    Transparent,
+    #[serde(rename = "hidden")]
+    Hidden,
+}
+impl ::std::fmt::Display for PageChromeHeader {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Default => f.write_str("default"),
+            Self::Transparent => f.write_str("transparent"),
+            Self::Hidden => f.write_str("hidden"),
+        }
+    }
+}
+impl ::std::str::FromStr for PageChromeHeader {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "default" => Ok(Self::Default),
+            "transparent" => Ok(Self::Transparent),
+            "hidden" => Ok(Self::Hidden),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for PageChromeHeader {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for PageChromeHeader {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
 }
 #[doc = "Absolute URL path, starting with '/', no trailing slash except root."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

@@ -91,13 +91,14 @@ export function footerOf(html: string): string {
 }
 
 /**
- * Today's derived header (no menu), byte for byte: the top-level pages, then the served top-level
- * categories; `current` names the item whose href is the path or a prefix of it.
- */
-/** The header's search form, rendered where the deployment answers searches (RFC-0019 §3). */
+ * The header's search form, rendered where the deployment answers searches (RFC-0019 §3). */
 export const HEADER_SEARCH =
   '<form class="ch-header-search" method="get" action="/search" role="search"><label for="ch-header-q" class="sr-only">Search this site</label><input id="ch-header-q" type="search" name="q" value maxlength="200" placeholder="Search articles…"><button type="submit" class="sr-only">Search</button></form>';
 
+/**
+ * The derived header (no menu, no chrome: RFC-0025's defaults), byte for byte: the top-level pages,
+ * then the served top-level categories; `current` names the item whose href is the path or a prefix of it.
+ */
 export function derivedHeader(
   siteName: string,
   links: ReadonlyArray<{ href: string; label: string; current?: boolean }>,
@@ -107,8 +108,12 @@ export function derivedHeader(
     l.current
       ? `<a href="${l.href}" aria-current="page" class="text-zinc-900">${l.label}</a>`
       : `<a href="${l.href}" class="hover:text-zinc-900">${l.label}</a>`;
-  return `<header class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6"><a href="/" class="text-lg font-semibold">${siteName}</a><nav class="flex flex-wrap gap-4 text-sm text-zinc-600" aria-label="Main">${links.map(a).join("")}</nav>${options.search ? HEADER_SEARCH : ""}</header>`;
+  const nav = links.length
+    ? `<nav class="ch-header__nav" aria-label="Main">${links.map(a).join("")}</nav>`
+    : "";
+  const actions = options.search ? `<div class="ch-header__actions">${HEADER_SEARCH}</div>` : "";
+  return `<header class="ch-header" data-layout="logo-left" data-behavior="static" data-width="content" data-surface="plain"><div class="ch-header__inner"><a href="/" class="ch-header__brand">${siteName}</a>${nav}${actions}</div></header>`;
 }
 
 export const DEFAULT_FOOTER =
-  '<footer class="mx-auto flex max-w-3xl justify-between gap-4 px-4 py-8 text-xs text-zinc-500"><span>Built with Cloudhal</span><a href="/rss.xml" class="hover:text-zinc-700">RSS</a></footer>';
+  '<footer class="ch-footer" data-layout="simple" data-surface="plain"><div class="ch-footer__inner"><div class="ch-footer__legal"><span>Built with Cloudhal</span><a href="/rss.xml" class="hover:text-zinc-700">RSS</a></div></div></footer>';

@@ -1,8 +1,8 @@
-/** Turkish `appearanceColors.*` (see `appearanceColors.en.ts`). */
+/** Turkish `appearance.*` (see `appearance.en.ts`). */
 import type { NamespaceMessages } from "../namespaces.ts";
 
-export const messages: NamespaceMessages<"appearanceColors"> = {
-  appearanceColors: {
+export const messages: NamespaceMessages<"appearance"> = {
+  appearance: {
     preview: "Renk rolleri",
     light: "Açık",
     dark: "Koyu",
@@ -38,6 +38,22 @@ export const messages: NamespaceMessages<"appearanceColors"> = {
       link: "Bağlantı",
       focus: "Odak halkası",
       gradient: "Geçiş sonu",
+    },
+    chrome: {
+      title: "Üst ve alt bilgi",
+      description:
+        "Her sayfada görünen logo, üst bilgi ve alt bilgi. Bir sayfa bunları gizleyebilir ya da üst bilgiyi ilk bandının üstünde saydam yapabilir.",
+      brand: "Marka",
+      header: "Üst bilgi",
+      footer: "Alt bilgi",
+      chooseLogo: "Görsel seç",
+      replaceLogo: "Değiştir",
+      removeLogo: "Kaldır",
+      noLogo: "Görsel yok: sitenin adı yazı olarak görünür.",
+      menus: "Adlandırabileceğiniz menüler: {menus}.",
+      saved: "Üst ve alt bilgi kaydedildi",
+      failed: "Üst ve alt bilgi kaydedilemedi",
+      publishHint: "Değişiklikler bir sonraki yayından sonra sitede görünür.",
     },
   },
 };
