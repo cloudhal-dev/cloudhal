@@ -997,12 +997,15 @@ function runFunction(
       return new Intl.DateTimeFormat(ctx.locale, { dateStyle: style, timeZone: "UTC" }).format(d);
     }
     case "formatNumber": {
+      // RFC-0022: a blank input shows blank, not 0.
+      if (blank(value)) return "";
       const n = num(value);
       if (!Number.isFinite(n)) return "";
       const digits = Math.min(Math.max(0, Math.trunc(num(args.digits ?? 2)) || 0), 6);
       return new Intl.NumberFormat(ctx.locale, { maximumFractionDigits: digits }).format(n);
     }
     case "formatCurrency": {
+      if (blank(value)) return "";
       const n = num(value);
       const currency = text(args.currency).toUpperCase();
       if (!Number.isFinite(n) || !/^[A-Z]{3}$/.test(currency)) return "";

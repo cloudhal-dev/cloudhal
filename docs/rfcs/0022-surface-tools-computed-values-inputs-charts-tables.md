@@ -1,5 +1,5 @@
 # RFC-0022: Surface tools — computed values, inputs, charts and tables
-- Status: Draft
+- Status: Accepted; 22a–22e shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0020 (surfaces: catalog, bindings, the interaction runtime, body fences, interop), RFC-0021 (DESIGN.md, `render_page`, the design pass and eval);
@@ -234,6 +234,31 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
   - **`Table`** is a primitive. `rows` must be a `{path}` binding; `columns` hold at most 8 fields with `label`, `align` and a `format` (text, number, currency with `currency`, percent, date, with `digits`); `highlight` marks a row where a field equals a value; `striped` is optional.
   - **Rendering.** A real `<table>` with `<caption>` and `<th scope="col">`. Cells are formatted in the page locale and escaped. Each cell carries `data-label`, so below 480 px the theme shows every row as a card of label–value pairs, with no sideways scroll.
   - **Checked in Chrome** with a calorie calculator, a bar chart and an 8-column table at 1440 and 390 px: no `overflow-x`. Two layout bugs found there were fixed: fields in one grid row now align when one has help text, and the caption no longer wraps narrow on phones.
+- **22e shipped.**
+  - **Eval.** Four tool briefs (`calories`, `loan`, `chart`, `compare`) are named with `--briefs`; the default stays the build set. The design pass fills empty number fields and choices with samples before it looks, and the summary reports "Tools working" (every computed result shows).
+  - **`power`** joined the functions (exponent at most ±1000), because a loan payment needs one.
+  - **The site-design skill** has tool recipes.
+  - **Workers AI run** (2026-10-16, newsroom, `--design --look`; stopped before GLM at the owner's request):
+
+    | Model | calories | loan | chart | compare |
+    |---|---|---|---|---|
+    | `@cf/openai/gpt-oss-120b` | not finished (empty page, 2.33) | built, but no computed results (2.33) | ✓ 3.33 | ✓ 3.0 |
+    | `@cf/openai/gpt-oss-20b` | not finished (empty, 1.0) | not finished | ✓ 3.5 | ✓ 2.83 |
+    | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | ✓ result shows (3.0) | built, no computed results (3.0) | chart left empty (3.33) | – |
+
+    - **Charts and tables are within reach** of the open models: 4 of 5 chart and comparison runs built something judged 2.8–3.5.
+    - **Calculators are not, yet.** Only Llama 3.3 wired one computed result. The others left the page empty or showed inputs whose result was text or nothing; the nested calls are where they fail.
+  - **The same briefs built through MCP by a frontier model** (Claude, as a person's agent would, with `create_page`, then `render_page` on a fresh local project with the blog theme):
+    - All four built on the first call and passed all 10 checks at 1440 and 390 px.
+    - Typing into the real theme page in Chrome: calories (30 years, 165 cm, 60 kg, light) gives 1,815, and 2,277 at high activity; the loan (200,000 at 6 % for 30 years) gives $1,199.10 a month and $431,676.38 in total.
+    - **This found two bugs, now fixed.**
+      - `formatNumber`/`formatCurrency` showed a blank input as 0, so an empty calculator read "0" or "$0.00". Blank now stays blank. The runtime is now `surface.6.js`; 1–5 are aliases.
+      - A `Button` in a `Stack` stretched to the full width; theme and preview buttons now keep their own width.
+  - **What it means.** The vocabulary works end to end, and an agent with a strong model builds working tools through MCP on the first try. Build chat on today's Workers AI models builds charts and tables but rarely calculators. Next steps: smaller calculator examples in the prompt (a two-input result) and a calculator block type that hides the nesting.
+  - **Seen once, not reproduced.** The very first `render_page` after Chrome started cold on a dev server timed out on the client side (60 s), although the tool's own limit is 20 s. Every later call took 1–3 s.
+- **Deviations (22e).**
+  - **The chart brief builds a page section, not an article:** Build chat builds pages.
+  - **No `computed-empty` check:** "Tools working" in the eval covers it, using sample inputs.
 - **Deviations (22d).**
   - **`format` is a named format,** not a function call per cell (props are flat objects in the catalog's schema subset). That is enough for the formats in §1.
   - **`highlight` compares one field with one value,** not a full condition.

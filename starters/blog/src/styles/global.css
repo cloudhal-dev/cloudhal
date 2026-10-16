@@ -83,7 +83,8 @@
   @apply border-red-500 bg-red-50;
 }
 .ch-button {
-  @apply inline-block rounded px-4 py-2 font-medium;
+  /* w-fit: a button in a Stack (a flex column) keeps its own width (RFC-0022 22e). */
+  @apply inline-block w-fit rounded px-4 py-2 font-medium;
 }
 .ch-button--primary {
   @apply text-white;
