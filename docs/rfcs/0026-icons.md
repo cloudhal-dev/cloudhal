@@ -82,3 +82,18 @@ None; `docs/design/icons.md` decided them.
   - **Repair.** `repairComponent` maps model spellings to the set: 160 aliases (`envelope`, `hamburger`, `ArrowForward`, `fa-…`, `-outline`). An unknown optional icon is dropped; an unknown `Icon` name stays an error.
   - **A2UI.** A basic-catalog `Icon` imports by name (`locationOn` → `map-pin`) and exports back where A2UI has the name.
   - **Rendering.** Decorative SVG everywhere a label is beside it. A labelled `Icon` gets `role="img"`. Button icons sit before or after the label. List bullets are an icon on each item, in the brand color.
+- **26c shipped.**
+  - **Weights.** The generator writes all four weights (light, regular, bold, fill; 13, 12, 12 and 10 KB gzipped). `renderIcon` takes the site's `weight`.
+  - **Setting.** The theme setting `iconWeight` (radio, en/tr, default regular) reaches every icon through `MediaContext.icons`, `Base.astro`, `NavMenu` and `MenuPanel`.
+  - **Bundling.** All four weights ship in the site Worker (about 48 KB gzipped), because a site's setting can change without a deploy.
+  - **Dropped: same-page `<symbol>`/`<use>` deduplication.** Brotli and gzip already make repeated inline SVG nearly free on the wire, and deduplication would need a page-wide collector across components.
+- **26d shipped.**
+  - **API.** `defineIconSet` lets a theme draw any names of the set itself; the other names stay Phosphor's. `renderIcon` takes the `set`.
+  - **Check.** Each drawing must be geometry only:
+    - `path`, `circle`, `ellipse`, `rect`, `line`, `polyline`, `polygon` and `g`, with shape and presentation attributes;
+    - paint only `none` or `currentColor`;
+    - a numeric viewBox, at most 8,000 characters.
+    
+    So an icon can never carry markup, links, styles or scripts.
+  - **Starter.** The blog starter has `src/icons.ts` (empty: Phosphor everywhere), which the route and layouts pass on.
+

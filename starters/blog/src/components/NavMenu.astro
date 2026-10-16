@@ -11,6 +11,7 @@
  */
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import { renderIcon } from "@cloudhal/core-ts/icons";
+import { iconSet } from "../icons.ts";
 import NavLink from "./NavLink.astro";
 
 interface Props {
@@ -21,8 +22,12 @@ interface Props {
   level?: number;
   /** A popover under a button (the header's bar), with this id. */
   popover?: string | undefined;
+  /** RFC-0026 26c: the site's icon weight. */
+  iconWeight?: string | undefined;
 }
-const { item, on, off, level = 1, popover } = Astro.props;
+const { item, on, off, level = 1, popover, iconWeight } = Astro.props;
+const icon = (name: string, className?: string) =>
+  renderIcon(name, { className, weight: iconWeight, set: iconSet });
 const MAX_LEVEL = 3;
 const mega = popover !== undefined && level === 1 && item.display === "mega";
 const columns = mega ? item.children.filter((c) => c.children.length > 0) : [];
@@ -36,7 +41,7 @@ const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
       class:list={["ch-nav-menu__btn", item.current || item.inTrail ? on : off]}
       popovertarget={popover}
       aria-label={item.href ? item.label : undefined}
-    >{!item.href && item.label}<Fragment set:html={renderIcon("chevron-down")} /></button>
+    >{!item.href && item.label}<Fragment set:html={icon("chevron-down")} /></button>
     <div popover="auto" id={popover} class:list={["ch-nav-menu__pop", mega && "ch-nav-menu__pop--mega"]}>
       {mega ? (
         <div class="ch-mega">
@@ -59,7 +64,7 @@ const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
         {item.children.map((child) => (
           <li>
             {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
-              <Astro.self item={child} on={on} off={off} level={level + 1} />
+              <Astro.self item={child} on={on} off={off} level={level + 1} iconWeight={iconWeight} />
             ) : (
               <NavLink item={child} on={on} off={off} />
             )}
@@ -73,13 +78,13 @@ const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
 <details class="ch-nav-menu" open={item.inTrail && level > 1 ? true : undefined}>
   <summary class={(item.current || item.inTrail ? on : off) || undefined}>
     {item.href ? <NavLink item={item} on={on} off={off} /> : <span>{item.label}</span>}
-    <Fragment set:html={renderIcon("chevron-down", { className: "ch-nav-menu__caret" })} />
+    <Fragment set:html={icon("chevron-down", "ch-nav-menu__caret")} />
   </summary>
   <ul>
     {item.children.map((child) => (
       <li>
         {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
-          <Astro.self item={child} on={on} off={off} level={level + 1} />
+          <Astro.self item={child} on={on} off={off} level={level + 1} iconWeight={iconWeight} />
         ) : (
           <NavLink item={child} on={on} off={off} />
         )}

@@ -12,6 +12,7 @@ import MenuPanel from "../components/MenuPanel.astro";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
 import { PAIRING_PRELOADS } from "../fonts.ts";
+import { iconSet } from "../icons.ts";
 import { themeSettings } from "../settings.ts";
 import "../styles/global.css";
 
@@ -149,6 +150,10 @@ const needsScript =
 const copyright = f.copyright
   ? copyrightText(f.copyright, site.name, new Date().getFullYear())
   : undefined;
+// RFC-0026: icons in the site's weight (26c), the theme's own drawings over the set's (26d).
+const iconWeight = String(site.theme.config?.iconWeight ?? "regular");
+const icon = (name: string, o: { label?: string; className?: string } = {}) =>
+  renderIcon(name, { ...o, weight: iconWeight, set: iconSet });
 // The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
 const look = themeVariables(site, themeSettings);
 // A page's own motion level wins over the site's (RFC-0024 §1).
@@ -187,7 +192,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
         </p>
         {announce.dismissible && (
           <button type="button" class="ch-announcement__close" data-ch-dismiss={announce.id} aria-label={bw.dismiss} hidden>
-            <Fragment set:html={renderIcon("close")} />
+            <Fragment set:html={icon("close")} />
           </button>
         )}
       </div>
@@ -222,7 +227,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
           )}
           {headerNav.length > 0 && (
             <nav class="ch-header__nav" aria-label={w.main}>
-              {headerNav.map((item, i) => item.children.length > 0 ? <NavMenu item={item} {...header} popover={`ch-sub-${i}`} /> : <NavLink item={item} {...header} />)}
+              {headerNav.map((item, i) => item.children.length > 0 ? <NavMenu item={item} {...header} popover={`ch-sub-${i}`} iconWeight={iconWeight} /> : <NavLink item={item} {...header} />)}
             </nav>
           )}
           {actions.length > 0 && (
@@ -244,16 +249,16 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
             <div class="ch-menu-slot">
               {dialog ? (
                 <a class="ch-menu__open" href="/menu" data-ch-dialog="ch-menu">
-                  <Fragment set:html={renderIcon("menu")} />
+                  <Fragment set:html={icon("menu")} />
                   {w.menu}
                 </a>
               ) : (
                 <details class="ch-menu">
                   <summary class="ch-menu__open">
-                    <Fragment set:html={renderIcon("menu")} />
+                    <Fragment set:html={icon("menu")} />
                     {w.menu}
                   </summary>
-                  <MenuPanel nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="drop" />
+                  <MenuPanel iconWeight={iconWeight} nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="drop" />
                 </details>
               )}
             </div>
@@ -267,7 +272,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
           <span class="ch-header__brand">{site.name}</span>
           <form method="dialog"><button class="ch-menu__close" type="submit">{w.closeMenu}</button></form>
         </div>
-        <MenuPanel nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="dialog" />
+        <MenuPanel iconWeight={iconWeight} nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="dialog" />
       </dialog>
     )}
     <main id="main" tabindex="-1" class="mx-auto max-w-3xl px-4 pb-16">
@@ -302,7 +307,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
                 {f.tagline && <p class="ch-footer__tagline">{f.tagline}</p>}
                 {social.length > 0 && (
                   <ul class="ch-footer__social" aria-label={w.social}>
-                    {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={renderIcon(l.network)} /></a></li>)}
+                    {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={icon(l.network)} /></a></li>)}
                   </ul>
                 )}
               </div>
@@ -321,14 +326,14 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
             {f.layout === "simple" && f.tagline && <span>{f.tagline}</span>}
             {f.layout === "simple" && social.length > 0 && (
               <ul class="ch-footer__social" aria-label={w.social}>
-                {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={renderIcon(l.network)} /></a></li>)}
+                {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={icon(l.network)} /></a></li>)}
               </ul>
             )}
             {f.credit && <span>{w.credit}</span>}
             {legalNav ? (
               legalNav.length > 0 && (
                 <nav class="flex flex-wrap gap-4" aria-label={f.legal === "footer" ? w.footer : w.legal}>
-                  {legalNav.map((item) => item.children.length > 0 ? <NavMenu item={item} {...below} /> : <NavLink item={item} {...below} />)}
+                  {legalNav.map((item) => item.children.length > 0 ? <NavMenu item={item} {...below} iconWeight={iconWeight} /> : <NavLink item={item} {...below} />)}
                 </nav>
               )
             ) : (

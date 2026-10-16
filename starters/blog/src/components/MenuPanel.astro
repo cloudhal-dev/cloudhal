@@ -15,8 +15,10 @@ interface Props {
   words: { main: string; secondary: string };
   /** Keeps ids unique when the panel shows twice on a page. */
   idSuffix: string;
+  /** RFC-0026 26c: the site's icon weight. */
+  iconWeight?: string | undefined;
 }
-const { nav, utility, search, words, idSuffix } = Astro.props;
+const { nav, utility, search, words, idSuffix, iconWeight } = Astro.props;
 const link = { on: "ch-menu__current", off: "" };
 ---
 <div class="ch-menu__panel">
@@ -30,7 +32,7 @@ const link = { on: "ch-menu__current", off: "" };
   {nav.length > 0 && (
     <nav aria-label={words.main} class="ch-menu__nav">
       <ul>
-        {nav.map((item) => <li>{item.children.length > 0 ? <NavMenu item={item} {...link} /> : <NavLink item={item} {...link} />}</li>)}
+        {nav.map((item) => <li>{item.children.length > 0 ? <NavMenu item={item} {...link} iconWeight={iconWeight} /> : <NavLink item={item} {...link} />}</li>)}
       </ul>
     </nav>
   )}
