@@ -5,6 +5,8 @@ import {
   COLOR_SCHEMES,
   colorRolesCss,
   contrastRatio,
+  DTCG_SCHEMA,
+  designTokensDtcg,
   expandColorTokens,
   legacyColorRoles,
   shapeCss,
@@ -228,5 +230,41 @@ describe("shape and density (RFC-0023 §3)", () => {
       ),
     ).toEqual(new Set(["0"]));
     expect(square["--ch-space-m"]).toBe("0.875rem");
+  });
+});
+
+describe("DTCG export (RFC-0023 §5)", () => {
+  const props = {
+    seed: {},
+    radius: { default: "small" },
+    density: { default: "cozy" },
+    typeScale: {},
+  };
+  type Token = { $value: { hex?: string; value?: number; unit?: string; components?: number[] } };
+
+  it("writes the roles for light and dark, radii, spaces and, with a scale, the fluid steps", () => {
+    const t = designTokensDtcg({ seed: "#0f766e", radius: "full", typeScale: "balanced" }, props, {
+      name: "Demo",
+    }) as Record<string, Record<string, Record<string, Token> & Token & { $type?: string }>>;
+    expect(t.$schema).toBe(DTCG_SCHEMA);
+    expect(t.color?.$type).toBe("color");
+    expect(Object.keys(t.color?.light ?? {})).toEqual([...COLOR_ROLES]);
+    expect(t.color?.light?.brand?.$value).toEqual({
+      colorSpace: "srgb",
+      components: [0.0588, 0.4627, 0.4314],
+      hex: "#0f766e",
+    });
+    expect(t.radius?.control?.$value).toEqual({ value: 9999, unit: "px" });
+    expect(t.space?.m?.$value).toEqual({ value: 1, unit: "rem" });
+    expect(Object.keys(t["type-step"] ?? {})).toEqual(expect.arrayContaining(["-1", "0", "6"]));
+    expect(t.$extensions).toMatchObject({
+      "dev.cloudhal": { source: "seed", settings: { seed: "#0f766e", radius: "full" } },
+    });
+  });
+
+  it("leaves the type steps out until a scale is chosen, and is deterministic", () => {
+    const t = designTokensDtcg({}, props);
+    expect(t).not.toHaveProperty("type-step");
+    expect(JSON.stringify(designTokensDtcg({}, props))).toBe(JSON.stringify(t));
   });
 });

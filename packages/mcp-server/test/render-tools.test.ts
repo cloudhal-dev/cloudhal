@@ -35,7 +35,9 @@ function fakeRenderer(log: string[], options: { hang?: boolean } = {}): PageRend
                 return RENDER_CHECK_IDS.map((id) =>
                   id === "contrast" && viewport.width === 390
                     ? { id, count: 2, examples: ["section sec_hero p — 2.1:1, needs 4.5:1"] }
-                    : { id, count: 0, examples: [] },
+                    : id === "contrast" && viewport.scheme === "dark"
+                      ? { id, count: 1, examples: ["section sec_cta a — 3.2:1, needs 4.5:1"] }
+                      : { id, count: 0, examples: [] },
                 ) as T;
               const scroll = /scrollTo\(0, (\d+)\)/.exec(expression);
               if (scroll) {
@@ -154,6 +156,48 @@ describe("render_page (RFC-0021 §4)", () => {
     );
     expect(log[1]).toMatch(/^open 390x\d+ dark /);
     expect((out.result as { scheme: string }).scheme).toBe("dark");
+  });
+
+  it("checks a dark or automatic site's contrast in the other scheme too (RFC-0023)", async () => {
+    const site = await store.getSite(siteId);
+    if (!site) throw new Error("no site");
+    await store.updateSite({ ...site, theme: { ...site.theme, config: { mode: "auto" } } });
+    const log: string[] = [];
+    const render = { renderer: fakeRenderer(log), limiter: new RenderLimiter() };
+    const out = await runTool(
+      def,
+      { siteId, pageId, widths: [1440], fullPage: false },
+      ctx({ render }),
+      {
+        policy,
+      },
+    );
+    expect(log.filter((l) => l.startsWith("open"))).toEqual([
+      expect.stringMatching(/^open 1440x900 light /),
+      expect.stringMatching(/^open 1440x900 dark /),
+    ]);
+    const contrast = (
+      out.result as { checks: { id: string; ok: boolean; examples: string[] }[] }
+    ).checks.find((c) => c.id === "contrast");
+    expect(contrast).toMatchObject({
+      ok: false,
+      examples: ["dark @1440: section sec_cta a — 3.2:1, needs 4.5:1"],
+    });
+
+    // a dark site renders dark by default and checks light as well
+    const now = await store.getSite(siteId);
+    if (!now) throw new Error("no site");
+    await store.updateSite({ ...now, theme: { ...now.theme, config: { mode: "dark" } } });
+    const dark = await runTool(
+      def,
+      { siteId, pageId, widths: [1440], fullPage: false },
+      ctx({ render }),
+      {
+        policy,
+      },
+    );
+    expect((dark.result as { scheme: string }).scheme).toBe("dark");
+    expect(log.filter((l) => l.startsWith("open")).length).toBe(3);
   });
 
   it("is rate-limited per key, and a browser that hangs fails within the timeout", async () => {

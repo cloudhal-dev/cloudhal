@@ -136,6 +136,16 @@ export const DESIGN_RUBRIC = [
     ],
   },
   {
+    id: "color",
+    question:
+      "Is the palette coherent, with one dominant color and accents used with purpose? (RFC-0023)",
+    anchors: [
+      "clashing or random colors, or no color decisions at all (default greys and blue links)",
+      "a workable palette, but accents are scattered or the page is flat",
+      "one dominant color, accents only where they guide the eye, every surface readable",
+    ],
+  },
+  {
     id: "spacing",
     question: "Is the spacing deliberate?",
     anchors: [

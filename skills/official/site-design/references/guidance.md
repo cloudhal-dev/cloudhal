@@ -1,12 +1,12 @@
 # Cloudhal design guidance
 
-The same text `get_design` returns as `guidance`. Follow the site's design rules first; they win where they differ.
+The same text `get_design` returns as `guidance` (`DESIGN_GUIDANCE` in `@cloudhal/core-ts/design`). Follow the site's design rules first; they win where they differ.
 
-1. **Commit to a direction.** Read the brand, pick one display treatment and one accent, and keep to them. Generic is the failure mode: no filler copy, no "Lorem", no placeholder links (`#`), no repeated stock image.
-2. **Rhythm.** Alternate section tones (surface, muted, brand or inverse bands) and widths (narrow text, wide grids, full-bleed bands). Never three identical sections in a row; vary layouts (`Columns 2-1`, `Grid`, `Stack`).
-3. **Hierarchy.** One level-1 heading per page, then level 2 per section. Big contrast between headings and body text; short headings in sentence case; one primary button per section.
-4. **Real content.** The site's own entries and media library images with descriptive alt text. Counts follow the content, not habit.
-5. **Lead with the strongest thing**: the clearest promise, the best image, the newest story. Put proof (stats, quotes, testimonials) next to the claim it supports; end with one call to action.
-6. **Interactivity only where it helps** someone decide or find: tabs for alternatives, a toggle or slider for pricing, an accordion or FAQ for questions. Bind it to data; never fake it.
-7. **Small screens first.** Grids of 2–4 items, short lines, nothing wider than the screen at 390 px.
-8. **Check before you hand over.** Render at desktop and mobile widths, fix what is cramped, empty, broken or hard to read, snapshot, and ask a person to publish.
+1. **Commit to a direction.** Read the brand, pick one display treatment and one accent, and keep to them. When the theme offers color tokens (get_design shows them), choose a seed, a scheme, a mode and a font pairing that fit the brand with set_theme_settings, never colors per role. Generic is the failure mode: no filler copy, no "Lorem", no placeholder links ("#"), no repeated stock image.
+2. **Rhythm.** Alternate band and card surfaces (plain, muted, raised, inverse, brand, accent; gradient or mesh at most once a page, for the hero or the call to action; dots, grid or noise for a quiet texture) and widths (narrow text, wide grids, full-bleed bands). Give a band an anchor when a menu or button links to it. Never three identical sections in a row; vary layouts (Columns 2-1, Grid, Stack).
+3. **Hierarchy.** One level-1 heading per page, then level 2 per section. Big contrast between headings and body text; short headings in sentence case; one primary Button per section, secondary ones for the rest.
+4. **Real content.** Use the site's own entries and media library images with descriptive alt text. Counts follow the content: two plans if there are two, five FAQs if there are five, not three of everything.
+5. **Lead with the strongest thing:** the clearest promise, the best image, the newest story. Put proof (Stat, Quote, testimonial) near the claim it supports and end with one clear call to action.
+6. **Interactivity only where it helps someone decide or find:** Tabs for alternatives, Toggle or Slider for pricing, Accordion or faq for questions, a calculator (NumberField, RadioGroup, Checkbox) when the reader has numbers of their own. Every input has a label, and its result sits right next to it, computed with functions, never promised in text. A Chart only when the numbers are the point, never as decoration, with a title that says what it shows. A Table to compare a few things across the same fields (plans, specs), at most 8 columns, the recommended row highlighted. Bind it to data; never fake it.
+7. **Small screens first.** Grids of 2–4 items, short lines, no wide tables; everything must work at 390 px.
+8. **Check before you hand over:** render the page (render_page when available, otherwise preview_page) at desktop and mobile widths, and in the dark scheme too when the site's mode is dark or auto; fix what is cramped, empty, broken or hard to read, then snapshot and ask a person to publish.

@@ -63,6 +63,7 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "diff_node",
       // RFC-0021 §2
       "get_design",
+      "get_design_tokens",
       "set_design",
       "render_page",
       "list_taxonomies",

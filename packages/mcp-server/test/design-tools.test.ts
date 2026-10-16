@@ -114,6 +114,15 @@ describe("design tools (RFC-0021)", () => {
     expect(text).toContain("Shape (RFC-0023): radius full, density cozy.");
   });
 
+  it("exports the tokens as a DTCG file (RFC-0023 §5)", async () => {
+    const out = (await run("get_design_tokens", { siteId })).result as Record<string, unknown>;
+    expect(out.$schema).toBe("https://www.designtokens.org/schemas/2025.10/format.json");
+    expect(out).toHaveProperty("color.light.brand.$value.hex", "#18181b");
+    expect(out).toHaveProperty("radius.control.$value", { value: 0.25, unit: "rem" });
+    expect(byName.get_design_tokens?.annotations?.readOnlyHint).toBe(true);
+    expect(byName.get_design_tokens?.scopes).toEqual(["site:read"]);
+  });
+
   it("changes the site's rules only with a person's approval, and warns without refusing", async () => {
     expect(byName.set_design?.requiresApproval).toBe(true);
     const prompt = await byName.set_design?.approvalPrompt?.(
