@@ -63,6 +63,8 @@ export interface SurfaceNode {
    */
   overlay?: { target: string; kind: string; fallback?: string };
   tip?: string;
+  /** RFC-0027: on a hero carousel's first slide, its images load first (not lazy). */
+  priority?: boolean;
   children: SurfaceNode[];
 }
 
@@ -194,6 +196,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
     depth: number,
     stagger?: { reveal: string; index: number },
     within?: string,
+    priority?: boolean,
   ): SurfaceNode | undefined => {
     const c = byId.get(id);
     if (!c || unknown.has(id) || depth > 8) return undefined;
@@ -219,6 +222,9 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
           depth + 1,
           staggers ? { reveal: motion?.reveal ?? "rise", index: Math.min(i++, 12) } : undefined,
           inside,
+          // RFC-0027: a hero carousel's first slide is what the reader sees first.
+          priority ||
+            (c.component === "Carousel" && c.props?.variant === "hero" && k === c.children?.[0]),
         ),
       )
       .filter((n): n is SurfaceNode => n !== undefined);
@@ -260,6 +266,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       entry,
       ...(overlay ? { overlay } : {}),
       ...(tip ? { tip } : {}),
+      ...(priority ? { priority: true } : {}),
       props: resolveProps(c.props, data, { locale }),
       raw: { ...(c.props ?? {}) },
       ...(live ? { live: true } : {}),
@@ -555,7 +562,7 @@ export const CHILDREN = "<!--ch-children-->";
  */
 export function primitiveHtml(
   node: Pick<SurfaceNode, "id" | "component" | "props" | "children"> &
-    Partial<Pick<SurfaceNode, "raw" | "live" | "split" | "overlay" | "tip">>,
+    Partial<Pick<SurfaceNode, "raw" | "live" | "split" | "overlay" | "tip" | "priority">>,
   scope: string,
   media?: MediaContext,
 ): string {
@@ -617,6 +624,7 @@ export function primitiveHtml(
             transform: media?.transform ?? "none",
             sizes: "(min-width: 64rem) 64rem, 100vw",
             ...(media?.preview ? { preview: true } : {}),
+            ...(node.priority ? { priority: true } : {}),
           },
         ),
       );
@@ -865,6 +873,33 @@ export function primitiveHtml(
       return `<div class="ch-step">${CHILDREN}</div>`;
     case "ScrollProgress":
       return `<div class="ch-progress"${attr("placement", p.placement ?? "page", ["page", "section"])}${attr("tone", p.tone, ["brand", "accent", "neutral"])} aria-hidden="true"><span class="ch-progress__bar"></span></div>`;
+    // RFC-0027: a scroll-snap track of slides (each child wrapped by `slideWrapper`), markers as
+    // links to the slides and arrows the carousel module reveals; all of it works without it.
+    case "Carousel": {
+      const tr = (media?.locale ?? "en").startsWith("tr");
+      const n = node.children.length;
+      const variant = p.variant === "hero" ? "hero" : "rail";
+      const controls = ["arrows", "markers", "none"].includes(str(p.controls))
+        ? str(p.controls)
+        : "both";
+      const arrows = controls === "both" || controls === "arrows";
+      const arrow = (dir: "prev" | "next") =>
+        `<button type="button" class="ch-carousel__arrow" data-ch-carousel="${dir}" data-ch-pending aria-controls="${id}-track" aria-label="${dir === "prev" ? (tr ? "Önceki slayt" : "Previous slide") : tr ? "Sonraki slayt" : "Next slide"}">${iconOf(dir === "prev" ? "chevron-left" : "chevron-right", media)}</button>`;
+      const markers =
+        controls === "both" || controls === "markers"
+          ? `<nav class="ch-carousel__markers" data-style="${p.markers === "dots" ? "dots" : "numbers"}" aria-label="${tr ? "Slaytlar" : "Slides"}">${node.children
+              .map(
+                (_, i) =>
+                  `<a href="#${id}-${i + 1}" aria-label="${tr ? "Slayt" : "Slide"} ${i + 1}">${p.markers === "dots" ? "" : i + 1}</a>`,
+              )
+              .join("")}</nav>`
+          : "";
+      const bar =
+        arrows || markers
+          ? `<div class="ch-carousel__controls">${arrows ? arrow("prev") : ""}${markers}${arrows ? arrow("next") : ""}</div>`
+          : "";
+      return `<section class="ch-carousel" id="${id}" data-variant="${variant}"${attr("per-view", p.perView === undefined ? undefined : String(p.perView), ["1", "2", "3", "4"])}${attr("item", p.itemWidth, ["s", "m", "l"])}${attr("peek", p.peek, ["none", "s", "m"])}${attr("align", p.align, ["start", "center"])}${attr("gap", p.gap, SPACE)}${attr("aspect", p.aspect, ["16:9", "21:9", "4:3", "1:1", "3:4"])} data-count="${n}" role="region" aria-roledescription="${tr ? "kaydırmalı alan" : "carousel"}" aria-label="${escapeHtml(str(p.label))}"><div class="ch-carousel__track" id="${id}-track" tabindex="0">${CHILDREN}</div>${bar}</section>`;
+    }
     // RFC-0025 §3: overlays, closed until the reader opens them (top layer when open).
     case "Dialog":
     case "Drawer": {
@@ -907,6 +942,26 @@ export function blockNodeHtml(node: SurfaceNode, media?: MediaContext, preview?:
  * In a live surface, a component with a visibility condition sits in a `display: contents`
  * wrapper the runtime hides and shows (`hidden` while the condition is false).
  */
+/**
+ * RFC-0027: the box around a Carousel's i-th child (a named slide the markers link to); nothing
+ * for other parents. Both renderers (`nodeHtml`, `SurfaceNode.astro`) wrap each child with it.
+ */
+export function slideWrapper(
+  parent: Pick<SurfaceNode, "id" | "component" | "children">,
+  index: number,
+  scope: string,
+  media?: MediaContext,
+): [string, string] {
+  if (parent.component !== "Carousel") return ["", ""];
+  const tr = (media?.locale ?? "en").startsWith("tr");
+  const n = parent.children.length;
+  const id = escapeHtml(`${scope}-${parent.id}-${index + 1}`);
+  return [
+    `<div class="ch-carousel__slide" id="${id}" role="group" aria-roledescription="${tr ? "slayt" : "slide"}" aria-label="${tr ? `${index + 1} / ${n}` : `${index + 1} of ${n}`}">`,
+    "</div>",
+  ];
+}
+
 export function visibilityWrapper(node: Pick<SurfaceNode, "visible" | "hidden">): [string, string] {
   if (node.visible === undefined) return ["", ""];
   return [
@@ -936,7 +991,12 @@ function nodeHtml(node: SurfaceNode, scope: string, ctx: SurfaceContext): string
       ) +
       close
     );
-  const inner = node.children.map((c) => nodeHtml(c, scope, ctx)).join("");
+  const inner = node.children
+    .map((c, i) => {
+      const [open, close] = slideWrapper(node, i, scope, ctx.media);
+      return open + nodeHtml(c, scope, ctx) + close;
+    })
+    .join("");
   return (
     open +
     markComponent(

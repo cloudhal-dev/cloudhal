@@ -67,6 +67,8 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "header-contrast": "transparent header contrast",
   "focus-obscured": "focus under the sticky header",
   "overlay-open": "overlays",
+  "carousel-label": "carousel names",
+  "carousel-lcp": "carousel image loading",
 };
 
 function summary(r: RenderPageResult): string {
