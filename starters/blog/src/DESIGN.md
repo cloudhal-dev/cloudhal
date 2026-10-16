@@ -20,6 +20,7 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 - A `Card` with `href` is a whole link: keep its text short (a heading and one sentence).
 - Tools (calculators): put the inputs (`NumberField`, `RadioGroup` with `variant: buttons`, `Checkbox`) in a `Card`, two or three to a `Grid` row, and the result as a `Stat` right below them.
 - Charts: a `Chart` sits in the reading column (or a `wide` band for dashboards), titled with what it shows ("Readers per month, 2026"), with a `caption` naming the source. Bar to compare, line over time, donut for parts of a whole.
+- Tables: a `Table` compares a few things across the same fields (plans, specs). The first column names the row; numbers align `end` with a `format`; `highlight` marks the recommended row. On phones rows become cards, so keep labels short.
 - Lists of articles come from the content list section or a surface entry source, not from copied titles.
 
 ## Imagery

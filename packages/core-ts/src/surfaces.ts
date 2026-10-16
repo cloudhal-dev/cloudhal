@@ -484,6 +484,63 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
       },
     },
   },
+  // RFC-0022 §4: a real table; rows stack into cards on small screens.
+  {
+    name: "Table",
+    title: { en: "Table", tr: "Tablo" },
+    description: {
+      en: "Rows of the surface's data as a table: rows {path} to a list of objects, columns the fields to show. On phones each row becomes a card.",
+      tr: "Yüzey verisindeki satırlar tablo olarak; telefonda her satır bir karta dönüşür.",
+    },
+    category: "content",
+    props: schema(
+      {
+        caption: label(160),
+        rows: { type: "array", items: { type: "string" }, maxItems: 50 },
+        columns: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["field", "label"],
+            properties: {
+              field: { type: "string", minLength: 1, maxLength: 60 },
+              label: { type: "string", minLength: 1, maxLength: 60 },
+              align: { type: "string", enum: ["start", "end"] },
+              format: { type: "string", enum: ["text", "number", "currency", "percent", "date"] },
+              currency: { type: "string", pattern: "^[A-Z]{3}$" },
+              digits: { type: "integer", minimum: 0, maximum: 6 },
+            },
+          },
+        },
+        highlight: {
+          type: "object",
+          additionalProperties: false,
+          required: ["field", "equals"],
+          properties: {
+            field: { type: "string", minLength: 1, maxLength: 60 },
+            equals: { type: "string", maxLength: 120 },
+          },
+        },
+        striped: { type: "boolean" },
+      },
+      ["caption", "rows", "columns"],
+    ),
+    children: "none",
+    example: {
+      props: {
+        caption: "Plans compared",
+        rows: { path: "/plans" },
+        columns: [
+          { field: "name", label: "Plan" },
+          { field: "price", label: "Price", align: "end", format: "currency", currency: "USD" },
+        ],
+        highlight: { field: "name", equals: "Pro" },
+      },
+    },
+  },
   // RFC-0022 §2: local inputs. They write only to the surface's data, in the reader's browser.
   {
     name: "NumberField",
@@ -1399,6 +1456,12 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       });
     checkProps(entry, c.props, `${at}/props`, issues);
     // RFC-0022 §2: a local input writes to the surface's data, so its value is a binding.
+    // RFC-0022 §4: so does a table.
+    if (c.component === "Table" && !(isObj(c.props) && isPathValue(c.props.rows)))
+      issues.push({
+        path: `${at}/props/rows`,
+        message: 'bind it to a list in the surface\'s data: {"path":"/rows"}',
+      });
     // RFC-0022 §3: a chart reads its rows from the surface's data.
     if (c.component === "Chart" && !(isObj(c.props) && isPathValue(c.props.data)))
       issues.push({
@@ -1998,6 +2061,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     `- Functions: ${SURFACE_FUNCTIONS.join(", ")}.`,
     '- Inputs (NumberField, TextField, Checkbox, RadioGroup) write only to the surface\'s data in the reader\'s browser: bind value (checked for Checkbox) with {"path"}, start it in `data` ("" for an empty number), give every input a label, and show the computed result next to it. Buttons may `append` text to a value (keypads) or `set` a computed value, e.g. {"action":"set","path":"/display","value":{"call":"calculate","args":{"expression":{"path":"/display"}}}}.',
     '- Charts: a Chart draws rows from the surface\'s data, e.g. {"id":"c","component":"Chart","props":{"kind":"bar","title":"Readers per month","data":{"path":"/months"},"x":"month","series":[{"field":"readers","label":"Readers"}]}} with "data":{"months":[{"month":"Jan","readers":1200},…]}. Use one only when the numbers are the point; bar for comparing, line or area for change over time, donut for parts of a whole (one series, at most six parts).',
+    '- Tables: a Table shows rows from the surface\'s data, e.g. {"id":"t","component":"Table","props":{"caption":"Plans compared","rows":{"path":"/plans"},"columns":[{"field":"name","label":"Plan"},{"field":"price","label":"Price","align":"end","format":"currency","currency":"USD"}],"highlight":{"field":"name","equals":"Pro"}}}. Formats: text, number, currency, percent, date. At most 8 columns; on phones each row becomes a card.',
     "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
       '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
       'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',
