@@ -186,8 +186,13 @@ describe("surface tools", () => {
       catalog: "blog@1",
       data: { title: "Try it free" },
     });
-    expect(section.components.map((c) => c.component)).toEqual(["Stack", "Heading", "Button"]);
-    expect(imported.notes.join("\n")).toMatch(/TextField components were left out/);
+    // RFC-0022 §2: the text field arrives as a local input bound to the same data
+    expect(section.components.map((c) => c.component)).toEqual([
+      "Stack",
+      "Heading",
+      "TextField",
+      "Button",
+    ]);
 
     const exported = (await call("export_surface", {
       siteId,

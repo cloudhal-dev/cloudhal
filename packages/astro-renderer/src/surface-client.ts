@@ -78,11 +78,14 @@ const boot=(root)=>{const s=root.querySelector("script[data-ch-state]");if(!s||r
 let init;try{init=JSON.parse(s.textContent||"{}");}catch{return;}let d=structuredClone(init);const loc=document.documentElement.lang||"en";
 const render=()=>{for(const el of root.querySelectorAll("[data-ch-text]"))el.textContent=txt(val(json(el,"data-ch-text"),d,loc));
 for(const el of root.querySelectorAll("[data-ch-visible]"))el.hidden=!cond(json(el,"data-ch-visible"),d);
-for(const el of root.querySelectorAll("[data-ch-model]")){const v=get(d,el.getAttribute("data-ch-model"));if(el.type==="radio")el.checked=el.value===txt(v);else if(v!==undefined&&document.activeElement!==el)el.value=txt(v);}};
-const write=(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-model]"):null;if(!el||!root.contains(el)||(el.type==="radio"&&!el.checked))return;put(d,el.getAttribute("data-ch-model"),el.type==="range"||el.type==="number"?num(el.value):el.value);render();};
+for(const el of root.querySelectorAll("[data-ch-invalid]"))el.setAttribute("aria-invalid",truthy(val(json(el,"data-ch-invalid"),d,loc))?"true":"false");
+for(const el of root.querySelectorAll("[data-ch-model]")){const v=get(d,el.getAttribute("data-ch-model"));if(el.type==="radio")el.checked=el.value===txt(v);else if(el.type==="checkbox")el.checked=truthy(v);else if(v!==undefined&&document.activeElement!==el)el.value=txt(v);}};
+const write=(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-model]"):null;if(!el||!root.contains(el)||(el.type==="radio"&&!el.checked))return;put(d,el.getAttribute("data-ch-model"),el.type==="checkbox"?el.checked:el.type==="number"?(el.value===""?"":num(el.value)):el.type==="range"?num(el.value):el.value);render();};
 root.addEventListener("input",write);root.addEventListener("change",write);
 root.addEventListener("click",(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-action]"):null;if(!el||!root.contains(el))return;const a=json(el,"data-ch-action");if(!obj(a))return;e.preventDefault();
-switch(a.action){case"set":put(d,a.path,a.value);break;
+const dyn=(v)=>isPath(v)||isCall(v)?val(v,d,loc):v;
+switch(a.action){case"set":put(d,a.path,dyn(a.value));break;
+case"append":put(d,a.path,(txt(get(d,a.path))+txt(dyn(a.value))).slice(0,200));break;
 case"toggle":put(d,a.path,!truthy(get(d,a.path)));break;
 case"increment":{const n=num(get(d,a.path));const by=num(a.by);put(d,a.path,(Number.isFinite(n)?n:0)+(Number.isFinite(by)?by:1));break;}
 case"reset":d=structuredClone(init);break;
@@ -96,13 +99,16 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.2.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.3.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
  * working (each version only adds to the one before; RFC-0022 §1).
  */
-export const SURFACE_SCRIPT_ALIASES = ["/_cloudhal/surface.1.js"] as const;
+export const SURFACE_SCRIPT_ALIASES = [
+  "/_cloudhal/surface.1.js",
+  "/_cloudhal/surface.2.js",
+] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */
 export function scriptJson(value: unknown): string {

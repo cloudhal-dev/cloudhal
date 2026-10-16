@@ -662,7 +662,7 @@ describe("interactive components (RFC-0020 §4)", () => {
       ),
     ).toEqual([
       "/components/1/props/onClick/href navigate needs href",
-      "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo",
+      "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo, append",
     ]);
   });
 });
@@ -804,5 +804,100 @@ describe("computed values (RFC-0022 22a)", () => {
         ]),
       ),
     ).toEqual(["/components/0/props/text/args/expression at most 200 characters"]);
+  });
+});
+
+describe("local inputs (RFC-0022 22b)", () => {
+  it("accepts bound inputs, refuses unbound ones, and checks options", () => {
+    const ok = surface(
+      [
+        {
+          id: "root",
+          component: "Stack",
+          children: ["w", "name", "vat", "act"],
+        },
+        {
+          id: "w",
+          component: "NumberField",
+          props: { label: "Weight", value: { path: "/w" }, unit: "kg", min: 30 },
+        },
+        {
+          id: "name",
+          component: "TextField",
+          props: { label: "Name", value: { path: "/name" }, kind: "email" },
+        },
+        {
+          id: "vat",
+          component: "Checkbox",
+          props: { label: "Include VAT", checked: { path: "/vat" } },
+        },
+        {
+          id: "act",
+          component: "RadioGroup",
+          props: {
+            label: "Activity",
+            value: { path: "/act" },
+            variant: "buttons",
+            options: [
+              { value: "low", label: "Low" },
+              { value: "high", label: "High" },
+            ],
+          },
+        },
+      ],
+      { w: "", name: "", vat: false, act: "low" },
+    );
+    expect(messages(ok)).toEqual([]);
+    expect(isInteractive(ok)).toBe(true);
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["w", "c", "r"] },
+          { id: "w", component: "NumberField", props: { label: "Weight", value: 70 } },
+          { id: "c", component: "Checkbox", props: { label: "Yes", checked: true } },
+          {
+            id: "r",
+            component: "RadioGroup",
+            props: { label: "Pick", value: { path: "/r" }, options: [{ value: "a", label: "A" }] },
+          },
+        ]),
+      ),
+    ).toEqual([
+      '/components/1/props/value bind it to the surface\'s data: {"path":"/…"} (the reader\'s input is written there)',
+      '/components/2/props/checked bind it to the surface\'s data: {"path":"/…"} (the reader\'s input is written there)',
+      "/components/3/props/options at least 2 items",
+    ]);
+  });
+
+  it("lets set and append write computed values, and keeps appends short", () => {
+    const button = (onClick: Record<string, unknown>) =>
+      surface([{ id: "root", component: "Button", props: { label: "=", onClick } }], {
+        display: "",
+      });
+    expect(
+      messages(
+        button({
+          action: "set",
+          path: "/display",
+          value: { call: "calculate", args: { expression: { path: "/display" } } },
+        }),
+      ),
+    ).toEqual([]);
+    expect(messages(button({ action: "append", path: "/display", value: "7" }))).toEqual([]);
+    expect(messages(button({ action: "append", path: "/display" }))).toEqual([
+      "/components/0/props/onClick/value append needs value",
+    ]);
+    expect(messages(button({ action: "append", path: "/display", value: "x".repeat(21) }))).toEqual(
+      ["/components/0/props/onClick/value at most 20 characters at a time"],
+    );
+    expect(messages(button({ action: "set", path: "/d", value: { call: "nope" } }))).toEqual([
+      `/components/0/props/onClick/value/call one of ${SURFACE_FUNCTIONS.join(", ")}`,
+    ]);
+  });
+
+  it("teaches models to bind inputs", () => {
+    const prompt = catalogPrompt(catalog);
+    expect(prompt).toContain("### NumberField (interactive; no children)");
+    expect(prompt).toContain('"value":{"path":"/weight"}');
   });
 });

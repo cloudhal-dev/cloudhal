@@ -215,6 +215,17 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
   - **The interaction runtime** carries the same table (a parity test over 32 values and 6 conditions) as `/_cloudhal/surface.2.js`. The same code is also served as `surface.1.js` for cached pages (`SURFACE_SCRIPT_ALIASES`).
   - **The catalog prompt** teaches "compute, don't promise", the argument shapes and a seats × price example.
   - **Interop.** json-render's `gte`/`lte` now map to the new conditions; A2UI has no arithmetic, so exporting a computed value leaves it out with a note.
+- **22b shipped.**
+  - **Inputs.** `NumberField`, `TextField`, `Checkbox` and `RadioGroup` are primitives (`INPUT_MODEL`). Their value (`checked` for Checkbox) must be a `{path}` binding, which the checks enforce. Each renders with a real `<label>` or `<fieldset>`/`<legend>`, its `help` linked by `aria-describedby`, and an `invalid` state the runtime keeps in step when it is bound or computed.
+  - **Without JavaScript,** a live surface with fields says, in the page's language, that the tool needs JavaScript (`<noscript>`).
+  - **Actions.** `append` adds text to a value (at most 20 characters a click, 200 in all). `set` may write a computed value, so `=` on a keypad is `set` with `calculate`.
+  - **The runtime** writes check boxes as true/false and leaves an empty number field `""`, never 0. It is now `/_cloudhal/surface.3.js`, with 1 and 2 served as aliases.
+  - **Interop.** A2UI TextField (`number` → NumberField) and CheckBox convert, with literal values moved into the data; password and date fields are refused with a note. The export maps the four inputs to TextField, CheckBox and ChoicePicker.
+  - **`render_page`** checks `input-label`: a form control without an accessible name. Studio names it in the chat.
+  - **Styles** in the blog theme (synced to the examples) and the preview. DESIGN guidance point 6 and the theme's DESIGN.md say how to lay out a tool.
+- **Deviations (22b).**
+  - **A bound or computed `Text`** in a live surface now renders as plain text the runtime keeps in step. Before, it was markdown rendered once, so a keypad display or a computed sentence never changed.
+  - **ChoicePicker imports stay as they were** (Toggle or Select, whose options are their values). RadioGroup is used when exporting and when agents build.
 - **Deviations (22a).**
   - **`if` takes `ifTrue`/`ifFalse`,** not `then`/`else`: an object with a `then` key is treated as a promise by `await`.
   - **Decimal commas.** Arithmetic reads `"2,5"` as 2.5, since readers type decimal commas in many locales.

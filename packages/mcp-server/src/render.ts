@@ -60,6 +60,8 @@ export const RENDER_CHECK_IDS = [
   "empty-section",
   "tap-target",
   "long-line",
+  // RFC-0022 §2: a form control a reader cannot identify.
+  "input-label",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -393,6 +395,15 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
         (toRect(c, o.r) < 12 || (small(o) && Math.hypot(c[0] - centre(o.r)[0], c[1] - centre(o.r)[1]) < 24)));
       if (near) add("tap-target", t.el, Math.round(t.r.width) + " × " + Math.round(t.r.height) + " px, too close to " + JSON.stringify(clip((near.el.innerText || near.el.getAttribute("aria-label") || near.el.tagName.toLowerCase()).trim(), 24)));
     }
+  }
+
+  // input-label: form controls without an accessible name (a label, aria-label or aria-labelledby).
+  for (const el of document.querySelectorAll("input:not([type=hidden]):not([type=submit]):not([type=button]),select,textarea")) {
+    if (!visible(el) && !(el.type === "radio" || el.type === "checkbox")) continue;
+    const named = [...(el.labels || [])].some((l) => (l.innerText || l.textContent || "").trim()) ||
+      (el.getAttribute("aria-label") || "").trim() ||
+      (el.getAttribute("aria-labelledby") || "").split(/s+/).some((id) => id && (document.getElementById(id)?.textContent || "").trim());
+    if (!named) add("input-label", el, "no label a screen reader can announce");
   }
 
   // long-line: paragraphs averaging more than 90 characters a line.

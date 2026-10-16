@@ -13,6 +13,7 @@ import {
   checkSurface,
   createCatalog,
   evaluateCondition,
+  INPUT_MODEL,
   isInteractive,
   resolveProps,
 } from "@cloudhal/core-ts/surfaces";
@@ -204,9 +205,28 @@ function text(
 }
 
 /** The pointer an input writes to (its `value` bound with {path}), in a live surface. */
-function model(node: Partial<Pick<SurfaceNode, "raw" | "live">>): string {
-  const v = node.raw?.value as { path?: unknown } | undefined;
+function model(node: Partial<Pick<SurfaceNode, "raw" | "live">>, prop = "value"): string {
+  const v = node.raw?.[prop] as { path?: unknown } | undefined;
   return node.live && typeof v?.path === "string" ? ` data-ch-model="${escapeHtml(v.path)}"` : "";
+}
+
+/**
+ * RFC-0022 §2: a field's help text (linked with `aria-describedby`) and its invalid state, which
+ * the runtime keeps in step when `invalid` is bound or computed.
+ */
+function fieldExtras(
+  node: Pick<SurfaceNode, "props"> & Partial<Pick<SurfaceNode, "raw" | "live">>,
+  id: string,
+): { attrs: string; help: string } {
+  const help = str(node.props.help);
+  const raw = node.raw?.invalid;
+  const invalid = node.props.invalid === true;
+  return {
+    attrs: `${help ? ` aria-describedby="${id}-help"` : ""}${invalid ? ' aria-invalid="true"' : ""}${
+      node.live && isBinding(raw) ? ` data-ch-invalid="${json(raw)}"` : ""
+    }`,
+    help: help ? `<span class="ch-field__help" id="${id}-help">${escapeHtml(help)}</span>` : "",
+  };
 }
 
 /** Where a primitive's children go in its markup. */
@@ -249,8 +269,12 @@ export function primitiveHtml(
       const level = [1, 2, 3, 4].includes(Number(p.level)) ? Number(p.level) : 2;
       return `<h${level} class="ch-heading"${attr("align", p.align, ALIGN)}>${text(node, "text")}</h${level}>`;
     }
-    case "Text":
-      return `<div class="ch-text"${attr("size", p.size, ["s", "m", "l"])}${p.muted === true ? ' data-muted="yes"' : ""}${attr("align", p.align, ALIGN)}>${renderMarkdown(str(p.text), media)}</div>`;
+    case "Text": {
+      // A bound or computed text in a live surface is plain text the runtime keeps in step
+      // (RFC-0022: a keypad's display, a result); otherwise it is markdown.
+      const live = node.live && isBinding(node.raw?.text);
+      return `<div class="ch-text"${attr("size", p.size, ["s", "m", "l"])}${p.muted === true ? ' data-muted="yes"' : ""}${attr("align", p.align, ALIGN)}>${live ? `<p>${text(node, "text")}</p>` : renderMarkdown(str(p.text), media)}</div>`;
+    }
     case "Markdown":
       return `<div class="ch-markdown ch-richtext">${renderMarkdown(str(p.content), media)}</div>`;
     case "Image": {
@@ -320,6 +344,35 @@ export function primitiveHtml(
           ? `<output class="ch-slider__value" data-ch-text="${json(node.raw?.value)}">${escapeHtml(str(p.value))}</output>`
           : `<output class="ch-slider__value">${escapeHtml(str(p.value))}</output>`;
       return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><span class="ch-slider"><input type="range" min="${n(p.min, 0)}" max="${n(p.max, 100)}" step="${n(p.step, 1) || "any"}" value="${n(p.value, 0)}"${model(node)}>${out}</span></label>`;
+    }
+    // RFC-0022 §2: local inputs; values stay in the reader's browser.
+    case "NumberField": {
+      const x = fieldExtras(node, id);
+      const n = (v: unknown) =>
+        Number.isFinite(Number(v)) && v !== "" ? ` ${String(Number(v))}` : "";
+      const bound = (k: string) => (n(p[k]) ? ` ${k}="${n(p[k]).trim()}"` : "");
+      const unit = str(p.unit);
+      return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><span class="ch-input-wrap"><input class="ch-input" type="number" inputmode="decimal" id="${id}"${bound("min")}${bound("max")}${p.step === undefined ? ' step="any"' : bound("step")}${p.placeholder ? ` placeholder="${escapeHtml(str(p.placeholder))}"` : ""} value="${escapeHtml(str(p.value))}"${model(node)}${x.attrs}>${unit ? `<span class="ch-input__unit">${escapeHtml(unit)}</span>` : ""}</span>${x.help}</label>`;
+    }
+    case "TextField": {
+      const x = fieldExtras(node, id);
+      const max = Number.isInteger(p.maxLength) ? Math.min(500, Number(p.maxLength)) : 500;
+      return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><input class="ch-input" type="${p.kind === "email" ? "email" : "text"}" id="${id}" maxlength="${max}"${p.placeholder ? ` placeholder="${escapeHtml(str(p.placeholder))}"` : ""} value="${escapeHtml(str(p.value))}"${model(node)}${x.attrs}>${x.help}</label>`;
+    }
+    case "Checkbox":
+      return `<label class="ch-check"><input type="checkbox"${p.checked === true ? " checked" : ""}${model(node, "checked")}><span>${escapeHtml(str(p.label))}</span></label>`;
+    case "RadioGroup": {
+      const x = fieldExtras(node, id);
+      const options = (Array.isArray(p.options) ? p.options : [])
+        .slice(0, 8)
+        .filter((o): o is Record<string, unknown> => typeof o === "object" && o !== null);
+      const radios = options
+        .map(
+          (o) =>
+            `<label class="ch-radio__option"><input type="radio" name="${id}" value="${escapeHtml(str(o.value))}"${model(node)}${str(o.value) === str(p.value) ? " checked" : ""}><span>${escapeHtml(str(o.label))}</span></label>`,
+        )
+        .join("");
+      return `<fieldset class="ch-radio" data-variant="${p.variant === "buttons" ? "buttons" : "list"}"${x.attrs}><legend class="ch-field__label">${escapeHtml(str(p.label))}</legend><span class="ch-radio__options">${radios}</span>${x.help}</fieldset>`;
     }
     case "Quote": {
       const cite = str(p.cite);
@@ -439,14 +492,23 @@ export const surfaceScope = (section: SurfaceSection) => `ch-${section.id}`;
 /** Opening and closing markup of the surface's wrapper. */
 export function surfaceWrapper(
   section: SurfaceSection,
-  live?: { data: Record<string, unknown> },
+  live?: { data: Record<string, unknown>; locale?: string | undefined },
 ): [string, string] {
   const scope = surfaceScope(section);
+  // RFC-0022 §2: fields need the runtime to compute; say so only when it cannot run.
+  const fields = live && section.components.some((c) => INPUT_MODEL[c.component]);
+  const noscript = fields
+    ? `<noscript><p class="ch-noscript">${
+        live?.locale?.startsWith("tr")
+          ? "Bu araç hesaplamak için JavaScript gerektirir."
+          : "This tool needs JavaScript to calculate."
+      }</p></noscript>`
+    : "";
   return [
     `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,
     live
       ? // RFC-0020 §4: the data as inert JSON, then Cloudhal's runtime (one module per page).
-        `<script type="application/json" data-ch-state>${scriptJson(live.data)}</script><script type="module" src="${SURFACE_SCRIPT.path}"></script></section>`
+        `${noscript}<script type="application/json" data-ch-state>${scriptJson(live.data)}</script><script type="module" src="${SURFACE_SCRIPT.path}"></script></section>`
       : "</section>",
   ];
 }
@@ -457,7 +519,10 @@ export function surfaceWrapper(
  */
 export function renderSurface(section: SurfaceSection, ctx: SurfaceContext = {}): string {
   const tree = surfaceTree(section, ctx);
-  const [open, close] = surfaceWrapper(section, tree.live ? { data: tree.data } : undefined);
+  const [open, close] = surfaceWrapper(
+    section,
+    tree.live ? { data: tree.data, locale: ctx.media?.locale } : undefined,
+  );
   const body = tree.root ? nodeHtml(tree.root, surfaceScope(section), ctx) : "";
   const missing = ctx.preview
     ? tree.unknown

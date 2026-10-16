@@ -21,7 +21,10 @@ interface Props {
 const { section, blocks = {}, blockTypes, media, sources } = Astro.props;
 const preview = media?.preview === true;
 const tree = surfaceTree(section, { registry: themeRegistry(blockTypes), media, sources, preview });
-const [open, close] = surfaceWrapper(section, tree.live ? { data: tree.data } : undefined);
+const [open, close] = surfaceWrapper(
+  section,
+  tree.live ? { data: tree.data, locale: media?.locale } : undefined,
+);
 ---
 {tree.root && (
   <Fragment>

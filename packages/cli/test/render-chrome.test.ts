@@ -19,6 +19,7 @@ const PAGE = `<!doctype html><html lang="en"><head><meta name="viewport" content
 <section data-section-id="sec_imgs"><img src="missing.png"><img src="missing-too.png" alt="A missing picture"></section>
 <section data-section-id="sec_low"><p class="low">Light grey text on white.</p><h4>Skips a level</h4>
 <nav><a href="/a" style="font-size:10px">a</a> <a href="/b" style="font-size:10px">b</a></nav></section>
+<section data-section-id="sec_form"><label>Weight <input type="number"></label><input type="text" placeholder="Name"></section>
 <section data-section-id="sec_empty"></section>
 <section data-section-id="sec_long"><p style="max-width:1400px">${"A sentence that goes on for a while. ".repeat(40)}</p></section>
 </body></html>`;
@@ -60,6 +61,8 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     );
     expect(check("tap-target")).toMatchObject({ widths: [390] });
     expect(check("long-line")).toMatchObject({ widths: [1440] });
+    expect(check("input-label")?.examples[0]).toMatch(/^@1440: section sec_form input — no label/);
+    expect(check("input-label")?.count).toBe(2);
     expect(check("overflow-x")?.widths).toEqual([1440, 390]);
   }, 60_000);
 });
