@@ -7,6 +7,7 @@
  */
 import type { ContentEntry, SurfaceSection } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
+import { renderIcon } from "@cloudhal/core-ts/icons";
 import {
   AMBIENT_KINDS,
   type Catalog,
@@ -488,7 +489,7 @@ function fieldExtras(
 
 /** An overlay's close button (Invoker Commands; the overlay module where they are missing). */
 function closeButton(id: string, tr: boolean): string {
-  return `<button type="button" class="ch-dialog__close" command="close" commandfor="${id}" aria-label="${tr ? "Kapat" : "Close"}"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6"/></svg></button>`;
+  return `<button type="button" class="ch-dialog__close" command="close" commandfor="${id}" aria-label="${tr ? "Kapat" : "Close"}">${renderIcon("close")}</button>`;
 }
 
 /**
@@ -535,7 +536,7 @@ function lightboxHtml(id: string, p: Record<string, unknown>, media?: MediaConte
     .join("");
   const nav =
     items.length > 1
-      ? `<div class="ch-lightbox__nav"><button type="button" class="ch-lightbox__prev" command="--prev" commandfor="${id}" aria-label="${tr ? "Önceki" : "Previous"}">‹</button><button type="button" class="ch-lightbox__next" command="--next" commandfor="${id}" aria-label="${tr ? "Sonraki" : "Next"}">›</button></div>`
+      ? `<div class="ch-lightbox__nav"><button type="button" class="ch-lightbox__prev" command="--prev" commandfor="${id}" aria-label="${tr ? "Önceki" : "Previous"}">${renderIcon("chevron-left")}</button><button type="button" class="ch-lightbox__next" command="--next" commandfor="${id}" aria-label="${tr ? "Sonraki" : "Next"}">${renderIcon("chevron-right")}</button></div>`
       : "";
   return `<div class="ch-lightbox"><ul class="ch-lightbox__grid" aria-label="${escapeHtml(title)}">${thumbs}</ul><dialog id="${id}" class="ch-dialog ch-lightbox__dialog" closedby="any" aria-label="${escapeHtml(title)}"><header class="ch-dialog__head"><span class="ch-lightbox__count" aria-live="polite">${start + 1} / ${items.length}</span>${closeButton(id, tr)}</header><div class="ch-lightbox__stage">${figures}</div>${nav}</dialog></div>`;
 }

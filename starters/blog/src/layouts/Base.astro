@@ -7,6 +7,7 @@ import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
 import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
 import { copyrightText, type ResolvedChrome, resolveChrome } from "@cloudhal/core-ts/chrome";
+import { renderIcon } from "@cloudhal/core-ts/icons";
 import MenuPanel from "../components/MenuPanel.astro";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
@@ -186,7 +187,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
         </p>
         {announce.dismissible && (
           <button type="button" class="ch-announcement__close" data-ch-dismiss={announce.id} aria-label={bw.dismiss} hidden>
-            <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" /></svg>
+            <Fragment set:html={renderIcon("close")} />
           </button>
         )}
       </div>
@@ -243,13 +244,13 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
             <div class="ch-menu-slot">
               {dialog ? (
                 <a class="ch-menu__open" href="/menu" data-ch-dialog="ch-menu">
-                  <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" /></svg>
+                  <Fragment set:html={renderIcon("menu")} />
                   {w.menu}
                 </a>
               ) : (
                 <details class="ch-menu">
                   <summary class="ch-menu__open">
-                    <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" /></svg>
+                    <Fragment set:html={renderIcon("menu")} />
                     {w.menu}
                   </summary>
                   <MenuPanel nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="drop" />
@@ -301,7 +302,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
                 {f.tagline && <p class="ch-footer__tagline">{f.tagline}</p>}
                 {social.length > 0 && (
                   <ul class="ch-footer__social" aria-label={w.social}>
-                    {social.map((l) => <li><a href={safe(l.href)} rel="me noopener">{SOCIAL[l.network] ?? l.network}</a></li>)}
+                    {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={renderIcon(l.network)} /></a></li>)}
                   </ul>
                 )}
               </div>
@@ -320,7 +321,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
             {f.layout === "simple" && f.tagline && <span>{f.tagline}</span>}
             {f.layout === "simple" && social.length > 0 && (
               <ul class="ch-footer__social" aria-label={w.social}>
-                {social.map((l) => <li><a href={safe(l.href)} rel="me noopener">{SOCIAL[l.network] ?? l.network}</a></li>)}
+                {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={renderIcon(l.network)} /></a></li>)}
               </ul>
             )}
             {f.credit && <span>{w.credit}</span>}

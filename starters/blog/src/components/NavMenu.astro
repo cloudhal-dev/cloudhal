@@ -10,6 +10,7 @@
  * links (a child with no children of its own joins a first column of links).
  */
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import { renderIcon } from "@cloudhal/core-ts/icons";
 import NavLink from "./NavLink.astro";
 
 interface Props {
@@ -35,7 +36,7 @@ const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
       class:list={["ch-nav-menu__btn", item.current || item.inTrail ? on : off]}
       popovertarget={popover}
       aria-label={item.href ? item.label : undefined}
-    >{!item.href && item.label}<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" /></svg></button>
+    >{!item.href && item.label}<Fragment set:html={renderIcon("chevron-down")} /></button>
     <div popover="auto" id={popover} class:list={["ch-nav-menu__pop", mega && "ch-nav-menu__pop--mega"]}>
       {mega ? (
         <div class="ch-mega">
@@ -72,6 +73,7 @@ const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
 <details class="ch-nav-menu" open={item.inTrail && level > 1 ? true : undefined}>
   <summary class={(item.current || item.inTrail ? on : off) || undefined}>
     {item.href ? <NavLink item={item} on={on} off={off} /> : <span>{item.label}</span>}
+    <Fragment set:html={renderIcon("chevron-down", { className: "ch-nav-menu__caret" })} />
   </summary>
   <ul>
     {item.children.map((child) => (
