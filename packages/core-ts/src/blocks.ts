@@ -8,8 +8,10 @@
  * Studio builds its forms from the same schema. Type names are one global namespace of plain
  * English names (`callout`, `pricing-table`), never theme-prefixed (D7).
  *
- * Dependency-free and Worker-safe.
+ * Worker-safe; its only import is the icon set's names (`format: "icon"`, RFC-0026).
  */
+
+import { ICON_NAMES } from "./icon-names.ts";
 
 /** A string, or one per UI locale (`en` required). */
 export type Localized = string | Readonly<Record<string, string>>;
@@ -30,8 +32,11 @@ export interface StringPropSchema extends Annotations {
   enum?: readonly string[];
   /** Words for `enum` values in forms, per value (per locale allowed): `{ serif: { en: "Serif" } }`. */
   "x-labels"?: Readonly<Record<string, Localized>>;
-  /** `url`: a safe link; `asset`: `asset:<id>`; `color`: `#rrggbb`; `markdown`: markdown text. */
-  format?: "url" | "asset" | "color" | "markdown";
+  /**
+   * `url`: a safe link; `asset`: `asset:<id>`; `color`: `#rrggbb`; `markdown`: markdown text;
+   * `icon`: a name of the curated icon set (RFC-0026); `marker`: an icon, `bullet` or `none`.
+   */
+  format?: "url" | "asset" | "color" | "markdown" | "icon" | "marker";
 }
 
 export interface NumberPropSchema extends Annotations {
@@ -135,7 +140,9 @@ const KEYS: Record<string, readonly string[]> = {
   array: ["type", "items", "minItems", "maxItems", ...ANNOTATIONS],
   object: ["type", "properties", "required", "additionalProperties", "x-contrast", ...ANNOTATIONS],
 };
-const FORMATS = new Set(["url", "asset", "color", "markdown"]);
+const ICON_SET = new Set<string>(ICON_NAMES);
+const isIconName = (v: string) => ICON_SET.has(v);
+const FORMATS = new Set(["url", "asset", "color", "markdown", "icon", "marker"]);
 const WIDGETS = new Set(["textarea", "radio", "asset-picker"]);
 const PROP_NAME = /^[a-z][A-Za-z0-9]{0,40}$/;
 /** Backreferences and lookaround: not linear-time, so not allowed in a theme's patterns. */
@@ -188,7 +195,10 @@ function checkSchema(
       if (s.minLength !== undefined && !isCount(s.minLength))
         out.push({ path: `${path}/minLength`, message: "a whole number" });
       if (s.format !== undefined && !FORMATS.has(s.format as string))
-        out.push({ path: `${path}/format`, message: "url, asset, color or markdown" });
+        out.push({
+          path: `${path}/format`,
+          message: "url, asset, color, markdown, icon or marker",
+        });
       if (s.enum !== undefined) {
         const values = s.enum;
         if (
@@ -399,6 +409,10 @@ function validateScalar(s: ScalarPropSchema, v: unknown, path: string, out: Prop
         out.push({ path, message: "an asset:<id> reference" });
       if (s.format === "color" && v && !COLOR.test(v))
         out.push({ path, message: "a #rrggbb color" });
+      if (s.format === "icon" && v && !isIconName(v))
+        out.push({ path, message: "an icon name of the set (catalogPrompt lists them)" });
+      if (s.format === "marker" && v && v !== "bullet" && v !== "none" && !isIconName(v))
+        out.push({ path, message: "bullet, none or an icon name of the set" });
       return;
     }
     case "number":

@@ -885,12 +885,15 @@ ol.ch-list {
 .ch-list[data-marker="none"] {
   @apply list-none pl-0;
 }
-.ch-list[data-marker="check"] {
+/* RFC-0026: an icon of the set as the bullet ("check" included), in the brand color. */
+.ch-list[data-marker="icon"] {
   @apply list-none pl-0;
 }
-.ch-list[data-marker="check"] li::before {
-  content: "✓";
-  @apply mr-2 font-bold;
+.ch-list[data-marker="icon"] li {
+  @apply flex items-start gap-2;
+}
+.ch-list__marker {
+  @apply mt-[0.2em];
   color: var(--ch-color-brand);
 }
 /* Tabs without JavaScript: the n-th checked radio shows the n-th panel. */
@@ -2981,4 +2984,44 @@ ul.ch-mega__col {
 }
 .ch-social-link:hover {
   background: color-mix(in oklab, currentColor 12%, transparent);
+}
+
+/* RFC-0026: icons in surfaces — on their own, in buttons, badges and statistics. */
+.ch-icon-box {
+  /* w-fit: in a Stack or Card (a flex column) it keeps its own width, at the start. */
+  @apply inline-flex w-fit items-center justify-center text-2xl;
+}
+.ch-icon-box[data-size="s"] {
+  @apply text-base;
+}
+.ch-icon-box[data-size="l"] {
+  @apply text-4xl;
+}
+.ch-icon-box[data-size="xl"] {
+  @apply text-6xl;
+}
+.ch-icon-box[data-tone="brand"] {
+  color: var(--ch-color-brand);
+}
+.ch-icon-box[data-tone="accent"] {
+  color: var(--ch-color-accent);
+}
+.ch-icon-box[data-tone="success"] {
+  color: #15803d;
+}
+.ch-icon-box[data-tone="warning"] {
+  color: #b45309;
+}
+.ch-icon-box[data-tone="danger"] {
+  color: #b91c1c;
+}
+.ch-button:has(> .ch-button__icon) {
+  @apply inline-flex items-center gap-2;
+}
+.ch-badge > .ch-icon {
+  @apply mr-1;
+}
+.ch-stat__icon {
+  @apply mb-2 block text-3xl;
+  color: var(--ch-color-brand);
 }

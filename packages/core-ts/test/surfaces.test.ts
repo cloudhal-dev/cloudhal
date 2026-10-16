@@ -667,6 +667,69 @@ describe("interactive components (RFC-0020 §4)", () => {
   });
 });
 
+describe("icons (RFC-0026)", () => {
+  it("accepts names of the set on Icon, Button, Badge, Stat and List markers, and refuses others", () => {
+    const ok = surface([
+      { id: "root", component: "Stack", children: ["i", "b", "g", "s", "l"] },
+      { id: "i", component: "Icon", props: { name: "rocket", size: "l", tone: "brand" } },
+      {
+        id: "b",
+        component: "Button",
+        props: { label: "Next", href: "/next", icon: "arrow-right", iconPosition: "end" },
+      },
+      { id: "g", component: "Badge", props: { label: "New", icon: "sparkle" } },
+      { id: "s", component: "Stat", props: { value: "24/7", label: "Support", icon: "chat" } },
+      { id: "l", component: "List", props: { items: ["Fast"], marker: "check-circle" } },
+    ]);
+    expect(messages(ok)).toEqual([]);
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["i", "l"] },
+          { id: "i", component: "Icon", props: { name: "unicorn" } },
+          { id: "l", component: "List", props: { items: ["a"], marker: "triangle" } },
+        ]),
+      ),
+    ).toEqual([
+      "/components/1/props/name an icon name of the set (catalogPrompt lists them)",
+      "/components/2/props/marker bullet, none or an icon name of the set",
+    ]);
+  });
+
+  it("repairs icon names as models write them, and drops an unknown one where it is optional", () => {
+    const fix = (c: Record<string, unknown>) => repairComponent(c as never, catalog);
+    expect(
+      fix({ id: "i", component: "Icon", props: { name: "ArrowForward" } }).component.props,
+    ).toEqual({
+      name: "arrow-right",
+    });
+    expect(
+      fix({
+        id: "b",
+        component: "Button",
+        props: { label: "Mail", href: "/m", icon: "fa-envelope" },
+      }).component.props,
+    ).toEqual({
+      label: "Mail",
+      href: "/m",
+      icon: "mail",
+    });
+    const dropped = fix({ id: "g", component: "Badge", props: { label: "x", icon: "unicorn" } });
+    expect(dropped.component.props).toEqual({ label: "x" });
+    expect(dropped.notes).toEqual(['g: dropped icon "unicorn" (not in the set)']);
+    expect(
+      fix({ id: "l", component: "List", props: { items: ["a"], marker: "bullet" } }).notes,
+    ).toEqual([]);
+  });
+
+  it("lists the names once, by group, in the prompt", () => {
+    const prompt = catalogPrompt(catalog);
+    expect(prompt).toContain("Icons (RFC-0026), by name only");
+    expect(prompt).toContain("Social: x, bluesky, mastodon");
+    expect(prompt.match(/"chevron-down"|chevron-down/g)?.length).toBe(1);
+  });
+});
+
 describe("overlays (RFC-0025 §3)", () => {
   const dialog = (id = "terms", props: Record<string, unknown> = { title: "Terms" }) => ({
     id,

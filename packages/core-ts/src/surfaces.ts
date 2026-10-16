@@ -19,6 +19,7 @@ import {
   validateProps,
 } from "./blocks.ts";
 import { parseFilter } from "./filter.ts";
+import { ICON_GROUPS, isIconNameValue, nearestIcon } from "./icon-names.ts";
 
 // ── limits ───────────────────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,20 @@ export interface PrimitiveType {
 }
 
 const SPACE = ["none", "s", "m", "l", "xl"] as const;
+/** RFC-0026: an icon of the curated set, by name. */
+const icon = {
+  type: "string" as const,
+  format: "icon" as const,
+  title: { en: "Icon", tr: "İkon" },
+};
+/** Which prop of a component names an icon (the repair maps model spellings to the set). */
+const ICON_PROPS: Readonly<Record<string, string>> = {
+  Icon: "name",
+  Button: "icon",
+  Badge: "icon",
+  Stat: "icon",
+  List: "marker",
+};
 /** What a Button's `onClick` may do (RFC-0020 §4); Cloudhal's runtime implements each. */
 export const SURFACE_ACTIONS = [
   "set",
@@ -361,6 +376,8 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         label: label(60),
         href,
         variant: { type: "string", enum: ["primary", "secondary", "ghost"] },
+        icon,
+        iconPosition: { type: "string", enum: ["start", "end"] },
         onClick: {
           type: "object",
           additionalProperties: false,
@@ -397,6 +414,7 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
       {
         label: label(40),
         tone: { type: "string", enum: ["neutral", "info", "success", "warning", "danger"] },
+        icon,
       },
       ["label"],
     ),
@@ -413,11 +431,36 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         value: { type: "string", minLength: 1, maxLength: 40 },
         label: label(80),
         detail: { type: "string", maxLength: 160 },
+        icon,
       },
       ["value", "label"],
     ),
     children: "none",
     example: { props: { value: "99.9%", label: "Uptime" } },
+  },
+  // RFC-0026: an icon on its own (next to text it is decorative; alone it needs a label).
+  {
+    name: "Icon",
+    title: { en: "Icon", tr: "İkon" },
+    description: {
+      en: "An icon of the curated set, by name. Next to text it is decoration; on its own, give it a label.",
+      tr: "Seçili setten bir ikon. Metnin yanında süstür; tek başınaysa etiket verin.",
+    },
+    category: "content",
+    props: schema(
+      {
+        name: icon,
+        label: label(60),
+        size: { type: "string", enum: ["s", "m", "l", "xl"] },
+        tone: {
+          type: "string",
+          enum: ["neutral", "brand", "accent", "success", "warning", "danger"],
+        },
+      },
+      ["name"],
+    ),
+    children: "none",
+    example: { props: { name: "check", size: "m", tone: "brand" } },
   },
   {
     name: "Quote",
@@ -447,7 +490,8 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
           maxItems: 50,
         },
         ordered: { type: "boolean" },
-        marker: { type: "string", enum: ["bullet", "check", "none"] },
+        // RFC-0026: any icon of the set as the bullet (decorative), besides a dot or none.
+        marker: { type: "string", format: "marker" },
       },
       ["items"],
     ),
@@ -2358,6 +2402,22 @@ export function repairComponent(
   if (!entry || (next.props !== undefined && !isObj(next.props))) return { component: next, notes };
   const props: Record<string, unknown> = { ...(next.props ?? {}) };
   let changed = false;
+  // RFC-0026: icon names as models write them (`envelope`, `ArrowForward`) in the set's spelling.
+  const iconKey = ICON_PROPS[next.component];
+  const raw = iconKey ? props[iconKey] : undefined;
+  const valid = (v: string) =>
+    isIconNameValue(v) || (iconKey === "marker" && (v === "bullet" || v === "none"));
+  if (iconKey && typeof raw === "string" && !valid(raw)) {
+    const named = nearestIcon(raw);
+    if (named) {
+      props[iconKey] = named;
+      notes.push(`${c.id}: icon "${raw}" → "${named}"`);
+    } else if (iconKey !== "name") {
+      delete props[iconKey];
+      notes.push(`${c.id}: dropped icon "${raw}" (not in the set)`);
+    }
+    changed = changed || named !== undefined || iconKey !== "name";
+  }
   for (const key of Object.keys(props))
     if (!(key in entry.schema.properties)) {
       delete props[key];
@@ -2858,6 +2918,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
     'Page transitions: when the site\'s pageTransition is morph, give the same "morph" key (motion {"morph":"plan-pro"}) to an element on two pages, a card image and the article cover, a pricing card and its plan page heading, and it moves from one to the other as the reader navigates. One key per element on a page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
+    `Icons (RFC-0026), by name only: an Icon component ({"name","size","tone","label" only when it stands alone}), "icon" on Button (with "iconPosition"), Badge and Stat, and List "marker". Interface: ${ICON_GROUPS.interface.join(", ")}. Actions: ${ICON_GROUPS.actions.join(", ")}. Content: ${ICON_GROUPS.content.join(", ")}. Social: ${ICON_GROUPS.social.join(", ")}. Icons decorate text; never use one as the only way to say something.`,
     'Overlays (Dialog, Drawer, Popover: at most 3 per section; and Lightbox) open only when the reader asks: a Button with "onClick":{"action":"open","target":"<overlay id>"}; a Button inside one with {"action":"close"} closes it. Never open one on load, on a timer or on leaving; content people read or link to belongs on a page. Dialog and Drawer need a title; give a Dialog a fallbackHref page when its content matters. A Tooltip ({"text","for":"<Button or Link id>"}) repeats what is on the page, never replaces it. A Lightbox shows images from items (asset and alt each).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
