@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.8.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.9.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -414,12 +414,64 @@ describe("interaction runtime", () => {
     });
   });
 
+  it("takes the step a scroll story is on from a ch:set event (RFC-0024 24b)", () => {
+    const page = mount(
+      renderSurface(
+        surface(
+          [
+            {
+              id: "root",
+              component: "Scrolly",
+              props: { step: { path: "/step" } },
+              children: ["media", "s1", "s2"],
+            },
+            { id: "media", component: "Stack", children: ["one", "two"] },
+            {
+              id: "one",
+              component: "Text",
+              props: { text: "Chart one" },
+              visible: { eq: [{ path: "/step" }, 1] },
+            },
+            {
+              id: "two",
+              component: "Text",
+              props: { text: "Chart two" },
+              visible: { eq: [{ path: "/step" }, 2] },
+            },
+            { id: "s1", component: "Step", children: ["t1"] },
+            { id: "t1", component: "Text", props: { text: "First" } },
+            { id: "s2", component: "Step", children: ["t2"] },
+            { id: "t2", component: "Text", props: { text: "Second" } },
+          ],
+          { step: 1 },
+        ),
+      ),
+    );
+    const shown = () =>
+      Array.from(page.querySelectorAll("[data-ch-visible]"), (el) =>
+        el.hidden ? "-" : el.textContent?.trim(),
+      );
+    expect(shown()).toEqual(["Chart one", "-"]);
+    const Custom = (
+      globalThis as unknown as { CustomEvent: new (t: string, i: unknown) => unknown }
+    ).CustomEvent;
+    page
+      .querySelector("[data-ch-surface]")
+      ?.dispatchEvent(new Custom("ch:set", { detail: { path: "/step", value: 2 } }));
+    expect(shown()).toEqual(["-", "Chart two"]);
+    // only a JSON Pointer and a plain value are taken
+    page
+      .querySelector("[data-ch-surface]")
+      ?.dispatchEvent(new Custom("ch:set", { detail: { path: "step", value: 1 } }));
+    expect(shown()).toEqual(["-", "Chart two"]);
+  });
+
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "fd4169201109",
+      "36d070ea6aa7",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.8.js");
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.9.js");
     // RFC-0022: pages cached with the first name get the same (compatible) code
     expect(SURFACE_SCRIPT_ALIASES).toEqual([
       "/_cloudhal/surface.1.js",
@@ -429,6 +481,7 @@ describe("interaction runtime", () => {
       "/_cloudhal/surface.5.js",
       "/_cloudhal/surface.6.js",
       "/_cloudhal/surface.7.js",
+      "/_cloudhal/surface.8.js",
     ]);
     // live charts load the drawer from its own versioned file
     expect(SURFACE_SCRIPT.code).toContain('import("/_cloudhal/chart.1.js")');

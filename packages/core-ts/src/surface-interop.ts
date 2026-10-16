@@ -711,7 +711,7 @@ export function toA2ui(
     (ids ?? []).filter((k) => byId.has(k) && !dropped.has(k));
   const dropped = new Set<string>();
   for (const c of surface.components) {
-    if (c.component === "Spacer") dropped.add(c.id);
+    if (c.component === "Spacer" || c.component === "ScrollProgress") dropped.add(c.id);
     if (c.component === "Image" && !options.assetUrl?.(String(c.props?.asset ?? "")))
       dropped.add(c.id);
   }
@@ -729,6 +729,10 @@ export function toA2ui(
       case "Stack":
       case "Band":
       case "Accordion":
+      case "Scrolly":
+      case "Step":
+        if (c.component === "Scrolly")
+          notes.add("scroll stories become a column: the first part, then every step (RFC-0024)");
         out.push({
           id: c.id,
           component: "Column",

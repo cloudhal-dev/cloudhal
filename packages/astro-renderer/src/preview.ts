@@ -471,6 +471,8 @@ const PREVIEW_CSS =
   ":is([data-surface=muted],[data-surface=mesh],[data-surface=dots],[data-surface=grid],[data-surface=noise],[data-tone=muted]){background:color-mix(in srgb,var(--fg) 5%,transparent)}" +
   "[data-surface=raised]{box-shadow:0 4px 16px -6px color-mix(in srgb,var(--fg) 25%,transparent)}" +
   ":is([data-surface=brand],[data-surface=inverse],[data-surface=accent],[data-surface=gradient],[data-tone=brand],[data-tone=inverse]){background:var(--fg);color:var(--bg)}" +
+  // RFC-0024 §3: scroll stories read as a column in previews; progress bars are left out.
+  ".ch-scrolly{display:grid;gap:1rem}.ch-step{padding:.8rem 1rem;border-left:3px solid var(--line)}.ch-progress{display:none}" +
   ".ch-heading{margin:0}.ch-text p:last-child,.ch-markdown p:last-child{margin-bottom:0}.ch-text[data-size=l]{font-size:1.2rem}.ch-text[data-size=s]{font-size:.9rem}.ch-text[data-muted=yes]{color:var(--muted)}" +
   ".ch-button{display:inline-block;width:fit-content;padding:.5rem 1rem;border-radius:6px;border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:500}.ch-button--primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}" +
   ":is([data-surface=brand],[data-surface=inverse],[data-surface=accent],[data-surface=gradient],[data-tone=brand],[data-tone=inverse]) .ch-button--primary{background:var(--bg);color:var(--fg)}" +

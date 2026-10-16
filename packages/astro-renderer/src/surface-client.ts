@@ -94,6 +94,7 @@ for(const el of root.querySelectorAll("[data-ch-invalid]"))el.setAttribute("aria
 for(const el of root.querySelectorAll("[data-ch-model]")){const v=get(d,el.getAttribute("data-ch-model"));if(el.type==="radio")el.checked=el.value===txt(v);else if(el.type==="checkbox")el.checked=truthy(v);else if(v!==undefined&&document.activeElement!==el)el.value=txt(v);}};
 const write=(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-model]"):null;if(!el||!root.contains(el)||(el.type==="radio"&&!el.checked))return;put(d,el.getAttribute("data-ch-model"),el.type==="checkbox"?el.checked:el.type==="number"?(el.value===""?"":num(el.value)):el.type==="range"?num(el.value):el.value);render();};
 root.addEventListener("input",write);root.addEventListener("change",write);
+root.addEventListener("ch:set",(e)=>{const a=e.detail;if(obj(a)&&typeof a.path==="string"&&a.path[0]==="/"&&(typeof a.value==="number"||typeof a.value==="string")){put(d,a.path,a.value);render();}});
 root.addEventListener("click",(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-action]"):null;if(!el||!root.contains(el))return;const a=json(el,"data-ch-action");if(!obj(a))return;e.preventDefault();
 const dyn=(v)=>isPath(v)||isCall(v)?val(v,d,loc):v;
 switch(a.action){case"set":put(d,a.path,dyn(a.value));break;
@@ -111,7 +112,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.8.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.9.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -125,6 +126,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.5.js",
   "/_cloudhal/surface.6.js",
   "/_cloudhal/surface.7.js",
+  "/_cloudhal/surface.8.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

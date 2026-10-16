@@ -11,6 +11,11 @@
  *   ran; `replay` puts it back when they leave downwards. Wipes
  *   and masks start fully clipped, which an observer never sees intersect, so their parent is
  *   watched instead.
+ * - **Scroll stories.** A `Scrolly`'s step crossing the middle of the screen becomes the active one;
+ *   its number goes to the surface's data through a `ch:set` event the interaction runtime takes
+ *   (at every motion level: it is content, not movement).
+ * - **Scroll effects without scroll-driven CSS** (Firefox today): `--ch-p` (0–1) on each element,
+ *   written once a frame from passive scroll events, which the theme's fallback rules read.
  * - **Pointer effects.** `tilt`, `magnetic` and `spotlight` follow a fine pointer through
  *   `--ch-mx`/`--ch-my` (0–1), one write per frame.
  * - **Pause control.** `[data-ch-motion-toggle]` buttons pause loops and ambient effects for every
@@ -42,6 +47,23 @@ el.classList.add("ch-pre");
 const clip=/^(wipe|mask)-/.test(el.getAttribute("data-ch-reveal")||"");
 const at=clip&&el.parentElement?el.parentElement:el;
 if(!watch.has(at))watch.set(at,[]);watch.get(at).push(el);io.observe(at);}}
+for(const sc of d.querySelectorAll(".ch-scrolly[data-ch-step-path]")){
+const steps=[...sc.children].filter((c)=>c.classList.contains("ch-step"));const path=sc.getAttribute("data-ch-step-path");
+const root=sc.closest("[data-ch-surface]");if(!steps.length||!path||!root||!("IntersectionObserver"in window))continue;
+sc.setAttribute("data-ch-live","");
+const so=new IntersectionObserver((es)=>{for(const e of es){if(!e.isIntersecting)continue;const n=steps.indexOf(e.target)+1;
+for(const s of steps)s.toggleAttribute("data-ch-active",s===e.target);sc.setAttribute("data-ch-current",String(n));
+root.dispatchEvent(new CustomEvent("ch:set",{detail:{path,value:n}}));}},{rootMargin:"-45% 0px -45% 0px",threshold:0});
+for(const s of steps)so.observe(s);}
+if(moving&&!(window.CSS&&CSS.supports("animation-timeline: view()"))){
+const els=[...d.querySelectorAll("[data-ch-scroll],.ch-progress")];
+if(els.length){let raf=0;const tick=()=>{raf=0;const vh=innerHeight,sh=d.documentElement.scrollHeight;
+for(const el of els){let p;
+if(el.matches('.ch-progress[data-placement="page"]'))p=scrollY/Math.max(1,sh-vh);
+else if(el.classList.contains("ch-progress")){const sec=el.closest(".ch-surface")||el.parentElement;const r=sec.getBoundingClientRect();p=-r.top/Math.max(1,r.height-vh);}
+else{const r=el.getBoundingClientRect();if(r.bottom<-vh||r.top>2*vh)continue;p=(vh-r.top)/(vh+r.height);}
+el.style.setProperty("--ch-p",Math.min(1,Math.max(0,p)).toFixed(4));}};
+addEventListener("scroll",()=>{if(!raf)raf=requestAnimationFrame(tick);},{passive:true});addEventListener("resize",()=>{if(!raf)raf=requestAnimationFrame(tick);},{passive:true});tick();}}
 if(moving&&matchMedia("(hover: hover) and (pointer: fine)").matches){
 let raf=0,pending=null;
 const apply=()=>{raf=0;if(!pending)return;const[el,x,y]=pending;pending=null;
@@ -54,4 +76,7 @@ d.addEventListener("pointerout",(e)=>{const el=e.target instanceof Element&&e.ta
 if(el&&!(e.relatedTarget instanceof Node&&el.contains(e.relatedTarget))){el.style.removeProperty("--ch-mx");el.style.removeProperty("--ch-my");}},{passive:true});}
 `;
 
-export const MOTION_SCRIPT = { path: "/_cloudhal/motion.1.js", code } as const;
+export const MOTION_SCRIPT = { path: "/_cloudhal/motion.2.js", code } as const;
+
+/** Earlier names of the module, served with the current code (each version only adds). */
+export const MOTION_SCRIPT_ALIASES = ["/_cloudhal/motion.1.js"] as const;
