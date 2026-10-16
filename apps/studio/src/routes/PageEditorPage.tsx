@@ -75,6 +75,7 @@ import { RelativeTime } from "../components/RelativeTime.tsx";
 import { PageSeoCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
+import { SurfaceSectionEditor } from "../components/SurfaceSectionEditor.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
@@ -159,29 +160,17 @@ function SectionForm({
 }) {
   const t = useT();
   switch (section.kind) {
-    // RFC-0020 phase 20a: surfaces are built and changed by agents (`patch_draft`); Studio shows
-    // them read-only until the Build view (20b).
+    // RFC-0020 surfaces: an outline with editable texts; layout changes go to Build chat.
     case "surface":
       return (
-        <div className="grid min-w-0 gap-3" data-surface={section.id}>
-          <Banner
-            icon={<Sparkle weight="fill" />}
-            title={t("editor.surface.title", { count: section.components.length })}
-            description={t("editor.surface.hint")}
-          />
-          <InputArea
-            aria-label={t("editor.surface.json")}
-            value={JSON.stringify(
-              { components: section.components, data: section.data ?? {} },
-              null,
-              2,
-            )}
-            readOnly
-            autoResize
-            maxRows={16}
-            className="w-full font-mono"
-          />
-        </div>
+        <SurfaceSectionEditor
+          section={section}
+          onChange={onChange}
+          readOnly={readOnly}
+          buildHref={(componentId) =>
+            `/sites/${media.siteId}/pages/${media.nodeId}/build?section=${encodeURIComponent(section.id)}${componentId ? `&component=${encodeURIComponent(componentId)}` : ""}`
+          }
+        />
       );
     case "component":
       return (

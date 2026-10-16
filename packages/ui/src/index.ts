@@ -401,6 +401,13 @@ export {
 } from "./blocks/StatTile.tsx";
 export { StatusBadge, type StatusBadgeProps } from "./blocks/StatusBadge.tsx";
 export {
+  SurfaceOutline,
+  type SurfaceOutlineField,
+  type SurfaceOutlineLabels,
+  type SurfaceOutlineNode,
+  type SurfaceOutlineProps,
+} from "./blocks/SurfaceOutline.tsx";
+export {
   AUTOMATION_STATES,
   dateToDay,
   dayToDate,

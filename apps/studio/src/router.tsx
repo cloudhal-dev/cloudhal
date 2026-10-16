@@ -380,6 +380,15 @@ const pageEditorRoute = createRoute({
 const buildRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/pages/$pageId/build",
+  // The editor's "Change with AI" aims Build chat at a section or component of the page.
+  validateSearch: (search: Record<string, unknown>): { section?: string; component?: string } => ({
+    ...(typeof search.section === "string" && search.section.length <= 64
+      ? { section: search.section }
+      : {}),
+    ...(typeof search.component === "string" && search.component.length <= 64
+      ? { component: search.component }
+      : {}),
+  }),
   component: BuildPage,
 });
 const articleEditorRoute = createRoute({
