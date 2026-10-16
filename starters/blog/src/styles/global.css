@@ -847,6 +847,61 @@ button.ch-button--secondary {
   @apply text-sm text-zinc-600;
 }
 
+/* RFC-0022 §3: charts. Six series colors from the brand color, each distinct at 3:1 on white. */
+:root {
+  --ch-chart-1: var(--ch-brand, #18181b);
+  --ch-chart-2: #2563eb;
+  --ch-chart-3: #d97706;
+  --ch-chart-4: #059669;
+  --ch-chart-5: #db2777;
+  --ch-chart-6: #7c3aed;
+}
+.ch-chart {
+  @apply m-0 grid gap-3;
+}
+.ch-chart__title {
+  @apply text-base font-semibold;
+}
+.ch-chart__svg {
+  @apply block h-auto w-full;
+}
+.ch-chart__grid {
+  stroke: #e4e4e7;
+  stroke-width: 1;
+}
+.ch-chart__tick {
+  fill: #52525b;
+  font-size: 12px;
+}
+.ch-chart__total {
+  fill: currentColor;
+  font-size: 22px;
+  font-weight: 600;
+}
+.ch-chart__legend {
+  @apply m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm;
+}
+.ch-chart__legend li {
+  @apply flex items-center gap-1.5;
+}
+.ch-chart__swatch {
+  @apply inline-block size-3 rounded-sm;
+}
+.ch-chart__caption,
+.ch-chart__empty {
+  @apply text-sm text-zinc-600;
+}
+.ch-chart__data summary {
+  @apply cursor-pointer text-sm text-zinc-600;
+}
+.ch-chart__data table {
+  @apply mt-2 w-full border-collapse text-sm tabular-nums;
+}
+.ch-chart__data th,
+.ch-chart__data td {
+  @apply border-b border-zinc-200 px-2 py-1 text-left;
+}
+
 /* Corners (src/settings.ts `radius`): after the base rules, so they win. */
 [data-ch-radius="none"] .ch-button,
 [data-ch-radius="none"] .ch-hero__cta,

@@ -19,6 +19,8 @@
  * with any change to the code; a test pins the code's hash to the version.
  */
 
+import { CHART_SCRIPT } from "./chart.ts";
+
 const code = String.raw`const ptr=(p)=>p===""?[]:String(p).slice(1).split("/").map((s)=>s.replace(/~1/g,"/").replace(/~0/g,"~"));
 const BAD=new Set(["__proto__","prototype","constructor"]);
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
@@ -74,10 +76,15 @@ if(["eq","ne","gt","lt","gte","lte"].includes(op)&&Array.isArray(a)){const x=o(a
 if(op==="and"&&Array.isArray(a))return a.every((x)=>cond(x,d));if(op==="or"&&Array.isArray(a))return a.some((x)=>cond(x,d));if(op==="not")return!cond(a,d);return false;};
 const safe=(h)=>typeof h==="string"&&/^(\/(?!\/)|#|https:\/\/)/.test(h)&&!/[\s<>"']/.test(h);
 const json=(el,a)=>{try{return JSON.parse(el.getAttribute(a)||"null");}catch{return undefined;}};
+let chartMod;
+const charts=(root,d,loc)=>{const els=[...root.querySelectorAll("[data-ch-chart]")];if(!els.length)return;
+const draw=(m)=>{for(const el of els){const raw=json(el,"data-ch-chart");const b=el.querySelector(".ch-chart__body");if(!obj(raw)||!b)continue;const sp={};for(const[k,x]of Object.entries(raw))sp[k]=val(x,d,loc);b.innerHTML=m.chartInner(sp,loc,{data:el.getAttribute("data-ch-label")||"Data"});}};
+if(chartMod)draw(chartMod);else import("${CHART_SCRIPT.path}").then((m)=>{chartMod=m;draw(m);}).catch(()=>{});};
 const boot=(root)=>{const s=root.querySelector("script[data-ch-state]");if(!s||root.hasAttribute("data-ch-live"))return;root.setAttribute("data-ch-live","");
 let init;try{init=JSON.parse(s.textContent||"{}");}catch{return;}let d=structuredClone(init);const loc=document.documentElement.lang||"en";
 const render=()=>{for(const el of root.querySelectorAll("[data-ch-text]"))el.textContent=txt(val(json(el,"data-ch-text"),d,loc));
 for(const el of root.querySelectorAll("[data-ch-visible]"))el.hidden=!cond(json(el,"data-ch-visible"),d);
+charts(root,d,loc);
 for(const el of root.querySelectorAll("[data-ch-invalid]"))el.setAttribute("aria-invalid",truthy(val(json(el,"data-ch-invalid"),d,loc))?"true":"false");
 for(const el of root.querySelectorAll("[data-ch-model]")){const v=get(d,el.getAttribute("data-ch-model"));if(el.type==="radio")el.checked=el.value===txt(v);else if(el.type==="checkbox")el.checked=truthy(v);else if(v!==undefined&&document.activeElement!==el)el.value=txt(v);}};
 const write=(e)=>{const el=e.target instanceof Element?e.target.closest("[data-ch-model]"):null;if(!el||!root.contains(el)||(el.type==="radio"&&!el.checked))return;put(d,el.getAttribute("data-ch-model"),el.type==="checkbox"?el.checked:el.type==="number"?(el.value===""?"":num(el.value)):el.type==="range"?num(el.value):el.value);render();};
@@ -99,7 +106,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.3.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.4.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -108,6 +115,7 @@ export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.3.js", code } as const
 export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.1.js",
   "/_cloudhal/surface.2.js",
+  "/_cloudhal/surface.3.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

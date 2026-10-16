@@ -62,6 +62,8 @@ export const RENDER_CHECK_IDS = [
   "long-line",
   // RFC-0022 §2: a form control a reader cannot identify.
   "input-label",
+  // RFC-0022 §3: a chart with no rows to draw.
+  "chart-empty",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -405,6 +407,9 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
       (el.getAttribute("aria-labelledby") || "").split(/s+/).some((id) => id && (document.getElementById(id)?.textContent || "").trim());
     if (!named) add("input-label", el, "no label a screen reader can announce");
   }
+
+  // chart-empty: a chart whose data has no rows.
+  for (const el of document.querySelectorAll("[data-ch-chart-empty]")) add("chart-empty", el, "no rows in its data");
 
   // long-line: paragraphs averaging more than 90 characters a line.
   for (const p of document.querySelectorAll("p,li,dd,blockquote")) {

@@ -18,6 +18,7 @@ import {
   resolveProps,
 } from "@cloudhal/core-ts/surfaces";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
+import { chartInner } from "./chart.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
 import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { SURFACE_SCRIPT, scriptJson } from "./surface-client.ts";
@@ -344,6 +345,18 @@ export function primitiveHtml(
           ? `<output class="ch-slider__value" data-ch-text="${json(node.raw?.value)}">${escapeHtml(str(p.value))}</output>`
           : `<output class="ch-slider__value">${escapeHtml(str(p.value))}</output>`;
       return `<label class="ch-field"><span class="ch-field__label">${escapeHtml(str(p.label))}</span><span class="ch-slider"><input type="range" min="${n(p.min, 0)}" max="${n(p.max, 100)}" step="${n(p.step, 1) || "any"}" value="${n(p.value, 0)}"${model(node)}>${out}</span></label>`;
+    }
+    // RFC-0022 §3: drawn here as SVG; a live surface redraws it when its data changes.
+    case "Chart": {
+      const locale = media?.locale ?? "en";
+      const dataLabel = locale.startsWith("tr") ? "Verileri göster" : "Show the data";
+      const live =
+        node.live && node.raw
+          ? ` data-ch-chart="${json(node.raw)}" data-ch-label="${escapeHtml(dataLabel)}"`
+          : "";
+      const rows = Array.isArray(p.data) ? p.data : [];
+      const caption = str(p.caption);
+      return `<figure class="ch-chart"${live}${rows.length === 0 ? " data-ch-chart-empty" : ""}><figcaption class="ch-chart__title">${escapeHtml(str(p.title))}</figcaption><div class="ch-chart__body">${chartInner(p, locale, { data: dataLabel })}</div>${caption ? `<p class="ch-chart__caption">${escapeHtml(caption)}</p>` : ""}</figure>`;
     }
     // RFC-0022 §2: local inputs; values stay in the reader's browser.
     case "NumberField": {

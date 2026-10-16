@@ -55,6 +55,7 @@ export const messages = {
         "tap-target": "small tap targets",
         "long-line": "long lines",
         "input-label": "unlabelled inputs",
+        "chart-empty": "empty charts",
       },
       done: "{steps} steps applied to the draft",
       doneRefused: "{steps} steps applied; {refused} refused and sent back to the model",

@@ -57,6 +57,7 @@ const RENDER_CHECKS = [
   "tap-target",
   "long-line",
   "input-label",
+  "chart-empty",
 ] as const;
 
 export function BuildChat({
