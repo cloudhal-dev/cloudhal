@@ -401,6 +401,39 @@ export function assetsSuite(ctx: SuiteContext): void {
       expect(await ctx.blobs().head(mediaBlobKey(w.site.id, asset.sha256))).not.toBeNull();
     });
 
+    it("RFC-0025: the site's logos are uses: canonical refs, delete refused, retired ones refused", async () => {
+      const w = await setup();
+      const store = ctx.store();
+      const { asset } = await upload(store, w.site.id);
+      const site = await store.updateSite({
+        ...w.site,
+        brand: { logo: { assetId: asset.id, alt: "" } as never, logoHeight: "m" },
+      });
+      expect(site.brand?.logo).toMatchObject({
+        assetId: asset.id,
+        width: asset.image?.width,
+        height: asset.image?.height,
+      });
+      expect(site.brand?.logo?.src).toMatch(/^\/media\/[0-9a-f]{16}\//);
+      const e = await rejects(store.deleteAsset(asset));
+      expect((e as InvariantError).code).toBe("in_use");
+      expect((e as InvariantError).details).toEqual({
+        uses: [{ nodeId: w.site.id, nodeKind: "site", field: "brand.logo" }],
+      });
+      // An edit elsewhere keeps the use; removing the brand frees the asset.
+      const renamed = await store.updateSite({ ...site, name: "Media, renamed" });
+      expect((await store.assetUsage(w.site.id, [asset.id])).get(asset.id)?.refs).toHaveLength(1);
+      const { brand: _b, ...bare } = renamed;
+      await store.updateSite(bare as Site);
+      expect((await store.assetUsage(w.site.id, [asset.id])).get(asset.id)).toBeUndefined();
+      const retired = await store.retireAsset((await store.getAsset(asset.id)) as Asset);
+      const again = (await store.getSite(w.site.id)) as Site;
+      const r = await rejects(
+        store.updateSite({ ...again, brand: { logo: { assetId: retired.id, alt: "" } as never } }),
+      );
+      expect((r as InvariantError).code).toBe("retired_asset");
+    });
+
     it("invariant 9 under concurrency: delete vs. an entry write that adds a reference", async () => {
       const w = await setup();
       const store = ctx.store();

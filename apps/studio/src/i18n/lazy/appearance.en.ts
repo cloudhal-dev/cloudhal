@@ -41,6 +41,7 @@ export const messages = {
       gradient: "Gradient end",
     },
     chrome: {
+      logoUse: "Site logo",
       title: "Header and footer",
       description:
         "The logo, the header and the footer every page shows. A page can hide them or make the header transparent over its first band.",

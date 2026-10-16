@@ -107,7 +107,10 @@ const NavigationPage = lazyRouteComponent(
   "NavigationPage",
 );
 const MediaPage = lazyRouteComponent(() => import("./routes/MediaPage.tsx"), "MediaPage");
-const AssetPage = lazyRouteComponent(() => import("./routes/AssetPage.tsx"), "AssetPage");
+const AssetPage = lazyRouteComponent(
+  () => withMessages(import("./routes/AssetPage.tsx"), ["appearance"]),
+  "AssetPage",
+);
 const RedirectsPage = lazyRouteComponent(
   () => import("./routes/RedirectsPage.tsx"),
   "RedirectsPage",

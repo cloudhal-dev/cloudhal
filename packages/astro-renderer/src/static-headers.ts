@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
+import { CHROME_SCRIPT } from "./chrome-client.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
@@ -80,6 +81,8 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
     ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
     [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
+    // RFC-0025 §2: the chrome module, loaded by pages whose header asks for it.
+    [CHROME_SCRIPT.path, CHROME_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
@@ -88,7 +91,7 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
   }
 }
 
-/** Whether any page of a static build has a live surface or motion (its HTML marks one). */
+/** Whether any page of a static build has a live surface, motion or the chrome module (its HTML marks one). */
 export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean> {
   const entries = await readdir(rootOf(dir), { recursive: true, withFileTypes: true }).catch(
     () => [],
@@ -96,7 +99,12 @@ export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean
   for (const e of entries) {
     if (!e.isFile() || !e.name.endsWith(".html")) continue;
     const html = await readFile(path.join(e.parentPath, e.name), "utf8");
-    if (html.includes("data-ch-surface=") || html.includes(MOTION_SCRIPT.path)) return true;
+    if (
+      html.includes("data-ch-surface=") ||
+      html.includes(MOTION_SCRIPT.path) ||
+      html.includes(CHROME_SCRIPT.path)
+    )
+      return true;
   }
   return false;
 }

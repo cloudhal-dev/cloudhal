@@ -5,6 +5,7 @@
 
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
+import { CHROME_SCRIPT } from "./chrome-client.ts";
 import { EMBED_SCRIPT } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
@@ -18,6 +19,7 @@ const SCRIPTS = new Map<string, string>([
   [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
   ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
   [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
+  [CHROME_SCRIPT.path, CHROME_SCRIPT.code],
 ]);
 
 interface MiddlewareContext {

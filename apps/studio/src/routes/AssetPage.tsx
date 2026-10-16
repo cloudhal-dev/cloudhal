@@ -49,7 +49,7 @@ import { SettingRow } from "../components/Settings.tsx";
 import { TakedownDialog } from "../components/TakedownDialog.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useCan, useGate } from "../components/useMe.ts";
-import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
+import { type MessageKey, type NamespaceKey, useI18n, useT } from "../i18n/index.tsx";
 import { type AssetDetail, type AssetUse, api } from "../lib/api.ts";
 import {
   ASSET_LIMITS,
@@ -81,8 +81,10 @@ function licenseOption(l: LicenseChoice): LicenseOption {
 }
 
 /** "Cover image", "Image section", "Text" — the slot an asset fills, from `asset_refs.field`. */
-function slotKey(field: string): MessageKey {
+function slotKey(field: string): MessageKey | NamespaceKey<"appearance"> {
   if (field === "coverImage") return "media.uses.slots.cover";
+  // RFC-0025: the site's logo (its words load with this route, in the `appearance` namespace).
+  if (field.startsWith("brand.")) return "appearance.chrome.logoUse";
   if (field === "image") return "media.uses.slots.termImage";
   if (field === "seo.ogImage" || /\.seo\.ogImage$/.test(field)) return "media.uses.slots.social";
   if (/^sections\..+\.image$/.test(field)) return "media.uses.slots.section";
@@ -97,7 +99,9 @@ function useHref(siteId: string) {
         ? `/sites/${siteId}/pages/${use.nodeId}`
         : use.nodeKind === "term"
           ? `/sites/${siteId}/taxonomy/${use.nodeId}`
-          : undefined;
+          : use.nodeKind === "site"
+            ? `/sites/${siteId}/settings#chrome`
+            : undefined;
 }
 
 /**
@@ -107,7 +111,7 @@ function useHref(siteId: string) {
  * Edits are the uploader's (asset:upload) or any Editor's (asset:manage); the server decides.
  */
 export function AssetPage() {
-  const t = useT();
+  const t = useT("appearance");
   const { locale: uiLocale } = useI18n();
   const { siteId, assetId } = useParams({ from: "/sites/$siteId/media/$assetId" });
   const navigate = useNavigate();

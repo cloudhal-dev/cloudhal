@@ -1,4 +1,5 @@
 /** RFC-0025: the chrome a page shows, the checks the contract cannot make, the brand form. */
+import type { Page } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import {
   brandFromForm,
@@ -6,8 +7,50 @@ import {
   checkChrome,
   chromeMenuKeys,
   copyrightText,
+  heroSurface,
   resolveChrome,
 } from "../src/chrome.ts";
+
+/** A page's first section: a surface whose root Stack starts with a Band painted `surface`. */
+const hero = (surface: string): Page["sections"][number] => ({
+  id: "sec_hero000001",
+  kind: "surface",
+  catalog: "blog@1",
+  components: [
+    { id: "root", component: "Stack", children: ["band"] },
+    { id: "band", component: "Band", props: { surface }, children: ["title"] },
+    { id: "title", component: "Heading", props: { text: "Hello", level: 1 } },
+  ],
+});
+
+describe("heroSurface and the transparent header (RFC-0025 §2)", () => {
+  it("finds a loud first band, three levels deep at most, and an old tone", () => {
+    expect(heroSurface({ sections: [hero("gradient")] })).toBe("gradient");
+    expect(heroSurface({ sections: [hero("muted")] })).toBeUndefined();
+    expect(heroSurface({ sections: [] })).toBeUndefined();
+    const tone = hero("x");
+    if (tone.kind === "surface")
+      tone.components[1] = {
+        id: "band",
+        component: "Band",
+        props: { tone: "brand" },
+        children: ["title"],
+      };
+    expect(heroSurface({ sections: [tone] })).toBe("brand");
+  });
+
+  it("keeps the header solid where the page opens without a loud band", () => {
+    const site = { chrome: { header: { overHero: "transparent" as const } } };
+    expect(resolveChrome(site, { sections: [hero("muted")] }).header).toMatchObject({
+      transparent: false,
+    });
+    expect(resolveChrome(site, { sections: [hero("accent")] }).header).toMatchObject({
+      transparent: true,
+      over: "accent",
+    });
+    expect(resolveChrome(site).header.transparent).toBe(false);
+  });
+});
 
 describe("resolveChrome", () => {
   it("reproduces the former header and footer without settings", () => {
@@ -33,9 +76,9 @@ describe("resolveChrome", () => {
   it("lets a page hide, thin or clear its chrome", () => {
     const c = resolveChrome(
       { chrome: { footer: { layout: "columns", columns: [{ heading: "Docs", menu: "docs" }] } } },
-      { chrome: { header: "transparent", footer: "minimal" } },
+      { chrome: { header: "transparent", footer: "minimal" }, sections: [hero("inverse")] },
     );
-    expect(c.header.transparent).toBe(true);
+    expect(c.header).toMatchObject({ transparent: true, over: "inverse" });
     expect(c.footer.layout).toBe("minimal");
     expect(c.footer.columns).toEqual([]);
     expect(c.footer.fallbackRss).toBe(false);

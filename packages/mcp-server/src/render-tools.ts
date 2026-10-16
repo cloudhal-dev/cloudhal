@@ -62,6 +62,10 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "motion-cls": "layout shift",
   "motion-budget": "too much motion",
   flash: "flashing",
+  "skip-link": "skip link",
+  landmarks: "page landmarks",
+  "header-contrast": "transparent header contrast",
+  "focus-obscured": "focus under the sticky header",
 };
 
 function summary(r: RenderPageResult): string {

@@ -1,10 +1,12 @@
 ---
+import { CHROME_SCRIPT } from "@cloudhal/astro-renderer/chrome";
 import { SeoHead } from "@cloudhal/astro-renderer/components";
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
 import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
 import { copyrightText, type ResolvedChrome, resolveChrome } from "@cloudhal/core-ts/chrome";
+import MenuPanel from "../components/MenuPanel.astro";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
 import { PAIRING_PRELOADS } from "../fonts.ts";
@@ -33,6 +35,8 @@ interface Props {
         skip: string;
         main: string;
         secondary: string;
+        menu: string;
+        closeMenu: string;
         footer: string;
         legal: string;
         social: string;
@@ -48,6 +52,8 @@ const w = words ?? {
   skip: "Skip to content",
   main: "Main",
   secondary: "Secondary",
+  menu: "Menu",
+  closeMenu: "Close menu",
   footer: "Footer",
   legal: "Legal",
   social: "Social links",
@@ -78,6 +84,21 @@ const safe = (href: string) => (/^(https?:|mailto:|\/(?!\/)|#)/i.test(href) ? hr
 const actions = h.actions.filter((a) =>
   a.kind === "button" ? a.label && a.href : a.kind === "search" && search,
 );
+// The bar collapses into the phone menu below `collapseAt` (always for the minimal layout).
+const collapse = h.layout === "minimal" ? "always" : h.collapseAt;
+const dialog =
+  h.mobileStyle === "drawer-start" ||
+  h.mobileStyle === "drawer-end" ||
+  h.mobileStyle === "fullscreen";
+const searchAction = actions.some((a) => a.kind === "search") ? search : undefined;
+// The chrome module, only where the header needs it (RFC-0025 §2): without it everything works.
+const needsScript =
+  !h.hidden &&
+  (h.behavior !== "static" ||
+    h.shrink ||
+    h.transparent ||
+    dialog ||
+    headerNav.some((i) => i.children.length > 0));
 const copyright = f.copyright
   ? copyrightText(f.copyright, site.name, new Date().getFullYear())
   : undefined;
@@ -110,7 +131,17 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
   <body class="ch-body min-h-screen antialiased">
     <a class="ch-skip" href="#main">{w.skip}</a>
     {!h.hidden && (
-      <header class="ch-header" data-layout={h.layout} data-behavior={h.behavior} data-width={h.width} data-surface={h.surface} data-transparent={h.transparent ? "" : undefined}>
+      <header
+        class="ch-header"
+        data-layout={h.layout}
+        data-behavior={h.behavior}
+        data-width={h.width}
+        data-surface={h.surface}
+        data-collapse={collapse}
+        data-shrink={h.shrink ? "" : undefined}
+        data-transparent={h.transparent ? "" : undefined}
+        data-over={h.transparent ? h.over : undefined}
+      >
         <div class="ch-header__inner">
           <a href="/" class="ch-header__brand">
             {brand?.logo ? (
@@ -127,35 +158,55 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
               {utilityNav.map((item) => <NavLink item={item} {...header} />)}
             </nav>
           )}
-          {headerNav.length > 0 && (h.layout === "minimal" ? (
-            <details class="ch-header__more">
-              <summary>{w.main}</summary>
-              <nav class="ch-header__nav" aria-label={w.main}>
-                {headerNav.map((item) => item.children.length > 0 ? <NavMenu item={item} {...header} /> : <NavLink item={item} {...header} />)}
-              </nav>
-            </details>
-          ) : (
+          {headerNav.length > 0 && (
             <nav class="ch-header__nav" aria-label={w.main}>
-              {headerNav.map((item) => item.children.length > 0 ? <NavMenu item={item} {...header} /> : <NavLink item={item} {...header} />)}
+              {headerNav.map((item, i) => item.children.length > 0 ? <NavMenu item={item} {...header} popover={`ch-sub-${i}`} /> : <NavLink item={item} {...header} />)}
             </nav>
-          ))}
+          )}
           {actions.length > 0 && (
-          <div class="ch-header__actions">
-            {actions.map((a) =>
-              a.kind === "button" && a.label && a.href ? (
-                <a class={`ch-button ch-button--${a.variant ?? "primary"}`} href={safe(a.href)}>{a.label}</a>
-              ) : a.kind === "search" && search ? (
-                <form class="ch-header-search" method="get" action="/search" role="search">
-                  <label for="ch-header-q" class="sr-only">{search.label}</label>
-                  <input id="ch-header-q" type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
-                  <button type="submit" class="sr-only">{search.button}</button>
-                </form>
-              ) : null,
-            )}
-          </div>
+            <div class="ch-header__actions">
+              {actions.map((a) =>
+                a.kind === "button" && a.label && a.href ? (
+                  <a class={`ch-button ch-button--${a.variant ?? "primary"}`} href={safe(a.href)}>{a.label}</a>
+                ) : a.kind === "search" && search ? (
+                  <form class="ch-header-search" method="get" action="/search" role="search">
+                    <label for="ch-header-q" class="sr-only">{search.label}</label>
+                    <input id="ch-header-q" type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
+                    <button type="submit" class="sr-only">{search.button}</button>
+                  </form>
+                ) : null,
+              )}
+            </div>
+          )}
+          {(headerNav.length > 0 || utilityNav.length > 0 || searchAction) && (
+            <div class="ch-menu-slot">
+              {dialog ? (
+                <a class="ch-menu__open" href="/menu" data-ch-dialog="ch-menu">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" /></svg>
+                  {w.menu}
+                </a>
+              ) : (
+                <details class="ch-menu">
+                  <summary class="ch-menu__open">
+                    <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" /></svg>
+                    {w.menu}
+                  </summary>
+                  <MenuPanel nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="drop" />
+                </details>
+              )}
+            </div>
           )}
         </div>
       </header>
+    )}
+    {!h.hidden && dialog && (
+      <dialog id="ch-menu" class="ch-menu__dialog" data-style={h.mobileStyle} aria-label={w.menu}>
+        <div class="ch-menu__bar">
+          <span class="ch-header__brand">{site.name}</span>
+          <form method="dialog"><button class="ch-menu__close" type="submit">{w.closeMenu}</button></form>
+        </div>
+        <MenuPanel nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="dialog" />
+      </dialog>
     )}
     <main id="main" tabindex="-1" class="mx-auto max-w-3xl px-4 pb-16">
       {notice && (
@@ -220,5 +271,6 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
         </div>
       </footer>
     )}
+    {needsScript && <script type="module" src={CHROME_SCRIPT.path}></script>}
   </body>
 </html>

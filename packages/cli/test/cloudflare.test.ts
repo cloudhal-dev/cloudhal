@@ -348,7 +348,8 @@ describe("Site Worker on workerd", () => {
       '<a href="/about" aria-current="page" class="text-zinc-900">Who we are</a>',
     );
     expect(header).toContain('<a href="/team" class="hover:text-zinc-900">Team</a>');
-    expect(header).toContain("<span>Topics</span>");
+    // a group in the bar is a popover under its button (RFC-0025 25b)
+    expect(header).toContain('popovertarget="ch-sub-2">Topics');
     expect(header).toContain('rel="noopener noreferrer" target="_blank">GitHub</a>');
     expect(footerOf(html)).toContain(">Status</a>");
     // pages that render a menu carry its node tag and the tags of the terms it shows

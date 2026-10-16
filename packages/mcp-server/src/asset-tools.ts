@@ -183,7 +183,7 @@ async function usesOf(ctx: ToolContext, asset: Asset, locale: string) {
     else if (ref.nodeKind === "term") {
       const t = await ctx.store.getTerm(ref.nodeId);
       title = t ? termName(t, locale) : undefined;
-    }
+    } else if (ref.nodeKind === "site") title = (await ctx.store.getSite(ref.nodeId))?.name;
     out.push({ ...ref, ...(title ? { title } : {}) });
   }
   return out;

@@ -82,7 +82,20 @@ export async function applyMenuFixture(
 
 /** The `<header>…</header>` of a rendered page. */
 export function headerOf(html: string): string {
-  return html.slice(html.indexOf("<header"), html.indexOf("</header>") + "</header>".length);
+  const header = html.slice(
+    html.indexOf("<header"),
+    html.indexOf("</header>") + "</header>".length,
+  );
+  // The phone menu (RFC-0025 25b) repeats the bar's menus: `menuOf` reads it on its own.
+  const slot = header.indexOf('<div class="ch-menu-slot">');
+  return slot < 0 ? header : `${header.slice(0, slot)}</div></header>`;
+}
+
+/** The header's phone menu (RFC-0025 §2): its disclosure or dialog link, with its panel. */
+export function menuOf(html: string): string {
+  const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+  const slot = header.indexOf('<div class="ch-menu-slot">');
+  return slot < 0 ? "" : header.slice(slot);
 }
 
 /** The `<footer>…</footer>` of a rendered page. */
@@ -112,7 +125,7 @@ export function derivedHeader(
     ? `<nav class="ch-header__nav" aria-label="Main">${links.map(a).join("")}</nav>`
     : "";
   const actions = options.search ? `<div class="ch-header__actions">${HEADER_SEARCH}</div>` : "";
-  return `<header class="ch-header" data-layout="logo-left" data-behavior="static" data-width="content" data-surface="plain"><div class="ch-header__inner"><a href="/" class="ch-header__brand">${siteName}</a>${nav}${actions}</div></header>`;
+  return `<header class="ch-header" data-layout="logo-left" data-behavior="static" data-width="content" data-surface="plain" data-collapse="md"><div class="ch-header__inner"><a href="/" class="ch-header__brand">${siteName}</a>${nav}${actions}</div></header>`;
 }
 
 export const DEFAULT_FOOTER =

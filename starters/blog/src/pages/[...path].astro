@@ -54,6 +54,7 @@ import { blockTypes } from "../blocks.ts";
 import Archive from "../components/Archive.astro";
 import Article from "../components/Article.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
+import MenuPanel from "../components/MenuPanel.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
 import Search from "../components/Search.astro";
@@ -71,6 +72,8 @@ import {
 export async function getStaticPaths() {
   const source = await getSource(config);
   const { pages } = await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE });
+  // RFC-0025 §2: the phone menu's page, unless the site has a page there.
+  if (!pages.includes("/menu")) pages.push("/menu");
   return pages.map((path) => ({
     params: { path: path === "/" ? undefined : path.slice(1) },
   }));
@@ -87,7 +90,11 @@ const route = await resolveRoute(source, path, {
 if (route.kind === "redirect")
   return new Response(null, { status: route.status, headers: { location: route.location } });
 if (route.kind === "gone") return new Response(null, { status: 410 });
-if (route.kind === "not-found" || route.kind === "feed") return new Response(null, { status: 404 });
+// RFC-0025 §2: `/menu` is the phone menu as a page (the menu link's target without JavaScript),
+// unless the site has a page there.
+const isMenu = route.kind === "not-found" && path === "/menu";
+if (!isMenu && (route.kind === "not-found" || route.kind === "feed"))
+  return new Response(null, { status: 404 });
 
 // Search results (RFC-0019 §3) are per query: never in the edge cache, never in search engines.
 if (route.kind === "search") {
@@ -237,7 +244,13 @@ const meta =
       ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
       : route.kind === "archive"
         ? archiveHead(site, route.archive, origin, media)
-        : searchHead(site, route.search.query, origin);
+        : route.kind === "search"
+          ? searchHead(site, route.search.query, origin)
+          : {
+              ...searchHead(site, "", origin),
+              title: `${t.menu} · ${site.name}`,
+              canonical: `${origin}/menu`,
+            };
 const searchForm = searchAvailable(config, source)
   ? {
       label: t.searchLabel,
@@ -247,7 +260,19 @@ const searchForm = searchAvailable(config, source)
     }
   : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }}>
+  {isMenu && (
+    <div class="ch-menu-page">
+      <h1>{t.menu}</h1>
+      <MenuPanel
+        nav={chrome.header.nav === "primary" ? nav : (menus[chrome.header.nav] ?? [])}
+        utility={chrome.header.utility ? (menus[chrome.header.utility] ?? []) : []}
+        search={searchForm}
+        words={{ main: t.mainMenu, secondary: t.secondaryMenu }}
+        idSuffix="page"
+      />
+    </div>
+  )}
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
   )}

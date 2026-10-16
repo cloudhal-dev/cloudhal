@@ -20,7 +20,7 @@ const { item, on, off } = Astro.props;
   <a
     href={item.href}
     aria-current={item.current}
-    class={item.current || item.inTrail ? on : off}
+    class={(item.current || item.inTrail ? on : off) || undefined}
     rel={item.external ? "noopener noreferrer" : undefined}
     target={item.newTab ? "_blank" : undefined}
   >{item.label}</a>
