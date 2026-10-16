@@ -1,5 +1,5 @@
 # RFC-0023: Design tokens v2 and surface styles
-- Status: Draft
+- Status: Accepted; 23a shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0017 (theme settings, `set_theme_settings`, `x-contrast`), RFC-0018 (theme kit, CSS layers, 18d section styles), RFC-0021 (DESIGN.md, `render_page`, the design judge), RFC-0022 (surface tools);
@@ -142,3 +142,13 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
 2. **Per-page mode.** Should a page or a band force dark (for a landing hero) regardless of the site mode, or is `surface: inverse` enough?
 3. **Accent derivation.** Derive the accent as the seed's complementary hue, a fixed rotation, or let the person pick a second seed?
 4. **Gradient taste.** Keep gradients and meshes off by default in the site-design guidance (easy to overuse) and allow them only for heroes and calls to action?
+
+## Status
+- **23a shipped.**
+  - **Expansion.** `@cloudhal/core-ts/tokens` (`expandColorTokens`) builds 16 roles for light and dark from the seed in OKLCH. That is the §1 list plus `text-subtle` and `border-strong`, which the blog theme's greys needed. The light brand is the seed itself; the accent hue is the seed's turned by 150°, as a fixed rotation (open question 3).
+  - **Contrast.** Eleven pairs are checked (text 4.5:1 or 7:1 at `high`, UI parts 3:1), plus text on brand and on accent. A failing foreground moves one lightness step at a time; backgrounds never move. If neither white nor near-black text reads on a fill, the fill is moved instead. Every move is returned as a `repairs` entry and as a note. A test runs 9 seeds × 4 schemes × 2 levels × light and dark without one failing pair.
+  - **Which colors apply.** `siteColorTokens` decides for the renderer, `get_design` and Studio alike. The seed applies when the theme declares `seed` and the site set one or chose a dark or automatic mode; otherwise the site's old four colors apply, with the former greys (`legacyColorRoles`), so live sites look the same.
+  - **The blog theme.** It gains `seed`, `scheme`, `contrast` and `mode`. Its CSS reads `--ch-color-*`, and Tailwind's `zinc-*` and `white` are remapped to the roles with `@theme inline`, so no class had to change for dark mode. Light renders matched the old look; dark and seeded renders passed every `render_page` check (calculator, pricing, chart pages).
+  - **Agents.** `get_design` returns `colors`: source, settings, both role sets, every pair's ratio and the repairs. Its text says which settings to change and to render dark when the mode is dark or auto. `render_page` takes `scheme: light | dark`, and DESIGN guidance points 1 and 8 say so.
+  - **Studio.** The Appearance form shows `ColorRolePreview` under the fields: a sample and swatches for light, and for dark once a seed is set. The repairs appear in the person's language, and it works out live as the fields change.
+  - **Moved to later phases.** The dark-mode `contrast` check run automatically by the site's mode, and the site-design skill recipes, move to 23e.

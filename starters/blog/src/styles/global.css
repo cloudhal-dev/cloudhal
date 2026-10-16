@@ -1,10 +1,29 @@
 /* Scan `src/` only: automatic detection may walk up the file system (docs/design/starter-references.md §6). */
 @import "tailwindcss" source("..");
 
+/*
+ * RFC-0023: the theme's greys and white are color roles (`--ch-color-<role>`, written by
+ * themeVariables from the site's seed, or the former greys when it has none), so a seed restyles
+ * them and dark mode works. Text on brand and inverse fills uses its own roles below.
+ */
+@theme inline {
+  --color-white: var(--ch-color-surface-raised);
+  --color-zinc-50: var(--ch-color-surface-muted);
+  --color-zinc-100: var(--ch-color-surface-muted);
+  --color-zinc-200: var(--ch-color-border);
+  --color-zinc-300: var(--ch-color-border-strong);
+  --color-zinc-400: var(--ch-color-text-subtle);
+  --color-zinc-500: var(--ch-color-text-subtle);
+  --color-zinc-600: var(--ch-color-text-muted);
+  --color-zinc-700: var(--ch-color-text);
+  --color-zinc-800: var(--ch-color-text);
+  --color-zinc-900: var(--ch-color-text);
+}
+
 /* Design settings (src/settings.ts, RFC-0017): CSS variables and data-ch-* attributes on <html>. */
 .ch-body {
-  background: var(--ch-surface, #ffffff);
-  color: var(--ch-text, #18181b);
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
   /* Full-width bands (RFC-0020) use 100vw, which counts a classic scrollbar: never scroll sideways. */
   overflow-x: clip;
 }
@@ -19,7 +38,7 @@
   font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 .ch-richtext a {
-  color: var(--ch-link, #0369a1);
+  color: var(--ch-color-link);
 }
 
 /* Section defaults; a theme overrides these or swaps components. */
@@ -33,8 +52,8 @@
   @apply mt-3 text-lg text-zinc-600;
 }
 .ch-hero__cta {
-  @apply mt-6 inline-block rounded px-4 py-2 text-white;
-  background: var(--ch-brand, #18181b);
+  @apply mt-6 inline-block rounded px-4 py-2 text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
 }
 .ch-article-header {
   @apply space-y-2 border-b border-zinc-200 pt-8 pb-6;
@@ -87,8 +106,8 @@
   @apply inline-block w-fit rounded px-4 py-2 font-medium;
 }
 .ch-button--primary {
-  @apply text-white;
-  background: var(--ch-brand, #18181b);
+  @apply text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
 }
 .ch-button--secondary {
   @apply border border-zinc-300 text-zinc-900;
@@ -97,7 +116,7 @@
   @apply flex items-center gap-3 rounded border border-zinc-200 px-4 py-3 no-underline;
 }
 .ch-embed__play {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
 }
 .ch-embed__title {
   @apply font-medium text-zinc-900;
@@ -152,7 +171,7 @@
 }
 .ch-kicker {
   @apply inline-block text-sm font-semibold uppercase;
-  color: var(--ch-link, #0369a1);
+  color: var(--ch-color-link);
   letter-spacing: 0.04em;
 }
 a.ch-kicker:hover {
@@ -278,7 +297,7 @@ a.ch-chip {
   @apply hover:border-zinc-900 hover:text-zinc-900;
 }
 .ch-terms__group[data-taxonomy="category"] .ch-chip {
-  @apply border-zinc-900 bg-zinc-900 text-white hover:text-white;
+  @apply border-(--ch-color-surface-inverse) bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse) hover:text-(--ch-color-text-inverse);
 }
 .ch-archive-header {
   @apply space-y-2 border-b border-zinc-200 pt-4 pb-6;
@@ -427,7 +446,7 @@ footer .ch-nav-menu > ul {
 }
 .cloudhal-comment-form button,
 .cloudhal-report-form button {
-  @apply rounded bg-zinc-900 px-4 py-2 text-white;
+  @apply rounded px-4 py-2 bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
 }
 .cloudhal-comment-form button[data-cancel-reply] {
   @apply bg-zinc-200 text-zinc-900;
@@ -540,11 +559,11 @@ footer .ch-nav-menu > ul {
   @apply bg-zinc-50;
 }
 [data-tone="brand"]:is(.ch-band, .ch-card) {
-  background: var(--ch-brand, #18181b);
-  @apply text-white;
+  background: var(--ch-color-brand);
+  @apply text-(--ch-color-on-brand);
 }
 [data-tone="inverse"]:is(.ch-band, .ch-card) {
-  @apply bg-zinc-900 text-white;
+  @apply bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
 }
 [data-tone="brand"] :is(.ch-text, .ch-stat__label, .ch-stat__detail),
 [data-tone="inverse"] :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
@@ -553,10 +572,10 @@ footer .ch-nav-menu > ul {
 }
 /* Buttons on a dark band or card keep their contrast. */
 :is([data-tone="brand"], [data-tone="inverse"]) .ch-button--primary {
-  @apply bg-white text-zinc-900;
+  @apply bg-(--ch-color-surface) text-(--ch-color-text);
 }
 :is([data-tone="brand"], [data-tone="inverse"]) .ch-button--secondary {
-  @apply border-white/60 text-white;
+  @apply border-current/60 text-inherit;
 }
 :is([data-tone="brand"], [data-tone="inverse"]) .ch-link {
   color: inherit;
@@ -693,7 +712,7 @@ ol.ch-list {
 .ch-list[data-marker="check"] li::before {
   content: "✓";
   @apply mr-2 font-bold;
-  color: var(--ch-brand, #18181b);
+  color: var(--ch-color-brand);
 }
 /* Tabs without JavaScript: the n-th checked radio shows the n-th panel. */
 .ch-tabs {
@@ -750,8 +769,8 @@ button.ch-button {
   font-family: inherit;
 }
 button.ch-button--primary {
-  @apply text-white;
-  background: var(--ch-brand, #18181b);
+  @apply text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
 }
 button.ch-button--secondary {
   @apply border border-zinc-300 text-zinc-900;
@@ -785,7 +804,7 @@ button.ch-button--secondary {
 }
 .ch-slider input {
   @apply w-full max-w-sm;
-  accent-color: var(--ch-brand, #18181b);
+  accent-color: var(--ch-color-brand);
 }
 .ch-slider__value {
   @apply min-w-12 text-right font-medium tabular-nums;
@@ -815,7 +834,7 @@ button.ch-button--secondary {
 }
 .ch-check input {
   @apply size-4;
-  accent-color: var(--ch-brand, #18181b);
+  accent-color: var(--ch-color-brand);
 }
 .ch-radio {
   @apply m-0 grid min-w-0 gap-1.5 border-0 p-0;
@@ -827,7 +846,7 @@ button.ch-button--secondary {
   @apply flex w-fit cursor-pointer items-center gap-2;
 }
 .ch-radio__option input {
-  accent-color: var(--ch-brand, #18181b);
+  accent-color: var(--ch-color-brand);
 }
 .ch-radio[data-variant="buttons"] .ch-radio__options {
   @apply inline-flex w-fit flex-row flex-wrap gap-1 rounded-lg bg-zinc-100 p-1;
@@ -850,7 +869,7 @@ button.ch-button--secondary {
 
 /* RFC-0022 §3: charts. Six series colors from the brand color, each distinct at 3:1 on white. */
 :root {
-  --ch-chart-1: var(--ch-brand, #18181b);
+  --ch-chart-1: var(--ch-color-brand);
   --ch-chart-2: #2563eb;
   --ch-chart-3: #d97706;
   --ch-chart-4: #059669;
@@ -867,11 +886,11 @@ button.ch-button--secondary {
   @apply block h-auto w-full;
 }
 .ch-chart__grid {
-  stroke: #e4e4e7;
+  stroke: var(--ch-color-border);
   stroke-width: 1;
 }
 .ch-chart__tick {
-  fill: #52525b;
+  fill: var(--ch-color-text-muted);
   font-size: 12px;
 }
 .ch-chart__total {
@@ -927,10 +946,10 @@ button.ch-button--secondary {
   @apply bg-zinc-50;
 }
 .ch-table tr[data-highlight="yes"] {
-  background: color-mix(in srgb, var(--ch-brand, #18181b) 8%, transparent);
+  background: color-mix(in srgb, var(--ch-color-brand) 8%, transparent);
 }
 .ch-table tr[data-highlight="yes"] td:first-child {
-  box-shadow: inset 3px 0 0 var(--ch-brand, #18181b);
+  box-shadow: inset 3px 0 0 var(--ch-color-brand);
 }
 @media (max-width: 480px) {
   .ch-table thead {
@@ -985,7 +1004,7 @@ button.ch-button--secondary {
   @apply min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2;
 }
 .ch-search-form button {
-  @apply rounded-md bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-700;
+  @apply rounded-md px-4 py-2 font-medium bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse) hover:opacity-90;
 }
 .ch-search-note {
   @apply mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900;

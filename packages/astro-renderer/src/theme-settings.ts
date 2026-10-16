@@ -8,6 +8,7 @@
  */
 import type { Site } from "@cloudhal/core-contracts";
 import type { PropsSchema } from "@cloudhal/core-ts/blocks";
+import { colorRolesCss, siteColorTokens } from "@cloudhal/core-ts/tokens";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 const kebab = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -58,5 +59,20 @@ export function themeVariables(
       if (typeof v === "boolean") attributes[`data-ch-${name}`] = v ? "on" : "off";
     }
   }
+  // RFC-0023 §1: the color roles every theme can use (`--ch-color-<role>`).
+  const roles = colorRoleCss(config, schema);
+  if (roles) vars.push(roles);
   return { style: vars.length ? `:root{${vars.join(";")}}` : "", attributes };
+}
+
+/**
+ * The color roles for a site: expanded from its seed (RFC-0023) when the theme declares `seed`
+ * and the site set one or chose a dark or automatic mode; otherwise its old colors with the blog
+ * theme's former greys, so a site that never opts in looks the same.
+ */
+export function colorRoleCss(
+  config: Readonly<Record<string, unknown>>,
+  schema: PropsSchema,
+): string {
+  return colorRolesCss(siteColorTokens(config, schema.properties));
 }

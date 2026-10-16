@@ -126,6 +126,12 @@ export {
   type CalendarNavProps,
   type CalendarView,
 } from "./blocks/CalendarNav.tsx";
+export {
+  ColorRolePreview,
+  type ColorRolePreviewLabels,
+  type ColorRolePreviewProps,
+  type ColorRolePreviewScheme,
+} from "./blocks/ColorRolePreview.tsx";
 export { Columns, type ColumnsProps, type ColumnsVariant } from "./blocks/Columns.tsx";
 export {
   type CommentBanSubject,

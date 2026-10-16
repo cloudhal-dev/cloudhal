@@ -24,7 +24,10 @@ export interface CdpSocket {
 
 /** A browser for one `render_page` call; `close` releases it. */
 export interface RenderSession {
-  open(url: string, viewport: { width: number; height: number }): Promise<RenderTab>;
+  open(
+    url: string,
+    viewport: { width: number; height: number; scheme?: RenderScheme },
+  ): Promise<RenderTab>;
   close(): Promise<void>;
 }
 
@@ -82,8 +85,14 @@ export interface RenderResult {
   checks: RenderCheck[];
 }
 
+/** The `prefers-color-scheme` a page is rendered in (RFC-0023: sites with a dark or auto mode). */
+export const RENDER_SCHEMES = ["light", "dark"] as const;
+export type RenderScheme = (typeof RENDER_SCHEMES)[number];
+
 export interface RenderOptions {
   widths: readonly RenderWidth[];
+  /** Default light. */
+  scheme?: RenderScheme;
   /** Screenshots down the page (up to `maxImages` viewports per width); otherwise the first one. */
   fullPage: boolean;
   maxImages?: number;
@@ -123,7 +132,11 @@ export async function renderPage(
       if (done) throw new RenderError("timed out");
       const vh = VIEWPORT_HEIGHT[width];
       stage = `opening the page at ${width} px`;
-      const tab = await session.open(url, { width, height: vh });
+      const tab = await session.open(url, {
+        width,
+        height: vh,
+        scheme: options.scheme ?? "light",
+      });
       try {
         stage = `checking the page at ${width} px`;
         const checks = await tab.evaluate<PageCheck[]>(RENDER_CHECK_SCRIPT);
@@ -567,9 +580,9 @@ export async function cdpSession(
         mobile: viewport.width < 768,
       });
       if (viewport.width < 768) await s("Emulation.setTouchEmulationEnabled", { enabled: true });
-      // The same render on every machine: the light scheme, whatever the host prefers.
+      // The same render on every machine: the scheme asked for, whatever the host prefers.
       await s("Emulation.setEmulatedMedia", {
-        features: [{ name: "prefers-color-scheme", value: "light" }],
+        features: [{ name: "prefers-color-scheme", value: viewport.scheme ?? "light" }],
       });
       const loaded = cdp.waitFor("Page.loadEventFired", sessionId, options.loadTimeoutMs ?? 12_000);
       const nav = await s("Page.navigate", { url });
