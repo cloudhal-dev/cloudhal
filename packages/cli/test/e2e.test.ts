@@ -406,7 +406,9 @@ describe("cloudhal init → dev → snapshot → build", () => {
     // the phone menu repeats the menu, its group as a disclosure, and links to nothing new
     const phone = menuOf(await read("about", "index.html"));
     expect(phone).toContain('<details class="ch-menu"><summary class="ch-menu__open">');
-    expect(phone).toContain("<span>Topics</span></summary>");
+    expect(phone).toContain(
+      '<span>Topics</span><svg class="ch-icon ch-nav-menu__caret" data-icon="chevron-down"',
+    );
     expect(phone).toContain('<li><a href="/team">Team</a></li>');
     // without the dialog, the menu link's page: the same menus, kept out of search engines
     const menuPage = await read("menu", "index.html");

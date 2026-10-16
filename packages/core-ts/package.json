@@ -31,7 +31,8 @@
     "./interop": "./src/surface-interop.ts",
     "./directives": "./src/directives.ts",
     "./tokens": "./src/tokens.ts",
-    "./chrome": "./src/chrome.ts"
+    "./chrome": "./src/chrome.ts",
+    "./icons": "./src/icons.ts"
   },
   "files": [
     "dist",
@@ -40,7 +41,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "pnpm typecheck && pnpm test",
+    "gen:icons": "node scripts/gen-icons.ts"
   },
   "dependencies": {
     "@cloudhal/core-contracts": "workspace:*",
@@ -51,6 +53,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "@phosphor-icons/core": "catalog:",
     "@types/node": "catalog:",
     "better-sqlite3": "catalog:",
     "miniflare": "catalog:",
@@ -158,6 +161,10 @@
       "./chrome": {
         "types": "./dist/src/chrome.d.ts",
         "default": "./dist/src/chrome.js"
+      },
+      "./icons": {
+        "types": "./dist/src/icons.d.ts",
+        "default": "./dist/src/icons.js"
       }
     }
   },

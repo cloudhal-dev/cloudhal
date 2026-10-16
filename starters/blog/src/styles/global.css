@@ -427,9 +427,11 @@ a.ch-chip {
 .ch-nav-menu summary::-webkit-details-marker {
   display: none;
 }
-.ch-nav-menu summary::after {
-  content: "▾";
+.ch-nav-menu__caret {
   @apply ml-1 text-xs;
+}
+.ch-nav-menu[open] > summary .ch-nav-menu__caret {
+  rotate: 180deg;
 }
 .ch-nav-menu > ul {
   @apply absolute z-10 mt-2 min-w-40 space-y-1 rounded border border-zinc-200 bg-white p-2 shadow-sm;
@@ -2948,4 +2950,35 @@ ul.ch-mega__col {
 }
 .ch-footer__region .ch-surface {
   padding: 0;
+}
+
+/*
+ * RFC-0026: icons follow the text (1em, currentColor), sit on its baseline, flip right-to-left
+ * when they point, and stay visible in forced colors.
+ */
+.ch-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -0.125em;
+}
+[dir="rtl"] .ch-icon[data-ch-mirror] {
+  transform: scaleX(-1);
+}
+@media (forced-colors: active) {
+  .ch-icon {
+    fill: CanvasText;
+  }
+  a .ch-icon,
+  button .ch-icon {
+    fill: currentColor;
+  }
+}
+.ch-footer__social {
+  @apply items-center;
+}
+.ch-social-link {
+  @apply inline-flex size-8 items-center justify-center rounded-full text-lg;
+}
+.ch-social-link:hover {
+  background: color-mix(in oklab, currentColor 12%, transparent);
 }
