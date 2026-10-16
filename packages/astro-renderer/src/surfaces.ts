@@ -234,6 +234,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
 // ── motion (RFC-0024 §2, §7) ─────────────────────────────────────────────────────────────────
 
 interface MotionFields {
+  morph?: string;
   reveal?: string | undefined;
   scroll?: string;
   depth?: number;
@@ -274,6 +275,10 @@ export function motionAttrs(
     if (Number.isInteger(depth) && depth !== 0 && Math.abs(depth as number) <= 3)
       out.push(` data-ch-dep="${depth}"`);
   }
+  // RFC-0024 §5: a morph key becomes the element's view-transition name (the same key on two
+  // pages moves one into the other on navigation).
+  if (typeof motion?.morph === "string" && /^[a-z][a-z0-9-]{0,30}$/.test(motion.morph))
+    out.push(` style="view-transition-name:ch-m-${motion.morph}"`);
   // RFC-0024 24c: a loop decorates on its own (never with a reveal or a scroll effect).
   if (
     !reveal &&

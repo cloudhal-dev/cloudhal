@@ -1,5 +1,5 @@
 # RFC-0024: Motion, scroll and ambient effects
-- Status: Accepted (2026-10-16; open questions decided below); 24a–24d shipped
+- Status: Accepted (2026-10-16; open questions decided below); implemented (24a–24e shipped; 24f, the WebGL tier, left for later)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0018 §7 and phase 18f (motion presets, never shipped; this RFC replaces them), RFC-0020 (surfaces, the interaction runtime, "motion stays CSS"), RFC-0021 (`render_page`, the design judge), RFC-0022 (functions, data bindings), RFC-0023 (tokens, surfaces, DTCG export);
@@ -385,6 +385,49 @@ These were decided on 2026-10-16. The test for each was which option serves deve
     - particles painted and moved, and stopped when paused;
     - beams and aurora paused with the control;
     - `render_page` passed every check in light and dark with motion `static` and `full`, apart from the demo's deliberate four backgrounds.
+
+- **24e shipped.**
+  - **Page transitions.** The blog theme gains `pageTransition` (`none`, `crossfade`, `slide`, `morph`). Once the site chooses one, `themeVariables` writes `@view-transition{navigation:auto}`.
+    - The theme paces transitions at the level's duration.
+    - `slide` moves the old page out and the new one in at `standard` and above (a crossfade at `subtle`).
+    - Nothing animates at `none` or under reduced motion.
+  - **Morph.** `motion.morph` (a key, once per section) becomes `view-transition-name: ch-m-<key>`, so the same key on two pages moves one element into the other. This differs from §5: agents give explicit keys rather than relying on component ids staying stable, because ids repeat across pages (`root`, `h1`).
+  - **Motion tokens out.** The DTCG export gains `motion`: `duration` (fast, normal, slow, stagger), `cubicBezier` easings and distances at the site's level. The settings in `$extensions` include `motion` and `pageTransition`.
+  - **CLI.**
+    - `cloudhal render <path|url> [--width] [--scheme] [--motion] [--frames] [--base] [--out]` runs `render_page`'s browser and checks against `cloudhal dev` or any URL. It writes JPEGs to `.cloudhal/renders/` and exits with 2 when a check fails.
+    - `cloudhal motion audit [--path]` counts each page's motion from its surfaces, without a browser, and names what goes over the §2 budgets, repeated morph keys and presets on still pages.
+  - **Studio.**
+    - The Appearance form shows `motion` and `pageTransition` (they are theme settings).
+    - The surface outline adds a component's presets to its summary (`✦ rise, lift`). The preset names are data, so the change adds no new UI words to a first load at its budget.
+    - The preview's reduced-motion toggle is left for later.
+  - **The judge.** The rubric gains `motion`: "Does motion serve the page… and nothing that distracts?", with anchors. It is judged from frames and layout, since stills cannot show movement.
+  - **Guidance.** The catalog prompt and the skill's recipes cover page transitions and morph keys, and say to check with `cloudhal motion audit` and `cloudhal render --frames`.
+  - **Eval** (2026-10-16, run through the CLI and tools by the agent, as in 23e).
+    - **Method.**
+      - The 23e SaaS brief (Ledgerly) was built again, same tokens, now with motion at `standard` and `crossfade`:
+        - a rotating-words hero over low-density particle links;
+        - the lead and buttons a step later;
+        - a staggered feature grid with `lift`;
+        - a "how a payment happens" scroll story (days since sent 0 → 3 → 11, badge Sent → Reminded → Paid);
+        - counters;
+        - a slow logo marquee;
+        - a split-words call to action.
+      - It was rendered with `cloudhal render --motion full --frames 6` and with the default `static`.
+    - **Checks.** Both renders passed all 14 checks. `cloudhal motion audit` reported it within every budget: 6 reveals, 5 hovers, 1 split, 2 loops, 1 ambient and 1 story.
+    - **Scores.** On the eight-criterion rubric, against 23e's motionless result:
+
+      | | Fidelity | Hierarchy | Rhythm | Color | Motion | Spacing | Readability | Mobile | Mean |
+      |---|---|---|---|---|---|---|---|---|---|
+      | 23e (tokens and surfaces, still) | 4 | 4 | 4 | 4 | 3 | 4 | 4 | 4 | 3.88 |
+      | 24e (with motion) | 4 | 4 | 5 | 4 | 4 | 4 | 4 | 4 | 4.13 |
+
+      - Rhythm went up because the scroll story breaks the pattern of bands with a section that changes as you read.
+      - Motion went up for one signature moment plus a few entrances. It is a 4, not a 5: the page has three standout moving elements (story, rotating headline, particles), one more than it needs.
+    - **What it does not show.** Stills under-sell motion: the frames show the story's states, but not the entrances or the marquee. As in 23e there was one judge, the agent, and the vision-model judge was not run.
+  - **Left for later.**
+    - 24f: the WebGL ambient tier (decision 1).
+    - The Studio preview's reduced-motion toggle.
+    - Back-navigation direction for `slide`, using view-transition types.
 
 ## Sources
 - **Scroll-driven animations:**

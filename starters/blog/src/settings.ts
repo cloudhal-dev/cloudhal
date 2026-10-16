@@ -184,6 +184,24 @@ export const themeSettings: PropsSchema = {
         tr: "Bölümlerin kaydırırken ve üzerine gelirken ne kadar hareket ettiği. Daha az hareket isteyen okurlar her zaman daha azını görür.",
       },
     },
+    // RFC-0024 §5: how one page gives way to the next.
+    pageTransition: {
+      type: "string",
+      enum: ["none", "crossfade", "slide", "morph"],
+      "x-labels": {
+        none: { en: "None", tr: "Yok" },
+        crossfade: { en: "Crossfade", tr: "Geçişli solma" },
+        slide: { en: "Slide", tr: "Kaydırma" },
+        morph: { en: "Morph shared parts", tr: "Ortak öğeleri dönüştür" },
+      },
+      default: "none",
+      "x-widget": "radio",
+      title: { en: "Page transition", tr: "Sayfa geçişi" },
+      description: {
+        en: "How one page gives way to the next, in browsers that support it.",
+        tr: "Bir sayfanın diğerine nasıl geçtiği (destekleyen tarayıcılarda).",
+      },
+    },
   },
   // WCAG 2.2 AA: body text 4.5:1, links 4.5:1, buttons and other UI parts 3:1 against the page.
   "x-contrast": [

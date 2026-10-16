@@ -1762,6 +1762,7 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
         "scroll",
         "depth",
         "loop",
+        "morph",
       ].includes(key)
     )
       issues.push({ path: `${at}/${key}`, message: "unknown motion field" });
@@ -1771,6 +1772,15 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
   oneOf("speed", MOTION_SPEEDS);
   oneOf("scroll", MOTION_SCROLLS);
   oneOf("loop", MOTION_LOOPS);
+  // RFC-0024 §5: the same key on two pages morphs one element into the other on navigation.
+  if (
+    motion.morph !== undefined &&
+    !(typeof motion.morph === "string" && /^[a-z][a-z0-9-]{0,30}$/.test(motion.morph))
+  )
+    issues.push({
+      path: `${at}/morph`,
+      message: "a key like plan-pro: lowercase letters, digits and hyphens",
+    });
   const loop = motion.loop as (typeof MOTION_LOOPS)[number] | undefined;
   if (loop && LOOP_FITS[loop] && !LOOP_FITS[loop].includes(component))
     issues.push({ path: `${at}/loop`, message: `${loop} fits ${LOOP_FITS[loop].join(", ")}` });
@@ -2030,6 +2040,18 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
           message: "the first child stays in view (not a Step); every other child is a Step",
         });
     }
+  });
+  // RFC-0024 §5: a morph key names one element on a page.
+  const morphs = new Map<string, number>();
+  components.forEach((c, i) => {
+    const key = isObj(c.motion) && typeof c.motion.morph === "string" ? c.motion.morph : undefined;
+    if (!key) return;
+    if (morphs.has(key))
+      issues.push({
+        path: `/components/${i}/motion/morph`,
+        message: `"${key}" is already used by another component here`,
+      });
+    else morphs.set(key, i);
   });
   // RFC-0024 §2: one moving background per surface; more competes for the eye.
   const ambients = components
@@ -2650,6 +2672,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry. "scroll" moves it with the page instead (not with "reveal"): parallax or pan with "depth" -3…3 (negative moves the other way), fade-through, scale-through, rotate-through — for images, cards and decorative parts, never for text people read. split-words, split-chars and split-lines reveal a Heading or a short Text piece by piece (once, as kinetic type). "loop" (alone, decorative only): float (Image, Badge, Stat, Card), pulse (Badge, Button, Stat), gradient-shift (Card, Band), spin-slow (Image, Badge).`,
     'Kinetic headings: Heading "effect" highlight (marks the words *between asterisks*, else the last word), gradient-text, or rotate-words with "words" (2–6) taking turns where {words} stands in the text ("Invoices that {words}" with ["chase themselves","never get lost"]). Marquee scrolls a row of 3+ children by itself (logos, quotes); Counter counts up to "value" once as it comes into view. Anything that loops gets a pause control from the renderer; use at most two per page.',
     'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
+    'Page transitions: when the site\'s pageTransition is morph, give the same "morph" key (motion {"morph":"plan-pro"}) to an element on two pages, a card image and the article cover, a pricing card and its plan page heading, and it moves from one to the other as the reader navigates. One key per element on a page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,

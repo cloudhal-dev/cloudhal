@@ -27,6 +27,8 @@ Set the site's `motion` level with `set_theme_settings`, and give components mot
 
 Scroll story: `Scrolly` with `step` bound to `/step` (start it at 1 in the data), the first child a `Chart`, `Stat` or a `Stack` of images shown by `visible` conditions on `/step`, then 2–12 `Step`s with short text. Check it with `render_page` `frames: 4`.
 
+Page transitions: `pageTransition` crossfade suits most sites; slide for product sites; morph when cards lead to pages (give the card image and the page's cover the same `motion.morph` key). Check the whole site with `cloudhal motion audit`, and a page with `cloudhal render /path --motion full --frames 4`.
+
 Rules: one entrance per section, hover only on things people click, never motion on text people are reading. Pages must be complete with motion off: render_page renders with reduced motion by default; render with `motion: "full"` to check layout shift.
 
 ## Surfaces

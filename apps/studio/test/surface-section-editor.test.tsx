@@ -17,7 +17,12 @@ const section = {
   data: { kg: "" },
   components: [
     { id: "root", component: "Card", children: ["title", "kg", "bmi"] },
-    { id: "title", component: "Heading", props: { text: "Body mass index", level: 2 } },
+    {
+      id: "title",
+      component: "Heading",
+      props: { text: "Body mass index", level: 2 },
+      motion: { reveal: "rise", hover: "underline" },
+    },
     {
       id: "kg",
       component: "NumberField",
@@ -57,6 +62,8 @@ describe("SurfaceSectionEditor", () => {
     expect(within(tree).getByText("Weight · shows /kg")).toBeInTheDocument();
     expect(within(tree).getByText("BMI · computed (calculate)")).toBeInTheDocument();
     expect(within(tree).getByText("Not on the page")).toBeInTheDocument();
+    // RFC-0024: a component's motion shows as its preset names
+    expect(within(tree).getByText("Body mass index · ✦ rise, underline")).toBeInTheDocument();
     // the data is not on screen until asked for
     expect(screen.queryByLabelText("Generated UI as data")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show JSON" })).toBeInTheDocument();
@@ -103,7 +110,7 @@ describe("SurfaceSectionEditor", () => {
       ),
     );
     expect(screen.queryByRole("button", { name: /metinlerini düzenle/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Body mass index")).toBeInTheDocument();
+    expect(screen.getByText("Body mass index · ✦ rise, underline")).toBeInTheDocument();
     expect(screen.getByText("Weight · /kg gösterir")).toBeInTheDocument();
     expect(screen.getByText("Sayı alanı")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Yapay zekâ ile değiştir" })).toBeInTheDocument();

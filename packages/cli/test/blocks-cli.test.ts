@@ -61,6 +61,7 @@ describe("theme block types", () => {
       "radius",
       "density",
       "motion",
+      "pageTransition",
     ]);
     const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-settings-"));
     try {
