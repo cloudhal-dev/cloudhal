@@ -35,6 +35,7 @@ import { describeReindex, searchReindex } from "./commands/search.ts";
 import { snapshot } from "./commands/snapshot.ts";
 import { studio } from "./commands/studio.ts";
 import { pullSite, pushSite } from "./commands/sync.ts";
+import { tokensExport } from "./commands/tokens.ts";
 
 const HELP = `cloudhal — agent-native sites
 
@@ -99,6 +100,8 @@ Usage:
                                                           the model see its render first, as Build chat does
   cloudhal ai judge-check [--remote] [--judge <model>]   score the reference pages (empty → strong) with the
                                                           design judge; fails when it does not rank them
+  cloudhal tokens export [--format dtcg] [--out <file>]   the site's design tokens as a W3C Design Tokens file
+                                                          (Figma, Style Dictionary; RFC-0023)
   cloudhal search reindex [--remote]                      rebuild the search index from the live snapshot
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
@@ -150,6 +153,7 @@ export async function main(argv: string[]): Promise<number> {
       design: { type: "boolean" },
       look: { type: "boolean" },
       judge: { type: "string" },
+      format: { type: "string" },
     },
   });
   const [command, ...rest] = positionals;
@@ -496,6 +500,19 @@ export async function main(argv: string[]): Promise<number> {
         await writeFile(values.out, `${JSON.stringify(report, null, 2)}\n`);
         console.log(`\nwrote ${values.out}`);
       }
+      return 0;
+    }
+    case "tokens": {
+      const [what] = rest;
+      if (what !== "export")
+        throw new Error("usage: cloudhal tokens export [--format dtcg] [--out <file>]");
+      const json = await tokensExport({
+        projectDir,
+        ...(values.format ? { format: values.format } : {}),
+        ...(values.out ? { out: values.out } : {}),
+      });
+      if (values.out) console.log(`wrote ${values.out}`);
+      else process.stdout.write(json);
       return 0;
     }
     case "search": {

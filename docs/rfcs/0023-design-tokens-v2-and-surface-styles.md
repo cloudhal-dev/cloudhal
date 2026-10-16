@@ -1,5 +1,5 @@
 # RFC-0023: Design tokens v2 and surface styles
-- Status: Accepted; 23a–23d shipped
+- Status: Accepted; implemented (23a–23e shipped)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0017 (theme settings, `set_theme_settings`, `x-contrast`), RFC-0018 (theme kit, CSS layers, 18d section styles), RFC-0021 (DESIGN.md, `render_page`, the design judge), RFC-0022 (surface tools);
@@ -138,10 +138,10 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
 | 23e | DTCG export (CLI and MCP), the `color` rubric criterion, skill recipes, an eval and judge-check run recorded here |
 
 ## Open questions
-1. **Font payload.** Ship every pairing's files with the theme (about 1–2 MB in the deploy, only the used ones downloaded), or let a site pick one pairing at deploy time to keep the bundle small?
+1. **Font payload.** Ship every pairing's files with the theme (about 1–2 MB in the deploy, only the used ones downloaded), or let a site pick one pairing at deploy time to keep the bundle small? *(23b: all ship, 0.48 MB; only the used ones download.)*
 2. **Per-page mode.** Should a page or a band force dark (for a landing hero) regardless of the site mode, or is `surface: inverse` enough?
-3. **Accent derivation.** Derive the accent as the seed's complementary hue, a fixed rotation, or let the person pick a second seed?
-4. **Gradient taste.** Keep gradients and meshes off by default in the site-design guidance (easy to overuse) and allow them only for heroes and calls to action?
+3. **Accent derivation.** Derive the accent as the seed's complementary hue, a fixed rotation, or let the person pick a second seed? *(23e: 60°, or 150° when 60° lands on the yellows and olives; a second seed stays possible later.)*
+4. **Gradient taste.** Keep gradients and meshes off by default in the site-design guidance (easy to overuse) and allow them only for heroes and calls to action? *(23d: once a page, hero or call to action.)*
 
 ## Status
 - **23a shipped.**
@@ -196,3 +196,38 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
   - **Guidance.** DESIGN guidance point 2 and the theme's DESIGN.md say when to use which surface: gradient and mesh at most once a page, for the hero or the call to action (open question 4).
   - **Checked.** A page with every surface passed the contrast check in light, dark and auto, at 1440 and 390 px.
   - **Follow-up.** The accent derived from a violet seed (hue + 150°) comes out a dark mustard once repaired for white text. Open question 3 (how to derive the accent) is worth revisiting in 23e.
+- **23e shipped.**
+  - **Export.** `designTokensDtcg` (`@cloudhal/core-ts/tokens`) writes a W3C DTCG 2025.10 file:
+    - `color.light` and `color.dark`, every role as `{colorSpace: "srgb", components, hex}`;
+    - `radius` and `space` as dimensions;
+    - once a scale is chosen, `type-step`: the desktop size as the value, with the minimum and the `clamp()` in `$extensions["dev.cloudhal"]`;
+    - the settings, mode, source and repairs in the root `$extensions`.
+
+    The spec text read when this was written leaves modes out, so light and dark are sibling groups. It is available as `cloudhal tokens export [--format dtcg] [--out <file>]` and as the read-only MCP tool `get_design_tokens` (`site:read`).
+  - **Dark contrast in `render_page`.** A site whose mode is `dark` renders dark by default. When the mode is `dark` or `auto`, text contrast is also checked in the other scheme, at the first width, and those examples are folded into the `contrast` check, marked `dark @1440:`. A page can no longer pass in light and fail in dark.
+  - **The judge.** The rubric gains `color`: "Is the palette coherent, with one dominant color and accents used with purpose?", with anchors.
+  - **The site-design skill.**
+    - `references/tokens.md` has a look recipe for each kind of site (editorial, SaaS, developer tool, portfolio, local business, institution) and the surface rules.
+    - A new step 2 proposes a look and sets it with `set_theme_settings`, so the skill now declares `site:settings` and the approvals for `set_design` and `set_theme_settings`.
+    - `references/guidance.md` now matches `DESIGN_GUIDANCE` again, and the page recipes use surfaces.
+  - **Accent (open question 3).** The accent sits 60° on from the seed, or 150° on when 60° lands among the yellows and olives (hue 50–115), which turn to mustard once darkened for white text. The gradient end avoids the same band by turning the other way. Checked across violet, blue, teal, red, orange, green, pink and yellow seeds.
+  - **Theme fixes the eval found.**
+    - A band's direct children now have vertical room between them (scaled by density). It was missing before 23, so headings touched their text and cards.
+    - Large lead text keeps a 48ch measure.
+  - **Eval** (2026-10-16). Following the project's eval practice, this was run through the tools by the agent itself, not by a Workers AI judge.
+    - **Method.** Three briefs were built twice on a local site with identical content and the same theme CSS:
+      - *before*: the old free settings and `tone`;
+      - *after*: the recipe from `references/tokens.md`, set through `get_theme_settings` → `set_theme_settings` → `get_design` → `get_design_tokens`, and `surface`.
+
+      Each was rendered with `render_page`'s browser and checks at 1440 and 390 px, light and (for dark or auto) dark, then scored on the seven rubric criteria.
+    - **Checks.** Every render passed every check. The token expansion reported 0 failing pairs and 0 repairs for all three recipes.
+
+    | Brief | Before | After | Change |
+    |---|---|---|---|
+    | SaaS landing (Ledgerly: violet, vibrant, modern, dramatic, pill buttons, airy, auto) | 3.29 | 4.00 | color 2→4, rhythm, hierarchy and spacing 3→4 |
+    | City magazine (Harbour Review: deep blue, neutral, editorial, balanced, square, cozy, auto) | 3.29 | 4.00 | color 2→4, hierarchy (serif display), rhythm and spacing 3→4 |
+    | Bakery (Mavi Fırın: terracotta, tonal, humanist, balanced, rounded, cozy, light) | 3.29 | 3.86 | color 2→3 (gradient hero and teal accent compete), rhythm, hierarchy and spacing 3→4 |
+    | Mean | 3.29 | 3.95 | +0.66; color +1.67 |
+
+    - **What it does not show.** Fidelity, readability and mobile did not change: the content and layout were the same. The gain is the look the tokens and surfaces add, which is what the judge's most common note ("lacks variation in tone and rhythm") asked for.
+    - **Limits.** There was one judge, the agent itself, so the numbers are a direction, not a benchmark. The vision-model judge (`cloudhal ai judge-check`) was not run for this phase.

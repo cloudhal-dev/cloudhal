@@ -20,6 +20,7 @@ import {
   COLOR_SCHEMES,
   CONTRAST_LEVELS,
   DENSITIES,
+  designTokensDtcg,
   RADII,
   type SiteColorTokens,
   siteColorTokens,
@@ -229,6 +230,45 @@ export function designTools(): ToolDefinition[] {
           guidance: DESIGN_GUIDANCE,
           rev: site.rev,
         };
+      },
+    },
+    {
+      name: "get_design_tokens",
+      title: "Export the design tokens",
+      description:
+        "The site's design tokens as a W3C Design Tokens (DTCG 2025.10) file, for Figma (Tokens Studio), Style Dictionary or a designer: the color roles for light and dark, corner radii, spaces and, once a type scale is chosen, the fluid type steps; the settings they came from are in $extensions. Read-only. To change them, use set_theme_settings.",
+      inputSchema: obj({ siteId: id }, ["siteId"]),
+      outputSchema: {
+        type: "object",
+        description: "A DTCG 2025.10 token file: groups of tokens with $type and $value",
+        properties: {
+          $schema: { type: "string" },
+          color: { type: "object" },
+          radius: { type: "object" },
+          space: { type: "object" },
+          "type-step": { type: "object" },
+        },
+        required: ["$schema", "color", "radius", "space"],
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      scopes: ["site:read"],
+      renderText: (result) => JSON.stringify(result, null, 2),
+      handler: async (a, ctx) => {
+        const site = await ctx.store.getSite(a.siteId as string);
+        if (!site) throw new ToolError("not_found", `site ${a.siteId} not found`);
+        const props = (
+          ctx.store.themeSettings as
+            | { properties?: Record<string, { default?: unknown }> }
+            | undefined
+        )?.properties;
+        if (!props)
+          throw new ToolError("invalid", "this site's theme declares no design settings to export");
+        return designTokensDtcg(site.theme.config ?? {}, props, { name: site.name });
       },
     },
     {

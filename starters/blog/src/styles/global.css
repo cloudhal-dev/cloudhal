@@ -608,6 +608,14 @@ footer .ch-nav-menu > ul {
 .ch-band:not([data-width]) .ch-band__inner {
   @apply mx-auto max-w-6xl;
 }
+/* A band's own children (heading, text, buttons, a grid) need room between them; the theme's
+   spacing unit scales it with the density. */
+.ch-band__inner > * + * {
+  margin-block-start: calc(var(--spacing) * 4);
+}
+.ch-band__inner > .ch-heading + :is(.ch-grid, .ch-columns, .ch-stack, .ch-tabs, .ch-table-wrap) {
+  margin-block-start: calc(var(--spacing) * 6);
+}
 .ch-band[data-spacing="s"] {
   @apply py-6;
 }
@@ -791,6 +799,8 @@ h4.ch-heading {
 }
 .ch-text[data-size="l"] {
   @apply text-xl;
+  /* A lead keeps a readable measure, even at a dramatic type scale. */
+  max-inline-size: 48ch;
 }
 .ch-text[data-muted="yes"] {
   @apply text-zinc-600;

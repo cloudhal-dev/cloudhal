@@ -80,6 +80,32 @@ function summary(r: RenderPageResult): string {
   ].join("\n");
 }
 
+/** The other scheme's contrast problems folded into the contrast check, each example marked. */
+function mergeContrast(
+  checks: RenderCheck[],
+  extra: readonly RenderCheck[],
+  scheme: RenderScheme,
+): RenderCheck[] {
+  const add = extra.find((c) => c.id === "contrast");
+  if (!add || add.ok) return checks;
+  return checks.map((c) =>
+    c.id === "contrast"
+      ? {
+          ...c,
+          ok: false,
+          count: c.count + add.count,
+          widths: [...new Set([...c.widths, ...add.widths])],
+          examples: [
+            ...c.examples,
+            ...add.examples.map((e) =>
+              e.startsWith("@") ? `${scheme} ${e}` : `${scheme} @${add.widths[0]}: ${e}`,
+            ),
+          ].slice(0, 8),
+        }
+      : c,
+  );
+}
+
 export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
   return [
     {
@@ -108,7 +134,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             type: "string",
             enum: [...RENDER_SCHEMES],
             description:
-              "The reader's color scheme (default light). Render dark too when the site's mode is dark or auto (get_design shows it).",
+              "The reader's color scheme: light by default, dark for a site whose mode is dark. When the mode is dark or auto, text contrast is also checked in the other scheme (its examples are marked).",
           },
         },
         ["siteId"],
@@ -191,7 +217,17 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
         const widths = (
           Array.isArray(a.widths) && a.widths.length ? a.widths : [1440, 390]
         ) as RenderWidth[];
-        const scheme: RenderScheme = a.scheme === "dark" ? "dark" : "light";
+        // RFC-0023: a dark site renders dark by default; a dark or automatic one also has its
+        // contrast checked in the other scheme, so a page cannot pass light and fail dark.
+        const mode = (await ctx.store.getSite(a.siteId as string))?.theme.config?.mode;
+        const scheme: RenderScheme =
+          a.scheme === "dark" || a.scheme === "light"
+            ? a.scheme
+            : mode === "dark"
+              ? "dark"
+              : "light";
+        const other: RenderScheme = scheme === "light" ? "dark" : "light";
+        const checkOther = mode === "auto" || (mode === "dark" && scheme === "light");
         try {
           const r = await renderPage(ctx.render.renderer, doc.url, {
             widths,
@@ -199,6 +235,15 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             scheme,
             timeoutMs: ctx.render.timeoutMs ?? 20_000,
           });
+          if (checkOther) {
+            const extra = await renderPage(ctx.render.renderer, doc.url, {
+              widths: [widths[0] as RenderWidth],
+              fullPage: false,
+              scheme: other,
+              timeoutMs: ctx.render.timeoutMs ?? 20_000,
+            });
+            r.checks = mergeContrast(r.checks, extra.checks, other);
+          }
           const result: RenderPageResult = {
             url: doc.url,
             path: doc.path,

@@ -221,7 +221,10 @@ export function expandColorTokens(settings: ColorTokenSettings): ColorTokens {
   // The brand is the seed itself in light (a brand color stays exact); the scheme shapes the
   // greys, the accent and the link. In dark it is the seed lightened, its chroma kept.
   const brandC = seedC;
-  const accentH = (H + 150) % 360;
+  // The accent sits 60° on (a close, harmonious hue), or 150° on when that lands among the
+  // yellows and olives, which turn to mustard once darkened for white text (RFC-0023 Q3).
+  const near = (H + 60) % 360;
+  const accentH = near >= 50 && near <= 115 ? (H + 150) % 360 : near;
   const n = (L: number): Oklch => [L, neutral, H];
   const p = (L: number, c = primary): Oklch => [L, c, H];
   const repairs: ColorRepair[] = [];
@@ -345,15 +348,18 @@ export function legacyColorRoles(colors: {
 }
 
 /**
- * The far end of the brand gradient (RFC-0023 §4): the brand turned 40° towards the accent and a
- * step further from its text, then moved until text on brand still reads on it — so the whole
- * gradient keeps the contrast of the brand fill.
+ * The far end of the brand gradient (RFC-0023 §4): the brand turned 40° (back the other way if
+ * that lands on the yellows and olives) and a step further from its text, then moved until text
+ * on brand still reads on it — so the whole gradient keeps the contrast of the brand fill.
  */
 export function gradientEnd(brand: string, onBrand: string, ratio: number): string {
   const [L, C, H] = rgbToOklch(hexToRgb(brand) ?? [0, 0, 0]);
   const darker = contrastRatio(onBrand, "#000000") > contrastRatio(onBrand, "#ffffff");
   const step = darker ? -0.01 : 0.01;
-  let end: Oklch = [Math.min(1, Math.max(0, L + step * 8)), C, (H + 40) % 360];
+  // Away from the yellows and olives, as the accent is: an orange brand warms towards red.
+  const turned = (H + 40) % 360;
+  const hue = turned >= 50 && turned <= 115 ? (H + 320) % 360 : turned;
+  let end: Oklch = [Math.min(1, Math.max(0, L + step * 8)), C, hue];
   for (let i = 0; i < 100 && contrastRatio(onBrand, oklchToHex(end)) < ratio; i++)
     end = [Math.min(1, Math.max(0, end[0] + step)), end[1], end[2]];
   return oklchToHex(end);
@@ -578,4 +584,104 @@ export function shapeCss(settings: { radius?: unknown; density?: unknown } = {})
     `--ch-space-unit:${rem(unit)}`,
     ...Object.entries(SPACES).map(([name, n]) => `--ch-space-${name}:${rem(unit * n)}`),
   ].join(";");
+}
+
+// ── export (RFC-0023 §5): W3C Design Tokens Community Group format 2025.10 ──────────────────
+
+export const DTCG_SCHEMA = "https://www.designtokens.org/schemas/2025.10/format.json";
+
+type DtcgToken = { $type?: string; $value: unknown; $description?: string; $extensions?: unknown };
+type DtcgGroup = { [key: string]: DtcgGroup | DtcgToken | string | unknown };
+
+const dtcgColor = (hex: string): DtcgToken => {
+  const [r, g, b] = hexToRgb(hex) ?? [0, 0, 0];
+  const c = (v: number) => Number(v.toFixed(4));
+  return { $value: { colorSpace: "srgb", components: [c(r), c(g), c(b)], hex } };
+};
+const dtcgDimension = (css: string): DtcgToken => {
+  const m = /^(-?[\d.]+)(rem|px)?$/.exec(css);
+  return { $value: { value: m ? Number(m[1]) : 0, unit: m?.[2] ?? "px" } };
+};
+
+/**
+ * A site's tokens as a DTCG 2025.10 file, for Figma (Tokens Studio) and Style Dictionary: the
+ * color roles for light and dark, the radii and spaces, and the fluid type steps once a scale
+ * is chosen (desktop size as the value, the clamp in `$extensions`). The settings they came from
+ * and the contrast repairs travel in `$extensions["dev.cloudhal"]`.
+ */
+export function designTokensDtcg(
+  config: Readonly<Record<string, unknown>>,
+  properties: Readonly<Record<string, { default?: unknown }>>,
+  meta: { name?: string } = {},
+): DtcgGroup {
+  const colors = siteColorTokens(config, properties);
+  const roles = (r: ColorRoles) =>
+    Object.fromEntries(COLOR_ROLES.map((role) => [role, dtcgColor(r[role])]));
+  const shape = Object.fromEntries(
+    shapeCss({
+      radius: config.radius ?? properties.radius?.default,
+      density: config.density ?? properties.density?.default,
+    })
+      .split(";")
+      .map((d) => d.split(":") as [string, string]),
+  );
+  const pick = (prefix: string) =>
+    Object.fromEntries(
+      Object.entries(shape)
+        .filter(([k]) => k.startsWith(prefix))
+        .map(([k, v]) => [k.slice(prefix.length), dtcgDimension(v)]),
+    );
+  const scale = (TYPE_SCALES as readonly unknown[]).includes(config.typeScale)
+    ? (config.typeScale as TypeScale)
+    : undefined;
+  const steps = scale
+    ? Object.fromEntries(
+        TYPE_STEPS.map((step) => {
+          const clamp = typeStep(scale, step);
+          const [lo, , hi] = clamp.slice(6, -1).split(",") as [string, string, string];
+          return [
+            String(step),
+            {
+              ...dtcgDimension(hi),
+              $extensions: {
+                "dev.cloudhal": {
+                  min: dtcgDimension(lo).$value,
+                  css: clamp,
+                  viewport: [390, 1440],
+                },
+              },
+            },
+          ];
+        }),
+      )
+    : undefined;
+  const settings = Object.fromEntries(
+    ["seed", "scheme", "contrast", "mode", "typePairing", "typeScale", "radius", "density"]
+      .filter((k) => k in properties && config[k] !== undefined)
+      .map((k) => [k, config[k]]),
+  );
+  return {
+    $schema: DTCG_SCHEMA,
+    $description: `Design tokens${meta.name ? ` of ${meta.name}` : ""}, expanded by Cloudhal (RFC-0023).`,
+    color: {
+      $type: "color",
+      $description:
+        colors.source === "seed"
+          ? "Color roles from the seed; every text and UI pair meets WCAG 2.2."
+          : "The theme's colors (no seed set).",
+      light: roles(colors.light),
+      dark: roles(colors.dark),
+    },
+    radius: { $type: "dimension", ...pick("--ch-radius-") },
+    space: { $type: "dimension", ...pick("--ch-space-") },
+    ...(steps ? { "type-step": { $type: "dimension", ...steps } } : {}),
+    $extensions: {
+      "dev.cloudhal": {
+        settings,
+        mode: colors.mode,
+        source: colors.source,
+        repairs: colors.notes,
+      },
+    },
+  };
 }
