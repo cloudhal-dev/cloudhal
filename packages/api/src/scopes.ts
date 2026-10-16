@@ -130,6 +130,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/block-types`, "content:read"],
   ["GET", `${S}/theme-settings`, "content:read"],
   ["PUT", `${S}/theme-settings`, "site:settings"],
+  // RFC-0025: the header, footer and brand
+  ["GET", `${S}/chrome`, "content:read"],
+  ["PUT", `${S}/chrome`, "site:settings"],
   // RFC-0021: the site's design rules
   ["GET", `${S}/design`, "content:read"],
   ["PUT", `${S}/design`, "site:settings"],

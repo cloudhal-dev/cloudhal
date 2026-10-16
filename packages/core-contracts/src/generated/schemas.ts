@@ -177,6 +177,12 @@ export const SiteSchema = {
     "design": {
       "$ref": "#/$defs/Design"
     },
+    "brand": {
+      "$ref": "#/$defs/Brand"
+    },
+    "chrome": {
+      "$ref": "#/$defs/Chrome"
+    },
     "timeZone": {
       "$ref": "#/$defs/TimeZone",
       "description": "The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."
@@ -199,6 +205,279 @@ export const SiteSchema = {
     }
   },
   "$defs": {
+    "Announcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,40}$",
+          "description": "Change it when the text changes, so readers who dismissed the old one see the new one."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "tone": {
+          "type": "string",
+          "enum": [
+            "info",
+            "brand",
+            "warning"
+          ]
+        },
+        "dismissible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Brand": {
+      "type": "object",
+      "description": "The site's logo and social links (RFC-0025 §1), shared by the header, the footer and SEO.",
+      "additionalProperties": false,
+      "properties": {
+        "logo": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "logoDark": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "logoHeight": {
+          "type": "string",
+          "enum": [
+            "s",
+            "m",
+            "l"
+          ]
+        },
+        "social": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/SocialLink"
+          }
+        }
+      }
+    },
+    "Chrome": {
+      "type": "object",
+      "description": "The site's header, footer and bars as data (RFC-0025): enums, menu keys and short texts; the theme renders them with landmarks, focus and contrast guaranteed.",
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "$ref": "#/$defs/ChromeHeader"
+        },
+        "footer": {
+          "$ref": "#/$defs/ChromeFooter"
+        },
+        "announcement": {
+          "$ref": "#/$defs/Announcement"
+        },
+        "consent": {
+          "$ref": "#/$defs/Consent"
+        }
+      }
+    },
+    "ChromeFooter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": [
+            "simple",
+            "columns",
+            "cta-band",
+            "minimal"
+          ]
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "muted",
+            "inverse"
+          ]
+        },
+        "tagline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "columns": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/FooterColumn"
+          }
+        },
+        "ctaHeading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "ctaLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "ctaHref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "social": {
+          "type": "boolean"
+        },
+        "copyright": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The legal line; {year} and {site} are the only placeholders."
+        },
+        "legal": {
+          "$ref": "#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "extras": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "locale",
+              "theme-toggle",
+              "motion-toggle"
+            ]
+          }
+        },
+        "credit": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ChromeHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": [
+            "logo-left",
+            "logo-left-nav-center",
+            "centered",
+            "split",
+            "minimal"
+          ]
+        },
+        "behavior": {
+          "type": "string",
+          "enum": [
+            "static",
+            "sticky",
+            "hide-on-scroll",
+            "fixed"
+          ]
+        },
+        "shrink": {
+          "type": "boolean"
+        },
+        "overHero": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "transparent"
+          ]
+        },
+        "width": {
+          "type": "string",
+          "enum": [
+            "content",
+            "wide",
+            "full"
+          ]
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "muted",
+            "raised",
+            "inverse",
+            "brand"
+          ]
+        },
+        "mobileStyle": {
+          "type": "string",
+          "enum": [
+            "dropdown",
+            "drawer-start",
+            "drawer-end",
+            "fullscreen"
+          ]
+        },
+        "collapseAt": {
+          "type": "string",
+          "enum": [
+            "sm",
+            "md",
+            "lg",
+            "always"
+          ]
+        },
+        "nav": {
+          "$ref": "#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "utility": {
+          "$ref": "#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/HeaderAction"
+          }
+        }
+      }
+    },
+    "Consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "notice",
+            "choices"
+          ]
+        },
+        "policy": {
+          "$ref": "#/$defs/Path"
+        }
+      }
+    },
     "Design": {
       "type": "object",
       "description": "The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.",
@@ -232,12 +511,99 @@ export const SiteSchema = {
         }
       }
     },
+    "FooterColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heading",
+        "menu"
+      ],
+      "properties": {
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "menu": {
+          "$ref": "#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        }
+      }
+    },
+    "HeaderAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "button",
+            "search",
+            "locale",
+            "theme-toggle",
+            "motion-toggle"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary"
+          ]
+        }
+      }
+    },
     "Id": {
       "type": "string",
       "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
       "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
       "minLength": 8,
       "maxLength": 48
+    },
+    "ImageRef": {
+      "type": "object",
+      "description": "Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.",
+      "additionalProperties": false,
+      "required": [
+        "src",
+        "alt"
+      ],
+      "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Id",
+          "description": "The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."
+        },
+        "src": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
     },
     "Locale": {
       "type": "string",
@@ -250,6 +616,12 @@ export const SiteSchema = {
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "Path": {
+      "type": "string",
+      "description": "Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.",
+      "pattern": "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$",
+      "maxLength": 1024
     },
     "Revision": {
       "type": "integer",
@@ -269,6 +641,38 @@ export const SiteSchema = {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "minLength": 1,
       "maxLength": 128
+    },
+    "SocialLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "network",
+        "href"
+      ],
+      "properties": {
+        "network": {
+          "type": "string",
+          "enum": [
+            "x",
+            "bluesky",
+            "mastodon",
+            "github",
+            "linkedin",
+            "instagram",
+            "facebook",
+            "youtube",
+            "tiktok",
+            "threads",
+            "rss",
+            "email"
+          ]
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
     },
     "ThemeRef": {
       "type": "object",
@@ -363,6 +767,29 @@ export const PageSchema = {
     },
     "availability": {
       "$ref": "#/$defs/Availability"
+    },
+    "chrome": {
+      "type": "object",
+      "description": "This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer.",
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "type": "string",
+          "enum": [
+            "default",
+            "transparent",
+            "hidden"
+          ]
+        },
+        "footer": {
+          "type": "string",
+          "enum": [
+            "default",
+            "minimal",
+            "hidden"
+          ]
+        }
+      }
     },
     "motion": {
       "$ref": "#/$defs/MotionLevel",

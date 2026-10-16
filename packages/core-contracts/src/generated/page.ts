@@ -123,6 +123,13 @@ export interface Page {
   seo?: Seo;
   availability?: Availability;
   /**
+   * This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer.
+   */
+  chrome?: {
+    header?: "default" | "transparent" | "hidden";
+    footer?: "default" | "minimal" | "hidden";
+  };
+  /**
    * Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site.
    */
   motion?: "none" | "subtle" | "standard" | "expressive";

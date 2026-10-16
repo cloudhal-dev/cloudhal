@@ -183,3 +183,28 @@ None; the report decided them:
 - hide-on-scroll by script with CSS where supported;
 - an optional footer surface region;
 - consent `none` by default, suggested when needed.
+
+## Status
+- **25a shipped.**
+  - **Contract.** `Site.brand`, `Site.chrome` (header, footer; announcement and consent are in the contract, rendered from 25d) and `Page.chrome` are optional; `pnpm gen` updated TypeScript and Rust, with fixtures.
+  - **Core.** `@cloudhal/core-ts/chrome`:
+    - `resolveChrome` (defaults reproduce the former header and footer, so sites that never set `chrome` render the same);
+    - `checkChrome` (menus that exist, buttons with label and link, an action kind once, a complete cta-band, only `{year}`/`{site}`);
+    - `chromeSchemas` (en/tr form schemas);
+    - `brandFromForm`/`brandToForm`/`logoAsset` (logos as `asset:<id>` in forms, `ImageRef`s with the asset's URL and size on the site);
+    - `applyChromeForm`, shared by the API and the CLI.
+  - **Theme.** The blog theme draws its header and footer from the chrome:
+    - five header layouts and three widths, `sticky` (`hide-on-scroll` and `fixed` act as sticky until 25b), surfaces, a logo with a dark-mode variant, button and search actions;
+    - four footer layouts with labelled column menus, social links as text, copyright, the legal menu and the credit;
+    - a skip link, `main#main` and `scroll-padding-top` under sticky headers.
+    - A page's `chrome` hides the header or footer, thins the footer, or marks the header transparent (its fill on scroll comes in 25b).
+  - **Agents.**
+    - `get_chrome` (site:read);
+    - `set_chrome` and `set_brand` (site:write, approval; merges, null removes);
+    - `update_page` accepts `chrome` and `motion` (null removes).
+    - 96 MCP tools.
+  - **People.**
+    - Studio › Settings › Header and footer: header, footer and brand segments from the same schemas, logos from the media library; its words live in the `appearance` lazy namespace (formerly `appearanceColors`), so the first load stays at 475.0 kB.
+    - REST `GET/PUT /api/sites/:id/chrome` (content:read / site:settings).
+    - `cloudhal chrome get|set --file`.
+  - **Gap.** Logos are not yet counted as asset uses (deleting a logo asset does not warn); this lands with 25b.

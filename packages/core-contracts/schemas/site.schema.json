@@ -46,6 +46,8 @@
     "homePageId": { "$ref": "common.schema.json#/$defs/Id" },
     "theme": { "$ref": "#/$defs/ThemeRef" },
     "design": { "$ref": "#/$defs/Design" },
+    "brand": { "$ref": "#/$defs/Brand" },
+    "chrome": { "$ref": "#/$defs/Chrome" },
     "timeZone": {
       "$ref": "common.schema.json#/$defs/TimeZone",
       "description": "The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."
@@ -60,6 +62,285 @@
     "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
   },
   "$defs": {
+    "Brand": {
+      "type": "object",
+      "description": "The site's logo and social links (RFC-0025 \u00a71), shared by the header, the footer and SEO.",
+      "additionalProperties": false,
+      "properties": {
+        "logo": {
+          "$ref": "common.schema.json#/$defs/ImageRef"
+        },
+        "logoDark": {
+          "$ref": "common.schema.json#/$defs/ImageRef"
+        },
+        "logoHeight": {
+          "type": "string",
+          "enum": ["s", "m", "l"]
+        },
+        "social": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/SocialLink"
+          }
+        }
+      }
+    },
+    "SocialLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network", "href"],
+      "properties": {
+        "network": {
+          "type": "string",
+          "enum": [
+            "x",
+            "bluesky",
+            "mastodon",
+            "github",
+            "linkedin",
+            "instagram",
+            "facebook",
+            "youtube",
+            "tiktok",
+            "threads",
+            "rss",
+            "email"
+          ]
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "Chrome": {
+      "type": "object",
+      "description": "The site's header, footer and bars as data (RFC-0025): enums, menu keys and short texts; the theme renders them with landmarks, focus and contrast guaranteed.",
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "$ref": "#/$defs/ChromeHeader"
+        },
+        "footer": {
+          "$ref": "#/$defs/ChromeFooter"
+        },
+        "announcement": {
+          "$ref": "#/$defs/Announcement"
+        },
+        "consent": {
+          "$ref": "#/$defs/Consent"
+        }
+      }
+    },
+    "ChromeHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["logo-left", "logo-left-nav-center", "centered", "split", "minimal"]
+        },
+        "behavior": {
+          "type": "string",
+          "enum": ["static", "sticky", "hide-on-scroll", "fixed"]
+        },
+        "shrink": {
+          "type": "boolean"
+        },
+        "overHero": {
+          "type": "string",
+          "enum": ["solid", "transparent"]
+        },
+        "width": {
+          "type": "string",
+          "enum": ["content", "wide", "full"]
+        },
+        "surface": {
+          "type": "string",
+          "enum": ["plain", "muted", "raised", "inverse", "brand"]
+        },
+        "mobileStyle": {
+          "type": "string",
+          "enum": ["dropdown", "drawer-start", "drawer-end", "fullscreen"]
+        },
+        "collapseAt": {
+          "type": "string",
+          "enum": ["sm", "md", "lg", "always"]
+        },
+        "nav": {
+          "$ref": "common.schema.json#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "utility": {
+          "$ref": "common.schema.json#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/HeaderAction"
+          }
+        }
+      }
+    },
+    "HeaderAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["button", "search", "locale", "theme-toggle", "motion-toggle"]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["primary", "secondary"]
+        }
+      }
+    },
+    "ChromeFooter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["simple", "columns", "cta-band", "minimal"]
+        },
+        "surface": {
+          "type": "string",
+          "enum": ["plain", "muted", "inverse"]
+        },
+        "tagline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "columns": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/FooterColumn"
+          }
+        },
+        "ctaHeading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "ctaLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "ctaHref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "social": {
+          "type": "boolean"
+        },
+        "copyright": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The legal line; {year} and {site} are the only placeholders."
+        },
+        "legal": {
+          "$ref": "common.schema.json#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        },
+        "extras": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["locale", "theme-toggle", "motion-toggle"]
+          }
+        },
+        "credit": {
+          "type": "boolean"
+        }
+      }
+    },
+    "FooterColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heading", "menu"],
+      "properties": {
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "menu": {
+          "$ref": "common.schema.json#/$defs/Slug",
+          "description": "A menu key (RFC-0003)."
+        }
+      }
+    },
+    "Announcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,40}$",
+          "description": "Change it when the text changes, so readers who dismissed the old one see the new one."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "tone": {
+          "type": "string",
+          "enum": ["info", "brand", "warning"]
+        },
+        "dismissible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "notice", "choices"]
+        },
+        "policy": {
+          "$ref": "common.schema.json#/$defs/Path"
+        }
+      }
+    },
     "Domain": {
       "type": "object",
       "additionalProperties": false,

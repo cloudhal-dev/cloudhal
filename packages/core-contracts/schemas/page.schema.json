@@ -37,6 +37,15 @@
     },
     "seo": { "$ref": "common.schema.json#/$defs/Seo" },
     "availability": { "$ref": "common.schema.json#/$defs/Availability" },
+    "chrome": {
+      "type": "object",
+      "description": "This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer.",
+      "additionalProperties": false,
+      "properties": {
+        "header": { "type": "string", "enum": ["default", "transparent", "hidden"] },
+        "footer": { "type": "string", "enum": ["default", "minimal", "hidden"] }
+      }
+    },
     "motion": {
       "$ref": "common.schema.json#/$defs/MotionLevel",
       "description": "Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site."

@@ -21,8 +21,8 @@ import { messages as analyticsEn } from "../src/i18n/lazy/analytics.en.ts";
 import { messages as analyticsTr } from "../src/i18n/lazy/analytics.tr.ts";
 import { messages as analyticsSettingsEn } from "../src/i18n/lazy/analyticsSettings.en.ts";
 import { messages as analyticsSettingsTr } from "../src/i18n/lazy/analyticsSettings.tr.ts";
-import { messages as appearanceColorsEn } from "../src/i18n/lazy/appearanceColors.en.ts";
-import { messages as appearanceColorsTr } from "../src/i18n/lazy/appearanceColors.tr.ts";
+import { messages as appearanceEn } from "../src/i18n/lazy/appearance.en.ts";
+import { messages as appearanceTr } from "../src/i18n/lazy/appearance.tr.ts";
 import { messages as bodyEditorEn } from "../src/i18n/lazy/bodyEditor.en.ts";
 import { messages as bodyEditorTr } from "../src/i18n/lazy/bodyEditor.tr.ts";
 import { messages as buildEn } from "../src/i18n/lazy/build.en.ts";
@@ -77,7 +77,7 @@ describe("lazy message namespaces", () => {
     aiSettings: [aiSettingsEn, aiSettingsTr],
     analytics: [analyticsEn, analyticsTr],
     analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
-    appearanceColors: [appearanceColorsEn, appearanceColorsTr],
+    appearance: [appearanceEn, appearanceTr],
     bodyEditor: [bodyEditorEn, bodyEditorTr],
     build: [buildEn, buildTr],
     comments: [commentsEn, commentsTr],

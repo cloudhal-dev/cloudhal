@@ -44,6 +44,7 @@ import {
   APPEARANCE_SETTINGS_SECTION,
   AppearanceSettingsSection,
 } from "../components/AppearanceSettings.tsx";
+import { CHROME_SETTINGS_SECTION, ChromeSettingsSection } from "../components/ChromeSettings.tsx";
 import {
   COMMENT_SETTINGS_SECTION,
   CommentSettingsSection,
@@ -95,6 +96,7 @@ const SECTIONS = [
   "general",
   "domains",
   APPEARANCE_SETTINGS_SECTION,
+  CHROME_SETTINGS_SECTION,
   DESIGN_RULES_SECTION,
   ANALYTICS_SETTINGS_SECTION,
   COMMENT_SETTINGS_SECTION,
@@ -848,7 +850,13 @@ function PreviewLinksSection({
 
 /** Site › Settings (DESIGN.md §2c settings template, §2k). */
 export function SiteSettingsPage() {
-  const t = useT("analyticsSettings", "commentsSettings", "scheduleSettings", "aiSettings");
+  const t = useT(
+    "analyticsSettings",
+    "commentsSettings",
+    "scheduleSettings",
+    "aiSettings",
+    "appearance",
+  );
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance });
@@ -877,7 +885,9 @@ export function SiteSettingsPage() {
                   ? t("scheduleSettings.title")
                   : id === AI_SETTINGS_SECTION
                     ? t("aiSettings.title")
-                    : t(`siteSettings.sections.${id}`),
+                    : id === CHROME_SETTINGS_SECTION
+                      ? t("appearance.chrome.title")
+                      : t(`siteSettings.sections.${id}`),
         }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
@@ -886,6 +896,8 @@ export function SiteSettingsPage() {
         </ReadOnly>
         {/* The theme's design settings (RFC-0017 §1): settings.write changes them. */}
         <AppearanceSettingsSection siteId={siteId} />
+        {/* The header, footer and brand (RFC-0025): settings.write changes them. */}
+        <ChromeSettingsSection siteId={siteId} defaultLocale={site.data?.defaultLocale ?? "en"} />
         {/* Design rules (RFC-0021): the site's DESIGN.md every agent reads; settings.write changes it. */}
         <DesignRulesSettingsSection siteId={siteId} theme={site.data?.theme.name ?? ""} />
         {/* Gated on its own abilities (analytics.read to see, analytics.settings to change). */}

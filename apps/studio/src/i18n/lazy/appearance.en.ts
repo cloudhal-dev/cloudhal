@@ -1,10 +1,11 @@
 /**
- * English `appearanceColors.*`, a lazy message namespace (`../namespaces.ts`, DESIGN.md §1): the
- * color roles under site settings' Appearance form (RFC-0023), loaded with the preview.
- * The source of truth for its keys; `appearanceColors.tr.ts` is typed against it.
+ * English `appearance.*`, a lazy message namespace (`../namespaces.ts`, DESIGN.md §1): the words of
+ * site settings' Appearance group that load with the settings route — the color roles under the
+ * Appearance form (RFC-0023) and the Header and footer section (`chrome`, RFC-0025).
+ * The source of truth for its keys; `appearance.tr.ts` is typed against it.
  */
 export const messages = {
-  appearanceColors: {
+  appearance: {
     preview: "Color roles",
     light: "Light",
     dark: "Dark",
@@ -38,6 +39,22 @@ export const messages = {
       link: "Link",
       focus: "Focus ring",
       gradient: "Gradient end",
+    },
+    chrome: {
+      title: "Header and footer",
+      description:
+        "The logo, the header and the footer every page shows. A page can hide them or make the header transparent over its first band.",
+      brand: "Brand",
+      header: "Header",
+      footer: "Footer",
+      chooseLogo: "Choose image",
+      replaceLogo: "Replace",
+      removeLogo: "Remove",
+      noLogo: "No image: the site's name shows as text.",
+      menus: "Menus you can name: {menus}.",
+      saved: "Header and footer saved",
+      failed: "The header and footer could not be saved",
+      publishHint: "Changes show on the site after the next publish.",
     },
   },
 } as const;

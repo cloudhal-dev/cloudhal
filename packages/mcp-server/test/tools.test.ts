@@ -65,6 +65,10 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "get_design",
       "get_design_tokens",
       "set_design",
+      // RFC-0025 §5
+      "get_chrome",
+      "set_chrome",
+      "set_brand",
       "render_page",
       "list_taxonomies",
       "list_terms",
