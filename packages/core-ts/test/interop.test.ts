@@ -120,7 +120,7 @@ describe("A2UI import", () => {
     expect(r.notes.join("\n")).toMatch(/no server actions/);
   });
 
-  it("drops form inputs with a reason, maps choices, tabs and links, and expands template lists", () => {
+  it("maps text fields to local inputs, choices, tabs and links, and expands template lists", () => {
     const r = fromA2ui(
       [
         { version: v, createSurface: { surfaceId: "s", catalogId: A2UI_BASIC_CATALOG } },
@@ -185,10 +185,11 @@ describe("A2UI import", () => {
     );
     expect(checkSurface(r.surface, catalog).issues).toEqual([]);
     const c = byId(r);
-    expect(c.has("user")).toBe(false);
-    expect(r.notes.join("\n")).toMatch(
-      /TextField components were left out: text fields need server actions/,
-    );
+    // RFC-0022 §2: a text field is a local input bound to the same data
+    expect(c.get("user")).toMatchObject({
+      component: "TextField",
+      props: { label: "Username", value: { path: "/username" } },
+    });
     const tabs = c.get("tabs");
     expect(tabs?.children?.map((k) => c.get(k)?.props?.label)).toEqual(["Monthly", "Yearly"]);
     expect(c.get("plans")?.children?.map((k) => c.get(k)?.props?.text)).toEqual([
@@ -201,6 +202,90 @@ describe("A2UI import", () => {
       href: "https://cloudhal.dev/docs",
     });
     expect(c.has("billing")).toBe(false); // never placed under root
+  });
+
+  it("carries number fields and check boxes, refuses passwords, and exports inputs back (RFC-0022)", () => {
+    const r = fromA2ui(
+      [
+        { version: v, createSurface: { surfaceId: "f", catalogId: A2UI_BASIC_CATALOG } },
+        {
+          version: v,
+          updateComponents: {
+            surfaceId: "f",
+            components: [
+              { id: "root", component: "Column", children: ["age", "ok", "pin"] },
+              {
+                id: "age",
+                component: "TextField",
+                label: "Age",
+                variant: "number",
+                value: { path: "/age" },
+              },
+              { id: "ok", component: "CheckBox", label: "I agree", value: false },
+              {
+                id: "pin",
+                component: "TextField",
+                label: "PIN",
+                variant: "obscured",
+                value: { path: "/pin" },
+              },
+            ],
+          },
+        },
+      ],
+      { sectionId: "sec_fields0001", catalog: catalog.id },
+    );
+    expect(checkSurface(r.surface, catalog).issues).toEqual([]);
+    const c = byId(r);
+    expect(c.get("age")).toMatchObject({
+      component: "NumberField",
+      props: { value: { path: "/age" } },
+    });
+    expect(c.get("ok")).toMatchObject({
+      component: "Checkbox",
+      props: { label: "I agree", checked: { path: "/ok" } },
+    });
+    expect(r.surface.data).toMatchObject({ ok: false });
+    expect(c.has("pin")).toBe(false);
+    expect(r.notes.join("\n")).toMatch(/password text fields were left out/);
+    const back = toA2ui({
+      ...r.surface,
+      components: [
+        ...r.surface.components,
+        {
+          id: "plan",
+          component: "RadioGroup",
+          props: {
+            label: "Plan",
+            value: { path: "/plan" },
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+          },
+        },
+      ],
+    });
+    const comps = back.messages.flatMap(
+      (m) =>
+        (m as { updateComponents?: { components: { id: string }[] } }).updateComponents
+          ?.components ?? [],
+    );
+    expect(comps.find((x) => x.id === "age")).toMatchObject({
+      component: "TextField",
+      variant: "number",
+    });
+    expect(comps.find((x) => x.id === "ok")).toMatchObject({
+      component: "CheckBox",
+      value: { path: "/ok" },
+    });
+    expect(comps.find((x) => x.id === "plan")).toMatchObject({
+      component: "ChoicePicker",
+      options: [
+        { label: "A", value: "a" },
+        { label: "B", value: "b" },
+      ],
+    });
   });
 
   it("applies later messages over earlier ones and refuses what is not a surface", () => {

@@ -18,6 +18,7 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 - The theme styles every primitive. These look best: `Band`, `Columns`, `Grid`, `Card` (with an `Image` at `ratio: 16:9` first), `Stat`, `Quote`, `Tabs`, `Accordion`, and the blocks `testimonial`, `callout` and `faq`.
 - Buttons: one `variant: primary` per section; `secondary` or `ghost` for the rest.
 - A `Card` with `href` is a whole link: keep its text short (a heading and one sentence).
+- Tools (calculators): put the inputs (`NumberField`, `RadioGroup` with `variant: buttons`, `Checkbox`) in a `Card`, two or three to a `Grid` row, and the result as a `Stat` right below them.
 - Lists of articles come from the content list section or a surface entry source, not from copied titles.
 
 ## Imagery

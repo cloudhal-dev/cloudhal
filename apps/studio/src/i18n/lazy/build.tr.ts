@@ -50,6 +50,7 @@ export const messages: NamespaceMessages<"build"> = {
         "empty-section": "boş bölümler",
         "tap-target": "küçük dokunma alanları",
         "long-line": "uzun satırlar",
+        "input-label": "etiketsiz alanlar",
       },
       done: "Taslağa {steps} adım uygulandı",
       doneRefused: "{steps} adım uygulandı; {refused} adım reddedilip modele geri gönderildi",

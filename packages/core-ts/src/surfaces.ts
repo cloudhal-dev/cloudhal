@@ -77,9 +77,27 @@ export const SURFACE_ACTIONS = [
   "copy",
   "share",
   "scrollTo",
+  // RFC-0022 §2: add text to a string value (keypad calculators).
+  "append",
 ] as const;
 /** Components whose values a reader changes: their surface loads the interaction runtime. */
-export const INPUT_COMPONENTS = new Set(["Toggle", "Select", "Slider"]);
+export const INPUT_COMPONENTS = new Set([
+  "Toggle",
+  "Select",
+  "Slider",
+  "NumberField",
+  "TextField",
+  "Checkbox",
+  "RadioGroup",
+]);
+
+/** RFC-0022 §2: the prop each local input writes to; it must be bound with {path}. */
+export const INPUT_MODEL: Readonly<Record<string, string>> = {
+  NumberField: "value",
+  TextField: "value",
+  Checkbox: "checked",
+  RadioGroup: "value",
+};
 const TONE = ["surface", "muted", "brand", "inverse"] as const;
 const ALIGN = ["start", "center", "end", "stretch"] as const;
 const space = (title: Localized) => ({ type: "string" as const, enum: SPACE, title });
@@ -419,6 +437,113 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     children: "none",
     example: { props: { label: "Seats", min: 1, max: 50, step: 1, value: 5 } },
   },
+  // RFC-0022 §2: local inputs. They write only to the surface's data, in the reader's browser.
+  {
+    name: "NumberField",
+    title: { en: "Number field", tr: "Sayı alanı" },
+    description: {
+      en: "A number the reader types; bind value: {path}. Nothing is sent anywhere.",
+      tr: "Okurun yazdığı sayı; value'yu {path} ile bağlayın. Hiçbir yere gönderilmez.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        value: { type: "number" },
+        min: { type: "number" },
+        max: { type: "number" },
+        step: { type: "number", minimum: 0 },
+        unit: { type: "string", maxLength: 20 },
+        placeholder: { type: "string", maxLength: 60 },
+        help: { type: "string", maxLength: 200 },
+        invalid: { type: "boolean" },
+      },
+      ["label", "value"],
+    ),
+    children: "none",
+    example: {
+      props: { label: "Weight", value: { path: "/weight" }, min: 30, max: 250, unit: "kg" },
+    },
+  },
+  {
+    name: "TextField",
+    title: { en: "Text field", tr: "Metin alanı" },
+    description: {
+      en: "One line of text the reader types; bind value: {path}. Nothing is sent anywhere.",
+      tr: "Okurun yazdığı tek satır; value'yu {path} ile bağlayın. Hiçbir yere gönderilmez.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        value: { type: "string", maxLength: 500 },
+        placeholder: { type: "string", maxLength: 60 },
+        maxLength: { type: "integer", minimum: 1, maximum: 500 },
+        kind: { type: "string", enum: ["text", "email"] },
+        help: { type: "string", maxLength: 200 },
+        invalid: { type: "boolean" },
+      },
+      ["label", "value"],
+    ),
+    children: "none",
+    example: { props: { label: "Your name", value: { path: "/name" }, placeholder: "Ada" } },
+  },
+  {
+    name: "Checkbox",
+    title: { en: "Checkbox", tr: "Onay kutusu" },
+    description: {
+      en: "A yes/no the reader ticks; bind checked: {path}.",
+      tr: "Okurun işaretlediği evet/hayır; checked'i {path} ile bağlayın.",
+    },
+    category: "interactive",
+    props: schema({ label: label(120), checked: { type: "boolean" } }, ["label", "checked"]),
+    children: "none",
+    example: { props: { label: "Include VAT", checked: { path: "/vat" } } },
+  },
+  {
+    name: "RadioGroup",
+    title: { en: "Radio group", tr: "Seçenek grubu" },
+    description: {
+      en: "One choice from a few labelled options; bind value: {path}. variant buttons is a segmented control.",
+      tr: "Birkaç etiketli seçenekten biri; value'yu {path} ile bağlayın. variant buttons bölümlü düğmelerdir.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        label: label(80),
+        value: { type: "string", maxLength: 60 },
+        options: {
+          type: "array",
+          minItems: 2,
+          maxItems: 8,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["value", "label"],
+            properties: {
+              value: { type: "string", minLength: 1, maxLength: 60 },
+              label: { type: "string", minLength: 1, maxLength: 60 },
+            },
+          },
+        },
+        variant: { type: "string", enum: ["list", "buttons"] },
+        help: { type: "string", maxLength: 200 },
+      },
+      ["label", "value", "options"],
+    ),
+    children: "none",
+    example: {
+      props: {
+        label: "Activity",
+        value: { path: "/activity" },
+        variant: "buttons",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "high", label: "High" },
+        ],
+      },
+    },
+  },
   {
     name: "Tabs",
     title: { en: "Tabs", tr: "Sekmeler" },
@@ -458,15 +583,29 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
   },
 ];
 
-// Primitive props follow the same subset as block props; checked once at load.
+// Primitive props follow the same subset as block props; checked once at load. Bound example
+// values ({path}, as inputs need) are bindings, not literals: left out, and not required.
+const isBoundExample = (v: unknown) => isObj(v) && ("path" in v || "call" in v);
 defineBlockTypes(
-  PRIMITIVES.map((p) => ({
-    name: p.name.toLowerCase(),
-    title: p.title,
-    where: ["section"] as const,
-    props: p.props,
-    example: p.example,
-  })) as BlockType[],
+  PRIMITIVES.map((p) => {
+    const bound = Object.keys(p.example.props).filter((k) => isBoundExample(p.example.props[k]));
+    return {
+      name: p.name.toLowerCase(),
+      title: p.title,
+      where: ["section"] as const,
+      props: {
+        ...p.props,
+        ...(p.props.required
+          ? { required: p.props.required.filter((k) => !bound.includes(k)) }
+          : {}),
+      },
+      example: {
+        props: Object.fromEntries(
+          Object.entries(p.example.props).filter(([k]) => !bound.includes(k)),
+        ),
+      },
+    };
+  }) as BlockType[],
 );
 
 // ── the catalog ──────────────────────────────────────────────────────────────────────────────
@@ -1031,12 +1170,18 @@ const ACTION_NEEDS: Record<string, readonly string[]> = {
   copy: ["value"],
   share: [],
   scrollTo: ["anchor"],
+  append: ["path", "value"],
 };
 
 function checkAction(a: Record<string, unknown>, path: string, out: PropsIssue[]): void {
   for (const key of ACTION_NEEDS[String(a.action)] ?? [])
     if (a[key] === undefined)
       out.push({ path: `${path}/${key}`, message: `${a.action} needs ${key}` });
+  // RFC-0022: `set` and `append` may write a computed value (worked out when clicked).
+  if ((a.action === "set" || a.action === "append") && isObj(a.value))
+    checkDynamic(a.value, `${path}/value`, out);
+  if (a.action === "append" && typeof a.value === "string" && a.value.length > 20)
+    out.push({ path: `${path}/value`, message: "at most 20 characters at a time" });
 }
 
 // ── checking a surface ───────────────────────────────────────────────────────────────────────
@@ -1124,6 +1269,10 @@ function checkProps(entry: CatalogEntry, props: unknown, path: string, out: Prop
     if (isDynamic(v) && k in entry.schema.properties) {
       bound.add(k);
       checkDynamic(v, `${path}/${k}`, out);
+    } else if (k === "onClick" && isObj(v) && isDynamic(v.value)) {
+      // RFC-0022: an action's computed value is checked by `checkAction`, not as text.
+      const { value: _computed, ...rest } = v;
+      literal[k] = rest;
     } else literal[k] = v;
   }
   for (const issue of validateProps(entry.schema, literal)) {
@@ -1202,6 +1351,13 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
           });
       });
     checkProps(entry, c.props, `${at}/props`, issues);
+    // RFC-0022 §2: a local input writes to the surface's data, so its value is a binding.
+    const writes = INPUT_MODEL[c.component];
+    if (writes && !(isObj(c.props) && isPathValue(c.props[writes])))
+      issues.push({
+        path: `${at}/props/${writes}`,
+        message: `bind it to the surface's data: {"path":"/…"} (the reader's input is written there)`,
+      });
     if (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick))
       checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
@@ -1787,6 +1943,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     "- `props` follow the component's props below. Any prop may instead be bound to the data model: " +
       '{"path":"/json/pointer"}, or computed by a named function: {"call":"formatDate","args":{"value":{"path":"/d"},"style":"long"}}.',
     `- Functions: ${SURFACE_FUNCTIONS.join(", ")}.`,
+    '- Inputs (NumberField, TextField, Checkbox, RadioGroup) write only to the surface\'s data in the reader\'s browser: bind value (checked for Checkbox) with {"path"}, start it in `data` ("" for an empty number), give every input a label, and show the computed result next to it. Buttons may `append` text to a value (keypads) or `set` a computed value, e.g. {"action":"set","path":"/display","value":{"call":"calculate","args":{"expression":{"path":"/display"}}}}.',
     "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
       '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
       'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',

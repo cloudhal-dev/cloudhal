@@ -789,6 +789,63 @@ button.ch-button--secondary {
 .ch-slider__value {
   @apply min-w-12 text-right font-medium tabular-nums;
 }
+/* RFC-0022 §2: local inputs. */
+.ch-input-wrap {
+  @apply flex w-full max-w-xs items-center gap-2;
+}
+.ch-input {
+  @apply w-full max-w-xs rounded-md border border-zinc-300 bg-white px-3 py-2 tabular-nums;
+}
+.ch-input[aria-invalid="true"] {
+  @apply border-red-600;
+}
+.ch-input__unit {
+  @apply shrink-0 text-sm text-zinc-600;
+}
+.ch-field__help {
+  @apply text-sm text-zinc-600;
+}
+[aria-invalid="true"] ~ .ch-field__help,
+.ch-input-wrap:has([aria-invalid="true"]) ~ .ch-field__help {
+  @apply text-red-700;
+}
+.ch-check {
+  @apply flex w-fit cursor-pointer items-center gap-2;
+}
+.ch-check input {
+  @apply size-4;
+  accent-color: var(--ch-brand, #18181b);
+}
+.ch-radio {
+  @apply m-0 grid min-w-0 gap-1.5 border-0 p-0;
+}
+.ch-radio__options {
+  @apply flex flex-col gap-1.5;
+}
+.ch-radio__option {
+  @apply flex w-fit cursor-pointer items-center gap-2;
+}
+.ch-radio__option input {
+  accent-color: var(--ch-brand, #18181b);
+}
+.ch-radio[data-variant="buttons"] .ch-radio__options {
+  @apply inline-flex w-fit flex-row flex-wrap gap-1 rounded-lg bg-zinc-100 p-1;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input {
+  @apply sr-only;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option span {
+  @apply block min-h-9 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input:checked + span {
+  @apply bg-white text-zinc-900 shadow-sm;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input:focus-visible + span {
+  @apply outline-2 outline-offset-2;
+}
+.ch-noscript {
+  @apply text-sm text-zinc-600;
+}
 
 /* Corners (src/settings.ts `radius`): after the base rules, so they win. */
 [data-ch-radius="none"] .ch-button,

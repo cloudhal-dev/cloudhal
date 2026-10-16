@@ -486,12 +486,46 @@ export function fromA2ui(
           value: v("value"),
         };
         break;
+      // RFC-0022 §2: text and check inputs are local state, like a slider.
+      case "TextField":
+      case "CheckBox": {
+        const kind = String(a.variant ?? a.textFieldType ?? "shortText");
+        if (a.component === "TextField" && (kind === "obscured" || kind === "date")) {
+          notes.add(
+            `${kind === "obscured" ? "password" : "date"} text fields were left out: Cloudhal has no such input`,
+          );
+          return undefined;
+        }
+        const bound = v(
+          a.component === "CheckBox" ? "value" : a.value !== undefined ? "value" : "text",
+        );
+        // A literal value becomes the surface's data, so the input can write to it.
+        let path = isObj(bound) && typeof bound.path === "string" ? bound.path : undefined;
+        if (!path) {
+          path = `/${id.replace(/[^a-z0-9-]/g, "-")}`;
+          data = pointerSet(
+            data,
+            path,
+            a.component === "CheckBox" ? bound === true : typeof bound === "string" ? bound : "",
+          );
+        }
+        const labelText = literal(a.label, data) ?? (a.component === "CheckBox" ? "Yes" : "Value");
+        if (a.component === "CheckBox") {
+          component = "Checkbox";
+          props = { label: labelText, checked: { path } };
+        } else {
+          component = kind === "number" ? "NumberField" : "TextField";
+          props = { label: labelText, value: { path } };
+          if (kind === "longText") notes.add("long text fields become one-line text fields");
+          if (a.validationRegexp !== undefined)
+            notes.add("text field patterns (validationRegexp) are not carried");
+        }
+        break;
+      }
       case "Image":
       case "Icon":
       case "Video":
       case "AudioPlayer":
-      case "TextField":
-      case "CheckBox":
       case "DateTimeInput": {
         const why: Record<string, string> = {
           Image:
@@ -499,9 +533,7 @@ export function fromA2ui(
           Icon: "Cloudhal has no icon component yet",
           Video: "videos are embedded with the video block, not URLs",
           AudioPlayer: "Cloudhal has no audio component",
-          TextField: "text fields need server actions, which surfaces do not have",
-          CheckBox: "check boxes need server actions, which surfaces do not have",
-          DateTimeInput: "date inputs need server actions, which surfaces do not have",
+          DateTimeInput: "Cloudhal has no date input yet",
         };
         notes.add(`${a.component} components were left out: ${why[a.component]}`);
         return undefined;
@@ -819,6 +851,34 @@ export function toA2ui(
             label: String(o),
             value: String(o),
           })),
+          value: v(p.value),
+        });
+        notes.add("choices bind a single string; A2UI pickers bind a list of strings");
+        break;
+      case "NumberField":
+      case "TextField":
+        out.push({
+          id: c.id,
+          component: "TextField",
+          label: v(p.label),
+          variant: c.component === "NumberField" ? "number" : "shortText",
+          value: v(p.value),
+        });
+        break;
+      case "Checkbox":
+        out.push({ id: c.id, component: "CheckBox", label: v(p.label), value: v(p.checked) });
+        break;
+      case "RadioGroup":
+        out.push({
+          id: c.id,
+          component: "ChoicePicker",
+          variant: "mutuallyExclusive",
+          label: v(p.label),
+          options: (Array.isArray(p.options) ? p.options : []).map((o) =>
+            isObj(o)
+              ? { label: String(o.label), value: String(o.value) }
+              : { label: "", value: "" },
+          ),
           value: v(p.value),
         });
         notes.add("choices bind a single string; A2UI pickers bind a list of strings");

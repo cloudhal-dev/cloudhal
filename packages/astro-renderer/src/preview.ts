@@ -484,6 +484,10 @@ const PREVIEW_CSS =
   ".ch-toggle__option span{display:block;padding:.3rem .8rem;border-radius:6px;cursor:pointer;color:var(--muted)}.ch-toggle__option input:checked+span{background:var(--fg);color:var(--bg)}" +
   ".ch-field{display:grid;gap:.35rem}.ch-field__label{font-weight:500;font-size:.9rem}.ch-select{max-width:20rem;padding:.4rem;border:1px solid var(--line);border-radius:6px;font:inherit}" +
   ".ch-slider{display:flex;align-items:center;gap:.75rem}.ch-slider input{flex:1;max-width:24rem}.ch-slider__value{font-weight:600;min-width:3rem}" +
+  // RFC-0022 §2: local inputs.
+  ".ch-input-wrap{display:flex;align-items:center;gap:.5rem;max-width:20rem}.ch-input{width:100%;max-width:20rem;padding:.4rem .6rem;border:1px solid var(--line);border-radius:6px;font:inherit}.ch-input[aria-invalid=true]{border-color:#b91c1c}.ch-input__unit,.ch-field__help,.ch-noscript{color:var(--muted);font-size:.9rem}" +
+  ".ch-check,.ch-radio__option{display:flex;align-items:center;gap:.5rem;width:fit-content;cursor:pointer}.ch-radio{display:grid;gap:.35rem;border:0;margin:0;padding:0;min-width:0}.ch-radio__options{display:flex;flex-direction:column;gap:.35rem}" +
+  ".ch-radio[data-variant=buttons] .ch-radio__options{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:.25rem;padding:.25rem;border:1px solid var(--line);border-radius:8px;width:fit-content}.ch-radio[data-variant=buttons] input{position:absolute;opacity:0}.ch-radio[data-variant=buttons] .ch-radio__option span{display:block;padding:.3rem .8rem;border-radius:6px;color:var(--muted)}.ch-radio[data-variant=buttons] input:checked+span{background:var(--fg);color:var(--bg)}" +
   ".ch-block--missing{padding:.6rem .9rem;border:1px dashed var(--line);border-radius:6px;color:var(--muted);font-size:.9rem}";
 
 /**

@@ -54,6 +54,7 @@ export const messages = {
         "empty-section": "empty sections",
         "tap-target": "small tap targets",
         "long-line": "long lines",
+        "input-label": "unlabelled inputs",
       },
       done: "{steps} steps applied to the draft",
       doneRefused: "{steps} steps applied; {refused} refused and sent back to the model",

@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.2.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.3.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -141,6 +141,130 @@ describe("live surface markup", () => {
 });
 
 describe("interaction runtime", () => {
+  it("computes from typed fields, ticks and radio choices, and runs a keypad (RFC-0022 22b)", () => {
+    const call = (name: string, args: Record<string, unknown>) => ({ call: name, args });
+    const tool = surface(
+      [
+        {
+          id: "root",
+          component: "Stack",
+          children: ["w", "vat", "plan", "total", "display", "seven", "times", "eq", "warn"],
+        },
+        {
+          id: "w",
+          component: "NumberField",
+          props: {
+            label: "Seats",
+            value: { path: "/seats" },
+            unit: "seats",
+            help: "1 to 50",
+            invalid: call("if", {
+              cond: { gt: [{ path: "/seats" }, 50] },
+              ifTrue: true,
+              ifFalse: false,
+            }) as unknown as boolean,
+          },
+        },
+        {
+          id: "vat",
+          component: "Checkbox",
+          props: { label: "Include VAT", checked: { path: "/vat" } },
+        },
+        {
+          id: "plan",
+          component: "RadioGroup",
+          props: {
+            label: "Plan",
+            value: { path: "/plan" },
+            variant: "buttons",
+            options: [
+              { value: "basic", label: "Basic" },
+              { value: "pro", label: "Pro" },
+            ],
+          },
+        },
+        {
+          id: "total",
+          component: "Stat",
+          props: {
+            label: "Total",
+            value: call("multiply", {
+              values: [
+                { path: "/seats" },
+                call("choose", { value: { path: "/plan" }, cases: { basic: 9, pro: 19 } }),
+                call("if", { cond: { path: "/vat" }, ifTrue: 1.2, ifFalse: 1 }),
+              ],
+            }),
+          },
+        },
+        { id: "display", component: "Text", props: { text: { path: "/display" } } },
+        {
+          id: "seven",
+          component: "Button",
+          props: { label: "7", onClick: { action: "append", path: "/display", value: "7" } },
+        },
+        {
+          id: "times",
+          component: "Button",
+          props: { label: "×", onClick: { action: "append", path: "/display", value: "×6" } },
+        },
+        {
+          id: "eq",
+          component: "Button",
+          props: {
+            label: "=",
+            onClick: {
+              action: "set",
+              path: "/display",
+              value: call("calculate", { expression: { path: "/display" } }),
+            },
+          },
+        },
+        {
+          id: "warn",
+          component: "Text",
+          props: { text: "Too many" },
+          visible: { gt: [{ path: "/seats" }, 50] },
+        },
+      ],
+      { seats: "", vat: false, plan: "basic", display: "" },
+    );
+    const html = renderSurface(tool, { media: { locale: "tr" } as never });
+    expect(html).toContain(
+      '<input class="ch-input" type="number" inputmode="decimal" id="ch-sec_live000001-w" step="any" value="" data-ch-model="/seats" aria-describedby="ch-sec_live000001-w-help"',
+    );
+    expect(html).toContain('<fieldset class="ch-radio" data-variant="buttons">');
+    expect(html).toContain("Bu araç hesaplamak için JavaScript gerektirir.");
+    const page = mount(html);
+    const total = () => page.querySelector(".ch-stat__value")?.textContent;
+    expect(total()).toBe("");
+    const field = page.querySelector('input[type="number"]') as El;
+    field.value = "10";
+    field.dispatchEvent(new DomEvent("input", { bubbles: true }));
+    expect(total()).toBe("90");
+    const vat = page.querySelector('input[type="checkbox"]') as El;
+    vat.checked = true;
+    vat.dispatchEvent(new DomEvent("change", { bubbles: true }));
+    expect(total()).toBe("108");
+    const pro = page.querySelector('input[value="pro"]') as El;
+    pro.checked = true;
+    pro.dispatchEvent(new DomEvent("change", { bubbles: true }));
+    expect(total()).toBe("228");
+    field.value = "";
+    field.dispatchEvent(new DomEvent("input", { bubbles: true }));
+    expect(total()).toBe("");
+    field.value = "60";
+    field.dispatchEvent(new DomEvent("input", { bubbles: true }));
+    expect((field as unknown as Element).getAttribute("aria-invalid")).toBe("true");
+    const buttons = [...page.querySelectorAll("button")] as El[];
+    const display = () => page.querySelectorAll(".ch-text")[0]?.textContent;
+    buttons[0]?.click();
+    buttons[1]?.click();
+    expect(display()).toBe("7×6");
+    buttons[2]?.click();
+    expect(display()).toBe("42");
+  });
+
   it("writes inputs to the data, runs actions and keeps text and visibility in step", () => {
     const page = mount(renderSurface(pricing));
     const price = () => page.querySelector(".ch-stat__value")?.textContent;
@@ -283,11 +407,11 @@ describe("interaction runtime", () => {
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "926b14b25d36",
+      "ca339b9ff5cf",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.2.js");
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.3.js");
     // RFC-0022: pages cached with the first name get the same (compatible) code
-    expect(SURFACE_SCRIPT_ALIASES).toEqual(["/_cloudhal/surface.1.js"]);
+    expect(SURFACE_SCRIPT_ALIASES).toEqual(["/_cloudhal/surface.1.js", "/_cloudhal/surface.2.js"]);
     expect(SURFACE_SCRIPT.code.length).toBeLessThan(10_000);
   });
 });
