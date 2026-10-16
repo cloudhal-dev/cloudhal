@@ -21,6 +21,7 @@ import {
   CONTRAST_LEVELS,
   DENSITIES,
   designTokensDtcg,
+  MOTION_LEVELS,
   RADII,
   type SiteColorTokens,
   siteColorTokens,
@@ -77,6 +78,8 @@ interface DesignResult {
   type: { pairing: string; scale: string | null } | null;
   /** RFC-0023 §3: corners and spacing, when the theme offers them. */
   shape: { radius: string; density: string } | null;
+  /** RFC-0024 §1: the site's motion level, when the theme offers it. */
+  motion: string | null;
   guidance: string;
   rev: number;
 }
@@ -94,6 +97,13 @@ function typeOf(config: Readonly<Record<string, unknown>>): {
       : "system",
     scale: (TYPE_SCALES as readonly unknown[]).includes(scale) ? (scale as string) : null,
   };
+}
+
+/** The site's motion level, the theme's default where unset. */
+function motionOf(config: Readonly<Record<string, unknown>>, fallback: unknown): string {
+  for (const v of [config.motion, fallback])
+    if (typeof v === "string" && (MOTION_LEVELS as readonly string[]).includes(v)) return v;
+  return "none";
 }
 
 /** The site's corners and spacing, the theme's defaults where unset. */
@@ -148,6 +158,9 @@ function designText(r: DesignResult): string {
     r.shape
       ? `Shape (RFC-0023): radius ${r.shape.radius}, density ${r.shape.density}. Change them with set_theme_settings: radius (${RADII.join(" | ")}; full makes pill buttons, cards stay modest), density (${DENSITIES.join(" | ")}).`
       : "",
+    r.motion
+      ? `Motion (RFC-0024): the site's level is ${r.motion}. Change it with set_theme_settings: motion (${MOTION_LEVELS.join(" | ")}); a page can set its own level. Give components motion presets in patch_draft (get_catalog explains them); render_page renders with reduced motion by default, motion "full" plays them and checks layout shift.`
+      : "",
     r.guidance,
     ...(r.design.warnings.length
       ? [`Warnings about the site's rules: ${r.design.warnings.join("; ")}`]
@@ -193,10 +206,14 @@ export function designTools(): ToolDefinition[] {
             type: ["object", "null"],
             description: "Corners and spacing (RFC-0023), when the theme offers them",
           },
+          motion: {
+            type: ["string", "null"],
+            description: "The site's motion level (RFC-0024), when the theme offers it",
+          },
           guidance: { type: "string" },
           rev: { type: "integer" },
         },
-        ["design", "settings", "catalog", "colors", "type", "shape", "guidance", "rev"],
+        ["design", "settings", "catalog", "colors", "type", "shape", "motion", "guidance", "rev"],
       ),
       annotations: {
         readOnlyHint: true,
@@ -223,6 +240,10 @@ export function designTools(): ToolDefinition[] {
           catalog: { id: catalog.id, components: catalog.names() },
           colors: themeProps ? siteColorTokens(site.theme.config ?? {}, themeProps) : null,
           type: themeProps && "typePairing" in themeProps ? typeOf(site.theme.config ?? {}) : null,
+          motion:
+            themeProps && "motion" in themeProps
+              ? motionOf(site.theme.config ?? {}, themeProps.motion?.default)
+              : null,
           shape:
             themeProps && ("radius" in themeProps || "density" in themeProps)
               ? shapeOf(site.theme.config ?? {}, themeProps)

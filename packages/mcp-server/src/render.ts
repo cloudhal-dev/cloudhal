@@ -26,7 +26,7 @@ export interface CdpSocket {
 export interface RenderSession {
   open(
     url: string,
-    viewport: { width: number; height: number; scheme?: RenderScheme },
+    viewport: { width: number; height: number; scheme?: RenderScheme; reducedMotion?: boolean },
   ): Promise<RenderTab>;
   close(): Promise<void>;
 }
@@ -67,6 +67,10 @@ export const RENDER_CHECK_IDS = [
   "input-label",
   // RFC-0022 §3: a chart with no rows to draw.
   "chart-empty",
+  // RFC-0024 §8: content hidden or moving for a reader who asked for reduced motion.
+  "reduced-motion",
+  // RFC-0024 §8: layout shift while the page loads and scrolls (reveals included).
+  "motion-cls",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -88,11 +92,20 @@ export interface RenderResult {
 /** The `prefers-color-scheme` a page is rendered in (RFC-0023: sites with a dark or auto mode). */
 export const RENDER_SCHEMES = ["light", "dark"] as const;
 export type RenderScheme = (typeof RENDER_SCHEMES)[number];
+/**
+ * How the page may move while it renders (RFC-0024 §8): `static` (the default) and `reduce`
+ * render with `prefers-reduced-motion: reduce`, so screenshots show final states and the
+ * `reduced-motion` check runs; `full` lets every preset play, for `motion-cls`.
+ */
+export const RENDER_MOTIONS = ["static", "reduce", "full"] as const;
+export type RenderMotion = (typeof RENDER_MOTIONS)[number];
 
 export interface RenderOptions {
   widths: readonly RenderWidth[];
   /** Default light. */
   scheme?: RenderScheme;
+  /** Default `static`. */
+  motion?: RenderMotion;
   /** Screenshots down the page (up to `maxImages` viewports per width); otherwise the first one. */
   fullPage: boolean;
   maxImages?: number;
@@ -136,6 +149,7 @@ export async function renderPage(
         width,
         height: vh,
         scheme: options.scheme ?? "light",
+        reducedMotion: (options.motion ?? "static") !== "full",
       });
       try {
         stage = `checking the page at ${width} px`;
@@ -255,7 +269,9 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return false;
     const s = getComputedStyle(el);
-    return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0;
+    // RFC-0024: content waiting for its reveal (.ch-pre) is content, whatever its opacity now.
+    const waiting = el.closest && el.closest(".ch-pre");
+    return s.visibility !== "hidden" && s.display !== "none" && (Number(s.opacity) > 0 || !!waiting);
   };
 
   // Lazy images load first, so broken ones show and the screenshots are complete.
@@ -269,6 +285,12 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     new Promise((r) => setTimeout(r, 4000)),
   ]);
   if (document.fonts) await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2000))]);
+  // RFC-0024: entrances that play on load finish first, so checks see the page's final state.
+  if (document.getAnimations)
+    await Promise.race([
+      Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))),
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
 
   // overflow-x: the outermost elements that stick out past the screen's right edge.
   const sw = document.documentElement.scrollWidth;
@@ -437,6 +459,44 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     if (per > 90) add("long-line", p, "about " + per + " characters a line");
   }
 
+  // RFC-0024 §8: scroll through the page once, as a reader would, so reveals play, then measure.
+  let shift = 0;
+  let po;
+  try {
+    po = new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) if (!e.hadRecentInput) shift += e.value;
+    });
+    po.observe({ type: "layout-shift", buffered: true });
+  } catch {}
+  const pageH = document.documentElement.scrollHeight;
+  for (let y = 0; y < pageH; y += Math.round(H * 0.8)) {
+    window.scrollTo(0, y);
+    await new Promise((r) => setTimeout(r, 90));
+  }
+  window.scrollTo(0, pageH);
+  await new Promise((r) => setTimeout(r, 700));
+  if (po) {
+    for (const e of po.takeRecords()) if (!e.hadRecentInput) shift += e.value;
+    po.disconnect();
+  }
+  // motion-cls: more layout shift than Core Web Vitals' "good" threshold.
+  if (shift > 0.1) add("motion-cls", document.body, "layout shift " + shift.toFixed(2) + " while loading and scrolling (good is 0.1 or less)");
+  // reduced-motion: with the reader asking for less, nothing stays hidden and nothing travels.
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    for (const el of document.querySelectorAll("[data-ch-reveal]"))
+      if (el.classList.contains("ch-pre") || Number(getComputedStyle(el).opacity) === 0)
+        add("reduced-motion", el, "stays hidden for readers who ask for reduced motion");
+    const moving = /transform|translate|scale|rotate|^top$|^left$|^right$|^bottom$|offset/;
+    for (const a of document.getAnimations ? document.getAnimations() : []) {
+      if (a.playState !== "running" || !a.effect || !a.effect.getKeyframes) continue;
+      const props = a.effect.getKeyframes().flatMap((k) => Object.keys(k));
+      if (!props.some((p) => moving.test(p))) continue;
+      const el = a.effect.target;
+      if (el) add("reduced-motion", el, "moves for readers who ask for reduced motion");
+    }
+  }
+  window.scrollTo(0, 0);
+
   return ids.map((id) => out[id]);
 })()`;
 
@@ -582,7 +642,13 @@ export async function cdpSession(
       if (viewport.width < 768) await s("Emulation.setTouchEmulationEnabled", { enabled: true });
       // The same render on every machine: the scheme asked for, whatever the host prefers.
       await s("Emulation.setEmulatedMedia", {
-        features: [{ name: "prefers-color-scheme", value: viewport.scheme ?? "light" }],
+        features: [
+          { name: "prefers-color-scheme", value: viewport.scheme ?? "light" },
+          {
+            name: "prefers-reduced-motion",
+            value: viewport.reducedMotion === false ? "no-preference" : "reduce",
+          },
+        ],
       });
       const loaded = cdp.waitFor("Page.loadEventFired", sessionId, options.loadTimeoutMs ?? 12_000);
       const nav = await s("Page.navigate", { url });

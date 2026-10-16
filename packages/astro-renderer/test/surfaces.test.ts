@@ -257,3 +257,53 @@ describe("surface styles and anchors (RFC-0023 §4)", () => {
     expect(html).not.toContain('id="ch-field-1"');
   });
 });
+
+describe("motion presets (RFC-0024 24a)", () => {
+  it("writes presets as attributes, hands a staggered reveal down, and loads the motion module", () => {
+    const html = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Grid",
+          props: { columns: 2 },
+          children: ["a", "b"],
+          motion: { reveal: "rise", stagger: true },
+        },
+        { id: "a", component: "Card", motion: { hover: "lift", delay: 1 }, children: ["t1"] },
+        { id: "t1", component: "Text", props: { text: "One" } },
+        { id: "b", component: "Card", motion: { reveal: "fade", speed: "slow" }, children: ["t2"] },
+        { id: "t2", component: "Text", props: { text: "Two" } },
+      ]),
+    );
+    // the grid hands its reveal to its children, a stagger step apart; it does not move itself
+    expect(html).toContain('<div class="ch-grid" data-cols="2">');
+    expect(html).toContain(
+      '<div data-ch-reveal="rise" data-ch-d="1" data-ch-hover="lift" class="ch-card">',
+    );
+    expect(html).toContain(
+      '<div data-ch-reveal="fade" data-ch-speed="slow" data-ch-d="1" class="ch-card">',
+    );
+    expect(html).toContain(
+      '<script type="module" src="/_cloudhal/motion.1.js"></script></section>',
+    );
+  });
+
+  it("drops motion that does not check but still draws the component, and loads nothing without motion", () => {
+    const html = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Heading",
+          props: { text: "Hello", level: 1 },
+          motion: { reveal: "explode" },
+        },
+      ]),
+    );
+    expect(html).toContain("Hello");
+    expect(html).not.toContain("data-ch-reveal");
+    const still = renderSurface(
+      surface([{ id: "root", component: "Heading", props: { text: "Still", level: 1 } }]),
+    );
+    expect(still).not.toContain("motion.1.js");
+  });
+});

@@ -746,6 +746,65 @@ impl ::std::convert::From<::std::collections::HashMap<::std::string::String, ::s
         Self(value)
     }
 }
+#[doc = "How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum MotionLevel {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "subtle")]
+    Subtle,
+    #[serde(rename = "standard")]
+    Standard,
+    #[serde(rename = "expressive")]
+    Expressive,
+}
+impl ::std::fmt::Display for MotionLevel {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::None => f.write_str("none"),
+            Self::Subtle => f.write_str("subtle"),
+            Self::Standard => f.write_str("standard"),
+            Self::Expressive => f.write_str("expressive"),
+        }
+    }
+}
+impl ::std::str::FromStr for MotionLevel {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "none" => Ok(Self::None),
+            "subtle" => Ok(Self::Subtle),
+            "standard" => Ok(Self::Standard),
+            "expressive" => Ok(Self::Expressive),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for MotionLevel {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for MotionLevel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
 #[doc = "A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -758,6 +817,9 @@ pub struct Page {
     pub locale: Locale,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub metadata: ::std::option::Option<Metadata>,
+    #[doc = "Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub motion: ::std::option::Option<MotionLevel>,
     #[doc = "Absolute URL path, starting with '/', no trailing slash except root."]
     pub path: PagePath,
     pub rev: Revision,
@@ -1793,6 +1855,9 @@ pub struct SurfaceComponent {
     pub children: ::std::vec::Vec<SurfaceComponentId>,
     pub component: SurfaceComponentComponent,
     pub id: SurfaceComponentId,
+    #[doc = "Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS."]
+    #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
+    pub motion: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
     #[doc = "Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract."]
     #[serde(default, skip_serializing_if = "::serde_json::Map::is_empty")]
     pub props: ::serde_json::Map<::std::string::String, ::serde_json::Value>,

@@ -721,6 +721,8 @@ export function toA2ui(
     const kids = kept(c.children);
     if (c.visible !== undefined)
       notes.add("visibility conditions have no A2UI equivalent; those components always show");
+    if (c.motion !== undefined)
+      notes.add("motion presets have no A2UI equivalent (RFC-0024); left out");
     const text = (id: string, value: unknown, variant?: string) =>
       out.push({ id, component: "Text", text: v(value), ...(variant ? { variant } : {}) });
     switch (c.component) {
@@ -1091,6 +1093,8 @@ export function toJsonRender(surface: Pick<SurfaceSection, "components" | "data"
   const elements: Record<string, Json> = {};
   for (const c of surface.components) {
     const visible = c.visible !== undefined ? toJrCondition(c.visible, notes) : undefined;
+    if (c.motion !== undefined)
+      notes.add("motion presets have no json-render equivalent (RFC-0024); left out");
     elements[c.id] = {
       type: c.component,
       props: toJrValue(c.props ?? {}),

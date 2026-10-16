@@ -1,5 +1,5 @@
 # RFC-0024: Motion, scroll and ambient effects
-- Status: Accepted (2026-10-16; open questions decided below)
+- Status: Accepted (2026-10-16; open questions decided below); 24a shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0018 §7 and phase 18f (motion presets, never shipped; this RFC replaces them), RFC-0020 (surfaces, the interaction runtime, "motion stays CSS"), RFC-0021 (`render_page`, the design judge), RFC-0022 (functions, data bindings), RFC-0023 (tokens, surfaces, DTCG export);
@@ -267,6 +267,43 @@ These were decided on 2026-10-16. The test for each was which option serves deve
    - `spotlight`, `magnetic` and `tilt` stay on single components, for fine pointers only.
    - A site-wide cursor follower is not offered: it replaces a system affordance, hurts usability and adds vestibular risk for little gain.
 6. **Lottie: a follow-up "animation asset", not a runtime.** A later media RFC converts a designer's Lottie or Rive file to a looping video and poster at upload (RFC-0004 media pipeline). Designers' work can then be used under the same CSP, with no `eval` or WASM on site pages.
+
+## Status
+- **24a shipped.**
+  - **Contract.** `SurfaceComponent.motion` (an object checked by the store, like `visible`) and `Page.motion` (`MotionLevel`) are optional fields; `pnpm gen` updated TypeScript and Rust, and fixtures were added.
+  - **Presets.** `@cloudhal/core-ts/surfaces` checks `motion`:
+    - **Reveals:** 10 kinds (`fade` … `mask-rise`).
+    - **Hovers:** 8 kinds; `underline`, `zoom-media`, `tilt`, `magnetic` and `spotlight` fit only some components.
+    - **`speed`, `delay` (0–4), `stagger` and `replay`.** `stagger` is accepted on layout components only.
+    - **Fields from later phases** (`scroll`, `depth`, `loop`) are refused with the phase that brings them.
+  - **Repairs.** `repairMotion` snaps the names models write (`fadeInUp` → `rise`, `animation` → `reveal`, a delay in ms → steps).
+  - **Agents.**
+    - The catalog prompt teaches the presets and their rules.
+    - A2UI and json-render exports leave motion out, with a note.
+    - DESIGN guidance gains point 8 (motion guides attention).
+    - `get_design` reports the level.
+    - The site-design skill has motion recipes per kind of site.
+  - **Tokens.** `motionCss()` writes durations, distances, the stagger step and easings for each level, scoped to `:root[data-ch-motion]`, so a page's own level needs no other CSS. The blog theme gains `motion` (default `none`). `cloudhal init` sets new sites to `standard` (decision 4). `Page.motion` overrides the level in `Base.astro`.
+  - **Rendering.**
+    - The renderer writes presets as `data-ch-reveal`, `data-ch-speed`, `data-ch-d`, `data-ch-hover` and `data-ch-replay` on the component's outer element, or on a wrapper around a theme's own component.
+    - A staggered parent hands its reveal to its children, one step apart; this is done on the server, so CSS alone staggers them.
+    - Motion that does not check is left out, and the component still draws.
+  - **Entrances.**
+    - Components on the first screen play their entrance with `@starting-style`, with no script.
+    - Components below get their "before" state from `/_cloudhal/motion.1.js` (2.3 KB, hash-pinned, gzip budget 5 KB) only while off screen, and reveal on entry.
+    - Wipes and masks start fully clipped, which an observer never sees intersect, so their parent is watched.
+    - A component the reader scrolled past before the module ran is revealed at once.
+    - Reveals use `opacity`, `translate`, `scale`, `filter` and `clip-path`; hovers use `transform` and `box-shadow`, so one element can have both.
+  - **Reduced motion.** Reveals do not play at all, which is stricter than §1's "fades of 200 ms or less", and hovers keep color and shadow only. `scrollTo` jumps instead of smooth-scrolling; the interaction runtime is now `surface.8.js`, with `surface.7.js` as an alias.
+  - **`render_page`.**
+    - New option `motion`: `static` (default), `reduce` or `full`.
+    - Two new checks: `reduced-motion` (content hidden, or animations that move, for a reader who asked for less) and `motion-cls` (layout shift above 0.1 while the page loads and is scrolled through).
+    - Checks wait for entrances to finish, and content still waiting for its reveal counts as visible.
+  - **Checked** in Chrome on a demo page with every preset:
+    - every reveal played on scroll, even when scrolled through fast;
+    - `lift` and the pointer-driven `tilt` worked;
+    - `render_page` passed every check with motion `static` and `full`.
+  - **Left for later.** The pause control is in the module and the theme CSS. It is rendered once loops exist (24c). Studio's motion badges come in 24e.
 
 ## Sources
 - **Scroll-driven animations:**

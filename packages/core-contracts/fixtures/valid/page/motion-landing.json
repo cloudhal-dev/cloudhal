@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "page_01HZX8K3Q9GH",
+  "siteId": "site_01HZX8K3Q9EF",
+  "path": "/launch",
+  "title": "Home",
+  "locale": "en",
+  "status": "published",
+  "sections": [
+    {
+      "id": "sec_motion000001",
+      "kind": "surface",
+      "catalog": "blog@1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Stack",
+          "children": ["h"],
+          "motion": {
+            "stagger": true
+          }
+        },
+        {
+          "id": "h",
+          "component": "Heading",
+          "props": {
+            "text": "Hello",
+            "level": 1
+          },
+          "motion": {
+            "reveal": "rise",
+            "speed": "slow",
+            "delay": 1
+          }
+        }
+      ]
+    }
+  ],
+  "seo": {
+    "title": "Demo Newsroom",
+    "description": "Agent-operated news site",
+    "noindex": false
+  },
+  "rev": 7,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z",
+  "motion": "expressive"
+}

@@ -182,4 +182,10 @@ export interface SurfaceComponent {
   visible?: {
     [k: string]: unknown | undefined;
   };
+  /**
+   * Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.
+   */
+  motion?: {
+    [k: string]: unknown | undefined;
+  };
 }

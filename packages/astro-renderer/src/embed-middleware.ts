@@ -5,6 +5,7 @@
 
 import { CHART_SCRIPT } from "./chart.ts";
 import { EMBED_SCRIPT } from "./embed-client.ts";
+import { MOTION_SCRIPT } from "./motion-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Cloudhal's constant first-party modules `cloudhal dev` serves (builds write them as files). */
@@ -13,6 +14,7 @@ const SCRIPTS = new Map<string, string>([
   [SURFACE_SCRIPT.path, SURFACE_SCRIPT.code],
   ...SURFACE_SCRIPT_ALIASES.map((alias) => [alias, SURFACE_SCRIPT.code] as [string, string]),
   [CHART_SCRIPT.path, CHART_SCRIPT.code],
+  [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
 ]);
 
 interface MiddlewareContext {

@@ -234,7 +234,7 @@ const searchForm = searchAvailable(config, source)
     }
   : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined}>
   {route.kind === "page" && (
     <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
   )}

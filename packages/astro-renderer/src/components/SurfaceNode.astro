@@ -12,6 +12,7 @@ import {
   primitiveHtml,
   type SurfaceNode,
   visibilityWrapper,
+  withMotion,
 } from "../surfaces.ts";
 
 interface Props {
@@ -30,10 +31,12 @@ let leaf = "";
 let open = "";
 let close = "";
 if (!Own) {
-  const html =
+  const html = withMotion(
     node.entry.kind === "block"
       ? blockNodeHtml(node, media, preview)
-      : primitiveHtml(node, scope, media);
+      : primitiveHtml(node, scope, media),
+    node.motion,
+  );
   const at = html.indexOf(CHILDREN);
   if (at < 0) leaf = html;
   else {
@@ -44,8 +47,12 @@ if (!Own) {
 const Self = Astro.self;
 // A live surface's conditional component: the runtime hides and shows this wrapper (RFC-0020 §4).
 const [shownOpen, shownClose] = visibilityWrapper(node);
+// RFC-0024: a theme's own component keeps its markup; its motion goes on a wrapper around it.
+const [motionOpen, motionClose] =
+  Own && node.motion ? [`<div class="ch-motion"${node.motion}>`, "</div>"] : ["", ""];
 ---
 {shownOpen && <Fragment set:html={shownOpen} />}
+{motionOpen && <Fragment set:html={motionOpen} />}
 {Own ? (
   <Own props={node.props} node={node} content={content} contentHtml={contentHtml} media={media}>
     {node.children.map((child) => <Self node={child} scope={scope} blocks={blocks} media={media} preview={preview} />)}
@@ -61,4 +68,5 @@ const [shownOpen, shownClose] = visibilityWrapper(node);
     </Fragment>
   )
 )}
+{motionClose && <Fragment set:html={motionClose} />}
 {shownClose && <Fragment set:html={shownClose} />}

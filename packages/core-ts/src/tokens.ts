@@ -685,3 +685,35 @@ export function designTokensDtcg(
     },
   };
 }
+
+// ── motion (RFC-0024 §1, §6) ────────────────────────────────────────────────────────────────
+
+export const MOTION_LEVELS = ["none", "subtle", "standard", "expressive"] as const;
+export type MotionLevel = (typeof MOTION_LEVELS)[number];
+
+/** Durations (ms), distances (px) and the stagger step (ms) at each level. */
+const MOTION: Record<
+  MotionLevel,
+  { dur: [number, number, number]; move: [number, number, number]; stagger: number }
+> = {
+  none: { dur: [0, 0, 0], move: [0, 0, 0], stagger: 0 },
+  // Fades only: short, and nothing travels further than 8 px.
+  subtle: { dur: [120, 200, 200], move: [4, 8, 8], stagger: 40 },
+  standard: { dur: [150, 320, 600], move: [8, 24, 48], stagger: 70 },
+  expressive: { dur: [200, 480, 850], move: [12, 40, 88], stagger: 90 },
+};
+
+/**
+ * The motion tokens for every level, each scoped to `:root[data-ch-motion="<level>"]` so a page's
+ * own level (RFC-0024 §1) needs no other CSS: `--ch-dur-{fast,normal,slow}`,
+ * `--ch-move-{s,m,l}`, `--ch-stagger` and the easing curves. The reader's reduced-motion setting
+ * is handled by the theme's motion layer, which only animates under `no-preference`.
+ */
+export function motionCss(): string {
+  const ease =
+    "--ch-ease-standard:cubic-bezier(.2,0,0,1);--ch-ease-emphasized:cubic-bezier(.3,1.25,.55,1);--ch-ease-exit:cubic-bezier(.4,0,1,1)";
+  return MOTION_LEVELS.map((level) => {
+    const m = MOTION[level];
+    return `:root[data-ch-motion="${level}"]{--ch-dur-fast:${m.dur[0]}ms;--ch-dur-normal:${m.dur[1]}ms;--ch-dur-slow:${m.dur[2]}ms;--ch-move-s:${m.move[0]}px;--ch-move-m:${m.move[1]}px;--ch-move-l:${m.move[2]}px;--ch-stagger:${m.stagger}ms;${ease}}`;
+  }).join("");
+}
