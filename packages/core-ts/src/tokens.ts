@@ -22,8 +22,11 @@ export const COLOR_ROLES = [
   "on-accent",
   "link",
   "focus",
+  "gradient",
 ] as const;
 export type ColorRole = (typeof COLOR_ROLES)[number];
+/** The roles taken from palette steps; `gradient` is derived from two of them afterwards. */
+type PaletteRole = Exclude<ColorRole, "gradient">;
 export type ColorRoles = Record<ColorRole, string>;
 
 export const COLOR_SCHEMES = ["tonal", "vibrant", "neutral", "mono"] as const;
@@ -154,7 +157,7 @@ const CHROMA: Record<ColorScheme, { primary: number; neutral: number }> = {
 };
 
 /** Text and UI pairs that must meet a ratio: [foreground, background, AA ratio, AAA ratio]. */
-const PAIRS: readonly [ColorRole, ColorRole, number, number][] = [
+const PAIRS: readonly [PaletteRole, PaletteRole, number, number][] = [
   ["text", "surface", 4.5, 7],
   ["text", "surface-muted", 4.5, 7],
   ["text", "surface-raised", 4.5, 7],
@@ -174,9 +177,9 @@ const PAIRS: readonly [ColorRole, ColorRole, number, number][] = [
  * white brand on a white page becomes a dark one).
  */
 function repair(
-  roles: Record<ColorRole, Oklch>,
-  fg: ColorRole,
-  bg: ColorRole,
+  roles: Record<PaletteRole, Oklch>,
+  fg: PaletteRole,
+  bg: PaletteRole,
   ratio: number,
   repairs: ColorRepair[],
   scheme: "light" | "dark",
@@ -224,7 +227,7 @@ export function expandColorTokens(settings: ColorTokenSettings): ColorTokens {
   const repairs: ColorRepair[] = [];
 
   const build = (dark: boolean): ColorRoles => {
-    const roles: Record<ColorRole, Oklch> = dark
+    const roles: Record<PaletteRole, Oklch> = dark
       ? {
           surface: n(0.17),
           "surface-muted": n(0.21),
@@ -295,7 +298,12 @@ export function expandColorTokens(settings: ColorTokenSettings): ColorTokens {
         ratio: onRatio,
       });
     }
-    return Object.fromEntries(COLOR_ROLES.map((r) => [r, oklchToHex(roles[r])])) as ColorRoles;
+    // The gradient's end is worked out from the settled brand and its text, not as a palette step.
+    const hex = Object.fromEntries(
+      COLOR_ROLES.filter((r) => r !== "gradient").map((r) => [r, oklchToHex(roles[r])]),
+    ) as ColorRoles;
+    hex.gradient = gradientEnd(hex.brand, hex["on-brand"], onRatio);
+    return hex;
   };
   const light = build(false);
   const dark = build(true);
@@ -313,6 +321,8 @@ export function legacyColorRoles(colors: {
   text?: string | undefined;
 }): ColorRoles {
   const brand = colors.brand ?? "#18181b";
+  const onBrand =
+    contrastRatio("#ffffff", brand) >= contrastRatio("#18181b", brand) ? "#ffffff" : "#18181b";
   return {
     surface: colors.surface ?? "#ffffff",
     "surface-muted": "#f4f4f5",
@@ -325,13 +335,28 @@ export function legacyColorRoles(colors: {
     border: "#e4e4e7",
     "border-strong": "#d4d4d8",
     brand,
-    "on-brand":
-      contrastRatio("#ffffff", brand) >= contrastRatio("#18181b", brand) ? "#ffffff" : "#18181b",
+    "on-brand": onBrand,
     accent: colors.link ?? "#0369a1",
     "on-accent": "#ffffff",
     link: colors.link ?? "#0369a1",
     focus: brand,
+    gradient: gradientEnd(brand, onBrand, 4.5),
   };
+}
+
+/**
+ * The far end of the brand gradient (RFC-0023 §4): the brand turned 40° towards the accent and a
+ * step further from its text, then moved until text on brand still reads on it — so the whole
+ * gradient keeps the contrast of the brand fill.
+ */
+export function gradientEnd(brand: string, onBrand: string, ratio: number): string {
+  const [L, C, H] = rgbToOklch(hexToRgb(brand) ?? [0, 0, 0]);
+  const darker = contrastRatio(onBrand, "#000000") > contrastRatio(onBrand, "#ffffff");
+  const step = darker ? -0.01 : 0.01;
+  let end: Oklch = [Math.min(1, Math.max(0, L + step * 8)), C, (H + 40) % 360];
+  for (let i = 0; i < 100 && contrastRatio(onBrand, oklchToHex(end)) < ratio; i++)
+    end = [Math.min(1, Math.max(0, end[0] + step)), end[1], end[2]];
+  return oklchToHex(end);
 }
 
 /**
@@ -448,6 +473,7 @@ export function colorPairs(
     })),
     { foreground: "on-brand" as const, background: "brand" as const, needs: onRatio },
     { foreground: "on-accent" as const, background: "accent" as const, needs: onRatio },
+    { foreground: "on-brand" as const, background: "gradient" as const, needs: onRatio },
   ].map((p) => ({
     ...p,
     light: round(contrastRatio(tokens.light[p.foreground], tokens.light[p.background])),

@@ -1,5 +1,5 @@
 # RFC-0023: Design tokens v2 and surface styles
-- Status: Accepted; 23a–23c shipped
+- Status: Accepted; 23a–23d shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0017 (theme settings, `set_theme_settings`, `x-contrast`), RFC-0018 (theme kit, CSS layers, 18d section styles), RFC-0021 (DESIGN.md, `render_page`, the design judge), RFC-0022 (surface tools);
@@ -181,3 +181,18 @@ They become `--ch-radius-{s,m,l}` and `--ch-space-{xs…xl}`, which the theme's 
   - **Defaults.** `small` and `cozy` are Tailwind's own values, so existing sites keep their look. One exception: the header search field takes the control radius, 4 px instead of 6 px.
   - **Agents.** `get_design` returns `shape`, and the theme's DESIGN.md says which corners and spacing fit which site.
   - **Checked.** Pill and airy, and square and compact, both rendered with `render_page` at 1440 and 390 px and passed every check, the tap targets on compact included.
+- **23d shipped.**
+  - **Surfaces.** `Band` and `Card` take `surface` (`SURFACE_STYLES`): `plain`, `muted`, `raised`, `inverse`, `brand`, `accent`, `gradient`, `mesh`, `dots`, `grid` and `noise`.
+    - `brand` was added to the §4 list so that every old tone has a surface with the same look.
+    - `tone` maps through `TONE_SURFACE`. Its `brand` maps to `brand`, not `accent` as §4 proposed, because pages with a brand band would otherwise change color.
+  - **Rendering.** The renderer writes `data-surface`; an old `tone` also stays as `data-tone` for themes that style it. The theme draws each surface from the color roles only:
+    - `gradient` runs from the brand to a new `gradient` role: the brand turned 40° towards the accent, then moved until text on brand still reads on it. The expansion checks that pair, so text on a gradient keeps its contrast; a test runs every seed, scheme and level.
+    - `mesh` is three soft radial lights from the brand and accent over the muted surface.
+    - `dots` and `grid` are CSS gradients from the border roles, not SVG data URIs, so they follow light and dark through `light-dark()`.
+    - `noise` is a fixed grey SVG grain at 18% opacity.
+    - Without `color-mix()` or gradient interpolation, browsers fall back to the plain fill.
+  - **Anchors.** `Band.anchor` (`^[a-z][a-z0-9-]{0,40}$`) becomes the band's `id`, so links can jump to it. Anchors starting with `ch-` are dropped so they cannot clash with the renderer's own ids. A band with an anchor keeps a small scroll margin.
+  - **Text on loud surfaces.** Buttons, links and secondary text on loud surfaces (inverse, brand, accent, gradient) follow the surface's own text color, as the loud tones did.
+  - **Guidance.** DESIGN guidance point 2 and the theme's DESIGN.md say when to use which surface: gradient and mesh at most once a page, for the hero or the call to action (open question 4).
+  - **Checked.** A page with every surface passed the contrast check in light, dark and auto, at 1440 and 390 px.
+  - **Follow-up.** The accent derived from a violet seed (hue + 150°) comes out a dark mustard once repaired for white text. Open question 3 (how to derive the accent) is worth revisiting in 23e.

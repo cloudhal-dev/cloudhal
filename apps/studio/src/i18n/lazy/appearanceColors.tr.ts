@@ -37,6 +37,7 @@ export const messages: NamespaceMessages<"appearanceColors"> = {
       "on-accent": "Vurgu üstü metin",
       link: "Bağlantı",
       focus: "Odak halkası",
+      gradient: "Geçiş sonu",
     },
   },
 };

@@ -228,3 +228,32 @@ describe("surfaces in markdown bodies (RFC-0020 §5)", () => {
     ).toHaveLength(2);
   });
 });
+
+describe("surface styles and anchors (RFC-0023 §4)", () => {
+  it("paints a band or card with its surface, maps an old tone, and writes a safe anchor", () => {
+    const html = renderSurface(
+      surface([
+        { id: "root", component: "Stack", children: ["hero", "card", "old", "bad"] },
+        {
+          id: "hero",
+          component: "Band",
+          props: { surface: "gradient", tone: "muted", anchor: "pricing" },
+          children: ["t"],
+        },
+        { id: "t", component: "Heading", props: { text: "Plans", level: 2 } },
+        { id: "card", component: "Card", props: { surface: "dots" }, children: ["t2"] },
+        { id: "t2", component: "Text", props: { text: "Dots" } },
+        { id: "old", component: "Band", props: { tone: "inverse" }, children: ["t3"] },
+        { id: "t3", component: "Text", props: { text: "Old" } },
+        { id: "bad", component: "Band", props: { anchor: "ch-field-1" }, children: ["t4"] },
+        { id: "t4", component: "Text", props: { text: "Bad" } },
+      ]),
+    );
+    // `surface` wins over `tone`
+    expect(html).toContain('<div class="ch-band" id="pricing" data-surface="gradient">');
+    expect(html).toContain('<div class="ch-card" data-surface="dots">');
+    expect(html).toContain('<div class="ch-band" data-surface="inverse" data-tone="inverse">');
+    // an anchor that could clash with the renderer's own ids is dropped
+    expect(html).not.toContain('id="ch-field-1"');
+  });
+});

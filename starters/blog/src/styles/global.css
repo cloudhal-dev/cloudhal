@@ -617,30 +617,135 @@ footer .ch-nav-menu > ul {
 .ch-band[data-spacing="xl"] {
   @apply py-24;
 }
-[data-tone="muted"]:is(.ch-band, .ch-card) {
-  @apply bg-zinc-50;
+/*
+ * Surfaces (RFC-0023 §4): what a band or card is painted with, from the color roles only, so
+ * text keeps the contrast the token expansion checked. `data-tone` (older pages) is an alias.
+ */
+:is([data-surface="muted"], [data-tone="muted"]):is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-muted);
 }
-[data-tone="brand"]:is(.ch-band, .ch-card) {
+[data-surface="raised"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-raised);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 6px 20px -6px rgb(0 0 0 / 0.12);
+}
+:is([data-surface="brand"], [data-tone="brand"]):is(.ch-band, .ch-card) {
   background: var(--ch-color-brand);
-  @apply text-(--ch-color-on-brand);
+  color: var(--ch-color-on-brand);
 }
-[data-tone="inverse"]:is(.ch-band, .ch-card) {
-  @apply bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
+:is([data-surface="inverse"], [data-tone="inverse"]):is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-inverse);
+  color: var(--ch-color-text-inverse);
 }
-[data-tone="brand"] :is(.ch-text, .ch-stat__label, .ch-stat__detail),
-[data-tone="inverse"] :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
+[data-surface="accent"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-accent);
+  color: var(--ch-color-on-accent);
+}
+/* From the brand to its gradient end: text on brand reads on both (the expansion checks it). */
+[data-surface="gradient"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-brand);
+  background-image: linear-gradient(
+    135deg in oklch,
+    var(--ch-color-brand),
+    var(--ch-color-gradient)
+  );
+  color: var(--ch-color-on-brand);
+}
+/* Soft light from the brand and accent over the muted surface; plain muted where unsupported. */
+[data-surface="mesh"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image:
+    radial-gradient(
+      at 12% 18%,
+      color-mix(in oklch, var(--ch-color-brand) 16%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      at 88% 8%,
+      color-mix(in oklch, var(--ch-color-accent) 14%, transparent),
+      transparent 50%
+    ),
+    radial-gradient(
+      at 55% 100%,
+      color-mix(in oklch, var(--ch-color-brand) 9%, transparent),
+      transparent 60%
+    );
+}
+[data-surface="dots"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image: radial-gradient(var(--ch-color-border-strong) 1px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+[data-surface="grid"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image:
+    linear-gradient(var(--ch-color-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ch-color-border) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+/* A fixed grey grain (no color in it), faint on light and dark alike. */
+[data-surface="noise"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* Loud surfaces: their text, buttons and links follow the surface's own text color. */
+:is(
+  [data-surface="brand"],
+  [data-surface="inverse"],
+  [data-surface="accent"],
+  [data-surface="gradient"],
+  [data-tone="brand"],
+  [data-tone="inverse"]
+) :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
   color: inherit;
   opacity: 0.85;
 }
-/* Buttons on a dark band or card keep their contrast. */
-:is([data-tone="brand"], [data-tone="inverse"]) .ch-button--primary {
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-button--primary {
   @apply bg-(--ch-color-surface) text-(--ch-color-text);
 }
-:is([data-tone="brand"], [data-tone="inverse"]) .ch-button--secondary {
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-button--secondary {
   @apply border-current/60 text-inherit;
 }
-:is([data-tone="brand"], [data-tone="inverse"]) .ch-link {
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-link {
   color: inherit;
+}
+:is(
+  [data-surface="brand"],
+  [data-surface="inverse"],
+  [data-surface="accent"],
+  [data-surface="gradient"],
+  [data-surface="raised"]
+).ch-card {
+  border-color: transparent;
+}
+/* A band with an anchor stops below the top of the window when a link jumps to it. */
+.ch-band[id] {
+  scroll-margin-top: 1rem;
 }
 .ch-card {
   @apply flex flex-col gap-3 rounded-lg border border-zinc-200 p-5 no-underline;

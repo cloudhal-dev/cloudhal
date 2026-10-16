@@ -102,6 +102,32 @@ const TONE = ["surface", "muted", "brand", "inverse"] as const;
 const ALIGN = ["start", "center", "end", "stretch"] as const;
 const space = (title: Localized) => ({ type: "string" as const, enum: SPACE, title });
 const tone = { type: "string" as const, enum: TONE, title: { en: "Tone", tr: "Ton" } };
+/**
+ * RFC-0023 §4: what a band or card is painted with, drawn by the theme from the color roles (never
+ * by the agent). `surface` wins over `tone`, which stays for existing pages.
+ */
+export const SURFACE_STYLES = [
+  "plain",
+  "muted",
+  "raised",
+  "inverse",
+  "brand",
+  "accent",
+  "gradient",
+  "mesh",
+  "dots",
+  "grid",
+  "noise",
+] as const;
+/** Old `tone` values as surfaces (`surface` is the page, so `plain`). */
+export const TONE_SURFACE: Readonly<
+  Record<(typeof TONE)[number], (typeof SURFACE_STYLES)[number]>
+> = { surface: "plain", muted: "muted", brand: "brand", inverse: "inverse" };
+const surface = {
+  type: "string" as const,
+  enum: SURFACE_STYLES,
+  title: { en: "Surface", tr: "Yüzey" },
+};
 const align = { type: "string" as const, enum: ALIGN, title: { en: "Align", tr: "Hizalama" } };
 const label = (max: number) => ({
   type: "string" as const,
@@ -176,26 +202,32 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     name: "Band",
     title: { en: "Band", tr: "Bant" },
     description: {
-      en: "A full-width band with a tone: the building block of landing pages.",
-      tr: "Tonlu, tam genişlikte bir bant.",
+      en: "A full-width band with a surface: the building block of landing pages. `anchor` lets a link jump to it (#anchor).",
+      tr: "Yüzeyli, tam genişlikte bir bant; `anchor` ile bağlantı verilebilir.",
     },
     category: "layout",
     props: schema({
+      surface,
       tone,
+      anchor: {
+        type: "string",
+        pattern: "^[a-z][a-z0-9-]{0,40}$",
+        title: { en: "Anchor", tr: "Çapa" },
+      },
       width: { type: "string", enum: ["narrow", "wide", "full"] },
       spacing: space({ en: "Spacing", tr: "Boşluk" }),
     }),
     children: "any",
-    example: { props: { tone: "muted", width: "wide", spacing: "xl" } },
+    example: { props: { surface: "muted", width: "wide", spacing: "xl", anchor: "features" } },
   },
   {
     name: "Card",
     title: { en: "Card", tr: "Kart" },
     description: { en: "A framed group; a link when `href` is set.", tr: "Çerçeveli bir grup." },
     category: "layout",
-    props: schema({ tone, href }),
+    props: schema({ surface, tone, href }),
     children: "any",
-    example: { props: { tone: "surface" } },
+    example: { props: { surface: "raised" } },
   },
   {
     name: "Spacer",
