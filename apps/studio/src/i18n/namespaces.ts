@@ -15,6 +15,7 @@ import type { Locale } from "./index.tsx";
 import type { messages as aiSettings } from "./lazy/aiSettings.en.ts";
 import type { messages as analytics } from "./lazy/analytics.en.ts";
 import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.ts";
+import type { messages as appearanceColors } from "./lazy/appearanceColors.en.ts";
 import type { messages as bodyEditor } from "./lazy/bodyEditor.en.ts";
 import type { messages as build } from "./lazy/build.en.ts";
 import type { messages as comments } from "./lazy/comments.en.ts";
@@ -30,6 +31,7 @@ export interface NamespaceCatalogs {
   aiSettings: DeepString<(typeof aiSettings)["aiSettings"]>;
   analytics: DeepString<(typeof analytics)["analytics"]>;
   analyticsSettings: DeepString<(typeof analyticsSettings)["analyticsSettings"]>;
+  appearanceColors: DeepString<(typeof appearanceColors)["appearanceColors"]>;
   bodyEditor: DeepString<(typeof bodyEditor)["bodyEditor"]>;
   build: DeepString<(typeof build)["build"]>;
   comments: DeepString<(typeof comments)["comments"]>;
@@ -57,6 +59,10 @@ const LOADERS: { [N in Namespace]: Record<Locale, Loader<N>> } = {
   analyticsSettings: {
     en: () => import("./lazy/analyticsSettings.en.ts"),
     tr: () => import("./lazy/analyticsSettings.tr.ts"),
+  },
+  appearanceColors: {
+    en: () => import("./lazy/appearanceColors.en.ts"),
+    tr: () => import("./lazy/appearanceColors.tr.ts"),
   },
   bodyEditor: {
     en: () => import("./lazy/bodyEditor.en.ts"),

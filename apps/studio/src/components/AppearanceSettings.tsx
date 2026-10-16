@@ -7,13 +7,13 @@
  */
 
 import { validateProps } from "@cloudhal/core-ts/blocks";
-import { COLOR_ROLES, siteColorTokens } from "@cloudhal/core-ts/tokens";
-import { Banner, BlockPropsForm, Button, ColorRolePreview, SkeletonLine, Text } from "@cloudhal/ui";
+import { Banner, BlockPropsForm, Button, SkeletonLine, Text } from "@cloudhal/ui";
 import { WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
+import { AppearanceColors } from "./AppearanceColors.tsx";
 import { useBlockEnumLabel } from "./BlockSection.tsx";
 import { SettingsSection } from "./Settings.tsx";
 import { useToast } from "./Toast.ts";
@@ -40,11 +40,6 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
     () => (saved?.schema && values ? validateProps(saved.schema, values) : []),
     [saved, values],
   );
-  const colors = useMemo(() => {
-    const props = saved?.schema?.properties as Record<string, { default?: unknown }> | undefined;
-    if (!props || !values || !("seed" in props || "brand" in props)) return undefined;
-    return siteColorTokens(values, props);
-  }, [saved, values]);
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
       api.themeSettings.save(siteId, { rev: saved?.rev ?? 0, values: v }),
@@ -70,6 +65,8 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
         description={t("siteSettings.appearance.none", { theme: saved.theme })}
       />
     );
+  const properties = saved.schema.properties as Record<string, { default?: unknown }>;
+  const showColors = "seed" in properties || "brand" in properties;
   const dirty = JSON.stringify(values) !== JSON.stringify(saved.values);
   const disabled = !gate.allowed;
   return (
@@ -127,58 +124,10 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
             moveDown: t("editor.blocks.moveDown"),
           }}
         />
-        {colors && (
-          <ColorRolePreview
-            schemes={[
-              {
-                id: "light",
-                label: t("siteSettings.appearance.colors.light"),
-                roles: colors.light,
-              },
-              ...(colors.source === "seed"
-                ? [
-                    {
-                      id: "dark",
-                      label: t("siteSettings.appearance.colors.dark"),
-                      roles: colors.dark,
-                    },
-                  ]
-                : []),
-            ]}
-            roles={COLOR_ROLES.map((role) => ({
-              role,
-              label: t(`siteSettings.appearance.colors.roles.${role}`),
-            }))}
-            notes={colors.repairs.map((r) =>
-              t(
-                r.kind === "pair"
-                  ? "siteSettings.appearance.colors.repairPair"
-                  : "siteSettings.appearance.colors.repairFill",
-                {
-                  scheme: t(`siteSettings.appearance.colors.${r.scheme}`),
-                  role: t(`siteSettings.appearance.colors.roles.${r.role}`),
-                  against: t(`siteSettings.appearance.colors.roles.${r.against}`),
-                  direction: t(`siteSettings.appearance.colors.${r.direction}`),
-                  steps: String(r.steps),
-                  ratio: String(r.ratio),
-                },
-              ),
-            )}
-            labels={{
-              preview: t("siteSettings.appearance.colors.preview"),
-              heading: t("siteSettings.appearance.colors.heading"),
-              body: t("siteSettings.appearance.colors.body"),
-              link: t("siteSettings.appearance.colors.link"),
-              button: t("siteSettings.appearance.colors.button"),
-              accent: t("siteSettings.appearance.colors.accent"),
-              notes: t("siteSettings.appearance.colors.notes"),
-            }}
-          />
-        )}
-        {colors?.source === "legacy" && colors.seedAvailable && (
-          <Text variant="secondary" size="sm">
-            {t("siteSettings.appearance.colors.legacy")}
-          </Text>
+        {showColors && (
+          <Suspense fallback={<SkeletonLine />}>
+            <AppearanceColors properties={properties} values={values} />
+          </Suspense>
         )}
         <Text variant="secondary" size="sm">
           {disabled && gate.reason ? gate.reason : t("siteSettings.appearance.publishHint")}
