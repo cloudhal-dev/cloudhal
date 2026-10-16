@@ -17,6 +17,7 @@ import {
   isInteractive,
   MOTION_HOVERS,
   MOTION_REVEALS,
+  MOTION_SCROLLS,
   MOTION_SPEEDS,
   MOTION_STAGGER,
   resolveProps,
@@ -219,6 +220,8 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
 
 interface MotionFields {
   reveal?: string | undefined;
+  scroll?: string;
+  depth?: number;
   hover?: string;
   speed?: string;
   delay?: number;
@@ -248,6 +251,13 @@ export function motionAttrs(
   if (motion?.hover && (MOTION_HOVERS as readonly string[]).includes(motion.hover))
     out.push(` data-ch-hover="${motion.hover}"`);
   if (reveal && motion?.replay === true) out.push(" data-ch-replay");
+  // RFC-0024 24b: moves with the scroll instead (never together with a reveal).
+  if (!reveal && motion?.scroll && (MOTION_SCROLLS as readonly string[]).includes(motion.scroll)) {
+    out.push(` data-ch-scroll="${motion.scroll}"`);
+    const depth = motion.depth;
+    if (Number.isInteger(depth) && depth !== 0 && Math.abs(depth as number) <= 3)
+      out.push(` data-ch-dep="${depth}"`);
+  }
   return out.join("");
 }
 
@@ -567,6 +577,16 @@ export function primitiveHtml(
       return `<div class="ch-tabs__panel" role="group" aria-label="${escapeHtml(str(p.label))}">${CHILDREN}</div>`;
     case "Accordion":
       return `<div class="ch-accordion" data-group="${id}">${CHILDREN}</div>`;
+    // RFC-0024 §3: scroll storytelling; the motion module writes the step being read to `step`.
+    case "Scrolly": {
+      const bound = node.raw?.step as { path?: unknown } | undefined;
+      const step = bound && typeof bound === "object" ? str(bound.path) : "";
+      return `<div class="ch-scrolly"${attr("side", p.side, ["start", "end"])}${attr("ratio", p.ratio, ["1-1", "2-1", "1-2"])}${/^\/[^\s"<>]{0,199}$/.test(step) ? ` data-ch-step-path="${escapeHtml(step)}"` : ""}>${CHILDREN}</div>`;
+    }
+    case "Step":
+      return `<div class="ch-step">${CHILDREN}</div>`;
+    case "ScrollProgress":
+      return `<div class="ch-progress"${attr("placement", p.placement ?? "page", ["page", "section"])}${attr("tone", p.tone, ["brand", "accent", "neutral"])} aria-hidden="true"><span class="ch-progress__bar"></span></div>`;
     case "Disclosure":
       return `<details class="ch-disclosure"${p.open === true ? " open" : ""}><summary>${escapeHtml(str(p.summary))}</summary><div class="ch-disclosure__body">${CHILDREN}</div></details>`;
     default:

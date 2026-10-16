@@ -229,6 +229,19 @@ describe("render_page (RFC-0021 §4)", () => {
     ]);
   });
 
+  it("takes frames spread over the page, with motion full unless set (RFC-0024 24b)", async () => {
+    const log: string[] = [];
+    const render = { renderer: fakeRenderer(log), limiter: new RenderLimiter() };
+    const out = await runTool(def, { siteId, pageId, widths: [1440], frames: 3 }, ctx({ render }), {
+      policy,
+    });
+    const result = out.result as { motion: string; images: { jpegs: Uint8Array[] }[] };
+    expect(result.motion).toBe("full");
+    expect(log.find((l) => l.startsWith("open"))).toMatch(/ full /);
+    // a 2,000 px page at 900 px a screen: 0, 550 and 1,100
+    expect(result.images[0]?.jpegs.map((j) => j[3])).toEqual([0, 550 % 256, 1100 % 256]);
+  });
+
   it("is rate-limited per key, and a browser that hangs fails within the timeout", async () => {
     const log: string[] = [];
     const limiter = new RenderLimiter({ perKeyPerMinute: 1 });

@@ -284,7 +284,7 @@ describe("motion presets (RFC-0024 24a)", () => {
       '<div data-ch-reveal="fade" data-ch-speed="slow" data-ch-d="1" class="ch-card">',
     );
     expect(html).toContain(
-      '<script type="module" src="/_cloudhal/motion.1.js"></script></section>',
+      '<script type="module" src="/_cloudhal/motion.2.js"></script></section>',
     );
   });
 
@@ -304,6 +304,48 @@ describe("motion presets (RFC-0024 24a)", () => {
     const still = renderSurface(
       surface([{ id: "root", component: "Heading", props: { text: "Still", level: 1 } }]),
     );
-    expect(still).not.toContain("motion.1.js");
+    expect(still).not.toContain("motion.2.js");
+  });
+});
+
+describe("scroll effects and scroll stories (RFC-0024 24b)", () => {
+  it("draws a scroll story live, with its step path, steps, a progress bar and scroll effects", () => {
+    const html = renderSurface(
+      surface(
+        [
+          { id: "root", component: "Stack", children: ["bar", "story", "pic"] },
+          { id: "bar", component: "ScrollProgress", props: { placement: "page", tone: "accent" } },
+          {
+            id: "story",
+            component: "Scrolly",
+            props: { step: { path: "/step" }, side: "end", ratio: "2-1" },
+            children: ["n", "s1", "s2"],
+          },
+          { id: "n", component: "Stat", props: { value: { path: "/step" }, label: "Step" } },
+          { id: "s1", component: "Step", children: ["t1"] },
+          { id: "t1", component: "Text", props: { text: "First" } },
+          { id: "s2", component: "Step", children: ["t2"] },
+          { id: "t2", component: "Text", props: { text: "Second" } },
+          {
+            id: "pic",
+            component: "Heading",
+            props: { text: "Moving", level: 2 },
+            motion: { scroll: "parallax", depth: -2 },
+          },
+        ],
+        { step: 1 },
+      ),
+    );
+    expect(html).toContain(
+      '<div class="ch-progress" data-placement="page" data-tone="accent" aria-hidden="true"><span class="ch-progress__bar"></span></div>',
+    );
+    expect(html).toContain(
+      '<div class="ch-scrolly" data-side="end" data-ratio="2-1" data-ch-step-path="/step">',
+    );
+    expect(html).toContain('<div class="ch-step"><div class="ch-text"><p>First</p>');
+    expect(html).toContain('data-ch-scroll="parallax" data-ch-dep="-2"');
+    // the story writes into the data, so the surface is live, and the motion module observes it
+    expect(html).toContain('data-ch-surface="ch-sec_surface0001"');
+    expect(html).toContain('<script type="module" src="/_cloudhal/motion.2.js"></script>');
   });
 });

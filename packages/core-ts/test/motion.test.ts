@@ -124,6 +124,81 @@ describe("motion on components (RFC-0024 §2)", () => {
   });
 });
 
+describe("scroll effects and scroll stories (RFC-0024 24b)", () => {
+  it("takes a scroll effect with a depth, but not together with a reveal or on a form control", () => {
+    expect(
+      issues([
+        {
+          id: "root",
+          component: "Image",
+          props: { asset: "asset:ast_example01", alt: "Harbour" },
+          motion: { scroll: "parallax", depth: -2 },
+        } as SurfaceComponent,
+      ]),
+    ).toEqual([]);
+    const out = issues([
+      { id: "root", component: "Stack", children: ["a", "b"] },
+      {
+        id: "a",
+        component: "Heading",
+        props: { text: "Hi", level: 1 },
+        motion: { reveal: "rise", scroll: "fade-through", depth: 2 },
+      },
+      {
+        id: "b",
+        component: "Slider",
+        props: { label: "Seats", min: 1, max: 9, value: { path: "/s" } },
+        motion: { scroll: "pan", depth: 0 },
+      },
+    ] as SurfaceComponent[]);
+    expect(out).toEqual(
+      expect.arrayContaining([
+        "/components/1/motion/scroll use reveal or scroll, not both",
+        "/components/1/motion/depth only with scroll parallax or pan",
+        "/components/2/motion/scroll form controls do not move with the scroll",
+        "/components/2/motion/depth -3 to 3, not 0 (negative moves the other way)",
+      ]),
+    );
+    expect(repairMotion({ scroll: "scroll-fade", depth: 7 }, "i").motion).toEqual({
+      scroll: "fade-through",
+      depth: 3,
+    });
+  });
+
+  it("checks a scroll story: a bound step, one child in view, then 2–12 Steps", () => {
+    const story = [
+      {
+        id: "root",
+        component: "Scrolly",
+        props: { step: { path: "/step" } },
+        children: ["chart", "s1", "s2"],
+      },
+      { id: "chart", component: "Stat", props: { value: { path: "/step" }, label: "Step" } },
+      { id: "s1", component: "Step", children: ["t1"] },
+      { id: "t1", component: "Text", props: { text: "First" } },
+      { id: "s2", component: "Step", children: ["t2"] },
+      { id: "t2", component: "Text", props: { text: "Second" } },
+    ] as SurfaceComponent[];
+    expect(issues(story)).toEqual([]);
+    expect(usesMotion(surface(story))).toBe(true);
+    const bad = issues([
+      { id: "root", component: "Stack", children: ["sc", "lost"] },
+      { id: "sc", component: "Scrolly", props: { step: "/step" }, children: ["s1", "s2"] },
+      { id: "s1", component: "Step" },
+      { id: "s2", component: "Step" },
+      { id: "lost", component: "Step" },
+    ] as SurfaceComponent[]);
+    expect(bad).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^\/components\/1\/props\/step bind it to the surface's data/),
+        "/components/1/children one child to keep in view, then 2 to 12 Steps",
+        "/components/4 a Step belongs inside a Scrolly",
+      ]),
+    );
+    expect(catalogPrompt(catalog, "en")).toContain("Scroll story: a Scrolly holds one child");
+  });
+});
+
 describe("motion tokens (RFC-0024 §6)", () => {
   it("writes one set per level: nothing moves at none, fades only at subtle", () => {
     const css = motionCss();

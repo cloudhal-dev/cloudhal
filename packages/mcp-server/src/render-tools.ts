@@ -60,6 +60,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "chart-empty": "empty charts",
   "reduced-motion": "motion under reduced motion",
   "motion-cls": "layout shift",
+  "motion-budget": "too much motion",
 };
 
 function summary(r: RenderPageResult): string {
@@ -134,6 +135,13 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
           fullPage: {
             type: "boolean",
             description: "Screenshots down the page, up to 4 per width (default true)",
+          },
+          frames: {
+            type: "integer",
+            minimum: 1,
+            maximum: 6,
+            description:
+              "Screenshots at this many evenly spaced scroll positions instead of one per viewport, with motion full unless set, to see a scroll story (Scrolly) or scroll effects (RFC-0024)",
           },
           motion: {
             type: "string",
@@ -239,8 +247,15 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
               ? "dark"
               : "light";
         const other: RenderScheme = scheme === "light" ? "dark" : "light";
+        const frames = Number.isInteger(a.frames)
+          ? Math.min(6, Math.max(1, a.frames as number))
+          : 0;
         const motion: RenderMotion =
-          a.motion === "full" || a.motion === "reduce" ? a.motion : "static";
+          a.motion === "full" || a.motion === "reduce" || a.motion === "static"
+            ? a.motion
+            : frames
+              ? "full"
+              : "static";
         const checkOther = mode === "auto" || (mode === "dark" && scheme === "light");
         try {
           const r = await renderPage(ctx.render.renderer, doc.url, {
@@ -248,6 +263,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             fullPage: a.fullPage !== false,
             scheme,
             motion,
+            ...(frames ? { frames } : {}),
             timeoutMs: ctx.render.timeoutMs ?? 20_000,
           });
           if (checkOther) {

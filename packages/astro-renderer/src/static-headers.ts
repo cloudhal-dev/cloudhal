@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { CHART_SCRIPT } from "./chart.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
-import { MOTION_SCRIPT } from "./motion-client.ts";
+import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
@@ -77,6 +77,7 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [CHART_SCRIPT.path, CHART_SCRIPT.code],
     // RFC-0024 §7: the motion module, loaded by pages whose surfaces move.
     [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
+    ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));

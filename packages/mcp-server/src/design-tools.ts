@@ -159,7 +159,7 @@ function designText(r: DesignResult): string {
       ? `Shape (RFC-0023): radius ${r.shape.radius}, density ${r.shape.density}. Change them with set_theme_settings: radius (${RADII.join(" | ")}; full makes pill buttons, cards stay modest), density (${DENSITIES.join(" | ")}).`
       : "",
     r.motion
-      ? `Motion (RFC-0024): the site's level is ${r.motion}. Change it with set_theme_settings: motion (${MOTION_LEVELS.join(" | ")}); a page can set its own level. Give components motion presets in patch_draft (get_catalog explains them); render_page renders with reduced motion by default, motion "full" plays them and checks layout shift.`
+      ? `Motion (RFC-0024): the site's level is ${r.motion}. Change it with set_theme_settings: motion (${MOTION_LEVELS.join(" | ")}); a page can set its own level. Give components motion presets in patch_draft (get_catalog explains them); render_page renders with reduced motion by default, motion "full" plays them and checks layout shift, and frames shows a scroll story at several scroll positions.`
       : "",
     r.guidance,
     ...(r.design.warnings.length

@@ -1,5 +1,5 @@
 # RFC-0024: Motion, scroll and ambient effects
-- Status: Accepted (2026-10-16; open questions decided below); 24a shipped
+- Status: Accepted (2026-10-16; open questions decided below); 24a and 24b shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0018 §7 and phase 18f (motion presets, never shipped; this RFC replaces them), RFC-0020 (surfaces, the interaction runtime, "motion stays CSS"), RFC-0021 (`render_page`, the design judge), RFC-0022 (functions, data bindings), RFC-0023 (tokens, surfaces, DTCG export);
@@ -304,6 +304,31 @@ These were decided on 2026-10-16. The test for each was which option serves deve
     - `lift` and the pointer-driven `tilt` worked;
     - `render_page` passed every check with motion `static` and `full`.
   - **Left for later.** The pause control is in the module and the theme CSS. It is rendered once loops exist (24c). Studio's motion badges come in 24e.
+- **24b shipped.**
+  - **Scroll effects.** `motion.scroll` takes `parallax`, `fade-through`, `scale-through`, `rotate-through` or `pan`; `parallax` and `pan` take a `depth` from -3 to 3 (not 0).
+    - The catalog refuses scroll together with a reveal (they would fight over the same properties) and on form controls, and repairs common names (`scroll-fade` → `fade-through`, a depth of 7 → 3).
+    - With scroll-driven animations (Chrome, Safari) the theme plays them over `view()` with no script. Elsewhere, the motion module writes the progress as `--ch-p` once a frame from passive scroll events, which fallback rules read.
+    - Only `fade-through` plays at `subtle`; nothing moves under reduced motion.
+  - **`Scrolly` and `Step`.** These replace §3's `Step.set`: rather than each step writing its own value, the story writes the number of the step being read to one binding (`step: {path}`).
+    - The first child changes with it through `visible` conditions or `choose`, so every effect is expressed with existing data bindings.
+    - The catalog checks the shape: a bound step, one child in view, then 2–12 `Step`s, and a `Step` only inside a `Scrolly`.
+    - A scroll story makes its surface live. The motion module marks the step crossing the middle of the screen and sends its number in a `ch:set` event, which the interaction runtime (now `surface.9.js`, with 8 as an alias) writes to the data. This works at every motion level, since it is content, not movement.
+    - **Layout.** On wide screens the first child is sticky beside the steps (`side`, `ratio`); on phones it is sticky above them, at most 45% of the screen. The step being read gets a brand rule at its edge rather than dimming the others, so contrast holds.
+    - Without JavaScript the steps read in order next to the first child in its starting state.
+  - **`ScrollProgress`.** It shows the page or the section; uses `scroll()` or a named view timeline (`--ch-section`), with the module's fallback elsewhere; and is hidden at `none`.
+  - **The motion module** is now `motion.2.js` (1.6 KB gzip), with 1 as an alias.
+  - **`render_page`.**
+    - `frames` (1–6) takes screenshots at evenly spaced scroll positions, each after the page settles, with motion `full` unless set, so an agent can see a scroll story.
+    - The new `motion-budget` check flags more than 6 scroll effects or more than one scroll story on a page. §2's per-page budgets are this check rather than `patch_draft` warnings, since the store has no warning channel.
+  - **Interop.** A2UI exports a scroll story as a column (the first part, then the steps) and leaves the progress bar out.
+  - **Guidance.** The catalog prompt, DESIGN guidance point 8, `get_design` and the skill's recipes say when to use a scroll story and how to check it.
+  - **Checked** in Chrome on a demo scroll story:
+    - each step changed the bound stat (0 → 120 → 740) and the shown badge;
+    - the first child stayed pinned;
+    - the progress bar and parallax followed the scroll;
+    - `render_page` frames showed each step at 1440 and 390 px.
+
+    Its only finding was the demo's own heading order.
 
 ## Sources
 - **Scroll-driven animations:**

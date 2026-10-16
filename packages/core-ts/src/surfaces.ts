@@ -717,6 +717,59 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     children: "any",
     example: { props: { summary: "Can I cancel any time?" } },
   },
+  // RFC-0024 §3: scroll storytelling and progress.
+  {
+    name: "Scrolly",
+    title: { en: "Scroll story", tr: "Kaydırmalı anlatım" },
+    description: {
+      en: "Scroll storytelling: the first child (a chart, a stat, an image) stays in view while the Step children scroll past, and the step being read is written to `step` (a binding), so the first child can change with it through `visible` conditions or `choose`.",
+      tr: "Kaydırmalı anlatım: ilk öğe görünür kalır, Step'ler kayarken okunan adımın numarası `step` yoluna yazılır.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        step: {
+          type: "object",
+          additionalProperties: false,
+          required: ["path"],
+          properties: { path: { type: "string", pattern: "^/[^\\s]{0,199}$" } },
+          title: { en: "Step number", tr: "Adım numarası" },
+        },
+        side: { type: "string", enum: ["start", "end"] },
+        ratio: { type: "string", enum: ["1-1", "2-1", "1-2"] },
+      },
+      ["step"],
+    ),
+    children: "any",
+    example: { props: { step: { path: "/step" }, side: "start", ratio: "1-1" } },
+  },
+  {
+    name: "Step",
+    title: { en: "Step", tr: "Adım" },
+    description: {
+      en: "One step of a scroll story (inside Scrolly).",
+      tr: "Kaydırmalı anlatımın bir adımı.",
+    },
+    category: "interactive",
+    props: schema({}),
+    children: "any",
+    example: { props: {} },
+  },
+  {
+    name: "ScrollProgress",
+    title: { en: "Scroll progress", tr: "Okuma ilerlemesi" },
+    description: {
+      en: "A thin bar showing how far the reader is through the page (placement page) or this section.",
+      tr: "Okurun sayfada ya da bu bölümde ne kadar ilerlediğini gösteren ince çubuk.",
+    },
+    category: "content",
+    props: schema({
+      placement: { type: "string", enum: ["page", "section"] },
+      tone: { type: "string", enum: ["brand", "accent", "neutral"] },
+    }),
+    children: "none",
+    example: { props: { placement: "page", tone: "brand" } },
+  },
 ];
 
 // Primitive props follow the same subset as block props; checked once at load. Bound example
@@ -1515,10 +1568,16 @@ const HOVER_FITS: Partial<Record<(typeof MOTION_HOVERS)[number], readonly string
   magnetic: ["Button", "Link"],
   spotlight: ["Card", "Band"],
 };
+/** Scroll effects: continuous, tied to the component's place in the viewport (RFC-0024 §2). */
+export const MOTION_SCROLLS = [
+  "parallax",
+  "fade-through",
+  "scale-through",
+  "rotate-through",
+  "pan",
+] as const;
 /** Fields later phases add: written now, they are refused with when they arrive. */
 const MOTION_LATER: Record<string, string> = {
-  scroll: "RFC-0024 phase 24b",
-  depth: "RFC-0024 phase 24b",
   loop: "RFC-0024 phase 24c",
 };
 /** Names models often write for a preset, and the preset they mean. */
@@ -1557,6 +1616,17 @@ const MOTION_ALIASES: Record<string, string> = {
   "3d": "tilt",
   medium: "normal",
   quick: "fast",
+  parallax: "parallax",
+  "parallax-scroll": "parallax",
+  "fade-scroll": "fade-through",
+  "scroll-fade": "fade-through",
+  "scale-scroll": "scale-through",
+  "scroll-scale": "scale-through",
+  "zoom-scroll": "scale-through",
+  "rotate-scroll": "rotate-through",
+  rotate: "rotate-through",
+  "horizontal-scroll": "pan",
+  slide: "pan",
 };
 /** Field names models write for a `motion` field. */
 const MOTION_FIELD_ALIASES: Record<string, string> = {
@@ -1584,12 +1654,29 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
   for (const key of Object.keys(motion)) {
     if (MOTION_LATER[key])
       issues.push({ path: `${at}/${key}`, message: `not available yet (${MOTION_LATER[key]})` });
-    else if (!["reveal", "hover", "speed", "delay", "stagger", "replay"].includes(key))
+    else if (
+      !["reveal", "hover", "speed", "delay", "stagger", "replay", "scroll", "depth"].includes(key)
+    )
       issues.push({ path: `${at}/${key}`, message: "unknown motion field" });
   }
   oneOf("reveal", MOTION_REVEALS);
   oneOf("hover", MOTION_HOVERS);
   oneOf("speed", MOTION_SPEEDS);
+  oneOf("scroll", MOTION_SCROLLS);
+  // A component either reveals once or moves with the scroll: both would fight over the same
+  // properties.
+  if (motion.scroll !== undefined && motion.reveal !== undefined)
+    issues.push({ path: `${at}/scroll`, message: "use reveal or scroll, not both" });
+  if (motion.scroll !== undefined && INPUT_COMPONENTS.has(component))
+    issues.push({ path: `${at}/scroll`, message: "form controls do not move with the scroll" });
+  const depth = motion.depth;
+  if (
+    depth !== undefined &&
+    !(Number.isInteger(depth) && (depth as number) !== 0 && Math.abs(depth as number) <= 3)
+  )
+    issues.push({ path: `${at}/depth`, message: "-3 to 3, not 0 (negative moves the other way)" });
+  if (depth !== undefined && motion.scroll !== "parallax" && motion.scroll !== "pan")
+    issues.push({ path: `${at}/depth`, message: "only with scroll parallax or pan" });
   const hover = motion.hover as (typeof MOTION_HOVERS)[number] | undefined;
   const fits = hover ? HOVER_FITS[hover] : undefined;
   if (fits && !fits.includes(component))
@@ -1608,8 +1695,13 @@ function checkMotion(motion: unknown, component: string, at: string, issues: Pro
 }
 
 /** Whether a surface uses motion, so its page loads the motion module (RFC-0024 §7). */
-export function usesMotion(section: SurfaceSection): boolean {
-  return section.components.some((c) => isObj(c.motion) && Object.keys(c.motion).length > 0);
+export function usesMotion(section: Pick<SurfaceSection, "components">): boolean {
+  return section.components.some(
+    (c) =>
+      (isObj(c.motion) && Object.keys(c.motion).length > 0) ||
+      c.component === "Scrolly" ||
+      c.component === "ScrollProgress",
+  );
 }
 
 /**
@@ -1644,6 +1736,9 @@ export function repairMotion(motion: unknown, id: string): { motion: unknown; no
     if (key === "reveal") v = snap(value, MOTION_REVEALS);
     else if (key === "hover") v = snap(value, MOTION_HOVERS);
     else if (key === "speed") v = snap(value, MOTION_SPEEDS);
+    else if (key === "scroll") v = snap(value, MOTION_SCROLLS);
+    else if (key === "depth" && typeof value === "number" && Number.isFinite(value) && value !== 0)
+      v = Math.max(-3, Math.min(3, Math.round(value) || Math.sign(value)));
     else if (key === "delay" && typeof value === "number" && value > 4)
       v = Math.min(4, Math.max(0, Math.round(value / 100)));
     if (v !== value)
@@ -1745,6 +1840,30 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
     if (c.motion !== undefined) checkMotion(c.motion, c.component, `${at}/motion`, issues);
+    // RFC-0024 §3: a scroll story is one sticky child, then 2–12 steps; it writes the step read.
+    if (c.component === "Scrolly") {
+      if (!(isObj(c.props) && isPathValue(c.props.step)))
+        issues.push({
+          path: `${at}/props/step`,
+          message:
+            'bind it to the surface\'s data: {"path":"/step"} (the step being read is written there)',
+        });
+      const kids = kidsOf(c).map((k) => byId.get(k)?.c.component);
+      if (kids.length < 3 || kids.length > 13)
+        issues.push({
+          path: `${at}/children`,
+          message: "one child to keep in view, then 2 to 12 Steps",
+        });
+      else if (kids[0] === "Step" || kids.slice(1).some((k) => k !== "Step"))
+        issues.push({
+          path: `${at}/children`,
+          message: "the first child stays in view (not a Step); every other child is a Step",
+        });
+    }
+  });
+  components.forEach((c, i) => {
+    if (c.component === "Step" && byId.get(parentOf.get(c.id) ?? "")?.c.component !== "Scrolly")
+      issues.push({ path: `/components/${i}`, message: "a Step belongs inside a Scrolly" });
   });
   // Reachability and depth from the root; `parentOf` already rules out shared children.
   const reached = new Set<string>();
@@ -2233,7 +2352,9 @@ export function isInteractive(surface: Pick<SurfaceSection, "components">): bool
   return surface.components.some(
     (c) =>
       INPUT_COMPONENTS.has(c.component) ||
-      (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick)),
+      (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick)) ||
+      // RFC-0024 §3: a scroll story writes the step being read into the data.
+      c.component === "Scrolly",
   );
 }
 
@@ -2347,7 +2468,8 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
       "Other functions: add/multiply/min/max {values}, subtract/divide {a,b}, round/floor/ceil {value,digits}, power {base,exponent}, if {cond,ifTrue,ifFalse}, sum/average/count {list,field}.",
     '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
     // RFC-0024 §2: motion as presets, next to `visible`.
-    `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry.`,
+    `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry. "scroll" moves it with the page instead (not with "reveal"): parallax or pan with "depth" -3…3 (negative moves the other way), fade-through, scale-through, rotate-through — for images, cards and decorative parts, never for text people read.`,
+    'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
     "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",

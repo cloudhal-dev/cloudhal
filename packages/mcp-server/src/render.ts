@@ -71,6 +71,8 @@ export const RENDER_CHECK_IDS = [
   "reduced-motion",
   // RFC-0024 §8: layout shift while the page loads and scrolls (reveals included).
   "motion-cls",
+  // RFC-0024 §2: more scroll effects or scroll stories than a page should carry.
+  "motion-budget",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -106,6 +108,11 @@ export interface RenderOptions {
   scheme?: RenderScheme;
   /** Default `static`. */
   motion?: RenderMotion;
+  /**
+   * RFC-0024 §8: screenshots at this many evenly spaced scroll positions (at most 6), each after
+   * the page settles, in place of one per viewport, to show a scroll story or scroll effects.
+   */
+  frames?: number;
   /** Screenshots down the page (up to `maxImages` viewports per width); otherwise the first one. */
   fullPage: boolean;
   maxImages?: number;
@@ -157,19 +164,25 @@ export async function renderPage(
         perWidth.push({ width, checks: Array.isArray(checks) ? checks : [] });
         const height = Math.max(vh, Math.ceil((await tab.evaluate<number>(PAGE_HEIGHT)) ?? vh));
         const max = Math.max(1, options.maxImages ?? 4);
-        const count = options.fullPage ? Math.min(max, Math.ceil(height / vh)) : 1;
+        const frames = options.frames ? Math.min(6, Math.max(1, Math.round(options.frames))) : 0;
+        const count = frames || (options.fullPage ? Math.min(max, Math.ceil(height / vh)) : 1);
         const images: Uint8Array[] = [];
         stage = `taking screenshots at ${width} px`;
         for (let i = 0; i < count; i++) {
-          // The last viewport ends at the page's end, so nothing is cut in half there.
-          const y = i === count - 1 && count * vh >= height ? Math.max(0, height - vh) : i * vh;
+          // Frames spread over the whole page; otherwise one viewport after another, the last
+          // ending at the page's end so nothing is cut in half there.
+          const y = frames
+            ? Math.round((Math.max(0, height - vh) * i) / Math.max(1, count - 1))
+            : i === count - 1 && count * vh >= height
+              ? Math.max(0, height - vh)
+              : i * vh;
           const at = await tab.evaluate<number>(`(window.scrollTo(0, ${y}), window.scrollY)`);
           // A phone layout that overflows sideways may not scroll at all: stop rather than repeat.
           if (i > 0 && Math.abs((at ?? 0) - y) > 2) break;
-          await sleep(150);
+          await sleep(frames ? 450 : 150);
           images.push(await tab.screenshot(options.quality ?? 60));
         }
-        const seen = images.length >= count ? count * vh : images.length * vh;
+        const seen = frames ? height : images.length >= count ? count * vh : images.length * vh;
         shots.push({ width, height, truncated: seen < height, images });
       } finally {
         await tab.close().catch(() => {});
@@ -495,6 +508,11 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
       if (el) add("reduced-motion", el, "moves for readers who ask for reduced motion");
     }
   }
+  // motion-budget: a page carries a few scroll effects and one scroll story, not a show.
+  const scrolls = document.querySelectorAll("[data-ch-scroll]");
+  if (scrolls.length > 6) add("motion-budget", scrolls[6], scrolls.length + " scroll effects on the page; keep to 6 or fewer, the strongest ones");
+  const stories = document.querySelectorAll(".ch-scrolly");
+  if (stories.length > 1) add("motion-budget", stories[1], stories.length + " scroll stories on the page; keep to one");
   window.scrollTo(0, 0);
 
   return ids.map((id) => out[id]);
