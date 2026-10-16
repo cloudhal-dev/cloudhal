@@ -4,7 +4,7 @@
 import type { IconName } from "../icon-names.ts";
 
 /** Each icon's inner SVG (`b`), its viewBox when not 0 0 256 256 (`v`), and whether it flips in RTL (`m`). */
-export const ICON_DATA: Readonly<Record<IconName, { v?: string; b: string; m?: true }>> = {
+export const ICONS: Readonly<Record<IconName, { v?: string; b: string; m?: true }>> = {
   "menu": { b: "<path d=\"M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z\"/>" },
   "close": { b: "<path d=\"M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z\"/>" },
   "search": { b: "<path d=\"M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z\"/>" },

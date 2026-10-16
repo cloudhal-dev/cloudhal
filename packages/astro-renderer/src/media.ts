@@ -11,6 +11,7 @@
 
 import type { Asset, ImageRef } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
+import type { IconSet } from "@cloudhal/core-ts/icons";
 import { assetUrl, formatBytes, MEDIA_TYPES, mediaPath } from "@cloudhal/core-ts/media";
 
 const escapeHtml = (s: string) =>
@@ -38,6 +39,10 @@ export interface MediaContext {
    * apart from an unknown one. The site renders theme types with the theme's components.
    */
   readonly blocks?: BlockRegistry | undefined;
+  /** RFC-0026: the site's icon weight (26c) and the theme's own drawings (26d). */
+  readonly icons?:
+    | { readonly weight?: string | undefined; readonly set?: IconSet | undefined }
+    | undefined;
 }
 
 export interface ImageAttributeOptions {

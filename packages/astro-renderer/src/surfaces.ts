@@ -7,7 +7,7 @@
  */
 import type { ContentEntry, SurfaceSection } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
-import { renderIcon } from "@cloudhal/core-ts/icons";
+import { type IconOptions, renderIcon } from "@cloudhal/core-ts/icons";
 import {
   AMBIENT_KINDS,
   type Catalog,
@@ -488,8 +488,13 @@ function fieldExtras(
 }
 
 /** An overlay's close button (Invoker Commands; the overlay module where they are missing). */
-function closeButton(id: string, tr: boolean): string {
-  return `<button type="button" class="ch-dialog__close" command="close" commandfor="${id}" aria-label="${tr ? "Kapat" : "Close"}">${renderIcon("close")}</button>`;
+function closeButton(id: string, tr: boolean, media?: MediaContext): string {
+  return `<button type="button" class="ch-dialog__close" command="close" commandfor="${id}" aria-label="${tr ? "Kapat" : "Close"}">${iconOf("close", media)}</button>`;
+}
+
+/** RFC-0026: an icon in the site's weight and the theme's drawings. */
+function iconOf(name: string, media?: MediaContext, o: IconOptions = {}): string {
+  return renderIcon(name, { ...o, weight: media?.icons?.weight, set: media?.icons?.set });
 }
 
 /**
@@ -536,9 +541,9 @@ function lightboxHtml(id: string, p: Record<string, unknown>, media?: MediaConte
     .join("");
   const nav =
     items.length > 1
-      ? `<div class="ch-lightbox__nav"><button type="button" class="ch-lightbox__prev" command="--prev" commandfor="${id}" aria-label="${tr ? "Önceki" : "Previous"}">${renderIcon("chevron-left")}</button><button type="button" class="ch-lightbox__next" command="--next" commandfor="${id}" aria-label="${tr ? "Sonraki" : "Next"}">${renderIcon("chevron-right")}</button></div>`
+      ? `<div class="ch-lightbox__nav"><button type="button" class="ch-lightbox__prev" command="--prev" commandfor="${id}" aria-label="${tr ? "Önceki" : "Previous"}">${iconOf("chevron-left", media)}</button><button type="button" class="ch-lightbox__next" command="--next" commandfor="${id}" aria-label="${tr ? "Sonraki" : "Next"}">${iconOf("chevron-right", media)}</button></div>`
       : "";
-  return `<div class="ch-lightbox"><ul class="ch-lightbox__grid" aria-label="${escapeHtml(title)}">${thumbs}</ul><dialog id="${id}" class="ch-dialog ch-lightbox__dialog" closedby="any" aria-label="${escapeHtml(title)}"><header class="ch-dialog__head"><span class="ch-lightbox__count" aria-live="polite">${start + 1} / ${items.length}</span>${closeButton(id, tr)}</header><div class="ch-lightbox__stage">${figures}</div>${nav}</dialog></div>`;
+  return `<div class="ch-lightbox"><ul class="ch-lightbox__grid" aria-label="${escapeHtml(title)}">${thumbs}</ul><dialog id="${id}" class="ch-dialog ch-lightbox__dialog" closedby="any" aria-label="${escapeHtml(title)}"><header class="ch-dialog__head"><span class="ch-lightbox__count" aria-live="polite">${start + 1} / ${items.length}</span>${closeButton(id, tr, media)}</header><div class="ch-lightbox__stage">${figures}</div>${nav}</dialog></div>`;
 }
 
 /** Where a primitive's children go in its markup. */
@@ -623,7 +628,7 @@ export function primitiveHtml(
       // RFC-0026: a button's icon, decorative (its label names it), before or after the label.
       const glyph =
         node.component === "Button"
-          ? renderIcon(str(p.icon), { className: "ch-button__icon" })
+          ? iconOf(str(p.icon), media, { className: "ch-button__icon" })
           : "";
       const label = glyph
         ? p.iconPosition === "end"
@@ -666,16 +671,16 @@ export function primitiveHtml(
       return `<a class="${cls}" href="${escapeHtml(href)}"${tip}>${label}</a>`;
     }
     case "Badge":
-      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${renderIcon(str(p.icon))}${text(node, "label")}</span>`;
+      return `<span class="ch-badge"${attr("tone", p.tone, ["neutral", "info", "success", "warning", "danger"])}>${iconOf(str(p.icon), media)}${text(node, "label")}</span>`;
     // RFC-0026: an icon on its own; named only when it carries meaning alone.
     case "Icon": {
-      const glyph = renderIcon(str(p.name), { label: str(p.label) || undefined });
+      const glyph = iconOf(str(p.name), media, { label: str(p.label) || undefined });
       return glyph
         ? `<span class="ch-icon-box"${attr("size", p.size, ["s", "m", "l", "xl"])}${attr("tone", p.tone, ["neutral", "brand", "accent", "success", "warning", "danger"])}>${glyph}</span>`
         : "";
     }
     case "Stat":
-      return `<div class="ch-stat">${p.icon ? `<span class="ch-stat__icon">${renderIcon(str(p.icon))}</span>` : ""}<span class="ch-stat__value">${text(node, "value")}</span><span class="ch-stat__label">${text(node, "label")}</span>${p.detail ? `<span class="ch-stat__detail">${text(node, "detail")}</span>` : ""}</div>`;
+      return `<div class="ch-stat">${p.icon ? `<span class="ch-stat__icon">${iconOf(str(p.icon), media)}</span>` : ""}<span class="ch-stat__value">${text(node, "value")}</span><span class="ch-stat__label">${text(node, "label")}</span>${p.detail ? `<span class="ch-stat__detail">${text(node, "detail")}</span>` : ""}</div>`;
     case "Toggle": {
       const options = Array.isArray(p.options) ? p.options.slice(0, 8).map(str) : [];
       const radios = options
@@ -806,7 +811,7 @@ export function primitiveHtml(
       const items = Array.isArray(p.items) ? p.items.slice(0, 50) : [];
       const tag = p.ordered === true ? "ol" : "ul";
       // RFC-0026: an icon of the set as the bullet (decorative), drawn on each item.
-      const glyph = renderIcon(str(p.marker), { className: "ch-list__marker" });
+      const glyph = iconOf(str(p.marker), media, { className: "ch-list__marker" });
       return `<${tag} class="ch-list"${glyph ? ' data-marker="icon"' : attr("marker", p.marker, ["bullet", "none"])}>${items.map((i) => `<li>${glyph}${escapeHtml(str(i))}</li>`).join("")}</${tag}>`;
     }
     case "Tabs": {
@@ -868,7 +873,7 @@ export function primitiveHtml(
         str(p.dismiss) as "any"
       ];
       const drawer = node.component === "Drawer";
-      return `<dialog id="${id}" class="ch-dialog${drawer ? " ch-drawer" : ""}"${attr("size", p.size, ["s", "m", "l"])}${drawer ? attr("placement", p.placement ?? "end", ["start", "end", "bottom"]) : ""} closedby="${closedby ?? "any"}" aria-labelledby="${id}-title"><header class="ch-dialog__head"><h2 class="ch-dialog__title" id="${id}-title">${escapeHtml(str(p.title))}</h2>${closeButton(id, tr)}</header><div class="ch-dialog__body">${CHILDREN}</div></dialog>`;
+      return `<dialog id="${id}" class="ch-dialog${drawer ? " ch-drawer" : ""}"${attr("size", p.size, ["s", "m", "l"])}${drawer ? attr("placement", p.placement ?? "end", ["start", "end", "bottom"]) : ""} closedby="${closedby ?? "any"}" aria-labelledby="${id}-title"><header class="ch-dialog__head"><h2 class="ch-dialog__title" id="${id}-title">${escapeHtml(str(p.title))}</h2>${closeButton(id, tr, media)}</header><div class="ch-dialog__body">${CHILDREN}</div></dialog>`;
     }
     case "Popover":
       return `<div popover="auto" id="${id}" class="ch-popover"${attr("placement", p.placement ?? "bottom", ["bottom", "top", "start", "end"])}${attr("width", p.width, ["s", "m", "l"])}>${CHILDREN}</div>`;

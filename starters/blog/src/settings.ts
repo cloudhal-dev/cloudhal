@@ -202,6 +202,24 @@ export const themeSettings: PropsSchema = {
         tr: "Bir sayfanın diğerine nasıl geçtiği (destekleyen tarayıcılarda).",
       },
     },
+    // RFC-0026 26c: how heavy the site's icons are drawn.
+    iconWeight: {
+      type: "string",
+      enum: ["light", "regular", "bold", "fill"],
+      "x-labels": {
+        light: { en: "Light", tr: "İnce" },
+        regular: { en: "Regular", tr: "Normal" },
+        bold: { en: "Bold", tr: "Kalın" },
+        fill: { en: "Filled", tr: "Dolu" },
+      },
+      default: "regular",
+      "x-widget": "radio",
+      title: { en: "Icons", tr: "İkonlar" },
+      description: {
+        en: "Light suits airy, editorial sites; bold and filled read better small and on busy pages.",
+        tr: "İnce, ferah ve editoryal sitelere uyar; kalın ve dolu, küçük boyutta ve kalabalık sayfalarda daha iyi okunur.",
+      },
+    },
   },
   // WCAG 2.2 AA: body text 4.5:1, links 4.5:1, buttons and other UI parts 3:1 against the page.
   "x-contrast": [

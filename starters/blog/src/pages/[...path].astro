@@ -58,6 +58,7 @@ import MenuPanel from "../components/MenuPanel.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
 import Search from "../components/Search.astro";
+import { iconSet } from "../icons.ts";
 import Base from "../layouts/Base.astro";
 import {
   ARCHIVE_PAGE_SIZE,
@@ -118,6 +119,8 @@ const media: MediaContext = {
   preview: Astro.response.headers.get("x-cloudhal-mode") === "preview",
   onMiss: (id) =>
     console.warn(`cloudhal: ${path} refers to ${id}, which this version does not have`),
+  // RFC-0026: icons in the site's weight, the theme's own drawings over the set's.
+  icons: { weight: String(site.theme.config?.iconWeight ?? "regular"), set: iconSet },
 };
 const t = strings(locale);
 const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);
@@ -276,6 +279,7 @@ const searchForm = searchAvailable(config, source)
     <div class="ch-menu-page">
       <h1>{t.menu}</h1>
       <MenuPanel
+        iconWeight={media.icons?.weight}
         nav={chrome.header.nav === "primary" ? nav : (menus[chrome.header.nav] ?? [])}
         utility={chrome.header.utility ? (menus[chrome.header.utility] ?? []) : []}
         search={searchForm}
