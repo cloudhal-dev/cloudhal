@@ -44,7 +44,7 @@ export function chromeTools(): ToolDefinition[] {
       name: "get_chrome",
       title: "Read the header and footer",
       description:
-        "The site's header, footer and brand (RFC-0025): what is set, what pages show (the defaults filled in), the form schemas with every allowed value, and the menu keys the header and footer may name (primary is derived from pages when the site has no menu). Change them with set_chrome and set_brand; a page can hide its header or footer, or make the header transparent over its first band, with its own chrome field (update_page).",
+        "The site's header, footer and brand (RFC-0025): what is set, what pages show (the defaults filled in), the form schemas with every allowed value, and the menu keys the header and footer may name (primary is derived from pages when the site has no menu). Change them with set_chrome and set_brand; a page can hide its header or footer, or make the header transparent over its first band, with its own chrome field (update_page). A transparent header (overHero, or a page's chrome) only applies where the page opens with a Band painted inverse, brand, accent or gradient: it takes that surface's text color; elsewhere it stays solid. Below collapseAt the menus move behind a Menu button (mobileStyle: dropdown, drawer-start, drawer-end, fullscreen); render_page checks skip-link, landmarks, header-contrast and focus-obscured.",
       inputSchema: obj({ siteId: id }, ["siteId"]),
       outputSchema: obj(
         {

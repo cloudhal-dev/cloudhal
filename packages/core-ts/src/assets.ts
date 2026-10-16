@@ -15,6 +15,7 @@ import {
   type ContentEntry,
   type NodeRef,
   type Page,
+  type Site,
   type Term,
 } from "@cloudhal/core-contracts";
 import {
@@ -180,8 +181,8 @@ export interface RefPlan<T> {
   diagnose(): Promise<void>;
 }
 
-type RefKind = "page" | "contentEntry" | "term";
-type RefNode = Page | ContentEntry | Term;
+type RefKind = "page" | "contentEntry" | "term" | "site";
+type RefNode = Page | ContentEntry | Term | Site;
 
 const LEASE_MS = 15 * 60 * 1000;
 const json = (v: unknown) => JSON.stringify(v);

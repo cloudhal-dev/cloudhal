@@ -3,7 +3,7 @@
  * and `asset:<id>` link and image targets in markdown bodies, found with marked's lexer (the
  * renderer's tokenizer), so references inside code blocks or inline code do not count. Worker-safe.
  */
-import type { Asset, ContentEntry, ImageRef, Page, Term } from "@cloudhal/core-contracts";
+import type { Asset, ContentEntry, ImageRef, Page, Site, Term } from "@cloudhal/core-contracts";
 import { Lexer, type Token, type Tokens } from "marked";
 import { assetUrl } from "./types.ts";
 
@@ -12,11 +12,13 @@ export const ASSET_HREF = /^asset:(asset_[A-Za-z0-9]{6,32})$/;
 
 export interface AssetRefUse {
   readonly assetId: string;
-  /** The slot: `coverImage`, `seo.ogImage`, `sections.<id>.image`, `body`, `labels.<l>.description`… */
+  /** The slot: `coverImage`, `seo.ogImage`, `sections.<id>.image`, `body`, `brand.logo`… */
   readonly field: string;
 }
 
-type RefKind = "page" | "contentEntry" | "term";
+/** The site counts for its brand's logos (RFC-0025). */
+type RefKind = "page" | "contentEntry" | "term" | "site";
+type RefNode = Page | ContentEntry | Term | Site;
 
 /** Asset ids linked or embedded by a markdown text (code spans and blocks excluded). */
 export function markdownAssetIds(markdown: string): string[] {
@@ -44,10 +46,16 @@ export function markdownAssetIds(markdown: string): string[] {
 /** Every ImageRef slot of a node with its field name (§2.2 table). */
 export function imageSlots(
   kind: RefKind,
-  node: Page | ContentEntry | Term,
+  node: RefNode,
 ): { field: string; ref: ImageRef; set(next: ImageRef): void }[] {
   const out: { field: string; ref: ImageRef; set(next: ImageRef): void }[] = [];
-  if (kind === "contentEntry") {
+  if (kind === "site") {
+    const brand = (node as Site).brand;
+    if (brand?.logo)
+      out.push({ field: "brand.logo", ref: brand.logo, set: (r) => (brand.logo = r) });
+    if (brand?.logoDark)
+      out.push({ field: "brand.logoDark", ref: brand.logoDark, set: (r) => (brand.logoDark = r) });
+  } else if (kind === "contentEntry") {
     const e = node as ContentEntry;
     if (e.coverImage)
       out.push({ field: "coverImage", ref: e.coverImage, set: (r) => (e.coverImage = r) });
@@ -84,10 +92,8 @@ export function imageSlots(
 }
 
 /** Markdown bodies of a node with their field names (html bodies are trusted and not scanned). */
-export function markdownSlots(
-  kind: RefKind,
-  node: Page | ContentEntry | Term,
-): { field: string; text: string }[] {
+export function markdownSlots(kind: RefKind, node: RefNode): { field: string; text: string }[] {
+  if (kind === "site") return [];
   if (kind === "contentEntry") {
     const e = node as ContentEntry;
     return e.body.format === "markdown" ? [{ field: "body", text: e.body.value }] : [];
@@ -105,8 +111,8 @@ export function markdownSlots(
 
 /** Every asset reference of a node, deduplicated by (asset, field), in a stable order. */
 export function assetRefsOf(kind: string, node: unknown): AssetRefUse[] {
-  if (kind !== "page" && kind !== "contentEntry" && kind !== "term") return [];
-  const n = node as Page | ContentEntry | Term;
+  if (kind !== "page" && kind !== "contentEntry" && kind !== "term" && kind !== "site") return [];
+  const n = node as RefNode;
   const seen = new Set<string>();
   const out: AssetRefUse[] = [];
   const add = (assetId: string, field: string) => {
@@ -127,9 +133,9 @@ export function assetRefsOf(kind: string, node: unknown): AssetRefUse[] {
  * Defensive: an input of the wrong shape is left for schema validation to reject.
  */
 export function fillMissingSrc(kind: string, node: unknown): void {
-  if (kind !== "page" && kind !== "contentEntry" && kind !== "term") return;
+  if (kind !== "page" && kind !== "contentEntry" && kind !== "term" && kind !== "site") return;
   try {
-    for (const slot of imageSlots(kind, node as Page | ContentEntry | Term)) {
+    for (const slot of imageSlots(kind, node as RefNode)) {
       const ref = slot.ref as Partial<ImageRef> | null;
       if (!ref || typeof ref !== "object" || typeof ref.assetId !== "string") continue;
       if (typeof ref.src !== "string" || ref.src === "")
@@ -148,7 +154,7 @@ export function fillMissingSrc(kind: string, node: unknown): void {
  */
 export function canonicalImageRefs(
   kind: RefKind,
-  node: Page | ContentEntry | Term,
+  node: RefNode,
   assets: ReadonlyMap<string, Asset>,
 ): void {
   for (const slot of imageSlots(kind, node)) {

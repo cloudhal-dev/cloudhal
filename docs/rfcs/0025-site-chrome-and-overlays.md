@@ -207,4 +207,28 @@ None; the report decided them:
     - Studio › Settings › Header and footer: header, footer and brand segments from the same schemas, logos from the media library; its words live in the `appearance` lazy namespace (formerly `appearanceColors`), so the first load stays at 475.0 kB.
     - REST `GET/PUT /api/sites/:id/chrome` (content:read / site:settings).
     - `cloudhal chrome get|set --file`.
-  - **Gap.** Logos are not yet counted as asset uses (deleting a logo asset does not warn); this lands with 25b.
+  - **Gap.** Logos are not yet counted as asset uses (deleting a logo asset does not warn); this lands with 25b. (Closed in 25b.)
+- **25b shipped.**
+  - **Phone menu.** Below `collapseAt` (always for the `minimal` layout) the bar's menus and search move behind a Menu control:
+    - `dropdown` is a `<details>` disclosure, with no script;
+    - `drawer-start`, `drawer-end` and `fullscreen` are a modal `<dialog>` opened from a link to `/menu`.
+    - Without the chrome module, or before it loads, the link opens `/menu`: a server-rendered, noindex page with the same menus (any site page at `/menu` wins).
+    - The dialog closes with Escape, its Close button (`form method="dialog"`, no script), a click on the backdrop or a link; the browser returns focus.
+    - We kept a link rather than `command="show-modal"`. It degrades to `/menu` everywhere, and the module adds `role=button`, `aria-haspopup` and `aria-expanded`.
+  - **Submenus.** A group in the bar is a native popover (`popover="auto"` + `popovertarget`) placed by CSS anchor positioning (the invoker is the implicit anchor). The module places it where that is missing. Groups in the phone menu stay disclosures.
+  - **Chrome module.** `/_cloudhal/chrome.1.js` is about 1.1 kB gzipped and loads only when the header needs it:
+    - it keeps `--ch-header-h`;
+    - it sets `data-ch-scrolled`;
+    - `hide-on-scroll` hides the header on the way down, but never at motion `none`, under reduced motion, or with keyboard focus in the header;
+    - it handles the menu dialog;
+    - it closes an open disclosure on Escape or a click elsewhere;
+    - it places popovers where anchor positioning is missing.
+  - **Shrink.** It moves the header and its row with `translate`, never their box, so nothing below shifts. `fixed` behaves like `sticky`.
+  - **Transparent over a hero.** `heroSurface(page)` finds a first band painted `inverse`, `brand`, `accent` or `gradient` (the root or its first child, three levels at most; an old `tone` counts).
+    - `resolveChrome` keeps the header solid anywhere else.
+    - The header takes that surface's text role (`data-over`), and the primary button swaps to stay visible on a brand hero.
+    - It fills with the page surface once scrolled. The first band starts under it and keeps its own room.
+    - An image with a scrim does not count yet.
+  - **Checks.** `render_page` adds four checks: `skip-link`, `landmarks`, `header-contrast` (a transparent header's text against the band at the top) and `focus-obscured` (tabbing back up, a sticky header never covers the focused element).
+  - **Asset uses.** The brand's logos are asset uses (`asset_refs`, node kind `site`, fields `brand.logo` and `brand.logoDark`): canonical `ImageRef`s, delete refused while used, retired assets refused. Studio's file page lists "Site logo" and links to the settings section.
+  - **Footer contrast.** On the muted surface the footer's text is `text-muted`, the role checked against `surface-muted`; the old zinc-500 was 4.4:1.

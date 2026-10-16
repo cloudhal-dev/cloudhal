@@ -367,6 +367,10 @@ async function usesOf(c: Context<Env>, asset: Asset, locale: string): Promise<As
     } else if (ref.nodeKind === "term") {
       const t = await store.getTerm(ref.nodeId);
       if (t) Object.assign(use, { title: termName(t, locale), status: t.status });
+    } else if (ref.nodeKind === "site") {
+      // RFC-0025: the brand's logo, on every page.
+      const s = await store.getSite(ref.nodeId);
+      if (s) Object.assign(use, { title: s.name, path: "/" });
     }
     out.push(use);
   }

@@ -14,6 +14,7 @@ import {
   derivedHeader,
   footerOf,
   headerOf,
+  menuOf,
 } from "./menu-fixture.ts";
 import { applyTaxonomyFixture } from "./taxonomy-fixture.ts";
 
@@ -395,9 +396,23 @@ describe("cloudhal init → dev → snapshot → build", () => {
       '<a href="/about" aria-current="page" class="text-zinc-900">Who we are</a>',
     );
     expect(about).toContain('<a href="/team" class="hover:text-zinc-900">Team</a>');
+    // a group in the bar is a popover under its button (RFC-0025 25b), no script needed
     expect(about).toContain(
-      '<details class="ch-nav-menu"><summary class="hover:text-zinc-900"><span>Topics</span></summary><ul><li><a href="/category/news" class="hover:text-zinc-900">News</a></li><li><a href="/" class="hover:text-zinc-900">Blog</a></li></ul></details>',
+      '<button type="button" class="ch-nav-menu__btn hover:text-zinc-900" popovertarget="ch-sub-2">Topics',
     );
+    expect(about).toContain(
+      '<div popover="auto" id="ch-sub-2" class="ch-nav-menu__pop"><ul><li><a href="/category/news" class="hover:text-zinc-900">News</a></li><li><a href="/" class="hover:text-zinc-900">Blog</a></li></ul></div>',
+    );
+    // the phone menu repeats the menu, its group as a disclosure, and links to nothing new
+    const phone = menuOf(await read("about", "index.html"));
+    expect(phone).toContain('<details class="ch-menu"><summary class="ch-menu__open">');
+    expect(phone).toContain("<span>Topics</span></summary>");
+    expect(phone).toContain('<li><a href="/team">Team</a></li>');
+    // without the dialog, the menu link's page: the same menus, kept out of search engines
+    const menuPage = await read("menu", "index.html");
+    expect(menuPage).toContain('class="ch-menu-page"');
+    expect(menuPage).toContain('<meta name="robots" content="noindex,follow">');
+    expect(menuOf(menuPage)).toContain("Who we are");
     expect(about).toContain(
       '<a href="https://github.com/cloudhal-dev" class="hover:text-zinc-900" rel="noopener noreferrer" target="_blank">GitHub</a>',
     );
@@ -405,7 +420,7 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(about.match(/href="\/category\/news"/g)).toHaveLength(1);
     // context match: a post in News marks the News item (aria-current="true") and opens its trail
     expect(headerOf(await read("posts", "issue-03", "index.html"))).toContain(
-      '<summary class="text-zinc-900"><span>Topics</span></summary><ul><li><a href="/category/news" aria-current="true" class="text-zinc-900">News</a>',
+      '<button type="button" class="ch-nav-menu__btn text-zinc-900" popovertarget="ch-sub-2">Topics',
     );
     // the home page lists posts, so "Blog" links to it (answer 5)
     expect(headerOf(await read("index.html"))).toContain(

@@ -43,7 +43,8 @@
     "./embeds": "./src/embed-client.ts",
     "./theme-settings": "./src/theme-settings.ts",
     "./kit": "./src/kit.ts",
-    "./surfaces": "./src/surfaces.ts"
+    "./surfaces": "./src/surfaces.ts",
+    "./chrome": "./src/chrome-client.ts"
   },
   "files": [
     "dist",
@@ -216,6 +217,10 @@
       "./surfaces": {
         "types": "./dist/src/surfaces.d.ts",
         "default": "./dist/src/surfaces.js"
+      },
+      "./chrome": {
+        "types": "./dist/src/chrome-client.d.ts",
+        "default": "./dist/src/chrome-client.js"
       }
     }
   }

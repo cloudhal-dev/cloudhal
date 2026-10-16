@@ -56,7 +56,10 @@ export interface ResolvedHeader {
   layout: (typeof HEADER_LAYOUTS)[number];
   behavior: (typeof HEADER_BEHAVIORS)[number];
   shrink: boolean;
+  /** Transparent over the page's first band (only over a loud one: `over`). */
   transparent: boolean;
+  /** The loud surface of the page's first band the transparent header stands on. */
+  over?: HeroSurface | undefined;
   width: (typeof HEADER_WIDTHS)[number];
   surface: (typeof CHROME_SURFACES)[number];
   mobileStyle: (typeof MOBILE_STYLES)[number];
@@ -96,15 +99,21 @@ export interface ResolvedChrome {
  */
 export function resolveChrome(
   site: Pick<Site, "chrome">,
-  page?: Pick<Page, "chrome"> | undefined,
+  page?: (Pick<Page, "chrome"> & Partial<Pick<Page, "sections">>) | undefined,
 ): ResolvedChrome {
+  // A transparent header needs a loud first band to stand on (RFC-0025 §2): its text takes that
+  // surface's text role, so contrast holds; anywhere else it stays solid.
+  const over = page ? heroSurface(page) : undefined;
+  const wantsTransparent =
+    page?.chrome?.header === "transparent" || site.chrome?.header?.overHero === "transparent";
   const h = site.chrome?.header ?? {};
   const f = site.chrome?.footer;
   const header: ResolvedHeader = {
     layout: h.layout ?? "logo-left",
     behavior: h.behavior ?? "static",
     shrink: h.shrink === true,
-    transparent: page?.chrome?.header === "transparent" || h.overHero === "transparent",
+    transparent: wantsTransparent && over !== undefined,
+    over: wantsTransparent ? over : undefined,
     width: h.width ?? "content",
     surface: h.surface ?? "plain",
     mobileStyle: h.mobileStyle ?? "dropdown",
@@ -140,6 +149,35 @@ export function resolveChrome(
     ...(footer.legal ? [footer.legal] : []),
   ];
   return { header, footer, menus: [...new Set(menus)] };
+}
+
+/** The surfaces loud enough for a transparent header to stand on (their text role is light or dark enough). */
+export const HERO_SURFACES = ["inverse", "brand", "accent", "gradient"] as const;
+export type HeroSurface = (typeof HERO_SURFACES)[number];
+const TONE_HERO: Record<string, HeroSurface> = { inverse: "inverse", brand: "brand" };
+
+/**
+ * The loud surface a page opens with: its first section a generated surface whose root is (or
+ * starts with, three levels deep at most) a `Band` painted `inverse`, `brand`, `accent` or
+ * `gradient` (an old `tone` counts). Undefined otherwise.
+ */
+export function heroSurface(page: Partial<Pick<Page, "sections">>): HeroSurface | undefined {
+  const first = page.sections?.[0];
+  if (!first || first.kind !== "surface") return undefined;
+  const byId = new Map(first.components.map((c) => [c.id, c]));
+  let c = byId.get("root");
+  for (let depth = 0; c && depth < 3; depth++) {
+    if (c.component === "Band") {
+      const p = (c.props ?? {}) as Record<string, unknown>;
+      if ((HERO_SURFACES as readonly unknown[]).includes(p.surface))
+        return p.surface as HeroSurface;
+      return p.surface === undefined && typeof p.tone === "string" ? TONE_HERO[p.tone] : undefined;
+    }
+    const kids = c.children;
+    const firstChild = Array.isArray(kids) ? kids[0] : undefined;
+    c = typeof firstChild === "string" ? byId.get(firstChild) : undefined;
+  }
+  return undefined;
 }
 
 /** The legal line with its only placeholders filled: `{year}` and `{site}`. */
@@ -328,6 +366,21 @@ export const chromeSchemas: { brand: PropsSchema; header: PropsSchema; footer: P
           fullscreen: ["Full screen", "Tam ekran"],
         }),
         title: { en: "Phone menu", tr: "Telefon menüsü" },
+      },
+      collapseAt: {
+        type: "string",
+        enum: COLLAPSE_AT,
+        "x-labels": labels({
+          sm: ["Phones", "Telefonlarda"],
+          md: ["Phones and small tablets", "Telefon ve küçük tabletlerde"],
+          lg: ["Below laptops", "Dizüstünden küçük ekranlarda"],
+          always: ["Always", "Her zaman"],
+        }),
+        title: { en: "Menu behind a button", tr: "Menü bir düğmenin arkasında" },
+      },
+      shrink: {
+        type: "boolean",
+        title: { en: "Shrink while scrolling", tr: "Kaydırırken küçült" },
       },
       nav: menuKey("Menu", "Menü"),
       utility: menuKey("Second menu (small)", "İkinci menü (küçük)"),

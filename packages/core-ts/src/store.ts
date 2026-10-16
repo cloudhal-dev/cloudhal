@@ -458,7 +458,8 @@ export class SiteGraphStore {
     site: Site,
     extra?: (guard: SiteGuard, at: string) => SqlStatement[],
   ): Promise<Site> {
-    const next: Site = { ...site, rev: site.rev + 1, updatedAt: this.#stamp() };
+    const next: Site = structuredClone({ ...site, rev: site.rev + 1, updatedAt: this.#stamp() });
+    fillMissingSrc("site", next);
     assertValid("site", next);
     // Only a config that changes is checked: values a theme change made misfit stay as written.
     if (this.themeSettings && next.theme.config !== undefined)
@@ -470,15 +471,26 @@ export class SiteGraphStore {
     // §4.1: a known zone needs no read; an unknown one is refused unless it is the stored one.
     if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
       checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
-    const s = await casUpdateStatement("site", next, site.rev);
-    const more = extra?.({ siteId: site.id, hash: await nodeHash(next) }, next.updatedAt) ?? [];
+    // RFC-0025: the brand's logos are uses of their assets (checked, made canonical, indexed).
+    const stored = await this.getSite(site.id);
+    const refs = await this.#assets.planRefs("site", site.id, next, stored);
+    const written = refs.node;
+    const s = await casUpdateStatement("site", written, site.rev, refs.guard);
+    const hash = await nodeHash(written);
+    const more = [
+      ...(extra?.({ siteId: site.id, hash }, written.updatedAt) ?? []),
+      ...refs.statements(hash),
+    ];
     const r =
       more.length > 0
         ? ((await this.#sql.batch([s, ...more]))[0] ?? { changes: 0 })
         : await this.#sql.run(s.sql, s.params ?? []);
-    if (r.changes !== 1)
-      throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
-    return next;
+    if (r.changes !== 1) {
+      const rev = await this.#revOf(site.id);
+      if (rev === site.rev) await refs.diagnose();
+      throw new ConflictError("site", site.id, site.rev, rev);
+    }
+    return written;
   }
 
   /**

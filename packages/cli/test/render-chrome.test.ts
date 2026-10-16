@@ -64,7 +64,50 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     expect(check("input-label")?.examples[0]).toMatch(/^@1440: section sec_form input — no label/);
     expect(check("input-label")?.count).toBe(2);
     expect(check("overflow-x")?.widths).toEqual([1440, 390]);
+    // RFC-0025: no skip link, no header, main or footer, and two unnamed menus.
+    expect(check("skip-link")?.examples[0]).toMatch(/not a link to the main content/);
+    expect(check("landmarks")?.examples).toEqual(
+      expect.arrayContaining(["@1440: the page — 0 page headers (one is right)"]),
+    );
   }, 60_000);
+
+  it("checks the chrome: skip link, landmarks, a transparent header's contrast, focus under it", async () => {
+    dir ??= await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-test-"));
+    const links = Array.from(
+      { length: 30 },
+      (_, i) => `<p><a href="#x${i}">Link ${i}</a></p>`,
+    ).join("");
+    const bad = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<style>body{margin:0;font:16px/1.5 sans-serif}header{position:sticky;top:0;height:80px;color:#eee}header a{color:inherit}
+header[data-ch-scrolled]{background:#fff}.band{background:#fafafa;padding:120px 20px}</style></head><body>
+<a href="#nowhere">Skip</a><header data-transparent><nav><a href="/">Home</a></nav><nav><a href="/b">B</a></nav></header>
+<main id="main"><div class="band"><h1>Title</h1></div>${links}</main><footer>f</footer></body></html>`;
+    const good = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<style>html{scroll-padding-top:96px}body{margin:0;font:16px/1.5 sans-serif}.skip{position:absolute;left:-999px}
+header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a{color:inherit}.band{background:#111;color:#fff;padding:120px 20px}</style></head><body>
+<a class="skip" href="#main">Skip to content</a><header data-transparent><nav aria-label="Main"><a href="/">Home</a></nav><nav aria-label="Second"><a href="/b">B</a></nav></header>
+<main id="main"><div class="band"><h1>Title</h1></div>${links}</main><footer>f</footer></body></html>`;
+    const run = async (name: string, html: string) => {
+      const file = path.join(dir, name);
+      await writeFile(file, html);
+      const r = await renderPage(
+        chromeRenderer(chrome as string, { idleMs: 10 }),
+        pathToFileURL(file).href,
+        { widths: [1440], fullPage: false },
+      );
+      return (id: string) => r.checks.find((c) => c.id === id);
+    };
+    const b = await run("bad.html", bad);
+    expect(b("skip-link")?.examples[0]).toMatch(/points at|not a link/);
+    expect(b("landmarks")?.examples).toEqual(
+      expect.arrayContaining([expect.stringMatching(/a menu without a name/)]),
+    );
+    expect(b("header-contrast")?.examples[0]).toMatch(/1\.\d:1 over the first band, needs 4\.5:1/);
+    expect(b("focus-obscured")?.count).toBeGreaterThan(0);
+    const g = await run("good.html", good);
+    for (const id of ["skip-link", "landmarks", "header-contrast", "focus-obscured"])
+      expect(g(id)).toMatchObject({ ok: true });
+  }, 90_000);
 });
 
 describe("localRender", () => {

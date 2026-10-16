@@ -3,6 +3,9 @@
  * An item with children as a disclosure (`<details>`, no JavaScript): the item's link (or a group's
  * label) as the summary, its children below. Renders up to three levels; deeper items are left out
  * (the menu's `maxDepth` is data, the theme decides what it shows). The active trail starts open.
+ * In the header's bar (`popover`, RFC-0025 §2) a group opens as a popover under its button instead,
+ * so it never pushes the bar: the browser opens and closes it (Escape, a click elsewhere) with no
+ * script, and a disclosure button never becomes `role=menu`.
  */
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import NavLink from "./NavLink.astro";
@@ -13,12 +16,38 @@ interface Props {
   off: string;
   /** 1 for a top-level item. */
   level?: number;
+  /** A popover under a button (the header's bar), with this id. */
+  popover?: string | undefined;
 }
-const { item, on, off, level = 1 } = Astro.props;
+const { item, on, off, level = 1, popover } = Astro.props;
 const MAX_LEVEL = 3;
 ---
+{popover ? (
+  <div class="ch-nav-menu" data-popover="">
+    {item.href && <NavLink item={item} on={on} off={off} />}
+    <button
+      type="button"
+      class:list={["ch-nav-menu__btn", item.current || item.inTrail ? on : off]}
+      popovertarget={popover}
+      aria-label={item.href ? item.label : undefined}
+    >{!item.href && item.label}<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" /></svg></button>
+    <div popover="auto" id={popover} class="ch-nav-menu__pop">
+      <ul>
+        {item.children.map((child) => (
+          <li>
+            {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
+              <Astro.self item={child} on={on} off={off} level={level + 1} />
+            ) : (
+              <NavLink item={child} on={on} off={off} />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+) : (
 <details class="ch-nav-menu" open={item.inTrail && level > 1 ? true : undefined}>
-  <summary class={item.current || item.inTrail ? on : off}>
+  <summary class={(item.current || item.inTrail ? on : off) || undefined}>
     {item.href ? <NavLink item={item} on={on} off={off} /> : <span>{item.label}</span>}
   </summary>
   <ul>
@@ -33,3 +62,4 @@ const MAX_LEVEL = 3;
     ))}
   </ul>
 </details>
+)}
