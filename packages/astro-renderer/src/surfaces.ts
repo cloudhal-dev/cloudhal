@@ -16,6 +16,8 @@ import {
   INPUT_MODEL,
   isInteractive,
   resolveProps,
+  SURFACE_STYLES,
+  TONE_SURFACE,
 } from "@cloudhal/core-ts/surfaces";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
 import { chartInner } from "./chart.ts";
@@ -188,6 +190,24 @@ const attr = (name: string, v: unknown, allowed?: readonly string[]) => {
 };
 const SPACE = ["none", "s", "m", "l", "xl"];
 const TONE = ["surface", "muted", "brand", "inverse"];
+/**
+ * RFC-0023 §4: a band's or card's paint as `data-surface` (the theme draws it from the color
+ * roles); an old `tone` maps to its surface and also stays as `data-tone` for themes that style it.
+ */
+const paint = (p: Record<string, unknown>) => {
+  const surface = str(p.surface);
+  if (surface && (SURFACE_STYLES as readonly string[]).includes(surface))
+    return ` data-surface="${surface}"`;
+  const tone = str(p.tone);
+  return tone && TONE.includes(tone)
+    ? ` data-surface="${TONE_SURFACE[tone as keyof typeof TONE_SURFACE]}" data-tone="${tone}"`
+    : "";
+};
+/** An anchor for `#links`; never one of the ids the renderer makes itself (`ch-…`). */
+const anchor = (v: unknown) => {
+  const s = str(v);
+  return s && /^[a-z][a-z0-9-]{0,40}$/.test(s) && !s.startsWith("ch-") ? ` id="${s}"` : "";
+};
 const ALIGN = ["start", "center", "end", "stretch"];
 
 const isBinding = (v: unknown) =>
@@ -255,12 +275,12 @@ export function primitiveHtml(
     case "Columns":
       return `<div class="ch-columns"${attr("ratio", p.ratio, ["1-1", "2-1", "1-2", "1-1-1", "1-2-1"])}${attr("gap", p.gap, SPACE)}>${CHILDREN}</div>`;
     case "Band":
-      return `<div class="ch-band"${attr("tone", p.tone, TONE)}${attr("width", p.width, ["narrow", "wide", "full"])}${attr("spacing", p.spacing, SPACE)}><div class="ch-band__inner">${CHILDREN}</div></div>`;
+      return `<div class="ch-band"${anchor(p.anchor)}${paint(p)}${attr("width", p.width, ["narrow", "wide", "full"])}${attr("spacing", p.spacing, SPACE)}><div class="ch-band__inner">${CHILDREN}</div></div>`;
     case "Card": {
       const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
       return href
-        ? `<a class="ch-card" href="${escapeHtml(href)}"${attr("tone", p.tone, TONE)}>${CHILDREN}</a>`
-        : `<div class="ch-card"${attr("tone", p.tone, TONE)}>${CHILDREN}</div>`;
+        ? `<a class="ch-card" href="${escapeHtml(href)}"${paint(p)}>${CHILDREN}</a>`
+        : `<div class="ch-card"${paint(p)}>${CHILDREN}</div>`;
     }
     case "Spacer":
       return `<div class="ch-spacer"${attr("size", p.size, SPACE)} aria-hidden="true"></div>`;

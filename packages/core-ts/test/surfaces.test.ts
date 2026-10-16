@@ -973,3 +973,23 @@ describe("local inputs (RFC-0022 22b)", () => {
     expect(prompt).toContain('"value":{"path":"/weight"}');
   });
 });
+
+describe("surface styles (RFC-0023 §4)", () => {
+  it("takes a surface and an anchor from the catalog's lists, and refuses others", () => {
+    const ok = surface([
+      {
+        id: "root",
+        component: "Band",
+        props: { surface: "mesh", anchor: "features" },
+        children: ["c"],
+      },
+      { id: "c", component: "Card", props: { surface: "raised" }, children: [] },
+    ]);
+    expect(messages(ok)).toEqual([]);
+    const bad = messages(
+      surface([{ id: "root", component: "Band", props: { surface: "neon", anchor: "Top Bar" } }]),
+    );
+    expect(bad.some((m) => m.includes("surface"))).toBe(true);
+    expect(bad.some((m) => m.includes("anchor"))).toBe(true);
+  });
+});

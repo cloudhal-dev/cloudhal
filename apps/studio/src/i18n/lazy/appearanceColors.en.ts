@@ -37,6 +37,7 @@ export const messages = {
       "on-accent": "Text on accent",
       link: "Link",
       focus: "Focus ring",
+      gradient: "Gradient end",
     },
   },
 } as const;

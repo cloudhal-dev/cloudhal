@@ -23,6 +23,7 @@ const PAIRS: [string, string, number, number][] = [
   ["link", "surface", 4.5, 7],
   ["on-brand", "brand", 4.5, 7],
   ["on-accent", "accent", 4.5, 7],
+  ["on-brand", "gradient", 4.5, 7],
   ["brand", "surface", 3, 3],
   ["focus", "surface", 3, 3],
 ];

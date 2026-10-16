@@ -4,7 +4,8 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 ## Colors
 - Prefer the color tokens: `seed` (one color the palette is built from), `scheme` (tonal, vibrant, neutral, mono), `contrast` and `mode` (light, dark, or auto to follow the reader). The roles, light and dark, are derived and always meet WCAG contrast; get_design shows them.
 - Without a seed, four settings apply: `{color.brand}` (buttons, the brand band, accents), `{color.link}`, `{color.surface}` (the page) and `{color.text}`. Change colors with set_theme_settings, never by hand.
-- Bands take a tone: `surface` (the page), `muted` (a soft grey step), `brand` (the brand color, white text) and `inverse` (near-black, white text). Use `brand` or `inverse` at most twice a page; they are the loud moments.
+- Bands and cards take a `surface`: `plain` (the page), `muted` (a soft step), `raised` (lifted, for cards), `inverse`, `brand` and `accent` (loud, their own text color), `gradient` and `mesh` (brand and accent light: one hero or call to action a page), and `dots`, `grid` or `noise` (quiet textures). Use loud surfaces at most twice a page. The older `tone` still works.
+- A band can have an `anchor` (e.g. `pricing`), so a menu or button can link to `#pricing`.
 
 ## Typography
 - `typePairing` sets headings and text in fonts that go together: editorial (Fraunces and Inter) for publications, modern (Space Grotesk and Inter) for products, humanist (Source Sans) for friendly sites, technical (JetBrains Mono headings) for developer tools, classic (Source Serif) for literary or institutional sites. With `system`, the `font` setting chooses one family (system, serif, humanist or mono).
@@ -14,7 +15,7 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 ## Layout
 - `radius` sets the corners: none for sober, institutional sites; small or medium for most; large for friendly ones; full for pill buttons (cards stay modest). `density` sets the room: compact for dense, text-heavy sites, cozy for most, airy for landing pages and portfolios.
 - The reading column is narrow (about 48rem). A `Band` with `width: wide` or `full` leaves it: use bands for heroes, feature grids, proof and calls to action, and keep long text in the column.
-- Good rhythm on a landing page: hero band (`inverse` or `brand`) → plain section → `muted` band → plain section → `brand` band call to action. Use `spacing: xl` on hero bands and `l` elsewhere.
+- Good rhythm on a landing page: hero band (`gradient`, `mesh`, `inverse` or `brand`) → plain section → `muted` or `dots` band → plain section with `raised` cards → `brand` or `accent` band call to action. Use `spacing: xl` on hero bands and `l` elsewhere.
 - Grids: 2 or 3 columns for cards, 3 or 4 for stats. `Columns` with `ratio: 2-1` pairs text with an image or a quote.
 
 ## Components
@@ -35,6 +36,6 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 - About: one short paragraph of purpose → people or values as cards → contact call to action.
 
 ## Don't
-- Don't stack three bands of the same tone, or three grids of cards, in a row.
+- Don't stack three bands of the same surface, or three grids of cards, in a row.
 - Don't use placeholder text, `#` links or repeated images.
 - Don't put long articles in a surface: articles are entries with a markdown body.
