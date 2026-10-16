@@ -232,3 +232,33 @@ None; the report decided them:
   - **Checks.** `render_page` adds four checks: `skip-link`, `landmarks`, `header-contrast` (a transparent header's text against the band at the top) and `focus-obscured` (tabbing back up, a sticky header never covers the focused element).
   - **Asset uses.** The brand's logos are asset uses (`asset_refs`, node kind `site`, fields `brand.logo` and `brand.logoDark`): canonical `ImageRef`s, delete refused while used, retired assets refused. Studio's file page lists "Site logo" and links to the settings section.
   - **Footer contrast.** On the muted surface the footer's text is `text-muted`, the role checked against `surface-muted`; the old zinc-500 was 4.4:1.
+- **25c shipped.**
+  - **Components.** `Dialog` (title, size, dismiss, fallbackHref), `Drawer` (title, placement, size), `Popover` (placement, width), `Tooltip` (text, `for` a Button or Link) and `Lightbox` (up to 24 items with asset and alt, start) join the catalog.
+    - A `Button`'s `onClick` gains `open` (target) and `close` (its own overlay, or target).
+    - `catalogPrompt` teaches them.
+    - A2UI `Modal` imports as a `Dialog` with the Button that opens it, and a `Dialog` or `Drawer` exports as a `Modal`.
+  - **Checks.**
+    - Targets are overlays of the same surface.
+    - A close button is inside an overlay or names one.
+    - Dialogs and drawers have titles.
+    - Tooltips point at a Button or Link and hold no children.
+    - No modal opens inside another.
+    - At most 3 dialogs, drawers and popovers per section. A Lightbox's thumbnails are content and don't count.
+    - At most 8 tooltips.
+    - There is no prop that opens an overlay by itself, so nothing opens on load or on a timer.
+  - **Rendering.** Everything is native and needs no script in current browsers:
+    - dialogs and drawers are `<dialog>` with `command="show-modal"`/`close` and `closedby` (`explicit` → `none`);
+    - a Dialog with `fallbackHref` opens from a real link;
+    - popovers use `popover="auto"` + `popovertarget`, anchored to their trigger;
+    - tooltips use `popover="hint"` + `interestfor` and `aria-describedby`;
+    - a Lightbox's thumbnails link to their images and open a dialog that moves with `--next`/`--prev` commands.
+    - Buttons that only open or close overlays no longer make a surface interactive, so the interaction runtime and data are not loaded for them.
+  - **Overlay module.** `/_cloudhal/overlay.1.js` is about 1.5 kB gzipped and loads only with an overlay:
+    - it shims Invoker Commands, `closedby` and `interestfor` where they are missing;
+    - it opens a dialog from its fallback link;
+    - it keeps `aria-expanded` on triggers;
+    - it handles lightbox navigation (buttons and arrow keys);
+    - it places popovers and tooltips where anchor positioning is missing.
+  - **Theme.** The scroll lock is `html:has(dialog:modal)`. Entrances use `@starting-style` and follow the motion level; there are none under reduced motion.
+  - **Check.** `render_page` adds `overlay-open`: each overlay is opened through its trigger, focus moves in, it closes, focus returns, and its text contrast is checked. An overlay nothing opens is reported. Screenshots of open overlays are left for later.
+  - **25b fix.** The drawer and full-screen menu dialog showed when closed on wide screens; only an open one is now laid out.

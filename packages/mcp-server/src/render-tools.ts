@@ -66,6 +66,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   landmarks: "page landmarks",
   "header-contrast": "transparent header contrast",
   "focus-obscured": "focus under the sticky header",
+  "overlay-open": "overlays",
 };
 
 function summary(r: RenderPageResult): string {

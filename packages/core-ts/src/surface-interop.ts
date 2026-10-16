@@ -403,9 +403,10 @@ export function fromA2ui(
         break;
       }
       case "Modal": {
-        component = "Disclosure";
+        // RFC-0025 §3: a Modal is a Dialog with the Button that opens it, side by side.
+        component = "Stack";
         const trigger = typeof a.trigger === "string" ? source.get(a.trigger) : undefined;
-        const summary =
+        const label =
           (trigger &&
             literal(
               trigger.component === "Button"
@@ -415,9 +416,21 @@ export function fromA2ui(
             )) ??
           "More";
         if (typeof a.trigger === "string") consumed.add(a.trigger);
-        props = { summary };
-        children = kids(a.content);
-        notes.add("a Modal becomes a Disclosure that opens in place");
+        const opener = ids.fresh(`${id}-open`);
+        const dialog = ids.fresh(`${id}-dialog`);
+        out.set(opener, {
+          id: opener,
+          component: "Button",
+          props: { label, variant: "secondary", onClick: { action: "open", target: dialog } },
+        });
+        out.set(dialog, {
+          id: dialog,
+          component: "Dialog",
+          props: { title: label },
+          children: kids(a.content),
+        });
+        props = { gap: "s" };
+        children = [opener, dialog];
         break;
       }
       case "Button": {
@@ -937,6 +950,21 @@ export function toA2ui(
       case "TabPanel":
         out.push({ id: c.id, component: "Column", children: kids });
         break;
+      // RFC-0025 §3: a Dialog or Drawer is A2UI's Modal, with a trigger of its own.
+      case "Dialog":
+      case "Drawer": {
+        const trigger = `${c.id}-trigger`;
+        const label = `${c.id}-trigger-label`;
+        const content = `${c.id}-content`;
+        text(label, p.title);
+        out.push({ id: trigger, component: "Button", child: label, variant: "default" });
+        out.push({ id: content, component: "Column", children: kids });
+        out.push({ id: c.id, component: "Modal", trigger, content });
+        notes.add(
+          "dialogs and drawers become Modals with a trigger of their own; the Buttons that opened them become events",
+        );
+        break;
+      }
       case "Disclosure": {
         const summary = `${c.id}-summary`;
         text(summary, p.summary, "h4");

@@ -79,7 +79,20 @@ export const SURFACE_ACTIONS = [
   "scrollTo",
   // RFC-0022 §2: add text to a string value (keypad calculators).
   "append",
+  // RFC-0025 §3: open an overlay of the surface (`target`), or close one (its own, or `target`).
+  "open",
+  "close",
 ] as const;
+/**
+ * RFC-0025 §3: components that open over the page, in the top layer, only when the reader asks
+ * (a Button's `open`, a Lightbox's thumbnails, a Tooltip's trigger): never on load or a timer.
+ */
+export const OVERLAY_COMPONENTS = new Set(["Dialog", "Drawer", "Popover", "Tooltip", "Lightbox"]);
+/** The overlays a Button opens and closes (a Tooltip opens on interest in its trigger). */
+const OPENABLE = new Set(["Dialog", "Drawer", "Popover", "Lightbox"]);
+/** The modal ones: they never open inside one another. */
+const MODAL_OVERLAYS = new Set(["Dialog", "Drawer", "Lightbox"]);
+const COMPONENT_ID = "^[a-z][a-z0-9-]{0,40}$";
 /** Components whose values a reader changes: their surface loads the interaction runtime. */
 export const INPUT_COMPONENTS = new Set([
   "Toggle",
@@ -359,6 +372,7 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
             by: { type: "number", minimum: -1000000, maximum: 1000000 },
             href: { type: "string", format: "url", maxLength: 2048 },
             anchor: { type: "string", pattern: "^[a-z][a-z0-9-]{0,40}$" },
+            target: { type: "string", pattern: COMPONENT_ID },
           },
         },
       },
@@ -842,6 +856,114 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     ),
     children: "none",
     example: { props: { value: 38000, prefix: "", suffix: "+", label: "Freelancers" } },
+  },
+  // RFC-0025 §3: overlays. Their children are their content; they open only from a reader's action.
+  {
+    name: "Dialog",
+    title: { en: "Dialog", tr: "İletişim kutusu" },
+    description: {
+      en: 'Short, optional detail over the page (terms, a video, filters), opened by a Button with onClick {action:"open",target:"<this id>"}. fallbackHref is a page with the same content, for readers without JavaScript.',
+      tr: "Sayfanın üstünde kısa, isteğe bağlı ayrıntı; bir Button'ın open eylemiyle açılır.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        title: label(120),
+        size: { type: "string", enum: ["s", "m", "l"] },
+        dismiss: { type: "string", enum: ["any", "closerequest", "explicit"] },
+        fallbackHref: href,
+      },
+      ["title"],
+    ),
+    children: "any",
+    example: { props: { title: "Pricing details", size: "m" } },
+  },
+  {
+    name: "Drawer",
+    title: { en: "Drawer", tr: "Çekmece" },
+    description: {
+      en: "A panel that slides in from an edge (filters, a cart, settings), opened like a Dialog.",
+      tr: "Bir kenardan kayan panel; Dialog gibi açılır.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        title: label(120),
+        placement: { type: "string", enum: ["start", "end", "bottom"] },
+        size: { type: "string", enum: ["s", "m", "l"] },
+      },
+      ["title"],
+    ),
+    children: "any",
+    example: { props: { title: "Filters", placement: "end" } },
+  },
+  {
+    name: "Popover",
+    title: { en: "Popover", tr: "Açılır kutu" },
+    description: {
+      en: "A small panel under the Button that opens it (a definition, a share menu); Escape or a click elsewhere closes it.",
+      tr: "Açan düğmenin altında küçük bir panel.",
+    },
+    category: "interactive",
+    props: schema({
+      placement: { type: "string", enum: ["bottom", "top", "start", "end"] },
+      width: { type: "string", enum: ["s", "m", "l"] },
+    }),
+    children: "any",
+    example: { props: { placement: "bottom", width: "m" } },
+  },
+  {
+    name: "Tooltip",
+    title: { en: "Tooltip", tr: "İpucu" },
+    description: {
+      en: "A short text shown when the reader points at or focuses a Button or Link (`for`); never the only way to the information.",
+      tr: "Bir Button veya Link'e gelince görünen kısa metin.",
+    },
+    category: "interactive",
+    props: schema({ text: label(160), for: { type: "string", pattern: COMPONENT_ID } }, [
+      "text",
+      "for",
+    ]),
+    children: "none",
+    example: { props: { text: "Billed yearly", for: "price-note" } },
+  },
+  {
+    name: "Lightbox",
+    title: { en: "Lightbox", tr: "Görsel galerisi" },
+    description: {
+      en: "Thumbnails of images that open large, one at a time, with previous and next; without JavaScript each thumbnail links to its image.",
+      tr: "Büyük açılan küçük resimler; önceki ve sonraki ile gezilir.",
+    },
+    category: "interactive",
+    props: schema(
+      {
+        title: label(120),
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 24,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["asset", "alt"],
+            properties: {
+              asset: { type: "string", format: "asset" },
+              alt: { type: "string", maxLength: 300 },
+              caption: { type: "string", maxLength: 300 },
+            },
+          },
+        },
+        start: { type: "integer", minimum: 0, maximum: 23 },
+      },
+      ["items"],
+    ),
+    children: "none",
+    example: {
+      props: {
+        title: "The bakery",
+        items: [{ asset: "asset:ast_example01", alt: "Loaves cooling on a rack" }],
+      },
+    },
   },
 ];
 
@@ -1493,6 +1615,8 @@ const ACTION_NEEDS: Record<string, readonly string[]> = {
   share: [],
   scrollTo: ["anchor"],
   append: ["path", "value"],
+  open: ["target"],
+  close: [],
 };
 
 function checkAction(a: Record<string, unknown>, path: string, out: PropsIssue[]): void {
@@ -2041,6 +2165,61 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
         });
     }
   });
+  // RFC-0025 §3: overlays open from a reader's action on this surface, never inside another modal.
+  const overlayAbove = (id: string): string | undefined => {
+    for (let p = parentOf.get(id); p; p = parentOf.get(p)) {
+      const k = byId.get(p)?.c.component;
+      if (k && OPENABLE.has(k)) return p;
+    }
+    return undefined;
+  };
+  let overlays = 0;
+  let tooltips = 0;
+  components.forEach((c, i) => {
+    const at = `/components/${i}`;
+    const action =
+      c.component === "Button" && isObj(c.props) && isObj(c.props.onClick)
+        ? c.props.onClick
+        : undefined;
+    if (action && (action.action === "open" || action.action === "close")) {
+      const target = typeof action.target === "string" ? action.target : undefined;
+      const kind = target ? byId.get(target)?.c.component : undefined;
+      if (target && !(kind && OPENABLE.has(kind)))
+        issues.push({
+          path: `${at}/props/onClick/target`,
+          message: `"${target}" is not a Dialog, Drawer, Popover or Lightbox of this surface`,
+        });
+      else if (action.action === "close" && !target && !overlayAbove(c.id))
+        issues.push({
+          path: `${at}/props/onClick`,
+          message:
+            "close belongs inside a Dialog, Drawer, Popover or Lightbox, or names one (target)",
+        });
+    }
+    if (c.component === "Tooltip") {
+      tooltips++;
+      const target = isObj(c.props) && typeof c.props.for === "string" ? c.props.for : undefined;
+      const kind = target ? byId.get(target)?.c.component : undefined;
+      if (target && kind !== "Button" && kind !== "Link")
+        issues.push({ path: `${at}/props/for`, message: "names a Button or Link of this surface" });
+    }
+    if (OPENABLE.has(c.component)) {
+      // A Lightbox's thumbnails are content on the page; its viewer does not count.
+      if (c.component !== "Lightbox") overlays++;
+      if (overlays > 3 && c.component !== "Lightbox")
+        issues.push({ path: at, message: "at most 3 overlays per section; put the rest on pages" });
+      if (c.id === "root")
+        issues.push({ path: at, message: "an overlay opens from the section; it is not its root" });
+      const above = overlayAbove(c.id);
+      if (
+        above &&
+        MODAL_OVERLAYS.has(c.component) &&
+        MODAL_OVERLAYS.has(byId.get(above)?.c.component ?? "")
+      )
+        issues.push({ path: at, message: "a dialog never opens inside another; close one first" });
+    }
+  });
+  if (tooltips > 8) issues.push({ path: "/components", message: "at most 8 tooltips per section" });
   // RFC-0024 §5: a morph key names one element on a page.
   const morphs = new Map<string, number>();
   components.forEach((c, i) => {
@@ -2553,7 +2732,12 @@ export function isInteractive(surface: Pick<SurfaceSection, "components">): bool
   return surface.components.some(
     (c) =>
       INPUT_COMPONENTS.has(c.component) ||
-      (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick)) ||
+      // Opening and closing overlays is the browser's (and the overlay module's), not the runtime's.
+      (c.component === "Button" &&
+        isObj(c.props) &&
+        isObj(c.props.onClick) &&
+        c.props.onClick.action !== "open" &&
+        c.props.onClick.action !== "close") ||
       // RFC-0024 §3: a scroll story writes the step being read into the data.
       c.component === "Scrolly",
   );
@@ -2674,6 +2858,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
     'Page transitions: when the site\'s pageTransition is morph, give the same "morph" key (motion {"morph":"plan-pro"}) to an element on two pages, a card image and the article cover, a pricing card and its plan page heading, and it moves from one to the other as the reader navigates. One key per element on a page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
+    'Overlays (Dialog, Drawer, Popover: at most 3 per section; and Lightbox) open only when the reader asks: a Button with "onClick":{"action":"open","target":"<overlay id>"}; a Button inside one with {"action":"close"} closes it. Never open one on load, on a timer or on leaving; content people read or link to belongs on a page. Dialog and Drawer need a title; give a Dialog a fallbackHref page when its content matters. A Tooltip ({"text","for":"<Button or Link id>"}) repeats what is on the page, never replaces it. A Lightbox shows images from items (asset and alt each).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
     "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",

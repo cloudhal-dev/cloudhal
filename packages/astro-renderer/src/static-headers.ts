@@ -7,6 +7,7 @@ import { CHROME_SCRIPT } from "./chrome-client.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
+import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
@@ -83,6 +84,8 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
     // RFC-0025 §2: the chrome module, loaded by pages whose header asks for it.
     [CHROME_SCRIPT.path, CHROME_SCRIPT.code],
+    // RFC-0025 §3: the overlay module, loaded by surfaces with an overlay.
+    [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
@@ -102,7 +105,8 @@ export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean
     if (
       html.includes("data-ch-surface=") ||
       html.includes(MOTION_SCRIPT.path) ||
-      html.includes(CHROME_SCRIPT.path)
+      html.includes(CHROME_SCRIPT.path) ||
+      html.includes(OVERLAY_SCRIPT.path)
     )
       return true;
   }

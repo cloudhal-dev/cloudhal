@@ -662,7 +662,84 @@ describe("interactive components (RFC-0020 §4)", () => {
       ),
     ).toEqual([
       "/components/1/props/onClick/href navigate needs href",
-      "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo, append",
+      "/components/2/props/onClick/action one of set, toggle, increment, reset, navigate, copy, share, scrollTo, append, open, close",
+    ]);
+  });
+});
+
+describe("overlays (RFC-0025 §3)", () => {
+  const dialog = (id = "terms", props: Record<string, unknown> = { title: "Terms" }) => ({
+    id,
+    component: "Dialog",
+    props,
+    children: [`${id}-text`, `${id}-close`],
+  });
+  const inner = (id = "terms") => [
+    { id: `${id}-text`, component: "Text", props: { text: "Fine print." } },
+    {
+      id: `${id}-close`,
+      component: "Button",
+      props: { label: "Close", onClick: { action: "close" } },
+    },
+  ];
+  const opener = (target: string, id = "open") => ({
+    id,
+    component: "Button",
+    props: { label: "Read the terms", onClick: { action: "open", target } },
+  });
+
+  it("accepts a dialog its button opens and its own button closes, and keeps the surface static", () => {
+    const s = surface([
+      { id: "root", component: "Stack", children: ["open", "terms"] },
+      opener("terms"),
+      dialog(),
+      ...inner(),
+    ]);
+    expect(messages(s)).toEqual([]);
+    expect(isInteractive(s)).toBe(false);
+  });
+
+  it("refuses targets that are not overlays, stray closes, nested modals and too many", () => {
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["open", "loose", "terms"] },
+          opener("loose"),
+          { id: "loose", component: "Button", props: { label: "x", onClick: { action: "close" } } },
+          { ...dialog(), children: ["terms-text", "terms-close", "inner"] },
+          ...inner(),
+          { id: "inner", component: "Drawer", props: { title: "More" } },
+        ]),
+      ),
+    ).toEqual([
+      '/components/1/props/onClick/target "loose" is not a Dialog, Drawer, Popover or Lightbox of this surface',
+      "/components/2/props/onClick close belongs inside a Dialog, Drawer, Popover or Lightbox, or names one (target)",
+      "/components/6 a dialog never opens inside another; close one first",
+    ]);
+    const four = ["a", "b", "c", "d"];
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: four },
+          ...four.map((id) => ({ id, component: "Popover", props: {} })),
+        ]),
+      ),
+    ).toEqual(["/components/4 at most 3 overlays per section; put the rest on pages"]);
+  });
+
+  it("needs titles on dialogs and drawers, and tooltips on a Button or Link", () => {
+    expect(
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["d", "t", "h"] },
+          { id: "d", component: "Drawer", props: {} },
+          { id: "t", component: "Tooltip", props: { text: "Hi", for: "h" } },
+          { id: "h", component: "Heading", props: { text: "Plans", level: 2 } },
+        ]),
+      ),
+    ).toEqual([
+      "/components/1/props/title required",
+      "/components/2/props/for names a Button or Link of this surface",
     ]);
   });
 });

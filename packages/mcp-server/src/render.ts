@@ -83,6 +83,8 @@ export const RENDER_CHECK_IDS = [
   "header-contrast",
   // RFC-0025 §4, WCAG 2.4.11: a sticky or fixed header covering what has focus.
   "focus-obscured",
+  // RFC-0025 §3: each overlay opens from its trigger, takes focus, closes and gives focus back.
+  "overlay-open",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -617,6 +619,47 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     window.scrollTo(0, 0);
   }
+
+  // overlay-open: every overlay of the page's sections, opened the way a reader would.
+  const isOpen = (t) => !!t.open || t.matches(":popover-open");
+  const overlaysOf = [...document.querySelectorAll("[data-section-id] dialog.ch-dialog, [data-section-id] [popover].ch-popover")];
+  for (const t of overlaysOf) {
+    const sel = '[commandfor="' + t.id + '"]:not([command="close"]),[popovertarget="' + t.id + '"]:not([popovertargetaction="hide"]),[data-ch-open="' + t.id + '"],[data-ch-lightbox="' + t.id + '"]';
+    const trigger = [...document.querySelectorAll(sel)].find(shown);
+    if (!trigger) { add("overlay-open", t, "nothing on the page opens it"); continue; }
+    trigger.scrollIntoView({ block: "center" });
+    trigger.focus();
+    trigger.click();
+    await frame();
+    if (!isOpen(t)) { add("overlay-open", trigger, "did not open its overlay"); continue; }
+    const modal = t.tagName === "DIALOG";
+    if (modal && !t.contains(document.activeElement)) add("overlay-open", t, "focus stayed outside when it opened");
+    if (modal && t.getAttribute("closedby") === "none" && !t.querySelector('[command="close"]'))
+      add("overlay-open", t, "it closes only by a button, and has none");
+    // Its text against its own paint (an overlay is opaque).
+    const tw = document.createTreeWalker(t, NodeFilter.SHOW_TEXT);
+    const doneT = new Set();
+    while (tw.nextNode()) {
+      const el = tw.currentNode.parentElement;
+      if (!el || doneT.has(el) || !tw.currentNode.nodeValue.trim() || !visible(el)) continue;
+      doneT.add(el);
+      // The first opaque fill between the text and the overlay's edge.
+      let bg = null;
+      for (let e = el; e && !bg; e = e === t ? null : e.parentElement) {
+        const c = rgba(getComputedStyle(e).backgroundColor);
+        if (c[3] >= 1) bg = c.slice(0, 3);
+      }
+      if (!bg) continue;
+      const st = getComputedStyle(el);
+      const got = ratio(over(rgba(st.color), bg), bg);
+      const big = parseFloat(st.fontSize) >= 24 || (parseFloat(st.fontSize) >= 18.66 && Number(st.fontWeight) >= 700);
+      if (got < (big ? 3 : 4.5)) add("overlay-open", el, got.toFixed(1) + ":1 inside the overlay, needs " + (big ? 3 : 4.5) + ":1");
+    }
+    if (modal) t.close(); else t.hidePopover();
+    await frame();
+    if (document.activeElement !== trigger) add("overlay-open", trigger, "focus did not come back when it closed");
+  }
+  window.scrollTo(0, 0);
 
   return ids.map((id) => out[id]);
 })()`;
