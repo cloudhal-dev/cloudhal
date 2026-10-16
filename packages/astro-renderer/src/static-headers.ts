@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
-import { SURFACE_SCRIPT } from "./surface-client.ts";
+import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
 export const CLOUDHAL_ASSETS_RULE = "/_cloudhal/*";
@@ -68,9 +68,11 @@ export async function writeEmbedClient(dir: URL | string): Promise<void> {
 
 /** Writes the interaction runtime (RFC-0020 §4) into the build's `/_cloudhal/`. */
 export async function writeSurfaceClient(dir: URL | string): Promise<void> {
-  const file = path.join(rootOf(dir), ...SURFACE_SCRIPT.path.split("/").filter(Boolean));
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, SURFACE_SCRIPT.code);
+  for (const name of [SURFACE_SCRIPT.path, ...SURFACE_SCRIPT_ALIASES]) {
+    const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, SURFACE_SCRIPT.code);
+  }
 }
 
 /** Whether any page of a static build has a live surface (its HTML marks one). */

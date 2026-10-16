@@ -48,7 +48,7 @@ New names in `SURFACE_FUNCTIONS`, in the same shape as today: `{"call": "<name>"
 | `min` / `max` | `values: [n…]` | smallest / largest |
 | `clamp` | `value`, `min`, `max` | value kept within |
 | `number` | `value`, `fallback?` | a typed string as a number |
-| `if` | `cond` (a `visible` condition), `then`, `else` | one of two values |
+| `if` | `cond` (a `visible` condition), `ifTrue`, `ifFalse` | one of two values (not `then`/`else`: an object with a `then` key is treated as a promise by `await`) |
 | `choose` | `value`, `cases: {key: v}`, `default?` | the case for a key (a select's choice → a factor) |
 | `sum` / `average` / `count` | `list`, `field?` | an aggregate over an array in the data |
 | `formatPercent` | `value`, `digits?` | `0.25` → "25%" in the page locale |
@@ -207,6 +207,17 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
 | 22c | `Chart` (§3): the shared SVG builder, server render, lazy runtime redraw, theme chart tokens, the `chart-empty` check |
 | 22d | `Table` (§4) |
 | 22e | Eval briefs, skill recipes, DESIGN guidance, the design pass with sample inputs; an eval run recorded here |
+
+### Status
+- **22a shipped.**
+  - **Functions.** The 19 functions of §1 are in `SURFACE_FUNCTIONS`, with `calculateExpression` (the §1.1 grammar). `resolveValue` runs `if` and `choose` against the data and returns `""` past 8 levels of nesting.
+  - **Checks.** A call's arguments may be calls (at most 8 deep), `choose.cases` a map (at most 20 keys) and `if.cond` a condition. A surface holds at most 500 calls, `calculate` at most 200 characters, and conditions add `gte`/`lte`.
+  - **The interaction runtime** carries the same table (a parity test over 32 values and 6 conditions) as `/_cloudhal/surface.2.js`. The same code is also served as `surface.1.js` for cached pages (`SURFACE_SCRIPT_ALIASES`).
+  - **The catalog prompt** teaches "compute, don't promise", the argument shapes and a seats × price example.
+  - **Interop.** json-render's `gte`/`lte` now map to the new conditions; A2UI has no arithmetic, so exporting a computed value leaves it out with a note.
+- **Deviations (22a).**
+  - **`if` takes `ifTrue`/`ifFalse`,** not `then`/`else`: an object with a `then` key is treated as a promise by `await`.
+  - **Decimal commas.** Arithmetic reads `"2,5"` as 2.5, since readers type decimal commas in many locales.
 
 ## Open questions
 1. **Reusable derived values.** Should a surface name derived values once (a `derive` map, read as `{"path": "/$derived/bmr"}`) instead of repeating nested calls? That would change `SurfaceSection` in the contract, so it may be its own small RFC after 22a shows how deep real calls get.

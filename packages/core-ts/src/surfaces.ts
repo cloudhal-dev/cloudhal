@@ -34,6 +34,15 @@ export const SURFACE_LIMITS = {
   conditionItems: 10,
   functionArgs: 8,
   listArgItems: 20,
+  /** RFC-0022 §1: calls nest at most this deep, and a surface holds at most this many. */
+  callDepth: 8,
+  callsPerSurface: 500,
+  /** Items `sum`, `average` and `count` read from a list in the data. */
+  aggregateItems: 1_000,
+  /** Characters in a `calculate` expression. */
+  expressionLength: 200,
+  /** Keys in a `choose` call's `cases`. */
+  chooseCases: 20,
   opsPerCall: 500,
   sourceLimit: 50,
 } as const;
@@ -540,6 +549,26 @@ export const SURFACE_FUNCTIONS = [
   "maxLength",
   "email",
   "range",
+  // RFC-0022 §1: computed values.
+  "add",
+  "subtract",
+  "multiply",
+  "divide",
+  "round",
+  "floor",
+  "ceil",
+  "abs",
+  "min",
+  "max",
+  "clamp",
+  "number",
+  "if",
+  "choose",
+  "sum",
+  "average",
+  "count",
+  "formatPercent",
+  "calculate",
 ] as const;
 export type SurfaceFunction = (typeof SURFACE_FUNCTIONS)[number];
 const FUNCTIONS = new Set<string>(SURFACE_FUNCTIONS);
@@ -578,7 +607,17 @@ function checkOperand(v: unknown, path: string, out: PropsIssue[]): void {
   else if (!isScalar(v)) out.push({ path, message: "a text, number, true/false or {path}" });
 }
 
-function checkCall(v: CallValue, path: string, out: PropsIssue[]): void {
+/** A function argument: a value, a `{path}`, or another call (RFC-0022 §1). */
+function checkArg(v: unknown, path: string, out: PropsIssue[], depth: number): void {
+  if (isCallValue(v)) checkCall(v, path, out, depth + 1);
+  else checkOperand(v, path, out);
+}
+
+function checkCall(v: CallValue, path: string, out: PropsIssue[], depth = 1): void {
+  if (depth > SURFACE_LIMITS.callDepth) {
+    out.push({ path, message: `calls nest at most ${SURFACE_LIMITS.callDepth} deep` });
+    return;
+  }
   if (!FUNCTIONS.has(v.call)) {
     out.push({ path: `${path}/call`, message: `one of ${SURFACE_FUNCTIONS.join(", ")}` });
     return;
@@ -592,17 +631,46 @@ function checkCall(v: CallValue, path: string, out: PropsIssue[]): void {
     return;
   }
   for (const [k, a] of Object.entries(v.args)) {
-    if (Array.isArray(a)) {
-      if (a.length > SURFACE_LIMITS.listArgItems)
+    const at = `${path}/args/${k}`;
+    // `if` takes a condition; `choose` a map from keys to values.
+    if (v.call === "if" && k === "cond") checkCondition(a, at, out);
+    else if (v.call === "choose" && k === "cases") {
+      if (!isObj(a) || Object.keys(a).length > SURFACE_LIMITS.chooseCases)
         out.push({
-          path: `${path}/args/${k}`,
-          message: `at most ${SURFACE_LIMITS.listArgItems} items`,
+          path: at,
+          message: `an object of at most ${SURFACE_LIMITS.chooseCases} keys and their values`,
         });
+      else
+        for (const [key, x] of Object.entries(a))
+          checkArg(x, `${at}/${escapePointer(key)}`, out, depth);
+    } else if (Array.isArray(a)) {
+      if (a.length > SURFACE_LIMITS.listArgItems)
+        out.push({ path: at, message: `at most ${SURFACE_LIMITS.listArgItems} items` });
       a.forEach((x, i) => {
-        checkOperand(x, `${path}/args/${k}/${i}`, out);
+        checkArg(x, `${at}/${i}`, out, depth);
       });
-    } else checkOperand(a, `${path}/args/${k}`, out);
+    } else checkArg(a, at, out, depth);
   }
+  if (
+    v.call === "calculate" &&
+    typeof v.args.expression === "string" &&
+    v.args.expression.length > SURFACE_LIMITS.expressionLength
+  )
+    out.push({
+      path: `${path}/args/expression`,
+      message: `at most ${SURFACE_LIMITS.expressionLength} characters`,
+    });
+}
+
+const escapePointer = (key: string) => key.replace(/~/g, "~0").replace(/\//g, "~1");
+
+/** Function calls anywhere in a value (each `{call}` object, nested ones included). */
+export function countCalls(v: unknown): number {
+  if (Array.isArray(v)) return v.reduce((n: number, x) => n + countCalls(x), 0);
+  if (!isObj(v)) return 0;
+  let n = isCallValue(v) ? 1 : 0;
+  for (const x of Object.values(v)) n += countCalls(x);
+  return n;
 }
 
 /** A value that is a binding or a call: problems with its shape (not with what it resolves to). */
@@ -611,7 +679,7 @@ function checkDynamic(v: unknown, path: string, out: PropsIssue[]): void {
   else if (isCallValue(v)) checkCall(v, path, out);
 }
 
-const COMPARE = ["eq", "ne", "gt", "lt"] as const;
+const COMPARE = ["eq", "ne", "gt", "lt", "gte", "lte"] as const;
 
 /** A visibility condition (RFC-0020 §3): `{path}`, `eq|ne|gt|lt: [a, b]`, `and|or: [...]`, `not`. */
 export function checkCondition(c: unknown, path: string, out: PropsIssue[], depth = 0): void {
@@ -624,7 +692,7 @@ export function checkCondition(c: unknown, path: string, out: PropsIssue[], dept
     return;
   }
   if (!isObj(c) || Object.keys(c).length !== 1) {
-    out.push({ path, message: "one of {path}, eq, ne, gt, lt, and, or, not" });
+    out.push({ path, message: "one of {path}, eq, ne, gt, lt, gte, lte, and, or, not" });
     return;
   }
   const [op, arg] = Object.entries(c)[0] as [string, unknown];
@@ -646,7 +714,7 @@ export function checkCondition(c: unknown, path: string, out: PropsIssue[], dept
         checkCondition(x, `${path}/${op}/${i}`, out, depth + 1);
       });
   } else if (op === "not") checkCondition(arg, `${path}/not`, out, depth + 1);
-  else out.push({ path, message: "one of {path}, eq, ne, gt, lt, and, or, not" });
+  else out.push({ path, message: "one of {path}, eq, ne, gt, lt, gte, lte, and, or, not" });
 }
 
 /** The value at a pointer in `data`, or `undefined`. */
@@ -726,18 +794,185 @@ function runFunction(
       const n = num(value);
       return Number.isFinite(n) && n >= num(args.min) && n <= num(args.max);
     }
+    // RFC-0022 §1: computed values. A blank or non-numeric input gives "" (shown as empty).
+    case "add":
+    case "multiply":
+    case "min":
+    case "max": {
+      const ns = numbers(args.values);
+      if (!ns) return "";
+      if (name === "add") return finite(ns.reduce((a, b) => a + b, 0));
+      if (name === "multiply") return finite(ns.reduce((a, b) => a * b, 1));
+      return finite(name === "min" ? Math.min(...ns) : Math.max(...ns));
+    }
+    case "subtract": {
+      const a = operand(args.a);
+      const b = operand(args.b);
+      return a === undefined || b === undefined ? "" : finite(a - b);
+    }
+    case "divide": {
+      const a = operand(args.a);
+      const b = operand(args.b);
+      if (a === undefined || b === undefined) return "";
+      return b === 0 ? (args.fallback ?? "") : finite(a / b);
+    }
+    case "round":
+    case "floor":
+    case "ceil": {
+      const n = operand(value);
+      if (n === undefined) return "";
+      const f = 10 ** Math.min(Math.max(0, Math.trunc(num(args.digits ?? 0)) || 0), 6);
+      return finite(Math[name](Number((n * f).toPrecision(12))) / f);
+    }
+    case "abs": {
+      const n = operand(value);
+      return n === undefined ? "" : finite(Math.abs(n));
+    }
+    case "clamp": {
+      const n = operand(value);
+      const lo = operand(args.min);
+      const hi = operand(args.max);
+      return n === undefined || lo === undefined || hi === undefined
+        ? ""
+        : finite(Math.min(Math.max(n, lo), hi));
+    }
+    case "number": {
+      const n = operand(value);
+      return n === undefined ? (args.fallback ?? "") : finite(n);
+    }
+    case "sum":
+    case "average":
+    case "count": {
+      const items = (Array.isArray(args.list) ? args.list : []).slice(
+        0,
+        SURFACE_LIMITS.aggregateItems,
+      );
+      const field = typeof args.field === "string" ? args.field : undefined;
+      const picked = items
+        .map((x) => (field === undefined ? x : isObj(x) ? x[field] : undefined))
+        .filter((x) => !blank(x));
+      if (name === "count") return picked.length;
+      const ns = picked.map(toNumber).filter((n) => Number.isFinite(n));
+      if (ns.length === 0) return name === "sum" ? 0 : "";
+      const total = ns.reduce((a, b) => a + b, 0);
+      return finite(name === "sum" ? total : total / ns.length);
+    }
+    case "formatPercent": {
+      const n = operand(value);
+      if (n === undefined) return "";
+      const digits = Math.min(Math.max(0, Math.trunc(num(args.digits ?? 0)) || 0), 6);
+      return new Intl.NumberFormat(ctx.locale, {
+        style: "percent",
+        maximumFractionDigits: digits,
+      }).format(n);
+    }
+    case "calculate":
+      return calculateExpression(text(args.expression));
+    // Resolved by `resolveValue`, which needs the data.
+    case "if":
+    case "choose":
+      return "";
+  }
+}
+
+const blank = (v: unknown) => v === undefined || v === null || v === "";
+/** A number from a value; "1,5" reads as 1.5 (a decimal comma, as typed in many locales). */
+const toNumber = (v: unknown): number =>
+  typeof v === "number"
+    ? v
+    : typeof v === "string"
+      ? Number(/^\s*-?\d+,\d+\s*$/.test(v) ? v.replace(",", ".") : v)
+      : Number.NaN;
+const operand = (v: unknown): number | undefined => {
+  if (blank(v)) return undefined;
+  const n = toNumber(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+const numbers = (v: unknown): number[] | undefined => {
+  const list = Array.isArray(v) ? v : [];
+  if (list.length === 0) return undefined;
+  const ns = list.map(operand);
+  return ns.every((n) => n !== undefined) ? (ns as number[]) : undefined;
+};
+/** A finite result to 10 significant digits (0.1 + 0.2 shows 0.3); anything else is "". */
+const finite = (n: number): number | "" => (Number.isFinite(n) ? Number(n.toPrecision(10)) : "");
+
+/**
+ * `calculate` (RFC-0022 §1.1): a typed arithmetic expression, read by a small grammar, never
+ * evaluated as code. `+ - * / %`, parentheses, unary minus and decimals; `×` and `÷` too.
+ * Anything else, or a result that is not finite, is "".
+ */
+export function calculateExpression(source: string): number | "" {
+  if (source.length > SURFACE_LIMITS.expressionLength) return "";
+  const s = source.replace(/×/g, "*").replace(/÷/g, "/").replace(/\s+/g, "");
+  if (!s) return "";
+  let i = 0;
+  let depth = 0;
+  const fail = (): never => {
+    throw new Error("calculate");
+  };
+  const factor = (): number => {
+    if (++depth > 32) fail();
+    let v: number;
+    if (s[i] === "-") {
+      i++;
+      v = -factor();
+    } else if (s[i] === "(") {
+      i++;
+      v = expr();
+      if (s[i++] !== ")") fail();
+    } else {
+      const m = /^\d+(?:\.\d+)?/.exec(s.slice(i));
+      if (!m) return fail();
+      i += m[0].length;
+      v = Number(m[0]);
+    }
+    depth--;
+    return v;
+  };
+  const term = (): number => {
+    let v = factor();
+    while (s[i] === "*" || s[i] === "/" || s[i] === "%") {
+      const op = s[i++];
+      const r = factor();
+      v = op === "*" ? v * r : op === "/" ? v / r : v % r;
+    }
+    return v;
+  };
+  const expr = (): number => {
+    let v = term();
+    while (s[i] === "+" || s[i] === "-") {
+      const op = s[i++];
+      const r = term();
+      v = op === "+" ? v + r : v - r;
+    }
+    return v;
+  };
+  try {
+    const v = expr();
+    return i === s.length ? finite(v) : "";
+  } catch {
+    return "";
   }
 }
 
 /** A prop value with its bindings and calls resolved against `data`. */
-export function resolveValue(v: unknown, data: unknown, ctx: ResolveContext): unknown {
+export function resolveValue(v: unknown, data: unknown, ctx: ResolveContext, depth = 0): unknown {
   if (isPathValue(v)) return getPointer(data, v.path);
   if (isCallValue(v) && FUNCTIONS.has(v.call)) {
+    // RFC-0022 §1: past the nesting limit a call gives "" rather than running on.
+    if (depth >= SURFACE_LIMITS.callDepth) return "";
+    const raw = isObj(v.args) ? v.args : {};
+    const at = (x: unknown) => resolveValue(x, data, ctx, depth + 1);
+    if (v.call === "if")
+      return (evaluateCondition(raw.cond, data) ? at(raw.ifTrue) : at(raw.ifFalse)) ?? "";
+    if (v.call === "choose") {
+      const key = text(at(raw.value));
+      const cases = isObj(raw.cases) ? raw.cases : {};
+      return (Object.hasOwn(cases, key) ? at(cases[key]) : at(raw.default)) ?? "";
+    }
     const args: Record<string, unknown> = {};
-    for (const [k, a] of Object.entries(v.args ?? {}))
-      args[k] = Array.isArray(a)
-        ? a.map((x) => resolveValue(x, data, ctx))
-        : resolveValue(a, data, ctx);
+    for (const [k, a] of Object.entries(raw)) args[k] = Array.isArray(a) ? a.map(at) : at(a);
     return runFunction(v.call, args, ctx);
   }
   return v;
@@ -776,7 +1011,9 @@ export function evaluateCondition(c: unknown, data: unknown): boolean {
     if (op === "eq") return a === b;
     if (op === "ne") return a !== b;
     if (typeof a !== typeof b || (typeof a !== "number" && typeof a !== "string")) return false;
-    return op === "gt" ? (a as number) > (b as number) : (a as number) < (b as number);
+    const x = a as number;
+    const y = b as number;
+    return op === "gt" ? x > y : op === "lt" ? x < y : op === "gte" ? x >= y : x <= y;
   }
   if (op === "and" && Array.isArray(arg)) return arg.every((x) => evaluateCondition(x, data));
   if (op === "or" && Array.isArray(arg)) return arg.some((x) => evaluateCondition(x, data));
@@ -908,6 +1145,12 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     issues.push({
       path: "/components",
       message: `at most ${SURFACE_LIMITS.components} components`,
+    });
+  const calls = countCalls(components.map((c) => [c.props, c.visible]));
+  if (calls > SURFACE_LIMITS.callsPerSurface)
+    issues.push({
+      path: "/components",
+      message: `at most ${SURFACE_LIMITS.callsPerSurface} function calls (this surface has ${calls})`,
     });
   const byId = new Map<string, { c: SurfaceComponent; i: number }>();
   /** A component's children when they are a list (anything else is reported below). */
@@ -1544,7 +1787,10 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     "- `props` follow the component's props below. Any prop may instead be bound to the data model: " +
       '{"path":"/json/pointer"}, or computed by a named function: {"call":"formatDate","args":{"value":{"path":"/d"},"style":"long"}}.',
     `- Functions: ${SURFACE_FUNCTIONS.join(", ")}.`,
-    '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
+    "- Compute, don't promise: a total, a price for N seats or a result from the reader's choices is a call, never text such as \"calculated at checkout\". Calls nest: an argument may be another call. " +
+      '`add`/`multiply`/`min`/`max` take {"values":[…]}; `subtract`/`divide` take {"a","b"} (divide by 0 gives `fallback`); `round`/`floor`/`ceil` take {"value","digits"}; `choose` maps a value to a case: {"call":"choose","args":{"value":{"path":"/plan"},"cases":{"monthly":9,"yearly":90}}}; `if` takes {"cond":<condition>,"ifTrue","ifFalse"}; `sum`/`average`/`count` take {"list":{"path":"/rows"},"field":"price"}; `calculate` reads a typed expression such as "12*3+4". ' +
+      'Example, seats × price: {"call":"formatCurrency","args":{"currency":"USD","value":{"call":"multiply","args":{"values":[{"path":"/seats"},{"call":"choose","args":{"value":{"path":"/billing"},"cases":{"monthly":9,"yearly":7.5}}}]}}}}. A blank input gives an empty result until it is filled.',
+    '- `visible` (optional) shows a component only when a condition holds: {"path":"/x"}, {"eq":[a,b]}, {"ne":[a,b]}, {"gt":[a,b]}, {"lt":[a,b]}, {"gte":[a,b]}, {"lte":[a,b]}, {"and":[…]}, {"or":[…]}, {"not":…}.',
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,
     "- Images only from the media library: `asset:<id>`. Links: https, mailto, tel, /site-paths or #anchors.",
     "- Text props take markdown where marked `markdown`; never HTML.",

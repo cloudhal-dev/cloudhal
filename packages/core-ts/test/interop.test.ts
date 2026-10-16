@@ -370,7 +370,7 @@ describe("json-render", () => {
     });
     expect(r.surface.components[2]?.props?.value).toEqual({ path: "/price" });
     expect(r.surface.components[3]?.visible).toEqual({
-      and: [{ path: "/onSale" }, { not: { lt: [{ path: "/price" }, 5] } }],
+      and: [{ path: "/onSale" }, { gte: [{ path: "/price" }, 5] }],
     });
     expect(r.surface.data).toEqual({ price: "$9", onSale: true });
     const back = toJsonRender(r.surface);
