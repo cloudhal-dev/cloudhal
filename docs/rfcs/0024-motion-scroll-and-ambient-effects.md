@@ -1,5 +1,5 @@
 # RFC-0024: Motion, scroll and ambient effects
-- Status: Accepted (2026-10-16; open questions decided below); 24a–24c shipped
+- Status: Accepted (2026-10-16; open questions decided below); 24a–24d shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0018 §7 and phase 18f (motion presets, never shipped; this RFC replaces them), RFC-0020 (surfaces, the interaction runtime, "motion stays CSS"), RFC-0021 (`render_page`, the design judge), RFC-0022 (functions, data bindings), RFC-0023 (tokens, surfaces, DTCG export);
@@ -355,6 +355,36 @@ These were decided on 2026-10-16. The test for each was which option serves deve
     - the pause control stopped the marquee and the words and remembered the choice;
     - `render_page` flagged only the demo's deliberate third loop, with no contrast finding for gradient text and no flashing.
   - **Fixed during checking.** Counter suffixes no longer drift: a hidden copy holds the width, where `ch` units had over-reserved for separators.
+
+- **24d shipped.**
+  - **Ambient backgrounds.** `Band` and `Card` take `ambient: {kind, preset, density, colors, interactive}`.
+    - **CSS kinds:** `aurora`, `gradient-shift`, `grain` and `beams`, on bands and cards.
+    - **`particles`:** bands only, with `dots`, `links`, `stars`, `snow`, `bubbles` or `fireflies`.
+    - The catalog allows one ambient background per section; `render_page`'s `motion-budget` flags more than 2 on a page.
+  - **Drawing.**
+    - CSS kinds are a `::before` layer under the content, from the role colors at about a fifth of their strength (`colors`: brand with accent, brand with its gradient end, accent with link, or neutral greys). The surface's text roles keep their contrast.
+    - They move slowly (12–18 s a cycle) at `standard` and above, and are a still poster everywhere else.
+    - Particle bands show a soft gradient poster and a canvas (`aria-hidden`, under the content, no pointer events).
+  - **The ambient module.** `/_cloudhal/ambient.1.js` (1.8 KB gzip, hash-pinned, budget 8 KB) paints the canvas. The motion module (now `motion.4.js`, 1–3 aliased) imports it only at `standard` or above, without Save-Data and with more than 2 GB of memory.
+  - **Guards.**
+    - Device-pixel ratio capped at 2.
+    - Particles scaled by the band's area and its density, fewer at `standard`, capped at 120 with links and 400 without.
+    - 30 frames a second.
+    - It stops off screen, in a hidden tab, and while the reader has paused motion (watched on `<html>`).
+    - Twinkles and glows change over seconds, so nothing flashes.
+    - `interactive` pushes particles away from a fine pointer.
+  - **Deviations from §4.**
+    - Particles are drawn on the main thread rather than in a worker: the caps keep the work small, and it saved a second file.
+    - The canvas reads colors from the band's `--ch-amb-*` variables, so dark mode needs nothing more.
+  - **Pause control.**
+    - Ambient sections get it, and only the first control on a page stays visible, since one control pauses every page.
+    - Pausing also stops `::before` and `::after` layers. The 24c rule had put pseudo-elements inside `:is()`, which made the whole rule invalid; it is now three separate selectors. This also fixes pausing marquees and loops.
+  - **Interop.** A2UI exports leave ambient out, with a note.
+  - **Guidance.** The catalog prompt, DESIGN guidance point 8 (one ambient, behind the hero) and the skill's recipes cover it.
+  - **Checked** in Chrome:
+    - particles painted and moved, and stopped when paused;
+    - beams and aurora paused with the control;
+    - `render_page` passed every check in light and dark with motion `static` and `full`, apart from the demo's deliberate four backgrounds.
 
 ## Sources
 - **Scroll-driven animations:**

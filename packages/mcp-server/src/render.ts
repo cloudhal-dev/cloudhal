@@ -517,6 +517,8 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
   if (stories.length > 1) add("motion-budget", stories[1], stories.length + " scroll stories on the page; keep to one");
   const splits = document.querySelectorAll('[data-ch-reveal^="split-"]');
   if (splits.length > 2) add("motion-budget", splits[2], splits.length + " split headings or texts; keep to 2, for the lines that matter most");
+  const ambients = document.querySelectorAll("[data-ch-ambient]");
+  if (ambients.length > 2) add("motion-budget", ambients[2], ambients.length + " ambient backgrounds on the page; keep to 2, best one on the hero");
   const loops = document.querySelectorAll("[data-ch-loop], .ch-marquee, [data-ch-rotate]");
   if (loops.length > 2) add("motion-budget", loops[2], loops.length + " things that loop on the page; keep to 2");
   // flash: a running animation that repeats faster than three times a second and changes how

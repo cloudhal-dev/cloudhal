@@ -8,6 +8,7 @@
 import type { ContentEntry, SurfaceSection } from "@cloudhal/core-contracts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import {
+  AMBIENT_KINDS,
   type Catalog,
   type CatalogEntry,
   checkSurface,
@@ -21,6 +22,7 @@ import {
   MOTION_SCROLLS,
   MOTION_SPEEDS,
   MOTION_STAGGER,
+  PARTICLE_PRESETS,
   resolveProps,
   SURFACE_STYLES,
   surfaceLoops,
@@ -366,6 +368,32 @@ const paint = (p: Record<string, unknown>) => {
     ? ` data-surface="${TONE_SURFACE[tone as keyof typeof TONE_SURFACE]}" data-tone="${tone}"`
     : "";
 };
+/**
+ * RFC-0024 §4: a moving background as attributes the theme draws from the color roles, and for
+ * particles the canvas the ambient module paints (hidden from assistive technology, under the
+ * content). Only known values pass.
+ */
+const ambientOf = (
+  p: Record<string, unknown>,
+  cards = false,
+): { attrs: string; canvas: string } => {
+  const a = p.ambient;
+  if (typeof a !== "object" || a === null) return { attrs: "", canvas: "" };
+  const amb = a as Record<string, unknown>;
+  const kind = str(amb.kind);
+  if (!(AMBIENT_KINDS as readonly string[]).includes(kind) || (cards && kind === "particles"))
+    return { attrs: "", canvas: "" };
+  const preset =
+    kind === "particles" && (PARTICLE_PRESETS as readonly string[]).includes(str(amb.preset))
+      ? str(amb.preset)
+      : kind === "particles"
+        ? "dots"
+        : "";
+  return {
+    attrs: ` data-ch-ambient="${kind}"${preset ? ` data-ch-preset="${preset}"` : ""}${attr("ch-density", amb.density, ["low", "medium", "high"])}${attr("ch-colors", amb.colors, ["brand", "accent", "brand-accent", "neutral"])}${kind === "particles" && amb.interactive === true ? " data-ch-interactive" : ""}`,
+    canvas: kind === "particles" ? '<canvas class="ch-ambient" aria-hidden="true"></canvas>' : "",
+  };
+};
 /** An anchor for `#links`; never one of the ids the renderer makes itself (`ch-…`). */
 const anchor = (v: unknown) => {
   const s = str(v);
@@ -438,12 +466,12 @@ export function primitiveHtml(
     case "Columns":
       return `<div class="ch-columns"${attr("ratio", p.ratio, ["1-1", "2-1", "1-2", "1-1-1", "1-2-1"])}${attr("gap", p.gap, SPACE)}>${CHILDREN}</div>`;
     case "Band":
-      return `<div class="ch-band"${anchor(p.anchor)}${paint(p)}${attr("width", p.width, ["narrow", "wide", "full"])}${attr("spacing", p.spacing, SPACE)}><div class="ch-band__inner">${CHILDREN}</div></div>`;
+      return `<div class="ch-band"${anchor(p.anchor)}${paint(p)}${ambientOf(p).attrs}${attr("width", p.width, ["narrow", "wide", "full"])}${attr("spacing", p.spacing, SPACE)}>${ambientOf(p).canvas}<div class="ch-band__inner">${CHILDREN}</div></div>`;
     case "Card": {
       const href = typeof p.href === "string" ? safeHref(p.href) : undefined;
       return href
-        ? `<a class="ch-card" href="${escapeHtml(href)}"${paint(p)}>${CHILDREN}</a>`
-        : `<div class="ch-card"${paint(p)}>${CHILDREN}</div>`;
+        ? `<a class="ch-card" href="${escapeHtml(href)}"${paint(p)}${ambientOf(p, true).attrs}>${CHILDREN}</a>`
+        : `<div class="ch-card"${paint(p)}${ambientOf(p, true).attrs}>${CHILDREN}</div>`;
     }
     case "Spacer":
       return `<div class="ch-spacer"${attr("size", p.size, SPACE)} aria-hidden="true"></div>`;

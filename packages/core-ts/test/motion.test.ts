@@ -286,6 +286,55 @@ describe("kinetic type, marquees, counters and loops (RFC-0024 24c)", () => {
   });
 });
 
+describe("ambient backgrounds (RFC-0024 24d)", () => {
+  it("takes one ambient background per section, particles on bands only", () => {
+    const hero = [
+      {
+        id: "root",
+        component: "Band",
+        props: {
+          ambient: {
+            kind: "particles",
+            preset: "links",
+            density: "low",
+            colors: "brand-accent",
+            interactive: true,
+          },
+        },
+        children: ["c"],
+      },
+      { id: "c", component: "Card", props: { ambient: { kind: "aurora" } }, children: [] },
+    ] as SurfaceComponent[];
+    // two in one section: the second is refused
+    expect(issues(hero)).toEqual([
+      "/components/1/props/ambient one ambient background per section",
+    ]);
+    expect(issues([hero[0], { ...hero[1], props: {} }] as SurfaceComponent[])).toEqual([]);
+    expect(surfaceLoops(surface([hero[0], { ...hero[1], props: {} }] as SurfaceComponent[]))).toBe(
+      true,
+    );
+    const bad = issues([
+      { id: "root", component: "Stack", children: ["b", "c"] },
+      {
+        id: "b",
+        component: "Band",
+        props: { ambient: { kind: "aurora", preset: "snow" } },
+        children: [],
+      },
+      { id: "c", component: "Card", props: { ambient: { kind: "particles" } }, children: [] },
+    ] as SurfaceComponent[]);
+    expect(bad).toEqual(
+      expect.arrayContaining([
+        "/components/1/props/ambient/preset only with kind particles",
+        expect.stringMatching(/^\/components\/2\/props\/ambient\/kind /),
+      ]),
+    );
+    expect(catalogPrompt(catalog, "en")).toContain(
+      "Ambient backgrounds: Band (or Card, CSS kinds only)",
+    );
+  });
+});
+
 describe("motion tokens (RFC-0024 §6)", () => {
   it("writes one set per level: nothing moves at none, fades only at subtle", () => {
     const css = motionCss();

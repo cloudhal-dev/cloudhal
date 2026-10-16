@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
@@ -78,6 +79,7 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     // RFC-0024 §7: the motion module, loaded by pages whose surfaces move.
     [MOTION_SCRIPT.path, MOTION_SCRIPT.code],
     ...MOTION_SCRIPT_ALIASES.map((alias) => [alias, MOTION_SCRIPT.code] as [string, string]),
+    [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));

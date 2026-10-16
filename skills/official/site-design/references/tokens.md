@@ -19,9 +19,9 @@ Set the site's `motion` level with `set_theme_settings`, and give components mot
 | Kind of site | motion | Presets that fit |
 |---|---|---|
 | Editorial | subtle (data stories standard) | `fade` on section headings; `underline` on story links; a `Scrolly` for an explainer whose chart changes as the reader goes |
-| SaaS or product | standard (landing pages expressive) | hero heading `rise`, its buttons a `delay` later; feature grid `stagger`; cards `lift`; one `spotlight` card; a `Scrolly` "how it works"; a hero image with `parallax` depth 1–2; a hero Heading with `rotate-words`; customer logos in a `Marquee`; proof as `Counter`s |
+| SaaS or product | standard (landing pages expressive) | hero heading `rise`, its buttons a `delay` later; feature grid `stagger`; cards `lift`; one `spotlight` card; a `Scrolly` "how it works"; a hero image with `parallax` depth 1–2; a hero Heading with `rotate-words`; customer logos in a `Marquee`; proof as `Counter`s; the hero band with `ambient` particles (`links` or `dots`) or `aurora` |
 | Developer tool or docs | subtle | `fade`; `underline` on links |
-| Portfolio or studio | expressive | `split-words` or `split-chars` on the hero heading; `mask-rise` or `wipe-up` on section headings; image cards `zoom-media` or `tilt`; a `highlight` on the key phrase |
+| Portfolio or studio | expressive | a hero `ambient` (`grain` or `fireflies` particles); `split-words` or `split-chars` on the hero heading; `mask-rise` or `wipe-up` on section headings; image cards `zoom-media` or `tilt`; a `highlight` on the key phrase |
 | Local business | standard | `rise` on sections; menu cards `lift`; a `Counter` for years open or customers served |
 | Institution | subtle | `fade` only |
 

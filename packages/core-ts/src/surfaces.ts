@@ -128,6 +128,22 @@ const surface = {
   enum: SURFACE_STYLES,
   title: { en: "Surface", tr: "Yüzey" },
 };
+/** RFC-0024 §4: a band's or card's moving background, drawn by the theme from the color roles. */
+export const AMBIENT_KINDS = ["aurora", "gradient-shift", "grain", "beams", "particles"] as const;
+export const PARTICLE_PRESETS = ["dots", "links", "stars", "snow", "bubbles", "fireflies"] as const;
+const ambient = (kinds: readonly string[]) => ({
+  type: "object" as const,
+  additionalProperties: false as const,
+  required: ["kind"],
+  properties: {
+    kind: { type: "string" as const, enum: kinds },
+    preset: { type: "string" as const, enum: PARTICLE_PRESETS },
+    density: { type: "string" as const, enum: ["low", "medium", "high"] },
+    colors: { type: "string" as const, enum: ["brand", "accent", "brand-accent", "neutral"] },
+    interactive: { type: "boolean" as const },
+  },
+  title: { en: "Ambient background", tr: "Hareketli arka plan" },
+});
 const align = { type: "string" as const, enum: ALIGN, title: { en: "Align", tr: "Hizalama" } };
 const label = (max: number) => ({
   type: "string" as const,
@@ -209,6 +225,7 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     props: schema({
       surface,
       tone,
+      ambient: ambient(AMBIENT_KINDS),
       anchor: {
         type: "string",
         pattern: "^[a-z][a-z0-9-]{0,40}$",
@@ -225,7 +242,13 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     title: { en: "Card", tr: "Kart" },
     description: { en: "A framed group; a link when `href` is set.", tr: "Çerçeveli bir grup." },
     category: "layout",
-    props: schema({ surface, tone, href }),
+    // Cards take the CSS kinds only: particles belong to bands.
+    props: schema({
+      surface,
+      tone,
+      href,
+      ambient: ambient(AMBIENT_KINDS.filter((k) => k !== "particles")),
+    }),
     children: "any",
     example: { props: { surface: "raised" } },
   },
@@ -1796,7 +1819,8 @@ export function usesMotion(section: Pick<SurfaceSection, "components">): boolean
       c.component === "ScrollProgress" ||
       c.component === "Marquee" ||
       c.component === "Counter" ||
-      (c.component === "Heading" && isObj(c.props) && c.props.effect === "rotate-words"),
+      (c.component === "Heading" && isObj(c.props) && c.props.effect === "rotate-words") ||
+      (isObj(c.props) && isObj(c.props.ambient)),
   );
 }
 
@@ -1809,7 +1833,8 @@ export function surfaceLoops(section: Pick<SurfaceSection, "components">): boole
     (c) =>
       c.component === "Marquee" ||
       (c.component === "Heading" && isObj(c.props) && c.props.effect === "rotate-words") ||
-      (isObj(c.motion) && typeof c.motion.loop === "string"),
+      (isObj(c.motion) && typeof c.motion.loop === "string") ||
+      (isObj(c.props) && isObj(c.props.ambient)),
   );
 }
 
@@ -1950,6 +1975,10 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       checkAction(c.props.onClick, `${at}/props/onClick`, issues);
     if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
     if (c.motion !== undefined) checkMotion(c.motion, c.component, `${at}/motion`, issues);
+    // RFC-0024 §4: a particle preset only for particles.
+    const amb = isObj(c.props) && isObj(c.props.ambient) ? c.props.ambient : undefined;
+    if (amb && amb.preset !== undefined && amb.kind !== "particles")
+      issues.push({ path: `${at}/props/ambient/preset`, message: "only with kind particles" });
     // RFC-0024 24c: a marquee needs enough to move; rotating words need words; split text is short.
     if (c.component === "Marquee" && kidsOf(c).length < 3)
       issues.push({ path: `${at}/children`, message: "at least 3 children to scroll" });
@@ -2002,6 +2031,15 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
         });
     }
   });
+  // RFC-0024 §2: one moving background per surface; more competes for the eye.
+  const ambients = components
+    .map((c, i) => (isObj(c.props) && isObj(c.props.ambient) ? i : -1))
+    .filter((i) => i >= 0);
+  for (const i of ambients.slice(1))
+    issues.push({
+      path: `/components/${i}/props/ambient`,
+      message: "one ambient background per section",
+    });
   components.forEach((c, i) => {
     if (c.component === "Step" && byId.get(parentOf.get(c.id) ?? "")?.c.component !== "Scrolly")
       issues.push({ path: `/components/${i}`, message: "a Step belongs inside a Scrolly" });
@@ -2611,6 +2649,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     // RFC-0024 §2: motion as presets, next to `visible`.
     `- \`motion\` (optional, next to \`visible\`) animates a component with presets, never CSS: {"reveal":"rise","speed":"normal","delay":1}. "reveal" plays once as it scrolls into view: ${MOTION_REVEALS.join(", ")}. "hover": lift, scale, glow; underline (Link, Button, Card, Heading); zoom-media (Card, Image); tilt (Card, Image); magnetic (Button, Link); spotlight (Card, Band). "stagger": true on ${MOTION_STAGGER.join("/")} reveals its children one after another. "delay" 0–4 stagger steps; "speed" fast|normal|slow; "replay": true reveals again on re-entry. "scroll" moves it with the page instead (not with "reveal"): parallax or pan with "depth" -3…3 (negative moves the other way), fade-through, scale-through, rotate-through — for images, cards and decorative parts, never for text people read. split-words, split-chars and split-lines reveal a Heading or a short Text piece by piece (once, as kinetic type). "loop" (alone, decorative only): float (Image, Badge, Stat, Card), pulse (Badge, Button, Stat), gradient-shift (Card, Band), spin-slow (Image, Badge).`,
     'Kinetic headings: Heading "effect" highlight (marks the words *between asterisks*, else the last word), gradient-text, or rotate-words with "words" (2–6) taking turns where {words} stands in the text ("Invoices that {words}" with ["chase themselves","never get lost"]). Marquee scrolls a row of 3+ children by itself (logos, quotes); Counter counts up to "value" once as it comes into view. Anything that loops gets a pause control from the renderer; use at most two per page.',
+    'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",
     `- \`data\` is JSON (≤ ${SURFACE_LIMITS.dataBytes / 1024} KB). A key may load entries: {"$source":"entries","query":{"collection":"posts","filter":"category:news","sort":"newest","limit":6}}.`,

@@ -20,13 +20,19 @@
  *   marquee's children copied once (hidden from screen readers, inert) so it loops seamlessly;
  *   rotating words take turns every 2.8 s; counters count up once as they come into view, ending
  *   on the number the page already shows. Loops stop while paused or in a hidden tab.
+ * - **Ambient particles** (24d): the ambient module, imported only for a page with a particle band,
+ *   at `standard` or above, without Save-Data and with more than 2 GB of memory; otherwise the
+ *   band keeps its still poster.
  * - **Pointer effects.** `tilt`, `magnetic` and `spotlight` follow a fine pointer through
  *   `--ch-mx`/`--ch-my` (0–1), one write per frame.
  * - **Pause control.** `[data-ch-motion-toggle]` buttons pause loops and ambient effects for every
- *   page (`data-ch-motion-paused` on `<html>`, remembered when storage allows).
+ *   page (`data-ch-motion-paused` on `<html>`, remembered when storage allows); the renderer adds
+ *   one per looping surface, and only the first on the page stays visible.
  *
  * Nothing moves when the page's level is `none` or the reader asks for reduced motion.
  */
+
+import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 
 const code = String.raw`const d=document,h=d.documentElement;
 const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -37,6 +43,7 @@ let paused=false;try{paused=localStorage.getItem(KEY)==="1";}catch{}
 const setPaused=(p)=>{paused=p;if(p)h.setAttribute("data-ch-motion-paused","");else h.removeAttribute("data-ch-motion-paused");
 for(const b of d.querySelectorAll("[data-ch-motion-toggle]"))b.setAttribute("aria-pressed",String(p));
 try{if(p)localStorage.setItem(KEY,"1");else localStorage.removeItem(KEY);}catch{}};
+const toggles=[...d.querySelectorAll("[data-ch-motion-toggle]")];for(const t of toggles.slice(1))t.hidden=true;
 setPaused(paused);
 d.addEventListener("click",(e)=>{const b=e.target instanceof Element&&e.target.closest("[data-ch-motion-toggle]");if(b)setPaused(!paused);});
 if(moving){
@@ -84,6 +91,8 @@ else if(el.classList.contains("ch-progress")){const sec=el.closest(".ch-surface"
 else{const r=el.getBoundingClientRect();if(r.bottom<-vh||r.top>2*vh)continue;p=(vh-r.top)/(vh+r.height);}
 el.style.setProperty("--ch-p",Math.min(1,Math.max(0,p)).toFixed(4));}};
 addEventListener("scroll",()=>{if(!raf)raf=requestAnimationFrame(tick);},{passive:true});addEventListener("resize",()=>{if(!raf)raf=requestAnimationFrame(tick);},{passive:true});tick();}}
+const nav=navigator;
+if(moving&&level!=="subtle"&&d.querySelector("canvas.ch-ambient")&&!(nav.connection&&nav.connection.saveData)&&!(nav.deviceMemory&&nav.deviceMemory<=2))import("${AMBIENT_SCRIPT.path}").catch(()=>{});
 if(moving&&matchMedia("(hover: hover) and (pointer: fine)").matches){
 let raf=0,pending=null;
 const apply=()=>{raf=0;if(!pending)return;const[el,x,y]=pending;pending=null;
@@ -96,7 +105,11 @@ d.addEventListener("pointerout",(e)=>{const el=e.target instanceof Element&&e.ta
 if(el&&!(e.relatedTarget instanceof Node&&el.contains(e.relatedTarget))){el.style.removeProperty("--ch-mx");el.style.removeProperty("--ch-my");}},{passive:true});}
 `;
 
-export const MOTION_SCRIPT = { path: "/_cloudhal/motion.3.js", code } as const;
+export const MOTION_SCRIPT = { path: "/_cloudhal/motion.4.js", code } as const;
 
 /** Earlier names of the module, served with the current code (each version only adds). */
-export const MOTION_SCRIPT_ALIASES = ["/_cloudhal/motion.1.js", "/_cloudhal/motion.2.js"] as const;
+export const MOTION_SCRIPT_ALIASES = [
+  "/_cloudhal/motion.1.js",
+  "/_cloudhal/motion.2.js",
+  "/_cloudhal/motion.3.js",
+] as const;
