@@ -530,20 +530,20 @@ return errors === 0;
 validate20.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 export const validateSite = validate21;
-const schema41 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/site.schema.json","title":"Site","description":"Root node of a Site Graph: one deployable website with its locales, domains, theme and page index. Pages and content entries are separate nodes referenced by id so they can be versioned and locked independently.","type":"object","additionalProperties":false,"required":["schemaVersion","id","projectId","name","slug","defaultLocale","locales","domains","pageIds","theme","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"projectId":{"$ref":"#/$defs/Id"},"name":{"type":"string","minLength":1,"maxLength":200},"slug":{"$ref":"#/$defs/Slug"},"defaultLocale":{"$ref":"#/$defs/Locale"},"locales":{"type":"array","items":{"$ref":"#/$defs/Locale"},"minItems":1,"uniqueItems":true},"domains":{"type":"array","description":"Hostnames serving this site. Exactly one should be primary; the *.cloudhal.app subdomain is always present in Cloud.","items":{"$ref":"#/$defs/Domain"}},"pageIds":{"type":"array","items":{"$ref":"#/$defs/Id"},"uniqueItems":true},"homePageId":{"$ref":"#/$defs/Id"},"theme":{"$ref":"#/$defs/ThemeRef"},"design":{"$ref":"#/$defs/Design"},"brand":{"$ref":"#/$defs/Brand"},"chrome":{"$ref":"#/$defs/Chrome"},"timeZone":{"$ref":"#/$defs/TimeZone","description":"The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."},"publishedSnapshotId":{"$ref":"#/$defs/Id","description":"Snapshot currently serving production. Rollback = pointing this at an older snapshot."},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Announcement":{"type":"object","additionalProperties":false,"required":["id","text"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{0,40}$","description":"Change it when the text changes, so readers who dismissed the old one see the new one."},"text":{"type":"string","minLength":1,"maxLength":200},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"tone":{"type":"string","enum":["info","brand","warning"]},"dismissible":{"type":"boolean"}}},"Brand":{"type":"object","description":"The site's logo and social links (RFC-0025 §1), shared by the header, the footer and SEO.","additionalProperties":false,"properties":{"logo":{"$ref":"#/$defs/ImageRef"},"logoDark":{"$ref":"#/$defs/ImageRef"},"logoHeight":{"type":"string","enum":["s","m","l"]},"social":{"type":"array","maxItems":8,"items":{"$ref":"#/$defs/SocialLink"}}}},"Chrome":{"type":"object","description":"The site's header, footer and bars as data (RFC-0025): enums, menu keys and short texts; the theme renders them with landmarks, focus and contrast guaranteed.","additionalProperties":false,"properties":{"header":{"$ref":"#/$defs/ChromeHeader"},"footer":{"$ref":"#/$defs/ChromeFooter"},"announcement":{"$ref":"#/$defs/Announcement"},"consent":{"$ref":"#/$defs/Consent"}}},"ChromeFooter":{"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["simple","columns","cta-band","minimal"]},"surface":{"type":"string","enum":["plain","muted","inverse"]},"tagline":{"type":"string","minLength":1,"maxLength":200},"columns":{"type":"array","maxItems":5,"items":{"$ref":"#/$defs/FooterColumn"}},"ctaHeading":{"type":"string","minLength":1,"maxLength":120},"ctaLabel":{"type":"string","minLength":1,"maxLength":40},"ctaHref":{"type":"string","minLength":1,"maxLength":2048},"social":{"type":"boolean"},"copyright":{"type":"string","minLength":1,"maxLength":200,"description":"The legal line; {year} and {site} are the only placeholders."},"legal":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"extras":{"type":"array","maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":["locale","theme-toggle","motion-toggle"]}},"credit":{"type":"boolean"}}},"ChromeHeader":{"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["logo-left","logo-left-nav-center","centered","split","minimal"]},"behavior":{"type":"string","enum":["static","sticky","hide-on-scroll","fixed"]},"shrink":{"type":"boolean"},"overHero":{"type":"string","enum":["solid","transparent"]},"width":{"type":"string","enum":["content","wide","full"]},"surface":{"type":"string","enum":["plain","muted","raised","inverse","brand"]},"mobileStyle":{"type":"string","enum":["dropdown","drawer-start","drawer-end","fullscreen"]},"collapseAt":{"type":"string","enum":["sm","md","lg","always"]},"nav":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"utility":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"actions":{"type":"array","maxItems":3,"items":{"$ref":"#/$defs/HeaderAction"}}}},"Consent":{"type":"object","additionalProperties":false,"required":["mode"],"properties":{"mode":{"type":"string","enum":["none","notice","choices"]},"policy":{"$ref":"#/$defs/Path"}}},"Design":{"type":"object","description":"The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.","additionalProperties":false,"required":["markdown"],"properties":{"markdown":{"type":"string","minLength":1,"maxLength":24000}}},"Domain":{"type":"object","additionalProperties":false,"required":["hostname","primary"],"properties":{"hostname":{"type":"string","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253},"primary":{"type":"boolean"}}},"FooterColumn":{"type":"object","additionalProperties":false,"required":["heading","menu"],"properties":{"heading":{"type":"string","minLength":1,"maxLength":60},"menu":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."}}},"HeaderAction":{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["button","search","locale","theme-toggle","motion-toggle"]},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"variant":{"type":"string","enum":["primary","secondary"]}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SocialLink":{"type":"object","additionalProperties":false,"required":["network","href"],"properties":{"network":{"type":"string","enum":["x","bluesky","mastodon","github","linkedin","instagram","facebook","youtube","tiktok","threads","rss","email"]},"href":{"type":"string","minLength":1,"maxLength":2048}}},"ThemeRef":{"type":"object","description":"Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.","additionalProperties":false,"required":["name"],"properties":{"name":{"$ref":"#/$defs/Slug"},"version":{"type":"string","maxLength":64},"config":{"type":"object","additionalProperties":true}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
+const schema41 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/site.schema.json","title":"Site","description":"Root node of a Site Graph: one deployable website with its locales, domains, theme and page index. Pages and content entries are separate nodes referenced by id so they can be versioned and locked independently.","type":"object","additionalProperties":false,"required":["schemaVersion","id","projectId","name","slug","defaultLocale","locales","domains","pageIds","theme","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"projectId":{"$ref":"#/$defs/Id"},"name":{"type":"string","minLength":1,"maxLength":200},"slug":{"$ref":"#/$defs/Slug"},"defaultLocale":{"$ref":"#/$defs/Locale"},"locales":{"type":"array","items":{"$ref":"#/$defs/Locale"},"minItems":1,"uniqueItems":true},"domains":{"type":"array","description":"Hostnames serving this site. Exactly one should be primary; the *.cloudhal.app subdomain is always present in Cloud.","items":{"$ref":"#/$defs/Domain"}},"pageIds":{"type":"array","items":{"$ref":"#/$defs/Id"},"uniqueItems":true},"homePageId":{"$ref":"#/$defs/Id"},"theme":{"$ref":"#/$defs/ThemeRef"},"design":{"$ref":"#/$defs/Design"},"brand":{"$ref":"#/$defs/Brand"},"chrome":{"$ref":"#/$defs/Chrome"},"timeZone":{"$ref":"#/$defs/TimeZone","description":"The site's time zone (RFC-0008): Studio's calendar, schedules entered as wall-clock times and recurring automations use it. Absent means UTC."},"publishedSnapshotId":{"$ref":"#/$defs/Id","description":"Snapshot currently serving production. Rollback = pointing this at an older snapshot."},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Announcement":{"type":"object","additionalProperties":false,"required":["id","text"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{0,40}$","description":"Change it when the text changes, so readers who dismissed the old one see the new one."},"text":{"type":"string","minLength":1,"maxLength":200},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"tone":{"type":"string","enum":["info","brand","warning"]},"dismissible":{"type":"boolean"}}},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Brand":{"type":"object","description":"The site's logo and social links (RFC-0025 §1), shared by the header, the footer and SEO.","additionalProperties":false,"properties":{"logo":{"$ref":"#/$defs/ImageRef"},"logoDark":{"$ref":"#/$defs/ImageRef"},"logoHeight":{"type":"string","enum":["s","m","l"]},"social":{"type":"array","maxItems":8,"items":{"$ref":"#/$defs/SocialLink"}}}},"Chrome":{"type":"object","description":"The site's header, footer and bars as data (RFC-0025): enums, menu keys and short texts; the theme renders them with landmarks, focus and contrast guaranteed.","additionalProperties":false,"properties":{"header":{"$ref":"#/$defs/ChromeHeader"},"footer":{"$ref":"#/$defs/ChromeFooter"},"announcement":{"$ref":"#/$defs/Announcement"},"consent":{"$ref":"#/$defs/Consent"}}},"ChromeFooter":{"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["simple","columns","cta-band","minimal"]},"surface":{"type":"string","enum":["plain","muted","inverse"]},"tagline":{"type":"string","minLength":1,"maxLength":200},"columns":{"type":"array","maxItems":5,"items":{"$ref":"#/$defs/FooterColumn"}},"ctaHeading":{"type":"string","minLength":1,"maxLength":120},"ctaLabel":{"type":"string","minLength":1,"maxLength":40},"ctaHref":{"type":"string","minLength":1,"maxLength":2048},"social":{"type":"boolean"},"copyright":{"type":"string","minLength":1,"maxLength":200,"description":"The legal line; {year} and {site} are the only placeholders."},"legal":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"extras":{"type":"array","maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":["locale","theme-toggle","motion-toggle"]}},"credit":{"type":"boolean"},"region":{"$ref":"#/$defs/Section","description":"RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds."}}},"ChromeHeader":{"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["logo-left","logo-left-nav-center","centered","split","minimal"]},"behavior":{"type":"string","enum":["static","sticky","hide-on-scroll","fixed"]},"shrink":{"type":"boolean"},"overHero":{"type":"string","enum":["solid","transparent"]},"width":{"type":"string","enum":["content","wide","full"]},"surface":{"type":"string","enum":["plain","muted","raised","inverse","brand"]},"mobileStyle":{"type":"string","enum":["dropdown","drawer-start","drawer-end","fullscreen"]},"collapseAt":{"type":"string","enum":["sm","md","lg","always"]},"nav":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"utility":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"actions":{"type":"array","maxItems":3,"items":{"$ref":"#/$defs/HeaderAction"}}}},"Consent":{"type":"object","additionalProperties":false,"required":["mode"],"properties":{"mode":{"type":"string","enum":["none","notice","choices"]},"policy":{"$ref":"#/$defs/Path"}}},"Design":{"type":"object","description":"The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.","additionalProperties":false,"required":["markdown"],"properties":{"markdown":{"type":"string","minLength":1,"maxLength":24000}}},"Domain":{"type":"object","additionalProperties":false,"required":["hostname","primary"],"properties":{"hostname":{"type":"string","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253},"primary":{"type":"boolean"}}},"FooterColumn":{"type":"object","additionalProperties":false,"required":["heading","menu"],"properties":{"heading":{"type":"string","minLength":1,"maxLength":60},"menu":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."}}},"HeaderAction":{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["button","search","locale","theme-toggle","motion-toggle"]},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"variant":{"type":"string","enum":["primary","secondary"]}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Section":{"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SocialLink":{"type":"object","additionalProperties":false,"required":["network","href"],"properties":{"network":{"type":"string","enum":["x","bluesky","mastodon","github","linkedin","instagram","facebook","youtube","tiktok","threads","rss","email"]},"href":{"type":"string","minLength":1,"maxLength":2048}}},"SurfaceComponent":{"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}},"SurfaceComponentId":{"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"},"ThemeRef":{"type":"object","description":"Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.","additionalProperties":false,"required":["name"],"properties":{"name":{"$ref":"#/$defs/Slug"},"version":{"type":"string","maxLength":64},"config":{"type":"object","additionalProperties":true}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
 const schema42 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
 const schema43 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
 const schema45 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
 const schema46 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
 const schema48 = {"type":"object","additionalProperties":false,"required":["hostname","primary"],"properties":{"hostname":{"type":"string","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253},"primary":{"type":"boolean"}}};
 const schema53 = {"type":"object","description":"The site's design rules for people and agents (RFC-0021): Markdown that agents read with the theme's DESIGN.md before they build. Guidance only: it changes neither rendering nor permissions.","additionalProperties":false,"required":["markdown"],"properties":{"markdown":{"type":"string","minLength":1,"maxLength":24000}}};
-const schema70 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
-const schema72 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema73 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema75 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema89 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
+const schema91 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema77 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema94 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
 const pattern11 = new RegExp("^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$", "u");
 const pattern13 = new RegExp("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$", "u");
-const pattern24 = new RegExp("^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$", "u");
+const pattern39 = new RegExp("^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$", "u");
 const schema51 = {"type":"object","description":"Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.","additionalProperties":false,"required":["name"],"properties":{"name":{"$ref":"#/$defs/Slug"},"version":{"type":"string","maxLength":64},"config":{"type":"object","additionalProperties":true}}};
 
 function validate22(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -1105,7 +1105,7 @@ return errors === 0;
 validate24.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 const schema58 = {"type":"object","description":"The site's header, footer and bars as data (RFC-0025): enums, menu keys and short texts; the theme renders them with landmarks, focus and contrast guaranteed.","additionalProperties":false,"properties":{"header":{"$ref":"#/$defs/ChromeHeader"},"footer":{"$ref":"#/$defs/ChromeFooter"},"announcement":{"$ref":"#/$defs/Announcement"},"consent":{"$ref":"#/$defs/Consent"}}};
-const schema67 = {"type":"object","additionalProperties":false,"required":["id","text"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{0,40}$","description":"Change it when the text changes, so readers who dismissed the old one see the new one."},"text":{"type":"string","minLength":1,"maxLength":200},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"tone":{"type":"string","enum":["info","brand","warning"]},"dismissible":{"type":"boolean"}}};
+const schema86 = {"type":"object","additionalProperties":false,"required":["id","text"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{0,40}$","description":"Change it when the text changes, so readers who dismissed the old one see the new one."},"text":{"type":"string","minLength":1,"maxLength":200},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"tone":{"type":"string","enum":["info","brand","warning"]},"dismissible":{"type":"boolean"}}};
 const schema59 = {"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["logo-left","logo-left-nav-center","centered","split","minimal"]},"behavior":{"type":"string","enum":["static","sticky","hide-on-scroll","fixed"]},"shrink":{"type":"boolean"},"overHero":{"type":"string","enum":["solid","transparent"]},"width":{"type":"string","enum":["content","wide","full"]},"surface":{"type":"string","enum":["plain","muted","raised","inverse","brand"]},"mobileStyle":{"type":"string","enum":["dropdown","drawer-start","drawer-end","fullscreen"]},"collapseAt":{"type":"string","enum":["sm","md","lg","always"]},"nav":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"utility":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"actions":{"type":"array","maxItems":3,"items":{"$ref":"#/$defs/HeaderAction"}}}};
 const schema62 = {"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["button","search","locale","theme-toggle","motion-toggle"]},"label":{"type":"string","minLength":1,"maxLength":40},"href":{"type":"string","minLength":1,"maxLength":2048},"variant":{"type":"string","enum":["primary","secondary"]}}};
 
@@ -1590,7 +1590,7 @@ return errors === 0;
 }
 validate30.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema63 = {"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["simple","columns","cta-band","minimal"]},"surface":{"type":"string","enum":["plain","muted","inverse"]},"tagline":{"type":"string","minLength":1,"maxLength":200},"columns":{"type":"array","maxItems":5,"items":{"$ref":"#/$defs/FooterColumn"}},"ctaHeading":{"type":"string","minLength":1,"maxLength":120},"ctaLabel":{"type":"string","minLength":1,"maxLength":40},"ctaHref":{"type":"string","minLength":1,"maxLength":2048},"social":{"type":"boolean"},"copyright":{"type":"string","minLength":1,"maxLength":200,"description":"The legal line; {year} and {site} are the only placeholders."},"legal":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"extras":{"type":"array","maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":["locale","theme-toggle","motion-toggle"]}},"credit":{"type":"boolean"}}};
+const schema63 = {"type":"object","additionalProperties":false,"properties":{"layout":{"type":"string","enum":["simple","columns","cta-band","minimal"]},"surface":{"type":"string","enum":["plain","muted","inverse"]},"tagline":{"type":"string","minLength":1,"maxLength":200},"columns":{"type":"array","maxItems":5,"items":{"$ref":"#/$defs/FooterColumn"}},"ctaHeading":{"type":"string","minLength":1,"maxLength":120},"ctaLabel":{"type":"string","minLength":1,"maxLength":40},"ctaHref":{"type":"string","minLength":1,"maxLength":2048},"social":{"type":"boolean"},"copyright":{"type":"string","minLength":1,"maxLength":200,"description":"The legal line; {year} and {site} are the only placeholders."},"legal":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."},"extras":{"type":"array","maxItems":3,"uniqueItems":true,"items":{"type":"string","enum":["locale","theme-toggle","motion-toggle"]}},"credit":{"type":"boolean"},"region":{"$ref":"#/$defs/Section","description":"RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds."}}};
 const schema64 = {"type":"object","additionalProperties":false,"required":["heading","menu"],"properties":{"heading":{"type":"string","minLength":1,"maxLength":60},"menu":{"$ref":"#/$defs/Slug","description":"A menu key (RFC-0003)."}}};
 
 function validate33(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -1731,6 +1731,2057 @@ validate33.errors = vErrors;
 return errors === 0;
 }
 validate33.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+
+const schema67 = {"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]};
+const schema69 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
+const schema71 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
+const pattern31 = new RegExp("^[a-z][a-z0-9-]{1,40}$", "u");
+const pattern33 = new RegExp("^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$", "u");
+const schema72 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
+const schema73 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
+const pattern24 = new RegExp("^blk_[0-9A-Za-z]{8,24}$", "u");
+const pattern25 = new RegExp("^[0-9a-f]{64}$", "u");
+const schema74 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema75 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+
+function validate39(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+let vErrors = null;
+let errors = 0;
+const evaluated0 = validate39.evaluated;
+if(evaluated0.dynamicProps){
+evaluated0.props = undefined;
+}
+if(evaluated0.dynamicItems){
+evaluated0.items = undefined;
+}
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.kind === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.id === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+for(const key0 in data){
+if(!(((key0 === "kind") || (key0 === "id")) || (key0 === "name"))){
+const err2 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data0 = data.kind;
+if(typeof data0 !== "string"){
+const err3 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema75.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data1 = data.id;
+if(typeof data1 === "string"){
+if(func2(data1) > 48){
+const err5 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if(func2(data1) < 8){
+const err6 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+if(!pattern4.test(data1)){
+const err7 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+else {
+const err8 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+if(data.name !== undefined){
+let data2 = data.name;
+if(typeof data2 === "string"){
+if(func2(data2) > 200){
+const err9 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/maxLength",keyword:"maxLength",params:{limit: 200},message:"must NOT have more than 200 characters"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+else {
+const err10 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+}
+else {
+const err11 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+validate39.errors = vErrors;
+return errors === 0;
+}
+validate39.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+
+
+function validate38(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+let vErrors = null;
+let errors = 0;
+const evaluated0 = validate38.evaluated;
+if(evaluated0.dynamicProps){
+evaluated0.props = undefined;
+}
+if(evaluated0.dynamicItems){
+evaluated0.items = undefined;
+}
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.hash === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "hash"},message:"must have required property '"+"hash"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+for(const key0 in data){
+if(!(((((key0 === "id") || (key0 === "hash")) || (key0 === "by")) || (key0 === "via")) || (key0 === "at"))){
+const err2 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data0 = data.id;
+if(typeof data0 === "string"){
+if(!pattern24.test(data0)){
+const err3 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^blk_[0-9A-Za-z]{8,24}$"},message:"must match pattern \""+"^blk_[0-9A-Za-z]{8,24}$"+"\""};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+else {
+const err4 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data.hash !== undefined){
+let data1 = data.hash;
+if(typeof data1 === "string"){
+if(!pattern25.test(data1)){
+const err5 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+else {
+const err6 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+if(data.by !== undefined){
+if(!(validate39(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate39.errors : vErrors.concat(validate39.errors);
+errors = vErrors.length;
+}
+}
+if(data.via !== undefined){
+let data3 = data.via;
+if(typeof data3 !== "string"){
+const err7 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+if(!((((((data3 === "studio") || (data3 === "mcp")) || (data3 === "api")) || (data3 === "import")) || (data3 === "ai-command")) || (data3 === "proposal"))){
+const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema73.properties.via.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+if(data.at !== undefined){
+let data4 = data.at;
+if(typeof data4 === "string"){
+if(!(formats0.validate(data4))){
+const err9 = {instancePath:instancePath+"/at",schemaPath:"#/$defs/Timestamp/format",keyword:"format",params:{format: "date-time"},message:"must match format \""+"date-time"+"\""};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+else {
+const err10 = {instancePath:instancePath+"/at",schemaPath:"#/$defs/Timestamp/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+}
+else {
+const err11 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+validate38.errors = vErrors;
+return errors === 0;
+}
+validate38.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+
+
+function validate37(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+let vErrors = null;
+let errors = 0;
+const evaluated0 = validate37.evaluated;
+if(evaluated0.dynamicProps){
+evaluated0.props = undefined;
+}
+if(evaluated0.dynamicItems){
+evaluated0.items = undefined;
+}
+if(Array.isArray(data)){
+if(data.length > 5000){
+const err0 = {instancePath,schemaPath:"#/maxItems",keyword:"maxItems",params:{limit: 5000},message:"must NOT have more than 5000 items"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+const len0 = data.length;
+for(let i0=0; i0<len0; i0++){
+if(!(validate38(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate38.errors : vErrors.concat(validate38.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err1 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+validate37.errors = vErrors;
+return errors === 0;
+}
+validate37.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
+
+const schema83 = {"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}};
+const schema84 = {"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"};
+const pattern34 = new RegExp("^[a-z][a-z0-9-]{0,40}$", "u");
+const pattern35 = new RegExp("^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$", "u");
+
+function validate44(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+let vErrors = null;
+let errors = 0;
+const evaluated0 = validate44.evaluated;
+if(evaluated0.dynamicProps){
+evaluated0.props = undefined;
+}
+if(evaluated0.dynamicItems){
+evaluated0.items = undefined;
+}
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.component === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "component"},message:"must have required property '"+"component"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+for(const key0 in data){
+if(!((((((key0 === "id") || (key0 === "component")) || (key0 === "children")) || (key0 === "props")) || (key0 === "visible")) || (key0 === "motion"))){
+const err2 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data0 = data.id;
+if(typeof data0 === "string"){
+if(!pattern34.test(data0)){
+const err3 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+else {
+const err4 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/SurfaceComponentId/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data.component !== undefined){
+let data1 = data.component;
+if(typeof data1 === "string"){
+if(!pattern35.test(data1)){
+const err5 = {instancePath:instancePath+"/component",schemaPath:"#/properties/component/pattern",keyword:"pattern",params:{pattern: "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},message:"must match pattern \""+"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"+"\""};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+else {
+const err6 = {instancePath:instancePath+"/component",schemaPath:"#/properties/component/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+if(data.children !== undefined){
+let data2 = data.children;
+if(Array.isArray(data2)){
+if(data2.length > 200){
+const err7 = {instancePath:instancePath+"/children",schemaPath:"#/properties/children/maxItems",keyword:"maxItems",params:{limit: 200},message:"must NOT have more than 200 items"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+const len0 = data2.length;
+for(let i0=0; i0<len0; i0++){
+let data3 = data2[i0];
+if(typeof data3 === "string"){
+if(!pattern34.test(data3)){
+const err8 = {instancePath:instancePath+"/children/" + i0,schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+else {
+const err9 = {instancePath:instancePath+"/children/" + i0,schemaPath:"#/$defs/SurfaceComponentId/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+}
+else {
+const err10 = {instancePath:instancePath+"/children",schemaPath:"#/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+if(data.props !== undefined){
+let data4 = data.props;
+if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
+}
+else {
+const err11 = {instancePath:instancePath+"/props",schemaPath:"#/properties/props/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+if(data.visible !== undefined){
+let data5 = data.visible;
+if(data5 && typeof data5 == "object" && !Array.isArray(data5)){
+}
+else {
+const err12 = {instancePath:instancePath+"/visible",schemaPath:"#/properties/visible/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+if(data.motion !== undefined){
+let data6 = data.motion;
+if(data6 && typeof data6 == "object" && !Array.isArray(data6)){
+}
+else {
+const err13 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+}
+else {
+const err14 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+validate44.errors = vErrors;
+return errors === 0;
+}
+validate44.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+
+
+function validate35(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+let vErrors = null;
+let errors = 0;
+const evaluated0 = validate35.evaluated;
+if(evaluated0.dynamicProps){
+evaluated0.props = undefined;
+}
+if(evaluated0.dynamicItems){
+evaluated0.items = undefined;
+}
+const _errs0 = errors;
+let valid0 = false;
+let passing0 = null;
+const _errs1 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err0 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err1 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.heading === undefined){
+const err2 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "heading"},message:"must have required property '"+"heading"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+for(const key0 in data){
+if(!((((((key0 === "id") || (key0 === "kind")) || (key0 === "heading")) || (key0 === "subheading")) || (key0 === "image")) || (key0 === "cta"))){
+const err3 = {instancePath,schemaPath:"#/oneOf/0/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data0 = data.id;
+if(typeof data0 === "string"){
+if(func2(data0) > 48){
+const err4 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(func2(data0) < 8){
+const err5 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if(!pattern4.test(data0)){
+const err6 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+else {
+const err7 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data1 = data.kind;
+if(typeof data1 !== "string"){
+const err8 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(!(data1 === "hero")){
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+if(data.heading !== undefined){
+let data2 = data.heading;
+if(typeof data2 === "string"){
+if(func2(data2) > 300){
+const err10 = {instancePath:instancePath+"/heading",schemaPath:"#/oneOf/0/properties/heading/maxLength",keyword:"maxLength",params:{limit: 300},message:"must NOT have more than 300 characters"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+if(func2(data2) < 1){
+const err11 = {instancePath:instancePath+"/heading",schemaPath:"#/oneOf/0/properties/heading/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+else {
+const err12 = {instancePath:instancePath+"/heading",schemaPath:"#/oneOf/0/properties/heading/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+if(data.subheading !== undefined){
+let data3 = data.subheading;
+if(typeof data3 === "string"){
+if(func2(data3) > 1000){
+const err13 = {instancePath:instancePath+"/subheading",schemaPath:"#/oneOf/0/properties/subheading/maxLength",keyword:"maxLength",params:{limit: 1000},message:"must NOT have more than 1000 characters"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+else {
+const err14 = {instancePath:instancePath+"/subheading",schemaPath:"#/oneOf/0/properties/subheading/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+if(data.image !== undefined){
+if(!(validate25(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate25.errors : vErrors.concat(validate25.errors);
+errors = vErrors.length;
+}
+}
+if(data.cta !== undefined){
+let data5 = data.cta;
+if(data5 && typeof data5 == "object" && !Array.isArray(data5)){
+if(data5.label === undefined){
+const err15 = {instancePath:instancePath+"/cta",schemaPath:"#/$defs/Link/required",keyword:"required",params:{missingProperty: "label"},message:"must have required property '"+"label"+"'"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+if(data5.href === undefined){
+const err16 = {instancePath:instancePath+"/cta",schemaPath:"#/$defs/Link/required",keyword:"required",params:{missingProperty: "href"},message:"must have required property '"+"href"+"'"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+for(const key1 in data5){
+if(!(((key1 === "label") || (key1 === "href")) || (key1 === "external"))){
+const err17 = {instancePath:instancePath+"/cta",schemaPath:"#/$defs/Link/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+}
+if(data5.label !== undefined){
+let data6 = data5.label;
+if(typeof data6 === "string"){
+if(func2(data6) > 200){
+const err18 = {instancePath:instancePath+"/cta/label",schemaPath:"#/$defs/Link/properties/label/maxLength",keyword:"maxLength",params:{limit: 200},message:"must NOT have more than 200 characters"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+if(func2(data6) < 1){
+const err19 = {instancePath:instancePath+"/cta/label",schemaPath:"#/$defs/Link/properties/label/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+}
+else {
+const err20 = {instancePath:instancePath+"/cta/label",schemaPath:"#/$defs/Link/properties/label/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+if(data5.href !== undefined){
+let data7 = data5.href;
+if(typeof data7 === "string"){
+if(func2(data7) > 2048){
+const err21 = {instancePath:instancePath+"/cta/href",schemaPath:"#/$defs/Link/properties/href/maxLength",keyword:"maxLength",params:{limit: 2048},message:"must NOT have more than 2048 characters"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+if(func2(data7) < 1){
+const err22 = {instancePath:instancePath+"/cta/href",schemaPath:"#/$defs/Link/properties/href/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+}
+else {
+const err23 = {instancePath:instancePath+"/cta/href",schemaPath:"#/$defs/Link/properties/href/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+}
+if(data5.external !== undefined){
+if(typeof data5.external !== "boolean"){
+const err24 = {instancePath:instancePath+"/cta/external",schemaPath:"#/$defs/Link/properties/external/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+}
+}
+else {
+const err25 = {instancePath:instancePath+"/cta",schemaPath:"#/$defs/Link/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+}
+}
+else {
+const err26 = {instancePath,schemaPath:"#/oneOf/0/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err26];
+}
+else {
+vErrors.push(err26);
+}
+errors++;
+}
+var _valid0 = _errs1 === errors;
+if(_valid0){
+valid0 = true;
+passing0 = 0;
+var props0 = true;
+}
+const _errs24 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err27 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err27];
+}
+else {
+vErrors.push(err27);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err28 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err28];
+}
+else {
+vErrors.push(err28);
+}
+errors++;
+}
+if(data.format === undefined){
+const err29 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "format"},message:"must have required property '"+"format"+"'"};
+if(vErrors === null){
+vErrors = [err29];
+}
+else {
+vErrors.push(err29);
+}
+errors++;
+}
+if(data.body === undefined){
+const err30 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "body"},message:"must have required property '"+"body"+"'"};
+if(vErrors === null){
+vErrors = [err30];
+}
+else {
+vErrors.push(err30);
+}
+errors++;
+}
+for(const key2 in data){
+if(!((((((key2 === "id") || (key2 === "kind")) || (key2 === "format")) || (key2 === "body")) || (key2 === "profile")) || (key2 === "blocks"))){
+const err31 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err31];
+}
+else {
+vErrors.push(err31);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data9 = data.id;
+if(typeof data9 === "string"){
+if(func2(data9) > 48){
+const err32 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err32];
+}
+else {
+vErrors.push(err32);
+}
+errors++;
+}
+if(func2(data9) < 8){
+const err33 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err33];
+}
+else {
+vErrors.push(err33);
+}
+errors++;
+}
+if(!pattern4.test(data9)){
+const err34 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err34];
+}
+else {
+vErrors.push(err34);
+}
+errors++;
+}
+}
+else {
+const err35 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err35];
+}
+else {
+vErrors.push(err35);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data10 = data.kind;
+if(typeof data10 !== "string"){
+const err36 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+if(!(data10 === "richText")){
+const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+}
+if(data.format !== undefined){
+let data11 = data.format;
+if(typeof data11 !== "string"){
+const err38 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+if(!((data11 === "markdown") || (data11 === "html"))){
+const err39 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[1].properties.format.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+}
+if(data.body !== undefined){
+let data12 = data.body;
+if(typeof data12 === "string"){
+if(func2(data12) > 200000){
+const err40 = {instancePath:instancePath+"/body",schemaPath:"#/oneOf/1/properties/body/maxLength",keyword:"maxLength",params:{limit: 200000},message:"must NOT have more than 200000 characters"};
+if(vErrors === null){
+vErrors = [err40];
+}
+else {
+vErrors.push(err40);
+}
+errors++;
+}
+}
+else {
+const err41 = {instancePath:instancePath+"/body",schemaPath:"#/oneOf/1/properties/body/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err41];
+}
+else {
+vErrors.push(err41);
+}
+errors++;
+}
+}
+if(data.profile !== undefined){
+let data13 = data.profile;
+if(!(((typeof data13 == "number") && (!(data13 % 1) && !isNaN(data13))) && (isFinite(data13)))){
+const err42 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/type",keyword:"type",params:{type: "integer"},message:"must be integer"};
+if(vErrors === null){
+vErrors = [err42];
+}
+else {
+vErrors.push(err42);
+}
+errors++;
+}
+if(!(data13 === 1)){
+const err43 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema71.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err43];
+}
+else {
+vErrors.push(err43);
+}
+errors++;
+}
+}
+if(data.blocks !== undefined){
+if(!(validate37(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate37.errors : vErrors.concat(validate37.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err44 = {instancePath,schemaPath:"#/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err44];
+}
+else {
+vErrors.push(err44);
+}
+errors++;
+}
+var _valid0 = _errs24 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 1;
+if(props0 !== true){
+props0 = true;
+}
+}
+const _errs40 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err45 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err45];
+}
+else {
+vErrors.push(err45);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err46 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err46];
+}
+else {
+vErrors.push(err46);
+}
+errors++;
+}
+if(data.image === undefined){
+const err47 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "image"},message:"must have required property '"+"image"+"'"};
+if(vErrors === null){
+vErrors = [err47];
+}
+else {
+vErrors.push(err47);
+}
+errors++;
+}
+for(const key3 in data){
+if(!((((key3 === "id") || (key3 === "kind")) || (key3 === "image")) || (key3 === "caption"))){
+const err48 = {instancePath,schemaPath:"#/oneOf/2/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key3},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err48];
+}
+else {
+vErrors.push(err48);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data15 = data.id;
+if(typeof data15 === "string"){
+if(func2(data15) > 48){
+const err49 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err49];
+}
+else {
+vErrors.push(err49);
+}
+errors++;
+}
+if(func2(data15) < 8){
+const err50 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err50];
+}
+else {
+vErrors.push(err50);
+}
+errors++;
+}
+if(!pattern4.test(data15)){
+const err51 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err51];
+}
+else {
+vErrors.push(err51);
+}
+errors++;
+}
+}
+else {
+const err52 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err52];
+}
+else {
+vErrors.push(err52);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data16 = data.kind;
+if(typeof data16 !== "string"){
+const err53 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err53];
+}
+else {
+vErrors.push(err53);
+}
+errors++;
+}
+if(!(data16 === "image")){
+const err54 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err54];
+}
+else {
+vErrors.push(err54);
+}
+errors++;
+}
+}
+if(data.image !== undefined){
+if(!(validate25(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate25.errors : vErrors.concat(validate25.errors);
+errors = vErrors.length;
+}
+}
+if(data.caption !== undefined){
+let data18 = data.caption;
+if(typeof data18 === "string"){
+if(func2(data18) > 1000){
+const err55 = {instancePath:instancePath+"/caption",schemaPath:"#/oneOf/2/properties/caption/maxLength",keyword:"maxLength",params:{limit: 1000},message:"must NOT have more than 1000 characters"};
+if(vErrors === null){
+vErrors = [err55];
+}
+else {
+vErrors.push(err55);
+}
+errors++;
+}
+}
+else {
+const err56 = {instancePath:instancePath+"/caption",schemaPath:"#/oneOf/2/properties/caption/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err56];
+}
+else {
+vErrors.push(err56);
+}
+errors++;
+}
+}
+}
+else {
+const err57 = {instancePath,schemaPath:"#/oneOf/2/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err57];
+}
+else {
+vErrors.push(err57);
+}
+errors++;
+}
+var _valid0 = _errs40 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 2];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 2;
+if(props0 !== true){
+props0 = true;
+}
+}
+const _errs51 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err58 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err58];
+}
+else {
+vErrors.push(err58);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err59 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err59];
+}
+else {
+vErrors.push(err59);
+}
+errors++;
+}
+if(data.collection === undefined){
+const err60 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "collection"},message:"must have required property '"+"collection"+"'"};
+if(vErrors === null){
+vErrors = [err60];
+}
+else {
+vErrors.push(err60);
+}
+errors++;
+}
+if(data.limit === undefined){
+const err61 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "limit"},message:"must have required property '"+"limit"+"'"};
+if(vErrors === null){
+vErrors = [err61];
+}
+else {
+vErrors.push(err61);
+}
+errors++;
+}
+if(data.sort === undefined){
+const err62 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "sort"},message:"must have required property '"+"sort"+"'"};
+if(vErrors === null){
+vErrors = [err62];
+}
+else {
+vErrors.push(err62);
+}
+errors++;
+}
+for(const key4 in data){
+if(!((((((key4 === "id") || (key4 === "kind")) || (key4 === "collection")) || (key4 === "limit")) || (key4 === "sort")) || (key4 === "filter"))){
+const err63 = {instancePath,schemaPath:"#/oneOf/3/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err63];
+}
+else {
+vErrors.push(err63);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data19 = data.id;
+if(typeof data19 === "string"){
+if(func2(data19) > 48){
+const err64 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err64];
+}
+else {
+vErrors.push(err64);
+}
+errors++;
+}
+if(func2(data19) < 8){
+const err65 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err65];
+}
+else {
+vErrors.push(err65);
+}
+errors++;
+}
+if(!pattern4.test(data19)){
+const err66 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err66];
+}
+else {
+vErrors.push(err66);
+}
+errors++;
+}
+}
+else {
+const err67 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err67];
+}
+else {
+vErrors.push(err67);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data20 = data.kind;
+if(typeof data20 !== "string"){
+const err68 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err68];
+}
+else {
+vErrors.push(err68);
+}
+errors++;
+}
+if(!(data20 === "contentList")){
+const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err69];
+}
+else {
+vErrors.push(err69);
+}
+errors++;
+}
+}
+if(data.collection !== undefined){
+let data21 = data.collection;
+if(typeof data21 === "string"){
+if(func2(data21) > 128){
+const err70 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/maxLength",keyword:"maxLength",params:{limit: 128},message:"must NOT have more than 128 characters"};
+if(vErrors === null){
+vErrors = [err70];
+}
+else {
+vErrors.push(err70);
+}
+errors++;
+}
+if(func2(data21) < 1){
+const err71 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err71];
+}
+else {
+vErrors.push(err71);
+}
+errors++;
+}
+if(!pattern5.test(data21)){
+const err72 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"},message:"must match pattern \""+"^[a-z0-9]+(?:-[a-z0-9]+)*$"+"\""};
+if(vErrors === null){
+vErrors = [err72];
+}
+else {
+vErrors.push(err72);
+}
+errors++;
+}
+}
+else {
+const err73 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err73];
+}
+else {
+vErrors.push(err73);
+}
+errors++;
+}
+}
+if(data.limit !== undefined){
+let data22 = data.limit;
+if(!(((typeof data22 == "number") && (!(data22 % 1) && !isNaN(data22))) && (isFinite(data22)))){
+const err74 = {instancePath:instancePath+"/limit",schemaPath:"#/oneOf/3/properties/limit/type",keyword:"type",params:{type: "integer"},message:"must be integer"};
+if(vErrors === null){
+vErrors = [err74];
+}
+else {
+vErrors.push(err74);
+}
+errors++;
+}
+if((typeof data22 == "number") && (isFinite(data22))){
+if(data22 > 100 || isNaN(data22)){
+const err75 = {instancePath:instancePath+"/limit",schemaPath:"#/oneOf/3/properties/limit/maximum",keyword:"maximum",params:{comparison: "<=", limit: 100},message:"must be <= 100"};
+if(vErrors === null){
+vErrors = [err75];
+}
+else {
+vErrors.push(err75);
+}
+errors++;
+}
+if(data22 < 1 || isNaN(data22)){
+const err76 = {instancePath:instancePath+"/limit",schemaPath:"#/oneOf/3/properties/limit/minimum",keyword:"minimum",params:{comparison: ">=", limit: 1},message:"must be >= 1"};
+if(vErrors === null){
+vErrors = [err76];
+}
+else {
+vErrors.push(err76);
+}
+errors++;
+}
+}
+}
+if(data.sort !== undefined){
+let data23 = data.sort;
+if(typeof data23 !== "string"){
+const err77 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err77];
+}
+else {
+vErrors.push(err77);
+}
+errors++;
+}
+if(!(((data23 === "newest") || (data23 === "oldest")) || (data23 === "title"))){
+const err78 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[3].properties.sort.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err78];
+}
+else {
+vErrors.push(err78);
+}
+errors++;
+}
+}
+if(data.filter !== undefined){
+let data24 = data.filter;
+if(typeof data24 === "string"){
+if(func2(data24) > 512){
+const err79 = {instancePath:instancePath+"/filter",schemaPath:"#/oneOf/3/properties/filter/maxLength",keyword:"maxLength",params:{limit: 512},message:"must NOT have more than 512 characters"};
+if(vErrors === null){
+vErrors = [err79];
+}
+else {
+vErrors.push(err79);
+}
+errors++;
+}
+if(func2(data24) < 1){
+const err80 = {instancePath:instancePath+"/filter",schemaPath:"#/oneOf/3/properties/filter/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err80];
+}
+else {
+vErrors.push(err80);
+}
+errors++;
+}
+}
+else {
+const err81 = {instancePath:instancePath+"/filter",schemaPath:"#/oneOf/3/properties/filter/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err81];
+}
+else {
+vErrors.push(err81);
+}
+errors++;
+}
+}
+}
+else {
+const err82 = {instancePath,schemaPath:"#/oneOf/3/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err82];
+}
+else {
+vErrors.push(err82);
+}
+errors++;
+}
+var _valid0 = _errs51 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 3];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 3;
+if(props0 !== true){
+props0 = true;
+}
+}
+const _errs68 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err83 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err83];
+}
+else {
+vErrors.push(err83);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err84 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err84];
+}
+else {
+vErrors.push(err84);
+}
+errors++;
+}
+if(data.type === undefined){
+const err85 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err85];
+}
+else {
+vErrors.push(err85);
+}
+errors++;
+}
+if(data.props === undefined){
+const err86 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "props"},message:"must have required property '"+"props"+"'"};
+if(vErrors === null){
+vErrors = [err86];
+}
+else {
+vErrors.push(err86);
+}
+errors++;
+}
+for(const key5 in data){
+if(!((((key5 === "id") || (key5 === "kind")) || (key5 === "type")) || (key5 === "props"))){
+const err87 = {instancePath,schemaPath:"#/oneOf/4/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key5},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err87];
+}
+else {
+vErrors.push(err87);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data25 = data.id;
+if(typeof data25 === "string"){
+if(func2(data25) > 48){
+const err88 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err88];
+}
+else {
+vErrors.push(err88);
+}
+errors++;
+}
+if(func2(data25) < 8){
+const err89 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err89];
+}
+else {
+vErrors.push(err89);
+}
+errors++;
+}
+if(!pattern4.test(data25)){
+const err90 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err90];
+}
+else {
+vErrors.push(err90);
+}
+errors++;
+}
+}
+else {
+const err91 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err91];
+}
+else {
+vErrors.push(err91);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data26 = data.kind;
+if(typeof data26 !== "string"){
+const err92 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err92];
+}
+else {
+vErrors.push(err92);
+}
+errors++;
+}
+if(!(data26 === "component")){
+const err93 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err93];
+}
+else {
+vErrors.push(err93);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data27 = data.type;
+if(typeof data27 === "string"){
+if(!pattern31.test(data27)){
+const err94 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{1,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{1,40}$"+"\""};
+if(vErrors === null){
+vErrors = [err94];
+}
+else {
+vErrors.push(err94);
+}
+errors++;
+}
+}
+else {
+const err95 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err95];
+}
+else {
+vErrors.push(err95);
+}
+errors++;
+}
+}
+if(data.props !== undefined){
+let data28 = data.props;
+if(data28 && typeof data28 == "object" && !Array.isArray(data28)){
+}
+else {
+const err96 = {instancePath:instancePath+"/props",schemaPath:"#/oneOf/4/properties/props/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err96];
+}
+else {
+vErrors.push(err96);
+}
+errors++;
+}
+}
+}
+else {
+const err97 = {instancePath,schemaPath:"#/oneOf/4/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err97];
+}
+else {
+vErrors.push(err97);
+}
+errors++;
+}
+var _valid0 = _errs68 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 4];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 4;
+if(props0 !== true){
+props0 = true;
+}
+}
+const _errs81 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err98 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err98];
+}
+else {
+vErrors.push(err98);
+}
+errors++;
+}
+if(data.kind === undefined){
+const err99 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
+if(vErrors === null){
+vErrors = [err99];
+}
+else {
+vErrors.push(err99);
+}
+errors++;
+}
+if(data.catalog === undefined){
+const err100 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "catalog"},message:"must have required property '"+"catalog"+"'"};
+if(vErrors === null){
+vErrors = [err100];
+}
+else {
+vErrors.push(err100);
+}
+errors++;
+}
+if(data.components === undefined){
+const err101 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "components"},message:"must have required property '"+"components"+"'"};
+if(vErrors === null){
+vErrors = [err101];
+}
+else {
+vErrors.push(err101);
+}
+errors++;
+}
+for(const key6 in data){
+if(!(((((key6 === "id") || (key6 === "kind")) || (key6 === "catalog")) || (key6 === "components")) || (key6 === "data"))){
+const err102 = {instancePath,schemaPath:"#/oneOf/5/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key6},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err102];
+}
+else {
+vErrors.push(err102);
+}
+errors++;
+}
+}
+if(data.id !== undefined){
+let data29 = data.id;
+if(typeof data29 === "string"){
+if(func2(data29) > 48){
+const err103 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err103];
+}
+else {
+vErrors.push(err103);
+}
+errors++;
+}
+if(func2(data29) < 8){
+const err104 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err104];
+}
+else {
+vErrors.push(err104);
+}
+errors++;
+}
+if(!pattern4.test(data29)){
+const err105 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err105];
+}
+else {
+vErrors.push(err105);
+}
+errors++;
+}
+}
+else {
+const err106 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err106];
+}
+else {
+vErrors.push(err106);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data30 = data.kind;
+if(typeof data30 !== "string"){
+const err107 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err107];
+}
+else {
+vErrors.push(err107);
+}
+errors++;
+}
+if(!(data30 === "surface")){
+const err108 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema67.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err108];
+}
+else {
+vErrors.push(err108);
+}
+errors++;
+}
+}
+if(data.catalog !== undefined){
+let data31 = data.catalog;
+if(typeof data31 === "string"){
+if(!pattern33.test(data31)){
+const err109 = {instancePath:instancePath+"/catalog",schemaPath:"#/oneOf/5/properties/catalog/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"+"\""};
+if(vErrors === null){
+vErrors = [err109];
+}
+else {
+vErrors.push(err109);
+}
+errors++;
+}
+}
+else {
+const err110 = {instancePath:instancePath+"/catalog",schemaPath:"#/oneOf/5/properties/catalog/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err110];
+}
+else {
+vErrors.push(err110);
+}
+errors++;
+}
+}
+if(data.components !== undefined){
+let data32 = data.components;
+if(Array.isArray(data32)){
+if(data32.length > 200){
+const err111 = {instancePath:instancePath+"/components",schemaPath:"#/oneOf/5/properties/components/maxItems",keyword:"maxItems",params:{limit: 200},message:"must NOT have more than 200 items"};
+if(vErrors === null){
+vErrors = [err111];
+}
+else {
+vErrors.push(err111);
+}
+errors++;
+}
+if(data32.length < 1){
+const err112 = {instancePath:instancePath+"/components",schemaPath:"#/oneOf/5/properties/components/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err112];
+}
+else {
+vErrors.push(err112);
+}
+errors++;
+}
+const len0 = data32.length;
+for(let i0=0; i0<len0; i0++){
+if(!(validate44(data32[i0], {instancePath:instancePath+"/components/" + i0,parentData:data32,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate44.errors : vErrors.concat(validate44.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err113 = {instancePath:instancePath+"/components",schemaPath:"#/oneOf/5/properties/components/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err113];
+}
+else {
+vErrors.push(err113);
+}
+errors++;
+}
+}
+if(data.data !== undefined){
+let data34 = data.data;
+if(data34 && typeof data34 == "object" && !Array.isArray(data34)){
+}
+else {
+const err114 = {instancePath:instancePath+"/data",schemaPath:"#/oneOf/5/properties/data/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err114];
+}
+else {
+vErrors.push(err114);
+}
+errors++;
+}
+}
+}
+else {
+const err115 = {instancePath,schemaPath:"#/oneOf/5/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err115];
+}
+else {
+vErrors.push(err115);
+}
+errors++;
+}
+var _valid0 = _errs81 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 5];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 5;
+if(props0 !== true){
+props0 = true;
+}
+}
+}
+}
+}
+}
+}
+if(!valid0){
+const err116 = {instancePath,schemaPath:"#/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err116];
+}
+else {
+vErrors.push(err116);
+}
+errors++;
+}
+else {
+errors = _errs0;
+if(vErrors !== null){
+if(_errs0){
+vErrors.length = _errs0;
+}
+else {
+vErrors = null;
+}
+}
+}
+validate35.errors = vErrors;
+evaluated0.props = props0;
+return errors === 0;
+}
+validate35.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 
 function validate32(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -2151,6 +4202,12 @@ vErrors.push(err32);
 errors++;
 }
 }
+if(data.region !== undefined){
+if(!(validate35(data.region, {instancePath:instancePath+"/region",parentData:data,parentDataProperty:"region",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate35.errors : vErrors.concat(validate35.errors);
+errors = vErrors.length;
+}
+}
 }
 else {
 const err33 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
@@ -2167,14 +4224,14 @@ return errors === 0;
 }
 validate32.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema68 = {"type":"object","additionalProperties":false,"required":["mode"],"properties":{"mode":{"type":"string","enum":["none","notice","choices"]},"policy":{"$ref":"#/$defs/Path"}}};
-const schema69 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
-const pattern23 = new RegExp("^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$", "u");
+const schema87 = {"type":"object","additionalProperties":false,"required":["mode"],"properties":{"mode":{"type":"string","enum":["none","notice","choices"]},"policy":{"$ref":"#/$defs/Path"}}};
+const schema88 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
+const pattern38 = new RegExp("^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$", "u");
 
-function validate36(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate48(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate36.evaluated;
+const evaluated0 = validate48.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -2217,7 +4274,7 @@ vErrors.push(err2);
 errors++;
 }
 if(!(((data0 === "none") || (data0 === "notice")) || (data0 === "choices"))){
-const err3 = {instancePath:instancePath+"/mode",schemaPath:"#/properties/mode/enum",keyword:"enum",params:{allowedValues: schema68.properties.mode.enum},message:"must be equal to one of the allowed values"};
+const err3 = {instancePath:instancePath+"/mode",schemaPath:"#/properties/mode/enum",keyword:"enum",params:{allowedValues: schema87.properties.mode.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -2240,7 +4297,7 @@ vErrors.push(err4);
 }
 errors++;
 }
-if(!pattern23.test(data1)){
+if(!pattern38.test(data1)){
 const err5 = {instancePath:instancePath+"/policy",schemaPath:"#/$defs/Path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -2273,12 +4330,12 @@ vErrors.push(err7);
 }
 errors++;
 }
-validate36.errors = vErrors;
+validate48.errors = vErrors;
 return errors === 0;
 }
-validate36.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate48.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const pattern22 = new RegExp("^[a-z0-9][a-z0-9-]{0,40}$", "u");
+const pattern37 = new RegExp("^[a-z0-9][a-z0-9-]{0,40}$", "u");
 
 function validate29(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -2353,7 +4410,7 @@ errors++;
 if(data2.id !== undefined){
 let data3 = data2.id;
 if(typeof data3 === "string"){
-if(!pattern22.test(data3)){
+if(!pattern37.test(data3)){
 const err4 = {instancePath:instancePath+"/announcement/id",schemaPath:"#/$defs/Announcement/properties/id/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{0,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err4];
@@ -2493,7 +4550,7 @@ vErrors.push(err15);
 errors++;
 }
 if(!(((data7 === "info") || (data7 === "brand")) || (data7 === "warning"))){
-const err16 = {instancePath:instancePath+"/announcement/tone",schemaPath:"#/$defs/Announcement/properties/tone/enum",keyword:"enum",params:{allowedValues: schema67.properties.tone.enum},message:"must be equal to one of the allowed values"};
+const err16 = {instancePath:instancePath+"/announcement/tone",schemaPath:"#/$defs/Announcement/properties/tone/enum",keyword:"enum",params:{allowedValues: schema86.properties.tone.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -2528,8 +4585,8 @@ errors++;
 }
 }
 if(data.consent !== undefined){
-if(!(validate36(data.consent, {instancePath:instancePath+"/consent",parentData:data,parentDataProperty:"consent",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate36.errors : vErrors.concat(validate36.errors);
+if(!(validate48(data.consent, {instancePath:instancePath+"/consent",parentData:data,parentDataProperty:"consent",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate48.errors : vErrors.concat(validate48.errors);
 errors = vErrors.length;
 }
 }
@@ -3332,7 +5389,7 @@ vErrors.push(err63);
 }
 errors++;
 }
-if(!pattern24.test(data20)){
+if(!pattern39.test(data20)){
 const err64 = {instancePath:instancePath+"/timeZone",schemaPath:"#/$defs/TimeZone/pattern",keyword:"pattern",params:{pattern: "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"},message:"must match pattern \""+"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"+"\""};
 if(vErrors === null){
 vErrors = [err64];
@@ -3517,28 +5574,26 @@ return errors === 0;
 }
 validate21.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validatePage = validate39;
-const schema76 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/page.schema.json","title":"Page","description":"A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","path","title","locale","status","sections","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"path":{"type":"string","description":"Absolute URL path, starting with '/', no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"title":{"type":"string","minLength":1,"maxLength":300},"locale":{"$ref":"#/$defs/Locale"},"status":{"$ref":"#/$defs/PublishStatus"},"sections":{"type":"array","items":{"$ref":"#/$defs/Section"}},"seo":{"$ref":"#/$defs/Seo"},"availability":{"$ref":"#/$defs/Availability"},"chrome":{"type":"object","description":"This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer.","additionalProperties":false,"properties":{"header":{"type":"string","enum":["default","transparent","hidden"]},"footer":{"type":"string","enum":["default","minimal","hidden"]}}},"motion":{"$ref":"#/$defs/MotionLevel","description":"Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site."},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Availability":{"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"MotionLevel":{"type":"string","description":"How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.","enum":["none","subtle","standard","expressive"]},"PublishStatus":{"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Section":{"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]},"Seo":{"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SurfaceComponent":{"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}},"SurfaceComponentId":{"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema77 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema78 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema80 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema81 = {"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]};
-const schema107 = {"type":"string","description":"How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.","enum":["none","subtle","standard","expressive"]};
-const schema108 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema94 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema111 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema82 = {"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]};
-const schema86 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
-const schema88 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
-const schema97 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const pattern40 = new RegExp("^[a-z][a-z0-9-]{1,40}$", "u");
-const pattern42 = new RegExp("^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$", "u");
-const schema84 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
+export const validatePage = validate51;
+const schema95 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/page.schema.json","title":"Page","description":"A routable page of a site: a path, editorial status and an ordered list of sections. Sections are embedded (not separate nodes) so a page is the unit of locking, snapshotting and diffing.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","path","title","locale","status","sections","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"path":{"type":"string","description":"Absolute URL path, starting with '/', no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"title":{"type":"string","minLength":1,"maxLength":300},"locale":{"$ref":"#/$defs/Locale"},"status":{"$ref":"#/$defs/PublishStatus"},"sections":{"type":"array","items":{"$ref":"#/$defs/Section"}},"seo":{"$ref":"#/$defs/Seo"},"availability":{"$ref":"#/$defs/Availability"},"chrome":{"type":"object","description":"This page's own header and footer (RFC-0025 §1): a landing page without the menu, a checkout without the footer.","additionalProperties":false,"properties":{"header":{"type":"string","enum":["default","transparent","hidden"]},"footer":{"type":"string","enum":["default","minimal","hidden"]}}},"motion":{"$ref":"#/$defs/MotionLevel","description":"Overrides the site's motion level for this page, up or down (RFC-0024 §1); absent follows the site."},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Availability":{"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"MotionLevel":{"type":"string","description":"How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.","enum":["none","subtle","standard","expressive"]},"PublishStatus":{"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Section":{"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]},"Seo":{"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SurfaceComponent":{"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}},"SurfaceComponentId":{"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema96 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema97 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema99 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema100 = {"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]};
+const schema126 = {"type":"string","description":"How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.","enum":["none","subtle","standard","expressive"]};
+const schema127 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema113 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema130 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema101 = {"title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}]};
+const schema105 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
+const schema107 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
+const schema116 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema103 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
 
-function validate41(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate53(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate41.evaluated;
+const evaluated0 = validate53.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -3744,22 +5799,20 @@ vErrors.push(err16);
 }
 errors++;
 }
-validate41.errors = vErrors;
+validate53.errors = vErrors;
 return errors === 0;
 }
-validate41.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate53.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema89 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
-const schema90 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
-const pattern33 = new RegExp("^blk_[0-9A-Za-z]{8,24}$", "u");
-const pattern34 = new RegExp("^[0-9a-f]{64}$", "u");
-const schema91 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema92 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+const schema108 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
+const schema109 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
+const schema110 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema111 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate45(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate57(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate45.evaluated;
+const evaluated0 = validate57.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -3812,7 +5865,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema92.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema111.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -3903,16 +5956,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate45.errors = vErrors;
+validate57.errors = vErrors;
 return errors === 0;
 }
-validate45.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate57.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate44(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate56(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate44.evaluated;
+const evaluated0 = validate56.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -3955,7 +6008,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern33.test(data0)){
+if(!pattern24.test(data0)){
 const err3 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^blk_[0-9A-Za-z]{8,24}$"},message:"must match pattern \""+"^blk_[0-9A-Za-z]{8,24}$"+"\""};
 if(vErrors === null){
 vErrors = [err3];
@@ -3980,7 +6033,7 @@ errors++;
 if(data.hash !== undefined){
 let data1 = data.hash;
 if(typeof data1 === "string"){
-if(!pattern34.test(data1)){
+if(!pattern25.test(data1)){
 const err5 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -4003,8 +6056,8 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate45(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate45.errors : vErrors.concat(validate45.errors);
+if(!(validate57(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate57.errors : vErrors.concat(validate57.errors);
 errors = vErrors.length;
 }
 }
@@ -4021,7 +6074,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!((((((data3 === "studio") || (data3 === "mcp")) || (data3 === "api")) || (data3 === "import")) || (data3 === "ai-command")) || (data3 === "proposal"))){
-const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema90.properties.via.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema109.properties.via.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -4067,16 +6120,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate44.errors = vErrors;
+validate56.errors = vErrors;
 return errors === 0;
 }
-validate44.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate56.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate43(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate55(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate43.evaluated;
+const evaluated0 = validate55.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -4096,8 +6149,8 @@ errors++;
 }
 const len0 = data.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate44(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate44.errors : vErrors.concat(validate44.errors);
+if(!(validate56(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate56.errors : vErrors.concat(validate56.errors);
 errors = vErrors.length;
 }
 }
@@ -4112,20 +6165,18 @@ vErrors.push(err1);
 }
 errors++;
 }
-validate43.errors = vErrors;
+validate55.errors = vErrors;
 return errors === 0;
 }
-validate43.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
+validate55.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema100 = {"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}};
-const schema101 = {"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"};
-const pattern43 = new RegExp("^[a-z][a-z0-9-]{0,40}$", "u");
-const pattern44 = new RegExp("^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$", "u");
+const schema119 = {"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}};
+const schema120 = {"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"};
 
-function validate50(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate62(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate50.evaluated;
+const evaluated0 = validate62.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -4168,7 +6219,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern43.test(data0)){
+if(!pattern34.test(data0)){
 const err3 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err3];
@@ -4193,7 +6244,7 @@ errors++;
 if(data.component !== undefined){
 let data1 = data.component;
 if(typeof data1 === "string"){
-if(!pattern44.test(data1)){
+if(!pattern35.test(data1)){
 const err5 = {instancePath:instancePath+"/component",schemaPath:"#/properties/component/pattern",keyword:"pattern",params:{pattern: "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},message:"must match pattern \""+"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -4232,7 +6283,7 @@ const len0 = data2.length;
 for(let i0=0; i0<len0; i0++){
 let data3 = data2[i0];
 if(typeof data3 === "string"){
-if(!pattern43.test(data3)){
+if(!pattern34.test(data3)){
 const err8 = {instancePath:instancePath+"/children/" + i0,schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err8];
@@ -4322,16 +6373,16 @@ vErrors.push(err14);
 }
 errors++;
 }
-validate50.errors = vErrors;
+validate62.errors = vErrors;
 return errors === 0;
 }
-validate50.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate62.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate40(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate52(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate40.evaluated;
+const evaluated0 = validate52.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -4443,7 +6494,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(data1 === "hero")){
-const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -4514,8 +6565,8 @@ errors++;
 }
 }
 if(data.image !== undefined){
-if(!(validate41(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate41.errors : vErrors.concat(validate41.errors);
+if(!(validate53(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate53.errors : vErrors.concat(validate53.errors);
 errors = vErrors.length;
 }
 }
@@ -4777,7 +6828,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(data10 === "richText")){
-const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -4800,7 +6851,7 @@ vErrors.push(err38);
 errors++;
 }
 if(!((data11 === "markdown") || (data11 === "html"))){
-const err39 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[1].properties.format.enum},message:"must be equal to one of the allowed values"};
+const err39 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[1].properties.format.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err39];
 }
@@ -4848,7 +6899,7 @@ vErrors.push(err42);
 errors++;
 }
 if(!(data13 === 1)){
-const err43 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema88.enum},message:"must be equal to one of the allowed values"};
+const err43 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema107.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err43];
 }
@@ -4859,8 +6910,8 @@ errors++;
 }
 }
 if(data.blocks !== undefined){
-if(!(validate43(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate43.errors : vErrors.concat(validate43.errors);
+if(!(validate55(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate55.errors : vErrors.concat(validate55.errors);
 errors = vErrors.length;
 }
 }
@@ -4990,7 +7041,7 @@ vErrors.push(err53);
 errors++;
 }
 if(!(data16 === "image")){
-const err54 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err54 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err54];
 }
@@ -5001,8 +7052,8 @@ errors++;
 }
 }
 if(data.image !== undefined){
-if(!(validate41(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate41.errors : vErrors.concat(validate41.errors);
+if(!(validate53(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate53.errors : vErrors.concat(validate53.errors);
 errors = vErrors.length;
 }
 }
@@ -5177,7 +7228,7 @@ vErrors.push(err68);
 errors++;
 }
 if(!(data20 === "contentList")){
-const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err69];
 }
@@ -5280,7 +7331,7 @@ vErrors.push(err77);
 errors++;
 }
 if(!(((data23 === "newest") || (data23 === "oldest")) || (data23 === "title"))){
-const err78 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[3].properties.sort.enum},message:"must be equal to one of the allowed values"};
+const err78 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[3].properties.sort.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -5461,7 +7512,7 @@ vErrors.push(err92);
 errors++;
 }
 if(!(data26 === "component")){
-const err93 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err93 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err93];
 }
@@ -5474,7 +7525,7 @@ errors++;
 if(data.type !== undefined){
 let data27 = data.type;
 if(typeof data27 === "string"){
-if(!pattern40.test(data27)){
+if(!pattern31.test(data27)){
 const err94 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{1,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{1,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err94];
@@ -5647,7 +7698,7 @@ vErrors.push(err107);
 errors++;
 }
 if(!(data30 === "surface")){
-const err108 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema82.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err108 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema101.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err108];
 }
@@ -5660,7 +7711,7 @@ errors++;
 if(data.catalog !== undefined){
 let data31 = data.catalog;
 if(typeof data31 === "string"){
-if(!pattern42.test(data31)){
+if(!pattern33.test(data31)){
 const err109 = {instancePath:instancePath+"/catalog",schemaPath:"#/oneOf/5/properties/catalog/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"+"\""};
 if(vErrors === null){
 vErrors = [err109];
@@ -5707,8 +7758,8 @@ errors++;
 }
 const len0 = data32.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate50(data32[i0], {instancePath:instancePath+"/components/" + i0,parentData:data32,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate50.errors : vErrors.concat(validate50.errors);
+if(!(validate62(data32[i0], {instancePath:instancePath+"/components/" + i0,parentData:data32,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate62.errors : vErrors.concat(validate62.errors);
 errors = vErrors.length;
 }
 }
@@ -5789,18 +7840,18 @@ vErrors = null;
 }
 }
 }
-validate40.errors = vErrors;
+validate52.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate40.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate52.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema103 = {"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}};
+const schema122 = {"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}};
 
-function validate53(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate65(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate53.evaluated;
+const evaluated0 = validate65.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -5908,8 +7959,8 @@ errors++;
 }
 }
 if(data.ogImage !== undefined){
-if(!(validate41(data.ogImage, {instancePath:instancePath+"/ogImage",parentData:data,parentDataProperty:"ogImage",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate41.errors : vErrors.concat(validate41.errors);
+if(!(validate53(data.ogImage, {instancePath:instancePath+"/ogImage",parentData:data,parentDataProperty:"ogImage",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate53.errors : vErrors.concat(validate53.errors);
 errors = vErrors.length;
 }
 }
@@ -5924,17 +7975,17 @@ vErrors.push(err8);
 }
 errors++;
 }
-validate53.errors = vErrors;
+validate65.errors = vErrors;
 return errors === 0;
 }
-validate53.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate65.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema104 = {"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}};
+const schema123 = {"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}};
 
-function validate56(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate68(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate56.evaluated;
+const evaluated0 = validate68.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -6025,17 +8076,17 @@ vErrors.push(err6);
 }
 errors++;
 }
-validate56.errors = vErrors;
+validate68.errors = vErrors;
 return errors === 0;
 }
-validate56.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate68.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate39(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate51(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/page.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate39.evaluated;
+const evaluated0 = validate51.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -6154,7 +8205,7 @@ vErrors.push(err10);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema76.properties, key0))){
+if(!(func1.call(schema95.properties, key0))){
 const err11 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err11];
@@ -6178,7 +8229,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(data0 === 1)){
-const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema77.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema96.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -6291,7 +8342,7 @@ vErrors.push(err22);
 }
 errors++;
 }
-if(!pattern23.test(data3)){
+if(!pattern38.test(data3)){
 const err23 = {instancePath:instancePath+"/path",schemaPath:"#/properties/path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err23];
@@ -6386,7 +8437,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!((((data6 === "draft") || (data6 === "review")) || (data6 === "published")) || (data6 === "archived"))){
-const err31 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/PublishStatus/enum",keyword:"enum",params:{allowedValues: schema81.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/PublishStatus/enum",keyword:"enum",params:{allowedValues: schema100.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -6401,8 +8452,8 @@ let data7 = data.sections;
 if(Array.isArray(data7)){
 const len0 = data7.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate40(data7[i0], {instancePath:instancePath+"/sections/" + i0,parentData:data7,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate40.errors : vErrors.concat(validate40.errors);
+if(!(validate52(data7[i0], {instancePath:instancePath+"/sections/" + i0,parentData:data7,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate52.errors : vErrors.concat(validate52.errors);
 errors = vErrors.length;
 }
 }
@@ -6419,14 +8470,14 @@ errors++;
 }
 }
 if(data.seo !== undefined){
-if(!(validate53(data.seo, {instancePath:instancePath+"/seo",parentData:data,parentDataProperty:"seo",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate53.errors : vErrors.concat(validate53.errors);
+if(!(validate65(data.seo, {instancePath:instancePath+"/seo",parentData:data,parentDataProperty:"seo",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate65.errors : vErrors.concat(validate65.errors);
 errors = vErrors.length;
 }
 }
 if(data.availability !== undefined){
-if(!(validate56(data.availability, {instancePath:instancePath+"/availability",parentData:data,parentDataProperty:"availability",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate56.errors : vErrors.concat(validate56.errors);
+if(!(validate68(data.availability, {instancePath:instancePath+"/availability",parentData:data,parentDataProperty:"availability",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate68.errors : vErrors.concat(validate68.errors);
 errors = vErrors.length;
 }
 }
@@ -6458,7 +8509,7 @@ vErrors.push(err34);
 errors++;
 }
 if(!(((data12 === "default") || (data12 === "transparent")) || (data12 === "hidden"))){
-const err35 = {instancePath:instancePath+"/chrome/header",schemaPath:"#/properties/chrome/properties/header/enum",keyword:"enum",params:{allowedValues: schema76.properties.chrome.properties.header.enum},message:"must be equal to one of the allowed values"};
+const err35 = {instancePath:instancePath+"/chrome/header",schemaPath:"#/properties/chrome/properties/header/enum",keyword:"enum",params:{allowedValues: schema95.properties.chrome.properties.header.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err35];
 }
@@ -6481,7 +8532,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(((data13 === "default") || (data13 === "minimal")) || (data13 === "hidden"))){
-const err37 = {instancePath:instancePath+"/chrome/footer",schemaPath:"#/properties/chrome/properties/footer/enum",keyword:"enum",params:{allowedValues: schema76.properties.chrome.properties.footer.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/chrome/footer",schemaPath:"#/properties/chrome/properties/footer/enum",keyword:"enum",params:{allowedValues: schema95.properties.chrome.properties.footer.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -6516,7 +8567,7 @@ vErrors.push(err39);
 errors++;
 }
 if(!((((data14 === "none") || (data14 === "subtle")) || (data14 === "standard")) || (data14 === "expressive"))){
-const err40 = {instancePath:instancePath+"/motion",schemaPath:"#/$defs/MotionLevel/enum",keyword:"enum",params:{allowedValues: schema107.enum},message:"must be equal to one of the allowed values"};
+const err40 = {instancePath:instancePath+"/motion",schemaPath:"#/$defs/MotionLevel/enum",keyword:"enum",params:{allowedValues: schema126.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err40];
 }
@@ -6639,23 +8690,23 @@ vErrors.push(err49);
 }
 errors++;
 }
-validate39.errors = vErrors;
+validate51.errors = vErrors;
 return errors === 0;
 }
-validate39.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate51.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateSection = validate58;
-const schema112 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/section.schema.json","title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}],"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SurfaceComponent":{"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}},"SurfaceComponentId":{"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema113 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema116 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
-const schema118 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
-const schema127 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema114 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
+export const validateSection = validate70;
+const schema131 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/section.schema.json","title":"Section","description":"A block inside a page, discriminated by `kind`. Variants are written inline (not via $ref) and `kind` is a single-value string enum so that TypeScript gets a literal union and Rust gets a serde internally-tagged enum.","oneOf":[{"type":"object","title":"HeroSection","additionalProperties":false,"required":["id","kind","heading"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["hero"]},"heading":{"type":"string","minLength":1,"maxLength":300},"subheading":{"type":"string","maxLength":1000},"image":{"$ref":"#/$defs/ImageRef"},"cta":{"$ref":"#/$defs/Link"}}},{"type":"object","title":"RichTextSection","additionalProperties":false,"required":["id","kind","format","body"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["richText"]},"format":{"type":"string","enum":["markdown","html"]},"body":{"type":"string","maxLength":200000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},{"type":"object","title":"ImageSection","additionalProperties":false,"required":["id","kind","image"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["image"]},"image":{"$ref":"#/$defs/ImageRef"},"caption":{"type":"string","maxLength":1000}}},{"type":"object","title":"ContentListSection","description":"Renders the newest entries of a content collection (e.g. blog posts).","additionalProperties":false,"required":["id","kind","collection","limit","sort"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentList"]},"collection":{"$ref":"#/$defs/Slug"},"limit":{"type":"integer","minimum":1,"maximum":100},"sort":{"type":"string","enum":["newest","oldest","title"]},"filter":{"type":"string","description":"Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.","minLength":1,"maxLength":512}}},{"type":"object","title":"ComponentSection","description":"A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.","additionalProperties":false,"required":["id","kind","type","props"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["component"]},"type":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,40}$"},"props":{"type":"object","description":"Validated against the type's props schema by the store, not by this contract.","additionalProperties":true}}},{"type":"object","title":"SurfaceSection","description":"A generative UI surface (RFC-0020): a flat list of catalog components with a `root`, plus a data model their props may bind to. Written and streamed by agents as data, never code; the store checks the tree, the catalog and the limits.","additionalProperties":false,"required":["id","kind","catalog","components"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["surface"]},"catalog":{"type":"string","description":"The catalog the surface was written for: `<theme>@<major>` (RFC-0018 manifest).","pattern":"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},"components":{"type":"array","minItems":1,"maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponent"}},"data":{"type":"object","description":"The surface's data model: JSON its components bind to with `{path}` (at most 64 KB serialized; the store enforces the size).","additionalProperties":true}}}],"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"SurfaceComponent":{"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}},"SurfaceComponentId":{"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema132 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema135 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
+const schema137 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
+const schema146 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema133 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
 
-function validate59(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate71(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate59.evaluated;
+const evaluated0 = validate71.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -6861,21 +8912,21 @@ vErrors.push(err16);
 }
 errors++;
 }
-validate59.errors = vErrors;
+validate71.errors = vErrors;
 return errors === 0;
 }
-validate59.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate71.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema119 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
-const schema120 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
-const schema124 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema121 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema122 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+const schema138 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
+const schema139 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
+const schema143 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema140 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema141 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate63(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate75(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate63.evaluated;
+const evaluated0 = validate75.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -6928,7 +8979,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema122.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema141.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -7019,16 +9070,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate63.errors = vErrors;
+validate75.errors = vErrors;
 return errors === 0;
 }
-validate63.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate75.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate62(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate74(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate62.evaluated;
+const evaluated0 = validate74.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -7071,7 +9122,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern33.test(data0)){
+if(!pattern24.test(data0)){
 const err3 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^blk_[0-9A-Za-z]{8,24}$"},message:"must match pattern \""+"^blk_[0-9A-Za-z]{8,24}$"+"\""};
 if(vErrors === null){
 vErrors = [err3];
@@ -7096,7 +9147,7 @@ errors++;
 if(data.hash !== undefined){
 let data1 = data.hash;
 if(typeof data1 === "string"){
-if(!pattern34.test(data1)){
+if(!pattern25.test(data1)){
 const err5 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -7119,8 +9170,8 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate63(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate63.errors : vErrors.concat(validate63.errors);
+if(!(validate75(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate75.errors : vErrors.concat(validate75.errors);
 errors = vErrors.length;
 }
 }
@@ -7137,7 +9188,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!((((((data3 === "studio") || (data3 === "mcp")) || (data3 === "api")) || (data3 === "import")) || (data3 === "ai-command")) || (data3 === "proposal"))){
-const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema120.properties.via.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema139.properties.via.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -7183,16 +9234,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate62.errors = vErrors;
+validate74.errors = vErrors;
 return errors === 0;
 }
-validate62.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate74.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate61(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate73(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate61.evaluated;
+const evaluated0 = validate73.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -7212,8 +9263,8 @@ errors++;
 }
 const len0 = data.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate62(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate62.errors : vErrors.concat(validate62.errors);
+if(!(validate74(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate74.errors : vErrors.concat(validate74.errors);
 errors = vErrors.length;
 }
 }
@@ -7228,18 +9279,18 @@ vErrors.push(err1);
 }
 errors++;
 }
-validate61.errors = vErrors;
+validate73.errors = vErrors;
 return errors === 0;
 }
-validate61.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
+validate73.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema130 = {"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}};
-const schema131 = {"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"};
+const schema149 = {"type":"object","description":"One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9.","additionalProperties":false,"required":["id","component"],"properties":{"id":{"$ref":"#/$defs/SurfaceComponentId"},"component":{"type":"string","pattern":"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},"children":{"type":"array","maxItems":200,"items":{"$ref":"#/$defs/SurfaceComponentId"}},"props":{"type":"object","description":"Literal values, `{path}` bindings into the surface's data, or `{call}` named functions; validated by the store against the catalog, not by this contract.","additionalProperties":true},"visible":{"type":"object","description":"A visibility condition over the surface's data (`eq`, `ne`, `gt`, `lt`, `and`, `or`, `not`); validated by the store.","additionalProperties":true},"motion":{"type":"object","description":"Motion presets for this component (RFC-0024 §2): `reveal`, `hover`, `speed`, `delay`, `stagger`, `replay` and later `scroll`, `loop`; enums and clamped numbers only, validated by the store against the catalog. The renderer turns them into CSS; agents never write CSS.","additionalProperties":true}}};
+const schema150 = {"type":"string","description":"A component's id, unique within its surface; `root` is the tree's root (RFC-0020 §1).","pattern":"^[a-z][a-z0-9-]{0,40}$"};
 
-function validate68(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate80(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate68.evaluated;
+const evaluated0 = validate80.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -7282,7 +9333,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern43.test(data0)){
+if(!pattern34.test(data0)){
 const err3 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err3];
@@ -7307,7 +9358,7 @@ errors++;
 if(data.component !== undefined){
 let data1 = data.component;
 if(typeof data1 === "string"){
-if(!pattern44.test(data1)){
+if(!pattern35.test(data1)){
 const err5 = {instancePath:instancePath+"/component",schemaPath:"#/properties/component/pattern",keyword:"pattern",params:{pattern: "^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"},message:"must match pattern \""+"^(?:[A-Z][A-Za-z0-9]{1,40}|[a-z][a-z0-9-]{1,40})$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -7346,7 +9397,7 @@ const len0 = data2.length;
 for(let i0=0; i0<len0; i0++){
 let data3 = data2[i0];
 if(typeof data3 === "string"){
-if(!pattern43.test(data3)){
+if(!pattern34.test(data3)){
 const err8 = {instancePath:instancePath+"/children/" + i0,schemaPath:"#/$defs/SurfaceComponentId/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err8];
@@ -7436,17 +9487,17 @@ vErrors.push(err14);
 }
 errors++;
 }
-validate68.errors = vErrors;
+validate80.errors = vErrors;
 return errors === 0;
 }
-validate68.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate80.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate58(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate70(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/section.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate58.evaluated;
+const evaluated0 = validate70.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -7558,7 +9609,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(data1 === "hero")){
-const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -7629,8 +9680,8 @@ errors++;
 }
 }
 if(data.image !== undefined){
-if(!(validate59(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate59.errors : vErrors.concat(validate59.errors);
+if(!(validate71(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate71.errors : vErrors.concat(validate71.errors);
 errors = vErrors.length;
 }
 }
@@ -7892,7 +9943,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(data10 === "richText")){
-const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -7915,7 +9966,7 @@ vErrors.push(err38);
 errors++;
 }
 if(!((data11 === "markdown") || (data11 === "html"))){
-const err39 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[1].properties.format.enum},message:"must be equal to one of the allowed values"};
+const err39 = {instancePath:instancePath+"/format",schemaPath:"#/oneOf/1/properties/format/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[1].properties.format.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err39];
 }
@@ -7963,7 +10014,7 @@ vErrors.push(err42);
 errors++;
 }
 if(!(data13 === 1)){
-const err43 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema118.enum},message:"must be equal to one of the allowed values"};
+const err43 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema137.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err43];
 }
@@ -7974,8 +10025,8 @@ errors++;
 }
 }
 if(data.blocks !== undefined){
-if(!(validate61(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate61.errors : vErrors.concat(validate61.errors);
+if(!(validate73(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate73.errors : vErrors.concat(validate73.errors);
 errors = vErrors.length;
 }
 }
@@ -8105,7 +10156,7 @@ vErrors.push(err53);
 errors++;
 }
 if(!(data16 === "image")){
-const err54 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err54 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err54];
 }
@@ -8116,8 +10167,8 @@ errors++;
 }
 }
 if(data.image !== undefined){
-if(!(validate59(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate59.errors : vErrors.concat(validate59.errors);
+if(!(validate71(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate71.errors : vErrors.concat(validate71.errors);
 errors = vErrors.length;
 }
 }
@@ -8292,7 +10343,7 @@ vErrors.push(err68);
 errors++;
 }
 if(!(data20 === "contentList")){
-const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err69];
 }
@@ -8395,7 +10446,7 @@ vErrors.push(err77);
 errors++;
 }
 if(!(((data23 === "newest") || (data23 === "oldest")) || (data23 === "title"))){
-const err78 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[3].properties.sort.enum},message:"must be equal to one of the allowed values"};
+const err78 = {instancePath:instancePath+"/sort",schemaPath:"#/oneOf/3/properties/sort/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[3].properties.sort.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -8576,7 +10627,7 @@ vErrors.push(err92);
 errors++;
 }
 if(!(data26 === "component")){
-const err93 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err93 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err93];
 }
@@ -8589,7 +10640,7 @@ errors++;
 if(data.type !== undefined){
 let data27 = data.type;
 if(typeof data27 === "string"){
-if(!pattern40.test(data27)){
+if(!pattern31.test(data27)){
 const err94 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{1,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{1,40}$"+"\""};
 if(vErrors === null){
 vErrors = [err94];
@@ -8762,7 +10813,7 @@ vErrors.push(err107);
 errors++;
 }
 if(!(data30 === "surface")){
-const err108 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema112.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err108 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema131.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err108];
 }
@@ -8775,7 +10826,7 @@ errors++;
 if(data.catalog !== undefined){
 let data31 = data.catalog;
 if(typeof data31 === "string"){
-if(!pattern42.test(data31)){
+if(!pattern33.test(data31)){
 const err109 = {instancePath:instancePath+"/catalog",schemaPath:"#/oneOf/5/properties/catalog/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$"+"\""};
 if(vErrors === null){
 vErrors = [err109];
@@ -8822,8 +10873,8 @@ errors++;
 }
 const len0 = data32.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate68(data32[i0], {instancePath:instancePath+"/components/" + i0,parentData:data32,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate68.errors : vErrors.concat(validate68.errors);
+if(!(validate80(data32[i0], {instancePath:instancePath+"/components/" + i0,parentData:data32,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate80.errors : vErrors.concat(validate80.errors);
 errors = vErrors.length;
 }
 }
@@ -8904,33 +10955,33 @@ vErrors = null;
 }
 }
 }
-validate58.errors = vErrors;
+validate70.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate58.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate70.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-export const validateContentEntry = validate70;
-const schema133 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/content-entry.schema.json","title":"ContentEntry","description":"A structured content item in a named collection (e.g. collection 'posts'). Core fields are typed; collection-specific fields live in `fields` and are validated by the collection's own schema in a later phase.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","collection","slug","locale","status","title","body","fields","tags","author","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"collection":{"$ref":"#/$defs/Slug"},"slug":{"$ref":"#/$defs/Slug"},"locale":{"$ref":"#/$defs/Locale"},"status":{"$ref":"#/$defs/PublishStatus"},"title":{"type":"string","minLength":1,"maxLength":300},"summary":{"type":"string","maxLength":2000},"body":{"$ref":"#/$defs/Body"},"fields":{"type":"object","description":"Collection-specific values; any JSON.","additionalProperties":true},"tags":{"type":"array","description":"Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2.","deprecated":true,"items":{"$ref":"#/$defs/Slug"},"uniqueItems":true,"maxItems":50},"terms":{"type":"object","description":"Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object.","propertyNames":{"$ref":"#/$defs/Slug"},"minProperties":1,"maxProperties":10,"additionalProperties":{"$ref":"#/$defs/TermAssignment"}},"author":{"$ref":"#/$defs/Actor"},"coverImage":{"$ref":"#/$defs/ImageRef"},"publishedAt":{"$ref":"#/$defs/Timestamp"},"availability":{"$ref":"#/$defs/Availability"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"},"corrections":{"type":"array","description":"Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note.","items":{"$ref":"#/$defs/Correction"},"maxItems":100}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Availability":{"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}},"Body":{"type":"object","additionalProperties":false,"required":["format","value"],"properties":{"format":{"type":"string","enum":["markdown","html"]},"value":{"type":"string","maxLength":1000000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Correction":{"type":"object","description":"One correction notice (RFC-0019 §2).","additionalProperties":false,"required":["id","kind","at","note"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["correction","clarification","update"]},"at":{"$ref":"#/$defs/Timestamp","description":"When it was written; set by the store, never by the caller."},"note":{"type":"string","description":"What changed, in markdown (inline).","minLength":1,"maxLength":2000},"snapshotId":{"$ref":"#/$defs/Id","description":"The snapshot it was first published in."}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"PublishStatus":{"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TermAssignment":{"type":"object","description":"Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.","additionalProperties":false,"required":["ids"],"properties":{"ids":{"type":"array","items":{"$ref":"#/$defs/Id"},"minItems":1,"maxItems":50,"uniqueItems":true},"primary":{"$ref":"#/$defs/Id","description":"The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema134 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema135 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema137 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema139 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema140 = {"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]};
-const schema148 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema160 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema163 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema141 = {"type":"object","additionalProperties":false,"required":["format","value"],"properties":{"format":{"type":"string","enum":["markdown","html"]},"value":{"type":"string","maxLength":1000000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}};
-const schema142 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
-const schema143 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
-const schema144 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
-const schema145 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema146 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+export const validateContentEntry = validate82;
+const schema152 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/content-entry.schema.json","title":"ContentEntry","description":"A structured content item in a named collection (e.g. collection 'posts'). Core fields are typed; collection-specific fields live in `fields` and are validated by the collection's own schema in a later phase.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","collection","slug","locale","status","title","body","fields","tags","author","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"collection":{"$ref":"#/$defs/Slug"},"slug":{"$ref":"#/$defs/Slug"},"locale":{"$ref":"#/$defs/Locale"},"status":{"$ref":"#/$defs/PublishStatus"},"title":{"type":"string","minLength":1,"maxLength":300},"summary":{"type":"string","maxLength":2000},"body":{"$ref":"#/$defs/Body"},"fields":{"type":"object","description":"Collection-specific values; any JSON.","additionalProperties":true},"tags":{"type":"array","description":"Deprecated by RFC-0002: use `terms.tag`. Still accepted on input for one release and translated into terms; the store then writes []. Removed in schemaVersion 2.","deprecated":true,"items":{"$ref":"#/$defs/Slug"},"uniqueItems":true,"maxItems":50},"terms":{"type":"object","description":"Term assignments by taxonomy key (e.g. 'category', 'tag'). Terms are referenced by id, independent of locale. A taxonomy without terms is omitted, never an empty object.","propertyNames":{"$ref":"#/$defs/Slug"},"minProperties":1,"maxProperties":10,"additionalProperties":{"$ref":"#/$defs/TermAssignment"}},"author":{"$ref":"#/$defs/Actor"},"coverImage":{"$ref":"#/$defs/ImageRef"},"publishedAt":{"$ref":"#/$defs/Timestamp"},"availability":{"$ref":"#/$defs/Availability"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"},"corrections":{"type":"array","description":"Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note.","items":{"$ref":"#/$defs/Correction"},"maxItems":100}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Availability":{"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}},"Body":{"type":"object","additionalProperties":false,"required":["format","value"],"properties":{"format":{"type":"string","enum":["markdown","html"]},"value":{"type":"string","maxLength":1000000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}},"BodyBlock":{"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}},"BodyBlocks":{"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}},"BodyProfile":{"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."},"Correction":{"type":"object","description":"One correction notice (RFC-0019 §2).","additionalProperties":false,"required":["id","kind","at","note"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["correction","clarification","update"]},"at":{"$ref":"#/$defs/Timestamp","description":"When it was written; set by the store, never by the caller."},"note":{"type":"string","description":"What changed, in markdown (inline).","minLength":1,"maxLength":2000},"snapshotId":{"$ref":"#/$defs/Id","description":"The snapshot it was first published in."}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"PublishStatus":{"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TermAssignment":{"type":"object","description":"Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.","additionalProperties":false,"required":["ids"],"properties":{"ids":{"type":"array","items":{"$ref":"#/$defs/Id"},"minItems":1,"maxItems":50,"uniqueItems":true},"primary":{"$ref":"#/$defs/Id","description":"The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema153 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema154 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema156 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema158 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema159 = {"type":"string","description":"Editorial lifecycle of a page or content entry.","enum":["draft","review","published","archived"]};
+const schema167 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema179 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema182 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema160 = {"type":"object","additionalProperties":false,"required":["format","value"],"properties":{"format":{"type":"string","enum":["markdown","html"]},"value":{"type":"string","maxLength":1000000},"profile":{"$ref":"#/$defs/BodyProfile"},"blocks":{"$ref":"#/$defs/BodyBlocks"}}};
+const schema161 = {"type":"integer","enum":[1],"description":"The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."};
+const schema162 = {"type":"array","description":"A markdown body's block index, in body order (RFC-0014 §3). Absent means not indexed (yet, or an HTML body), never empty.","maxItems":5000,"items":{"$ref":"#/$defs/BodyBlock"}};
+const schema163 = {"type":"object","description":"One top-level block of a markdown body in the store's index (RFC-0014 §3). Written by the store only: a client's values are replaced on every write. `by`, `via` and `at` say who last changed the block's content, through which channel and when; they are absent for content written before the index existed.","additionalProperties":false,"required":["id","hash"],"properties":{"id":{"type":"string","pattern":"^blk_[0-9A-Za-z]{8,24}$","description":"Stable across writes that keep the block's content or its place among unchanged blocks."},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$","description":"SHA-256 (hex) of the block's markdown without trailing whitespace."},"by":{"$ref":"#/$defs/Actor"},"via":{"type":"string","enum":["studio","mcp","api","import","ai-command","proposal"],"description":"The channel of that change."},"at":{"$ref":"#/$defs/Timestamp"}}};
+const schema164 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema165 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate74(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate86(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate74.evaluated;
+const evaluated0 = validate86.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -8983,7 +11034,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema146.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema165.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -9074,16 +11125,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate74.errors = vErrors;
+validate86.errors = vErrors;
 return errors === 0;
 }
-validate74.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate86.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate73(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate85(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate73.evaluated;
+const evaluated0 = validate85.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9126,7 +11177,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern33.test(data0)){
+if(!pattern24.test(data0)){
 const err3 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^blk_[0-9A-Za-z]{8,24}$"},message:"must match pattern \""+"^blk_[0-9A-Za-z]{8,24}$"+"\""};
 if(vErrors === null){
 vErrors = [err3];
@@ -9151,7 +11202,7 @@ errors++;
 if(data.hash !== undefined){
 let data1 = data.hash;
 if(typeof data1 === "string"){
-if(!pattern34.test(data1)){
+if(!pattern25.test(data1)){
 const err5 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -9174,8 +11225,8 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate74(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate74.errors : vErrors.concat(validate74.errors);
+if(!(validate86(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate86.errors : vErrors.concat(validate86.errors);
 errors = vErrors.length;
 }
 }
@@ -9192,7 +11243,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!((((((data3 === "studio") || (data3 === "mcp")) || (data3 === "api")) || (data3 === "import")) || (data3 === "ai-command")) || (data3 === "proposal"))){
-const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema144.properties.via.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/via",schemaPath:"#/properties/via/enum",keyword:"enum",params:{allowedValues: schema163.properties.via.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -9238,16 +11289,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate73.errors = vErrors;
+validate85.errors = vErrors;
 return errors === 0;
 }
-validate73.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate85.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate72(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate84(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate72.evaluated;
+const evaluated0 = validate84.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9267,8 +11318,8 @@ errors++;
 }
 const len0 = data.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate73(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate73.errors : vErrors.concat(validate73.errors);
+if(!(validate85(data[i0], {instancePath:instancePath+"/" + i0,parentData:data,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate85.errors : vErrors.concat(validate85.errors);
 errors = vErrors.length;
 }
 }
@@ -9283,16 +11334,16 @@ vErrors.push(err1);
 }
 errors++;
 }
-validate72.errors = vErrors;
+validate84.errors = vErrors;
 return errors === 0;
 }
-validate72.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
+validate84.evaluated = {"items":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate71(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate83(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate71.evaluated;
+const evaluated0 = validate83.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9345,7 +11396,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!((data0 === "markdown") || (data0 === "html"))){
-const err4 = {instancePath:instancePath+"/format",schemaPath:"#/properties/format/enum",keyword:"enum",params:{allowedValues: schema141.properties.format.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/format",schemaPath:"#/properties/format/enum",keyword:"enum",params:{allowedValues: schema160.properties.format.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -9393,7 +11444,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!(data2 === 1)){
-const err8 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema142.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/profile",schemaPath:"#/$defs/BodyProfile/enum",keyword:"enum",params:{allowedValues: schema161.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -9404,8 +11455,8 @@ errors++;
 }
 }
 if(data.blocks !== undefined){
-if(!(validate72(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate72.errors : vErrors.concat(validate72.errors);
+if(!(validate84(data.blocks, {instancePath:instancePath+"/blocks",parentData:data,parentDataProperty:"blocks",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate84.errors : vErrors.concat(validate84.errors);
 errors = vErrors.length;
 }
 }
@@ -9420,17 +11471,17 @@ vErrors.push(err9);
 }
 errors++;
 }
-validate71.errors = vErrors;
+validate83.errors = vErrors;
 return errors === 0;
 }
-validate71.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate83.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema151 = {"type":"object","description":"Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.","additionalProperties":false,"required":["ids"],"properties":{"ids":{"type":"array","items":{"$ref":"#/$defs/Id"},"minItems":1,"maxItems":50,"uniqueItems":true},"primary":{"$ref":"#/$defs/Id","description":"The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."}}};
+const schema170 = {"type":"object","description":"Terms of one taxonomy on one entry, in display order. The primary term is explicit and never derived from the order.","additionalProperties":false,"required":["ids"],"properties":{"ids":{"type":"array","items":{"$ref":"#/$defs/Id"},"minItems":1,"maxItems":50,"uniqueItems":true},"primary":{"$ref":"#/$defs/Id","description":"The entry's main term in this taxonomy (breadcrumbs, articleSection, later permalinks). Must be one of `ids`."}}};
 
-function validate79(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate91(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate79.evaluated;
+const evaluated0 = validate91.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9617,17 +11668,17 @@ vErrors.push(err14);
 }
 errors++;
 }
-validate79.errors = vErrors;
+validate91.errors = vErrors;
 return errors === 0;
 }
-validate79.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate91.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema154 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
+const schema173 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
 
-function validate82(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate94(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate82.evaluated;
+const evaluated0 = validate94.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9833,17 +11884,17 @@ vErrors.push(err16);
 }
 errors++;
 }
-validate82.errors = vErrors;
+validate94.errors = vErrors;
 return errors === 0;
 }
-validate82.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate94.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema157 = {"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}};
+const schema176 = {"type":"object","description":"Time gates of a page or content entry (RFC-0008): the published site shows the node only from `from` (inclusive: an embargo) until `until` (exclusive: an expiry), checked at render time, so the gates hold even when no scheduler runs. Before `from` and from `until` on, the node is absent from every public route, list, feed, sitemap and search output; previews still show it. At least one gate; writers check that `from` is before `until`.","additionalProperties":false,"minProperties":1,"properties":{"from":{"$ref":"#/$defs/Timestamp"},"until":{"$ref":"#/$defs/Timestamp"}}};
 
-function validate84(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate96(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate84.evaluated;
+const evaluated0 = validate96.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -9934,17 +11985,17 @@ vErrors.push(err6);
 }
 errors++;
 }
-validate84.errors = vErrors;
+validate96.errors = vErrors;
 return errors === 0;
 }
-validate84.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate96.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema164 = {"type":"object","description":"One correction notice (RFC-0019 §2).","additionalProperties":false,"required":["id","kind","at","note"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["correction","clarification","update"]},"at":{"$ref":"#/$defs/Timestamp","description":"When it was written; set by the store, never by the caller."},"note":{"type":"string","description":"What changed, in markdown (inline).","minLength":1,"maxLength":2000},"snapshotId":{"$ref":"#/$defs/Id","description":"The snapshot it was first published in."}}};
+const schema183 = {"type":"object","description":"One correction notice (RFC-0019 §2).","additionalProperties":false,"required":["id","kind","at","note"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["correction","clarification","update"]},"at":{"$ref":"#/$defs/Timestamp","description":"When it was written; set by the store, never by the caller."},"note":{"type":"string","description":"What changed, in markdown (inline).","minLength":1,"maxLength":2000},"snapshotId":{"$ref":"#/$defs/Id","description":"The snapshot it was first published in."}}};
 
-function validate86(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate98(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate86.evaluated;
+const evaluated0 = validate98.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -10062,7 +12113,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(((data1 === "correction") || (data1 === "clarification")) || (data1 === "update"))){
-const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema164.properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema183.properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -10188,17 +12239,17 @@ vErrors.push(err20);
 }
 errors++;
 }
-validate86.errors = vErrors;
+validate98.errors = vErrors;
 return errors === 0;
 }
-validate86.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate98.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate70(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate82(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/content-entry.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate70.evaluated;
+const evaluated0 = validate82.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -10357,7 +12408,7 @@ vErrors.push(err14);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema133.properties, key0))){
+if(!(func1.call(schema152.properties, key0))){
 const err15 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err15];
@@ -10381,7 +12432,7 @@ vErrors.push(err16);
 errors++;
 }
 if(!(data0 === 1)){
-const err17 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema134.enum},message:"must be equal to one of the allowed values"};
+const err17 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema153.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -10609,7 +12660,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!((((data6 === "draft") || (data6 === "review")) || (data6 === "published")) || (data6 === "archived"))){
-const err37 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/PublishStatus/enum",keyword:"enum",params:{allowedValues: schema140.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/PublishStatus/enum",keyword:"enum",params:{allowedValues: schema159.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -10680,8 +12731,8 @@ errors++;
 }
 }
 if(data.body !== undefined){
-if(!(validate71(data.body, {instancePath:instancePath+"/body",parentData:data,parentDataProperty:"body",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate71.errors : vErrors.concat(validate71.errors);
+if(!(validate83(data.body, {instancePath:instancePath+"/body",parentData:data,parentDataProperty:"body",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate83.errors : vErrors.concat(validate83.errors);
 errors = vErrors.length;
 }
 }
@@ -10871,8 +12922,8 @@ errors++;
 }
 }
 for(const key2 in data13){
-if(!(validate79(data13[key2], {instancePath:instancePath+"/terms/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data13,parentDataProperty:key2,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate79.errors : vErrors.concat(validate79.errors);
+if(!(validate91(data13[key2], {instancePath:instancePath+"/terms/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data13,parentDataProperty:key2,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate91.errors : vErrors.concat(validate91.errors);
 errors = vErrors.length;
 }
 }
@@ -10889,14 +12940,14 @@ errors++;
 }
 }
 if(data.author !== undefined){
-if(!(validate74(data.author, {instancePath:instancePath+"/author",parentData:data,parentDataProperty:"author",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate74.errors : vErrors.concat(validate74.errors);
+if(!(validate86(data.author, {instancePath:instancePath+"/author",parentData:data,parentDataProperty:"author",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate86.errors : vErrors.concat(validate86.errors);
 errors = vErrors.length;
 }
 }
 if(data.coverImage !== undefined){
-if(!(validate82(data.coverImage, {instancePath:instancePath+"/coverImage",parentData:data,parentDataProperty:"coverImage",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate82.errors : vErrors.concat(validate82.errors);
+if(!(validate94(data.coverImage, {instancePath:instancePath+"/coverImage",parentData:data,parentDataProperty:"coverImage",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate94.errors : vErrors.concat(validate94.errors);
 errors = vErrors.length;
 }
 }
@@ -10926,8 +12977,8 @@ errors++;
 }
 }
 if(data.availability !== undefined){
-if(!(validate84(data.availability, {instancePath:instancePath+"/availability",parentData:data,parentDataProperty:"availability",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate84.errors : vErrors.concat(validate84.errors);
+if(!(validate96(data.availability, {instancePath:instancePath+"/availability",parentData:data,parentDataProperty:"availability",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate96.errors : vErrors.concat(validate96.errors);
 errors = vErrors.length;
 }
 }
@@ -11048,8 +13099,8 @@ errors++;
 }
 const len1 = data24.length;
 for(let i2=0; i2<len1; i2++){
-if(!(validate86(data24[i2], {instancePath:instancePath+"/corrections/" + i2,parentData:data24,parentDataProperty:i2,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate86.errors : vErrors.concat(validate86.errors);
+if(!(validate98(data24[i2], {instancePath:instancePath+"/corrections/" + i2,parentData:data24,parentDataProperty:i2,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate98.errors : vErrors.concat(validate98.errors);
 errors = vErrors.length;
 }
 }
@@ -11076,26 +13127,26 @@ vErrors.push(err71);
 }
 errors++;
 }
-validate70.errors = vErrors;
+validate82.errors = vErrors;
 return errors === 0;
 }
-validate70.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate82.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateSnapshot = validate88;
-const schema168 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/snapshot.schema.json","title":"Snapshot","description":"Immutable record of a site's node set at one instant: which nodes existed, at which revision, with which content hash. Every mutation by an agent produces one; publish and rollback point the site at one. Node bodies are stored by hash in the blob store, not here.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","siteRev","reason","actor","nodes","summary","createdAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"parentId":{"$ref":"#/$defs/Id","description":"Previous snapshot in this site's history; absent for the first one."},"siteRev":{"$ref":"#/$defs/Revision"},"reason":{"type":"string","enum":["manual","agentMutation","publish","rollback","scheduled","import"]},"label":{"type":"string","maxLength":200},"actor":{"$ref":"#/$defs/Actor"},"nodes":{"type":"array","items":{"$ref":"#/$defs/NodeRef"}},"summary":{"$ref":"#/$defs/ChangeSummary"},"createdAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"ChangeSummary":{"type":"object","additionalProperties":false,"required":["added","changed","removed"],"properties":{"added":{"type":"integer","minimum":0},"changed":{"type":"integer","minimum":0},"removed":{"type":"integer","minimum":0}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"NodeRef":{"type":"object","additionalProperties":false,"required":["id","kind","rev","hash"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["site","page","contentEntry","taxonomy","term","redirect","menu","asset"]},"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","description":"Lower-case hex SHA-256 of the node's canonical JSON.","pattern":"^[0-9a-f]{64}$"}}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema169 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema170 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema173 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema180 = {"type":"object","additionalProperties":false,"required":["added","changed","removed"],"properties":{"added":{"type":"integer","minimum":0},"changed":{"type":"integer","minimum":0},"removed":{"type":"integer","minimum":0}}};
-const schema181 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema182 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema174 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema175 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+export const validateSnapshot = validate100;
+const schema187 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/snapshot.schema.json","title":"Snapshot","description":"Immutable record of a site's node set at one instant: which nodes existed, at which revision, with which content hash. Every mutation by an agent produces one; publish and rollback point the site at one. Node bodies are stored by hash in the blob store, not here.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","siteRev","reason","actor","nodes","summary","createdAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"parentId":{"$ref":"#/$defs/Id","description":"Previous snapshot in this site's history; absent for the first one."},"siteRev":{"$ref":"#/$defs/Revision"},"reason":{"type":"string","enum":["manual","agentMutation","publish","rollback","scheduled","import"]},"label":{"type":"string","maxLength":200},"actor":{"$ref":"#/$defs/Actor"},"nodes":{"type":"array","items":{"$ref":"#/$defs/NodeRef"}},"summary":{"$ref":"#/$defs/ChangeSummary"},"createdAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"ChangeSummary":{"type":"object","additionalProperties":false,"required":["added","changed","removed"],"properties":{"added":{"type":"integer","minimum":0},"changed":{"type":"integer","minimum":0},"removed":{"type":"integer","minimum":0}}},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"NodeRef":{"type":"object","additionalProperties":false,"required":["id","kind","rev","hash"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["site","page","contentEntry","taxonomy","term","redirect","menu","asset"]},"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","description":"Lower-case hex SHA-256 of the node's canonical JSON.","pattern":"^[0-9a-f]{64}$"}}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema188 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema189 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema192 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema199 = {"type":"object","additionalProperties":false,"required":["added","changed","removed"],"properties":{"added":{"type":"integer","minimum":0},"changed":{"type":"integer","minimum":0},"removed":{"type":"integer","minimum":0}}};
+const schema200 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema201 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema193 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema194 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate89(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate101(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate89.evaluated;
+const evaluated0 = validate101.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -11148,7 +13199,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema175.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema194.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -11239,17 +13290,17 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate89.errors = vErrors;
+validate101.errors = vErrors;
 return errors === 0;
 }
-validate89.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate101.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema177 = {"type":"object","additionalProperties":false,"required":["id","kind","rev","hash"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["site","page","contentEntry","taxonomy","term","redirect","menu","asset"]},"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","description":"Lower-case hex SHA-256 of the node's canonical JSON.","pattern":"^[0-9a-f]{64}$"}}};
+const schema196 = {"type":"object","additionalProperties":false,"required":["id","kind","rev","hash"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["site","page","contentEntry","taxonomy","term","redirect","menu","asset"]},"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","description":"Lower-case hex SHA-256 of the node's canonical JSON.","pattern":"^[0-9a-f]{64}$"}}};
 
-function validate91(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate103(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate91.evaluated;
+const evaluated0 = validate103.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -11367,7 +13418,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!((((((((data1 === "site") || (data1 === "page")) || (data1 === "contentEntry")) || (data1 === "taxonomy")) || (data1 === "term")) || (data1 === "redirect")) || (data1 === "menu")) || (data1 === "asset"))){
-const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema177.properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema196.properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -11405,7 +13456,7 @@ errors++;
 if(data.hash !== undefined){
 let data3 = data.hash;
 if(typeof data3 === "string"){
-if(!pattern34.test(data3)){
+if(!pattern25.test(data3)){
 const err13 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err13];
@@ -11438,17 +13489,17 @@ vErrors.push(err15);
 }
 errors++;
 }
-validate91.errors = vErrors;
+validate103.errors = vErrors;
 return errors === 0;
 }
-validate91.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate103.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate88(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate100(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/snapshot.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate88.evaluated;
+const evaluated0 = validate100.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -11547,7 +13598,7 @@ vErrors.push(err8);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema168.properties, key0))){
+if(!(func1.call(schema187.properties, key0))){
 const err9 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err9];
@@ -11571,7 +13622,7 @@ vErrors.push(err10);
 errors++;
 }
 if(!(data0 === 1)){
-const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema169.enum},message:"must be equal to one of the allowed values"};
+const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema188.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -11754,7 +13805,7 @@ vErrors.push(err26);
 errors++;
 }
 if(!((((((data5 === "manual") || (data5 === "agentMutation")) || (data5 === "publish")) || (data5 === "rollback")) || (data5 === "scheduled")) || (data5 === "import"))){
-const err27 = {instancePath:instancePath+"/reason",schemaPath:"#/properties/reason/enum",keyword:"enum",params:{allowedValues: schema168.properties.reason.enum},message:"must be equal to one of the allowed values"};
+const err27 = {instancePath:instancePath+"/reason",schemaPath:"#/properties/reason/enum",keyword:"enum",params:{allowedValues: schema187.properties.reason.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -11790,8 +13841,8 @@ errors++;
 }
 }
 if(data.actor !== undefined){
-if(!(validate89(data.actor, {instancePath:instancePath+"/actor",parentData:data,parentDataProperty:"actor",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate89.errors : vErrors.concat(validate89.errors);
+if(!(validate101(data.actor, {instancePath:instancePath+"/actor",parentData:data,parentDataProperty:"actor",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate101.errors : vErrors.concat(validate101.errors);
 errors = vErrors.length;
 }
 }
@@ -11800,8 +13851,8 @@ let data8 = data.nodes;
 if(Array.isArray(data8)){
 const len0 = data8.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate91(data8[i0], {instancePath:instancePath+"/nodes/" + i0,parentData:data8,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate91.errors : vErrors.concat(validate91.errors);
+if(!(validate103(data8[i0], {instancePath:instancePath+"/nodes/" + i0,parentData:data8,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate103.errors : vErrors.concat(validate103.errors);
 errors = vErrors.length;
 }
 }
@@ -12012,20 +14063,20 @@ vErrors.push(err46);
 }
 errors++;
 }
-validate88.errors = vErrors;
+validate100.errors = vErrors;
 return errors === 0;
 }
-validate88.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate100.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateSkillManifest = validate93;
-const schema183 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/skill-manifest.schema.json","title":"SkillManifest","description":"YAML frontmatter of a SKILL.md, exactly the six fields of the Agent Skills specification (agentskills.io). Cloudhal-specific data goes under `metadata` as flat string keys prefixed `cloudhal.` (schemaVersion, requiresCapabilities, scopes, approval); nested vendor blocks are rejected by hosted skill uploaders.","type":"object","additionalProperties":false,"required":["name","description"],"properties":{"name":{"type":"string","description":"Lower-case kebab-case; must equal the skill directory name.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":1024},"license":{"type":"string","maxLength":200},"compatibility":{"type":"string","maxLength":500},"metadata":{"$ref":"#/$defs/Metadata"},"allowed-tools":{"type":"string","description":"Space-separated tool names the skill may call (experimental in the spec).","maxLength":2000}},"$defs":{"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}}}};
-const schema184 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+export const validateSkillManifest = validate105;
+const schema202 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/skill-manifest.schema.json","title":"SkillManifest","description":"YAML frontmatter of a SKILL.md, exactly the six fields of the Agent Skills specification (agentskills.io). Cloudhal-specific data goes under `metadata` as flat string keys prefixed `cloudhal.` (schemaVersion, requiresCapabilities, scopes, approval); nested vendor blocks are rejected by hosted skill uploaders.","type":"object","additionalProperties":false,"required":["name","description"],"properties":{"name":{"type":"string","description":"Lower-case kebab-case; must equal the skill directory name.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":1024},"license":{"type":"string","maxLength":200},"compatibility":{"type":"string","maxLength":500},"metadata":{"$ref":"#/$defs/Metadata"},"allowed-tools":{"type":"string","description":"Space-separated tool names the skill may call (experimental in the spec).","maxLength":2000}},"$defs":{"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}}}};
+const schema203 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
 
-function validate93(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate105(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/skill-manifest.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate93.evaluated;
+const evaluated0 = validate105.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -12258,28 +14309,28 @@ vErrors.push(err18);
 }
 errors++;
 }
-validate93.errors = vErrors;
+validate105.errors = vErrors;
 return errors === 0;
 }
-validate93.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate105.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateTaxonomy = validate94;
-const schema185 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/taxonomy.schema.json","title":"Taxonomy","description":"A classification scheme of a site (e.g. 'category', 'tag', 'series') and its rules: hierarchy, who may create terms, how many terms an entry takes, and how its archives are published. Terms are separate nodes (term.schema.json) that point here by id (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","key","labels","hierarchical","allowNewTerms","required","archive","feed","minEntriesToIndex","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"key":{"$ref":"#/$defs/Slug","description":"Stable name of the taxonomy, unique per site and immutable once created. ContentEntry.terms and filter expressions use it (e.g. 'category:news')."},"labels":{"type":"object","description":"Display names per locale. Must contain the site's default locale.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"$ref":"#/$defs/TaxonomyLabel"}},"hierarchical":{"type":"boolean","description":"Terms may have a parent term (categories). Flat when false (tags)."},"allowNewTerms":{"type":"string","description":"Who may add terms. none: people only. propose: agents may create terms with status 'proposed' that wait for a person. free: agents may create active terms.","enum":["none","propose","free"]},"required":{"type":"boolean","description":"An entry in review or published status must have at least one term of this taxonomy and an explicit primary term."},"maxPerEntry":{"type":"integer","description":"Most terms of this taxonomy one entry may carry. Absent: the contract limit of 50.","minimum":1,"maximum":50},"collections":{"type":"array","description":"Collections this taxonomy applies to. Absent: every collection.","items":{"$ref":"#/$defs/Slug"},"minItems":1,"maxItems":50,"uniqueItems":true},"archive":{"$ref":"#/$defs/TaxonomyArchive"},"feed":{"type":"boolean","description":"Publish an RSS feed per term at <archive.basePath>/<slug>/rss.xml. Requires archive.enabled."},"minEntriesToIndex":{"type":"integer","description":"Archives listing fewer published entries than this are served with robots 'noindex, follow' and left out of the sitemap.","minimum":0,"maximum":1000},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TaxonomyArchive":{"type":"object","description":"Public archive pages: <basePath>/<term-slug> and <basePath>/<term-slug>/page/<n>.","additionalProperties":false,"required":["enabled","basePath"],"properties":{"enabled":{"type":"boolean"},"basePath":{"$ref":"#/$defs/Path"}}},"TaxonomyLabel":{"type":"object","additionalProperties":false,"required":["singular","plural"],"properties":{"singular":{"type":"string","minLength":1,"maxLength":100},"plural":{"type":"string","minLength":1,"maxLength":100},"description":{"type":"string","maxLength":1000}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema186 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema187 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema189 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema190 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema191 = {"type":"object","additionalProperties":false,"required":["singular","plural"],"properties":{"singular":{"type":"string","minLength":1,"maxLength":100},"plural":{"type":"string","minLength":1,"maxLength":100},"description":{"type":"string","maxLength":1000}}};
-const schema195 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema196 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema198 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema193 = {"type":"object","description":"Public archive pages: <basePath>/<term-slug> and <basePath>/<term-slug>/page/<n>.","additionalProperties":false,"required":["enabled","basePath"],"properties":{"enabled":{"type":"boolean"},"basePath":{"$ref":"#/$defs/Path"}}};
-const schema194 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
+export const validateTaxonomy = validate106;
+const schema204 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/taxonomy.schema.json","title":"Taxonomy","description":"A classification scheme of a site (e.g. 'category', 'tag', 'series') and its rules: hierarchy, who may create terms, how many terms an entry takes, and how its archives are published. Terms are separate nodes (term.schema.json) that point here by id (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","key","labels","hierarchical","allowNewTerms","required","archive","feed","minEntriesToIndex","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"key":{"$ref":"#/$defs/Slug","description":"Stable name of the taxonomy, unique per site and immutable once created. ContentEntry.terms and filter expressions use it (e.g. 'category:news')."},"labels":{"type":"object","description":"Display names per locale. Must contain the site's default locale.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"$ref":"#/$defs/TaxonomyLabel"}},"hierarchical":{"type":"boolean","description":"Terms may have a parent term (categories). Flat when false (tags)."},"allowNewTerms":{"type":"string","description":"Who may add terms. none: people only. propose: agents may create terms with status 'proposed' that wait for a person. free: agents may create active terms.","enum":["none","propose","free"]},"required":{"type":"boolean","description":"An entry in review or published status must have at least one term of this taxonomy and an explicit primary term."},"maxPerEntry":{"type":"integer","description":"Most terms of this taxonomy one entry may carry. Absent: the contract limit of 50.","minimum":1,"maximum":50},"collections":{"type":"array","description":"Collections this taxonomy applies to. Absent: every collection.","items":{"$ref":"#/$defs/Slug"},"minItems":1,"maxItems":50,"uniqueItems":true},"archive":{"$ref":"#/$defs/TaxonomyArchive"},"feed":{"type":"boolean","description":"Publish an RSS feed per term at <archive.basePath>/<slug>/rss.xml. Requires archive.enabled."},"minEntriesToIndex":{"type":"integer","description":"Archives listing fewer published entries than this are served with robots 'noindex, follow' and left out of the sitemap.","minimum":0,"maximum":1000},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TaxonomyArchive":{"type":"object","description":"Public archive pages: <basePath>/<term-slug> and <basePath>/<term-slug>/page/<n>.","additionalProperties":false,"required":["enabled","basePath"],"properties":{"enabled":{"type":"boolean"},"basePath":{"$ref":"#/$defs/Path"}}},"TaxonomyLabel":{"type":"object","additionalProperties":false,"required":["singular","plural"],"properties":{"singular":{"type":"string","minLength":1,"maxLength":100},"plural":{"type":"string","minLength":1,"maxLength":100},"description":{"type":"string","maxLength":1000}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema205 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema206 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema208 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema209 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema210 = {"type":"object","additionalProperties":false,"required":["singular","plural"],"properties":{"singular":{"type":"string","minLength":1,"maxLength":100},"plural":{"type":"string","minLength":1,"maxLength":100},"description":{"type":"string","maxLength":1000}}};
+const schema214 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema215 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema217 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema212 = {"type":"object","description":"Public archive pages: <basePath>/<term-slug> and <basePath>/<term-slug>/page/<n>.","additionalProperties":false,"required":["enabled","basePath"],"properties":{"enabled":{"type":"boolean"},"basePath":{"$ref":"#/$defs/Path"}}};
+const schema213 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
 
-function validate95(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate107(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate95.evaluated;
+const evaluated0 = validate107.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -12344,7 +14395,7 @@ vErrors.push(err4);
 }
 errors++;
 }
-if(!pattern23.test(data1)){
+if(!pattern38.test(data1)){
 const err5 = {instancePath:instancePath+"/basePath",schemaPath:"#/$defs/Path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -12377,17 +14428,17 @@ vErrors.push(err7);
 }
 errors++;
 }
-validate95.errors = vErrors;
+validate107.errors = vErrors;
 return errors === 0;
 }
-validate95.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate107.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate94(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate106(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/taxonomy.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate94.evaluated;
+const evaluated0 = validate106.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -12536,7 +14587,7 @@ vErrors.push(err13);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema185.properties, key0))){
+if(!(func1.call(schema204.properties, key0))){
 const err14 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err14];
@@ -12560,7 +14611,7 @@ vErrors.push(err15);
 errors++;
 }
 if(!(data0 === 1)){
-const err16 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema186.enum},message:"must be equal to one of the allowed values"};
+const err16 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema205.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -12933,7 +14984,7 @@ vErrors.push(err47);
 errors++;
 }
 if(!(((data10 === "none") || (data10 === "propose")) || (data10 === "free"))){
-const err48 = {instancePath:instancePath+"/allowNewTerms",schemaPath:"#/properties/allowNewTerms/enum",keyword:"enum",params:{allowedValues: schema185.properties.allowNewTerms.enum},message:"must be equal to one of the allowed values"};
+const err48 = {instancePath:instancePath+"/allowNewTerms",schemaPath:"#/properties/allowNewTerms/enum",keyword:"enum",params:{allowedValues: schema204.properties.allowNewTerms.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err48];
 }
@@ -13092,8 +15143,8 @@ errors++;
 }
 }
 if(data.archive !== undefined){
-if(!(validate95(data.archive, {instancePath:instancePath+"/archive",parentData:data,parentDataProperty:"archive",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate95.errors : vErrors.concat(validate95.errors);
+if(!(validate107(data.archive, {instancePath:instancePath+"/archive",parentData:data,parentDataProperty:"archive",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate107.errors : vErrors.concat(validate107.errors);
 errors = vErrors.length;
 }
 }
@@ -13257,29 +15308,29 @@ vErrors.push(err73);
 }
 errors++;
 }
-validate94.errors = vErrors;
+validate106.errors = vErrors;
 return errors === 0;
 }
-validate94.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate106.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateTerm = validate97;
-const schema199 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/term.schema.json","title":"Term","description":"One concept in a taxonomy (a category, a tag, a series). Content refers to terms by id, independent of locale; names, synonyms, archive intro and SEO are per locale. Renames, merges and retirements keep the id and leave redirects behind; `proposedBy` records the actor that proposed it (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","taxonomyId","slug","status","visibility","labels","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"taxonomyId":{"$ref":"#/$defs/Id"},"slug":{"$ref":"#/$defs/Slug","description":"URL segment of the term's archive; unique within its taxonomy, together with every slug in any term's slugHistory."},"status":{"type":"string","description":"active: usable and public (subject to visibility). proposed: created by an agent, waiting for a person; assignable but never public. retired: no new assignments, no archive.","enum":["active","proposed","retired"]},"visibility":{"type":"string","description":"internal terms have no archive, feed or sitemap entry and are not shown on entries; themes and filters may still use them.","enum":["public","internal"]},"labels":{"type":"object","description":"Names per locale. Must contain the site's default locale.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"$ref":"#/$defs/TermLabel"}},"parentId":{"$ref":"#/$defs/Id","description":"Parent term in the same taxonomy; only in hierarchical taxonomies. No cycles."},"position":{"type":"integer","description":"Order among sibling terms (same taxonomy and parent), lowest first, for menus and sidebars. Terms without a position follow, by name.","minimum":0,"maximum":100000},"image":{"$ref":"#/$defs/ImageRef"},"links":{"type":"array","description":"Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1).","maxItems":10,"items":{"$ref":"#/$defs/Link"}},"slugHistory":{"type":"array","description":"Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.","items":{"$ref":"#/$defs/Slug"},"minItems":1,"maxItems":50,"uniqueItems":true},"mergedInto":{"$ref":"#/$defs/Id","description":"Set when this term was merged into another active term of the same taxonomy; status is then 'retired'."},"proposedBy":{"$ref":"#/$defs/Actor"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Seo":{"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TermLabel":{"type":"object","additionalProperties":false,"required":["name"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"altNames":{"type":"array","description":"Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.","items":{"type":"string","minLength":1,"maxLength":200},"minItems":1,"maxItems":50,"uniqueItems":true},"description":{"type":"string","description":"Markdown introduction shown at the top of the archive.","maxLength":20000},"role":{"type":"string","description":"A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).","minLength":1,"maxLength":120},"seo":{"$ref":"#/$defs/Seo"}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema200 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema201 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema204 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema205 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema211 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
-const schema217 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema218 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema220 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema206 = {"type":"object","additionalProperties":false,"required":["name"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"altNames":{"type":"array","description":"Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.","items":{"type":"string","minLength":1,"maxLength":200},"minItems":1,"maxItems":50,"uniqueItems":true},"description":{"type":"string","description":"Markdown introduction shown at the top of the archive.","maxLength":20000},"role":{"type":"string","description":"A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).","minLength":1,"maxLength":120},"seo":{"$ref":"#/$defs/Seo"}}};
-const schema207 = {"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}};
-const schema208 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
+export const validateTerm = validate109;
+const schema218 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/term.schema.json","title":"Term","description":"One concept in a taxonomy (a category, a tag, a series). Content refers to terms by id, independent of locale; names, synonyms, archive intro and SEO are per locale. Renames, merges and retirements keep the id and leave redirects behind; `proposedBy` records the actor that proposed it (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","taxonomyId","slug","status","visibility","labels","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"taxonomyId":{"$ref":"#/$defs/Id"},"slug":{"$ref":"#/$defs/Slug","description":"URL segment of the term's archive; unique within its taxonomy, together with every slug in any term's slugHistory."},"status":{"type":"string","description":"active: usable and public (subject to visibility). proposed: created by an agent, waiting for a person; assignable but never public. retired: no new assignments, no archive.","enum":["active","proposed","retired"]},"visibility":{"type":"string","description":"internal terms have no archive, feed or sitemap entry and are not shown on entries; themes and filters may still use them.","enum":["public","internal"]},"labels":{"type":"object","description":"Names per locale. Must contain the site's default locale.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"$ref":"#/$defs/TermLabel"}},"parentId":{"$ref":"#/$defs/Id","description":"Parent term in the same taxonomy; only in hierarchical taxonomies. No cycles."},"position":{"type":"integer","description":"Order among sibling terms (same taxonomy and parent), lowest first, for menus and sidebars. Terms without a position follow, by name.","minimum":0,"maximum":100000},"image":{"$ref":"#/$defs/ImageRef"},"links":{"type":"array","description":"Profile links shown with the term and given to search engines as sameAs, such as an author's pages elsewhere (RFC-0019 §1).","maxItems":10,"items":{"$ref":"#/$defs/Link"}},"slugHistory":{"type":"array","description":"Earlier slugs, oldest first. Old slugs stay reserved in the taxonomy and still resolve when an agent assigns by slug.","items":{"$ref":"#/$defs/Slug"},"minItems":1,"maxItems":50,"uniqueItems":true},"mergedInto":{"$ref":"#/$defs/Id","description":"Set when this term was merged into another active term of the same taxonomy; status is then 'retired'."},"proposedBy":{"$ref":"#/$defs/Actor"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"ImageRef":{"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}},"Link":{"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Seo":{"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"TermLabel":{"type":"object","additionalProperties":false,"required":["name"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"altNames":{"type":"array","description":"Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.","items":{"type":"string","minLength":1,"maxLength":200},"minItems":1,"maxItems":50,"uniqueItems":true},"description":{"type":"string","description":"Markdown introduction shown at the top of the archive.","maxLength":20000},"role":{"type":"string","description":"A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).","minLength":1,"maxLength":120},"seo":{"$ref":"#/$defs/Seo"}}},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema219 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema220 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema223 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema224 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema230 = {"type":"object","additionalProperties":false,"required":["label","href"],"properties":{"label":{"type":"string","minLength":1,"maxLength":200},"href":{"type":"string","minLength":1,"maxLength":2048},"external":{"type":"boolean"}}};
+const schema236 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema237 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema239 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema225 = {"type":"object","additionalProperties":false,"required":["name"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"altNames":{"type":"array","description":"Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.","items":{"type":"string","minLength":1,"maxLength":200},"minItems":1,"maxItems":50,"uniqueItems":true},"description":{"type":"string","description":"Markdown introduction shown at the top of the archive.","maxLength":20000},"role":{"type":"string","description":"A short role or title shown with the term, such as an author's \"Senior reporter\" (RFC-0019 §1).","minLength":1,"maxLength":120},"seo":{"$ref":"#/$defs/Seo"}}};
+const schema226 = {"type":"object","description":"Search and social metadata of a routable node (page, term archive).","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":300},"description":{"type":"string","maxLength":500},"noindex":{"type":"boolean"},"canonical":{"type":"string","maxLength":2048},"ogImage":{"$ref":"#/$defs/ImageRef"}}};
+const schema227 = {"type":"object","description":"Reference to an image. With `assetId` the image is an Asset node (RFC-0004): the store writes its media URL into `src`, and its size into `width` and `height`, as a fallback for readers that do not resolve assets. Without it, `src` is a relative path or an absolute URL, as before.","additionalProperties":false,"required":["src","alt"],"properties":{"assetId":{"$ref":"#/$defs/Id","description":"The Asset node shown (RFC-0004). Renderers that know assets resolve it and ignore `src`."},"src":{"type":"string","minLength":1,"maxLength":2048},"alt":{"type":"string","maxLength":500},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1}}};
 
-function validate100(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate112(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate100.evaluated;
+const evaluated0 = validate112.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -13485,16 +15536,16 @@ vErrors.push(err16);
 }
 errors++;
 }
-validate100.errors = vErrors;
+validate112.errors = vErrors;
 return errors === 0;
 }
-validate100.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate112.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate99(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate111(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate99.evaluated;
+const evaluated0 = validate111.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -13602,8 +15653,8 @@ errors++;
 }
 }
 if(data.ogImage !== undefined){
-if(!(validate100(data.ogImage, {instancePath:instancePath+"/ogImage",parentData:data,parentDataProperty:"ogImage",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate100.errors : vErrors.concat(validate100.errors);
+if(!(validate112(data.ogImage, {instancePath:instancePath+"/ogImage",parentData:data,parentDataProperty:"ogImage",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate112.errors : vErrors.concat(validate112.errors);
 errors = vErrors.length;
 }
 }
@@ -13618,16 +15669,16 @@ vErrors.push(err8);
 }
 errors++;
 }
-validate99.errors = vErrors;
+validate111.errors = vErrors;
 return errors === 0;
 }
-validate99.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate111.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate98(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate110(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate98.evaluated;
+const evaluated0 = validate110.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -13848,8 +15899,8 @@ errors++;
 }
 }
 if(data.seo !== undefined){
-if(!(validate99(data.seo, {instancePath:instancePath+"/seo",parentData:data,parentDataProperty:"seo",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate99.errors : vErrors.concat(validate99.errors);
+if(!(validate111(data.seo, {instancePath:instancePath+"/seo",parentData:data,parentDataProperty:"seo",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate111.errors : vErrors.concat(validate111.errors);
 errors = vErrors.length;
 }
 }
@@ -13864,18 +15915,18 @@ vErrors.push(err17);
 }
 errors++;
 }
-validate98.errors = vErrors;
+validate110.errors = vErrors;
 return errors === 0;
 }
-validate98.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate110.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema214 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema215 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+const schema233 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema234 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate105(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate117(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate105.evaluated;
+const evaluated0 = validate117.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -13928,7 +15979,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema215.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema234.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -14019,17 +16070,17 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate105.errors = vErrors;
+validate117.errors = vErrors;
 return errors === 0;
 }
-validate105.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate117.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate97(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate109(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/term.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate97.evaluated;
+const evaluated0 = validate109.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -14148,7 +16199,7 @@ vErrors.push(err10);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema199.properties, key0))){
+if(!(func1.call(schema218.properties, key0))){
 const err11 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err11];
@@ -14172,7 +16223,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(data0 === 1)){
-const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema200.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema219.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -14375,7 +16426,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!(((data5 === "active") || (data5 === "proposed")) || (data5 === "retired"))){
-const err31 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema199.properties.status.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema218.properties.status.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -14398,7 +16449,7 @@ vErrors.push(err32);
 errors++;
 }
 if(!((data6 === "public") || (data6 === "internal"))){
-const err33 = {instancePath:instancePath+"/visibility",schemaPath:"#/properties/visibility/enum",keyword:"enum",params:{allowedValues: schema199.properties.visibility.enum},message:"must be equal to one of the allowed values"};
+const err33 = {instancePath:instancePath+"/visibility",schemaPath:"#/properties/visibility/enum",keyword:"enum",params:{allowedValues: schema218.properties.visibility.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -14458,8 +16509,8 @@ errors++;
 }
 }
 for(const key2 in data7){
-if(!(validate98(data7[key2], {instancePath:instancePath+"/labels/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data7,parentDataProperty:key2,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate98.errors : vErrors.concat(validate98.errors);
+if(!(validate110(data7[key2], {instancePath:instancePath+"/labels/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data7,parentDataProperty:key2,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate110.errors : vErrors.concat(validate110.errors);
 errors = vErrors.length;
 }
 }
@@ -14556,8 +16607,8 @@ errors++;
 }
 }
 if(data.image !== undefined){
-if(!(validate100(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate100.errors : vErrors.concat(validate100.errors);
+if(!(validate112(data.image, {instancePath:instancePath+"/image",parentData:data,parentDataProperty:"image",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate112.errors : vErrors.concat(validate112.errors);
 errors = vErrors.length;
 }
 }
@@ -14863,8 +16914,8 @@ errors++;
 }
 }
 if(data.proposedBy !== undefined){
-if(!(validate105(data.proposedBy, {instancePath:instancePath+"/proposedBy",parentData:data,parentDataProperty:"proposedBy",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate105.errors : vErrors.concat(validate105.errors);
+if(!(validate117(data.proposedBy, {instancePath:instancePath+"/proposedBy",parentData:data,parentDataProperty:"proposedBy",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate117.errors : vErrors.concat(validate117.errors);
 errors = vErrors.length;
 }
 }
@@ -14981,26 +17032,26 @@ vErrors.push(err79);
 }
 errors++;
 }
-validate97.errors = vErrors;
+validate109.errors = vErrors;
 return errors === 0;
 }
-validate97.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate109.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateRedirect = validate107;
-const schema221 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/redirect.schema.json","title":"Redirect","description":"An HTTP redirect from a path the site no longer serves. Created automatically when a published entry or a term changes slug, when terms are merged or retired, and by people. Snapshotted and published like every other node (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","from","to","status","match","reason","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"from":{"type":"string","description":"Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.","pattern":"^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$","maxLength":1024},"to":{"type":"string","description":"Target: a site path (may carry a query or fragment) or an absolute https URL. Protocol-relative ('//host') and backslash forms are rejected.","pattern":"^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$","maxLength":2048},"status":{"type":"integer","description":"301 (permanent) for slug changes, merges and retirements; 302 (temporary) only for manual redirects.","enum":[301,302]},"match":{"type":"string","description":"exact: only `from` itself. prefix: `from` and every path below it; the rest of the path is appended to `to` (archives: /tag/old/page/2 → /tag/new/page/2).","enum":["exact","prefix"]},"reason":{"type":"string","enum":["slug-change","merge","retire","manual"]},"source":{"$ref":"#/$defs/RedirectSource"},"note":{"type":"string","maxLength":500},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"RedirectSource":{"type":"object","description":"The node whose earlier URL this redirect preserves (automatic redirects). Used to collapse chains on later renames and to list a node's old URLs.","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["page","contentEntry","term"]},"id":{"$ref":"#/$defs/Id"}}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema222 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema223 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema227 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema228 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema230 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern102 = new RegExp("^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$", "u");
-const pattern103 = new RegExp("^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$", "u");
-const schema225 = {"type":"object","description":"The node whose earlier URL this redirect preserves (automatic redirects). Used to collapse chains on later renames and to list a node's old URLs.","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["page","contentEntry","term"]},"id":{"$ref":"#/$defs/Id"}}};
+export const validateRedirect = validate119;
+const schema240 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/redirect.schema.json","title":"Redirect","description":"An HTTP redirect from a path the site no longer serves. Created automatically when a published entry or a term changes slug, when terms are merged or retired, and by people. Snapshotted and published like every other node (RFC-0002).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","from","to","status","match","reason","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"from":{"type":"string","description":"Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.","pattern":"^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$","maxLength":1024},"to":{"type":"string","description":"Target: a site path (may carry a query or fragment) or an absolute https URL. Protocol-relative ('//host') and backslash forms are rejected.","pattern":"^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$","maxLength":2048},"status":{"type":"integer","description":"301 (permanent) for slug changes, merges and retirements; 302 (temporary) only for manual redirects.","enum":[301,302]},"match":{"type":"string","description":"exact: only `from` itself. prefix: `from` and every path below it; the rest of the path is appended to `to` (archives: /tag/old/page/2 → /tag/new/page/2).","enum":["exact","prefix"]},"reason":{"type":"string","enum":["slug-change","merge","retire","manual"]},"source":{"$ref":"#/$defs/RedirectSource"},"note":{"type":"string","maxLength":500},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"RedirectSource":{"type":"object","description":"The node whose earlier URL this redirect preserves (automatic redirects). Used to collapse chains on later renames and to list a node's old URLs.","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["page","contentEntry","term"]},"id":{"$ref":"#/$defs/Id"}}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema241 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema242 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema246 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema247 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema249 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const pattern117 = new RegExp("^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$", "u");
+const pattern118 = new RegExp("^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$", "u");
+const schema244 = {"type":"object","description":"The node whose earlier URL this redirect preserves (automatic redirects). Used to collapse chains on later renames and to list a node's old URLs.","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["page","contentEntry","term"]},"id":{"$ref":"#/$defs/Id"}}};
 
-function validate108(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate120(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate108.evaluated;
+const evaluated0 = validate120.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -15053,7 +17104,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "page") || (data0 === "contentEntry")) || (data0 === "term"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema225.properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema244.properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -15119,17 +17170,17 @@ vErrors.push(err9);
 }
 errors++;
 }
-validate108.errors = vErrors;
+validate120.errors = vErrors;
 return errors === 0;
 }
-validate108.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate120.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate107(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate119(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/redirect.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate107.evaluated;
+const evaluated0 = validate119.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -15248,7 +17299,7 @@ vErrors.push(err10);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema221.properties, key0))){
+if(!(func1.call(schema240.properties, key0))){
 const err11 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err11];
@@ -15272,7 +17323,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(data0 === 1)){
-const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema222.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema241.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -15385,7 +17436,7 @@ vErrors.push(err22);
 }
 errors++;
 }
-if(!pattern102.test(data3)){
+if(!pattern117.test(data3)){
 const err23 = {instancePath:instancePath+"/from",schemaPath:"#/properties/from/pattern",keyword:"pattern",params:{pattern: "^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$"},message:"must match pattern \""+"^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err23];
@@ -15420,7 +17471,7 @@ vErrors.push(err25);
 }
 errors++;
 }
-if(!pattern103.test(data4)){
+if(!pattern118.test(data4)){
 const err26 = {instancePath:instancePath+"/to",schemaPath:"#/properties/to/pattern",keyword:"pattern",params:{pattern: "^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$"},message:"must match pattern \""+"^(?:/(?![/\\\\])[^\\s\\\\]*|https://[^\\s\\\\/?#]+(?:[/?#][^\\s\\\\]*)?)$"+"\""};
 if(vErrors === null){
 vErrors = [err26];
@@ -15455,7 +17506,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!((data5 === 301) || (data5 === 302))){
-const err29 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema221.properties.status.enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema240.properties.status.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -15478,7 +17529,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!((data6 === "exact") || (data6 === "prefix"))){
-const err31 = {instancePath:instancePath+"/match",schemaPath:"#/properties/match/enum",keyword:"enum",params:{allowedValues: schema221.properties.match.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/match",schemaPath:"#/properties/match/enum",keyword:"enum",params:{allowedValues: schema240.properties.match.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -15501,7 +17552,7 @@ vErrors.push(err32);
 errors++;
 }
 if(!((((data7 === "slug-change") || (data7 === "merge")) || (data7 === "retire")) || (data7 === "manual"))){
-const err33 = {instancePath:instancePath+"/reason",schemaPath:"#/properties/reason/enum",keyword:"enum",params:{allowedValues: schema221.properties.reason.enum},message:"must be equal to one of the allowed values"};
+const err33 = {instancePath:instancePath+"/reason",schemaPath:"#/properties/reason/enum",keyword:"enum",params:{allowedValues: schema240.properties.reason.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -15512,8 +17563,8 @@ errors++;
 }
 }
 if(data.source !== undefined){
-if(!(validate108(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate108.errors : vErrors.concat(validate108.errors);
+if(!(validate120(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate120.errors : vErrors.concat(validate120.errors);
 errors = vErrors.length;
 }
 }
@@ -15655,33 +17706,33 @@ vErrors.push(err44);
 }
 errors++;
 }
-validate107.errors = vErrors;
+validate119.errors = vErrors;
 return errors === 0;
 }
-validate107.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate119.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateAsset = validate110;
-const schema231 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/asset.schema.json","title":"Asset","description":"A media file of a site (image, video, audio, document, data) as a graph node: its bytes are identified by SHA-256 and stored once per site in the blob store under a content-addressed key, or kept elsewhere (`storage.kind: external`, e.g. a Zenodo or Hugging Face file). Pages, entries and terms refer to it by id (`ImageRef.assetId`, markdown `asset:<id>`). Snapshotted like every node, so a deleted asset's bytes stay while any snapshot references it (RFC-0004).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","kind","mediaType","bytes","sha256","slug","storage","status","uploadedBy","source","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"kind":{"type":"string","description":"What the file is, derived from the sniffed media type (never chosen by the client). `other` is allowed for external storage only.","enum":["image","video","audio","document","data","other"]},"mediaType":{"type":"string","description":"MIME type of the stored bytes as sniffed by the server (RFC 6838, lower case, no parameters), e.g. image/webp, text/csv. Served as Content-Type.","pattern":"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$","maxLength":255},"bytes":{"type":"integer","description":"Size of the stored bytes. For external files: the size the source reports or the uploader declares.","minimum":0},"sha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the stored bytes (lower-case hex): the blob key, the public URL prefix, the ETag and the checksum shown with downloads. Unique per site. For external files see `storage.checksum`."},"originalSha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the bytes as uploaded, present only when the server changed them (image metadata stripping)."},"slug":{"$ref":"#/$defs/Slug","description":"File name in the public URL, without extension: /media/<sha256[0..16]>/<slug>.<ext>. May change; the old URL then answers 301 to the new one."},"storage":{"$ref":"#/$defs/AssetStorage"},"image":{"$ref":"#/$defs/AssetImage"},"title":{"type":"object","description":"Display title per locale (download lists, library search).","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":300}},"alt":{"type":"object","description":"Alternative text per locale. An `ImageRef.alt` that is not empty overrides it for one use.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":500}},"decorative":{"type":"boolean","description":"The image carries no information and renders with alt=\"\". Absent means false; the store never writes false."},"caption":{"type":"object","description":"Caption per locale (plain text), the default for figures that show this asset.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":1000}},"credit":{"type":"string","description":"Who made it, as shown next to it (e.g. 'Photo: Ayşe Yılmaz').","minLength":1,"maxLength":300},"license":{"$ref":"#/$defs/AssetLicense"},"status":{"type":"string","description":"active: listed and pickable. retired: hidden from the library and pickers and cannot be newly referenced; existing references keep rendering.","enum":["active","retired"]},"uploadedBy":{"$ref":"#/$defs/Actor"},"source":{"$ref":"#/$defs/AssetSource"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"AssetImage":{"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}},"AssetLicense":{"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]},"AssetSource":{"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]},"AssetStorage":{"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]},"HttpsUrl":{"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Sha256":{"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema232 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema233 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema235 = {"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"};
-const schema237 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema242 = {"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}};
-const schema243 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema255 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema241 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema258 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern107 = new RegExp("^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$", "u");
-const pattern113 = new RegExp("^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$", "u");
-const pattern114 = new RegExp("^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$", "u");
-const schema238 = {"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]};
-const schema239 = {"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048};
-const pattern111 = new RegExp("^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "u");
+export const validateAsset = validate122;
+const schema250 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/asset.schema.json","title":"Asset","description":"A media file of a site (image, video, audio, document, data) as a graph node: its bytes are identified by SHA-256 and stored once per site in the blob store under a content-addressed key, or kept elsewhere (`storage.kind: external`, e.g. a Zenodo or Hugging Face file). Pages, entries and terms refer to it by id (`ImageRef.assetId`, markdown `asset:<id>`). Snapshotted like every node, so a deleted asset's bytes stay while any snapshot references it (RFC-0004).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","kind","mediaType","bytes","sha256","slug","storage","status","uploadedBy","source","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"kind":{"type":"string","description":"What the file is, derived from the sniffed media type (never chosen by the client). `other` is allowed for external storage only.","enum":["image","video","audio","document","data","other"]},"mediaType":{"type":"string","description":"MIME type of the stored bytes as sniffed by the server (RFC 6838, lower case, no parameters), e.g. image/webp, text/csv. Served as Content-Type.","pattern":"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$","maxLength":255},"bytes":{"type":"integer","description":"Size of the stored bytes. For external files: the size the source reports or the uploader declares.","minimum":0},"sha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the stored bytes (lower-case hex): the blob key, the public URL prefix, the ETag and the checksum shown with downloads. Unique per site. For external files see `storage.checksum`."},"originalSha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the bytes as uploaded, present only when the server changed them (image metadata stripping)."},"slug":{"$ref":"#/$defs/Slug","description":"File name in the public URL, without extension: /media/<sha256[0..16]>/<slug>.<ext>. May change; the old URL then answers 301 to the new one."},"storage":{"$ref":"#/$defs/AssetStorage"},"image":{"$ref":"#/$defs/AssetImage"},"title":{"type":"object","description":"Display title per locale (download lists, library search).","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":300}},"alt":{"type":"object","description":"Alternative text per locale. An `ImageRef.alt` that is not empty overrides it for one use.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":500}},"decorative":{"type":"boolean","description":"The image carries no information and renders with alt=\"\". Absent means false; the store never writes false."},"caption":{"type":"object","description":"Caption per locale (plain text), the default for figures that show this asset.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":1000}},"credit":{"type":"string","description":"Who made it, as shown next to it (e.g. 'Photo: Ayşe Yılmaz').","minLength":1,"maxLength":300},"license":{"$ref":"#/$defs/AssetLicense"},"status":{"type":"string","description":"active: listed and pickable. retired: hidden from the library and pickers and cannot be newly referenced; existing references keep rendering.","enum":["active","retired"]},"uploadedBy":{"$ref":"#/$defs/Actor"},"source":{"$ref":"#/$defs/AssetSource"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"AssetImage":{"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}},"AssetLicense":{"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]},"AssetSource":{"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]},"AssetStorage":{"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]},"HttpsUrl":{"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Sha256":{"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema251 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema252 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema254 = {"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"};
+const schema256 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema261 = {"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}};
+const schema262 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema274 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema260 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema277 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const pattern122 = new RegExp("^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$", "u");
+const pattern128 = new RegExp("^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$", "u");
+const pattern129 = new RegExp("^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$", "u");
+const schema257 = {"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]};
+const schema258 = {"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048};
+const pattern126 = new RegExp("^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "u");
 
-function validate111(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate123(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate111.evaluated;
+const evaluated0 = validate123.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -15728,7 +17779,7 @@ vErrors.push(err2);
 errors++;
 }
 if(!(data0 === "blob")){
-const err3 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema238.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err3 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema257.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -15812,7 +17863,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(data1 === "external")){
-const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema238.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema257.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -15835,7 +17886,7 @@ vErrors.push(err11);
 }
 errors++;
 }
-if(!pattern111.test(data2)){
+if(!pattern126.test(data2)){
 const err12 = {instancePath:instancePath+"/url",schemaPath:"#/$defs/HttpsUrl/pattern",keyword:"pattern",params:{pattern: "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"},message:"must match pattern \""+"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err12];
@@ -15870,7 +17921,7 @@ vErrors.push(err14);
 }
 errors++;
 }
-if(!pattern111.test(data3)){
+if(!pattern126.test(data3)){
 const err15 = {instancePath:instancePath+"/landingPage",schemaPath:"#/$defs/HttpsUrl/pattern",keyword:"pattern",params:{pattern: "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"},message:"must match pattern \""+"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err15];
@@ -15905,7 +17956,7 @@ vErrors.push(err17);
 errors++;
 }
 if(!((data4 === "computed") || (data4 === "declared"))){
-const err18 = {instancePath:instancePath+"/checksum",schemaPath:"#/oneOf/1/properties/checksum/enum",keyword:"enum",params:{allowedValues: schema238.oneOf[1].properties.checksum.enum},message:"must be equal to one of the allowed values"};
+const err18 = {instancePath:instancePath+"/checksum",schemaPath:"#/oneOf/1/properties/checksum/enum",keyword:"enum",params:{allowedValues: schema257.oneOf[1].properties.checksum.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -15986,19 +18037,19 @@ vErrors = null;
 }
 }
 }
-validate111.errors = vErrors;
+validate123.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate111.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate123.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema246 = {"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]};
-const pattern118 = new RegExp("^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$", "u");
+const schema265 = {"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]};
+const pattern133 = new RegExp("^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$", "u");
 
-function validate113(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate125(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate113.evaluated;
+const evaluated0 = validate125.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -16055,7 +18106,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(data0 === "spdx")){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema246.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema265.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -16078,7 +18129,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern118.test(data1)){
+if(!pattern133.test(data1)){
 const err6 = {instancePath:instancePath+"/id",schemaPath:"#/oneOf/0/properties/id/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$"},message:"must match pattern \""+"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -16164,7 +18215,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(data2 === "url")){
-const err13 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema246.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema265.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -16187,7 +18238,7 @@ vErrors.push(err14);
 }
 errors++;
 }
-if(!pattern111.test(data3)){
+if(!pattern126.test(data3)){
 const err15 = {instancePath:instancePath+"/url",schemaPath:"#/$defs/HttpsUrl/pattern",keyword:"pattern",params:{pattern: "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"},message:"must match pattern \""+"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err15];
@@ -16290,19 +18341,19 @@ vErrors = null;
 }
 }
 }
-validate113.errors = vErrors;
+validate125.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate113.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate125.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema248 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema249 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+const schema267 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema268 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate115(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate127(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate115.evaluated;
+const evaluated0 = validate127.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -16355,7 +18406,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema249.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema268.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -16446,18 +18497,18 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate115.errors = vErrors;
+validate127.errors = vErrors;
 return errors === 0;
 }
-validate115.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate127.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema251 = {"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]};
-const pattern121 = new RegExp("^[^/\\\\\\u0000-\\u001f\\u007f]+$", "u");
+const schema270 = {"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]};
+const pattern136 = new RegExp("^[^/\\\\\\u0000-\\u001f\\u007f]+$", "u");
 
-function validate117(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate129(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate117.evaluated;
+const evaluated0 = validate129.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -16504,7 +18555,7 @@ vErrors.push(err2);
 errors++;
 }
 if(!(data0 === "upload")){
-const err3 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema251.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err3 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema270.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -16537,7 +18588,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern121.test(data1)){
+if(!pattern136.test(data1)){
 const err6 = {instancePath:instancePath+"/filename",schemaPath:"#/oneOf/0/properties/filename/pattern",keyword:"pattern",params:{pattern: "^[^/\\\\\\u0000-\\u001f\\u007f]+$"},message:"must match pattern \""+"^[^/\\\\\\u0000-\\u001f\\u007f]+$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -16633,7 +18684,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data2 === "fetch")){
-const err14 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema251.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema270.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -16656,7 +18707,7 @@ vErrors.push(err15);
 }
 errors++;
 }
-if(!pattern111.test(data3)){
+if(!pattern126.test(data3)){
 const err16 = {instancePath:instancePath+"/url",schemaPath:"#/$defs/HttpsUrl/pattern",keyword:"pattern",params:{pattern: "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"},message:"must match pattern \""+"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err16];
@@ -16774,7 +18825,7 @@ vErrors.push(err24);
 errors++;
 }
 if(!(data5 === "import")){
-const err25 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema251.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err25 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema270.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -16925,7 +18976,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(data8 === "link")){
-const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema251.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema270.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -16983,18 +19034,18 @@ vErrors = null;
 }
 }
 }
-validate117.errors = vErrors;
+validate129.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate117.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate129.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 
-function validate110(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate122(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/asset.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate110.evaluated;
+const evaluated0 = validate122.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -17153,7 +19204,7 @@ vErrors.push(err14);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema231.properties, key0))){
+if(!(func1.call(schema250.properties, key0))){
 const err15 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err15];
@@ -17177,7 +19228,7 @@ vErrors.push(err16);
 errors++;
 }
 if(!(data0 === 1)){
-const err17 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema232.enum},message:"must be equal to one of the allowed values"};
+const err17 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema251.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -17290,7 +19341,7 @@ vErrors.push(err26);
 errors++;
 }
 if(!((((((data3 === "image") || (data3 === "video")) || (data3 === "audio")) || (data3 === "document")) || (data3 === "data")) || (data3 === "other"))){
-const err27 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema231.properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err27 = {instancePath:instancePath+"/kind",schemaPath:"#/properties/kind/enum",keyword:"enum",params:{allowedValues: schema250.properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -17313,7 +19364,7 @@ vErrors.push(err28);
 }
 errors++;
 }
-if(!pattern107.test(data4)){
+if(!pattern122.test(data4)){
 const err29 = {instancePath:instancePath+"/mediaType",schemaPath:"#/properties/mediaType/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$"+"\""};
 if(vErrors === null){
 vErrors = [err29];
@@ -17363,7 +19414,7 @@ errors++;
 if(data.sha256 !== undefined){
 let data6 = data.sha256;
 if(typeof data6 === "string"){
-if(!pattern34.test(data6)){
+if(!pattern25.test(data6)){
 const err33 = {instancePath:instancePath+"/sha256",schemaPath:"#/$defs/Sha256/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err33];
@@ -17388,7 +19439,7 @@ errors++;
 if(data.originalSha256 !== undefined){
 let data7 = data.originalSha256;
 if(typeof data7 === "string"){
-if(!pattern34.test(data7)){
+if(!pattern25.test(data7)){
 const err35 = {instancePath:instancePath+"/originalSha256",schemaPath:"#/$defs/Sha256/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err35];
@@ -17456,8 +19507,8 @@ errors++;
 }
 }
 if(data.storage !== undefined){
-if(!(validate111(data.storage, {instancePath:instancePath+"/storage",parentData:data,parentDataProperty:"storage",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate111.errors : vErrors.concat(validate111.errors);
+if(!(validate123(data.storage, {instancePath:instancePath+"/storage",parentData:data,parentDataProperty:"storage",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate123.errors : vErrors.concat(validate123.errors);
 errors = vErrors.length;
 }
 }
@@ -17581,7 +19632,7 @@ errors++;
 if(data10.blurhash !== undefined){
 let data14 = data10.blurhash;
 if(typeof data14 === "string"){
-if(!pattern113.test(data14)){
+if(!pattern128.test(data14)){
 const err51 = {instancePath:instancePath+"/image/blurhash",schemaPath:"#/$defs/AssetImage/properties/blurhash/pattern",keyword:"pattern",params:{pattern: "^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},message:"must match pattern \""+"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"+"\""};
 if(vErrors === null){
 vErrors = [err51];
@@ -17616,7 +19667,7 @@ vErrors.push(err53);
 }
 errors++;
 }
-if(!pattern114.test(data15)){
+if(!pattern129.test(data15)){
 const err54 = {instancePath:instancePath+"/image/lqip",schemaPath:"#/$defs/AssetImage/properties/lqip/pattern",keyword:"pattern",params:{pattern: "^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$"},message:"must match pattern \""+"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$"+"\""};
 if(vErrors === null){
 vErrors = [err54];
@@ -17986,8 +20037,8 @@ errors++;
 }
 }
 if(data.license !== undefined){
-if(!(validate113(data.license, {instancePath:instancePath+"/license",parentData:data,parentDataProperty:"license",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate113.errors : vErrors.concat(validate113.errors);
+if(!(validate125(data.license, {instancePath:instancePath+"/license",parentData:data,parentDataProperty:"license",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate125.errors : vErrors.concat(validate125.errors);
 errors = vErrors.length;
 }
 }
@@ -18004,7 +20055,7 @@ vErrors.push(err85);
 errors++;
 }
 if(!((data25 === "active") || (data25 === "retired"))){
-const err86 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema231.properties.status.enum},message:"must be equal to one of the allowed values"};
+const err86 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema250.properties.status.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err86];
 }
@@ -18015,14 +20066,14 @@ errors++;
 }
 }
 if(data.uploadedBy !== undefined){
-if(!(validate115(data.uploadedBy, {instancePath:instancePath+"/uploadedBy",parentData:data,parentDataProperty:"uploadedBy",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate115.errors : vErrors.concat(validate115.errors);
+if(!(validate127(data.uploadedBy, {instancePath:instancePath+"/uploadedBy",parentData:data,parentDataProperty:"uploadedBy",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate127.errors : vErrors.concat(validate127.errors);
 errors = vErrors.length;
 }
 }
 if(data.source !== undefined){
-if(!(validate117(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate117.errors : vErrors.concat(validate117.errors);
+if(!(validate129(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate129.errors : vErrors.concat(validate129.errors);
 errors = vErrors.length;
 }
 }
@@ -18139,29 +20190,30 @@ vErrors.push(err95);
 }
 errors++;
 }
-validate110.errors = vErrors;
+validate122.errors = vErrors;
 return errors === 0;
 }
-validate110.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate122.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateMenu = validate119;
-const schema259 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/menu.schema.json","title":"Menu","description":"A named navigation menu of a site (e.g. 'primary', 'footer', 'sidebar'): an ordered tree of items. Items point at pages, entries and terms by id, so renames and slug changes never break them; an item whose target is gone, retired or unpublished is hidden by the renderer, never rendered as a dead link (RFC-0003).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","key","maxDepth","items","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"key":{"$ref":"#/$defs/Slug","description":"Where themes place the menu ('primary', 'footer', 'sidebar', …). Unique per site and immutable once created."},"maxDepth":{"type":"integer","description":"Deepest level an item may sit at; top-level items are level 1. The store refuses deeper trees.","minimum":1,"maximum":6},"items":{"type":"array","description":"Top-level items in display order. Empty means the site deliberately shows no items here (a missing menu means the theme's derived default).","items":{"$ref":"#/$defs/MenuItem"},"maxItems":100},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"MenuItem":{"description":"One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.","oneOf":[{"type":"object","title":"PageMenuItem","description":"Links to a page by id; the label falls back to the page title.","additionalProperties":false,"required":["id","kind","pageId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["page"]},"pageId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"EntryMenuItem","description":"Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.","additionalProperties":false,"required":["id","kind","entryId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentEntry"]},"entryId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"TermMenuItem","description":"Links to a term's archive by term id; the label falls back to the term name in the locale.","additionalProperties":false,"required":["id","kind","termId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["term"]},"termId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"CollectionMenuItem","description":"Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.","additionalProperties":false,"required":["id","kind","collection","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["collection"]},"collection":{"$ref":"#/$defs/Slug"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"UrlMenuItem","description":"Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.","additionalProperties":false,"required":["id","kind","href","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["url"]},"href":{"type":"string","pattern":"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$","maxLength":2048},"newTab":{"type":"boolean","description":"Open in a new tab (rendered with rel=\"noopener noreferrer\")."},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"GroupMenuItem","description":"A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.","additionalProperties":false,"required":["id","kind","labels","children"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["group"]},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}}]},"MenuLabels":{"type":"object","description":"Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":100,"pattern":"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"}},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema260 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema261 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema263 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema277 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema278 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema280 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const schema264 = {"description":"One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.","oneOf":[{"type":"object","title":"PageMenuItem","description":"Links to a page by id; the label falls back to the page title.","additionalProperties":false,"required":["id","kind","pageId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["page"]},"pageId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"EntryMenuItem","description":"Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.","additionalProperties":false,"required":["id","kind","entryId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentEntry"]},"entryId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"TermMenuItem","description":"Links to a term's archive by term id; the label falls back to the term name in the locale.","additionalProperties":false,"required":["id","kind","termId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["term"]},"termId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"CollectionMenuItem","description":"Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.","additionalProperties":false,"required":["id","kind","collection","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["collection"]},"collection":{"$ref":"#/$defs/Slug"},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"UrlMenuItem","description":"Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.","additionalProperties":false,"required":["id","kind","href","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["url"]},"href":{"type":"string","pattern":"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$","maxLength":2048},"newTab":{"type":"boolean","description":"Open in a new tab (rendered with rel=\"noopener noreferrer\")."},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"GroupMenuItem","description":"A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.","additionalProperties":false,"required":["id","kind","labels","children"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["group"]},"labels":{"$ref":"#/$defs/MenuLabels"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}}]};
-const pattern138 = new RegExp("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$", "u");
-const schema267 = {"type":"object","description":"Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":100,"pattern":"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"}};
-const schema268 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const pattern130 = new RegExp("^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$", "u");
+export const validateMenu = validate131;
+const schema278 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/menu.schema.json","title":"Menu","description":"A named navigation menu of a site (e.g. 'primary', 'footer', 'sidebar'): an ordered tree of items. Items point at pages, entries and terms by id, so renames and slug changes never break them; an item whose target is gone, retired or unpublished is hidden by the renderer, never rendered as a dead link (RFC-0003).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","key","maxDepth","items","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"key":{"$ref":"#/$defs/Slug","description":"Where themes place the menu ('primary', 'footer', 'sidebar', …). Unique per site and immutable once created."},"maxDepth":{"type":"integer","description":"Deepest level an item may sit at; top-level items are level 1. The store refuses deeper trees.","minimum":1,"maximum":6},"items":{"type":"array","description":"Top-level items in display order. Empty means the site deliberately shows no items here (a missing menu means the theme's derived default).","items":{"$ref":"#/$defs/MenuItem"},"maxItems":100},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"MenuDisplay":{"type":"string","description":"RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).","enum":["mega"]},"MenuItem":{"description":"One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.","oneOf":[{"type":"object","title":"PageMenuItem","description":"Links to a page by id; the label falls back to the page title.","additionalProperties":false,"required":["id","kind","pageId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["page"]},"pageId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"EntryMenuItem","description":"Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.","additionalProperties":false,"required":["id","kind","entryId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentEntry"]},"entryId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"TermMenuItem","description":"Links to a term's archive by term id; the label falls back to the term name in the locale.","additionalProperties":false,"required":["id","kind","termId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["term"]},"termId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"CollectionMenuItem","description":"Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.","additionalProperties":false,"required":["id","kind","collection","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["collection"]},"collection":{"$ref":"#/$defs/Slug"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"UrlMenuItem","description":"Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.","additionalProperties":false,"required":["id","kind","href","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["url"]},"href":{"type":"string","pattern":"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$","maxLength":2048},"newTab":{"type":"boolean","description":"Open in a new tab (rendered with rel=\"noopener noreferrer\")."},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"GroupMenuItem","description":"A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.","additionalProperties":false,"required":["id","kind","labels","children"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["group"]},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}}]},"MenuLabels":{"type":"object","description":"Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":100,"pattern":"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"}},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema279 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema280 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema282 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
+const schema302 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema303 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema305 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const schema283 = {"description":"One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.","oneOf":[{"type":"object","title":"PageMenuItem","description":"Links to a page by id; the label falls back to the page title.","additionalProperties":false,"required":["id","kind","pageId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["page"]},"pageId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"EntryMenuItem","description":"Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.","additionalProperties":false,"required":["id","kind","entryId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentEntry"]},"entryId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"TermMenuItem","description":"Links to a term's archive by term id; the label falls back to the term name in the locale.","additionalProperties":false,"required":["id","kind","termId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["term"]},"termId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"CollectionMenuItem","description":"Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.","additionalProperties":false,"required":["id","kind","collection","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["collection"]},"collection":{"$ref":"#/$defs/Slug"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"UrlMenuItem","description":"Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.","additionalProperties":false,"required":["id","kind","href","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["url"]},"href":{"type":"string","pattern":"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$","maxLength":2048},"newTab":{"type":"boolean","description":"Open in a new tab (rendered with rel=\"noopener noreferrer\")."},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"GroupMenuItem","description":"A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.","additionalProperties":false,"required":["id","kind","labels","children"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["group"]},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}}]};
+const schema288 = {"type":"string","description":"RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).","enum":["mega"]};
+const pattern153 = new RegExp("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$", "u");
+const schema286 = {"type":"object","description":"Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":100,"pattern":"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"}};
+const schema287 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const pattern145 = new RegExp("^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$", "u");
 
-function validate121(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate133(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate121.evaluated;
+const evaluated0 = validate133.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -18238,7 +20290,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern130.test(data0)){
+if(!pattern145.test(data0)){
 const err6 = {instancePath:instancePath+"/" + key1.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/additionalProperties/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -18271,17 +20323,17 @@ vErrors.push(err8);
 }
 errors++;
 }
-validate121.errors = vErrors;
+validate133.errors = vErrors;
 return errors === 0;
 }
-validate121.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate133.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const wrapper0 = {validate: validate120};
+const wrapper0 = {validate: validate132};
 
-function validate120(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate132(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate120.evaluated;
+const evaluated0 = validate132.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -18324,7 +20376,7 @@ vErrors.push(err2);
 errors++;
 }
 for(const key0 in data){
-if(!(((((key0 === "id") || (key0 === "kind")) || (key0 === "pageId")) || (key0 === "labels")) || (key0 === "children"))){
+if(!((((((key0 === "id") || (key0 === "kind")) || (key0 === "pageId")) || (key0 === "labels")) || (key0 === "display")) || (key0 === "children"))){
 const err3 = {instancePath,schemaPath:"#/oneOf/0/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err3];
@@ -18393,7 +20445,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(data1 === "page")){
-const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -18449,16 +20501,15 @@ errors++;
 }
 }
 if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
 errors = vErrors.length;
 }
 }
-if(data.children !== undefined){
-let data4 = data.children;
-if(Array.isArray(data4)){
-if(data4.length > 100){
-const err14 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(data.display !== undefined){
+let data4 = data.display;
+if(typeof data4 !== "string"){
+const err14 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -18467,8 +20518,8 @@ vErrors.push(err14);
 }
 errors++;
 }
-if(data4.length < 1){
-const err15 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(!(data4 === "mega")){
+const err15 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -18477,16 +20528,12 @@ vErrors.push(err15);
 }
 errors++;
 }
-const len0 = data4.length;
-for(let i0=0; i0<len0; i0++){
-if(!(wrapper0.validate(data4[i0], {instancePath:instancePath+"/children/" + i0,parentData:data4,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
-errors = vErrors.length;
 }
-}
-}
-else {
-const err16 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(data.children !== undefined){
+let data5 = data.children;
+if(Array.isArray(data5)){
+if(data5.length > 100){
+const err16 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -18495,15 +20542,43 @@ vErrors.push(err16);
 }
 errors++;
 }
-}
-}
-else {
-const err17 = {instancePath,schemaPath:"#/oneOf/0/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(data5.length < 1){
+const err17 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
 if(vErrors === null){
 vErrors = [err17];
 }
 else {
 vErrors.push(err17);
+}
+errors++;
+}
+const len0 = data5.length;
+for(let i0=0; i0<len0; i0++){
+if(!(wrapper0.validate(data5[i0], {instancePath:instancePath+"/children/" + i0,parentData:data5,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err18 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/0/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+}
+}
+else {
+const err19 = {instancePath,schemaPath:"#/oneOf/0/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
 }
 errors++;
 }
@@ -18513,30 +20588,10 @@ valid0 = true;
 passing0 = 0;
 var props1 = true;
 }
-const _errs16 = errors;
+const _errs19 = errors;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.id === undefined){
-const err18 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
-if(vErrors === null){
-vErrors = [err18];
-}
-else {
-vErrors.push(err18);
-}
-errors++;
-}
-if(data.kind === undefined){
-const err19 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
-if(vErrors === null){
-vErrors = [err19];
-}
-else {
-vErrors.push(err19);
-}
-errors++;
-}
-if(data.entryId === undefined){
-const err20 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "entryId"},message:"must have required property '"+"entryId"+"'"};
+const err20 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -18545,9 +20600,8 @@ vErrors.push(err20);
 }
 errors++;
 }
-for(const key1 in data){
-if(!(((((key1 === "id") || (key1 === "kind")) || (key1 === "entryId")) || (key1 === "labels")) || (key1 === "children"))){
-const err21 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
+if(data.kind === undefined){
+const err21 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -18556,12 +20610,8 @@ vErrors.push(err21);
 }
 errors++;
 }
-}
-if(data.id !== undefined){
-let data6 = data.id;
-if(typeof data6 === "string"){
-if(func2(data6) > 48){
-const err22 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(data.entryId === undefined){
+const err22 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "entryId"},message:"must have required property '"+"entryId"+"'"};
 if(vErrors === null){
 vErrors = [err22];
 }
@@ -18570,8 +20620,9 @@ vErrors.push(err22);
 }
 errors++;
 }
-if(func2(data6) < 8){
-const err23 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+for(const key1 in data){
+if(!((((((key1 === "id") || (key1 === "kind")) || (key1 === "entryId")) || (key1 === "labels")) || (key1 === "display")) || (key1 === "children"))){
+const err23 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -18580,8 +20631,12 @@ vErrors.push(err23);
 }
 errors++;
 }
-if(!pattern4.test(data6)){
-const err24 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+}
+if(data.id !== undefined){
+let data7 = data.id;
+if(typeof data7 === "string"){
+if(func2(data7) > 48){
+const err24 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -18590,9 +20645,8 @@ vErrors.push(err24);
 }
 errors++;
 }
-}
-else {
-const err25 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(func2(data7) < 8){
+const err25 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -18601,11 +20655,8 @@ vErrors.push(err25);
 }
 errors++;
 }
-}
-if(data.kind !== undefined){
-let data7 = data.kind;
-if(typeof data7 !== "string"){
-const err26 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(!pattern4.test(data7)){
+const err26 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -18614,8 +20665,9 @@ vErrors.push(err26);
 }
 errors++;
 }
-if(!(data7 === "contentEntry")){
-const err27 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+}
+else {
+const err27 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -18625,11 +20677,10 @@ vErrors.push(err27);
 errors++;
 }
 }
-if(data.entryId !== undefined){
-let data8 = data.entryId;
-if(typeof data8 === "string"){
-if(func2(data8) > 48){
-const err28 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(data.kind !== undefined){
+let data8 = data.kind;
+if(typeof data8 !== "string"){
+const err28 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err28];
 }
@@ -18638,8 +20689,8 @@ vErrors.push(err28);
 }
 errors++;
 }
-if(func2(data8) < 8){
-const err29 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(!(data8 === "contentEntry")){
+const err29 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -18648,8 +20699,12 @@ vErrors.push(err29);
 }
 errors++;
 }
-if(!pattern4.test(data8)){
-const err30 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+}
+if(data.entryId !== undefined){
+let data9 = data.entryId;
+if(typeof data9 === "string"){
+if(func2(data9) > 48){
+const err30 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err30];
 }
@@ -18658,9 +20713,8 @@ vErrors.push(err30);
 }
 errors++;
 }
-}
-else {
-const err31 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(func2(data9) < 8){
+const err31 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -18669,18 +20723,8 @@ vErrors.push(err31);
 }
 errors++;
 }
-}
-if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
-errors = vErrors.length;
-}
-}
-if(data.children !== undefined){
-let data10 = data.children;
-if(Array.isArray(data10)){
-if(data10.length > 100){
-const err32 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(!pattern4.test(data9)){
+const err32 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -18689,8 +20733,9 @@ vErrors.push(err32);
 }
 errors++;
 }
-if(data10.length < 1){
-const err33 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+}
+else {
+const err33 = {instancePath:instancePath+"/entryId",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -18699,16 +20744,17 @@ vErrors.push(err33);
 }
 errors++;
 }
-const len1 = data10.length;
-for(let i1=0; i1<len1; i1++){
-if(!(wrapper0.validate(data10[i1], {instancePath:instancePath+"/children/" + i1,parentData:data10,parentDataProperty:i1,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+}
+if(data.labels !== undefined){
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
 errors = vErrors.length;
 }
 }
-}
-else {
-const err34 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(data.display !== undefined){
+let data11 = data.display;
+if(typeof data11 !== "string"){
+const err34 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err34];
 }
@@ -18717,10 +20763,8 @@ vErrors.push(err34);
 }
 errors++;
 }
-}
-}
-else {
-const err35 = {instancePath,schemaPath:"#/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(!(data11 === "mega")){
+const err35 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err35];
 }
@@ -18729,7 +20773,61 @@ vErrors.push(err35);
 }
 errors++;
 }
-var _valid0 = _errs16 === errors;
+}
+if(data.children !== undefined){
+let data12 = data.children;
+if(Array.isArray(data12)){
+if(data12.length > 100){
+const err36 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+if(data12.length < 1){
+const err37 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+const len1 = data12.length;
+for(let i1=0; i1<len1; i1++){
+if(!(wrapper0.validate(data12[i1], {instancePath:instancePath+"/children/" + i1,parentData:data12,parentDataProperty:i1,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err38 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/1/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+}
+}
+else {
+const err39 = {instancePath,schemaPath:"#/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+var _valid0 = _errs19 === errors;
 if(_valid0 && valid0){
 valid0 = false;
 passing0 = [passing0, 1];
@@ -18742,55 +20840,10 @@ if(props1 !== true){
 props1 = true;
 }
 }
-const _errs31 = errors;
+const _errs37 = errors;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.id === undefined){
-const err36 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
-if(vErrors === null){
-vErrors = [err36];
-}
-else {
-vErrors.push(err36);
-}
-errors++;
-}
-if(data.kind === undefined){
-const err37 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
-if(vErrors === null){
-vErrors = [err37];
-}
-else {
-vErrors.push(err37);
-}
-errors++;
-}
-if(data.termId === undefined){
-const err38 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "termId"},message:"must have required property '"+"termId"+"'"};
-if(vErrors === null){
-vErrors = [err38];
-}
-else {
-vErrors.push(err38);
-}
-errors++;
-}
-for(const key2 in data){
-if(!(((((key2 === "id") || (key2 === "kind")) || (key2 === "termId")) || (key2 === "labels")) || (key2 === "children"))){
-const err39 = {instancePath,schemaPath:"#/oneOf/2/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
-if(vErrors === null){
-vErrors = [err39];
-}
-else {
-vErrors.push(err39);
-}
-errors++;
-}
-}
-if(data.id !== undefined){
-let data12 = data.id;
-if(typeof data12 === "string"){
-if(func2(data12) > 48){
-const err40 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+const err40 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
 if(vErrors === null){
 vErrors = [err40];
 }
@@ -18799,8 +20852,8 @@ vErrors.push(err40);
 }
 errors++;
 }
-if(func2(data12) < 8){
-const err41 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(data.kind === undefined){
+const err41 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
 if(vErrors === null){
 vErrors = [err41];
 }
@@ -18809,8 +20862,8 @@ vErrors.push(err41);
 }
 errors++;
 }
-if(!pattern4.test(data12)){
-const err42 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(data.termId === undefined){
+const err42 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "termId"},message:"must have required property '"+"termId"+"'"};
 if(vErrors === null){
 vErrors = [err42];
 }
@@ -18819,9 +20872,9 @@ vErrors.push(err42);
 }
 errors++;
 }
-}
-else {
-const err43 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+for(const key2 in data){
+if(!((((((key2 === "id") || (key2 === "kind")) || (key2 === "termId")) || (key2 === "labels")) || (key2 === "display")) || (key2 === "children"))){
+const err43 = {instancePath,schemaPath:"#/oneOf/2/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err43];
 }
@@ -18831,10 +20884,11 @@ vErrors.push(err43);
 errors++;
 }
 }
-if(data.kind !== undefined){
-let data13 = data.kind;
-if(typeof data13 !== "string"){
-const err44 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.id !== undefined){
+let data14 = data.id;
+if(typeof data14 === "string"){
+if(func2(data14) > 48){
+const err44 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err44];
 }
@@ -18843,8 +20897,8 @@ vErrors.push(err44);
 }
 errors++;
 }
-if(!(data13 === "term")){
-const err45 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(func2(data14) < 8){
+const err45 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err45];
 }
@@ -18853,12 +20907,8 @@ vErrors.push(err45);
 }
 errors++;
 }
-}
-if(data.termId !== undefined){
-let data14 = data.termId;
-if(typeof data14 === "string"){
-if(func2(data14) > 48){
-const err46 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(!pattern4.test(data14)){
+const err46 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err46];
 }
@@ -18867,8 +20917,9 @@ vErrors.push(err46);
 }
 errors++;
 }
-if(func2(data14) < 8){
-const err47 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+}
+else {
+const err47 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err47];
 }
@@ -18877,8 +20928,11 @@ vErrors.push(err47);
 }
 errors++;
 }
-if(!pattern4.test(data14)){
-const err48 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+}
+if(data.kind !== undefined){
+let data15 = data.kind;
+if(typeof data15 !== "string"){
+const err48 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err48];
 }
@@ -18887,9 +20941,8 @@ vErrors.push(err48);
 }
 errors++;
 }
-}
-else {
-const err49 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(!(data15 === "term")){
+const err49 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err49];
 }
@@ -18899,17 +20952,11 @@ vErrors.push(err49);
 errors++;
 }
 }
-if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
-errors = vErrors.length;
-}
-}
-if(data.children !== undefined){
-let data16 = data.children;
-if(Array.isArray(data16)){
-if(data16.length > 100){
-const err50 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(data.termId !== undefined){
+let data16 = data.termId;
+if(typeof data16 === "string"){
+if(func2(data16) > 48){
+const err50 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err50];
 }
@@ -18918,8 +20965,8 @@ vErrors.push(err50);
 }
 errors++;
 }
-if(data16.length < 1){
-const err51 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(func2(data16) < 8){
+const err51 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err51];
 }
@@ -18928,16 +20975,8 @@ vErrors.push(err51);
 }
 errors++;
 }
-const len2 = data16.length;
-for(let i2=0; i2<len2; i2++){
-if(!(wrapper0.validate(data16[i2], {instancePath:instancePath+"/children/" + i2,parentData:data16,parentDataProperty:i2,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
-errors = vErrors.length;
-}
-}
-}
-else {
-const err52 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(!pattern4.test(data16)){
+const err52 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err52];
 }
@@ -18947,9 +20986,8 @@ vErrors.push(err52);
 errors++;
 }
 }
-}
 else {
-const err53 = {instancePath,schemaPath:"#/oneOf/2/type",keyword:"type",params:{type: "object"},message:"must be object"};
+const err53 = {instancePath:instancePath+"/termId",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err53];
 }
@@ -18958,7 +20996,90 @@ vErrors.push(err53);
 }
 errors++;
 }
-var _valid0 = _errs31 === errors;
+}
+if(data.labels !== undefined){
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+errors = vErrors.length;
+}
+}
+if(data.display !== undefined){
+let data18 = data.display;
+if(typeof data18 !== "string"){
+const err54 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err54];
+}
+else {
+vErrors.push(err54);
+}
+errors++;
+}
+if(!(data18 === "mega")){
+const err55 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err55];
+}
+else {
+vErrors.push(err55);
+}
+errors++;
+}
+}
+if(data.children !== undefined){
+let data19 = data.children;
+if(Array.isArray(data19)){
+if(data19.length > 100){
+const err56 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(vErrors === null){
+vErrors = [err56];
+}
+else {
+vErrors.push(err56);
+}
+errors++;
+}
+if(data19.length < 1){
+const err57 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err57];
+}
+else {
+vErrors.push(err57);
+}
+errors++;
+}
+const len2 = data19.length;
+for(let i2=0; i2<len2; i2++){
+if(!(wrapper0.validate(data19[i2], {instancePath:instancePath+"/children/" + i2,parentData:data19,parentDataProperty:i2,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err58 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/2/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err58];
+}
+else {
+vErrors.push(err58);
+}
+errors++;
+}
+}
+}
+else {
+const err59 = {instancePath,schemaPath:"#/oneOf/2/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err59];
+}
+else {
+vErrors.push(err59);
+}
+errors++;
+}
+var _valid0 = _errs37 === errors;
 if(_valid0 && valid0){
 valid0 = false;
 passing0 = [passing0, 2];
@@ -18971,75 +21092,10 @@ if(props1 !== true){
 props1 = true;
 }
 }
-const _errs46 = errors;
+const _errs55 = errors;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.id === undefined){
-const err54 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
-if(vErrors === null){
-vErrors = [err54];
-}
-else {
-vErrors.push(err54);
-}
-errors++;
-}
-if(data.kind === undefined){
-const err55 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
-if(vErrors === null){
-vErrors = [err55];
-}
-else {
-vErrors.push(err55);
-}
-errors++;
-}
-if(data.collection === undefined){
-const err56 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "collection"},message:"must have required property '"+"collection"+"'"};
-if(vErrors === null){
-vErrors = [err56];
-}
-else {
-vErrors.push(err56);
-}
-errors++;
-}
-if(data.labels === undefined){
-const err57 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
-if(vErrors === null){
-vErrors = [err57];
-}
-else {
-vErrors.push(err57);
-}
-errors++;
-}
-for(const key3 in data){
-if(!(((((key3 === "id") || (key3 === "kind")) || (key3 === "collection")) || (key3 === "labels")) || (key3 === "children"))){
-const err58 = {instancePath,schemaPath:"#/oneOf/3/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key3},message:"must NOT have additional properties"};
-if(vErrors === null){
-vErrors = [err58];
-}
-else {
-vErrors.push(err58);
-}
-errors++;
-}
-}
-if(data.id !== undefined){
-let data18 = data.id;
-if(typeof data18 === "string"){
-if(func2(data18) > 48){
-const err59 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
-if(vErrors === null){
-vErrors = [err59];
-}
-else {
-vErrors.push(err59);
-}
-errors++;
-}
-if(func2(data18) < 8){
-const err60 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+const err60 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
 if(vErrors === null){
 vErrors = [err60];
 }
@@ -19048,8 +21104,8 @@ vErrors.push(err60);
 }
 errors++;
 }
-if(!pattern4.test(data18)){
-const err61 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(data.kind === undefined){
+const err61 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
 if(vErrors === null){
 vErrors = [err61];
 }
@@ -19058,9 +21114,8 @@ vErrors.push(err61);
 }
 errors++;
 }
-}
-else {
-const err62 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.collection === undefined){
+const err62 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "collection"},message:"must have required property '"+"collection"+"'"};
 if(vErrors === null){
 vErrors = [err62];
 }
@@ -19069,11 +21124,8 @@ vErrors.push(err62);
 }
 errors++;
 }
-}
-if(data.kind !== undefined){
-let data19 = data.kind;
-if(typeof data19 !== "string"){
-const err63 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.labels === undefined){
+const err63 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
 if(vErrors === null){
 vErrors = [err63];
 }
@@ -19082,8 +21134,9 @@ vErrors.push(err63);
 }
 errors++;
 }
-if(!(data19 === "collection")){
-const err64 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+for(const key3 in data){
+if(!((((((key3 === "id") || (key3 === "kind")) || (key3 === "collection")) || (key3 === "labels")) || (key3 === "display")) || (key3 === "children"))){
+const err64 = {instancePath,schemaPath:"#/oneOf/3/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key3},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err64];
 }
@@ -19093,11 +21146,11 @@ vErrors.push(err64);
 errors++;
 }
 }
-if(data.collection !== undefined){
-let data20 = data.collection;
-if(typeof data20 === "string"){
-if(func2(data20) > 128){
-const err65 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/maxLength",keyword:"maxLength",params:{limit: 128},message:"must NOT have more than 128 characters"};
+if(data.id !== undefined){
+let data21 = data.id;
+if(typeof data21 === "string"){
+if(func2(data21) > 48){
+const err65 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err65];
 }
@@ -19106,8 +21159,8 @@ vErrors.push(err65);
 }
 errors++;
 }
-if(func2(data20) < 1){
-const err66 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(func2(data21) < 8){
+const err66 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err66];
 }
@@ -19116,8 +21169,8 @@ vErrors.push(err66);
 }
 errors++;
 }
-if(!pattern5.test(data20)){
-const err67 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"},message:"must match pattern \""+"^[a-z0-9]+(?:-[a-z0-9]+)*$"+"\""};
+if(!pattern4.test(data21)){
+const err67 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err67];
 }
@@ -19128,7 +21181,7 @@ errors++;
 }
 }
 else {
-const err68 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/type",keyword:"type",params:{type: "string"},message:"must be string"};
+const err68 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err68];
 }
@@ -19138,17 +21191,10 @@ vErrors.push(err68);
 errors++;
 }
 }
-if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
-errors = vErrors.length;
-}
-}
-if(data.children !== undefined){
-let data22 = data.children;
-if(Array.isArray(data22)){
-if(data22.length > 100){
-const err69 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(data.kind !== undefined){
+let data22 = data.kind;
+if(typeof data22 !== "string"){
+const err69 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err69];
 }
@@ -19157,8 +21203,8 @@ vErrors.push(err69);
 }
 errors++;
 }
-if(data22.length < 1){
-const err70 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(!(data22 === "collection")){
+const err70 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err70];
 }
@@ -19167,16 +21213,12 @@ vErrors.push(err70);
 }
 errors++;
 }
-const len3 = data22.length;
-for(let i3=0; i3<len3; i3++){
-if(!(wrapper0.validate(data22[i3], {instancePath:instancePath+"/children/" + i3,parentData:data22,parentDataProperty:i3,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
-errors = vErrors.length;
 }
-}
-}
-else {
-const err71 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(data.collection !== undefined){
+let data23 = data.collection;
+if(typeof data23 === "string"){
+if(func2(data23) > 128){
+const err71 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/maxLength",keyword:"maxLength",params:{limit: 128},message:"must NOT have more than 128 characters"};
 if(vErrors === null){
 vErrors = [err71];
 }
@@ -19185,10 +21227,8 @@ vErrors.push(err71);
 }
 errors++;
 }
-}
-}
-else {
-const err72 = {instancePath,schemaPath:"#/oneOf/3/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(func2(data23) < 1){
+const err72 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
 if(vErrors === null){
 vErrors = [err72];
 }
@@ -19197,7 +21237,111 @@ vErrors.push(err72);
 }
 errors++;
 }
-var _valid0 = _errs46 === errors;
+if(!pattern5.test(data23)){
+const err73 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"},message:"must match pattern \""+"^[a-z0-9]+(?:-[a-z0-9]+)*$"+"\""};
+if(vErrors === null){
+vErrors = [err73];
+}
+else {
+vErrors.push(err73);
+}
+errors++;
+}
+}
+else {
+const err74 = {instancePath:instancePath+"/collection",schemaPath:"#/$defs/Slug/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err74];
+}
+else {
+vErrors.push(err74);
+}
+errors++;
+}
+}
+if(data.labels !== undefined){
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+errors = vErrors.length;
+}
+}
+if(data.display !== undefined){
+let data25 = data.display;
+if(typeof data25 !== "string"){
+const err75 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err75];
+}
+else {
+vErrors.push(err75);
+}
+errors++;
+}
+if(!(data25 === "mega")){
+const err76 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err76];
+}
+else {
+vErrors.push(err76);
+}
+errors++;
+}
+}
+if(data.children !== undefined){
+let data26 = data.children;
+if(Array.isArray(data26)){
+if(data26.length > 100){
+const err77 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(vErrors === null){
+vErrors = [err77];
+}
+else {
+vErrors.push(err77);
+}
+errors++;
+}
+if(data26.length < 1){
+const err78 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err78];
+}
+else {
+vErrors.push(err78);
+}
+errors++;
+}
+const len3 = data26.length;
+for(let i3=0; i3<len3; i3++){
+if(!(wrapper0.validate(data26[i3], {instancePath:instancePath+"/children/" + i3,parentData:data26,parentDataProperty:i3,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err79 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/3/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err79];
+}
+else {
+vErrors.push(err79);
+}
+errors++;
+}
+}
+}
+else {
+const err80 = {instancePath,schemaPath:"#/oneOf/3/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err80];
+}
+else {
+vErrors.push(err80);
+}
+errors++;
+}
+var _valid0 = _errs55 === errors;
 if(_valid0 && valid0){
 valid0 = false;
 passing0 = [passing0, 3];
@@ -19210,96 +21354,10 @@ if(props1 !== true){
 props1 = true;
 }
 }
-const _errs61 = errors;
+const _errs73 = errors;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.id === undefined){
-const err73 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
-if(vErrors === null){
-vErrors = [err73];
-}
-else {
-vErrors.push(err73);
-}
-errors++;
-}
-if(data.kind === undefined){
-const err74 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
-if(vErrors === null){
-vErrors = [err74];
-}
-else {
-vErrors.push(err74);
-}
-errors++;
-}
-if(data.href === undefined){
-const err75 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "href"},message:"must have required property '"+"href"+"'"};
-if(vErrors === null){
-vErrors = [err75];
-}
-else {
-vErrors.push(err75);
-}
-errors++;
-}
-if(data.labels === undefined){
-const err76 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
-if(vErrors === null){
-vErrors = [err76];
-}
-else {
-vErrors.push(err76);
-}
-errors++;
-}
-for(const key4 in data){
-if(!((((((key4 === "id") || (key4 === "kind")) || (key4 === "href")) || (key4 === "newTab")) || (key4 === "labels")) || (key4 === "children"))){
-const err77 = {instancePath,schemaPath:"#/oneOf/4/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties"};
-if(vErrors === null){
-vErrors = [err77];
-}
-else {
-vErrors.push(err77);
-}
-errors++;
-}
-}
-if(data.id !== undefined){
-let data24 = data.id;
-if(typeof data24 === "string"){
-if(func2(data24) > 48){
-const err78 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
-if(vErrors === null){
-vErrors = [err78];
-}
-else {
-vErrors.push(err78);
-}
-errors++;
-}
-if(func2(data24) < 8){
-const err79 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
-if(vErrors === null){
-vErrors = [err79];
-}
-else {
-vErrors.push(err79);
-}
-errors++;
-}
-if(!pattern4.test(data24)){
-const err80 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
-if(vErrors === null){
-vErrors = [err80];
-}
-else {
-vErrors.push(err80);
-}
-errors++;
-}
-}
-else {
-const err81 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+const err81 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
 if(vErrors === null){
 vErrors = [err81];
 }
@@ -19308,11 +21366,8 @@ vErrors.push(err81);
 }
 errors++;
 }
-}
-if(data.kind !== undefined){
-let data25 = data.kind;
-if(typeof data25 !== "string"){
-const err82 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.kind === undefined){
+const err82 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
 if(vErrors === null){
 vErrors = [err82];
 }
@@ -19321,8 +21376,8 @@ vErrors.push(err82);
 }
 errors++;
 }
-if(!(data25 === "url")){
-const err83 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(data.href === undefined){
+const err83 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "href"},message:"must have required property '"+"href"+"'"};
 if(vErrors === null){
 vErrors = [err83];
 }
@@ -19331,12 +21386,8 @@ vErrors.push(err83);
 }
 errors++;
 }
-}
-if(data.href !== undefined){
-let data26 = data.href;
-if(typeof data26 === "string"){
-if(func2(data26) > 2048){
-const err84 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/maxLength",keyword:"maxLength",params:{limit: 2048},message:"must NOT have more than 2048 characters"};
+if(data.labels === undefined){
+const err84 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
 if(vErrors === null){
 vErrors = [err84];
 }
@@ -19345,8 +21396,9 @@ vErrors.push(err84);
 }
 errors++;
 }
-if(!pattern138.test(data26)){
-const err85 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/pattern",keyword:"pattern",params:{pattern: "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"},message:"must match pattern \""+"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"+"\""};
+for(const key4 in data){
+if(!(((((((key4 === "id") || (key4 === "kind")) || (key4 === "href")) || (key4 === "newTab")) || (key4 === "labels")) || (key4 === "display")) || (key4 === "children"))){
+const err85 = {instancePath,schemaPath:"#/oneOf/4/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err85];
 }
@@ -19356,8 +21408,11 @@ vErrors.push(err85);
 errors++;
 }
 }
-else {
-const err86 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.id !== undefined){
+let data28 = data.id;
+if(typeof data28 === "string"){
+if(func2(data28) > 48){
+const err86 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
 if(vErrors === null){
 vErrors = [err86];
 }
@@ -19366,10 +21421,8 @@ vErrors.push(err86);
 }
 errors++;
 }
-}
-if(data.newTab !== undefined){
-if(typeof data.newTab !== "boolean"){
-const err87 = {instancePath:instancePath+"/newTab",schemaPath:"#/oneOf/4/properties/newTab/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(func2(data28) < 8){
+const err87 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
 if(vErrors === null){
 vErrors = [err87];
 }
@@ -19378,18 +21431,8 @@ vErrors.push(err87);
 }
 errors++;
 }
-}
-if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
-errors = vErrors.length;
-}
-}
-if(data.children !== undefined){
-let data29 = data.children;
-if(Array.isArray(data29)){
-if(data29.length > 100){
-const err88 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(!pattern4.test(data28)){
+const err88 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err88];
 }
@@ -19398,8 +21441,9 @@ vErrors.push(err88);
 }
 errors++;
 }
-if(data29.length < 1){
-const err89 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+}
+else {
+const err89 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err89];
 }
@@ -19408,16 +21452,11 @@ vErrors.push(err89);
 }
 errors++;
 }
-const len4 = data29.length;
-for(let i4=0; i4<len4; i4++){
-if(!(wrapper0.validate(data29[i4], {instancePath:instancePath+"/children/" + i4,parentData:data29,parentDataProperty:i4,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
-errors = vErrors.length;
 }
-}
-}
-else {
-const err90 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(data.kind !== undefined){
+let data29 = data.kind;
+if(typeof data29 !== "string"){
+const err90 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err90];
 }
@@ -19426,10 +21465,8 @@ vErrors.push(err90);
 }
 errors++;
 }
-}
-}
-else {
-const err91 = {instancePath,schemaPath:"#/oneOf/4/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(!(data29 === "url")){
+const err91 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err91];
 }
@@ -19438,7 +21475,137 @@ vErrors.push(err91);
 }
 errors++;
 }
-var _valid0 = _errs61 === errors;
+}
+if(data.href !== undefined){
+let data30 = data.href;
+if(typeof data30 === "string"){
+if(func2(data30) > 2048){
+const err92 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/maxLength",keyword:"maxLength",params:{limit: 2048},message:"must NOT have more than 2048 characters"};
+if(vErrors === null){
+vErrors = [err92];
+}
+else {
+vErrors.push(err92);
+}
+errors++;
+}
+if(!pattern153.test(data30)){
+const err93 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/pattern",keyword:"pattern",params:{pattern: "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"},message:"must match pattern \""+"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"+"\""};
+if(vErrors === null){
+vErrors = [err93];
+}
+else {
+vErrors.push(err93);
+}
+errors++;
+}
+}
+else {
+const err94 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err94];
+}
+else {
+vErrors.push(err94);
+}
+errors++;
+}
+}
+if(data.newTab !== undefined){
+if(typeof data.newTab !== "boolean"){
+const err95 = {instancePath:instancePath+"/newTab",schemaPath:"#/oneOf/4/properties/newTab/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err95];
+}
+else {
+vErrors.push(err95);
+}
+errors++;
+}
+}
+if(data.labels !== undefined){
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+errors = vErrors.length;
+}
+}
+if(data.display !== undefined){
+let data33 = data.display;
+if(typeof data33 !== "string"){
+const err96 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err96];
+}
+else {
+vErrors.push(err96);
+}
+errors++;
+}
+if(!(data33 === "mega")){
+const err97 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err97];
+}
+else {
+vErrors.push(err97);
+}
+errors++;
+}
+}
+if(data.children !== undefined){
+let data34 = data.children;
+if(Array.isArray(data34)){
+if(data34.length > 100){
+const err98 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(vErrors === null){
+vErrors = [err98];
+}
+else {
+vErrors.push(err98);
+}
+errors++;
+}
+if(data34.length < 1){
+const err99 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err99];
+}
+else {
+vErrors.push(err99);
+}
+errors++;
+}
+const len4 = data34.length;
+for(let i4=0; i4<len4; i4++){
+if(!(wrapper0.validate(data34[i4], {instancePath:instancePath+"/children/" + i4,parentData:data34,parentDataProperty:i4,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err100 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/4/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err100];
+}
+else {
+vErrors.push(err100);
+}
+errors++;
+}
+}
+}
+else {
+const err101 = {instancePath,schemaPath:"#/oneOf/4/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err101];
+}
+else {
+vErrors.push(err101);
+}
+errors++;
+}
+var _valid0 = _errs73 === errors;
 if(_valid0 && valid0){
 valid0 = false;
 passing0 = [passing0, 4];
@@ -19451,119 +21618,10 @@ if(props1 !== true){
 props1 = true;
 }
 }
-const _errs77 = errors;
+const _errs92 = errors;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.id === undefined){
-const err92 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
-if(vErrors === null){
-vErrors = [err92];
-}
-else {
-vErrors.push(err92);
-}
-errors++;
-}
-if(data.kind === undefined){
-const err93 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
-if(vErrors === null){
-vErrors = [err93];
-}
-else {
-vErrors.push(err93);
-}
-errors++;
-}
-if(data.labels === undefined){
-const err94 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
-if(vErrors === null){
-vErrors = [err94];
-}
-else {
-vErrors.push(err94);
-}
-errors++;
-}
-if(data.children === undefined){
-const err95 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "children"},message:"must have required property '"+"children"+"'"};
-if(vErrors === null){
-vErrors = [err95];
-}
-else {
-vErrors.push(err95);
-}
-errors++;
-}
-for(const key5 in data){
-if(!((((key5 === "id") || (key5 === "kind")) || (key5 === "labels")) || (key5 === "children"))){
-const err96 = {instancePath,schemaPath:"#/oneOf/5/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key5},message:"must NOT have additional properties"};
-if(vErrors === null){
-vErrors = [err96];
-}
-else {
-vErrors.push(err96);
-}
-errors++;
-}
-}
-if(data.id !== undefined){
-let data31 = data.id;
-if(typeof data31 === "string"){
-if(func2(data31) > 48){
-const err97 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
-if(vErrors === null){
-vErrors = [err97];
-}
-else {
-vErrors.push(err97);
-}
-errors++;
-}
-if(func2(data31) < 8){
-const err98 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
-if(vErrors === null){
-vErrors = [err98];
-}
-else {
-vErrors.push(err98);
-}
-errors++;
-}
-if(!pattern4.test(data31)){
-const err99 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
-if(vErrors === null){
-vErrors = [err99];
-}
-else {
-vErrors.push(err99);
-}
-errors++;
-}
-}
-else {
-const err100 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
-if(vErrors === null){
-vErrors = [err100];
-}
-else {
-vErrors.push(err100);
-}
-errors++;
-}
-}
-if(data.kind !== undefined){
-let data32 = data.kind;
-if(typeof data32 !== "string"){
-const err101 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
-if(vErrors === null){
-vErrors = [err101];
-}
-else {
-vErrors.push(err101);
-}
-errors++;
-}
-if(!(data32 === "group")){
-const err102 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema264.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err102 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
 if(vErrors === null){
 vErrors = [err102];
 }
@@ -19572,18 +21630,8 @@ vErrors.push(err102);
 }
 errors++;
 }
-}
-if(data.labels !== undefined){
-if(!(validate121(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate121.errors : vErrors.concat(validate121.errors);
-errors = vErrors.length;
-}
-}
-if(data.children !== undefined){
-let data34 = data.children;
-if(Array.isArray(data34)){
-if(data34.length > 100){
-const err103 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(data.kind === undefined){
+const err103 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "kind"},message:"must have required property '"+"kind"+"'"};
 if(vErrors === null){
 vErrors = [err103];
 }
@@ -19592,8 +21640,8 @@ vErrors.push(err103);
 }
 errors++;
 }
-if(data34.length < 1){
-const err104 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(data.labels === undefined){
+const err104 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "labels"},message:"must have required property '"+"labels"+"'"};
 if(vErrors === null){
 vErrors = [err104];
 }
@@ -19602,16 +21650,8 @@ vErrors.push(err104);
 }
 errors++;
 }
-const len5 = data34.length;
-for(let i5=0; i5<len5; i5++){
-if(!(wrapper0.validate(data34[i5], {instancePath:instancePath+"/children/" + i5,parentData:data34,parentDataProperty:i5,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
-errors = vErrors.length;
-}
-}
-}
-else {
-const err105 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(data.children === undefined){
+const err105 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "children"},message:"must have required property '"+"children"+"'"};
 if(vErrors === null){
 vErrors = [err105];
 }
@@ -19620,10 +21660,9 @@ vErrors.push(err105);
 }
 errors++;
 }
-}
-}
-else {
-const err106 = {instancePath,schemaPath:"#/oneOf/5/type",keyword:"type",params:{type: "object"},message:"must be object"};
+for(const key5 in data){
+if(!(((((key5 === "id") || (key5 === "kind")) || (key5 === "labels")) || (key5 === "display")) || (key5 === "children"))){
+const err106 = {instancePath,schemaPath:"#/oneOf/5/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key5},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err106];
 }
@@ -19632,7 +21671,158 @@ vErrors.push(err106);
 }
 errors++;
 }
-var _valid0 = _errs77 === errors;
+}
+if(data.id !== undefined){
+let data36 = data.id;
+if(typeof data36 === "string"){
+if(func2(data36) > 48){
+const err107 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/maxLength",keyword:"maxLength",params:{limit: 48},message:"must NOT have more than 48 characters"};
+if(vErrors === null){
+vErrors = [err107];
+}
+else {
+vErrors.push(err107);
+}
+errors++;
+}
+if(func2(data36) < 8){
+const err108 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/minLength",keyword:"minLength",params:{limit: 8},message:"must NOT have fewer than 8 characters"};
+if(vErrors === null){
+vErrors = [err108];
+}
+else {
+vErrors.push(err108);
+}
+errors++;
+}
+if(!pattern4.test(data36)){
+const err109 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/pattern",keyword:"pattern",params:{pattern: "^[a-z]+_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^[a-z]+_[A-Za-z0-9]{6,32}$"+"\""};
+if(vErrors === null){
+vErrors = [err109];
+}
+else {
+vErrors.push(err109);
+}
+errors++;
+}
+}
+else {
+const err110 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/Id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err110];
+}
+else {
+vErrors.push(err110);
+}
+errors++;
+}
+}
+if(data.kind !== undefined){
+let data37 = data.kind;
+if(typeof data37 !== "string"){
+const err111 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err111];
+}
+else {
+vErrors.push(err111);
+}
+errors++;
+}
+if(!(data37 === "group")){
+const err112 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema283.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err112];
+}
+else {
+vErrors.push(err112);
+}
+errors++;
+}
+}
+if(data.labels !== undefined){
+if(!(validate133(data.labels, {instancePath:instancePath+"/labels",parentData:data,parentDataProperty:"labels",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+errors = vErrors.length;
+}
+}
+if(data.display !== undefined){
+let data39 = data.display;
+if(typeof data39 !== "string"){
+const err113 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err113];
+}
+else {
+vErrors.push(err113);
+}
+errors++;
+}
+if(!(data39 === "mega")){
+const err114 = {instancePath:instancePath+"/display",schemaPath:"#/$defs/MenuDisplay/enum",keyword:"enum",params:{allowedValues: schema288.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err114];
+}
+else {
+vErrors.push(err114);
+}
+errors++;
+}
+}
+if(data.children !== undefined){
+let data40 = data.children;
+if(Array.isArray(data40)){
+if(data40.length > 100){
+const err115 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/maxItems",keyword:"maxItems",params:{limit: 100},message:"must NOT have more than 100 items"};
+if(vErrors === null){
+vErrors = [err115];
+}
+else {
+vErrors.push(err115);
+}
+errors++;
+}
+if(data40.length < 1){
+const err116 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/minItems",keyword:"minItems",params:{limit: 1},message:"must NOT have fewer than 1 items"};
+if(vErrors === null){
+vErrors = [err116];
+}
+else {
+vErrors.push(err116);
+}
+errors++;
+}
+const len5 = data40.length;
+for(let i5=0; i5<len5; i5++){
+if(!(wrapper0.validate(data40[i5], {instancePath:instancePath+"/children/" + i5,parentData:data40,parentDataProperty:i5,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? wrapper0.validate.errors : vErrors.concat(wrapper0.validate.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err117 = {instancePath:instancePath+"/children",schemaPath:"#/oneOf/5/properties/children/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err117];
+}
+else {
+vErrors.push(err117);
+}
+errors++;
+}
+}
+}
+else {
+const err118 = {instancePath,schemaPath:"#/oneOf/5/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err118];
+}
+else {
+vErrors.push(err118);
+}
+errors++;
+}
+var _valid0 = _errs92 === errors;
 if(_valid0 && valid0){
 valid0 = false;
 passing0 = [passing0, 5];
@@ -19651,12 +21841,12 @@ props1 = true;
 }
 }
 if(!valid0){
-const err107 = {instancePath,schemaPath:"#/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+const err119 = {instancePath,schemaPath:"#/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
 if(vErrors === null){
-vErrors = [err107];
+vErrors = [err119];
 }
 else {
-vErrors.push(err107);
+vErrors.push(err119);
 }
 errors++;
 }
@@ -19671,18 +21861,18 @@ vErrors = null;
 }
 }
 }
-validate120.errors = vErrors;
+validate132.errors = vErrors;
 evaluated0.props = props1;
 return errors === 0;
 }
-validate120.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate132.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 
-function validate119(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate131(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/menu.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate119.evaluated;
+const evaluated0 = validate131.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -19781,7 +21971,7 @@ vErrors.push(err8);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema259.properties, key0))){
+if(!(func1.call(schema278.properties, key0))){
 const err9 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err9];
@@ -19805,7 +21995,7 @@ vErrors.push(err10);
 errors++;
 }
 if(!(data0 === 1)){
-const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema260.enum},message:"must be equal to one of the allowed values"};
+const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema279.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -20000,8 +22190,8 @@ errors++;
 }
 const len0 = data5.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate120(data5[i0], {instancePath:instancePath+"/items/" + i0,parentData:data5,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate120.errors : vErrors.concat(validate120.errors);
+if(!(validate132(data5[i0], {instancePath:instancePath+"/items/" + i0,parentData:data5,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate132.errors : vErrors.concat(validate132.errors);
 errors = vErrors.length;
 }
 }
@@ -20130,44 +22320,44 @@ vErrors.push(err37);
 }
 errors++;
 }
-validate119.errors = vErrors;
+validate131.errors = vErrors;
 return errors === 0;
 }
-validate119.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate131.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateAnalyticsEvent = validate129;
-const schema281 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/analytics-event.schema.json","title":"AnalyticsEvent","description":"One site analytics event as stored (RFC-0006): a page view or a Core Web Vitals sample reported by the site's first-party script, or a response the site Worker rendered itself (cache miss, redirect, 404, 410, 5xx). Written by the site Worker after it validated and enriched a beacon. The named fields are the columns of the local/self-host SQLite store; each one documents its fixed slot in a Workers Analytics Engine data point (index1 = siteId, blob1 = kind, blob2 = schemaVersion). Slots never move and new fields are only appended. Never carries an IP address, a user agent, a full referrer URL, a query string or a cookie.","oneOf":[{"type":"object","title":"AnalyticsPageviewEvent","description":"A published page, article or archive was shown to a visitor (the site's script ran).","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","nodeId","nodeKind","channel","entrance","device","browser","os","navType"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["pageview"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/Path","description":"WAE blob3. The published route the view resolved to; never a query string."},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4. The page, entry or term the server resolved the path to, so stats survive slug changes."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"refHost":{"$ref":"#/$defs/AnalyticsHostname"},"channel":{"$ref":"#/$defs/AnalyticsChannel"},"utmSource":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob8."},"utmMedium":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob9."},"utmCampaign":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob10."},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"browser":{"$ref":"#/$defs/AnalyticsBrowser"},"os":{"$ref":"#/$defs/AnalyticsOs"},"visitor":{"$ref":"#/$defs/AnalyticsVisitorHash"},"navType":{"$ref":"#/$defs/AnalyticsNavType"},"locale":{"$ref":"#/$defs/Locale","description":"WAE blob17. Locale of the resolved node, not the visitor's Accept-Language."},"entrance":{"type":"boolean","description":"WAE double1 (1 or 0). The view starts a visit: the referrer is empty or another site, and the navigation is not a reload, back/forward or restore."},"privacySignal":{"type":"boolean","description":"WAE double10 (1 or 0). The beacon request carried Global Privacy Control (Sec-GPC: 1) or Do Not Track (DNT: 1), so no visitor hash was formed. Only this flag is kept, never which signal or any header. Absent means no signal (and on events written before the field existed)."}}},{"type":"object","title":"AnalyticsVitalsEvent","description":"Core Web Vitals of one sampled page view, measured by the site's own script and sent when the page is hidden. Code checks that at least one metric is present (the schema subset has no cross-property rules).","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","nodeId","nodeKind","device","sampleOneIn"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["vitals"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/Path","description":"WAE blob3."},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"browser":{"$ref":"#/$defs/AnalyticsBrowser"},"lcp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double3. Largest Contentful Paint."},"inp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double4. Interaction to Next Paint."},"cls":{"type":"number","description":"WAE double5, stored multiplied by 1000. Cumulative Layout Shift (unitless).","minimum":0,"maximum":100},"ttfb":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double6. Time to First Byte."},"fcp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double7. First Contentful Paint."},"sampleOneIn":{"$ref":"#/$defs/AnalyticsSampleOneIn"}}},{"type":"object","title":"AnalyticsRenderEvent","description":"The site Worker answered a request itself (a cache miss, redirect, 404, 410 or error). Cache hits never run the Worker, so these are not page views. The requested path is visitor-controlled text and is always shown as such.","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","status","device"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["render"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/AnalyticsRequestPath"},"status":{"type":"integer","description":"WAE double2. HTTP status the Worker answered with.","minimum":100,"maximum":599},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4. The node rendered or redirected from, when the path resolved to one."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"redirectTo":{"type":"string","description":"WAE blob19. Target of a 301, 302 or 308: a site path or an https URL, without query string.","pattern":"^(?:/|https://)[!-~]*$","maxLength":512},"refHost":{"$ref":"#/$defs/AnalyticsHostname"},"refPath":{"$ref":"#/$defs/Path","description":"WAE blob20. Same-site referrers only: the page that linked here, which finds broken internal links."},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"crawler":{"$ref":"#/$defs/AnalyticsCrawlerName"},"renderMs":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double8. Time the Worker spent answering."},"sampleOneIn":{"$ref":"#/$defs/AnalyticsSampleOneIn"}}}],"$defs":{"AnalyticsBrowser":{"type":"string","description":"WAE blob13. Browser family, without version.","enum":["chrome","edge","firefox","safari","samsung","opera","other"]},"AnalyticsChannel":{"type":"string","description":"WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.","enum":["direct","internal","search","social","ai","email","paid","referral"]},"AnalyticsCountry":{"type":"string","description":"WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.","pattern":"^[A-Z][A-Z0-9]$"},"AnalyticsCrawlerName":{"type":"string","description":"WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.","pattern":"^[a-z0-9][a-z0-9-]{0,31}$"},"AnalyticsDevice":{"type":"string","description":"WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.","enum":["desktop","mobile","tablet","bot","unknown"]},"AnalyticsHostname":{"type":"string","description":"WAE blob6. Host of an external referrer: lower case, without www., port, path or query.","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253},"AnalyticsMillis":{"type":"integer","description":"Whole milliseconds (the server rounds), capped at ten minutes.","minimum":0,"maximum":600000},"AnalyticsNavType":{"type":"string","description":"WAE blob16. How the page was reached; restore = back/forward cache.","enum":["navigate","reload","back_forward","prerender","restore"]},"AnalyticsNodeKind":{"type":"string","description":"WAE blob5. The kind of node the path resolved to.","enum":["page","entry","archive"]},"AnalyticsOs":{"type":"string","description":"WAE blob14. Operating system family, without version.","enum":["windows","macos","ios","android","linux","chromeos","other"]},"AnalyticsRequestPath":{"type":"string","description":"WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.","pattern":"^/[!-~]*$","maxLength":256},"AnalyticsSampleOneIn":{"type":"integer","description":"WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.","minimum":1,"maximum":1000},"AnalyticsUtmValue":{"type":"string","description":"A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.","pattern":"^[a-z0-9][a-z0-9._+-]{0,63}$"},"AnalyticsVisitorHash":{"type":"string","description":"WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.","pattern":"^[0-9a-f]{16}$"},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema282 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema283 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema284 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema285 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
-const schema287 = {"type":"string","description":"WAE blob5. The kind of node the path resolved to.","enum":["page","entry","archive"]};
-const schema288 = {"type":"string","description":"WAE blob6. Host of an external referrer: lower case, without www., port, path or query.","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253};
-const schema289 = {"type":"string","description":"WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.","enum":["direct","internal","search","social","ai","email","paid","referral"]};
-const schema290 = {"type":"string","description":"A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.","pattern":"^[a-z0-9][a-z0-9._+-]{0,63}$"};
-const schema293 = {"type":"string","description":"WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.","pattern":"^[A-Z][A-Z0-9]$"};
-const schema294 = {"type":"string","description":"WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.","enum":["desktop","mobile","tablet","bot","unknown"]};
-const schema295 = {"type":"string","description":"WAE blob13. Browser family, without version.","enum":["chrome","edge","firefox","safari","samsung","opera","other"]};
-const schema296 = {"type":"string","description":"WAE blob14. Operating system family, without version.","enum":["windows","macos","ios","android","linux","chromeos","other"]};
-const schema297 = {"type":"string","description":"WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.","pattern":"^[0-9a-f]{16}$"};
-const schema298 = {"type":"string","description":"WAE blob16. How the page was reached; restore = back/forward cache.","enum":["navigate","reload","back_forward","prerender","restore"]};
-const schema299 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const schema309 = {"type":"integer","description":"Whole milliseconds (the server rounds), capped at ten minutes.","minimum":0,"maximum":600000};
-const schema313 = {"type":"integer","description":"WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.","minimum":1,"maximum":1000};
-const schema317 = {"type":"string","description":"WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.","pattern":"^/[!-~]*$","maxLength":256};
-const schema324 = {"type":"string","description":"WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.","pattern":"^[a-z0-9][a-z0-9-]{0,31}$"};
-const pattern144 = new RegExp("^[a-z0-9][a-z0-9._+-]{0,63}$", "u");
-const pattern147 = new RegExp("^[A-Z][A-Z0-9]$", "u");
-const pattern148 = new RegExp("^[0-9a-f]{16}$", "u");
-const pattern155 = new RegExp("^/[!-~]*$", "u");
-const pattern157 = new RegExp("^(?:/|https://)[!-~]*$", "u");
-const pattern161 = new RegExp("^[a-z0-9][a-z0-9-]{0,31}$", "u");
+export const validateAnalyticsEvent = validate141;
+const schema306 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/analytics-event.schema.json","title":"AnalyticsEvent","description":"One site analytics event as stored (RFC-0006): a page view or a Core Web Vitals sample reported by the site's first-party script, or a response the site Worker rendered itself (cache miss, redirect, 404, 410, 5xx). Written by the site Worker after it validated and enriched a beacon. The named fields are the columns of the local/self-host SQLite store; each one documents its fixed slot in a Workers Analytics Engine data point (index1 = siteId, blob1 = kind, blob2 = schemaVersion). Slots never move and new fields are only appended. Never carries an IP address, a user agent, a full referrer URL, a query string or a cookie.","oneOf":[{"type":"object","title":"AnalyticsPageviewEvent","description":"A published page, article or archive was shown to a visitor (the site's script ran).","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","nodeId","nodeKind","channel","entrance","device","browser","os","navType"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["pageview"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/Path","description":"WAE blob3. The published route the view resolved to; never a query string."},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4. The page, entry or term the server resolved the path to, so stats survive slug changes."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"refHost":{"$ref":"#/$defs/AnalyticsHostname"},"channel":{"$ref":"#/$defs/AnalyticsChannel"},"utmSource":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob8."},"utmMedium":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob9."},"utmCampaign":{"$ref":"#/$defs/AnalyticsUtmValue","description":"WAE blob10."},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"browser":{"$ref":"#/$defs/AnalyticsBrowser"},"os":{"$ref":"#/$defs/AnalyticsOs"},"visitor":{"$ref":"#/$defs/AnalyticsVisitorHash"},"navType":{"$ref":"#/$defs/AnalyticsNavType"},"locale":{"$ref":"#/$defs/Locale","description":"WAE blob17. Locale of the resolved node, not the visitor's Accept-Language."},"entrance":{"type":"boolean","description":"WAE double1 (1 or 0). The view starts a visit: the referrer is empty or another site, and the navigation is not a reload, back/forward or restore."},"privacySignal":{"type":"boolean","description":"WAE double10 (1 or 0). The beacon request carried Global Privacy Control (Sec-GPC: 1) or Do Not Track (DNT: 1), so no visitor hash was formed. Only this flag is kept, never which signal or any header. Absent means no signal (and on events written before the field existed)."}}},{"type":"object","title":"AnalyticsVitalsEvent","description":"Core Web Vitals of one sampled page view, measured by the site's own script and sent when the page is hidden. Code checks that at least one metric is present (the schema subset has no cross-property rules).","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","nodeId","nodeKind","device","sampleOneIn"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["vitals"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/Path","description":"WAE blob3."},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"browser":{"$ref":"#/$defs/AnalyticsBrowser"},"lcp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double3. Largest Contentful Paint."},"inp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double4. Interaction to Next Paint."},"cls":{"type":"number","description":"WAE double5, stored multiplied by 1000. Cumulative Layout Shift (unitless).","minimum":0,"maximum":100},"ttfb":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double6. Time to First Byte."},"fcp":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double7. First Contentful Paint."},"sampleOneIn":{"$ref":"#/$defs/AnalyticsSampleOneIn"}}},{"type":"object","title":"AnalyticsRenderEvent","description":"The site Worker answered a request itself (a cache miss, redirect, 404, 410 or error). Cache hits never run the Worker, so these are not page views. The requested path is visitor-controlled text and is always shown as such.","additionalProperties":false,"required":["schemaVersion","kind","siteId","timestamp","path","status","device"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["render"]},"siteId":{"$ref":"#/$defs/Id","description":"WAE index1."},"timestamp":{"$ref":"#/$defs/Timestamp"},"path":{"$ref":"#/$defs/AnalyticsRequestPath"},"status":{"type":"integer","description":"WAE double2. HTTP status the Worker answered with.","minimum":100,"maximum":599},"nodeId":{"$ref":"#/$defs/Id","description":"WAE blob4. The node rendered or redirected from, when the path resolved to one."},"nodeKind":{"$ref":"#/$defs/AnalyticsNodeKind"},"redirectTo":{"type":"string","description":"WAE blob19. Target of a 301, 302 or 308: a site path or an https URL, without query string.","pattern":"^(?:/|https://)[!-~]*$","maxLength":512},"refHost":{"$ref":"#/$defs/AnalyticsHostname"},"refPath":{"$ref":"#/$defs/Path","description":"WAE blob20. Same-site referrers only: the page that linked here, which finds broken internal links."},"country":{"$ref":"#/$defs/AnalyticsCountry"},"device":{"$ref":"#/$defs/AnalyticsDevice"},"crawler":{"$ref":"#/$defs/AnalyticsCrawlerName"},"renderMs":{"$ref":"#/$defs/AnalyticsMillis","description":"WAE double8. Time the Worker spent answering."},"sampleOneIn":{"$ref":"#/$defs/AnalyticsSampleOneIn"}}}],"$defs":{"AnalyticsBrowser":{"type":"string","description":"WAE blob13. Browser family, without version.","enum":["chrome","edge","firefox","safari","samsung","opera","other"]},"AnalyticsChannel":{"type":"string","description":"WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.","enum":["direct","internal","search","social","ai","email","paid","referral"]},"AnalyticsCountry":{"type":"string","description":"WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.","pattern":"^[A-Z][A-Z0-9]$"},"AnalyticsCrawlerName":{"type":"string","description":"WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.","pattern":"^[a-z0-9][a-z0-9-]{0,31}$"},"AnalyticsDevice":{"type":"string","description":"WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.","enum":["desktop","mobile","tablet","bot","unknown"]},"AnalyticsHostname":{"type":"string","description":"WAE blob6. Host of an external referrer: lower case, without www., port, path or query.","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253},"AnalyticsMillis":{"type":"integer","description":"Whole milliseconds (the server rounds), capped at ten minutes.","minimum":0,"maximum":600000},"AnalyticsNavType":{"type":"string","description":"WAE blob16. How the page was reached; restore = back/forward cache.","enum":["navigate","reload","back_forward","prerender","restore"]},"AnalyticsNodeKind":{"type":"string","description":"WAE blob5. The kind of node the path resolved to.","enum":["page","entry","archive"]},"AnalyticsOs":{"type":"string","description":"WAE blob14. Operating system family, without version.","enum":["windows","macos","ios","android","linux","chromeos","other"]},"AnalyticsRequestPath":{"type":"string","description":"WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.","pattern":"^/[!-~]*$","maxLength":256},"AnalyticsSampleOneIn":{"type":"integer","description":"WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.","minimum":1,"maximum":1000},"AnalyticsUtmValue":{"type":"string","description":"A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.","pattern":"^[a-z0-9][a-z0-9._+-]{0,63}$"},"AnalyticsVisitorHash":{"type":"string","description":"WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.","pattern":"^[0-9a-f]{16}$"},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Path":{"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema307 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema308 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema309 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema310 = {"type":"string","description":"Absolute URL path of a route the site owns: starts with '/', lower-case slug segments, no trailing slash except root.","pattern":"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$","maxLength":1024};
+const schema312 = {"type":"string","description":"WAE blob5. The kind of node the path resolved to.","enum":["page","entry","archive"]};
+const schema313 = {"type":"string","description":"WAE blob6. Host of an external referrer: lower case, without www., port, path or query.","pattern":"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$","maxLength":253};
+const schema314 = {"type":"string","description":"WAE blob7. Where the view came from, classified by the server from the referrer host and utm_medium; internal = another page of this site.","enum":["direct","internal","search","social","ai","email","paid","referral"]};
+const schema315 = {"type":"string","description":"A normalised UTM value: lower case, a small alphabet, at most 64 characters. Values that do not fit are dropped, never stored as free text.","pattern":"^[a-z0-9][a-z0-9._+-]{0,63}$"};
+const schema318 = {"type":"string","description":"WAE blob11. ISO 3166-1 alpha-2 country from Cloudflare's request.cf.country (XX unknown, T1 Tor). Never a city or region.","pattern":"^[A-Z][A-Z0-9]$"};
+const schema319 = {"type":"string","description":"WAE blob12. Device class derived from the user agent and client hints, neither of which is stored.","enum":["desktop","mobile","tablet","bot","unknown"]};
+const schema320 = {"type":"string","description":"WAE blob13. Browser family, without version.","enum":["chrome","edge","firefox","safari","samsung","opera","other"]};
+const schema321 = {"type":"string","description":"WAE blob14. Operating system family, without version.","enum":["windows","macos","ios","android","linux","chromeos","other"]};
+const schema322 = {"type":"string","description":"WAE blob15. Present only when the site owner turned on unique visitors and the request carried no GPC or DNT signal: the first 64 bits of SHA-256(dailySalt ‖ siteId ‖ ip ‖ userAgent) in hex. The salt is random, lives for one UTC day and is then deleted, so the hash can neither be recomputed nor linked across days.","pattern":"^[0-9a-f]{16}$"};
+const schema323 = {"type":"string","description":"WAE blob16. How the page was reached; restore = back/forward cache.","enum":["navigate","reload","back_forward","prerender","restore"]};
+const schema324 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
+const schema334 = {"type":"integer","description":"Whole milliseconds (the server rounds), capped at ten minutes.","minimum":0,"maximum":600000};
+const schema338 = {"type":"integer","description":"WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.","minimum":1,"maximum":1000};
+const schema342 = {"type":"string","description":"WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.","pattern":"^/[!-~]*$","maxLength":256};
+const schema349 = {"type":"string","description":"WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.","pattern":"^[a-z0-9][a-z0-9-]{0,31}$"};
+const pattern159 = new RegExp("^[a-z0-9][a-z0-9._+-]{0,63}$", "u");
+const pattern162 = new RegExp("^[A-Z][A-Z0-9]$", "u");
+const pattern163 = new RegExp("^[0-9a-f]{16}$", "u");
+const pattern170 = new RegExp("^/[!-~]*$", "u");
+const pattern172 = new RegExp("^(?:/|https://)[!-~]*$", "u");
+const pattern176 = new RegExp("^[a-z0-9][a-z0-9-]{0,31}$", "u");
 
-function validate129(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate141(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/analytics-event.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate129.evaluated;
+const evaluated0 = validate141.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -20310,7 +22500,7 @@ vErrors.push(err12);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema281.oneOf[0].properties, key0))){
+if(!(func1.call(schema306.oneOf[0].properties, key0))){
 const err13 = {instancePath,schemaPath:"#/oneOf/0/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err13];
@@ -20334,7 +22524,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data0 === 1)){
-const err15 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema282.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema307.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -20357,7 +22547,7 @@ vErrors.push(err16);
 errors++;
 }
 if(!(data1 === "pageview")){
-const err17 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema281.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err17 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema306.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -20450,7 +22640,7 @@ vErrors.push(err24);
 }
 errors++;
 }
-if(!pattern23.test(data4)){
+if(!pattern38.test(data4)){
 const err25 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/Path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err25];
@@ -20530,7 +22720,7 @@ vErrors.push(err31);
 errors++;
 }
 if(!(((data6 === "page") || (data6 === "entry")) || (data6 === "archive"))){
-const err32 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema287.enum},message:"must be equal to one of the allowed values"};
+const err32 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema312.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -20588,7 +22778,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!((((((((data8 === "direct") || (data8 === "internal")) || (data8 === "search")) || (data8 === "social")) || (data8 === "ai")) || (data8 === "email")) || (data8 === "paid")) || (data8 === "referral"))){
-const err37 = {instancePath:instancePath+"/channel",schemaPath:"#/$defs/AnalyticsChannel/enum",keyword:"enum",params:{allowedValues: schema289.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/channel",schemaPath:"#/$defs/AnalyticsChannel/enum",keyword:"enum",params:{allowedValues: schema314.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -20601,7 +22791,7 @@ errors++;
 if(data.utmSource !== undefined){
 let data9 = data.utmSource;
 if(typeof data9 === "string"){
-if(!pattern144.test(data9)){
+if(!pattern159.test(data9)){
 const err38 = {instancePath:instancePath+"/utmSource",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err38];
@@ -20626,7 +22816,7 @@ errors++;
 if(data.utmMedium !== undefined){
 let data10 = data.utmMedium;
 if(typeof data10 === "string"){
-if(!pattern144.test(data10)){
+if(!pattern159.test(data10)){
 const err40 = {instancePath:instancePath+"/utmMedium",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err40];
@@ -20651,7 +22841,7 @@ errors++;
 if(data.utmCampaign !== undefined){
 let data11 = data.utmCampaign;
 if(typeof data11 === "string"){
-if(!pattern144.test(data11)){
+if(!pattern159.test(data11)){
 const err42 = {instancePath:instancePath+"/utmCampaign",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err42];
@@ -20676,7 +22866,7 @@ errors++;
 if(data.country !== undefined){
 let data12 = data.country;
 if(typeof data12 === "string"){
-if(!pattern147.test(data12)){
+if(!pattern162.test(data12)){
 const err44 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err44];
@@ -20711,7 +22901,7 @@ vErrors.push(err46);
 errors++;
 }
 if(!(((((data13 === "desktop") || (data13 === "mobile")) || (data13 === "tablet")) || (data13 === "bot")) || (data13 === "unknown"))){
-const err47 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema294.enum},message:"must be equal to one of the allowed values"};
+const err47 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema319.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err47];
 }
@@ -20734,7 +22924,7 @@ vErrors.push(err48);
 errors++;
 }
 if(!(((((((data14 === "chrome") || (data14 === "edge")) || (data14 === "firefox")) || (data14 === "safari")) || (data14 === "samsung")) || (data14 === "opera")) || (data14 === "other"))){
-const err49 = {instancePath:instancePath+"/browser",schemaPath:"#/$defs/AnalyticsBrowser/enum",keyword:"enum",params:{allowedValues: schema295.enum},message:"must be equal to one of the allowed values"};
+const err49 = {instancePath:instancePath+"/browser",schemaPath:"#/$defs/AnalyticsBrowser/enum",keyword:"enum",params:{allowedValues: schema320.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err49];
 }
@@ -20757,7 +22947,7 @@ vErrors.push(err50);
 errors++;
 }
 if(!(((((((data15 === "windows") || (data15 === "macos")) || (data15 === "ios")) || (data15 === "android")) || (data15 === "linux")) || (data15 === "chromeos")) || (data15 === "other"))){
-const err51 = {instancePath:instancePath+"/os",schemaPath:"#/$defs/AnalyticsOs/enum",keyword:"enum",params:{allowedValues: schema296.enum},message:"must be equal to one of the allowed values"};
+const err51 = {instancePath:instancePath+"/os",schemaPath:"#/$defs/AnalyticsOs/enum",keyword:"enum",params:{allowedValues: schema321.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err51];
 }
@@ -20770,7 +22960,7 @@ errors++;
 if(data.visitor !== undefined){
 let data16 = data.visitor;
 if(typeof data16 === "string"){
-if(!pattern148.test(data16)){
+if(!pattern163.test(data16)){
 const err52 = {instancePath:instancePath+"/visitor",schemaPath:"#/$defs/AnalyticsVisitorHash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{16}$"},message:"must match pattern \""+"^[0-9a-f]{16}$"+"\""};
 if(vErrors === null){
 vErrors = [err52];
@@ -20805,7 +22995,7 @@ vErrors.push(err54);
 errors++;
 }
 if(!(((((data17 === "navigate") || (data17 === "reload")) || (data17 === "back_forward")) || (data17 === "prerender")) || (data17 === "restore"))){
-const err55 = {instancePath:instancePath+"/navType",schemaPath:"#/$defs/AnalyticsNavType/enum",keyword:"enum",params:{allowedValues: schema298.enum},message:"must be equal to one of the allowed values"};
+const err55 = {instancePath:instancePath+"/navType",schemaPath:"#/$defs/AnalyticsNavType/enum",keyword:"enum",params:{allowedValues: schema323.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err55];
 }
@@ -20974,7 +23164,7 @@ vErrors.push(err69);
 errors++;
 }
 for(const key1 in data){
-if(!(func1.call(schema281.oneOf[1].properties, key1))){
+if(!(func1.call(schema306.oneOf[1].properties, key1))){
 const err70 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err70];
@@ -20998,7 +23188,7 @@ vErrors.push(err71);
 errors++;
 }
 if(!(data21 === 1)){
-const err72 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema282.enum},message:"must be equal to one of the allowed values"};
+const err72 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema307.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err72];
 }
@@ -21021,7 +23211,7 @@ vErrors.push(err73);
 errors++;
 }
 if(!(data22 === "vitals")){
-const err74 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema281.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err74 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema306.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err74];
 }
@@ -21114,7 +23304,7 @@ vErrors.push(err81);
 }
 errors++;
 }
-if(!pattern23.test(data25)){
+if(!pattern38.test(data25)){
 const err82 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/Path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err82];
@@ -21194,7 +23384,7 @@ vErrors.push(err88);
 errors++;
 }
 if(!(((data27 === "page") || (data27 === "entry")) || (data27 === "archive"))){
-const err89 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema287.enum},message:"must be equal to one of the allowed values"};
+const err89 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema312.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err89];
 }
@@ -21207,7 +23397,7 @@ errors++;
 if(data.country !== undefined){
 let data28 = data.country;
 if(typeof data28 === "string"){
-if(!pattern147.test(data28)){
+if(!pattern162.test(data28)){
 const err90 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err90];
@@ -21242,7 +23432,7 @@ vErrors.push(err92);
 errors++;
 }
 if(!(((((data29 === "desktop") || (data29 === "mobile")) || (data29 === "tablet")) || (data29 === "bot")) || (data29 === "unknown"))){
-const err93 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema294.enum},message:"must be equal to one of the allowed values"};
+const err93 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema319.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err93];
 }
@@ -21265,7 +23455,7 @@ vErrors.push(err94);
 errors++;
 }
 if(!(((((((data30 === "chrome") || (data30 === "edge")) || (data30 === "firefox")) || (data30 === "safari")) || (data30 === "samsung")) || (data30 === "opera")) || (data30 === "other"))){
-const err95 = {instancePath:instancePath+"/browser",schemaPath:"#/$defs/AnalyticsBrowser/enum",keyword:"enum",params:{allowedValues: schema295.enum},message:"must be equal to one of the allowed values"};
+const err95 = {instancePath:instancePath+"/browser",schemaPath:"#/$defs/AnalyticsBrowser/enum",keyword:"enum",params:{allowedValues: schema320.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err95];
 }
@@ -21582,7 +23772,7 @@ vErrors.push(err121);
 errors++;
 }
 for(const key2 in data){
-if(!(func1.call(schema281.oneOf[2].properties, key2))){
+if(!(func1.call(schema306.oneOf[2].properties, key2))){
 const err122 = {instancePath,schemaPath:"#/oneOf/2/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err122];
@@ -21606,7 +23796,7 @@ vErrors.push(err123);
 errors++;
 }
 if(!(data37 === 1)){
-const err124 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema282.enum},message:"must be equal to one of the allowed values"};
+const err124 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema307.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err124];
 }
@@ -21629,7 +23819,7 @@ vErrors.push(err125);
 errors++;
 }
 if(!(data38 === "render")){
-const err126 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema281.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err126 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema306.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err126];
 }
@@ -21722,7 +23912,7 @@ vErrors.push(err133);
 }
 errors++;
 }
-if(!pattern155.test(data41)){
+if(!pattern170.test(data41)){
 const err134 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/AnalyticsRequestPath/pattern",keyword:"pattern",params:{pattern: "^/[!-~]*$"},message:"must match pattern \""+"^/[!-~]*$"+"\""};
 if(vErrors === null){
 vErrors = [err134];
@@ -21837,7 +24027,7 @@ vErrors.push(err143);
 errors++;
 }
 if(!(((data44 === "page") || (data44 === "entry")) || (data44 === "archive"))){
-const err144 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema287.enum},message:"must be equal to one of the allowed values"};
+const err144 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/AnalyticsNodeKind/enum",keyword:"enum",params:{allowedValues: schema312.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err144];
 }
@@ -21860,7 +24050,7 @@ vErrors.push(err145);
 }
 errors++;
 }
-if(!pattern157.test(data45)){
+if(!pattern172.test(data45)){
 const err146 = {instancePath:instancePath+"/redirectTo",schemaPath:"#/oneOf/2/properties/redirectTo/pattern",keyword:"pattern",params:{pattern: "^(?:/|https://)[!-~]*$"},message:"must match pattern \""+"^(?:/|https://)[!-~]*$"+"\""};
 if(vErrors === null){
 vErrors = [err146];
@@ -21930,7 +24120,7 @@ vErrors.push(err151);
 }
 errors++;
 }
-if(!pattern23.test(data47)){
+if(!pattern38.test(data47)){
 const err152 = {instancePath:instancePath+"/refPath",schemaPath:"#/$defs/Path/pattern",keyword:"pattern",params:{pattern: "^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"},message:"must match pattern \""+"^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err152];
@@ -21955,7 +24145,7 @@ errors++;
 if(data.country !== undefined){
 let data48 = data.country;
 if(typeof data48 === "string"){
-if(!pattern147.test(data48)){
+if(!pattern162.test(data48)){
 const err154 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err154];
@@ -21990,7 +24180,7 @@ vErrors.push(err156);
 errors++;
 }
 if(!(((((data49 === "desktop") || (data49 === "mobile")) || (data49 === "tablet")) || (data49 === "bot")) || (data49 === "unknown"))){
-const err157 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema294.enum},message:"must be equal to one of the allowed values"};
+const err157 = {instancePath:instancePath+"/device",schemaPath:"#/$defs/AnalyticsDevice/enum",keyword:"enum",params:{allowedValues: schema319.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err157];
 }
@@ -22003,7 +24193,7 @@ errors++;
 if(data.crawler !== undefined){
 let data50 = data.crawler;
 if(typeof data50 === "string"){
-if(!pattern161.test(data50)){
+if(!pattern176.test(data50)){
 const err158 = {instancePath:instancePath+"/crawler",schemaPath:"#/$defs/AnalyticsCrawlerName/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{0,31}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{0,31}$"+"\""};
 if(vErrors === null){
 vErrors = [err158];
@@ -22142,25 +24332,25 @@ vErrors = null;
 }
 }
 }
-validate129.errors = vErrors;
+validate141.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate129.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate141.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-export const validateAnalyticsBeacon = validate130;
-const schema327 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json","title":"AnalyticsBeacon","description":"What a site's first-party analytics script sends to POST /__cloudhal/e (RFC-0006): JSON as text/plain, at most 2 KB. Everything in it is untrusted. The server keeps a beacon only after the same-origin, bot and rate checks, normalises the path and resolves it to a published route, reduces the referrer to a host, normalises UTM values, and derives everything else (node, country, device, visitor) itself. The script never sends an identifier, a cookie or a full URL.","oneOf":[{"type":"object","title":"AnalyticsPageviewBeacon","description":"Sent once per page view, when the page is first visible (after prerendering, and again on a back/forward cache restore).","additionalProperties":false,"required":["schemaVersion","kind","path"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["pageview"]},"path":{"$ref":"#/$defs/BeaconPath"},"referrer":{"type":"string","description":"The host of document.referrer only (the script drops scheme, path and query); empty or absent for direct visits.","maxLength":253},"utmSource":{"$ref":"#/$defs/BeaconUtm"},"utmMedium":{"$ref":"#/$defs/BeaconUtm"},"utmCampaign":{"$ref":"#/$defs/BeaconUtm"},"navType":{"type":"string","enum":["navigate","reload","back_forward","prerender","restore"]}}},{"type":"object","title":"AnalyticsVitalsBeacon","description":"Sent once, when a sampled page view is hidden, with the Core Web Vitals measured so far.","additionalProperties":false,"required":["schemaVersion","kind","path","sampleOneIn"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["vitals"]},"path":{"$ref":"#/$defs/BeaconPath"},"lcp":{"$ref":"#/$defs/BeaconMillis"},"inp":{"$ref":"#/$defs/BeaconMillis"},"cls":{"type":"number","minimum":0,"maximum":100},"ttfb":{"$ref":"#/$defs/BeaconMillis"},"fcp":{"$ref":"#/$defs/BeaconMillis"},"sampleOneIn":{"type":"integer","description":"The vitals sampling the script was served with (one page view in N); the server checks it against the site's setting.","minimum":1,"maximum":1000}}}],"$defs":{"BeaconMillis":{"type":"number","minimum":0,"maximum":600000},"BeaconPath":{"type":"string","description":"location.pathname as the browser reports it (no query string, no fragment).","pattern":"^/[^?#\\s]*$","maxLength":1024},"BeaconUtm":{"type":"string","description":"A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.","minLength":1,"maxLength":128},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]}}};
-const schema328 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema329 = {"type":"string","description":"location.pathname as the browser reports it (no query string, no fragment).","pattern":"^/[^?#\\s]*$","maxLength":1024};
-const schema330 = {"type":"string","description":"A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.","minLength":1,"maxLength":128};
-const schema335 = {"type":"number","minimum":0,"maximum":600000};
-const pattern162 = new RegExp("^/[^?#\\s]*$", "u");
+export const validateAnalyticsBeacon = validate142;
+const schema352 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json","title":"AnalyticsBeacon","description":"What a site's first-party analytics script sends to POST /__cloudhal/e (RFC-0006): JSON as text/plain, at most 2 KB. Everything in it is untrusted. The server keeps a beacon only after the same-origin, bot and rate checks, normalises the path and resolves it to a published route, reduces the referrer to a host, normalises UTM values, and derives everything else (node, country, device, visitor) itself. The script never sends an identifier, a cookie or a full URL.","oneOf":[{"type":"object","title":"AnalyticsPageviewBeacon","description":"Sent once per page view, when the page is first visible (after prerendering, and again on a back/forward cache restore).","additionalProperties":false,"required":["schemaVersion","kind","path"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["pageview"]},"path":{"$ref":"#/$defs/BeaconPath"},"referrer":{"type":"string","description":"The host of document.referrer only (the script drops scheme, path and query); empty or absent for direct visits.","maxLength":253},"utmSource":{"$ref":"#/$defs/BeaconUtm"},"utmMedium":{"$ref":"#/$defs/BeaconUtm"},"utmCampaign":{"$ref":"#/$defs/BeaconUtm"},"navType":{"type":"string","enum":["navigate","reload","back_forward","prerender","restore"]}}},{"type":"object","title":"AnalyticsVitalsBeacon","description":"Sent once, when a sampled page view is hidden, with the Core Web Vitals measured so far.","additionalProperties":false,"required":["schemaVersion","kind","path","sampleOneIn"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["vitals"]},"path":{"$ref":"#/$defs/BeaconPath"},"lcp":{"$ref":"#/$defs/BeaconMillis"},"inp":{"$ref":"#/$defs/BeaconMillis"},"cls":{"type":"number","minimum":0,"maximum":100},"ttfb":{"$ref":"#/$defs/BeaconMillis"},"fcp":{"$ref":"#/$defs/BeaconMillis"},"sampleOneIn":{"type":"integer","description":"The vitals sampling the script was served with (one page view in N); the server checks it against the site's setting.","minimum":1,"maximum":1000}}}],"$defs":{"BeaconMillis":{"type":"number","minimum":0,"maximum":600000},"BeaconPath":{"type":"string","description":"location.pathname as the browser reports it (no query string, no fragment).","pattern":"^/[^?#\\s]*$","maxLength":1024},"BeaconUtm":{"type":"string","description":"A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.","minLength":1,"maxLength":128},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]}}};
+const schema353 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema354 = {"type":"string","description":"location.pathname as the browser reports it (no query string, no fragment).","pattern":"^/[^?#\\s]*$","maxLength":1024};
+const schema355 = {"type":"string","description":"A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.","minLength":1,"maxLength":128};
+const schema360 = {"type":"number","minimum":0,"maximum":600000};
+const pattern177 = new RegExp("^/[^?#\\s]*$", "u");
 
-function validate130(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate142(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate130.evaluated;
+const evaluated0 = validate142.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -22227,7 +24417,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!(data0 === 1)){
-const err5 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema328.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema353.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -22250,7 +24440,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(data1 === "pageview")){
-const err7 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema327.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema352.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -22273,7 +24463,7 @@ vErrors.push(err8);
 }
 errors++;
 }
-if(!pattern162.test(data2)){
+if(!pattern177.test(data2)){
 const err9 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/BeaconPath/pattern",keyword:"pattern",params:{pattern: "^/[^?#\\s]*$"},message:"must match pattern \""+"^/[^?#\\s]*$"+"\""};
 if(vErrors === null){
 vErrors = [err9];
@@ -22438,7 +24628,7 @@ vErrors.push(err22);
 errors++;
 }
 if(!(((((data7 === "navigate") || (data7 === "reload")) || (data7 === "back_forward")) || (data7 === "prerender")) || (data7 === "restore"))){
-const err23 = {instancePath:instancePath+"/navType",schemaPath:"#/oneOf/0/properties/navType/enum",keyword:"enum",params:{allowedValues: schema327.oneOf[0].properties.navType.enum},message:"must be equal to one of the allowed values"};
+const err23 = {instancePath:instancePath+"/navType",schemaPath:"#/oneOf/0/properties/navType/enum",keyword:"enum",params:{allowedValues: schema352.oneOf[0].properties.navType.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -22508,7 +24698,7 @@ vErrors.push(err28);
 errors++;
 }
 for(const key1 in data){
-if(!(func1.call(schema327.oneOf[1].properties, key1))){
+if(!(func1.call(schema352.oneOf[1].properties, key1))){
 const err29 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err29];
@@ -22532,7 +24722,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!(data8 === 1)){
-const err31 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema328.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema353.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -22555,7 +24745,7 @@ vErrors.push(err32);
 errors++;
 }
 if(!(data9 === "vitals")){
-const err33 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema327.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err33 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema352.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -22578,7 +24768,7 @@ vErrors.push(err34);
 }
 errors++;
 }
-if(!pattern162.test(data10)){
+if(!pattern177.test(data10)){
 const err35 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/BeaconPath/pattern",keyword:"pattern",params:{pattern: "^/[^?#\\s]*$"},message:"must match pattern \""+"^/[^?#\\s]*$"+"\""};
 if(vErrors === null){
 vErrors = [err35];
@@ -22856,36 +25046,36 @@ vErrors = null;
 }
 }
 }
-validate130.errors = vErrors;
+validate142.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate130.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate142.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-export const validateComment = validate131;
-const schema339 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/comment.schema.json","title":"Comment","description":"A reader comment on a published content entry, as stored in D1 (outside the site graph), returned to people and agents, and exported (RFC-0007). It is not a graph node: it never enters a snapshot, a diff or a site bundle, and a content rollback never changes it. The record carries no personal data beyond the display name the commenter chose: an email address, an IP address or its hash, a user agent and a proof-of-work challenge live in separate columns and tables that this contract cannot express (additionalProperties: false), so no reader of the contract — Studio lists, MCP tools, exports — can leak them. Text is plain text; renderers escape it and turn only https links into anchors with rel=\"ugc nofollow noopener noreferrer\".","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","nodeId","source","author","status","createdAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/CommentId"},"siteId":{"$ref":"#/$defs/Id"},"nodeId":{"$ref":"#/$defs/Id","description":"The content entry the comment belongs to, by id, so threads survive slug changes (RFC-0002)."},"parentId":{"$ref":"#/$defs/CommentId","description":"The comment this one is nested under for display. Absent for a top-level comment. In v1 the tree is two levels deep: a parent is always top-level, and a reply to a reply is nested under the same top-level comment with `inReplyToId` pointing at the comment it answers."},"inReplyToId":{"$ref":"#/$defs/CommentId","description":"The comment this one answers when that is not `parentId` itself (a reply to a reply). Only with `parentId`, in the same thread."},"source":{"type":"string","description":"Where the comment came from: `native` (the site's own form or Studio), `import` (an importer; see `origin`). `webmention` and `activitypub` are reserved for later RFCs and are refused by v1 writers.","enum":["native","import","webmention","activitypub"]},"origin":{"$ref":"#/$defs/CommentOrigin"},"author":{"$ref":"#/$defs/CommentAuthor"},"body":{"$ref":"#/$defs/CommentBody"},"status":{"$ref":"#/$defs/CommentStatus"},"labels":{"type":"array","description":"Advisory labels from rules, classifiers, agents and people. Labels never change what readers see; only a status change does.","items":{"$ref":"#/$defs/CommentLabel"},"maxItems":32},"moderation":{"$ref":"#/$defs/CommentModeration"},"createdAt":{"$ref":"#/$defs/Timestamp"},"editedAt":{"$ref":"#/$defs/Timestamp","description":"Set when the text changed after it was first stored (v1.1 edit window; staff replies edited in Studio)."},"rev":{"$ref":"#/$defs/Revision"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"CommentAuthor":{"description":"Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.","oneOf":[{"type":"object","title":"GuestCommentAuthor","description":"A guest: only the display name they typed. Guest comments are always held for moderation in v1.","additionalProperties":false,"required":["kind","name"],"properties":{"kind":{"type":"string","enum":["guest"]},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"ReaderCommentAuthor","description":"A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.","additionalProperties":false,"required":["kind","readerId","name"],"properties":{"kind":{"type":"string","enum":["reader"]},"readerId":{"$ref":"#/$defs/Id"},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"StaffCommentAuthor","description":"A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).","additionalProperties":false,"required":["kind","personId","name","badge"],"properties":{"kind":{"type":"string","enum":["staff"]},"personId":{"type":"string","description":"The person who wrote or approved the reply.","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"$ref":"#/$defs/CommentDisplayName"},"badge":{"type":"string","description":"What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.","enum":["author","team"]},"draftedBy":{"$ref":"#/$defs/Actor"}}},{"type":"object","title":"ErasedCommentAuthor","description":"The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["erased"]}}}]},"CommentBody":{"type":"object","description":"The comment text. v1 has only `text`: plain text with line breaks, no markup. A later RFC may add a restricted Markdown format. Absent only when the text was deleted (status `deleted`, or an erasure that removed the text); the record then stays as a tombstone while approved replies hang under it.","additionalProperties":false,"required":["format","text"],"properties":{"format":{"type":"string","enum":["text"]},"text":{"type":"string","description":"NFC-normalised, CRLF turned into LF, trimmed: 1 to 5,000 characters. Tabs and line feeds are the only control characters allowed; bidirectional overrides are refused so a comment cannot disguise itself in Studio.","minLength":1,"maxLength":5000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"}}},"CommentDisplayName":{"type":"string","description":"Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.","minLength":1,"maxLength":80,"pattern":"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},"CommentId":{"type":"string","description":"A comment id: `cmt_` and 6 to 32 letters or digits.","pattern":"^cmt_[A-Za-z0-9]{6,32}$"},"CommentLabel":{"type":"object","description":"An advisory label. `rule` labels come from the submission pipeline (word lists, link count, instruction-like text); `classifier` from an opt-in classifier (Workers AI, Akismet); `agent` from `label_comments`; `person` from Studio. `by` is the agent or person that set it (absent for rules and classifiers).","additionalProperties":false,"required":["label","source","at"],"properties":{"label":{"type":"string","enum":["spam-suspect","toxic","off-topic","question","needs-reply","praise","personal-data","links","watch-word","instruction-like"]},"source":{"type":"string","enum":["rule","classifier","agent","person"]},"by":{"$ref":"#/$defs/Actor"},"confidence":{"type":"integer","description":"0 to 100, when the source reports one.","minimum":0,"maximum":100},"at":{"$ref":"#/$defs/Timestamp"}}},"CommentModeration":{"type":"object","description":"The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.","additionalProperties":false,"required":["action","actor","at","automated"],"properties":{"action":{"type":"string","enum":["approve","hide","spam","hold","restore","delete","erase"]},"actor":{"$ref":"#/$defs/Actor"},"at":{"$ref":"#/$defs/Timestamp"},"reasonCode":{"type":"string","description":"Required by writers for hide, spam, delete and erase.","enum":["spam","abuse","off-topic","personal-data","illegal-content","legal-order","author-request","erasure-request","duplicate","other"]},"note":{"type":"string","description":"Free text from the moderator, plain text, at most 500 characters.","maxLength":500,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"automated":{"type":"boolean","description":"True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."}}},"CommentOrigin":{"type":"object","description":"For imported comments: the system and its id, so importers are idempotent.","additionalProperties":false,"required":["system","id"],"properties":{"system":{"type":"string","enum":["cloudhal","disqus","wordpress"]},"id":{"type":"string","description":"The comment's id in that system: printable ASCII, at most 200 characters.","minLength":1,"maxLength":200,"pattern":"^[!-~]+$"}}},"CommentStatus":{"type":"string","description":"Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.","enum":["pending","approved","hidden","spam","deleted"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema340 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema341 = {"type":"string","description":"A comment id: `cmt_` and 6 to 32 letters or digits.","pattern":"^cmt_[A-Za-z0-9]{6,32}$"};
-const schema342 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema346 = {"type":"object","description":"For imported comments: the system and its id, so importers are idempotent.","additionalProperties":false,"required":["system","id"],"properties":{"system":{"type":"string","enum":["cloudhal","disqus","wordpress"]},"id":{"type":"string","description":"The comment's id in that system: printable ASCII, at most 200 characters.","minLength":1,"maxLength":200,"pattern":"^[!-~]+$"}}};
-const schema355 = {"type":"object","description":"The comment text. v1 has only `text`: plain text with line breaks, no markup. A later RFC may add a restricted Markdown format. Absent only when the text was deleted (status `deleted`, or an erasure that removed the text); the record then stays as a tombstone while approved replies hang under it.","additionalProperties":false,"required":["format","text"],"properties":{"format":{"type":"string","enum":["text"]},"text":{"type":"string","description":"NFC-normalised, CRLF turned into LF, trimmed: 1 to 5,000 characters. Tabs and line feeds are the only control characters allowed; bidirectional overrides are refused so a comment cannot disguise itself in Studio.","minLength":1,"maxLength":5000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"}}};
-const schema356 = {"type":"string","description":"Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.","enum":["pending","approved","hidden","spam","deleted"]};
-const schema358 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema363 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const pattern164 = new RegExp("^cmt_[A-Za-z0-9]{6,32}$", "u");
-const pattern169 = new RegExp("^[!-~]+$", "u");
-const pattern176 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
-const schema347 = {"description":"Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.","oneOf":[{"type":"object","title":"GuestCommentAuthor","description":"A guest: only the display name they typed. Guest comments are always held for moderation in v1.","additionalProperties":false,"required":["kind","name"],"properties":{"kind":{"type":"string","enum":["guest"]},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"ReaderCommentAuthor","description":"A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.","additionalProperties":false,"required":["kind","readerId","name"],"properties":{"kind":{"type":"string","enum":["reader"]},"readerId":{"$ref":"#/$defs/Id"},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"StaffCommentAuthor","description":"A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).","additionalProperties":false,"required":["kind","personId","name","badge"],"properties":{"kind":{"type":"string","enum":["staff"]},"personId":{"type":"string","description":"The person who wrote or approved the reply.","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"$ref":"#/$defs/CommentDisplayName"},"badge":{"type":"string","description":"What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.","enum":["author","team"]},"draftedBy":{"$ref":"#/$defs/Actor"}}},{"type":"object","title":"ErasedCommentAuthor","description":"The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["erased"]}}}]};
-const schema348 = {"type":"string","description":"Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.","minLength":1,"maxLength":80,"pattern":"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"};
-const pattern170 = new RegExp("^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$", "u");
-const pattern173 = new RegExp("^user_[A-Za-z0-9]{6,32}$", "u");
-const schema352 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema353 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+export const validateComment = validate143;
+const schema364 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/comment.schema.json","title":"Comment","description":"A reader comment on a published content entry, as stored in D1 (outside the site graph), returned to people and agents, and exported (RFC-0007). It is not a graph node: it never enters a snapshot, a diff or a site bundle, and a content rollback never changes it. The record carries no personal data beyond the display name the commenter chose: an email address, an IP address or its hash, a user agent and a proof-of-work challenge live in separate columns and tables that this contract cannot express (additionalProperties: false), so no reader of the contract — Studio lists, MCP tools, exports — can leak them. Text is plain text; renderers escape it and turn only https links into anchors with rel=\"ugc nofollow noopener noreferrer\".","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","nodeId","source","author","status","createdAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/CommentId"},"siteId":{"$ref":"#/$defs/Id"},"nodeId":{"$ref":"#/$defs/Id","description":"The content entry the comment belongs to, by id, so threads survive slug changes (RFC-0002)."},"parentId":{"$ref":"#/$defs/CommentId","description":"The comment this one is nested under for display. Absent for a top-level comment. In v1 the tree is two levels deep: a parent is always top-level, and a reply to a reply is nested under the same top-level comment with `inReplyToId` pointing at the comment it answers."},"inReplyToId":{"$ref":"#/$defs/CommentId","description":"The comment this one answers when that is not `parentId` itself (a reply to a reply). Only with `parentId`, in the same thread."},"source":{"type":"string","description":"Where the comment came from: `native` (the site's own form or Studio), `import` (an importer; see `origin`). `webmention` and `activitypub` are reserved for later RFCs and are refused by v1 writers.","enum":["native","import","webmention","activitypub"]},"origin":{"$ref":"#/$defs/CommentOrigin"},"author":{"$ref":"#/$defs/CommentAuthor"},"body":{"$ref":"#/$defs/CommentBody"},"status":{"$ref":"#/$defs/CommentStatus"},"labels":{"type":"array","description":"Advisory labels from rules, classifiers, agents and people. Labels never change what readers see; only a status change does.","items":{"$ref":"#/$defs/CommentLabel"},"maxItems":32},"moderation":{"$ref":"#/$defs/CommentModeration"},"createdAt":{"$ref":"#/$defs/Timestamp"},"editedAt":{"$ref":"#/$defs/Timestamp","description":"Set when the text changed after it was first stored (v1.1 edit window; staff replies edited in Studio)."},"rev":{"$ref":"#/$defs/Revision"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"CommentAuthor":{"description":"Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.","oneOf":[{"type":"object","title":"GuestCommentAuthor","description":"A guest: only the display name they typed. Guest comments are always held for moderation in v1.","additionalProperties":false,"required":["kind","name"],"properties":{"kind":{"type":"string","enum":["guest"]},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"ReaderCommentAuthor","description":"A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.","additionalProperties":false,"required":["kind","readerId","name"],"properties":{"kind":{"type":"string","enum":["reader"]},"readerId":{"$ref":"#/$defs/Id"},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"StaffCommentAuthor","description":"A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).","additionalProperties":false,"required":["kind","personId","name","badge"],"properties":{"kind":{"type":"string","enum":["staff"]},"personId":{"type":"string","description":"The person who wrote or approved the reply.","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"$ref":"#/$defs/CommentDisplayName"},"badge":{"type":"string","description":"What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.","enum":["author","team"]},"draftedBy":{"$ref":"#/$defs/Actor"}}},{"type":"object","title":"ErasedCommentAuthor","description":"The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["erased"]}}}]},"CommentBody":{"type":"object","description":"The comment text. v1 has only `text`: plain text with line breaks, no markup. A later RFC may add a restricted Markdown format. Absent only when the text was deleted (status `deleted`, or an erasure that removed the text); the record then stays as a tombstone while approved replies hang under it.","additionalProperties":false,"required":["format","text"],"properties":{"format":{"type":"string","enum":["text"]},"text":{"type":"string","description":"NFC-normalised, CRLF turned into LF, trimmed: 1 to 5,000 characters. Tabs and line feeds are the only control characters allowed; bidirectional overrides are refused so a comment cannot disguise itself in Studio.","minLength":1,"maxLength":5000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"}}},"CommentDisplayName":{"type":"string","description":"Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.","minLength":1,"maxLength":80,"pattern":"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},"CommentId":{"type":"string","description":"A comment id: `cmt_` and 6 to 32 letters or digits.","pattern":"^cmt_[A-Za-z0-9]{6,32}$"},"CommentLabel":{"type":"object","description":"An advisory label. `rule` labels come from the submission pipeline (word lists, link count, instruction-like text); `classifier` from an opt-in classifier (Workers AI, Akismet); `agent` from `label_comments`; `person` from Studio. `by` is the agent or person that set it (absent for rules and classifiers).","additionalProperties":false,"required":["label","source","at"],"properties":{"label":{"type":"string","enum":["spam-suspect","toxic","off-topic","question","needs-reply","praise","personal-data","links","watch-word","instruction-like"]},"source":{"type":"string","enum":["rule","classifier","agent","person"]},"by":{"$ref":"#/$defs/Actor"},"confidence":{"type":"integer","description":"0 to 100, when the source reports one.","minimum":0,"maximum":100},"at":{"$ref":"#/$defs/Timestamp"}}},"CommentModeration":{"type":"object","description":"The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.","additionalProperties":false,"required":["action","actor","at","automated"],"properties":{"action":{"type":"string","enum":["approve","hide","spam","hold","restore","delete","erase"]},"actor":{"$ref":"#/$defs/Actor"},"at":{"$ref":"#/$defs/Timestamp"},"reasonCode":{"type":"string","description":"Required by writers for hide, spam, delete and erase.","enum":["spam","abuse","off-topic","personal-data","illegal-content","legal-order","author-request","erasure-request","duplicate","other"]},"note":{"type":"string","description":"Free text from the moderator, plain text, at most 500 characters.","maxLength":500,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"automated":{"type":"boolean","description":"True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."}}},"CommentOrigin":{"type":"object","description":"For imported comments: the system and its id, so importers are idempotent.","additionalProperties":false,"required":["system","id"],"properties":{"system":{"type":"string","enum":["cloudhal","disqus","wordpress"]},"id":{"type":"string","description":"The comment's id in that system: printable ASCII, at most 200 characters.","minLength":1,"maxLength":200,"pattern":"^[!-~]+$"}}},"CommentStatus":{"type":"string","description":"Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.","enum":["pending","approved","hidden","spam","deleted"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema365 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema366 = {"type":"string","description":"A comment id: `cmt_` and 6 to 32 letters or digits.","pattern":"^cmt_[A-Za-z0-9]{6,32}$"};
+const schema367 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema371 = {"type":"object","description":"For imported comments: the system and its id, so importers are idempotent.","additionalProperties":false,"required":["system","id"],"properties":{"system":{"type":"string","enum":["cloudhal","disqus","wordpress"]},"id":{"type":"string","description":"The comment's id in that system: printable ASCII, at most 200 characters.","minLength":1,"maxLength":200,"pattern":"^[!-~]+$"}}};
+const schema380 = {"type":"object","description":"The comment text. v1 has only `text`: plain text with line breaks, no markup. A later RFC may add a restricted Markdown format. Absent only when the text was deleted (status `deleted`, or an erasure that removed the text); the record then stays as a tombstone while approved replies hang under it.","additionalProperties":false,"required":["format","text"],"properties":{"format":{"type":"string","enum":["text"]},"text":{"type":"string","description":"NFC-normalised, CRLF turned into LF, trimmed: 1 to 5,000 characters. Tabs and line feeds are the only control characters allowed; bidirectional overrides are refused so a comment cannot disguise itself in Studio.","minLength":1,"maxLength":5000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"}}};
+const schema381 = {"type":"string","description":"Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.","enum":["pending","approved","hidden","spam","deleted"]};
+const schema383 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema388 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const pattern179 = new RegExp("^cmt_[A-Za-z0-9]{6,32}$", "u");
+const pattern184 = new RegExp("^[!-~]+$", "u");
+const pattern191 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
+const schema372 = {"description":"Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.","oneOf":[{"type":"object","title":"GuestCommentAuthor","description":"A guest: only the display name they typed. Guest comments are always held for moderation in v1.","additionalProperties":false,"required":["kind","name"],"properties":{"kind":{"type":"string","enum":["guest"]},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"ReaderCommentAuthor","description":"A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.","additionalProperties":false,"required":["kind","readerId","name"],"properties":{"kind":{"type":"string","enum":["reader"]},"readerId":{"$ref":"#/$defs/Id"},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"StaffCommentAuthor","description":"A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).","additionalProperties":false,"required":["kind","personId","name","badge"],"properties":{"kind":{"type":"string","enum":["staff"]},"personId":{"type":"string","description":"The person who wrote or approved the reply.","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"$ref":"#/$defs/CommentDisplayName"},"badge":{"type":"string","description":"What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.","enum":["author","team"]},"draftedBy":{"$ref":"#/$defs/Actor"}}},{"type":"object","title":"ErasedCommentAuthor","description":"The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["erased"]}}}]};
+const schema373 = {"type":"string","description":"Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.","minLength":1,"maxLength":80,"pattern":"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"};
+const pattern185 = new RegExp("^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$", "u");
+const pattern188 = new RegExp("^user_[A-Za-z0-9]{6,32}$", "u");
+const schema377 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema378 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate133(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate145(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate133.evaluated;
+const evaluated0 = validate145.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -22938,7 +25128,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema353.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema378.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -23029,16 +25219,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate133.errors = vErrors;
+validate145.errors = vErrors;
 return errors === 0;
 }
-validate133.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate145.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate132(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate144(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate132.evaluated;
+const evaluated0 = validate144.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -23095,7 +25285,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(data0 === "guest")){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema347.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema372.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -23128,7 +25318,7 @@ vErrors.push(err6);
 }
 errors++;
 }
-if(!pattern170.test(data1)){
+if(!pattern185.test(data1)){
 const err7 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err7];
@@ -23224,7 +25414,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data2 === "reader")){
-const err15 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema347.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema372.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -23302,7 +25492,7 @@ vErrors.push(err21);
 }
 errors++;
 }
-if(!pattern170.test(data4)){
+if(!pattern185.test(data4)){
 const err22 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err22];
@@ -23415,7 +25605,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!(data5 === "staff")){
-const err31 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema347.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema372.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -23428,7 +25618,7 @@ errors++;
 if(data.personId !== undefined){
 let data6 = data.personId;
 if(typeof data6 === "string"){
-if(!pattern173.test(data6)){
+if(!pattern188.test(data6)){
 const err32 = {instancePath:instancePath+"/personId",schemaPath:"#/oneOf/2/properties/personId/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err32];
@@ -23473,7 +25663,7 @@ vErrors.push(err35);
 }
 errors++;
 }
-if(!pattern170.test(data7)){
+if(!pattern185.test(data7)){
 const err36 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err36];
@@ -23508,7 +25698,7 @@ vErrors.push(err38);
 errors++;
 }
 if(!((data8 === "author") || (data8 === "team"))){
-const err39 = {instancePath:instancePath+"/badge",schemaPath:"#/oneOf/2/properties/badge/enum",keyword:"enum",params:{allowedValues: schema347.oneOf[2].properties.badge.enum},message:"must be equal to one of the allowed values"};
+const err39 = {instancePath:instancePath+"/badge",schemaPath:"#/oneOf/2/properties/badge/enum",keyword:"enum",params:{allowedValues: schema372.oneOf[2].properties.badge.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err39];
 }
@@ -23519,8 +25709,8 @@ errors++;
 }
 }
 if(data.draftedBy !== undefined){
-if(!(validate133(data.draftedBy, {instancePath:instancePath+"/draftedBy",parentData:data,parentDataProperty:"draftedBy",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+if(!(validate145(data.draftedBy, {instancePath:instancePath+"/draftedBy",parentData:data,parentDataProperty:"draftedBy",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
 errors = vErrors.length;
 }
 }
@@ -23585,7 +25775,7 @@ vErrors.push(err43);
 errors++;
 }
 if(!(data10 === "erased")){
-const err44 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema347.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err44 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema372.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err44];
 }
@@ -23643,18 +25833,18 @@ vErrors = null;
 }
 }
 }
-validate132.errors = vErrors;
+validate144.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate132.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate144.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema357 = {"type":"object","description":"An advisory label. `rule` labels come from the submission pipeline (word lists, link count, instruction-like text); `classifier` from an opt-in classifier (Workers AI, Akismet); `agent` from `label_comments`; `person` from Studio. `by` is the agent or person that set it (absent for rules and classifiers).","additionalProperties":false,"required":["label","source","at"],"properties":{"label":{"type":"string","enum":["spam-suspect","toxic","off-topic","question","needs-reply","praise","personal-data","links","watch-word","instruction-like"]},"source":{"type":"string","enum":["rule","classifier","agent","person"]},"by":{"$ref":"#/$defs/Actor"},"confidence":{"type":"integer","description":"0 to 100, when the source reports one.","minimum":0,"maximum":100},"at":{"$ref":"#/$defs/Timestamp"}}};
+const schema382 = {"type":"object","description":"An advisory label. `rule` labels come from the submission pipeline (word lists, link count, instruction-like text); `classifier` from an opt-in classifier (Workers AI, Akismet); `agent` from `label_comments`; `person` from Studio. `by` is the agent or person that set it (absent for rules and classifiers).","additionalProperties":false,"required":["label","source","at"],"properties":{"label":{"type":"string","enum":["spam-suspect","toxic","off-topic","question","needs-reply","praise","personal-data","links","watch-word","instruction-like"]},"source":{"type":"string","enum":["rule","classifier","agent","person"]},"by":{"$ref":"#/$defs/Actor"},"confidence":{"type":"integer","description":"0 to 100, when the source reports one.","minimum":0,"maximum":100},"at":{"$ref":"#/$defs/Timestamp"}}};
 
-function validate136(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate148(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate136.evaluated;
+const evaluated0 = validate148.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -23717,7 +25907,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!((((((((((data0 === "spam-suspect") || (data0 === "toxic")) || (data0 === "off-topic")) || (data0 === "question")) || (data0 === "needs-reply")) || (data0 === "praise")) || (data0 === "personal-data")) || (data0 === "links")) || (data0 === "watch-word")) || (data0 === "instruction-like"))){
-const err5 = {instancePath:instancePath+"/label",schemaPath:"#/properties/label/enum",keyword:"enum",params:{allowedValues: schema357.properties.label.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/label",schemaPath:"#/properties/label/enum",keyword:"enum",params:{allowedValues: schema382.properties.label.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -23740,7 +25930,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!((((data1 === "rule") || (data1 === "classifier")) || (data1 === "agent")) || (data1 === "person"))){
-const err7 = {instancePath:instancePath+"/source",schemaPath:"#/properties/source/enum",keyword:"enum",params:{allowedValues: schema357.properties.source.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/source",schemaPath:"#/properties/source/enum",keyword:"enum",params:{allowedValues: schema382.properties.source.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -23751,8 +25941,8 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate133(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+if(!(validate145(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
 errors = vErrors.length;
 }
 }
@@ -23827,18 +26017,18 @@ vErrors.push(err13);
 }
 errors++;
 }
-validate136.errors = vErrors;
+validate148.errors = vErrors;
 return errors === 0;
 }
-validate136.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate148.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema359 = {"type":"object","description":"The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.","additionalProperties":false,"required":["action","actor","at","automated"],"properties":{"action":{"type":"string","enum":["approve","hide","spam","hold","restore","delete","erase"]},"actor":{"$ref":"#/$defs/Actor"},"at":{"$ref":"#/$defs/Timestamp"},"reasonCode":{"type":"string","description":"Required by writers for hide, spam, delete and erase.","enum":["spam","abuse","off-topic","personal-data","illegal-content","legal-order","author-request","erasure-request","duplicate","other"]},"note":{"type":"string","description":"Free text from the moderator, plain text, at most 500 characters.","maxLength":500,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"automated":{"type":"boolean","description":"True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."}}};
-const pattern177 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
+const schema384 = {"type":"object","description":"The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.","additionalProperties":false,"required":["action","actor","at","automated"],"properties":{"action":{"type":"string","enum":["approve","hide","spam","hold","restore","delete","erase"]},"actor":{"$ref":"#/$defs/Actor"},"at":{"$ref":"#/$defs/Timestamp"},"reasonCode":{"type":"string","description":"Required by writers for hide, spam, delete and erase.","enum":["spam","abuse","off-topic","personal-data","illegal-content","legal-order","author-request","erasure-request","duplicate","other"]},"note":{"type":"string","description":"Free text from the moderator, plain text, at most 500 characters.","maxLength":500,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"automated":{"type":"boolean","description":"True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."}}};
+const pattern192 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
 
-function validate139(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate151(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate139.evaluated;
+const evaluated0 = validate151.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -23911,7 +26101,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(((((((data0 === "approve") || (data0 === "hide")) || (data0 === "spam")) || (data0 === "hold")) || (data0 === "restore")) || (data0 === "delete")) || (data0 === "erase"))){
-const err6 = {instancePath:instancePath+"/action",schemaPath:"#/properties/action/enum",keyword:"enum",params:{allowedValues: schema359.properties.action.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/action",schemaPath:"#/properties/action/enum",keyword:"enum",params:{allowedValues: schema384.properties.action.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -23922,8 +26112,8 @@ errors++;
 }
 }
 if(data.actor !== undefined){
-if(!(validate133(data.actor, {instancePath:instancePath+"/actor",parentData:data,parentDataProperty:"actor",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate133.errors : vErrors.concat(validate133.errors);
+if(!(validate145(data.actor, {instancePath:instancePath+"/actor",parentData:data,parentDataProperty:"actor",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
 errors = vErrors.length;
 }
 }
@@ -23965,7 +26155,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!((((((((((data3 === "spam") || (data3 === "abuse")) || (data3 === "off-topic")) || (data3 === "personal-data")) || (data3 === "illegal-content")) || (data3 === "legal-order")) || (data3 === "author-request")) || (data3 === "erasure-request")) || (data3 === "duplicate")) || (data3 === "other"))){
-const err10 = {instancePath:instancePath+"/reasonCode",schemaPath:"#/properties/reasonCode/enum",keyword:"enum",params:{allowedValues: schema359.properties.reasonCode.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/reasonCode",schemaPath:"#/properties/reasonCode/enum",keyword:"enum",params:{allowedValues: schema384.properties.reasonCode.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -23988,7 +26178,7 @@ vErrors.push(err11);
 }
 errors++;
 }
-if(!pattern177.test(data4)){
+if(!pattern192.test(data4)){
 const err12 = {instancePath:instancePath+"/note",schemaPath:"#/properties/note/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err12];
@@ -24033,17 +26223,17 @@ vErrors.push(err15);
 }
 errors++;
 }
-validate139.errors = vErrors;
+validate151.errors = vErrors;
 return errors === 0;
 }
-validate139.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate151.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate131(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate143(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/comment.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate131.evaluated;
+const evaluated0 = validate143.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -24142,7 +26332,7 @@ vErrors.push(err8);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema339.properties, key0))){
+if(!(func1.call(schema364.properties, key0))){
 const err9 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err9];
@@ -24166,7 +26356,7 @@ vErrors.push(err10);
 errors++;
 }
 if(!(data0 === 1)){
-const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema340.enum},message:"must be equal to one of the allowed values"};
+const err11 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema365.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -24179,7 +26369,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern164.test(data1)){
+if(!pattern179.test(data1)){
 const err12 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err12];
@@ -24294,7 +26484,7 @@ errors++;
 if(data.parentId !== undefined){
 let data4 = data.parentId;
 if(typeof data4 === "string"){
-if(!pattern164.test(data4)){
+if(!pattern179.test(data4)){
 const err22 = {instancePath:instancePath+"/parentId",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err22];
@@ -24319,7 +26509,7 @@ errors++;
 if(data.inReplyToId !== undefined){
 let data5 = data.inReplyToId;
 if(typeof data5 === "string"){
-if(!pattern164.test(data5)){
+if(!pattern179.test(data5)){
 const err24 = {instancePath:instancePath+"/inReplyToId",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err24];
@@ -24354,7 +26544,7 @@ vErrors.push(err26);
 errors++;
 }
 if(!((((data6 === "native") || (data6 === "import")) || (data6 === "webmention")) || (data6 === "activitypub"))){
-const err27 = {instancePath:instancePath+"/source",schemaPath:"#/properties/source/enum",keyword:"enum",params:{allowedValues: schema339.properties.source.enum},message:"must be equal to one of the allowed values"};
+const err27 = {instancePath:instancePath+"/source",schemaPath:"#/properties/source/enum",keyword:"enum",params:{allowedValues: schema364.properties.source.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -24412,7 +26602,7 @@ vErrors.push(err31);
 errors++;
 }
 if(!(((data8 === "cloudhal") || (data8 === "disqus")) || (data8 === "wordpress"))){
-const err32 = {instancePath:instancePath+"/origin/system",schemaPath:"#/$defs/CommentOrigin/properties/system/enum",keyword:"enum",params:{allowedValues: schema346.properties.system.enum},message:"must be equal to one of the allowed values"};
+const err32 = {instancePath:instancePath+"/origin/system",schemaPath:"#/$defs/CommentOrigin/properties/system/enum",keyword:"enum",params:{allowedValues: schema371.properties.system.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -24445,7 +26635,7 @@ vErrors.push(err34);
 }
 errors++;
 }
-if(!pattern169.test(data9)){
+if(!pattern184.test(data9)){
 const err35 = {instancePath:instancePath+"/origin/id",schemaPath:"#/$defs/CommentOrigin/properties/id/pattern",keyword:"pattern",params:{pattern: "^[!-~]+$"},message:"must match pattern \""+"^[!-~]+$"+"\""};
 if(vErrors === null){
 vErrors = [err35];
@@ -24480,8 +26670,8 @@ errors++;
 }
 }
 if(data.author !== undefined){
-if(!(validate132(data.author, {instancePath:instancePath+"/author",parentData:data,parentDataProperty:"author",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate132.errors : vErrors.concat(validate132.errors);
+if(!(validate144(data.author, {instancePath:instancePath+"/author",parentData:data,parentDataProperty:"author",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate144.errors : vErrors.concat(validate144.errors);
 errors = vErrors.length;
 }
 }
@@ -24533,7 +26723,7 @@ vErrors.push(err41);
 errors++;
 }
 if(!(data12 === "text")){
-const err42 = {instancePath:instancePath+"/body/format",schemaPath:"#/$defs/CommentBody/properties/format/enum",keyword:"enum",params:{allowedValues: schema355.properties.format.enum},message:"must be equal to one of the allowed values"};
+const err42 = {instancePath:instancePath+"/body/format",schemaPath:"#/$defs/CommentBody/properties/format/enum",keyword:"enum",params:{allowedValues: schema380.properties.format.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err42];
 }
@@ -24566,7 +26756,7 @@ vErrors.push(err44);
 }
 errors++;
 }
-if(!pattern176.test(data13)){
+if(!pattern191.test(data13)){
 const err45 = {instancePath:instancePath+"/body/text",schemaPath:"#/$defs/CommentBody/properties/text/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err45];
@@ -24613,7 +26803,7 @@ vErrors.push(err48);
 errors++;
 }
 if(!(((((data14 === "pending") || (data14 === "approved")) || (data14 === "hidden")) || (data14 === "spam")) || (data14 === "deleted"))){
-const err49 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/CommentStatus/enum",keyword:"enum",params:{allowedValues: schema356.enum},message:"must be equal to one of the allowed values"};
+const err49 = {instancePath:instancePath+"/status",schemaPath:"#/$defs/CommentStatus/enum",keyword:"enum",params:{allowedValues: schema381.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err49];
 }
@@ -24638,8 +26828,8 @@ errors++;
 }
 const len0 = data15.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate136(data15[i0], {instancePath:instancePath+"/labels/" + i0,parentData:data15,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate136.errors : vErrors.concat(validate136.errors);
+if(!(validate148(data15[i0], {instancePath:instancePath+"/labels/" + i0,parentData:data15,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate148.errors : vErrors.concat(validate148.errors);
 errors = vErrors.length;
 }
 }
@@ -24656,8 +26846,8 @@ errors++;
 }
 }
 if(data.moderation !== undefined){
-if(!(validate139(data.moderation, {instancePath:instancePath+"/moderation",parentData:data,parentDataProperty:"moderation",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate139.errors : vErrors.concat(validate139.errors);
+if(!(validate151(data.moderation, {instancePath:instancePath+"/moderation",parentData:data,parentDataProperty:"moderation",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate151.errors : vErrors.concat(validate151.errors);
 errors = vErrors.length;
 }
 }
@@ -24747,29 +26937,29 @@ vErrors.push(err58);
 }
 errors++;
 }
-validate131.errors = vErrors;
+validate143.errors = vErrors;
 return errors === 0;
 }
-validate131.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate143.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateCommentSubmission = validate142;
-const schema364 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/comment-submission.schema.json","title":"CommentSubmission","description":"What a browser may send to the site Worker's comment endpoints (RFC-0007): `POST /__cloudhal/comments` (a comment) and `POST /__cloudhal/comments/report` (a report). Forms post application/x-www-form-urlencoded and the comments module posts JSON; the server builds this object from either (the endpoint sets `kind`, the server sets `schemaVersion`) and checks it with the precompiled validator before anything else reads it. Everything in it is untrusted. It is loose where the server normalises (it trims, NFC-normalises and re-checks text against the stored Comment contract) and strict where a browser has no business sending something: there is no field for a status, a site, an author kind, a label, an IP address or anything the server derives itself.","oneOf":[{"type":"object","title":"CommentPostSubmission","description":"A new comment or a reply.","additionalProperties":false,"required":["schemaVersion","kind","nodeId","name","body"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["comment"]},"nodeId":{"$ref":"#/$defs/Id","description":"The entry commented on. The server accepts it only for a published entry with an open thread, and works out the page to return to itself."},"parentId":{"$ref":"#/$defs/SubmissionCommentId","description":"The comment replied to; it must be approved and in the same thread. The server decides `parentId`/`inReplyToId` of the stored comment."},"name":{"type":"string","description":"The display name as typed (the form says it is shown publicly).","minLength":1,"maxLength":200},"email":{"type":"string","description":"Optional and never shown. Kept only for moderation, erasure and export requests (v1.1: reply notifications after double opt-in).","maxLength":254,"pattern":"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},"body":{"type":"string","description":"The comment as typed; the server trims and normalises it, then requires 2 to 5,000 characters.","minLength":1,"maxLength":20000},"challenge":{"$ref":"#/$defs/SubmissionChallenge"},"solution":{"$ref":"#/$defs/SubmissionSolution"},"turnstileToken":{"$ref":"#/$defs/SubmissionTurnstileToken"},"website":{"$ref":"#/$defs/SubmissionHoneypot"}}},{"type":"object","title":"CommentReportSubmission","description":"A reader's notice that a comment breaks the site's rules or the law (EU DSA Art. 16). A report never hides anything by itself: it puts the comment in front of a person.","additionalProperties":false,"required":["schemaVersion","kind","commentId","reason"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["report"]},"commentId":{"$ref":"#/$defs/SubmissionCommentId"},"reason":{"type":"string","enum":["spam","abuse","personal-data","illegal-content","other"]},"details":{"type":"string","description":"Why, as typed; at most 1,000 characters after normalising.","maxLength":4000},"email":{"type":"string","description":"Optional, never shown: where the site may answer the notice.","maxLength":254,"pattern":"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},"challenge":{"$ref":"#/$defs/SubmissionChallenge"},"solution":{"$ref":"#/$defs/SubmissionSolution"},"turnstileToken":{"$ref":"#/$defs/SubmissionTurnstileToken"},"website":{"$ref":"#/$defs/SubmissionHoneypot"}}}],"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"SubmissionChallenge":{"type":"string","description":"The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).","minLength":16,"maxLength":512,"pattern":"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},"SubmissionCommentId":{"type":"string","pattern":"^cmt_[A-Za-z0-9]{6,32}$"},"SubmissionHoneypot":{"type":"string","description":"A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.","maxLength":2048},"SubmissionSolution":{"type":"string","description":"The counter that solves the challenge, in decimal.","pattern":"^(?:0|[1-9][0-9]{0,15})$"},"SubmissionTurnstileToken":{"type":"string","description":"Cloudflare Turnstile's response token, when the site turned Turnstile on.","minLength":1,"maxLength":2048}}};
-const schema365 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema366 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema367 = {"type":"string","pattern":"^cmt_[A-Za-z0-9]{6,32}$"};
-const schema368 = {"type":"string","description":"The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).","minLength":16,"maxLength":512,"pattern":"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"};
-const schema369 = {"type":"string","description":"The counter that solves the challenge, in decimal.","pattern":"^(?:0|[1-9][0-9]{0,15})$"};
-const schema370 = {"type":"string","description":"Cloudflare Turnstile's response token, when the site turned Turnstile on.","minLength":1,"maxLength":2048};
-const schema371 = {"type":"string","description":"A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.","maxLength":2048};
-const pattern180 = new RegExp("^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$", "u");
-const pattern181 = new RegExp("^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$", "u");
-const pattern182 = new RegExp("^(?:0|[1-9][0-9]{0,15})$", "u");
+export const validateCommentSubmission = validate154;
+const schema389 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/comment-submission.schema.json","title":"CommentSubmission","description":"What a browser may send to the site Worker's comment endpoints (RFC-0007): `POST /__cloudhal/comments` (a comment) and `POST /__cloudhal/comments/report` (a report). Forms post application/x-www-form-urlencoded and the comments module posts JSON; the server builds this object from either (the endpoint sets `kind`, the server sets `schemaVersion`) and checks it with the precompiled validator before anything else reads it. Everything in it is untrusted. It is loose where the server normalises (it trims, NFC-normalises and re-checks text against the stored Comment contract) and strict where a browser has no business sending something: there is no field for a status, a site, an author kind, a label, an IP address or anything the server derives itself.","oneOf":[{"type":"object","title":"CommentPostSubmission","description":"A new comment or a reply.","additionalProperties":false,"required":["schemaVersion","kind","nodeId","name","body"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["comment"]},"nodeId":{"$ref":"#/$defs/Id","description":"The entry commented on. The server accepts it only for a published entry with an open thread, and works out the page to return to itself."},"parentId":{"$ref":"#/$defs/SubmissionCommentId","description":"The comment replied to; it must be approved and in the same thread. The server decides `parentId`/`inReplyToId` of the stored comment."},"name":{"type":"string","description":"The display name as typed (the form says it is shown publicly).","minLength":1,"maxLength":200},"email":{"type":"string","description":"Optional and never shown. Kept only for moderation, erasure and export requests (v1.1: reply notifications after double opt-in).","maxLength":254,"pattern":"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},"body":{"type":"string","description":"The comment as typed; the server trims and normalises it, then requires 2 to 5,000 characters.","minLength":1,"maxLength":20000},"challenge":{"$ref":"#/$defs/SubmissionChallenge"},"solution":{"$ref":"#/$defs/SubmissionSolution"},"turnstileToken":{"$ref":"#/$defs/SubmissionTurnstileToken"},"website":{"$ref":"#/$defs/SubmissionHoneypot"}}},{"type":"object","title":"CommentReportSubmission","description":"A reader's notice that a comment breaks the site's rules or the law (EU DSA Art. 16). A report never hides anything by itself: it puts the comment in front of a person.","additionalProperties":false,"required":["schemaVersion","kind","commentId","reason"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"kind":{"type":"string","enum":["report"]},"commentId":{"$ref":"#/$defs/SubmissionCommentId"},"reason":{"type":"string","enum":["spam","abuse","personal-data","illegal-content","other"]},"details":{"type":"string","description":"Why, as typed; at most 1,000 characters after normalising.","maxLength":4000},"email":{"type":"string","description":"Optional, never shown: where the site may answer the notice.","maxLength":254,"pattern":"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},"challenge":{"$ref":"#/$defs/SubmissionChallenge"},"solution":{"$ref":"#/$defs/SubmissionSolution"},"turnstileToken":{"$ref":"#/$defs/SubmissionTurnstileToken"},"website":{"$ref":"#/$defs/SubmissionHoneypot"}}}],"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"SubmissionChallenge":{"type":"string","description":"The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).","minLength":16,"maxLength":512,"pattern":"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},"SubmissionCommentId":{"type":"string","pattern":"^cmt_[A-Za-z0-9]{6,32}$"},"SubmissionHoneypot":{"type":"string","description":"A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.","maxLength":2048},"SubmissionSolution":{"type":"string","description":"The counter that solves the challenge, in decimal.","pattern":"^(?:0|[1-9][0-9]{0,15})$"},"SubmissionTurnstileToken":{"type":"string","description":"Cloudflare Turnstile's response token, when the site turned Turnstile on.","minLength":1,"maxLength":2048}}};
+const schema390 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema391 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema392 = {"type":"string","pattern":"^cmt_[A-Za-z0-9]{6,32}$"};
+const schema393 = {"type":"string","description":"The signed proof-of-work challenge from `GET /__cloudhal/comments/challenge`, as issued (base64url segments joined by dots).","minLength":16,"maxLength":512,"pattern":"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"};
+const schema394 = {"type":"string","description":"The counter that solves the challenge, in decimal.","pattern":"^(?:0|[1-9][0-9]{0,15})$"};
+const schema395 = {"type":"string","description":"Cloudflare Turnstile's response token, when the site turned Turnstile on.","minLength":1,"maxLength":2048};
+const schema396 = {"type":"string","description":"A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.","maxLength":2048};
+const pattern195 = new RegExp("^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$", "u");
+const pattern196 = new RegExp("^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$", "u");
+const pattern197 = new RegExp("^(?:0|[1-9][0-9]{0,15})$", "u");
 
-function validate142(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate154(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/comment-submission.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate142.evaluated;
+const evaluated0 = validate154.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -24832,7 +27022,7 @@ vErrors.push(err4);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema364.oneOf[0].properties, key0))){
+if(!(func1.call(schema389.oneOf[0].properties, key0))){
 const err5 = {instancePath,schemaPath:"#/oneOf/0/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err5];
@@ -24856,7 +27046,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(data0 === 1)){
-const err7 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema365.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema390.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -24879,7 +27069,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(data1 === "comment")){
-const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema364.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema389.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -24937,7 +27127,7 @@ errors++;
 if(data.parentId !== undefined){
 let data3 = data.parentId;
 if(typeof data3 === "string"){
-if(!pattern164.test(data3)){
+if(!pattern179.test(data3)){
 const err14 = {instancePath:instancePath+"/parentId",schemaPath:"#/$defs/SubmissionCommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err14];
@@ -25007,7 +27197,7 @@ vErrors.push(err19);
 }
 errors++;
 }
-if(!pattern180.test(data5)){
+if(!pattern195.test(data5)){
 const err20 = {instancePath:instancePath+"/email",schemaPath:"#/oneOf/0/properties/email/pattern",keyword:"pattern",params:{pattern: "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},message:"must match pattern \""+"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"+"\""};
 if(vErrors === null){
 vErrors = [err20];
@@ -25087,7 +27277,7 @@ vErrors.push(err26);
 }
 errors++;
 }
-if(!pattern181.test(data7)){
+if(!pattern196.test(data7)){
 const err27 = {instancePath:instancePath+"/challenge",schemaPath:"#/$defs/SubmissionChallenge/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},message:"must match pattern \""+"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"+"\""};
 if(vErrors === null){
 vErrors = [err27];
@@ -25112,7 +27302,7 @@ errors++;
 if(data.solution !== undefined){
 let data8 = data.solution;
 if(typeof data8 === "string"){
-if(!pattern182.test(data8)){
+if(!pattern197.test(data8)){
 const err29 = {instancePath:instancePath+"/solution",schemaPath:"#/$defs/SubmissionSolution/pattern",keyword:"pattern",params:{pattern: "^(?:0|[1-9][0-9]{0,15})$"},message:"must match pattern \""+"^(?:0|[1-9][0-9]{0,15})$"+"\""};
 if(vErrors === null){
 vErrors = [err29];
@@ -25254,7 +27444,7 @@ vErrors.push(err40);
 errors++;
 }
 for(const key1 in data){
-if(!(func1.call(schema364.oneOf[1].properties, key1))){
+if(!(func1.call(schema389.oneOf[1].properties, key1))){
 const err41 = {instancePath,schemaPath:"#/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err41];
@@ -25278,7 +27468,7 @@ vErrors.push(err42);
 errors++;
 }
 if(!(data11 === 1)){
-const err43 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema365.enum},message:"must be equal to one of the allowed values"};
+const err43 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema390.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err43];
 }
@@ -25301,7 +27491,7 @@ vErrors.push(err44);
 errors++;
 }
 if(!(data12 === "report")){
-const err45 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema364.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err45 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema389.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err45];
 }
@@ -25314,7 +27504,7 @@ errors++;
 if(data.commentId !== undefined){
 let data13 = data.commentId;
 if(typeof data13 === "string"){
-if(!pattern164.test(data13)){
+if(!pattern179.test(data13)){
 const err46 = {instancePath:instancePath+"/commentId",schemaPath:"#/$defs/SubmissionCommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err46];
@@ -25349,7 +27539,7 @@ vErrors.push(err48);
 errors++;
 }
 if(!(((((data14 === "spam") || (data14 === "abuse")) || (data14 === "personal-data")) || (data14 === "illegal-content")) || (data14 === "other"))){
-const err49 = {instancePath:instancePath+"/reason",schemaPath:"#/oneOf/1/properties/reason/enum",keyword:"enum",params:{allowedValues: schema364.oneOf[1].properties.reason.enum},message:"must be equal to one of the allowed values"};
+const err49 = {instancePath:instancePath+"/reason",schemaPath:"#/oneOf/1/properties/reason/enum",keyword:"enum",params:{allowedValues: schema389.oneOf[1].properties.reason.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err49];
 }
@@ -25397,7 +27587,7 @@ vErrors.push(err52);
 }
 errors++;
 }
-if(!pattern180.test(data16)){
+if(!pattern195.test(data16)){
 const err53 = {instancePath:instancePath+"/email",schemaPath:"#/oneOf/1/properties/email/pattern",keyword:"pattern",params:{pattern: "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},message:"must match pattern \""+"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"+"\""};
 if(vErrors === null){
 vErrors = [err53];
@@ -25442,7 +27632,7 @@ vErrors.push(err56);
 }
 errors++;
 }
-if(!pattern181.test(data17)){
+if(!pattern196.test(data17)){
 const err57 = {instancePath:instancePath+"/challenge",schemaPath:"#/$defs/SubmissionChallenge/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},message:"must match pattern \""+"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"+"\""};
 if(vErrors === null){
 vErrors = [err57];
@@ -25467,7 +27657,7 @@ errors++;
 if(data.solution !== undefined){
 let data18 = data.solution;
 if(typeof data18 === "string"){
-if(!pattern182.test(data18)){
+if(!pattern197.test(data18)){
 const err59 = {instancePath:instancePath+"/solution",schemaPath:"#/$defs/SubmissionSolution/pattern",keyword:"pattern",params:{pattern: "^(?:0|[1-9][0-9]{0,15})$"},message:"must match pattern \""+"^(?:0|[1-9][0-9]{0,15})$"+"\""};
 if(vErrors === null){
 vErrors = [err59];
@@ -25595,33 +27785,33 @@ vErrors = null;
 }
 }
 }
-validate142.errors = vErrors;
+validate154.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate142.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate154.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-export const validateRelease = validate143;
-const schema378 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/release.schema.json","title":"Release","description":"A scheduled content change set (RFC-0008): node versions pinned by id, rev and content hash, applied on top of whatever is live at the release's time. A single scheduled publish is a one-item release. Each item records the version that was live when the release was pinned (`base`); if a pinned node or its live base changed before the release runs, the release is held as a conflict instead of overwriting anything. A person's approval is bound to `hash` (`rl1:`), which digests the items only, so a person may move an approved release without re-approving it while an agent's move or any content change voids the approval. Releases live in D1 next to the graph; they are not graph nodes, never enter a snapshot and are not part of site bundles.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","items","state","hash","createdBy","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/ReleaseId"},"siteId":{"$ref":"#/$defs/Id"},"title":{"type":"string","description":"Optional name shown in Studio (\"Election night\"). A one-item release without a title is shown under its entry's or page's title.","minLength":1,"maxLength":200,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"items":{"type":"array","description":"The pinned changes, at most one per node. A release never contains the site node: site settings, domains and structure are published the ordinary way.","items":{"$ref":"#/$defs/ReleaseItem"},"minItems":1,"maxItems":100},"when":{"$ref":"#/$defs/ReleaseWhen"},"state":{"$ref":"#/$defs/ReleaseState"},"hash":{"$ref":"#/$defs/ReleaseHash"},"approval":{"$ref":"#/$defs/ReleaseApproval"},"outcome":{"$ref":"#/$defs/ReleaseOutcome"},"createdBy":{"$ref":"#/$defs/Actor"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"LocalDateTime":{"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"ReleaseApproval":{"description":"Why the release may run, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleasePersonApproval","description":"A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.","additionalProperties":false,"required":["kind","by","at"],"properties":{"kind":{"type":"string","enum":["person"]},"by":{"$ref":"#/$defs/ReleasePerson"},"at":{"$ref":"#/$defs/Timestamp"},"executeAt":{"$ref":"#/$defs/Timestamp"},"approvalId":{"$ref":"#/$defs/Id"}}},{"type":"object","title":"ReleaseAutoApproval","description":"An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.","additionalProperties":false,"required":["kind","by","keyId","at","windowEnds"],"properties":{"kind":{"type":"string","enum":["auto"]},"by":{"$ref":"#/$defs/Actor"},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"at":{"$ref":"#/$defs/Timestamp"},"windowEnds":{"$ref":"#/$defs/Timestamp"}}}]},"ReleaseConflict":{"type":"object","description":"A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.","additionalProperties":false,"required":["nodeId"],"properties":{"nodeId":{"$ref":"#/$defs/Id"},"expected":{"$ref":"#/$defs/ReleaseNodeVersion"},"found":{"$ref":"#/$defs/ReleaseNodeVersion"}}},"ReleaseHash":{"type":"string","description":"`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.","pattern":"^rl1:[0-9a-f]{64}$"},"ReleaseId":{"type":"string","description":"A release id: `rel_` and 6 to 32 letters or digits.","pattern":"^rel_[A-Za-z0-9]{6,32}$"},"ReleaseItem":{"description":"One pinned change, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseSetItem","description":"Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).","additionalProperties":false,"required":["kind","nodeId","nodeKind","target"],"properties":{"kind":{"type":"string","enum":["set"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"target":{"$ref":"#/$defs/ReleaseNodeVersion"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}},{"type":"object","title":"ReleaseRemoveItem","description":"Take the node out of the live snapshot. `base` is the live version that is removed.","additionalProperties":false,"required":["kind","nodeId","nodeKind","base"],"properties":{"kind":{"type":"string","enum":["remove"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}}]},"ReleaseNodeKind":{"type":"string","description":"Kinds of graph node a release may carry. The site node is never one of them.","enum":["page","contentEntry","taxonomy","term","redirect","menu","asset"]},"ReleaseNodeVersion":{"type":"object","description":"One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.","additionalProperties":false,"required":["rev","hash"],"properties":{"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},"ReleaseOutcome":{"description":"What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).","oneOf":[{"type":"object","title":"ReleasePublishedOutcome","description":"Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.","additionalProperties":false,"required":["kind","runId","at","snapshotId","baseSnapshotId","latenessSeconds","purge"],"properties":{"kind":{"type":"string","enum":["published"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"snapshotId":{"$ref":"#/$defs/Id"},"baseSnapshotId":{"$ref":"#/$defs/Id"},"latenessSeconds":{"type":"integer","minimum":0},"purge":{"type":"string","enum":["tags","everything","deferred","failed","none"]}}},{"type":"object","title":"ReleaseConflictOutcome","description":"Held: these nodes changed since the release was pinned. Nothing was published.","additionalProperties":false,"required":["kind","at","conflicts"],"properties":{"kind":{"type":"string","enum":["conflict"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"conflicts":{"type":"array","items":{"$ref":"#/$defs/ReleaseConflict"},"minItems":1,"maxItems":100}}},{"type":"object","title":"ReleaseFailedOutcome","description":"Refused at run time; nothing was published.","additionalProperties":false,"required":["kind","at","code"],"properties":{"kind":{"type":"string","enum":["failed"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"code":{"type":"string","enum":["dependency_missing","invalid_snapshot","site_missing","node_body_missing","store_error"]},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},{"type":"object","title":"ReleaseMissedOutcome","description":"The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.","additionalProperties":false,"required":["kind","at","latenessSeconds"],"properties":{"kind":{"type":"string","enum":["missed"]},"at":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0}}},{"type":"object","title":"ReleaseExpiredOutcome","description":"No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.","additionalProperties":false,"required":["kind","at","reason"],"properties":{"kind":{"type":"string","enum":["expired"]},"at":{"$ref":"#/$defs/Timestamp"},"reason":{"type":"string","enum":["unapproved","approval_lost","auto_window_ended","creator_removed"]}}},{"type":"object","title":"ReleaseCanceledOutcome","description":"Withdrawn by a person or an agent; its nodes are unlocked.","additionalProperties":false,"required":["kind","at","by"],"properties":{"kind":{"type":"string","enum":["canceled"]},"at":{"$ref":"#/$defs/Timestamp"},"by":{"$ref":"#/$defs/Actor"}}}]},"ReleasePerson":{"type":"object","description":"A staff person (`user_…`). Agents never appear here.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}},"ReleaseState":{"type":"string","description":"Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.","enum":["draft","awaiting_approval","scheduled","running","published","conflict","missed","expired","failed","canceled"]},"ReleaseWhen":{"description":"When the release runs, discriminated by `kind`. Absent while a draft has no time yet.","oneOf":[{"type":"object","title":"ReleaseAt","description":"At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.","additionalProperties":false,"required":["kind","at","timeZone"],"properties":{"kind":{"type":"string","enum":["at"]},"at":{"$ref":"#/$defs/Timestamp"},"timeZone":{"$ref":"#/$defs/TimeZone"},"localTime":{"$ref":"#/$defs/LocalDateTime"}}},{"type":"object","title":"ReleaseOnApproval","description":"As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["on-approval"]}}}]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
-const schema379 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema380 = {"type":"string","description":"A release id: `rel_` and 6 to 32 letters or digits.","pattern":"^rel_[A-Za-z0-9]{6,32}$"};
-const schema381 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema393 = {"type":"string","description":"Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.","enum":["draft","awaiting_approval","scheduled","running","published","conflict","missed","expired","failed","canceled"]};
-const schema394 = {"type":"string","description":"`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.","pattern":"^rl1:[0-9a-f]{64}$"};
-const schema390 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema386 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema422 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern187 = new RegExp("^rel_[A-Za-z0-9]{6,32}$", "u");
-const pattern189 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
-const pattern195 = new RegExp("^rl1:[0-9a-f]{64}$", "u");
-const schema382 = {"description":"One pinned change, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseSetItem","description":"Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).","additionalProperties":false,"required":["kind","nodeId","nodeKind","target"],"properties":{"kind":{"type":"string","enum":["set"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"target":{"$ref":"#/$defs/ReleaseNodeVersion"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}},{"type":"object","title":"ReleaseRemoveItem","description":"Take the node out of the live snapshot. `base` is the live version that is removed.","additionalProperties":false,"required":["kind","nodeId","nodeKind","base"],"properties":{"kind":{"type":"string","enum":["remove"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}}]};
-const schema384 = {"type":"string","description":"Kinds of graph node a release may carry. The site node is never one of them.","enum":["page","contentEntry","taxonomy","term","redirect","menu","asset"]};
-const schema385 = {"type":"object","description":"One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.","additionalProperties":false,"required":["rev","hash"],"properties":{"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}};
+export const validateRelease = validate155;
+const schema403 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/release.schema.json","title":"Release","description":"A scheduled content change set (RFC-0008): node versions pinned by id, rev and content hash, applied on top of whatever is live at the release's time. A single scheduled publish is a one-item release. Each item records the version that was live when the release was pinned (`base`); if a pinned node or its live base changed before the release runs, the release is held as a conflict instead of overwriting anything. A person's approval is bound to `hash` (`rl1:`), which digests the items only, so a person may move an approved release without re-approving it while an agent's move or any content change voids the approval. Releases live in D1 next to the graph; they are not graph nodes, never enter a snapshot and are not part of site bundles.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","items","state","hash","createdBy","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/ReleaseId"},"siteId":{"$ref":"#/$defs/Id"},"title":{"type":"string","description":"Optional name shown in Studio (\"Election night\"). A one-item release without a title is shown under its entry's or page's title.","minLength":1,"maxLength":200,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"items":{"type":"array","description":"The pinned changes, at most one per node. A release never contains the site node: site settings, domains and structure are published the ordinary way.","items":{"$ref":"#/$defs/ReleaseItem"},"minItems":1,"maxItems":100},"when":{"$ref":"#/$defs/ReleaseWhen"},"state":{"$ref":"#/$defs/ReleaseState"},"hash":{"$ref":"#/$defs/ReleaseHash"},"approval":{"$ref":"#/$defs/ReleaseApproval"},"outcome":{"$ref":"#/$defs/ReleaseOutcome"},"createdBy":{"$ref":"#/$defs/Actor"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"LocalDateTime":{"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"ReleaseApproval":{"description":"Why the release may run, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleasePersonApproval","description":"A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.","additionalProperties":false,"required":["kind","by","at"],"properties":{"kind":{"type":"string","enum":["person"]},"by":{"$ref":"#/$defs/ReleasePerson"},"at":{"$ref":"#/$defs/Timestamp"},"executeAt":{"$ref":"#/$defs/Timestamp"},"approvalId":{"$ref":"#/$defs/Id"}}},{"type":"object","title":"ReleaseAutoApproval","description":"An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.","additionalProperties":false,"required":["kind","by","keyId","at","windowEnds"],"properties":{"kind":{"type":"string","enum":["auto"]},"by":{"$ref":"#/$defs/Actor"},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"at":{"$ref":"#/$defs/Timestamp"},"windowEnds":{"$ref":"#/$defs/Timestamp"}}}]},"ReleaseConflict":{"type":"object","description":"A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.","additionalProperties":false,"required":["nodeId"],"properties":{"nodeId":{"$ref":"#/$defs/Id"},"expected":{"$ref":"#/$defs/ReleaseNodeVersion"},"found":{"$ref":"#/$defs/ReleaseNodeVersion"}}},"ReleaseHash":{"type":"string","description":"`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.","pattern":"^rl1:[0-9a-f]{64}$"},"ReleaseId":{"type":"string","description":"A release id: `rel_` and 6 to 32 letters or digits.","pattern":"^rel_[A-Za-z0-9]{6,32}$"},"ReleaseItem":{"description":"One pinned change, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseSetItem","description":"Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).","additionalProperties":false,"required":["kind","nodeId","nodeKind","target"],"properties":{"kind":{"type":"string","enum":["set"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"target":{"$ref":"#/$defs/ReleaseNodeVersion"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}},{"type":"object","title":"ReleaseRemoveItem","description":"Take the node out of the live snapshot. `base` is the live version that is removed.","additionalProperties":false,"required":["kind","nodeId","nodeKind","base"],"properties":{"kind":{"type":"string","enum":["remove"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}}]},"ReleaseNodeKind":{"type":"string","description":"Kinds of graph node a release may carry. The site node is never one of them.","enum":["page","contentEntry","taxonomy","term","redirect","menu","asset"]},"ReleaseNodeVersion":{"type":"object","description":"One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.","additionalProperties":false,"required":["rev","hash"],"properties":{"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},"ReleaseOutcome":{"description":"What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).","oneOf":[{"type":"object","title":"ReleasePublishedOutcome","description":"Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.","additionalProperties":false,"required":["kind","runId","at","snapshotId","baseSnapshotId","latenessSeconds","purge"],"properties":{"kind":{"type":"string","enum":["published"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"snapshotId":{"$ref":"#/$defs/Id"},"baseSnapshotId":{"$ref":"#/$defs/Id"},"latenessSeconds":{"type":"integer","minimum":0},"purge":{"type":"string","enum":["tags","everything","deferred","failed","none"]}}},{"type":"object","title":"ReleaseConflictOutcome","description":"Held: these nodes changed since the release was pinned. Nothing was published.","additionalProperties":false,"required":["kind","at","conflicts"],"properties":{"kind":{"type":"string","enum":["conflict"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"conflicts":{"type":"array","items":{"$ref":"#/$defs/ReleaseConflict"},"minItems":1,"maxItems":100}}},{"type":"object","title":"ReleaseFailedOutcome","description":"Refused at run time; nothing was published.","additionalProperties":false,"required":["kind","at","code"],"properties":{"kind":{"type":"string","enum":["failed"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"code":{"type":"string","enum":["dependency_missing","invalid_snapshot","site_missing","node_body_missing","store_error"]},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},{"type":"object","title":"ReleaseMissedOutcome","description":"The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.","additionalProperties":false,"required":["kind","at","latenessSeconds"],"properties":{"kind":{"type":"string","enum":["missed"]},"at":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0}}},{"type":"object","title":"ReleaseExpiredOutcome","description":"No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.","additionalProperties":false,"required":["kind","at","reason"],"properties":{"kind":{"type":"string","enum":["expired"]},"at":{"$ref":"#/$defs/Timestamp"},"reason":{"type":"string","enum":["unapproved","approval_lost","auto_window_ended","creator_removed"]}}},{"type":"object","title":"ReleaseCanceledOutcome","description":"Withdrawn by a person or an agent; its nodes are unlocked.","additionalProperties":false,"required":["kind","at","by"],"properties":{"kind":{"type":"string","enum":["canceled"]},"at":{"$ref":"#/$defs/Timestamp"},"by":{"$ref":"#/$defs/Actor"}}}]},"ReleasePerson":{"type":"object","description":"A staff person (`user_…`). Agents never appear here.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}},"ReleaseState":{"type":"string","description":"Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.","enum":["draft","awaiting_approval","scheduled","running","published","conflict","missed","expired","failed","canceled"]},"ReleaseWhen":{"description":"When the release runs, discriminated by `kind`. Absent while a draft has no time yet.","oneOf":[{"type":"object","title":"ReleaseAt","description":"At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.","additionalProperties":false,"required":["kind","at","timeZone"],"properties":{"kind":{"type":"string","enum":["at"]},"at":{"$ref":"#/$defs/Timestamp"},"timeZone":{"$ref":"#/$defs/TimeZone"},"localTime":{"$ref":"#/$defs/LocalDateTime"}}},{"type":"object","title":"ReleaseOnApproval","description":"As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["on-approval"]}}}]},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
+const schema404 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema405 = {"type":"string","description":"A release id: `rel_` and 6 to 32 letters or digits.","pattern":"^rel_[A-Za-z0-9]{6,32}$"};
+const schema406 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema418 = {"type":"string","description":"Lifecycle. `draft`: proposed or being assembled, nothing locked. `awaiting_approval`: waiting for a person; its nodes are locked. `scheduled`: approved (or allowed by `auto` mode) and locked until it runs. `running`: claimed by the scheduler. `published`: applied; `outcome` names the snapshot. `conflict`: a pinned node or its live base changed; held, nothing published. `missed`: the scheduler reached it more than an hour late; nothing published. `expired`: no valid approval at its time. `failed`: refused at run time (e.g. a dependency is missing). `canceled`: withdrawn.","enum":["draft","awaiting_approval","scheduled","running","published","conflict","missed","expired","failed","canceled"]};
+const schema419 = {"type":"string","description":"`rl1:` and the lower-case hex SHA-256 of the release's canonical item lines (site id, then one line per item sorted by node id: kind, node id, target and base versions). The prefix keeps it apart from the graph state hash and from comment bindings (`cm1:`); approvals store it as their state.","pattern":"^rl1:[0-9a-f]{64}$"};
+const schema415 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema411 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema447 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const pattern202 = new RegExp("^rel_[A-Za-z0-9]{6,32}$", "u");
+const pattern204 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
+const pattern210 = new RegExp("^rl1:[0-9a-f]{64}$", "u");
+const schema407 = {"description":"One pinned change, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseSetItem","description":"Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).","additionalProperties":false,"required":["kind","nodeId","nodeKind","target"],"properties":{"kind":{"type":"string","enum":["set"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"target":{"$ref":"#/$defs/ReleaseNodeVersion"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}},{"type":"object","title":"ReleaseRemoveItem","description":"Take the node out of the live snapshot. `base` is the live version that is removed.","additionalProperties":false,"required":["kind","nodeId","nodeKind","base"],"properties":{"kind":{"type":"string","enum":["remove"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}}]};
+const schema409 = {"type":"string","description":"Kinds of graph node a release may carry. The site node is never one of them.","enum":["page","contentEntry","taxonomy","term","redirect","menu","asset"]};
+const schema410 = {"type":"object","description":"One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.","additionalProperties":false,"required":["rev","hash"],"properties":{"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}};
 
-function validate145(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate157(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate145.evaluated;
+const evaluated0 = validate157.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -25689,7 +27879,7 @@ errors++;
 if(data.hash !== undefined){
 let data1 = data.hash;
 if(typeof data1 === "string"){
-if(!pattern34.test(data1)){
+if(!pattern25.test(data1)){
 const err5 = {instancePath:instancePath+"/hash",schemaPath:"#/properties/hash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{64}$"},message:"must match pattern \""+"^[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -25722,16 +27912,16 @@ vErrors.push(err7);
 }
 errors++;
 }
-validate145.errors = vErrors;
+validate157.errors = vErrors;
 return errors === 0;
 }
-validate145.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate157.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate144(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate156(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate144.evaluated;
+const evaluated0 = validate156.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -25808,7 +27998,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(data0 === "set")){
-const err6 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema382.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema407.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -25876,7 +28066,7 @@ vErrors.push(err11);
 errors++;
 }
 if(!(((((((data2 === "page") || (data2 === "contentEntry")) || (data2 === "taxonomy")) || (data2 === "term")) || (data2 === "redirect")) || (data2 === "menu")) || (data2 === "asset"))){
-const err12 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/ReleaseNodeKind/enum",keyword:"enum",params:{allowedValues: schema384.enum},message:"must be equal to one of the allowed values"};
+const err12 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/ReleaseNodeKind/enum",keyword:"enum",params:{allowedValues: schema409.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -25887,14 +28077,14 @@ errors++;
 }
 }
 if(data.target !== undefined){
-if(!(validate145(data.target, {instancePath:instancePath+"/target",parentData:data,parentDataProperty:"target",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
+if(!(validate157(data.target, {instancePath:instancePath+"/target",parentData:data,parentDataProperty:"target",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
 errors = vErrors.length;
 }
 }
 if(data.base !== undefined){
-if(!(validate145(data.base, {instancePath:instancePath+"/base",parentData:data,parentDataProperty:"base",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
+if(!(validate157(data.base, {instancePath:instancePath+"/base",parentData:data,parentDataProperty:"base",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
 errors = vErrors.length;
 }
 }
@@ -25982,7 +28172,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data5 === "remove")){
-const err20 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema382.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema407.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -26050,7 +28240,7 @@ vErrors.push(err25);
 errors++;
 }
 if(!(((((((data7 === "page") || (data7 === "contentEntry")) || (data7 === "taxonomy")) || (data7 === "term")) || (data7 === "redirect")) || (data7 === "menu")) || (data7 === "asset"))){
-const err26 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/ReleaseNodeKind/enum",keyword:"enum",params:{allowedValues: schema384.enum},message:"must be equal to one of the allowed values"};
+const err26 = {instancePath:instancePath+"/nodeKind",schemaPath:"#/$defs/ReleaseNodeKind/enum",keyword:"enum",params:{allowedValues: schema409.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -26061,8 +28251,8 @@ errors++;
 }
 }
 if(data.base !== undefined){
-if(!(validate145(data.base, {instancePath:instancePath+"/base",parentData:data,parentDataProperty:"base",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
+if(!(validate157(data.base, {instancePath:instancePath+"/base",parentData:data,parentDataProperty:"base",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
 errors = vErrors.length;
 }
 }
@@ -26112,21 +28302,21 @@ vErrors = null;
 }
 }
 }
-validate144.errors = vErrors;
+validate156.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate144.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate156.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema389 = {"description":"When the release runs, discriminated by `kind`. Absent while a draft has no time yet.","oneOf":[{"type":"object","title":"ReleaseAt","description":"At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.","additionalProperties":false,"required":["kind","at","timeZone"],"properties":{"kind":{"type":"string","enum":["at"]},"at":{"$ref":"#/$defs/Timestamp"},"timeZone":{"$ref":"#/$defs/TimeZone"},"localTime":{"$ref":"#/$defs/LocalDateTime"}}},{"type":"object","title":"ReleaseOnApproval","description":"As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["on-approval"]}}}]};
-const schema391 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
-const schema392 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
-const pattern194 = new RegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$", "u");
+const schema414 = {"description":"When the release runs, discriminated by `kind`. Absent while a draft has no time yet.","oneOf":[{"type":"object","title":"ReleaseAt","description":"At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.","additionalProperties":false,"required":["kind","at","timeZone"],"properties":{"kind":{"type":"string","enum":["at"]},"at":{"$ref":"#/$defs/Timestamp"},"timeZone":{"$ref":"#/$defs/TimeZone"},"localTime":{"$ref":"#/$defs/LocalDateTime"}}},{"type":"object","title":"ReleaseOnApproval","description":"As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["on-approval"]}}}]};
+const schema416 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
+const schema417 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
+const pattern209 = new RegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$", "u");
 
-function validate150(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate162(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate150.evaluated;
+const evaluated0 = validate162.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -26193,7 +28383,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!(data0 === "at")){
-const err5 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema389.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema414.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -26241,7 +28431,7 @@ vErrors.push(err8);
 }
 errors++;
 }
-if(!pattern24.test(data2)){
+if(!pattern39.test(data2)){
 const err9 = {instancePath:instancePath+"/timeZone",schemaPath:"#/$defs/TimeZone/pattern",keyword:"pattern",params:{pattern: "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"},message:"must match pattern \""+"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"+"\""};
 if(vErrors === null){
 vErrors = [err9];
@@ -26266,7 +28456,7 @@ errors++;
 if(data.localTime !== undefined){
 let data3 = data.localTime;
 if(typeof data3 === "string"){
-if(!pattern194.test(data3)){
+if(!pattern209.test(data3)){
 const err11 = {instancePath:instancePath+"/localTime",schemaPath:"#/$defs/LocalDateTime/pattern",keyword:"pattern",params:{pattern: "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},message:"must match pattern \""+"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err11];
@@ -26342,7 +28532,7 @@ vErrors.push(err16);
 errors++;
 }
 if(!(data4 === "on-approval")){
-const err17 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema389.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err17 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema414.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -26398,22 +28588,22 @@ vErrors = null;
 }
 }
 }
-validate150.errors = vErrors;
+validate162.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate150.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate162.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema395 = {"description":"Why the release may run, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleasePersonApproval","description":"A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.","additionalProperties":false,"required":["kind","by","at"],"properties":{"kind":{"type":"string","enum":["person"]},"by":{"$ref":"#/$defs/ReleasePerson"},"at":{"$ref":"#/$defs/Timestamp"},"executeAt":{"$ref":"#/$defs/Timestamp"},"approvalId":{"$ref":"#/$defs/Id"}}},{"type":"object","title":"ReleaseAutoApproval","description":"An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.","additionalProperties":false,"required":["kind","by","keyId","at","windowEnds"],"properties":{"kind":{"type":"string","enum":["auto"]},"by":{"$ref":"#/$defs/Actor"},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"at":{"$ref":"#/$defs/Timestamp"},"windowEnds":{"$ref":"#/$defs/Timestamp"}}}]};
-const schema396 = {"type":"object","description":"A staff person (`user_…`). Agents never appear here.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}};
-const pattern199 = new RegExp("^[A-Za-z0-9_-]{6,64}$", "u");
-const schema400 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
-const schema401 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
+const schema420 = {"description":"Why the release may run, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleasePersonApproval","description":"A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.","additionalProperties":false,"required":["kind","by","at"],"properties":{"kind":{"type":"string","enum":["person"]},"by":{"$ref":"#/$defs/ReleasePerson"},"at":{"$ref":"#/$defs/Timestamp"},"executeAt":{"$ref":"#/$defs/Timestamp"},"approvalId":{"$ref":"#/$defs/Id"}}},{"type":"object","title":"ReleaseAutoApproval","description":"An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.","additionalProperties":false,"required":["kind","by","keyId","at","windowEnds"],"properties":{"kind":{"type":"string","enum":["auto"]},"by":{"$ref":"#/$defs/Actor"},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"at":{"$ref":"#/$defs/Timestamp"},"windowEnds":{"$ref":"#/$defs/Timestamp"}}}]};
+const schema421 = {"type":"object","description":"A staff person (`user_…`). Agents never appear here.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}};
+const pattern214 = new RegExp("^[A-Za-z0-9_-]{6,64}$", "u");
+const schema425 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
+const schema426 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
-function validate153(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate165(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate153.evaluated;
+const evaluated0 = validate165.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -26466,7 +28656,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data0 === "human") || (data0 === "agent")) || (data0 === "system"))){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema401.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/$defs/ActorKind/enum",keyword:"enum",params:{allowedValues: schema426.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -26557,16 +28747,16 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate153.errors = vErrors;
+validate165.errors = vErrors;
 return errors === 0;
 }
-validate153.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate165.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate152(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate164(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate152.evaluated;
+const evaluated0 = validate164.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -26633,7 +28823,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!(data0 === "person")){
-const err5 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema395.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema420.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -26671,7 +28861,7 @@ errors++;
 if(data1.id !== undefined){
 let data2 = data1.id;
 if(typeof data2 === "string"){
-if(!pattern173.test(data2)){
+if(!pattern188.test(data2)){
 const err8 = {instancePath:instancePath+"/by/id",schemaPath:"#/$defs/ReleasePerson/properties/id/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err8];
@@ -26919,7 +29109,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(data7 === "auto")){
-const err29 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema395.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema420.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -26930,15 +29120,15 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate153(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate153.errors : vErrors.concat(validate153.errors);
+if(!(validate165(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate165.errors : vErrors.concat(validate165.errors);
 errors = vErrors.length;
 }
 }
 if(data.keyId !== undefined){
 let data9 = data.keyId;
 if(typeof data9 === "string"){
-if(!pattern199.test(data9)){
+if(!pattern214.test(data9)){
 const err30 = {instancePath:instancePath+"/keyId",schemaPath:"#/oneOf/1/properties/keyId/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]{6,64}$"},message:"must match pattern \""+"^[A-Za-z0-9_-]{6,64}$"+"\""};
 if(vErrors === null){
 vErrors = [err30];
@@ -27056,20 +29246,20 @@ vErrors = null;
 }
 }
 }
-validate152.errors = vErrors;
+validate164.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate152.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate164.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema405 = {"description":"What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).","oneOf":[{"type":"object","title":"ReleasePublishedOutcome","description":"Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.","additionalProperties":false,"required":["kind","runId","at","snapshotId","baseSnapshotId","latenessSeconds","purge"],"properties":{"kind":{"type":"string","enum":["published"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"snapshotId":{"$ref":"#/$defs/Id"},"baseSnapshotId":{"$ref":"#/$defs/Id"},"latenessSeconds":{"type":"integer","minimum":0},"purge":{"type":"string","enum":["tags","everything","deferred","failed","none"]}}},{"type":"object","title":"ReleaseConflictOutcome","description":"Held: these nodes changed since the release was pinned. Nothing was published.","additionalProperties":false,"required":["kind","at","conflicts"],"properties":{"kind":{"type":"string","enum":["conflict"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"conflicts":{"type":"array","items":{"$ref":"#/$defs/ReleaseConflict"},"minItems":1,"maxItems":100}}},{"type":"object","title":"ReleaseFailedOutcome","description":"Refused at run time; nothing was published.","additionalProperties":false,"required":["kind","at","code"],"properties":{"kind":{"type":"string","enum":["failed"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"code":{"type":"string","enum":["dependency_missing","invalid_snapshot","site_missing","node_body_missing","store_error"]},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},{"type":"object","title":"ReleaseMissedOutcome","description":"The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.","additionalProperties":false,"required":["kind","at","latenessSeconds"],"properties":{"kind":{"type":"string","enum":["missed"]},"at":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0}}},{"type":"object","title":"ReleaseExpiredOutcome","description":"No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.","additionalProperties":false,"required":["kind","at","reason"],"properties":{"kind":{"type":"string","enum":["expired"]},"at":{"$ref":"#/$defs/Timestamp"},"reason":{"type":"string","enum":["unapproved","approval_lost","auto_window_ended","creator_removed"]}}},{"type":"object","title":"ReleaseCanceledOutcome","description":"Withdrawn by a person or an agent; its nodes are unlocked.","additionalProperties":false,"required":["kind","at","by"],"properties":{"kind":{"type":"string","enum":["canceled"]},"at":{"$ref":"#/$defs/Timestamp"},"by":{"$ref":"#/$defs/Actor"}}}]};
-const pattern206 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
-const schema412 = {"type":"object","description":"A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.","additionalProperties":false,"required":["nodeId"],"properties":{"nodeId":{"$ref":"#/$defs/Id"},"expected":{"$ref":"#/$defs/ReleaseNodeVersion"},"found":{"$ref":"#/$defs/ReleaseNodeVersion"}}};
+const schema430 = {"description":"What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).","oneOf":[{"type":"object","title":"ReleasePublishedOutcome","description":"Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.","additionalProperties":false,"required":["kind","runId","at","snapshotId","baseSnapshotId","latenessSeconds","purge"],"properties":{"kind":{"type":"string","enum":["published"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"snapshotId":{"$ref":"#/$defs/Id"},"baseSnapshotId":{"$ref":"#/$defs/Id"},"latenessSeconds":{"type":"integer","minimum":0},"purge":{"type":"string","enum":["tags","everything","deferred","failed","none"]}}},{"type":"object","title":"ReleaseConflictOutcome","description":"Held: these nodes changed since the release was pinned. Nothing was published.","additionalProperties":false,"required":["kind","at","conflicts"],"properties":{"kind":{"type":"string","enum":["conflict"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"conflicts":{"type":"array","items":{"$ref":"#/$defs/ReleaseConflict"},"minItems":1,"maxItems":100}}},{"type":"object","title":"ReleaseFailedOutcome","description":"Refused at run time; nothing was published.","additionalProperties":false,"required":["kind","at","code"],"properties":{"kind":{"type":"string","enum":["failed"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"code":{"type":"string","enum":["dependency_missing","invalid_snapshot","site_missing","node_body_missing","store_error"]},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},{"type":"object","title":"ReleaseMissedOutcome","description":"The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.","additionalProperties":false,"required":["kind","at","latenessSeconds"],"properties":{"kind":{"type":"string","enum":["missed"]},"at":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0}}},{"type":"object","title":"ReleaseExpiredOutcome","description":"No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.","additionalProperties":false,"required":["kind","at","reason"],"properties":{"kind":{"type":"string","enum":["expired"]},"at":{"$ref":"#/$defs/Timestamp"},"reason":{"type":"string","enum":["unapproved","approval_lost","auto_window_ended","creator_removed"]}}},{"type":"object","title":"ReleaseCanceledOutcome","description":"Withdrawn by a person or an agent; its nodes are unlocked.","additionalProperties":false,"required":["kind","at","by"],"properties":{"kind":{"type":"string","enum":["canceled"]},"at":{"$ref":"#/$defs/Timestamp"},"by":{"$ref":"#/$defs/Actor"}}}]};
+const pattern221 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
+const schema437 = {"type":"object","description":"A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.","additionalProperties":false,"required":["nodeId"],"properties":{"nodeId":{"$ref":"#/$defs/Id"},"expected":{"$ref":"#/$defs/ReleaseNodeVersion"},"found":{"$ref":"#/$defs/ReleaseNodeVersion"}}};
 
-function validate157(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate169(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate157.evaluated;
+const evaluated0 = validate169.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -27145,14 +29335,14 @@ errors++;
 }
 }
 if(data.expected !== undefined){
-if(!(validate145(data.expected, {instancePath:instancePath+"/expected",parentData:data,parentDataProperty:"expected",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
+if(!(validate157(data.expected, {instancePath:instancePath+"/expected",parentData:data,parentDataProperty:"expected",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
 errors = vErrors.length;
 }
 }
 if(data.found !== undefined){
-if(!(validate145(data.found, {instancePath:instancePath+"/found",parentData:data,parentDataProperty:"found",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate145.errors : vErrors.concat(validate145.errors);
+if(!(validate157(data.found, {instancePath:instancePath+"/found",parentData:data,parentDataProperty:"found",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
 errors = vErrors.length;
 }
 }
@@ -27167,16 +29357,16 @@ vErrors.push(err6);
 }
 errors++;
 }
-validate157.errors = vErrors;
+validate169.errors = vErrors;
 return errors === 0;
 }
-validate157.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate169.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate156(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate168(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate156.evaluated;
+const evaluated0 = validate168.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -27283,7 +29473,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(data0 === "published")){
-const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -27491,7 +29681,7 @@ vErrors.push(err26);
 errors++;
 }
 if(!(((((data6 === "tags") || (data6 === "everything")) || (data6 === "deferred")) || (data6 === "failed")) || (data6 === "none"))){
-const err27 = {instancePath:instancePath+"/purge",schemaPath:"#/oneOf/0/properties/purge/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[0].properties.purge.enum},message:"must be equal to one of the allowed values"};
+const err27 = {instancePath:instancePath+"/purge",schemaPath:"#/oneOf/0/properties/purge/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[0].properties.purge.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -27575,7 +29765,7 @@ vErrors.push(err33);
 errors++;
 }
 if(!(data7 === "conflict")){
-const err34 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err34 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err34];
 }
@@ -27680,8 +29870,8 @@ errors++;
 }
 const len0 = data10.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate157(data10[i0], {instancePath:instancePath+"/conflicts/" + i0,parentData:data10,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate157.errors : vErrors.concat(validate157.errors);
+if(!(validate169(data10[i0], {instancePath:instancePath+"/conflicts/" + i0,parentData:data10,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate169.errors : vErrors.concat(validate169.errors);
 errors = vErrors.length;
 }
 }
@@ -27778,7 +29968,7 @@ vErrors.push(err49);
 errors++;
 }
 if(!(data12 === "failed")){
-const err50 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err50 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/2/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[2].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err50];
 }
@@ -27871,7 +30061,7 @@ vErrors.push(err57);
 errors++;
 }
 if(!(((((data15 === "dependency_missing") || (data15 === "invalid_snapshot")) || (data15 === "site_missing")) || (data15 === "node_body_missing")) || (data15 === "store_error"))){
-const err58 = {instancePath:instancePath+"/code",schemaPath:"#/oneOf/2/properties/code/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[2].properties.code.enum},message:"must be equal to one of the allowed values"};
+const err58 = {instancePath:instancePath+"/code",schemaPath:"#/oneOf/2/properties/code/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[2].properties.code.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err58];
 }
@@ -27894,7 +30084,7 @@ vErrors.push(err59);
 }
 errors++;
 }
-if(!pattern206.test(data16)){
+if(!pattern221.test(data16)){
 const err60 = {instancePath:instancePath+"/message",schemaPath:"#/oneOf/2/properties/message/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err60];
@@ -27997,7 +30187,7 @@ vErrors.push(err67);
 errors++;
 }
 if(!(data17 === "missed")){
-const err68 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err68 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/3/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[3].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err68];
 }
@@ -28138,7 +30328,7 @@ vErrors.push(err78);
 errors++;
 }
 if(!(data20 === "expired")){
-const err79 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err79 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/4/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[4].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err79];
 }
@@ -28186,7 +30376,7 @@ vErrors.push(err82);
 errors++;
 }
 if(!((((data22 === "unapproved") || (data22 === "approval_lost")) || (data22 === "auto_window_ended")) || (data22 === "creator_removed"))){
-const err83 = {instancePath:instancePath+"/reason",schemaPath:"#/oneOf/4/properties/reason/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[4].properties.reason.enum},message:"must be equal to one of the allowed values"};
+const err83 = {instancePath:instancePath+"/reason",schemaPath:"#/oneOf/4/properties/reason/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[4].properties.reason.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err83];
 }
@@ -28277,7 +30467,7 @@ vErrors.push(err89);
 errors++;
 }
 if(!(data23 === "canceled")){
-const err90 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema405.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err90 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/5/properties/kind/enum",keyword:"enum",params:{allowedValues: schema430.oneOf[5].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err90];
 }
@@ -28313,8 +30503,8 @@ errors++;
 }
 }
 if(data.by !== undefined){
-if(!(validate153(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate153.errors : vErrors.concat(validate153.errors);
+if(!(validate165(data.by, {instancePath:instancePath+"/by",parentData:data,parentDataProperty:"by",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate165.errors : vErrors.concat(validate165.errors);
 errors = vErrors.length;
 }
 }
@@ -28368,18 +30558,18 @@ vErrors = null;
 }
 }
 }
-validate156.errors = vErrors;
+validate168.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate156.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate168.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 
-function validate143(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate155(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/release.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate143.evaluated;
+const evaluated0 = validate155.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -28488,7 +30678,7 @@ vErrors.push(err9);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema378.properties, key0))){
+if(!(func1.call(schema403.properties, key0))){
 const err10 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err10];
@@ -28512,7 +30702,7 @@ vErrors.push(err11);
 errors++;
 }
 if(!(data0 === 1)){
-const err12 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema379.enum},message:"must be equal to one of the allowed values"};
+const err12 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema404.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -28525,7 +30715,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern187.test(data1)){
+if(!pattern202.test(data1)){
 const err13 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/ReleaseId/pattern",keyword:"pattern",params:{pattern: "^rel_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^rel_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err13];
@@ -28615,7 +30805,7 @@ vErrors.push(err20);
 }
 errors++;
 }
-if(!pattern189.test(data3)){
+if(!pattern204.test(data3)){
 const err21 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err21];
@@ -28662,8 +30852,8 @@ errors++;
 }
 const len0 = data4.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate144(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate144.errors : vErrors.concat(validate144.errors);
+if(!(validate156(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate156.errors : vErrors.concat(validate156.errors);
 errors = vErrors.length;
 }
 }
@@ -28680,8 +30870,8 @@ errors++;
 }
 }
 if(data.when !== undefined){
-if(!(validate150(data.when, {instancePath:instancePath+"/when",parentData:data,parentDataProperty:"when",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate150.errors : vErrors.concat(validate150.errors);
+if(!(validate162(data.when, {instancePath:instancePath+"/when",parentData:data,parentDataProperty:"when",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate162.errors : vErrors.concat(validate162.errors);
 errors = vErrors.length;
 }
 }
@@ -28698,7 +30888,7 @@ vErrors.push(err26);
 errors++;
 }
 if(!((((((((((data7 === "draft") || (data7 === "awaiting_approval")) || (data7 === "scheduled")) || (data7 === "running")) || (data7 === "published")) || (data7 === "conflict")) || (data7 === "missed")) || (data7 === "expired")) || (data7 === "failed")) || (data7 === "canceled"))){
-const err27 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/ReleaseState/enum",keyword:"enum",params:{allowedValues: schema393.enum},message:"must be equal to one of the allowed values"};
+const err27 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/ReleaseState/enum",keyword:"enum",params:{allowedValues: schema418.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -28711,7 +30901,7 @@ errors++;
 if(data.hash !== undefined){
 let data8 = data.hash;
 if(typeof data8 === "string"){
-if(!pattern195.test(data8)){
+if(!pattern210.test(data8)){
 const err28 = {instancePath:instancePath+"/hash",schemaPath:"#/$defs/ReleaseHash/pattern",keyword:"pattern",params:{pattern: "^rl1:[0-9a-f]{64}$"},message:"must match pattern \""+"^rl1:[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err28];
@@ -28734,20 +30924,20 @@ errors++;
 }
 }
 if(data.approval !== undefined){
-if(!(validate152(data.approval, {instancePath:instancePath+"/approval",parentData:data,parentDataProperty:"approval",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate152.errors : vErrors.concat(validate152.errors);
+if(!(validate164(data.approval, {instancePath:instancePath+"/approval",parentData:data,parentDataProperty:"approval",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate164.errors : vErrors.concat(validate164.errors);
 errors = vErrors.length;
 }
 }
 if(data.outcome !== undefined){
-if(!(validate156(data.outcome, {instancePath:instancePath+"/outcome",parentData:data,parentDataProperty:"outcome",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate156.errors : vErrors.concat(validate156.errors);
+if(!(validate168(data.outcome, {instancePath:instancePath+"/outcome",parentData:data,parentDataProperty:"outcome",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate168.errors : vErrors.concat(validate168.errors);
 errors = vErrors.length;
 }
 }
 if(data.createdBy !== undefined){
-if(!(validate153(data.createdBy, {instancePath:instancePath+"/createdBy",parentData:data,parentDataProperty:"createdBy",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate153.errors : vErrors.concat(validate153.errors);
+if(!(validate165(data.createdBy, {instancePath:instancePath+"/createdBy",parentData:data,parentDataProperty:"createdBy",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate165.errors : vErrors.concat(validate165.errors);
 errors = vErrors.length;
 }
 }
@@ -28864,29 +31054,29 @@ vErrors.push(err38);
 }
 errors++;
 }
-validate143.errors = vErrors;
+validate155.errors = vErrors;
 return errors === 0;
 }
-validate143.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate155.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateAutomation = validate164;
-const schema423 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/automation.schema.json","title":"Automation","description":"A recurring job on a site (RFC-0008), created by a person in Studio: either a built-in deterministic job that Cloudhal runs itself (reports, findings and notifications; it never publishes), or a scheduled agent task that an external agent picks up over MCP with the automation's own key, inside a run window, under a mode cap and budgets. No language model runs inside Cloudhal. Scheduling never grants rights: every call of a task runs with the key's scopes narrowed to its owner's current role. Automations live in D1 next to the graph; they are not graph nodes and are not part of site bundles.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","name","job","recurrence","state","consecutiveFailures","owner","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/AutomationId"},"siteId":{"$ref":"#/$defs/Id"},"name":{"type":"string","minLength":1,"maxLength":120,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"job":{"$ref":"#/$defs/AutomationJob"},"recurrence":{"$ref":"#/$defs/AutomationRecurrence"},"state":{"$ref":"#/$defs/AutomationState"},"pausedReason":{"type":"string","description":"Why the automation is not `active`: a person paused it; its agent paused it; three consecutive failures; a run exceeded its budget; the site's kill switch; its key was revoked; its owner left or no longer holds the scopes it needs.","enum":["person","agent","failures","budget","kill-switch","key-revoked","owner-removed","role-changed"]},"consecutiveFailures":{"type":"integer","minimum":0},"owner":{"$ref":"#/$defs/AutomationOwner"},"nextRunAt":{"$ref":"#/$defs/Timestamp"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"AutomationBudget":{"type":"object","description":"Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.","additionalProperties":false,"required":["maxToolCalls","maxWrites","maxApprovalRequests","maxMinutes"],"properties":{"maxToolCalls":{"type":"integer","minimum":1,"maximum":500},"maxWrites":{"type":"integer","minimum":0,"maximum":200},"maxApprovalRequests":{"type":"integer","minimum":0,"maximum":20},"maxMinutes":{"type":"integer","minimum":1,"maximum":240}}},"AutomationId":{"type":"string","description":"An automation id: `aut_` and 6 to 32 letters or digits.","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"AutomationJob":{"description":"What runs, discriminated by `kind`.","oneOf":[{"type":"object","title":"BuiltinAutomationJob","description":"A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.","additionalProperties":false,"required":["kind","builtin"],"properties":{"kind":{"type":"string","enum":["builtin"]},"builtin":{"type":"string","enum":["broken-links","stale-content","feed-check","weekly-digest","cleanup"]},"staleAfterDays":{"type":"integer","description":"`stale-content` only: entries not updated for this many days are listed for review.","minimum":30,"maximum":1095}}},{"type":"object","title":"AgentTaskAutomationJob","description":"A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.","additionalProperties":false,"required":["kind","keyId","instructions","modeCap","readsUntrustedText","windowMinutes","budget"],"properties":{"kind":{"type":"string","enum":["agent-task"]},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"instructions":{"type":"string","description":"What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.","minLength":1,"maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"skill":{"type":"string","description":"A skill the run declares (its scopes and approval list narrow the run further).","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},"modeCap":{"type":"string","description":"The most autonomous mode a run may use; never `bypass`.","enum":["plan","manual","edits","auto"]},"readsUntrustedText":{"type":"boolean"},"windowMinutes":{"type":"integer","minimum":5,"maximum":240},"budget":{"$ref":"#/$defs/AutomationBudget"}}}]},"AutomationOwner":{"type":"object","description":"The person who created the automation and owns its key (`user_…`). Agents never own automations.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}},"AutomationRecurrence":{"type":"object","description":"When the automation runs: the first occurrence as a wall-clock time in `timeZone`, repeated by `rule` (absent: once). Occurrences are computed in the zone, so \"Mondays 09:07\" stays 09:07 across daylight-saving changes; a time that does not exist on a given day (a spring-forward gap) runs at the next valid minute, and a time that occurs twice runs once, at the first (a documented deviation from RFC 5545 §3.3.10, which drops such occurrences). `preset` records which Studio choice produced the rule.","additionalProperties":false,"required":["start","timeZone","preset"],"properties":{"start":{"$ref":"#/$defs/LocalDateTime"},"timeZone":{"$ref":"#/$defs/TimeZone"},"rule":{"$ref":"#/$defs/AutomationRule"},"preset":{"type":"string","enum":["once","hourly","daily","weekdays","weekly","monthly","custom"]}}},"AutomationRule":{"type":"string","description":"The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.","maxLength":300,"pattern":"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"},"AutomationState":{"type":"string","description":"`active` runs on its recurrence; `paused` and `auto-paused` (by failures or a budget) wait for a person to resume; `broken` needs a person to repair it (key revoked, owner gone); `ended` reached its COUNT or UNTIL.","enum":["active","paused","auto-paused","broken","ended"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"LocalDateTime":{"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
-const schema424 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema425 = {"type":"string","description":"An automation id: `aut_` and 6 to 32 letters or digits.","pattern":"^aut_[A-Za-z0-9]{6,32}$"};
-const schema426 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema433 = {"type":"string","description":"`active` runs on its recurrence; `paused` and `auto-paused` (by failures or a budget) wait for a person to resume; `broken` needs a person to repair it (key revoked, owner gone); `ended` reached its COUNT or UNTIL.","enum":["active","paused","auto-paused","broken","ended"]};
-const schema434 = {"type":"object","description":"The person who created the automation and owns its key (`user_…`). Agents never own automations.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}};
-const schema435 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema438 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const schema439 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern207 = new RegExp("^aut_[A-Za-z0-9]{6,32}$", "u");
-const schema427 = {"description":"What runs, discriminated by `kind`.","oneOf":[{"type":"object","title":"BuiltinAutomationJob","description":"A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.","additionalProperties":false,"required":["kind","builtin"],"properties":{"kind":{"type":"string","enum":["builtin"]},"builtin":{"type":"string","enum":["broken-links","stale-content","feed-check","weekly-digest","cleanup"]},"staleAfterDays":{"type":"integer","description":"`stale-content` only: entries not updated for this many days are listed for review.","minimum":30,"maximum":1095}}},{"type":"object","title":"AgentTaskAutomationJob","description":"A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.","additionalProperties":false,"required":["kind","keyId","instructions","modeCap","readsUntrustedText","windowMinutes","budget"],"properties":{"kind":{"type":"string","enum":["agent-task"]},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"instructions":{"type":"string","description":"What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.","minLength":1,"maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"skill":{"type":"string","description":"A skill the run declares (its scopes and approval list narrow the run further).","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},"modeCap":{"type":"string","description":"The most autonomous mode a run may use; never `bypass`.","enum":["plan","manual","edits","auto"]},"readsUntrustedText":{"type":"boolean"},"windowMinutes":{"type":"integer","minimum":5,"maximum":240},"budget":{"$ref":"#/$defs/AutomationBudget"}}}]};
-const schema428 = {"type":"object","description":"Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.","additionalProperties":false,"required":["maxToolCalls","maxWrites","maxApprovalRequests","maxMinutes"],"properties":{"maxToolCalls":{"type":"integer","minimum":1,"maximum":500},"maxWrites":{"type":"integer","minimum":0,"maximum":200},"maxApprovalRequests":{"type":"integer","minimum":0,"maximum":20},"maxMinutes":{"type":"integer","minimum":1,"maximum":240}}};
+export const validateAutomation = validate176;
+const schema448 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/automation.schema.json","title":"Automation","description":"A recurring job on a site (RFC-0008), created by a person in Studio: either a built-in deterministic job that Cloudhal runs itself (reports, findings and notifications; it never publishes), or a scheduled agent task that an external agent picks up over MCP with the automation's own key, inside a run window, under a mode cap and budgets. No language model runs inside Cloudhal. Scheduling never grants rights: every call of a task runs with the key's scopes narrowed to its owner's current role. Automations live in D1 next to the graph; they are not graph nodes and are not part of site bundles.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","name","job","recurrence","state","consecutiveFailures","owner","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/AutomationId"},"siteId":{"$ref":"#/$defs/Id"},"name":{"type":"string","minLength":1,"maxLength":120,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"job":{"$ref":"#/$defs/AutomationJob"},"recurrence":{"$ref":"#/$defs/AutomationRecurrence"},"state":{"$ref":"#/$defs/AutomationState"},"pausedReason":{"type":"string","description":"Why the automation is not `active`: a person paused it; its agent paused it; three consecutive failures; a run exceeded its budget; the site's kill switch; its key was revoked; its owner left or no longer holds the scopes it needs.","enum":["person","agent","failures","budget","kill-switch","key-revoked","owner-removed","role-changed"]},"consecutiveFailures":{"type":"integer","minimum":0},"owner":{"$ref":"#/$defs/AutomationOwner"},"nextRunAt":{"$ref":"#/$defs/Timestamp"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"AutomationBudget":{"type":"object","description":"Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.","additionalProperties":false,"required":["maxToolCalls","maxWrites","maxApprovalRequests","maxMinutes"],"properties":{"maxToolCalls":{"type":"integer","minimum":1,"maximum":500},"maxWrites":{"type":"integer","minimum":0,"maximum":200},"maxApprovalRequests":{"type":"integer","minimum":0,"maximum":20},"maxMinutes":{"type":"integer","minimum":1,"maximum":240}}},"AutomationId":{"type":"string","description":"An automation id: `aut_` and 6 to 32 letters or digits.","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"AutomationJob":{"description":"What runs, discriminated by `kind`.","oneOf":[{"type":"object","title":"BuiltinAutomationJob","description":"A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.","additionalProperties":false,"required":["kind","builtin"],"properties":{"kind":{"type":"string","enum":["builtin"]},"builtin":{"type":"string","enum":["broken-links","stale-content","feed-check","weekly-digest","cleanup"]},"staleAfterDays":{"type":"integer","description":"`stale-content` only: entries not updated for this many days are listed for review.","minimum":30,"maximum":1095}}},{"type":"object","title":"AgentTaskAutomationJob","description":"A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.","additionalProperties":false,"required":["kind","keyId","instructions","modeCap","readsUntrustedText","windowMinutes","budget"],"properties":{"kind":{"type":"string","enum":["agent-task"]},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"instructions":{"type":"string","description":"What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.","minLength":1,"maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"skill":{"type":"string","description":"A skill the run declares (its scopes and approval list narrow the run further).","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},"modeCap":{"type":"string","description":"The most autonomous mode a run may use; never `bypass`.","enum":["plan","manual","edits","auto"]},"readsUntrustedText":{"type":"boolean"},"windowMinutes":{"type":"integer","minimum":5,"maximum":240},"budget":{"$ref":"#/$defs/AutomationBudget"}}}]},"AutomationOwner":{"type":"object","description":"The person who created the automation and owns its key (`user_…`). Agents never own automations.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}},"AutomationRecurrence":{"type":"object","description":"When the automation runs: the first occurrence as a wall-clock time in `timeZone`, repeated by `rule` (absent: once). Occurrences are computed in the zone, so \"Mondays 09:07\" stays 09:07 across daylight-saving changes; a time that does not exist on a given day (a spring-forward gap) runs at the next valid minute, and a time that occurs twice runs once, at the first (a documented deviation from RFC 5545 §3.3.10, which drops such occurrences). `preset` records which Studio choice produced the rule.","additionalProperties":false,"required":["start","timeZone","preset"],"properties":{"start":{"$ref":"#/$defs/LocalDateTime"},"timeZone":{"$ref":"#/$defs/TimeZone"},"rule":{"$ref":"#/$defs/AutomationRule"},"preset":{"type":"string","enum":["once","hourly","daily","weekdays","weekly","monthly","custom"]}}},"AutomationRule":{"type":"string","description":"The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.","maxLength":300,"pattern":"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"},"AutomationState":{"type":"string","description":"`active` runs on its recurrence; `paused` and `auto-paused` (by failures or a budget) wait for a person to resume; `broken` needs a person to repair it (key revoked, owner gone); `ended` reached its COUNT or UNTIL.","enum":["active","paused","auto-paused","broken","ended"]},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"LocalDateTime":{"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"},"TimeZone":{"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64}}};
+const schema449 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema450 = {"type":"string","description":"An automation id: `aut_` and 6 to 32 letters or digits.","pattern":"^aut_[A-Za-z0-9]{6,32}$"};
+const schema451 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema458 = {"type":"string","description":"`active` runs on its recurrence; `paused` and `auto-paused` (by failures or a budget) wait for a person to resume; `broken` needs a person to repair it (key revoked, owner gone); `ended` reached its COUNT or UNTIL.","enum":["active","paused","auto-paused","broken","ended"]};
+const schema459 = {"type":"object","description":"The person who created the automation and owns its key (`user_…`). Agents never own automations.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}};
+const schema460 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema463 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const schema464 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
+const pattern222 = new RegExp("^aut_[A-Za-z0-9]{6,32}$", "u");
+const schema452 = {"description":"What runs, discriminated by `kind`.","oneOf":[{"type":"object","title":"BuiltinAutomationJob","description":"A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.","additionalProperties":false,"required":["kind","builtin"],"properties":{"kind":{"type":"string","enum":["builtin"]},"builtin":{"type":"string","enum":["broken-links","stale-content","feed-check","weekly-digest","cleanup"]},"staleAfterDays":{"type":"integer","description":"`stale-content` only: entries not updated for this many days are listed for review.","minimum":30,"maximum":1095}}},{"type":"object","title":"AgentTaskAutomationJob","description":"A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.","additionalProperties":false,"required":["kind","keyId","instructions","modeCap","readsUntrustedText","windowMinutes","budget"],"properties":{"kind":{"type":"string","enum":["agent-task"]},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"instructions":{"type":"string","description":"What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.","minLength":1,"maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"skill":{"type":"string","description":"A skill the run declares (its scopes and approval list narrow the run further).","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},"modeCap":{"type":"string","description":"The most autonomous mode a run may use; never `bypass`.","enum":["plan","manual","edits","auto"]},"readsUntrustedText":{"type":"boolean"},"windowMinutes":{"type":"integer","minimum":5,"maximum":240},"budget":{"$ref":"#/$defs/AutomationBudget"}}}]};
+const schema453 = {"type":"object","description":"Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.","additionalProperties":false,"required":["maxToolCalls","maxWrites","maxApprovalRequests","maxMinutes"],"properties":{"maxToolCalls":{"type":"integer","minimum":1,"maximum":500},"maxWrites":{"type":"integer","minimum":0,"maximum":200},"maxApprovalRequests":{"type":"integer","minimum":0,"maximum":20},"maxMinutes":{"type":"integer","minimum":1,"maximum":240}}};
 
-function validate165(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate177(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate165.evaluated;
+const evaluated0 = validate177.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -28943,7 +31133,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(data0 === "builtin")){
-const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema427.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema452.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -28966,7 +31156,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(((((data1 === "broken-links") || (data1 === "stale-content")) || (data1 === "feed-check")) || (data1 === "weekly-digest")) || (data1 === "cleanup"))){
-const err6 = {instancePath:instancePath+"/builtin",schemaPath:"#/oneOf/0/properties/builtin/enum",keyword:"enum",params:{allowedValues: schema427.oneOf[0].properties.builtin.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/builtin",schemaPath:"#/oneOf/0/properties/builtin/enum",keyword:"enum",params:{allowedValues: schema452.oneOf[0].properties.builtin.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -29125,7 +31315,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data3 === "agent-task")){
-const err20 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema427.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/kind",schemaPath:"#/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema452.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -29138,7 +31328,7 @@ errors++;
 if(data.keyId !== undefined){
 let data4 = data.keyId;
 if(typeof data4 === "string"){
-if(!pattern199.test(data4)){
+if(!pattern214.test(data4)){
 const err21 = {instancePath:instancePath+"/keyId",schemaPath:"#/oneOf/1/properties/keyId/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]{6,64}$"},message:"must match pattern \""+"^[A-Za-z0-9_-]{6,64}$"+"\""};
 if(vErrors === null){
 vErrors = [err21];
@@ -29183,7 +31373,7 @@ vErrors.push(err24);
 }
 errors++;
 }
-if(!pattern176.test(data5)){
+if(!pattern191.test(data5)){
 const err25 = {instancePath:instancePath+"/instructions",schemaPath:"#/oneOf/1/properties/instructions/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err25];
@@ -29253,7 +31443,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!((((data7 === "plan") || (data7 === "manual")) || (data7 === "edits")) || (data7 === "auto"))){
-const err31 = {instancePath:instancePath+"/modeCap",schemaPath:"#/oneOf/1/properties/modeCap/enum",keyword:"enum",params:{allowedValues: schema427.oneOf[1].properties.modeCap.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/modeCap",schemaPath:"#/oneOf/1/properties/modeCap/enum",keyword:"enum",params:{allowedValues: schema452.oneOf[1].properties.modeCap.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -29563,22 +31753,22 @@ vErrors = null;
 }
 }
 }
-validate165.errors = vErrors;
+validate177.errors = vErrors;
 evaluated0.props = props0;
 return errors === 0;
 }
-validate165.evaluated = {"dynamicProps":true,"dynamicItems":false};
+validate177.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
-const schema429 = {"type":"object","description":"When the automation runs: the first occurrence as a wall-clock time in `timeZone`, repeated by `rule` (absent: once). Occurrences are computed in the zone, so \"Mondays 09:07\" stays 09:07 across daylight-saving changes; a time that does not exist on a given day (a spring-forward gap) runs at the next valid minute, and a time that occurs twice runs once, at the first (a documented deviation from RFC 5545 §3.3.10, which drops such occurrences). `preset` records which Studio choice produced the rule.","additionalProperties":false,"required":["start","timeZone","preset"],"properties":{"start":{"$ref":"#/$defs/LocalDateTime"},"timeZone":{"$ref":"#/$defs/TimeZone"},"rule":{"$ref":"#/$defs/AutomationRule"},"preset":{"type":"string","enum":["once","hourly","daily","weekdays","weekly","monthly","custom"]}}};
-const schema430 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
-const schema431 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
-const schema432 = {"type":"string","description":"The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.","maxLength":300,"pattern":"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"};
-const pattern215 = new RegExp("^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$", "u");
+const schema454 = {"type":"object","description":"When the automation runs: the first occurrence as a wall-clock time in `timeZone`, repeated by `rule` (absent: once). Occurrences are computed in the zone, so \"Mondays 09:07\" stays 09:07 across daylight-saving changes; a time that does not exist on a given day (a spring-forward gap) runs at the next valid minute, and a time that occurs twice runs once, at the first (a documented deviation from RFC 5545 §3.3.10, which drops such occurrences). `preset` records which Studio choice produced the rule.","additionalProperties":false,"required":["start","timeZone","preset"],"properties":{"start":{"$ref":"#/$defs/LocalDateTime"},"timeZone":{"$ref":"#/$defs/TimeZone"},"rule":{"$ref":"#/$defs/AutomationRule"},"preset":{"type":"string","enum":["once","hourly","daily","weekdays","weekly","monthly","custom"]}}};
+const schema455 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
+const schema456 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
+const schema457 = {"type":"string","description":"The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.","maxLength":300,"pattern":"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"};
+const pattern230 = new RegExp("^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$", "u");
 
-function validate167(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate179(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate167.evaluated;
+const evaluated0 = validate179.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -29631,7 +31821,7 @@ errors++;
 if(data.start !== undefined){
 let data0 = data.start;
 if(typeof data0 === "string"){
-if(!pattern194.test(data0)){
+if(!pattern209.test(data0)){
 const err4 = {instancePath:instancePath+"/start",schemaPath:"#/$defs/LocalDateTime/pattern",keyword:"pattern",params:{pattern: "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},message:"must match pattern \""+"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err4];
@@ -29666,7 +31856,7 @@ vErrors.push(err6);
 }
 errors++;
 }
-if(!pattern24.test(data1)){
+if(!pattern39.test(data1)){
 const err7 = {instancePath:instancePath+"/timeZone",schemaPath:"#/$defs/TimeZone/pattern",keyword:"pattern",params:{pattern: "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"},message:"must match pattern \""+"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$"+"\""};
 if(vErrors === null){
 vErrors = [err7];
@@ -29701,7 +31891,7 @@ vErrors.push(err9);
 }
 errors++;
 }
-if(!pattern215.test(data2)){
+if(!pattern230.test(data2)){
 const err10 = {instancePath:instancePath+"/rule",schemaPath:"#/$defs/AutomationRule/pattern",keyword:"pattern",params:{pattern: "^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"},message:"must match pattern \""+"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"+"\""};
 if(vErrors === null){
 vErrors = [err10];
@@ -29736,7 +31926,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(((((((data3 === "once") || (data3 === "hourly")) || (data3 === "daily")) || (data3 === "weekdays")) || (data3 === "weekly")) || (data3 === "monthly")) || (data3 === "custom"))){
-const err13 = {instancePath:instancePath+"/preset",schemaPath:"#/properties/preset/enum",keyword:"enum",params:{allowedValues: schema429.properties.preset.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/preset",schemaPath:"#/properties/preset/enum",keyword:"enum",params:{allowedValues: schema454.properties.preset.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -29757,17 +31947,17 @@ vErrors.push(err14);
 }
 errors++;
 }
-validate167.errors = vErrors;
+validate179.errors = vErrors;
 return errors === 0;
 }
-validate167.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate179.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate164(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate176(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/automation.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate164.evaluated;
+const evaluated0 = validate176.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -29896,7 +32086,7 @@ vErrors.push(err11);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema423.properties, key0))){
+if(!(func1.call(schema448.properties, key0))){
 const err12 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err12];
@@ -29920,7 +32110,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data0 === 1)){
-const err14 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema424.enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema449.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -29933,7 +32123,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern207.test(data1)){
+if(!pattern222.test(data1)){
 const err15 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/AutomationId/pattern",keyword:"pattern",params:{pattern: "^aut_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^aut_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err15];
@@ -30023,7 +32213,7 @@ vErrors.push(err22);
 }
 errors++;
 }
-if(!pattern189.test(data3)){
+if(!pattern204.test(data3)){
 const err23 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err23];
@@ -30046,14 +32236,14 @@ errors++;
 }
 }
 if(data.job !== undefined){
-if(!(validate165(data.job, {instancePath:instancePath+"/job",parentData:data,parentDataProperty:"job",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate165.errors : vErrors.concat(validate165.errors);
+if(!(validate177(data.job, {instancePath:instancePath+"/job",parentData:data,parentDataProperty:"job",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate177.errors : vErrors.concat(validate177.errors);
 errors = vErrors.length;
 }
 }
 if(data.recurrence !== undefined){
-if(!(validate167(data.recurrence, {instancePath:instancePath+"/recurrence",parentData:data,parentDataProperty:"recurrence",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate167.errors : vErrors.concat(validate167.errors);
+if(!(validate179(data.recurrence, {instancePath:instancePath+"/recurrence",parentData:data,parentDataProperty:"recurrence",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate179.errors : vErrors.concat(validate179.errors);
 errors = vErrors.length;
 }
 }
@@ -30070,7 +32260,7 @@ vErrors.push(err25);
 errors++;
 }
 if(!(((((data6 === "active") || (data6 === "paused")) || (data6 === "auto-paused")) || (data6 === "broken")) || (data6 === "ended"))){
-const err26 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/AutomationState/enum",keyword:"enum",params:{allowedValues: schema433.enum},message:"must be equal to one of the allowed values"};
+const err26 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/AutomationState/enum",keyword:"enum",params:{allowedValues: schema458.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -30093,7 +32283,7 @@ vErrors.push(err27);
 errors++;
 }
 if(!((((((((data7 === "person") || (data7 === "agent")) || (data7 === "failures")) || (data7 === "budget")) || (data7 === "kill-switch")) || (data7 === "key-revoked")) || (data7 === "owner-removed")) || (data7 === "role-changed"))){
-const err28 = {instancePath:instancePath+"/pausedReason",schemaPath:"#/properties/pausedReason/enum",keyword:"enum",params:{allowedValues: schema423.properties.pausedReason.enum},message:"must be equal to one of the allowed values"};
+const err28 = {instancePath:instancePath+"/pausedReason",schemaPath:"#/properties/pausedReason/enum",keyword:"enum",params:{allowedValues: schema448.properties.pausedReason.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err28];
 }
@@ -30156,7 +32346,7 @@ errors++;
 if(data9.id !== undefined){
 let data10 = data9.id;
 if(typeof data10 === "string"){
-if(!pattern173.test(data10)){
+if(!pattern188.test(data10)){
 const err33 = {instancePath:instancePath+"/owner/id",schemaPath:"#/$defs/AutomationOwner/properties/id/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err33];
@@ -30353,30 +32543,30 @@ vErrors.push(err48);
 }
 errors++;
 }
-validate164.errors = vErrors;
+validate176.errors = vErrors;
 return errors === 0;
 }
-validate164.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate176.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-export const validateScheduleRun = validate169;
-const schema440 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/schedule-run.schema.json","title":"ScheduleRun","description":"One occurrence of something scheduled (RFC-0008): a release's execution or an automation's run. Its id is derived from the subject and `occurrenceAt`, so a second scheduler tick that reaches the same occurrence finds the same row and the effect happens at most once. `state` says whether the run itself completed; `outcome` says whether it did any work, because a run that ended cleanly may still have done nothing. Runs live in D1 and are kept 90 days; the audit log keeps what each call did.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","subject","occurrenceAt","state","attempt","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/ScheduleRunId"},"siteId":{"$ref":"#/$defs/Id"},"subject":{"$ref":"#/$defs/ScheduleRunSubject"},"occurrenceAt":{"$ref":"#/$defs/Timestamp"},"state":{"$ref":"#/$defs/ScheduleRunState"},"outcome":{"type":"string","description":"What the run achieved, separately from whether it completed: `did-work` changed something or produced findings; `nothing-to-do`; `proposed` left drafts or proposals for people; `waiting-approval` filed requests a person must decide.","enum":["did-work","nothing-to-do","proposed","waiting-approval"]},"trigger":{"type":"string","description":"What woke the scheduler: the every-minute cron trigger, the Durable Object clock's alarm, an admin request (backstop), the Node timer, or a person (\"Run now\", \"Publish now\").","enum":["cron","alarm","request","node","manual"]},"attempt":{"type":"integer","minimum":1},"startedAt":{"$ref":"#/$defs/Timestamp"},"endedAt":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0},"adjusted":{"type":"string","description":"The occurrence was moved: `dst-gap` (the wall-clock time did not exist that day, so it ran at the next valid minute) or `tzdata` (the zone's rules changed after it was planned).","enum":["dst-gap","tzdata"]},"window":{"$ref":"#/$defs/ScheduleRunWindow"},"usage":{"$ref":"#/$defs/ScheduleRunUsage"},"taint":{"$ref":"#/$defs/ScheduleRunTaint"},"summary":{"type":"string","description":"The agent's own account of the run (`end_run`) or the built-in job's report line. Plain text written by an agent: Studio renders it as text and never as an instruction.","maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"counts":{"type":"object","description":"Findings by name (e.g. `broken-links`, `stale-entries`, `proposals`).","propertyNames":{"type":"string","pattern":"^[a-z][a-z0-9-]{0,40}$"},"maxProperties":20,"additionalProperties":{"type":"integer","minimum":0}},"approvalIds":{"type":"array","description":"Approval requests the run filed.","items":{"$ref":"#/$defs/Id"},"uniqueItems":true,"maxItems":50},"error":{"$ref":"#/$defs/ScheduleRunError"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"ScheduleRunError":{"type":"object","additionalProperties":false,"required":["code"],"properties":{"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},"ScheduleRunId":{"type":"string","description":"A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).","pattern":"^run_[A-Za-z0-9]{6,32}$"},"ScheduleRunState":{"type":"string","description":"`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.","enum":["due","ready","running","succeeded","failed","missed","skipped","budget-exceeded","killed"]},"ScheduleRunSubject":{"description":"What ran, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseRunSubject","additionalProperties":false,"required":["kind","releaseId"],"properties":{"kind":{"type":"string","enum":["release"]},"releaseId":{"type":"string","pattern":"^rel_[A-Za-z0-9]{6,32}$"}}},{"type":"object","title":"AutomationRunSubject","additionalProperties":false,"required":["kind","automationId","job"],"properties":{"kind":{"type":"string","enum":["automation"]},"automationId":{"type":"string","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"job":{"type":"string","enum":["builtin","agent-task"]}}}]},"ScheduleRunTaint":{"type":"object","description":"The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.","additionalProperties":false,"required":["at","tool"],"properties":{"at":{"$ref":"#/$defs/Timestamp"},"tool":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}},"ScheduleRunUsage":{"type":"object","description":"What the run used against its budget, counted by the server.","additionalProperties":false,"required":["toolCalls","writes","approvalRequests"],"properties":{"toolCalls":{"type":"integer","minimum":0},"writes":{"type":"integer","minimum":0},"approvalRequests":{"type":"integer","minimum":0}}},"ScheduleRunWindow":{"type":"object","description":"An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.","additionalProperties":false,"required":["opensAt","closesAt"],"properties":{"opensAt":{"$ref":"#/$defs/Timestamp"},"closesAt":{"$ref":"#/$defs/Timestamp"}}},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
-const schema441 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
-const schema442 = {"type":"string","description":"A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).","pattern":"^run_[A-Za-z0-9]{6,32}$"};
-const schema443 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
-const schema444 = {"description":"What ran, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseRunSubject","additionalProperties":false,"required":["kind","releaseId"],"properties":{"kind":{"type":"string","enum":["release"]},"releaseId":{"type":"string","pattern":"^rel_[A-Za-z0-9]{6,32}$"}}},{"type":"object","title":"AutomationRunSubject","additionalProperties":false,"required":["kind","automationId","job"],"properties":{"kind":{"type":"string","enum":["automation"]},"automationId":{"type":"string","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"job":{"type":"string","enum":["builtin","agent-task"]}}}]};
-const schema445 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
-const schema446 = {"type":"string","description":"`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.","enum":["due","ready","running","succeeded","failed","missed","skipped","budget-exceeded","killed"]};
-const schema452 = {"type":"object","description":"What the run used against its budget, counted by the server.","additionalProperties":false,"required":["toolCalls","writes","approvalRequests"],"properties":{"toolCalls":{"type":"integer","minimum":0},"writes":{"type":"integer","minimum":0},"approvalRequests":{"type":"integer","minimum":0}}};
-const schema456 = {"type":"object","additionalProperties":false,"required":["code"],"properties":{"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}};
-const schema459 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const pattern217 = new RegExp("^run_[A-Za-z0-9]{6,32}$", "u");
-const pattern221 = new RegExp("^[a-z][a-z0-9_]{0,63}$", "u");
-const schema449 = {"type":"object","description":"An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.","additionalProperties":false,"required":["opensAt","closesAt"],"properties":{"opensAt":{"$ref":"#/$defs/Timestamp"},"closesAt":{"$ref":"#/$defs/Timestamp"}}};
+export const validateScheduleRun = validate181;
+const schema465 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/schedule-run.schema.json","title":"ScheduleRun","description":"One occurrence of something scheduled (RFC-0008): a release's execution or an automation's run. Its id is derived from the subject and `occurrenceAt`, so a second scheduler tick that reaches the same occurrence finds the same row and the effect happens at most once. `state` says whether the run itself completed; `outcome` says whether it did any work, because a run that ended cleanly may still have done nothing. Runs live in D1 and are kept 90 days; the audit log keeps what each call did.","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","subject","occurrenceAt","state","attempt","createdAt","updatedAt","rev"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/ScheduleRunId"},"siteId":{"$ref":"#/$defs/Id"},"subject":{"$ref":"#/$defs/ScheduleRunSubject"},"occurrenceAt":{"$ref":"#/$defs/Timestamp"},"state":{"$ref":"#/$defs/ScheduleRunState"},"outcome":{"type":"string","description":"What the run achieved, separately from whether it completed: `did-work` changed something or produced findings; `nothing-to-do`; `proposed` left drafts or proposals for people; `waiting-approval` filed requests a person must decide.","enum":["did-work","nothing-to-do","proposed","waiting-approval"]},"trigger":{"type":"string","description":"What woke the scheduler: the every-minute cron trigger, the Durable Object clock's alarm, an admin request (backstop), the Node timer, or a person (\"Run now\", \"Publish now\").","enum":["cron","alarm","request","node","manual"]},"attempt":{"type":"integer","minimum":1},"startedAt":{"$ref":"#/$defs/Timestamp"},"endedAt":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0},"adjusted":{"type":"string","description":"The occurrence was moved: `dst-gap` (the wall-clock time did not exist that day, so it ran at the next valid minute) or `tzdata` (the zone's rules changed after it was planned).","enum":["dst-gap","tzdata"]},"window":{"$ref":"#/$defs/ScheduleRunWindow"},"usage":{"$ref":"#/$defs/ScheduleRunUsage"},"taint":{"$ref":"#/$defs/ScheduleRunTaint"},"summary":{"type":"string","description":"The agent's own account of the run (`end_run`) or the built-in job's report line. Plain text written by an agent: Studio renders it as text and never as an instruction.","maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"counts":{"type":"object","description":"Findings by name (e.g. `broken-links`, `stale-entries`, `proposals`).","propertyNames":{"type":"string","pattern":"^[a-z][a-z0-9-]{0,40}$"},"maxProperties":20,"additionalProperties":{"type":"integer","minimum":0}},"approvalIds":{"type":"array","description":"Approval requests the run filed.","items":{"$ref":"#/$defs/Id"},"uniqueItems":true,"maxItems":50},"error":{"$ref":"#/$defs/ScheduleRunError"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"rev":{"$ref":"#/$defs/Revision"}},"$defs":{"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"ScheduleRunError":{"type":"object","additionalProperties":false,"required":["code"],"properties":{"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},"ScheduleRunId":{"type":"string","description":"A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).","pattern":"^run_[A-Za-z0-9]{6,32}$"},"ScheduleRunState":{"type":"string","description":"`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.","enum":["due","ready","running","succeeded","failed","missed","skipped","budget-exceeded","killed"]},"ScheduleRunSubject":{"description":"What ran, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseRunSubject","additionalProperties":false,"required":["kind","releaseId"],"properties":{"kind":{"type":"string","enum":["release"]},"releaseId":{"type":"string","pattern":"^rel_[A-Za-z0-9]{6,32}$"}}},{"type":"object","title":"AutomationRunSubject","additionalProperties":false,"required":["kind","automationId","job"],"properties":{"kind":{"type":"string","enum":["automation"]},"automationId":{"type":"string","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"job":{"type":"string","enum":["builtin","agent-task"]}}}]},"ScheduleRunTaint":{"type":"object","description":"The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.","additionalProperties":false,"required":["at","tool"],"properties":{"at":{"$ref":"#/$defs/Timestamp"},"tool":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}},"ScheduleRunUsage":{"type":"object","description":"What the run used against its budget, counted by the server.","additionalProperties":false,"required":["toolCalls","writes","approvalRequests"],"properties":{"toolCalls":{"type":"integer","minimum":0},"writes":{"type":"integer","minimum":0},"approvalRequests":{"type":"integer","minimum":0}}},"ScheduleRunWindow":{"type":"object","description":"An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.","additionalProperties":false,"required":["opensAt","closesAt"],"properties":{"opensAt":{"$ref":"#/$defs/Timestamp"},"closesAt":{"$ref":"#/$defs/Timestamp"}}},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema466 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
+const schema467 = {"type":"string","description":"A run id: `run_` and 6 to 32 letters or digits, derived from the subject id and `occurrenceAt` (the occurrence's idempotency key).","pattern":"^run_[A-Za-z0-9]{6,32}$"};
+const schema468 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
+const schema469 = {"description":"What ran, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseRunSubject","additionalProperties":false,"required":["kind","releaseId"],"properties":{"kind":{"type":"string","enum":["release"]},"releaseId":{"type":"string","pattern":"^rel_[A-Za-z0-9]{6,32}$"}}},{"type":"object","title":"AutomationRunSubject","additionalProperties":false,"required":["kind","automationId","job"],"properties":{"kind":{"type":"string","enum":["automation"]},"automationId":{"type":"string","pattern":"^aut_[A-Za-z0-9]{6,32}$"},"job":{"type":"string","enum":["builtin","agent-task"]}}}]};
+const schema470 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
+const schema471 = {"type":"string","description":"`due`: claimed occurrence not started yet; `ready`: an agent task's window is open and waits for `begin_run`; `running`; `succeeded`; `failed`; `missed`: the window closed or the scheduler came too late; `skipped`: a missed occurrence coalesced into a later one; `budget-exceeded`; `killed`: stopped by a pause or a kill switch.","enum":["due","ready","running","succeeded","failed","missed","skipped","budget-exceeded","killed"]};
+const schema477 = {"type":"object","description":"What the run used against its budget, counted by the server.","additionalProperties":false,"required":["toolCalls","writes","approvalRequests"],"properties":{"toolCalls":{"type":"integer","minimum":0},"writes":{"type":"integer","minimum":0},"approvalRequests":{"type":"integer","minimum":0}}};
+const schema481 = {"type":"object","additionalProperties":false,"required":["code"],"properties":{"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}};
+const schema484 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
+const pattern232 = new RegExp("^run_[A-Za-z0-9]{6,32}$", "u");
+const pattern236 = new RegExp("^[a-z][a-z0-9_]{0,63}$", "u");
+const schema474 = {"type":"object","description":"An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.","additionalProperties":false,"required":["opensAt","closesAt"],"properties":{"opensAt":{"$ref":"#/$defs/Timestamp"},"closesAt":{"$ref":"#/$defs/Timestamp"}}};
 
-function validate170(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate182(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate170.evaluated;
+const evaluated0 = validate182.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -30477,17 +32667,17 @@ vErrors.push(err7);
 }
 errors++;
 }
-validate170.errors = vErrors;
+validate182.errors = vErrors;
 return errors === 0;
 }
-validate170.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate182.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema453 = {"type":"object","description":"The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.","additionalProperties":false,"required":["at","tool"],"properties":{"at":{"$ref":"#/$defs/Timestamp"},"tool":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}};
+const schema478 = {"type":"object","description":"The run read visitor-supplied text at `at` through `tool`; from then on it may only read, label, hide and pause.","additionalProperties":false,"required":["at","tool"],"properties":{"at":{"$ref":"#/$defs/Timestamp"},"tool":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"}}};
 
-function validate172(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate184(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate172.evaluated;
+const evaluated0 = validate184.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -30555,7 +32745,7 @@ errors++;
 if(data.tool !== undefined){
 let data1 = data.tool;
 if(typeof data1 === "string"){
-if(!pattern221.test(data1)){
+if(!pattern236.test(data1)){
 const err5 = {instancePath:instancePath+"/tool",schemaPath:"#/properties/tool/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9_]{0,63}$"},message:"must match pattern \""+"^[a-z][a-z0-9_]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -30588,17 +32778,17 @@ vErrors.push(err7);
 }
 errors++;
 }
-validate172.errors = vErrors;
+validate184.errors = vErrors;
 return errors === 0;
 }
-validate172.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate184.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 
-function validate169(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
+function validate181(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/schedule-run.schema.json" */;
 let vErrors = null;
 let errors = 0;
-const evaluated0 = validate169.evaluated;
+const evaluated0 = validate181.evaluated;
 if(evaluated0.dynamicProps){
 evaluated0.props = undefined;
 }
@@ -30707,7 +32897,7 @@ vErrors.push(err9);
 errors++;
 }
 for(const key0 in data){
-if(!(func1.call(schema440.properties, key0))){
+if(!(func1.call(schema465.properties, key0))){
 const err10 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err10];
@@ -30731,7 +32921,7 @@ vErrors.push(err11);
 errors++;
 }
 if(!(data0 === 1)){
-const err12 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema441.enum},message:"must be equal to one of the allowed values"};
+const err12 = {instancePath:instancePath+"/schemaVersion",schemaPath:"#/$defs/SchemaVersion/enum",keyword:"enum",params:{allowedValues: schema466.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -30744,7 +32934,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern217.test(data1)){
+if(!pattern232.test(data1)){
 const err13 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/ScheduleRunId/pattern",keyword:"pattern",params:{pattern: "^run_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^run_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err13];
@@ -30863,7 +33053,7 @@ vErrors.push(err22);
 errors++;
 }
 if(!(data4 === "release")){
-const err23 = {instancePath:instancePath+"/subject/kind",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema444.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err23 = {instancePath:instancePath+"/subject/kind",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/0/properties/kind/enum",keyword:"enum",params:{allowedValues: schema469.oneOf[0].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -30876,7 +33066,7 @@ errors++;
 if(data3.releaseId !== undefined){
 let data5 = data3.releaseId;
 if(typeof data5 === "string"){
-if(!pattern187.test(data5)){
+if(!pattern202.test(data5)){
 const err24 = {instancePath:instancePath+"/subject/releaseId",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/0/properties/releaseId/pattern",keyword:"pattern",params:{pattern: "^rel_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^rel_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err24];
@@ -30972,7 +33162,7 @@ vErrors.push(err31);
 errors++;
 }
 if(!(data6 === "automation")){
-const err32 = {instancePath:instancePath+"/subject/kind",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema444.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
+const err32 = {instancePath:instancePath+"/subject/kind",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/kind/enum",keyword:"enum",params:{allowedValues: schema469.oneOf[1].properties.kind.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -30985,7 +33175,7 @@ errors++;
 if(data3.automationId !== undefined){
 let data7 = data3.automationId;
 if(typeof data7 === "string"){
-if(!pattern207.test(data7)){
+if(!pattern222.test(data7)){
 const err33 = {instancePath:instancePath+"/subject/automationId",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/automationId/pattern",keyword:"pattern",params:{pattern: "^aut_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^aut_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err33];
@@ -31020,7 +33210,7 @@ vErrors.push(err35);
 errors++;
 }
 if(!((data8 === "builtin") || (data8 === "agent-task"))){
-const err36 = {instancePath:instancePath+"/subject/job",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/job/enum",keyword:"enum",params:{allowedValues: schema444.oneOf[1].properties.job.enum},message:"must be equal to one of the allowed values"};
+const err36 = {instancePath:instancePath+"/subject/job",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/job/enum",keyword:"enum",params:{allowedValues: schema469.oneOf[1].properties.job.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err36];
 }
@@ -31115,7 +33305,7 @@ vErrors.push(err41);
 errors++;
 }
 if(!(((((((((data10 === "due") || (data10 === "ready")) || (data10 === "running")) || (data10 === "succeeded")) || (data10 === "failed")) || (data10 === "missed")) || (data10 === "skipped")) || (data10 === "budget-exceeded")) || (data10 === "killed"))){
-const err42 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/ScheduleRunState/enum",keyword:"enum",params:{allowedValues: schema446.enum},message:"must be equal to one of the allowed values"};
+const err42 = {instancePath:instancePath+"/state",schemaPath:"#/$defs/ScheduleRunState/enum",keyword:"enum",params:{allowedValues: schema471.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err42];
 }
@@ -31138,7 +33328,7 @@ vErrors.push(err43);
 errors++;
 }
 if(!((((data11 === "did-work") || (data11 === "nothing-to-do")) || (data11 === "proposed")) || (data11 === "waiting-approval"))){
-const err44 = {instancePath:instancePath+"/outcome",schemaPath:"#/properties/outcome/enum",keyword:"enum",params:{allowedValues: schema440.properties.outcome.enum},message:"must be equal to one of the allowed values"};
+const err44 = {instancePath:instancePath+"/outcome",schemaPath:"#/properties/outcome/enum",keyword:"enum",params:{allowedValues: schema465.properties.outcome.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err44];
 }
@@ -31161,7 +33351,7 @@ vErrors.push(err45);
 errors++;
 }
 if(!(((((data12 === "cron") || (data12 === "alarm")) || (data12 === "request")) || (data12 === "node")) || (data12 === "manual"))){
-const err46 = {instancePath:instancePath+"/trigger",schemaPath:"#/properties/trigger/enum",keyword:"enum",params:{allowedValues: schema440.properties.trigger.enum},message:"must be equal to one of the allowed values"};
+const err46 = {instancePath:instancePath+"/trigger",schemaPath:"#/properties/trigger/enum",keyword:"enum",params:{allowedValues: schema465.properties.trigger.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err46];
 }
@@ -31284,7 +33474,7 @@ vErrors.push(err55);
 errors++;
 }
 if(!((data17 === "dst-gap") || (data17 === "tzdata"))){
-const err56 = {instancePath:instancePath+"/adjusted",schemaPath:"#/properties/adjusted/enum",keyword:"enum",params:{allowedValues: schema440.properties.adjusted.enum},message:"must be equal to one of the allowed values"};
+const err56 = {instancePath:instancePath+"/adjusted",schemaPath:"#/properties/adjusted/enum",keyword:"enum",params:{allowedValues: schema465.properties.adjusted.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err56];
 }
@@ -31295,8 +33485,8 @@ errors++;
 }
 }
 if(data.window !== undefined){
-if(!(validate170(data.window, {instancePath:instancePath+"/window",parentData:data,parentDataProperty:"window",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate170.errors : vErrors.concat(validate170.errors);
+if(!(validate182(data.window, {instancePath:instancePath+"/window",parentData:data,parentDataProperty:"window",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate182.errors : vErrors.concat(validate182.errors);
 errors = vErrors.length;
 }
 }
@@ -31433,8 +33623,8 @@ errors++;
 }
 }
 if(data.taint !== undefined){
-if(!(validate172(data.taint, {instancePath:instancePath+"/taint",parentData:data,parentDataProperty:"taint",rootData,dynamicAnchors}))){
-vErrors = vErrors === null ? validate172.errors : vErrors.concat(validate172.errors);
+if(!(validate184(data.taint, {instancePath:instancePath+"/taint",parentData:data,parentDataProperty:"taint",rootData,dynamicAnchors}))){
+vErrors = vErrors === null ? validate184.errors : vErrors.concat(validate184.errors);
 errors = vErrors.length;
 }
 }
@@ -31451,7 +33641,7 @@ vErrors.push(err68);
 }
 errors++;
 }
-if(!pattern177.test(data24)){
+if(!pattern192.test(data24)){
 const err69 = {instancePath:instancePath+"/summary",schemaPath:"#/properties/summary/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err69];
@@ -31489,7 +33679,7 @@ errors++;
 for(const key4 in data25){
 const _errs68 = errors;
 if(typeof key4 === "string"){
-if(!pattern43.test(key4)){
+if(!pattern34.test(key4)){
 const err72 = {instancePath:instancePath+"/counts",schemaPath:"#/properties/counts/propertyNames/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9-]{0,40}$"},message:"must match pattern \""+"^[a-z][a-z0-9-]{0,40}$"+"\"",propertyName:key4};
 if(vErrors === null){
 vErrors = [err72];
@@ -31678,7 +33868,7 @@ errors++;
 if(data29.code !== undefined){
 let data30 = data29.code;
 if(typeof data30 === "string"){
-if(!pattern221.test(data30)){
+if(!pattern236.test(data30)){
 const err87 = {instancePath:instancePath+"/error/code",schemaPath:"#/$defs/ScheduleRunError/properties/code/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9_]{0,63}$"},message:"must match pattern \""+"^[a-z][a-z0-9_]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err87];
@@ -31713,7 +33903,7 @@ vErrors.push(err89);
 }
 errors++;
 }
-if(!pattern206.test(data31)){
+if(!pattern221.test(data31)){
 const err90 = {instancePath:instancePath+"/error/message",schemaPath:"#/$defs/ScheduleRunError/properties/message/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err90];
@@ -31833,8 +34023,8 @@ vErrors.push(err99);
 }
 errors++;
 }
-validate169.errors = vErrors;
+validate181.errors = vErrors;
 return errors === 0;
 }
-validate169.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
+validate181.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 

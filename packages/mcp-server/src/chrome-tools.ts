@@ -66,11 +66,11 @@ export function chromeTools(): ToolDefinition[] {
       scopes: ["site:read"],
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
-        const { header, footer } = resolveChrome(site);
+        const { header, footer, announcement, consent } = resolveChrome(site);
         return {
           chrome: site.chrome ?? {},
           brand: brandToForm(site.brand),
-          resolved: { header, footer },
+          resolved: { header, footer, announcement: announcement ?? null, consent },
           schemas: chromeSchemas,
           menus: chromeMenuKeys(await ctx.store.listMenus(site.id)),
           rev: site.rev,
@@ -87,7 +87,21 @@ export function chromeTools(): ToolDefinition[] {
           siteId: id,
           rev: { type: "integer", minimum: 0, description: "The site's rev from get_chrome" },
           header: PART,
-          footer: PART,
+          footer: {
+            ...PART,
+            description:
+              "Fields to change; null removes a field or the part. footer.region is one surface section (kind surface, checked like a page's) above the columns, shown on every page (start its headings at level 2); null removes it",
+          },
+          announcement: {
+            ...PART,
+            description:
+              "The bar above the header: id (change it to show a new bar to readers who closed the old one), text, label + href, tone info|brand|warning, dismissible",
+          },
+          consent: {
+            ...PART,
+            description:
+              "The privacy bar: mode none|notice|choices, policy (the privacy page). Cloudhal sites are cookieless and embeds load on click, so most sites need none; a person decides",
+          },
         },
         ["siteId", "rev"],
       ),
@@ -104,13 +118,15 @@ export function chromeTools(): ToolDefinition[] {
       scopes: ["site:write"],
       requiresApproval: true,
       approvalPrompt: async (a) => {
-        const parts = (["header", "footer"] as const).filter((k) => a[k] !== undefined);
+        const parts = (["header", "footer", "announcement", "consent"] as const).filter(
+          (k) => a[k] !== undefined,
+        );
         return `Change the site's ${parts.join(" and ") || "chrome"} (shown on every page)?`;
       },
       handler: async (a, ctx) => {
         const site = await requireSite(ctx, a.siteId as string);
         const chrome: SiteChrome = { ...(site.chrome ?? {}) };
-        for (const part of ["header", "footer"] as const) {
+        for (const part of ["header", "footer", "announcement", "consent"] as const) {
           const v = a[part];
           if (v === undefined) continue;
           if (v === null) delete chrome[part];

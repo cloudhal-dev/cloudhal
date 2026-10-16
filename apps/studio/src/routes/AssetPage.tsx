@@ -49,7 +49,7 @@ import { SettingRow } from "../components/Settings.tsx";
 import { TakedownDialog } from "../components/TakedownDialog.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useCan, useGate } from "../components/useMe.ts";
-import { type MessageKey, type NamespaceKey, useI18n, useT } from "../i18n/index.tsx";
+import { type KeyIn, useI18n, useT } from "../i18n/index.tsx";
 import { type AssetDetail, type AssetUse, api } from "../lib/api.ts";
 import {
   ASSET_LIMITS,
@@ -67,7 +67,7 @@ import {
 } from "../lib/media.ts";
 import { isDirty } from "../lib/util.ts";
 
-const ALT_ERROR: Record<NonNullable<AssetFormErrors["alt"]>, MessageKey> = {
+const ALT_ERROR: Record<NonNullable<AssetFormErrors["alt"]>, KeyIn<"media">> = {
   required: "media.detail.errors.altRequired",
   tooLong: "media.detail.errors.altTooLong",
 };
@@ -81,10 +81,10 @@ function licenseOption(l: LicenseChoice): LicenseOption {
 }
 
 /** "Cover image", "Image section", "Text" — the slot an asset fills, from `asset_refs.field`. */
-function slotKey(field: string): MessageKey | NamespaceKey<"appearance"> {
+function slotKey(field: string): KeyIn<"media"> {
   if (field === "coverImage") return "media.uses.slots.cover";
-  // RFC-0025: the site's logo (its words load with this route, in the `appearance` namespace).
-  if (field.startsWith("brand.")) return "appearance.chrome.logoUse";
+  // RFC-0025: the site's logo.
+  if (field.startsWith("brand.")) return "media.uses.slots.logo";
   if (field === "image") return "media.uses.slots.termImage";
   if (field === "seo.ogImage" || /\.seo\.ogImage$/.test(field)) return "media.uses.slots.social";
   if (/^sections\..+\.image$/.test(field)) return "media.uses.slots.section";
@@ -111,8 +111,8 @@ function useHref(siteId: string) {
  * Edits are the uploader's (asset:upload) or any Editor's (asset:manage); the server decides.
  */
 export function AssetPage() {
-  const t = useT("appearance");
-  const { locale: uiLocale } = useI18n();
+  const t = useT("media");
+  const { locale: uiLocale } = useI18n("media");
   const { siteId, assetId } = useParams({ from: "/sites/$siteId/media/$assetId" });
   const navigate = useNavigate();
   const qc = useQueryClient();

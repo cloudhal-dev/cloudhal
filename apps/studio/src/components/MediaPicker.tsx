@@ -61,8 +61,8 @@ export function AssetPickerDialog({
   /** The asset the slot shows now (preselected). */
   currentId?: string | undefined;
 }) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("media");
+  const { locale } = useI18n("media");
   const uploadGate = useGate("assets.upload");
   const [tab, setTab] = useState<PickerTab>("library");
   const [search, setSearch] = useState("");
@@ -254,8 +254,8 @@ export function ImageRefField({
   testId?: string;
   labels?: { empty?: string };
 }) {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("media");
+  const { locale } = useI18n("media");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [touched, setTouched] = useState({ src: false, alt: false });
   const assetId = image?.assetId;

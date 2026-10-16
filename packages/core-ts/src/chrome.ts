@@ -6,7 +6,7 @@
  * names what the contract cannot say (a button without its link, a menu that does not exist).
  * Worker-safe.
  */
-import type { Asset, Page, Site } from "@cloudhal/core-contracts";
+import type { Asset, Page, Site, SurfaceSection } from "@cloudhal/core-contracts";
 import type { PropsSchema } from "./blocks.ts";
 import { assetUrl } from "./media/types.ts";
 
@@ -83,11 +83,25 @@ export interface ResolvedFooter {
   credit: boolean;
   fallbackRss: boolean;
   hidden: boolean;
+  /** RFC-0025 §2: the surface above the columns (not on a minimal footer). */
+  region?: SurfaceSection | undefined;
+}
+
+/** RFC-0025 25d: the bar above the header; a dismissed one stays hidden for that reader. */
+export interface ResolvedAnnouncement {
+  id: string;
+  text: string;
+  link?: { label: string; href: string } | undefined;
+  tone: "info" | "brand" | "warning";
+  dismissible: boolean;
 }
 
 export interface ResolvedChrome {
   header: ResolvedHeader;
   footer: ResolvedFooter;
+  announcement?: ResolvedAnnouncement | undefined;
+  /** The consent bar's mode (`none`: no bar) and the privacy page it links to. */
+  consent: { mode: "none" | "notice" | "choices"; policy?: string | undefined };
   /** Every menu key the header and footer name, for the route to load. */
   menus: string[];
 }
@@ -141,6 +155,7 @@ export function resolveChrome(
     credit: f?.credit !== false,
     fallbackRss: !f,
     hidden: page?.chrome?.footer === "hidden",
+    region: !minimal && f?.region?.kind === "surface" ? f.region : undefined,
   };
   const menus = [
     header.nav,
@@ -148,7 +163,24 @@ export function resolveChrome(
     ...footer.columns.map((c) => c.menu),
     ...(footer.legal ? [footer.legal] : []),
   ];
-  return { header, footer, menus: [...new Set(menus)] };
+  const a = site.chrome?.announcement;
+  const announcement: ResolvedAnnouncement | undefined = a
+    ? {
+        id: a.id,
+        text: a.text,
+        link: a.label && a.href ? { label: a.label, href: a.href } : undefined,
+        tone: a.tone ?? "info",
+        dismissible: a.dismissible !== false,
+      }
+    : undefined;
+  const c = site.chrome?.consent;
+  return {
+    header,
+    footer,
+    announcement,
+    consent: { mode: c?.mode ?? "none", policy: c?.policy },
+    menus: [...new Set(menus)],
+  };
 }
 
 /** The surfaces loud enough for a transparent header to stand on (their text role is light or dark enough). */
@@ -247,7 +279,13 @@ const menuKey = (en: string, tr: string) => ({
  * read the allowed values. They mirror `Site.brand` and `Site.chrome`, except the logo, which the
  * form takes as an asset (`asset:<id>`) and the server turns into an `ImageRef`.
  */
-export const chromeSchemas: { brand: PropsSchema; header: PropsSchema; footer: PropsSchema } = {
+export const chromeSchemas: {
+  brand: PropsSchema;
+  header: PropsSchema;
+  footer: PropsSchema;
+  announcement: PropsSchema;
+  consent: PropsSchema;
+} = {
   brand: {
     type: "object",
     additionalProperties: false,
@@ -501,6 +539,70 @@ export const chromeSchemas: { brand: PropsSchema; header: PropsSchema; footer: P
       },
     },
   },
+  announcement: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      id: {
+        type: "string",
+        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        maxLength: 40,
+        title: {
+          en: "Name (change it to show a new bar)",
+          tr: "Ad (yeni bir bar göstermek için değiştirin)",
+        },
+      },
+      text: {
+        type: "string",
+        maxLength: 160,
+        title: { en: "Text", tr: "Metin" },
+      },
+      label: { type: "string", maxLength: 40, title: { en: "Link text", tr: "Bağlantı metni" } },
+      href: {
+        type: "string",
+        format: "url",
+        maxLength: 2048,
+        title: { en: "Link", tr: "Bağlantı" },
+      },
+      tone: {
+        type: "string",
+        enum: ["info", "brand", "warning"],
+        "x-labels": labels({
+          info: ["Info", "Bilgi"],
+          brand: ["Brand", "Marka"],
+          warning: ["Warning", "Uyarı"],
+        }),
+        "x-widget": "radio",
+        title: { en: "Tone", tr: "Ton" },
+      },
+      dismissible: {
+        type: "boolean",
+        title: { en: "Readers can close it", tr: "Okurlar kapatabilir" },
+      },
+    },
+  },
+  consent: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      mode: {
+        type: "string",
+        enum: ["none", "notice", "choices"],
+        "x-labels": labels({
+          none: ["No bar", "Bar yok"],
+          notice: ["A notice with OK", "Tamam düğmeli bir bildirim"],
+          choices: ["Allow all or only essential", "Tümüne izin ver ya da yalnız gerekli"],
+        }),
+        title: { en: "Privacy bar", tr: "Gizlilik barı" },
+      },
+      policy: {
+        type: "string",
+        format: "url",
+        maxLength: 2048,
+        title: { en: "Privacy page", tr: "Gizlilik sayfası" },
+      },
+    },
+  },
 };
 
 /** What a brand form needs to know about a logo asset: its media URL, size and default alt text. */
@@ -602,21 +704,31 @@ function formPart(v: unknown): Record<string, unknown> | undefined {
  */
 export async function applyChromeForm<S extends Site>(
   site: S,
-  input: { header?: unknown; footer?: unknown; brand?: unknown },
+  input: {
+    header?: unknown;
+    footer?: unknown;
+    brand?: unknown;
+    announcement?: unknown;
+    consent?: unknown;
+  },
   options: {
     menus: readonly string[];
     resolve: (assetId: string) => Promise<LogoAsset | undefined>;
   },
 ): Promise<{ site: S; issues: ChromeIssue[] }> {
   const issues: ChromeIssue[] = [];
-  for (const key of ["header", "footer", "brand"] as const)
+  for (const key of ["header", "footer", "brand", "announcement", "consent"] as const)
     if (input[key] !== undefined && !isObject(input[key]))
       issues.push({ path: `/${key}`, message: "an object" });
   if (issues.length > 0) return { site, issues };
   const chrome: SiteChrome = { ...(site.chrome ?? {}) };
-  for (const key of ["header", "footer"] as const) {
+  for (const key of ["header", "footer", "announcement", "consent"] as const) {
     if (input[key] === undefined) continue;
     const v = formPart(input[key]);
+    // The footer's region is a surface no form edits: it stays unless the input removes it (null).
+    const region = chrome.footer?.region;
+    if (key === "footer" && region && v && !("region" in (input.footer as object)))
+      v.region = region;
     if (v) (chrome as Record<string, unknown>)[key] = v;
     else delete chrome[key];
   }

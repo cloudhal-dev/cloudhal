@@ -51,6 +51,8 @@ export interface NavItem {
   readonly target?:
     | { readonly kind: "page" | "contentEntry" | "term"; readonly id: string }
     | { readonly kind: "collection"; readonly collection: string };
+  /** RFC-0025 25d: a top-level item that opens its children as columns of one wide panel. */
+  readonly display?: "mega";
   /** Shown children only. */
   readonly children: NavItem[];
 }
@@ -162,6 +164,7 @@ function shownItems(items: readonly ResolvedMenuItem[]): NavItem[] {
       external: i.external,
       newTab: i.newTab,
       ...(i.target ? { target: i.target } : {}),
+      ...(i.display ? { display: i.display } : {}),
       children: shownItems(i.children),
     }));
 }

@@ -27,7 +27,7 @@ export function TakedownDialog({
   error: string | undefined;
   onConfirm: (input: { reason: string; legal: boolean }) => void;
 }) {
-  const t = useT();
+  const t = useT("media");
   const [reason, setReason] = useState("");
   const [legal, setLegal] = useState(false);
   const [tried, setTried] = useState(false);

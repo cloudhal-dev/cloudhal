@@ -8,7 +8,10 @@
  * - `data-ch-action='<json>'` buttons run a named action (set, toggle, increment, reset,
  *   navigate, copy, share, scrollTo);
  * - `data-ch-text='<value>'` elements show a binding or a named function's result as text;
- * - `data-ch-visible='<condition>'` elements are hidden while the condition is false.
+ * - `data-ch-visible='<condition>'` elements are hidden while the condition is false;
+ * - RFC-0025 25d: a copy (or a share that copies the link) says so in the page's toast region
+ *   (`[data-ch-toasts]`, a live region the theme renders with the words in `data-copied` and
+ *   `data-link-copied`); a toast goes after four seconds.
  *
  * Nothing a model wrote is evaluated: values are JSON, functions are Cloudhal's fixed set (the
  * same as `@cloudhal/core-ts/surfaces`; a test keeps them equal), text goes in as `textContent`,
@@ -21,7 +24,9 @@
 
 import { CHART_SCRIPT } from "./chart.ts";
 
-const code = String.raw`const ptr=(p)=>p===""?[]:String(p).slice(1).split("/").map((s)=>s.replace(/~1/g,"/").replace(/~0/g,"~"));
+const code = String.raw`const toast=(k)=>{const r=document.querySelector("[data-ch-toasts]");const t=r&&r.getAttribute("data-"+k);if(!t)return;
+const el=document.createElement("p");el.className="ch-toast";el.textContent=t;r.append(el);setTimeout(()=>el.remove(),4000);};
+const ptr=(p)=>p===""?[]:String(p).slice(1).split("/").map((s)=>s.replace(/~1/g,"/").replace(/~0/g,"~"));
 const BAD=new Set(["__proto__","prototype","constructor"]);
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 const get=(d,p)=>{if(typeof p!=="string"||(p&&p[0]!=="/"))return undefined;let c=d;for(const s of ptr(p)){if(Array.isArray(c))c=/^\d+$/.test(s)?c[+s]:undefined;else if(c&&typeof c==="object"&&own(c,s))c=c[s];else return undefined;}return c;};
@@ -103,8 +108,8 @@ case"toggle":put(d,a.path,!truthy(get(d,a.path)));break;
 case"increment":{const n=num(get(d,a.path));const by=num(a.by);put(d,a.path,(Number.isFinite(n)?n:0)+(Number.isFinite(by)?by:1));break;}
 case"reset":d=structuredClone(init);break;
 case"navigate":if(safe(a.href))location.assign(a.href);return;
-case"copy":navigator.clipboard?.writeText(txt(a.value)).catch(()=>{});return;
-case"share":if(navigator.share)navigator.share({title:document.title,url:location.href}).catch(()=>{});else navigator.clipboard?.writeText(location.href).catch(()=>{});return;
+case"copy":navigator.clipboard?.writeText(txt(a.value)).then(()=>toast("copied")).catch(()=>{});return;
+case"share":if(navigator.share)navigator.share({title:document.title,url:location.href}).catch(()=>{});else navigator.clipboard?.writeText(location.href).then(()=>toast("link-copied")).catch(()=>{});return;
 case"scrollTo":document.getElementById(txt(a.anchor))?.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});return;
 default:return;}
 render();});
@@ -112,7 +117,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.9.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.10.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -127,6 +132,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.6.js",
   "/_cloudhal/surface.7.js",
   "/_cloudhal/surface.8.js",
+  "/_cloudhal/surface.9.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

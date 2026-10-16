@@ -25,7 +25,8 @@ export const BUNDLE_BUDGET = {
    * with schedules (467.2 kB before them). 470.6 kB on 2026-10-14 with the rich body editor:
    * Tiptap stays in its own lazy chunk (560 kB minified), but the Kumo modules it shares with the
    * shell (text, input, toolbar, popover, …) split into 9 more shared chunks; no new code loads
-   * first, the extra gzip is the chunks' own overhead.
+   * first, the extra gzip is the chunks' own overhead. 467.3 kB on 2026-10-17 once the media
+   * library's words (about 300 keys) moved to the lazy `media` namespace (was 475.0 kB).
    */
   initialGzipBytes: 475_000,
 };

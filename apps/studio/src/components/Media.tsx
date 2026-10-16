@@ -46,7 +46,7 @@ export function AssetFrame({
   size: "tile" | "thumb" | "card";
   alt?: string;
 }) {
-  const t = useT();
+  const t = useT("media");
   const src = assetPreviewUrl(siteId, asset);
   if (asset.kind !== "image")
     return (
@@ -84,7 +84,7 @@ export function AssetBadges({
   /** Tiles: icons with tooltips only where space is short. */
   compact?: boolean;
 }) {
-  const t = useT();
+  const t = useT("media");
   const badges = [];
   if (asset.status === "retired")
     badges.push(
@@ -126,7 +126,7 @@ export function AssetBadges({
 
 /** "Used in 3 places" / "Unused" as a small badge (`overlay`: solid, legible over a picture). */
 export function UsageBadge({ count, overlay = false }: { count: number; overlay?: boolean }) {
-  const t = useT();
+  const t = useT("media");
   return (
     <span className="inline-flex" data-usage={count}>
       <Badge variant={overlay ? "secondary" : count > 0 ? "info" : "outline"}>

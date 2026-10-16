@@ -83,8 +83,8 @@ function useStoredView(): [View, (v: View) => void] {
  * Uploading needs `assets.upload`; the gated button says who may.
  */
 export function MediaPage() {
-  const t = useT();
-  const { locale } = useI18n();
+  const t = useT("media");
+  const { locale } = useI18n("media");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });

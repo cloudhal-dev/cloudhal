@@ -3,11 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
-import { CHROME_SCRIPT } from "./chrome-client.ts";
+import { CHROME_SCRIPT, CHROME_SCRIPT_ALIASES } from "./chrome-client.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
 import { OVERLAY_SCRIPT } from "./overlay-client.ts";
+import { PREFS_SCRIPT } from "./prefs-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
@@ -84,6 +85,9 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [AMBIENT_SCRIPT.path, AMBIENT_SCRIPT.code],
     // RFC-0025 §2: the chrome module, loaded by pages whose header asks for it.
     [CHROME_SCRIPT.path, CHROME_SCRIPT.code],
+    ...CHROME_SCRIPT_ALIASES.map((alias) => [alias, CHROME_SCRIPT.code] as [string, string]),
+    // RFC-0025 25d: the bars' preferences, read in <head> before the page paints.
+    [PREFS_SCRIPT.path, PREFS_SCRIPT.code],
     // RFC-0025 §3: the overlay module, loaded by surfaces with an overlay.
     [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
   ];
@@ -106,7 +110,8 @@ export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean
       html.includes("data-ch-surface=") ||
       html.includes(MOTION_SCRIPT.path) ||
       html.includes(CHROME_SCRIPT.path) ||
-      html.includes(OVERLAY_SCRIPT.path)
+      html.includes(OVERLAY_SCRIPT.path) ||
+      html.includes(PREFS_SCRIPT.path)
     )
       return true;
   }

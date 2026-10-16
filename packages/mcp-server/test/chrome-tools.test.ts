@@ -93,6 +93,27 @@ describe("chrome tools (RFC-0025)", () => {
     });
   });
 
+  it("sets the announcement and consent bars and shows them resolved (RFC-0025 25d)", async () => {
+    const { rev } = (await run("get_chrome", { siteId })).result as { rev: number };
+    await run("set_chrome", {
+      siteId,
+      rev,
+      announcement: { id: "launch", text: "We launched", label: "Read", href: "/news" },
+      consent: { mode: "notice" },
+    });
+    const got = (await run("get_chrome", { siteId })).result as {
+      resolved: { announcement: unknown; consent: unknown };
+    };
+    expect(got.resolved.announcement).toEqual({
+      id: "launch",
+      text: "We launched",
+      link: { label: "Read", href: "/news" },
+      tone: "info",
+      dismissible: true,
+    });
+    expect(got.resolved.consent).toEqual({ mode: "notice" });
+  });
+
   it("turns a logo asset into an image reference and refuses what is not an image of the site", async () => {
     const person = { kind: "human" as const, id: "user_owner000001", name: "Owner" };
     const { asset } = await store.createAsset({

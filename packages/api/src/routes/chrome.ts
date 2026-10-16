@@ -25,6 +25,8 @@ export const chrome: Hono<Env> = new Hono<Env>()
     return c.json({
       header: site.chrome?.header ?? {},
       footer: site.chrome?.footer ?? {},
+      announcement: site.chrome?.announcement ?? {},
+      consent: site.chrome?.consent ?? {},
       brand: brandToForm(site.brand),
       schemas: chromeSchemas,
       menus: chromeMenuKeys(await store.listMenus(site.id)),
@@ -48,6 +50,8 @@ export const chrome: Hono<Env> = new Hono<Env>()
     return c.json({
       header: saved.chrome?.header ?? {},
       footer: saved.chrome?.footer ?? {},
+      announcement: saved.chrome?.announcement ?? {},
+      consent: saved.chrome?.consent ?? {},
       brand: brandToForm(saved.brand),
       rev: saved.rev,
     });

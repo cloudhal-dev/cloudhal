@@ -54,6 +54,11 @@
         "pattern": "^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"
       }
     },
+    "MenuDisplay": {
+      "type": "string",
+      "description": "RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).",
+      "enum": ["mega"]
+    },
     "MenuItem": {
       "description": "One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.",
       "oneOf": [
@@ -68,6 +73,7 @@
             "kind": { "type": "string", "enum": ["page"] },
             "pageId": { "$ref": "common.schema.json#/$defs/Id" },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },
@@ -87,6 +93,7 @@
             "kind": { "type": "string", "enum": ["contentEntry"] },
             "entryId": { "$ref": "common.schema.json#/$defs/Id" },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },
@@ -106,6 +113,7 @@
             "kind": { "type": "string", "enum": ["term"] },
             "termId": { "$ref": "common.schema.json#/$defs/Id" },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },
@@ -125,6 +133,7 @@
             "kind": { "type": "string", "enum": ["collection"] },
             "collection": { "$ref": "common.schema.json#/$defs/Slug" },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },
@@ -152,6 +161,7 @@
               "description": "Open in a new tab (rendered with rel=\"noopener noreferrer\")."
             },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },
@@ -170,6 +180,7 @@
             "id": { "$ref": "common.schema.json#/$defs/Id" },
             "kind": { "type": "string", "enum": ["group"] },
             "labels": { "$ref": "#/$defs/MenuLabels" },
+            "display": { "$ref": "#/$defs/MenuDisplay" },
             "children": {
               "type": "array",
               "items": { "$ref": "#/$defs/MenuItem" },

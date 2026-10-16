@@ -24,6 +24,8 @@ function server(role: "owner" | "editor") {
       body: {
         header: { behavior: "sticky" },
         footer: {},
+        announcement: {},
+        consent: {},
         brand: {},
         schemas: chromeSchemas,
         menus: ["primary", "footer"],
@@ -55,9 +57,20 @@ describe("Header and footer settings", () => {
         rev: 7,
         header: { behavior: "sticky" },
         footer: { tagline: "Made with care." },
+        announcement: {},
+        consent: {},
         brand: {},
       }),
     );
+  });
+
+  it("edits the announcement and consent bars on their own segment", async () => {
+    vi.stubGlobal("fetch", server("owner"));
+    render(wrap(<ChromeSettingsSection siteId="site_1" defaultLocale="en" />));
+    fireEvent.click(await screen.findByRole("tab", { name: "Bars" }));
+    expect(screen.getByRole("heading", { name: "Announcement" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Privacy bar" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Text" })).toBeInTheDocument();
   });
 
   it("offers the logo from the media library on the brand segment", async () => {

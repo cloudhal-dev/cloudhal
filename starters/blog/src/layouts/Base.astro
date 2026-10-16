@@ -2,6 +2,7 @@
 import { CHROME_SCRIPT } from "@cloudhal/astro-renderer/chrome";
 import { SeoHead } from "@cloudhal/astro-renderer/components";
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import { PREFS_SCRIPT } from "@cloudhal/astro-renderer/prefs";
 import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
 import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
@@ -43,8 +44,34 @@ interface Props {
         credit: string;
       }
     | undefined;
+  /** RFC-0025 25d: the bars' and toasts' words, in the page's language. */
+  barWords?: Record<(typeof BAR_WORDS)[number], string> | undefined;
 }
-const { site, meta, nav, footer, notice, search, motion, menus = {}, words } = Astro.props;
+const BAR_WORDS = [
+  "announcement",
+  "dismiss",
+  "privacy",
+  "consentNotice",
+  "consentChoices",
+  "consentOk",
+  "consentAll",
+  "consentEssential",
+  "privacyPolicy",
+  "copied",
+  "linkCopied",
+] as const;
+const {
+  site,
+  meta,
+  nav,
+  footer,
+  notice,
+  search,
+  motion,
+  menus = {},
+  words,
+  barWords,
+} = Astro.props;
 const chrome = Astro.props.chrome ?? resolveChrome(site);
 const h = chrome.header;
 const f = chrome.footer;
@@ -92,13 +119,32 @@ const dialog =
   h.mobileStyle === "fullscreen";
 const searchAction = actions.some((a) => a.kind === "search") ? search : undefined;
 // The chrome module, only where the header needs it (RFC-0025 §2): without it everything works.
+// RFC-0025 25d: the bars, and the words they and the toasts speak.
+const bw = barWords ?? {
+  announcement: "Announcement",
+  dismiss: "Dismiss",
+  privacy: "Privacy",
+  consentNotice: "This site keeps only what it needs to work: no tracking cookies.",
+  consentChoices: "Some parts of this site can load content from other services (videos, maps).",
+  consentOk: "OK",
+  consentAll: "Allow all",
+  consentEssential: "Only essential",
+  privacyPolicy: "Privacy policy",
+  copied: "Copied",
+  linkCopied: "Link copied",
+};
+const announce = chrome.announcement;
+const consent = chrome.consent.mode !== "none" ? chrome.consent : undefined;
+// Read before the body paints, so a closed bar is never drawn (the edge cache ignores cookies).
+const needsPrefs = Boolean(announce?.dismissible || consent);
 const needsScript =
-  !h.hidden &&
-  (h.behavior !== "static" ||
-    h.shrink ||
-    h.transparent ||
-    dialog ||
-    headerNav.some((i) => i.children.length > 0));
+  needsPrefs ||
+  (!h.hidden &&
+    (h.behavior !== "static" ||
+      h.shrink ||
+      h.transparent ||
+      dialog ||
+      headerNav.some((i) => i.children.length > 0)));
 const copyright = f.copyright
   ? copyrightText(f.copyright, site.name, new Date().getFullYear())
   : undefined;
@@ -116,8 +162,10 @@ const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
 <!doctype html>
-<html lang={meta.lang} {...look.attributes}>
+<html lang={meta.lang} {...look.attributes} data-ch-announcement={announce?.dismissible ? announce.id : undefined}>
   <head>
+    {/* is:inline keeps it a classic script where it is: it must run before the body paints. */}
+    {needsPrefs && <script is:inline src={PREFS_SCRIPT.path}></script>}
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <SeoHead meta={meta} />
@@ -130,6 +178,19 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
   </head>
   <body class="ch-body min-h-screen antialiased">
     <a class="ch-skip" href="#main">{w.skip}</a>
+    {announce && (
+      <div class="ch-announcement" data-tone={announce.tone} role="region" aria-label={bw.announcement}>
+        <p class="ch-announcement__text">
+          {announce.text}
+          {announce.link && <a href={safe(announce.link.href)}>{announce.link.label}</a>}
+        </p>
+        {announce.dismissible && (
+          <button type="button" class="ch-announcement__close" data-ch-dismiss={announce.id} aria-label={bw.dismiss} hidden>
+            <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" /></svg>
+          </button>
+        )}
+      </div>
+    )}
     {!h.hidden && (
       <header
         class="ch-header"
@@ -222,6 +283,11 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
     {!f.hidden && (
       <footer class="ch-footer" data-layout={f.layout} data-surface={f.surface}>
         <div class="ch-footer__inner">
+          {f.region && (
+            <div class="ch-footer__region">
+              <slot name="footer-region" />
+            </div>
+          )}
           {f.cta && (
             <div class="ch-footer__cta">
               <p class="ch-footer__cta-heading">{f.cta.heading}</p>
@@ -271,6 +337,26 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
         </div>
       </footer>
     )}
+    {consent && (
+      <div class="ch-consent" data-ch-bar data-ch-consent-bar data-mode={consent.mode} role="region" aria-label={bw.privacy}>
+        <p class="ch-consent__text">
+          {consent.mode === "choices" ? bw.consentChoices : bw.consentNotice}
+          {consent.policy && <a href={safe(consent.policy)}>{bw.privacyPolicy}</a>}
+        </p>
+        <div class="ch-consent__actions">
+          {consent.mode === "choices" ? (
+            <Fragment>
+              <button type="button" class="ch-button ch-button--secondary" data-ch-consent-choice="essential" hidden>{bw.consentEssential}</button>
+              <button type="button" class="ch-button ch-button--primary" data-ch-consent-choice="all" hidden>{bw.consentAll}</button>
+            </Fragment>
+          ) : (
+            <button type="button" class="ch-button ch-button--primary" data-ch-consent-choice="ok" hidden>{bw.consentOk}</button>
+          )}
+        </div>
+      </div>
+    )}
+    {/* RFC-0025 25d: toasts land here (a live region already in the page, so they are announced). */}
+    <div class="ch-toasts" data-ch-toasts role="status" aria-live="polite" data-copied={bw.copied} data-link-copied={bw.linkCopied}></div>
     {needsScript && <script type="module" src={CHROME_SCRIPT.path}></script>}
   </body>
 </html>

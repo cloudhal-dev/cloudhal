@@ -274,6 +274,10 @@
         },
         "credit": {
           "type": "boolean"
+        },
+        "region": {
+          "$ref": "section.schema.json",
+          "description": "RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds."
         }
       }
     },

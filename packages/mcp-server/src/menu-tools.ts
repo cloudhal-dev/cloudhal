@@ -106,6 +106,12 @@ const ITEM_INPUT: JsonSchema = {
     target: TARGET,
     labels: LABELS,
     newTab: { type: "boolean", description: "url items only: open in a new tab" },
+    display: {
+      type: "string",
+      enum: ["mega"],
+      description:
+        "top-level items with children: open as one wide panel in the header, children as columns (a group's children are the column's links)",
+    },
     children: { type: "array", items: { $ref: "#/$defs/MenuItemInput" }, maxItems: 100 },
   },
 };
@@ -134,6 +140,11 @@ const OP = {
     },
     target: TARGET,
     newTab: { type: ["boolean", "null"], description: "update: url items only; null clears" },
+    display: {
+      type: ["string", "null"],
+      enum: ["mega", null],
+      description: "update: mega for a top-level item with children; null clears",
+    },
   },
 };
 const DELTA_OUT = obj(
@@ -176,6 +187,7 @@ interface RawItem {
   target: RawTarget;
   labels?: Record<string, string>;
   newTab?: boolean;
+  display?: "mega";
   children?: RawItem[];
 }
 interface RawOp {
@@ -187,6 +199,7 @@ interface RawOp {
   labels?: Record<string, string | null>;
   target?: RawTarget;
   newTab?: boolean | null;
+  display?: "mega" | null;
 }
 
 /** Resolves a target handle to an id of a linkable node of this site (invariant 9, before approval). */
@@ -301,6 +314,7 @@ async function resolveItem(ctx: ToolContext, site: Site, raw: RawItem): Promise<
     target: await resolveTarget(ctx, site, raw.target),
     ...(raw.labels ? { labels: raw.labels } : {}),
     ...(raw.newTab !== undefined ? { newTab: raw.newTab } : {}),
+    ...(raw.display ? { display: raw.display } : {}),
     ...(raw.children?.length
       ? { children: await Promise.all(raw.children.map((c) => resolveItem(ctx, site, c))) }
       : {}),
@@ -355,6 +369,7 @@ async function resolveOps(ctx: ToolContext, site: Site, raw: RawOp[]): Promise<M
               ...(op.labels ? { labels: op.labels } : {}),
               ...(target ? { target } : {}),
               ...(op.newTab !== undefined ? { newTab: op.newTab } : {}),
+              ...(op.display !== undefined ? { display: op.display } : {}),
             });
           }
           break;

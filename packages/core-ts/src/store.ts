@@ -461,6 +461,19 @@ export class SiteGraphStore {
     const next: Site = structuredClone({ ...site, rev: site.rev + 1, updatedAt: this.#stamp() });
     fillMissingSrc("site", next);
     assertValid("site", next);
+    // RFC-0025 §2: the footer's region is a surface, checked like a page's.
+    const region = next.chrome?.footer?.region;
+    if (region) {
+      if (region.kind !== "surface")
+        throw new InvariantError("invalid_surface", "chrome.footer.region: a surface section");
+      const issues = checkPageSurfaces([region], createCatalog({ blocks: this.blocks }));
+      if (issues.length)
+        throw new InvariantError(
+          "invalid_surface",
+          `chrome.footer.region: ${issues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
+          { issues },
+        );
+    }
     // Only a config that changes is checked: values a theme change made misfit stay as written.
     if (this.themeSettings && next.theme.config !== undefined)
       checkThemeConfig(
