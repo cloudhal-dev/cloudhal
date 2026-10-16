@@ -27,7 +27,12 @@ describe("design tools (RFC-0021)", () => {
       themeSettings: {
         type: "object",
         additionalProperties: false,
-        properties: { brand: { type: "string", format: "color", default: "#18181b" } },
+        properties: {
+          seed: { type: "string", format: "color" },
+          scheme: { type: "string", enum: ["tonal", "vibrant", "neutral", "mono"] },
+          mode: { type: "string", enum: ["light", "dark", "auto"] },
+          brand: { type: "string", format: "color", default: "#18181b" },
+        },
       },
     });
     siteId = (await seedStarterSite(store, { name: "Design Site", slug: "design" })).id;
@@ -56,6 +61,34 @@ describe("design tools (RFC-0021)", () => {
     expect(byName.get_design?.annotations?.readOnlyHint).toBe(true);
   });
 
+  it("shows the color roles, light and dark, with their contrast (RFC-0023)", async () => {
+    type Colors = {
+      source: string;
+      seedAvailable: boolean;
+      mode: string;
+      light: Record<string, string>;
+      pairs: { foreground: string; light: number; dark: number; needs: number }[];
+    };
+    const before = (await run("get_design", { siteId })).result as { colors: Colors; rev: number };
+    expect(before.colors).toMatchObject({ source: "legacy", seedAvailable: true, mode: "light" });
+    expect(byName.get_design?.renderText?.(before)).toContain("The theme offers tokens");
+
+    await run("set_theme_settings", {
+      siteId,
+      rev: before.rev,
+      values: { seed: "#0f766e", scheme: "vibrant", mode: "auto" },
+    });
+    const after = (await run("get_design", { siteId })).result as { colors: Colors };
+    expect(after.colors).toMatchObject({ source: "seed", mode: "auto" });
+    expect(after.colors.light.brand).toBe("#0f766e");
+    for (const p of after.colors.pairs)
+      expect(Math.min(p.light, p.dark)).toBeGreaterThanOrEqual(p.needs);
+    const text = byName.get_design?.renderText?.(after) ?? "";
+    expect(text).toContain('Colors (RFC-0023): expanded from {"seed":"#0f766e"');
+    expect(text).toContain("Dark roles: surface #");
+    expect(text).toContain("Render the page with scheme dark too.");
+  });
+
   it("changes the site's rules only with a person's approval, and warns without refusing", async () => {
     expect(byName.set_design?.requiresApproval).toBe(true);
     const prompt = await byName.set_design?.approvalPrompt?.(
@@ -74,7 +107,7 @@ describe("design tools (RFC-0021)", () => {
     ).result as { rev: number; warnings: string[] };
     expect(set.warnings).toEqual([
       "Not in this site's catalog: Hero",
-      "These refer to design settings the theme does not have: {color.accent} (it has brand)",
+      "These refer to design settings the theme does not have: {color.accent} (it has seed, scheme, mode, brand)",
       "No “## Brand” section: say what the site is for, who reads it and its voice.",
     ]);
     const got = (await run("get_design", { siteId })).result as {

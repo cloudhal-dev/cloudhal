@@ -14,6 +14,14 @@ import {
   effectiveDesign,
 } from "@cloudhal/core-ts/design";
 import { createCatalog } from "@cloudhal/core-ts/surfaces";
+import {
+  COLOR_MODES,
+  COLOR_ROLES,
+  COLOR_SCHEMES,
+  CONTRAST_LEVELS,
+  type SiteColorTokens,
+  siteColorTokens,
+} from "@cloudhal/core-ts/tokens";
 import { id, mapError, obj, type ToolDefinition, ToolError } from "./common.ts";
 
 /** Everything `design_lint` needs from the site's deployment. */
@@ -58,8 +66,33 @@ interface DesignResult {
   design: { theme: string | null; site: string | null; warnings: string[] };
   settings: Record<string, unknown>;
   catalog: { id: string; components: string[] };
+  /** RFC-0023: the site's color roles, light and dark, and their contrast; null without a theme schema. */
+  colors: SiteColorTokens | null;
   guidance: string;
   rev: number;
+}
+
+/** A few lines on the colors: what they come from, the choices, failing pairs, the repair notes. */
+function colorsText(c: SiteColorTokens | null): string {
+  if (!c) return "";
+  const roles = (r: Record<string, string>) =>
+    COLOR_ROLES.map((role) => `${role} ${r[role]}`).join(", ");
+  const failing = c.pairs.filter(
+    (p) => p.light < p.needs || (c.mode !== "light" && p.dark < p.needs),
+  );
+  return [
+    c.source === "seed"
+      ? `Colors (RFC-0023): expanded from ${JSON.stringify(c.settings)}. Change them with set_theme_settings: seed (#rrggbb), scheme (${COLOR_SCHEMES.join(" | ")}), contrast (${CONTRAST_LEVELS.join(" | ")}), mode (${COLOR_MODES.join(" | ")}); never write colors per role.`
+      : `Colors: the theme's free colors, no seed set.${c.seedAvailable ? " The theme offers tokens: prefer setting seed, scheme, contrast and mode with set_theme_settings over picking colors." : ""}`,
+    `Light roles: ${roles(c.light)}`,
+    ...(c.mode === "light"
+      ? []
+      : [`Dark roles: ${roles(c.dark)}`, "Render the page with scheme dark too."]),
+    failing.length
+      ? `Pairs below their ratio: ${failing.map((p) => `${p.foreground} on ${p.background} ${p.light}:1 (needs ${p.needs})`).join("; ")}`
+      : `Every text and UI pair passes (${c.pairs.length} checked).`,
+    ...(c.notes.length ? [`Contrast repairs: ${c.notes.join("; ")}`] : []),
+  ].join("\n");
 }
 
 /** The text every client reads: the theme's rules, the site's delimited as the owner's data, guidance. */
@@ -71,6 +104,7 @@ function designText(r: DesignResult): string {
       : "This site has no design rules of its own yet. You may propose some to the person (set_design waits for their approval); do not invent brand facts.",
     `Design settings (rev ${r.rev}): ${JSON.stringify(r.settings)}`,
     `Catalog ${r.catalog.id}: ${r.catalog.components.join(", ")} (props: get_catalog)`,
+    colorsText(r.colors),
     r.guidance,
     ...(r.design.warnings.length
       ? [`Warnings about the site's rules: ${r.design.warnings.join("; ")}`]
@@ -103,10 +137,15 @@ export function designTools(): ToolDefinition[] {
             { id: { type: "string" }, components: { type: "array", items: { type: "string" } } },
             ["id", "components"],
           ),
+          colors: {
+            type: ["object", "null"],
+            description:
+              "The color roles (RFC-0023): source seed or legacy, the token settings, light and dark roles, every checked pair's contrast and what the repair changed",
+          },
           guidance: { type: "string" },
           rev: { type: "integer" },
         },
-        ["design", "settings", "catalog", "guidance", "rev"],
+        ["design", "settings", "catalog", "colors", "guidance", "rev"],
       ),
       annotations: {
         readOnlyHint: true,
@@ -122,10 +161,16 @@ export function designTools(): ToolDefinition[] {
         const { catalog, lint } = lintContext(site, ctx);
         const theme = ctx.store.themeDesign ?? null;
         const own = site.design?.markdown ?? null;
+        const themeProps = (
+          ctx.store.themeSettings as
+            | { properties?: Record<string, { default?: unknown }> }
+            | undefined
+        )?.properties;
         return {
           design: { theme, site: own, warnings: own ? designLint(own, lint) : [] },
           settings: site.theme.config ?? {},
           catalog: { id: catalog.id, components: catalog.names() },
+          colors: themeProps ? siteColorTokens(site.theme.config ?? {}, themeProps) : null,
           guidance: DESIGN_GUIDANCE,
           rev: site.rev,
         };

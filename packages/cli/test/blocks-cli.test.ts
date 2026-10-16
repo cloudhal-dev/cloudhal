@@ -47,6 +47,10 @@ describe("theme block types", () => {
   it("loads the starter's design settings and refuses settings outside the subset (RFC-0017)", async () => {
     const settings = await loadThemeSettings(starter);
     expect(Object.keys(settings?.properties ?? {})).toEqual([
+      "seed",
+      "scheme",
+      "contrast",
+      "mode",
       "brand",
       "link",
       "surface",

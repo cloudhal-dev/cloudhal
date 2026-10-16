@@ -4,7 +4,7 @@
  * people below Administrator see the values read-only.
  */
 import type { PropsSchema } from "@cloudhal/core-ts/blocks";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppearanceSettingsSection } from "../src/components/AppearanceSettings.tsx";
 import { asRole, bodyOf, on, type Route, serve, wrap } from "./roles-fixtures.tsx";
@@ -66,6 +66,33 @@ describe("Appearance settings", () => {
     await waitFor(() =>
       expect(bodyOf(fetch, "PUT", PATH)).toEqual({ rev: 3, values: { brand: "#1d4ed8" } }),
     );
+  });
+
+  it("shows the color roles live, light and dark once a seed is set, with the contrast repairs", async () => {
+    const tokens: PropsSchema = {
+      ...SCHEMA,
+      properties: {
+        seed: { type: "string", format: "color", title: { en: "Seed color" } },
+        ...SCHEMA.properties,
+      },
+    };
+    vi.stubGlobal("fetch", server("owner", tokens));
+    render(wrap(<AppearanceSettingsSection siteId="site_1" />));
+    const preview = await screen.findByRole("region", { name: "Color roles" });
+    expect(within(preview).getByRole("group", { name: "Light" })).toBeInTheDocument();
+    expect(within(preview).queryByRole("group", { name: "Dark" })).not.toBeInTheDocument();
+    expect(within(preview).getByText("Text on brand")).toBeInTheDocument();
+    expect(screen.getByText(/Pick a seed color to get a full palette/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Seed color" }), {
+      target: { value: "#facc15" },
+    });
+    expect(await within(preview).findByRole("group", { name: "Dark" })).toBeInTheDocument();
+    expect(within(preview).getByText("Adjusted for contrast")).toBeInTheDocument();
+    expect(
+      within(preview).getByText(/^Light: Brand darkened \d+ step\(s\) to read on Page \(3:1\)$/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Pick a seed color/)).not.toBeInTheDocument();
   });
 
   it("says when the theme has no settings", async () => {

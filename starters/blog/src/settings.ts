@@ -13,6 +13,52 @@ export const themeSettings: PropsSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    // RFC-0023 §1: one seed color and three choices; the color roles (and dark mode) follow.
+    // Without a seed (and in light mode) the four colors below apply, as before.
+    seed: {
+      type: "string",
+      format: "color",
+      title: { en: "Seed color", tr: "Ana renk" },
+      description: {
+        en: "One color the whole palette is built from, light and dark, always readable.",
+        tr: "Tüm paletin, açık ve koyu, okunaklı kalarak üretildiği tek renk.",
+      },
+    },
+    scheme: {
+      type: "string",
+      enum: ["tonal", "vibrant", "neutral", "mono"],
+      "x-labels": {
+        tonal: { en: "Tonal", tr: "Tonlu" },
+        vibrant: { en: "Vibrant", tr: "Canlı" },
+        neutral: { en: "Neutral", tr: "Nötr" },
+        mono: { en: "Monochrome", tr: "Tek renk" },
+      },
+      default: "tonal",
+      "x-widget": "radio",
+      title: { en: "Palette", tr: "Palet" },
+    },
+    contrast: {
+      type: "string",
+      enum: ["standard", "high"],
+      "x-labels": {
+        standard: { en: "Standard (AA)", tr: "Standart (AA)" },
+        high: { en: "High (AAA)", tr: "Yüksek (AAA)" },
+      },
+      default: "standard",
+      title: { en: "Contrast", tr: "Kontrast" },
+    },
+    mode: {
+      type: "string",
+      enum: ["light", "dark", "auto"],
+      "x-labels": {
+        light: { en: "Light", tr: "Açık" },
+        dark: { en: "Dark", tr: "Koyu" },
+        auto: { en: "Follow the reader", tr: "Okura göre" },
+      },
+      default: "light",
+      "x-widget": "radio",
+      title: { en: "Mode", tr: "Mod" },
+    },
     brand: {
       type: "string",
       format: "color",

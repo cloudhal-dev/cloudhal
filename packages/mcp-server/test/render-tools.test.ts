@@ -27,7 +27,7 @@ function fakeRenderer(log: string[], options: { hang?: boolean } = {}): PageRend
       return {
         async open(url, viewport) {
           if (options.hang) await new Promise(() => {});
-          log.push(`open ${viewport.width}x${viewport.height} ${url}`);
+          log.push(`open ${viewport.width}x${viewport.height} ${viewport.scheme} ${url}`);
           let y = 0;
           return {
             async evaluate<T>(expression: string): Promise<T> {
@@ -113,7 +113,9 @@ describe("render_page (RFC-0021 §4)", () => {
     };
     expect(new URL(result.url).pathname).toBe("/about");
     expect(log[0]).toBe("session");
-    expect(log[1]).toMatch(/^open 1440x900 https:\/\/news\.example\.com\/about\?cloudhal-preview=/);
+    expect(log[1]).toMatch(
+      /^open 1440x900 light https:\/\/news\.example\.com\/about\?cloudhal-preview=/,
+    );
     expect(log).toContain("close 390");
     expect(log.at(-1)).toBe("session closed");
     expect(result.widths).toEqual([
@@ -136,10 +138,22 @@ describe("render_page (RFC-0021 §4)", () => {
     expect(structured).not.toHaveProperty("images");
     expect(content[0]).toMatchObject({ type: "text" });
     const text = (content[0] as { text: string }).text;
-    expect(text).toContain("Rendered /about (the draft) at 1440, 390 px.");
+    expect(text).toContain("Rendered /about (the draft) at 1440, 390 px, light scheme.");
     expect(text).toContain("✗ contrast (text contrast): 2 at 390 px");
     expect(content.filter((c) => c.type === "image")).toHaveLength(6);
     expect(content[2]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
+  });
+
+  it("renders in the dark scheme when asked (RFC-0023)", async () => {
+    const log: string[] = [];
+    const out = await runTool(
+      def,
+      { siteId, pageId, widths: [390], fullPage: false, scheme: "dark" },
+      ctx({ render: { renderer: fakeRenderer(log), limiter: new RenderLimiter() } }),
+      { policy },
+    );
+    expect(log[1]).toMatch(/^open 390x\d+ dark /);
+    expect((out.result as { scheme: string }).scheme).toBe("dark");
   });
 
   it("is rate-limited per key, and a browser that hangs fails within the timeout", async () => {
@@ -152,6 +166,7 @@ describe("render_page (RFC-0021 §4)", () => {
     await expect(
       runTool(def, { siteId, pageId }, ctx({ render }), { policy }),
     ).rejects.toMatchObject({ code: "render_limited" });
+    expect(log.find((l) => l.startsWith("open 390"))).toContain(" light ");
 
     const hung = { renderer: fakeRenderer(log, { hang: true }), timeoutMs: 50 };
     await expect(

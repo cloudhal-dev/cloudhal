@@ -20,10 +20,9 @@ const site = (config?: Record<string, unknown>) => ({
 
 describe("themeVariables", () => {
   it("writes defaults for unset values, and nothing without a schema", () => {
-    expect(themeVariables(site(), schema)).toEqual({
-      style: ":root{--ch-brand:#18181b;--ch-width:72}",
-      attributes: { "data-ch-font": "system" },
-    });
+    const v = themeVariables(site(), schema);
+    expect(v.style).toMatch(/^:root\{--ch-brand:#18181b;--ch-width:72;color-scheme:light;/);
+    expect(v.attributes).toEqual({ "data-ch-font": "system" });
     expect(themeVariables(site({ brand: "#FF0000" }), undefined)).toEqual({
       style: "",
       attributes: {},
@@ -42,7 +41,44 @@ describe("themeVariables", () => {
       }),
       schema,
     );
-    expect(v.style).toBe(":root{--ch-brand:#18181b;--ch-link-color:#2563eb;--ch-width:72}");
+    expect(v.style).toMatch(/^:root\{--ch-brand:#18181b;--ch-link-color:#2563eb;--ch-width:72;/);
+    expect(v.style).not.toContain("display:none");
     expect(v.attributes).toEqual({ "data-ch-font": "serif", "data-ch-dense": "on" });
+  });
+});
+
+describe("color roles (RFC-0023 §1)", () => {
+  const tokens: PropsSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      brand: { type: "string", format: "color", default: "#18181b" },
+      seed: { type: "string", format: "color" },
+      scheme: { type: "string", enum: ["tonal", "vibrant", "neutral", "mono"], default: "tonal" },
+      mode: { type: "string", enum: ["light", "dark", "auto"], default: "light" },
+    },
+  };
+  it("keeps the old look without a seed: the theme's colors and its former greys", () => {
+    const { style } = themeVariables(site({ brand: "#2563eb" }), tokens);
+    expect(style).toContain("--ch-color-brand:#2563eb");
+    expect(style).toContain("--ch-color-surface-muted:#f4f4f5");
+    expect(style).toContain("color-scheme:light");
+  });
+  it("expands a seed, and writes light-dark() for the automatic mode", () => {
+    const { style } = themeVariables(
+      site({ seed: "#7c3aed", scheme: "vibrant", mode: "auto" }),
+      tokens,
+    );
+    expect(style).toContain("--ch-color-brand:#7c3aed;--ch-color-brand:light-dark(#7c3aed,");
+    expect(style).toContain("color-scheme:light dark");
+    // a dark mode alone (no seed) expands from the brand color
+    expect(themeVariables(site({ mode: "dark" }), tokens).style).toContain("color-scheme:dark");
+    // a theme without `seed` never expands
+    expect(
+      themeVariables(site({ seed: "#7c3aed" }), {
+        ...tokens,
+        properties: { brand: tokens.properties.brand as never },
+      }).style,
+    ).toContain("--ch-color-surface:#ffffff");
   });
 });

@@ -16,10 +16,12 @@ import {
 import {
   bytesToBase64,
   RENDER_CHECK_IDS,
+  RENDER_SCHEMES,
   RENDER_WIDTHS,
   type RenderCheck,
   RenderError,
   RenderLimiter,
+  type RenderScheme,
   type RenderWidth,
   renderPage,
 } from "./render.ts";
@@ -35,6 +37,7 @@ const SHARED_LIMITER = new RenderLimiter();
 interface RenderPageResult {
   url: string;
   path: string;
+  scheme: RenderScheme;
   widths: { width: number; height: number; truncated: boolean; images: number }[];
   checks: RenderCheck[];
   /** The screenshots, per width; moved into image content, never into structured content. */
@@ -57,7 +60,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
 function summary(r: RenderPageResult): string {
   const failed = r.checks.filter((c) => !c.ok);
   return [
-    `Rendered ${r.path} (the draft) at ${r.widths.map((w) => `${w.width}`).join(", ")} px.`,
+    `Rendered ${r.path} (the draft) at ${r.widths.map((w) => `${w.width}`).join(", ")} px, ${r.scheme} scheme.`,
     ...r.widths.map(
       (w) =>
         `${w.width} px: ${w.images} screenshot(s) of a ${w.height} px page${w.truncated ? " (truncated: the screenshots stop there; preview_page has the whole page as HTML)" : ""}.`,
@@ -101,6 +104,12 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
             type: "boolean",
             description: "Screenshots down the page, up to 4 per width (default true)",
           },
+          scheme: {
+            type: "string",
+            enum: [...RENDER_SCHEMES],
+            description:
+              "The reader's color scheme (default light). Render dark too when the site's mode is dark or auto (get_design shows it).",
+          },
         },
         ["siteId"],
       ),
@@ -108,6 +117,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
         {
           url: { type: "string" },
           path: { type: "string" },
+          scheme: { type: "string", enum: [...RENDER_SCHEMES] },
           widths: {
             type: "array",
             items: obj(
@@ -181,15 +191,18 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
         const widths = (
           Array.isArray(a.widths) && a.widths.length ? a.widths : [1440, 390]
         ) as RenderWidth[];
+        const scheme: RenderScheme = a.scheme === "dark" ? "dark" : "light";
         try {
           const r = await renderPage(ctx.render.renderer, doc.url, {
             widths,
             fullPage: a.fullPage !== false,
+            scheme,
             timeoutMs: ctx.render.timeoutMs ?? 20_000,
           });
           const result: RenderPageResult = {
             url: doc.url,
             path: doc.path,
+            scheme,
             widths: r.shots.map((s) => ({
               width: s.width,
               height: s.height,

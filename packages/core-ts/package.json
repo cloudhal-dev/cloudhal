@@ -29,7 +29,8 @@
     "./surfaces": "./src/surfaces.ts",
     "./design": "./src/design.ts",
     "./interop": "./src/surface-interop.ts",
-    "./directives": "./src/directives.ts"
+    "./directives": "./src/directives.ts",
+    "./tokens": "./src/tokens.ts"
   },
   "files": [
     "dist",
@@ -148,6 +149,10 @@
       "./directives": {
         "types": "./dist/src/directives.d.ts",
         "default": "./dist/src/directives.js"
+      },
+      "./tokens": {
+        "types": "./dist/src/tokens.d.ts",
+        "default": "./dist/src/tokens.js"
       }
     }
   },
