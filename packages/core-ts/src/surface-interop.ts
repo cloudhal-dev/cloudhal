@@ -764,9 +764,18 @@ export function toA2ui(
       case "Divider":
         out.push({ id: c.id, component: "Divider" });
         break;
-      case "Heading":
-        text(c.id, p.text, `h${Math.min(5, Math.max(1, Number(p.level ?? 2)))}`);
+      case "Heading": {
+        // RFC-0024 24c: rotating words export as the first one, the effects not at all.
+        const words = Array.isArray(p.words) ? p.words : [];
+        const heading =
+          typeof p.text === "string" && words.length
+            ? p.text.replace("{words}", String(words[0]))
+            : p.text;
+        if (p.effect)
+          notes.add("heading effects have no A2UI equivalent; the plain text is exported");
+        text(c.id, heading, `h${Math.min(5, Math.max(1, Number(p.level ?? 2)))}`);
         break;
+      }
       case "Text":
         text(c.id, p.text, p.muted || p.size === "s" ? "caption" : "body");
         break;
@@ -821,6 +830,19 @@ export function toA2ui(
           );
         break;
       }
+      // RFC-0024 24c: a counter is its final number; a marquee a still row.
+      case "Counter": {
+        const parts = [`${c.id}-value`, ...(p.label ? [`${c.id}-label`] : [])];
+        text(parts[0] as string, `${p.prefix ?? ""}${p.value ?? ""}${p.suffix ?? ""}`, "h2");
+        if (p.label) text(parts[1] as string, p.label, "caption");
+        out.push({ id: c.id, component: "Column", children: parts });
+        notes.add("counters export their final number; A2UI does not count");
+        break;
+      }
+      case "Marquee":
+        out.push({ id: c.id, component: "Row", children: kids });
+        notes.add("marquees export as a still row; A2UI has no motion");
+        break;
       case "Stat": {
         const parts = [`${c.id}-value`, `${c.id}-label`, ...(p.detail ? [`${c.id}-detail`] : [])];
         text(parts[0] as string, p.value, "h2");

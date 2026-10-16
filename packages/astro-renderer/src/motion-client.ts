@@ -16,6 +16,10 @@
  *   (at every motion level: it is content, not movement).
  * - **Scroll effects without scroll-driven CSS** (Firefox today): `--ch-p` (0–1) on each element,
  *   written once a frame from passive scroll events, which the theme's fallback rules read.
+ * - **Kinetic type and loops** (24c): split lines numbered once the line breaks are known; a
+ *   marquee's children copied once (hidden from screen readers, inert) so it loops seamlessly;
+ *   rotating words take turns every 2.8 s; counters count up once as they come into view, ending
+ *   on the number the page already shows. Loops stop while paused or in a hidden tab.
  * - **Pointer effects.** `tilt`, `magnetic` and `spotlight` follow a fine pointer through
  *   `--ch-mx`/`--ch-my` (0–1), one write per frame.
  * - **Pause control.** `[data-ch-motion-toggle]` buttons pause loops and ambient effects for every
@@ -35,6 +39,22 @@ for(const b of d.querySelectorAll("[data-ch-motion-toggle]"))b.setAttribute("ari
 try{if(p)localStorage.setItem(KEY,"1");else localStorage.removeItem(KEY);}catch{}};
 setPaused(paused);
 d.addEventListener("click",(e)=>{const b=e.target instanceof Element&&e.target.closest("[data-ch-motion-toggle]");if(b)setPaused(!paused);});
+if(moving){
+for(const sp of d.querySelectorAll('.ch-split[data-mode="lines"]')){let line=-1,top=null;
+for(const w of sp.querySelectorAll(".ch-w")){const t=w.offsetTop;if(top===null||t>top+2){line++;top=t;}w.style.setProperty("--ch-i",String(line));}}
+for(const m of d.querySelectorAll(".ch-marquee")){const tr=m.querySelector(".ch-marquee__track");if(!tr||m.hasAttribute("data-ch-ready")||level==="subtle")continue;
+for(const c of [...tr.children]){const k=c.cloneNode(true);for(const x of [k,...k.querySelectorAll("[id]")])x.removeAttribute("id");k.setAttribute("aria-hidden","true");k.setAttribute("inert","");tr.appendChild(k);}m.setAttribute("data-ch-ready","");}
+if(level!=="subtle"){const rot=[...d.querySelectorAll("[data-ch-rotate]")];
+if(rot.length)setInterval(()=>{if(paused||d.hidden)return;for(const r of rot){const ws=[...r.children];const i=ws.findIndex((w)=>w.hasAttribute("data-active"));
+ws.forEach((w,j)=>w.toggleAttribute("data-active",j===(i+1)%ws.length));}},2800);}
+const counts=[...d.querySelectorAll("[data-ch-count]")];
+if(counts.length&&"IntersectionObserver"in window){const lang=h.lang||"en";
+const co=new IntersectionObserver((es)=>{for(const e of es){const el=e.target;if(!e.isIntersecting){if(e.boundingClientRect.bottom<=0)co.unobserve(el);continue;}co.unobserve(el);
+const to=Number(el.getAttribute("data-ch-count")),from=Number(el.getAttribute("data-ch-from"))||0,dec=Number(el.getAttribute("data-ch-decimals"))||0;
+const sp=el.getAttribute("data-ch-speed"),ms=sp==="fast"?900:sp==="slow"?2200:1500;const fmt=new Intl.NumberFormat(lang,{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const final=el.textContent;const t0=performance.now();const step=(t)=>{const k=Math.min(1,(t-t0)/ms),v=from+(to-from)*(1-Math.pow(1-k,3));
+el.textContent=k<1?fmt.format(v):final;if(k<1)requestAnimationFrame(step);};el.textContent=fmt.format(from);requestAnimationFrame(step);}},{threshold:0.4});
+for(const el of counts)co.observe(el);}}
 if(moving&&"IntersectionObserver"in window){
 const watch=new Map();
 const io=new IntersectionObserver((es)=>{for(const e of es){for(const el of watch.get(e.target)||[]){
@@ -76,7 +96,7 @@ d.addEventListener("pointerout",(e)=>{const el=e.target instanceof Element&&e.ta
 if(el&&!(e.relatedTarget instanceof Node&&el.contains(e.relatedTarget))){el.style.removeProperty("--ch-mx");el.style.removeProperty("--ch-my");}},{passive:true});}
 `;
 
-export const MOTION_SCRIPT = { path: "/_cloudhal/motion.2.js", code } as const;
+export const MOTION_SCRIPT = { path: "/_cloudhal/motion.3.js", code } as const;
 
 /** Earlier names of the module, served with the current code (each version only adds). */
-export const MOTION_SCRIPT_ALIASES = ["/_cloudhal/motion.1.js"] as const;
+export const MOTION_SCRIPT_ALIASES = ["/_cloudhal/motion.1.js", "/_cloudhal/motion.2.js"] as const;

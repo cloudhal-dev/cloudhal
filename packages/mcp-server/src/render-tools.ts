@@ -61,6 +61,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "reduced-motion": "motion under reduced motion",
   "motion-cls": "layout shift",
   "motion-budget": "too much motion",
+  flash: "flashing",
 };
 
 function summary(r: RenderPageResult): string {

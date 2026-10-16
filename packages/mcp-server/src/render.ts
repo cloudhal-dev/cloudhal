@@ -73,6 +73,8 @@ export const RENDER_CHECK_IDS = [
   "motion-cls",
   // RFC-0024 §2: more scroll effects or scroll stories than a page should carry.
   "motion-budget",
+  // RFC-0024 §8, WCAG 2.3.1: something that flashes more than three times a second.
+  "flash",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -513,6 +515,21 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
   if (scrolls.length > 6) add("motion-budget", scrolls[6], scrolls.length + " scroll effects on the page; keep to 6 or fewer, the strongest ones");
   const stories = document.querySelectorAll(".ch-scrolly");
   if (stories.length > 1) add("motion-budget", stories[1], stories.length + " scroll stories on the page; keep to one");
+  const splits = document.querySelectorAll('[data-ch-reveal^="split-"]');
+  if (splits.length > 2) add("motion-budget", splits[2], splits.length + " split headings or texts; keep to 2, for the lines that matter most");
+  const loops = document.querySelectorAll("[data-ch-loop], .ch-marquee, [data-ch-rotate]");
+  if (loops.length > 2) add("motion-budget", loops[2], loops.length + " things that loop on the page; keep to 2");
+  // flash: a running animation that repeats faster than three times a second and changes how
+  // bright something is (opacity, color, background, filter, visibility).
+  const bright = /opacity|color|background|filter|visibility|fill/i;
+  for (const a of document.getAnimations ? document.getAnimations() : []) {
+    if (a.playState !== "running" || !a.effect || !a.effect.getComputedTiming) continue;
+    const t = a.effect.getComputedTiming();
+    const each = Number(t.duration) / Math.max(0.0001, Math.abs(a.playbackRate || 1));
+    if (!(t.iterations > 1) || !(each > 0) || each >= 1000 / 3) continue;
+    const props = a.effect.getKeyframes ? a.effect.getKeyframes().flatMap((k) => Object.keys(k)) : [];
+    if (props.some((p) => bright.test(p)) && a.effect.target) add("flash", a.effect.target, "repeats " + Math.round(1000 / each) + " times a second");
+  }
   window.scrollTo(0, 0);
 
   return ids.map((id) => out[id]);

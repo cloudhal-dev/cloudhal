@@ -1,5 +1,5 @@
 # RFC-0024: Motion, scroll and ambient effects
-- Status: Accepted (2026-10-16; open questions decided below); 24a and 24b shipped
+- Status: Accepted (2026-10-16; open questions decided below); 24a–24c shipped
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-16
 - Related:
   - RFC-0018 §7 and phase 18f (motion presets, never shipped; this RFC replaces them), RFC-0020 (surfaces, the interaction runtime, "motion stays CSS"), RFC-0021 (`render_page`, the design judge), RFC-0022 (functions, data bindings), RFC-0023 (tokens, surfaces, DTCG export);
@@ -329,6 +329,32 @@ These were decided on 2026-10-16. The test for each was which option serves deve
     - `render_page` frames showed each step at 1440 and 390 px.
 
     Its only finding was the demo's own heading order.
+- **24c shipped.**
+  - **Kinetic type.** `reveal` gains `split-words`, `split-chars` and `split-lines`, on a written `Heading` or `Text` only (at most 60 characters for characters, 300 for words and lines).
+    - The renderer splits the text at build time into `aria-hidden` pieces, each with its place as `--ch-i`; screen readers read the whole text once from a visually hidden copy. Lines are numbered by the motion module once the line breaks are known.
+    - The element stays put while its pieces rise and fade in turn: on the first screen through `@starting-style`, below it on entry.
+  - **Heading effects.** `Heading.effect` adds:
+    - `highlight`: the words *between asterisks*, else the last word, under an accent band that sweeps in;
+    - `gradient-text`: from the brand to the link color, both checked on the page by the token expansion. This differs from §3, which named no colors; it keeps large headings at 3:1 or more.
+    - `rotate-words` with `words` (2–6): the words take turns where `{words}` stands. The widest word holds the width, so nothing shifts; screen readers get the list once.
+  - **`Marquee`.** At least 3 children; `speed`, `direction`, `pauseOnHover`, `gap`. It is a still, wrapping row until the motion module copies its children once (hidden from screen readers, `inert`, ids removed) and sets it moving, at `standard` and above.
+  - **`Counter`.** It replaces §3's `format` with `decimals`, `prefix`, `suffix`, `label` and `duration`; `value` may be a binding in a live surface, which shows the bound value without counting.
+    - The final number is in the HTML, formatted for the page's locale, and screen readers read only that.
+    - A hidden copy in the same grid cell holds its width while it counts up once on entry (ease-out, 0.9–2.2 s).
+    - A counter the reader scrolled past keeps its final number.
+  - **Loops.** `motion.loop` takes `float`, `pulse`, `gradient-shift` or `spin-slow`. Each fits only some decorative components and goes alone (no reveal or scroll). They use `translate`, `scale`, `rotate` or `background-position`, so hover effects still work.
+  - **The pause control is now on the page.** The renderer adds "Pause motion" / "Hareketi duraklat" (`aria-pressed`) at the end of every surface with a marquee, rotating words or a loop.
+    - This differs from §1's footer placement: the control sits next to what moves and needs no page-level knowledge.
+    - It shows only where motion plays. Pressing it pauses every loop on every page: CSS animations pause and rotating words stop. The choice is remembered.
+  - **`render_page`.** The new `flash` check flags a running animation that repeats more than three times a second and changes brightness (WCAG 2.3.1). `motion-budget` also flags more than 2 split texts or more than 2 loops.
+  - **Interop.** A2UI exports a counter as its final number, a marquee as a still row, and rotating words as the first word.
+  - **Guidance.** The catalog prompt, DESIGN guidance point 8 and the skill's recipes say where kinetic type, marquees and counters fit.
+  - **The motion module** is now `motion.3.js` (2.3 KB gzip), with 1 and 2 as aliases.
+  - **Checked** in Chrome on a demo page:
+    - rotating words took turns, the marquee moved, and counters counted up to 11, 38,000 and 99.9 with their width held;
+    - the pause control stopped the marquee and the words and remembered the choice;
+    - `render_page` flagged only the demo's deliberate third loop, with no contrast finding for gradient text and no flashing.
+  - **Fixed during checking.** Counter suffixes no longer drift: a hidden copy holds the width, where `ch` units had over-reserved for separators.
 
 ## Sources
 - **Scroll-driven animations:**

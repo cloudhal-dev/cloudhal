@@ -1,7 +1,7 @@
 import type { ContentEntry, SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import { renderSectionHtml } from "../src/preview.ts";
-import { loadSurfaceSources, renderSurface, surfaceTree } from "../src/surfaces.ts";
+import { loadSurfaceSources, renderSurface, splitHtml, surfaceTree } from "../src/surfaces.ts";
 
 const surface = (
   components: SurfaceComponent[],
@@ -284,7 +284,7 @@ describe("motion presets (RFC-0024 24a)", () => {
       '<div data-ch-reveal="fade" data-ch-speed="slow" data-ch-d="1" class="ch-card">',
     );
     expect(html).toContain(
-      '<script type="module" src="/_cloudhal/motion.2.js"></script></section>',
+      '<script type="module" src="/_cloudhal/motion.3.js"></script></section>',
     );
   });
 
@@ -346,6 +346,95 @@ describe("scroll effects and scroll stories (RFC-0024 24b)", () => {
     expect(html).toContain('data-ch-scroll="parallax" data-ch-dep="-2"');
     // the story writes into the data, so the surface is live, and the motion module observes it
     expect(html).toContain('data-ch-surface="ch-sec_surface0001"');
-    expect(html).toContain('<script type="module" src="/_cloudhal/motion.2.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/motion.3.js"></script>');
+  });
+});
+
+describe("kinetic type, marquees, counters and loops (RFC-0024 24c)", () => {
+  it("splits a heading into pieces screen readers skip, and reads the whole text once", () => {
+    expect(splitHtml("Ship <faster>", "words")).toBe(
+      '<span class="sr-only">Ship &lt;faster&gt;</span><span class="ch-split" data-mode="words" aria-hidden="true"><span class="ch-w" style="--ch-i:0">Ship</span> <span class="ch-w" style="--ch-i:1">&lt;faster&gt;</span></span>',
+    );
+    expect(splitHtml("Go on", "chars")).toContain(
+      '<span class="ch-w"><span class="ch-c" style="--ch-i:0">G</span><span class="ch-c" style="--ch-i:1">o</span></span> <span class="ch-w"><span class="ch-c" style="--ch-i:2">o</span>',
+    );
+    const html = renderSurface(
+      surface([
+        {
+          id: "root",
+          component: "Heading",
+          props: { text: "Ship faster", level: 1 },
+          motion: { reveal: "split-words" },
+        },
+      ]),
+    );
+    expect(html).toContain(
+      '<h1 data-ch-reveal="split-words" class="ch-heading"><span class="sr-only">Ship faster</span>',
+    );
+  });
+
+  it("draws heading effects, a marquee, a counter with its final number, and a pause control", () => {
+    const html = renderSurface(
+      surface([
+        { id: "root", component: "Stack", children: ["rot", "hl", "gr", "m", "n", "f"] },
+        {
+          id: "rot",
+          component: "Heading",
+          props: {
+            text: "Invoices that {words}.",
+            level: 1,
+            effect: "rotate-words",
+            words: ["chase", "close"],
+          },
+        },
+        {
+          id: "hl",
+          component: "Heading",
+          props: { text: "Paid *in days*, not months", effect: "highlight" },
+        },
+        { id: "gr", component: "Heading", props: { text: "Bright", effect: "gradient-text" } },
+        {
+          id: "m",
+          component: "Marquee",
+          props: { speed: "slow", direction: "end" },
+          children: ["a", "b", "c"],
+        },
+        { id: "a", component: "Badge", props: { label: "A" } },
+        { id: "b", component: "Badge", props: { label: "B" } },
+        { id: "c", component: "Badge", props: { label: "C" } },
+        {
+          id: "n",
+          component: "Counter",
+          props: { value: 38000, suffix: "+", label: "Freelancers" },
+        },
+        { id: "f", component: "Badge", props: { label: "New" }, motion: { loop: "float" } },
+      ]),
+    );
+    expect(html).toContain(
+      'Invoices that <span class="sr-only">chase, close</span><span class="ch-rotate" data-ch-rotate aria-hidden="true"><span class="ch-rotate__word" data-active>chase</span><span class="ch-rotate__word">close</span></span>.',
+    );
+    expect(html).toContain('Paid <span class="ch-hl">in days</span>, not months');
+    expect(html).toContain('<span class="ch-gradient-text">Bright</span>');
+    expect(html).toContain(
+      '<div class="ch-marquee" data-speed="slow" data-direction="end" data-hover-pause><div class="ch-marquee__track">',
+    );
+    expect(html).toContain(
+      '<span class="sr-only">38,000</span><span class="ch-counter__num" aria-hidden="true"><span class="ch-counter__hold">38,000</span><span class="ch-counter__live" data-ch-count="38000" data-ch-from="0" data-ch-decimals="0">38,000</span></span>+',
+    );
+    expect(html).toContain('data-ch-loop="float"');
+    expect(html).toContain(
+      '<button type="button" class="ch-motion-toggle" data-ch-motion-toggle aria-pressed="false">Pause motion</button><script type="module" src="/_cloudhal/motion.3.js"></script>',
+    );
+    // in Turkish, and no control where nothing loops
+    const tr = renderSurface(
+      surface([
+        { id: "root", component: "Badge", props: { label: "Yeni" }, motion: { loop: "pulse" } },
+      ]),
+      { media: { locale: "tr" } as never },
+    );
+    expect(tr).toContain(">Hareketi duraklat</button>");
+    expect(
+      renderSurface(surface([{ id: "root", component: "Counter", props: { value: 3 } }])),
+    ).not.toContain("ch-motion-toggle");
   });
 });
