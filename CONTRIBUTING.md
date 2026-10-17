@@ -15,7 +15,7 @@ Thanks for considering a contribution. The goal of this document is that you can
 
 ```bash
 pnpm install
-pnpm check                 # biome lint, tsc, vitest
+pnpm check                 # biome lint, size check, tsc, vitest
 cargo test --workspace     # Rust fixture tests
 ```
 
@@ -38,7 +38,8 @@ Commit the regenerated files; CI fails on drift. Add a valid and an invalid fixt
 - **Conventional commits**: `feat(contracts): add Redirect node`, `fix(cli): …`, `docs: …`, `chore: …`.
 - **DCO sign-off**: every commit needs `Signed-off-by:` — use `git commit -s`. This certifies the [Developer Certificate of Origin](https://developercertificate.org/); there is no CLA.
 - Add a changeset (`pnpm changeset`) when a published package changes behaviour.
-- CI must be green: lint, typecheck, tests (TS + Rust), contract drift.
+- Keep modules small and single-purpose: [`docs/engineering/code-structure.md`](docs/engineering/code-structure.md) sets file/function limits that `pnpm size:check` enforces with a shrink-only baseline.
+- CI must be green: lint, size check, typecheck, tests (TS + Rust), contract drift.
 
 ## Where to start
 

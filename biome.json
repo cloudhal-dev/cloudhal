@@ -45,6 +45,32 @@
               "temporal-polyfill/full/shim": "RFC-0008 §9.4: never install a global Temporal; import temporal-polyfill/implementation."
             }
           }
+        },
+        "noExcessiveLinesPerFile": {
+          "level": "warn",
+          "options": {
+            "maxLines": 800
+          }
+        }
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 25
+          }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "warn",
+          "options": {
+            "maxLines": 150
+          }
+        },
+        "useMaxParams": {
+          "level": "warn",
+          "options": {
+            "max": 4
+          }
         }
       }
     }
@@ -103,6 +129,47 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/test/**",
+        "**/tests/**",
+        "**/src/testing*.ts",
+        "**/fixtures.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off",
+            "noExcessiveLinesPerFunction": "off",
+            "useMaxParams": "off"
+          },
+          "style": {
+            "noExcessiveLinesPerFile": {
+              "level": "warn",
+              "options": {
+                "maxLines": 1500
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/studio/src/i18n/en.ts",
+        "apps/studio/src/i18n/tr.ts",
+        "apps/studio/src/i18n/lazy/*.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
           }
         }
       }

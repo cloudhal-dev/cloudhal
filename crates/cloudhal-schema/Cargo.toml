@@ -19,3 +19,6 @@ regress = { workspace = true }
 
 [dev-dependencies]
 jsonschema = { workspace = true }
+
+[lints]
+workspace = true
