@@ -12,33 +12,56 @@
  * - After the reader moves, a polite live region names the slide ("2 of 5").
  * - A hero's or gallery's slides out of view are `inert` (one slide in view: Tab never lands on
  *   what cannot be seen).
+ * - 27d: a hero with `data-loop` wraps at its ends. A hero with `data-autoplay` (slow 8 s, normal 6 s)
+ *   moves on its own only while the site's motion is standard or expressive, the reader has not
+ *   asked for reduced motion or paused motion, the tab is visible and the carousel is in view; it
+ *   pauses on hover and stops for good on focus inside, a pointer press or a swipe; its rotation
+ *   control (first in Tab order, shown only where motion may play) stops and restarts it; the
+ *   live region is silent while it plays.
  * No scroll hijacking: swipe and wheel stay native.
  */
 
 const code = String.raw`const d=document;
 for(const box of d.querySelectorAll(".ch-carousel")){const track=box.querySelector(".ch-carousel__track");if(!track)continue;
 const slides=[...track.children].filter((e)=>e.classList.contains("ch-carousel__slide"));if(!slides.length)continue;
-const v=box.getAttribute("data-variant"),hero=v==="hero",single=hero||v==="gallery";const prev=box.querySelector('[data-ch-carousel="prev"]'),next=box.querySelector('[data-ch-carousel="next"]');
-const marks=[...box.querySelectorAll(".ch-carousel__markers a")];let seen=new Set(),current=0,said=false,timer=0;
+const v=box.getAttribute("data-variant"),hero=v==="hero",single=hero||v==="gallery",loop=hero&&box.hasAttribute("data-loop");const prev=box.querySelector('[data-ch-carousel="prev"]'),next=box.querySelector('[data-ch-carousel="next"]');
+const marks=[...box.querySelectorAll(".ch-carousel__markers a")];let seen=new Set(),current=0,said=false,timer=0,auto=false,stop=()=>{};
 const live=d.createElement("p");live.className="sr-only";live.setAttribute("aria-live","polite");box.append(live);
 const measure=()=>{const r=track.getBoundingClientRect();seen=new Set(slides.filter((s)=>{const b=s.getBoundingClientRect();const w=Math.min(b.right,r.right)-Math.max(b.left,r.left);return b.width>0&&w/b.width>=0.6;}));};
 const sync=()=>{measure();const shown=slides.map((s,i)=>seen.has(s)?i:-1).filter((i)=>i>=0);if(shown.length)current=shown[0];
 const last=shown.length?shown[shown.length-1]:current;
 marks.forEach((m,i)=>{if(i===current)m.setAttribute("aria-current","true");else m.removeAttribute("aria-current");});
-if(prev)prev.setAttribute("aria-disabled",String(current<=0));if(next)next.setAttribute("aria-disabled",String(last>=slides.length-1));
+if(prev)prev.setAttribute("aria-disabled",String(!loop&&current<=0));if(next)next.setAttribute("aria-disabled",String(!loop&&last>=slides.length-1));
 if(single)slides.forEach((s,i)=>{s.inert=i!==current;});
-if(said){said=false;live.textContent=slides[current].getAttribute("aria-label")||"";}};
-track.addEventListener("scroll",()=>{clearTimeout(timer);timer=setTimeout(sync,90);},{passive:true});
+if(said){said=false;live.textContent=slides[current].getAttribute("aria-label")||"";}auto=false;};
+track.addEventListener("scroll",()=>{if(!auto&&!said)stop();clearTimeout(timer);timer=setTimeout(sync,90);},{passive:true});
 track.addEventListener("scrollend",()=>{clearTimeout(timer);sync();});
 addEventListener("resize",()=>{clearTimeout(timer);timer=setTimeout(sync,90);},{passive:true});
-const go=(i)=>{const to=slides[Math.max(0,Math.min(slides.length-1,i))];said=true;to.scrollIntoView({block:"nearest",inline:"start"});clearTimeout(timer);timer=setTimeout(sync,400);};
+const go=(i)=>{if(loop)i=(i+slides.length)%slides.length;const to=slides[Math.max(0,Math.min(slides.length-1,i))];said=true;to.scrollIntoView({block:"nearest",inline:"start"});clearTimeout(timer);timer=setTimeout(sync,400);};
 const page=()=>{measure();return Math.max(1,slides.filter((s)=>seen.has(s)).length);};
 for(const [b,dir] of [[prev,-1],[next,1]]){if(!b)continue;b.removeAttribute("data-ch-pending");
 b.addEventListener("click",()=>{if(b.getAttribute("aria-disabled")==="true")return;go(current+dir*(single?1:page()));});}
 marks.forEach((m,i)=>m.addEventListener("click",(e)=>{e.preventDefault();go(i);}));
+const ms={slow:8000,normal:6000}[box.getAttribute("data-autoplay")||""],rot=box.querySelector('[data-ch-carousel="rotate"]');
+if(hero&&ms&&rot){const h=d.documentElement;
+const allowed=()=>["standard","expressive"].includes(h.getAttribute("data-ch-motion")||"")&&!matchMedia("(prefers-reduced-motion: reduce)").matches&&!h.hasAttribute("data-ch-motion-paused");
+let on=true,hover=false,t=0;
+const show=()=>{rot.setAttribute("data-state",on?"playing":"stopped");rot.setAttribute("aria-label",rot.getAttribute(on?"data-stop":"data-start")||"");live.setAttribute("aria-live",on?"off":"polite");};
+const tick=()=>{t=setTimeout(tick,ms);if(!on||hover||d.hidden||!allowed())return;const r=box.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
+auto=true;slides[(current+1)%slides.length].scrollIntoView({block:"nearest",inline:"start"});clearTimeout(timer);timer=setTimeout(sync,400);};
+stop=()=>{if(!on)return;on=false;clearTimeout(t);show();};
+if(allowed())rot.removeAttribute("data-ch-pending");
+rot.addEventListener("click",()=>{if(on)stop();else{on=true;show();clearTimeout(t);t=setTimeout(tick,ms);}});
+box.addEventListener("focusin",(e)=>{if(e.target!==rot)stop();});
+box.addEventListener("pointerdown",(e)=>{if(!(e.target instanceof Node&&rot.contains(e.target)))stop();});
+box.addEventListener("mouseenter",()=>{hover=true;});box.addEventListener("mouseleave",()=>{hover=false;});
+show();t=setTimeout(tick,ms);}
 sync();}
 `;
 
-export const CAROUSEL_SCRIPT = { path: "/_cloudhal/carousel.2.js", code } as const;
+export const CAROUSEL_SCRIPT = { path: "/_cloudhal/carousel.3.js", code } as const;
 /** Earlier names, still asked for by cached pages: they get the current code. */
-export const CAROUSEL_SCRIPT_ALIASES = ["/_cloudhal/carousel.1.js"] as const;
+export const CAROUSEL_SCRIPT_ALIASES = [
+  "/_cloudhal/carousel.1.js",
+  "/_cloudhal/carousel.2.js",
+] as const;

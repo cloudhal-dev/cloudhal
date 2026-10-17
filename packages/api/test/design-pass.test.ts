@@ -344,6 +344,9 @@ describe("tool briefs (RFC-0022 22e)", () => {
   it("fills sample inputs before looking, and reports whether the tool's results show", async () => {
     const { TOOL_EVAL_BRIEFS, withSampleInputs } = await import("../src/build-eval.ts");
     expect(TOOL_EVAL_BRIEFS.map((b) => b.id)).toEqual(["calories", "loan", "chart", "compare"]);
+    const { CAROUSEL_EVAL_BRIEFS, ALL_EVAL_BRIEFS } = await import("../src/build-eval.ts");
+    expect(CAROUSEL_EVAL_BRIEFS.map((b) => b.id)).toEqual(["offers", "logos"]);
+    expect(new Set(ALL_EVAL_BRIEFS.map((b) => b.id)).size).toBe(ALL_EVAL_BRIEFS.length);
     const tool = JSON.stringify({
       ops: [
         {

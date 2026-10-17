@@ -172,6 +172,21 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
       hero('<script defer src="carousel.js"></script>'),
     );
     expect(withModule("carousel-focus")).toMatchObject({ ok: true });
+    expect(withModule("carousel-autoplay")).toMatchObject({ ok: true });
+    // RFC-0027 27d: a playing hero needs its rotation control first, and one per page.
+    const playing = hero('<script defer src="carousel.js"></script>')
+      .replace('data-variant="hero"', 'data-variant="hero" data-autoplay="slow"')
+      .replace(
+        "</main>",
+        '<section aria-roledescription="carousel" aria-label="More" data-autoplay="slow"></section></main>',
+      );
+    const p = await run("hero-playing.html", playing);
+    expect(p("carousel-autoplay")?.examples).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/without a rotation control first/),
+        expect.stringMatching(/one per page at most/),
+      ]),
+    );
   }, 90_000);
 });
 

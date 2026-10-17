@@ -93,10 +93,13 @@ describe("carousels (RFC-0027 27a)", () => {
     expect(html).toContain(`<script type="module" src="${CAROUSEL_SCRIPT.path}"></script>`);
     // Bump `carousel.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(CAROUSEL_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "7f92dc92f2d9",
+      "3d22a6c5655f",
     );
-    expect(CAROUSEL_SCRIPT.path).toBe("/_cloudhal/carousel.2.js");
-    expect(CAROUSEL_SCRIPT_ALIASES).toEqual(["/_cloudhal/carousel.1.js"]);
+    expect(CAROUSEL_SCRIPT.path).toBe("/_cloudhal/carousel.3.js");
+    expect(CAROUSEL_SCRIPT_ALIASES).toEqual([
+      "/_cloudhal/carousel.1.js",
+      "/_cloudhal/carousel.2.js",
+    ]);
     expect(gzipSync(CAROUSEL_SCRIPT.code).length).toBeLessThan(2 * 1024);
     expect(CAROUSEL_SCRIPT.code).not.toMatch(
       /\beval\b|new Function|innerHTML|addEventListener\("wheel"/,
@@ -140,5 +143,28 @@ describe("carousels (RFC-0027 27a)", () => {
     expect(html).toMatch(
       /<a href="#ch-sec_carousel01-root-2" aria-label="Slide 2"><img [^>]*alt=""/,
     );
+  });
+
+  it("puts a playing hero's rotation control first, hidden until the module allows motion (27d)", () => {
+    const html = renderSurface(
+      section([
+        {
+          id: "root",
+          component: "Carousel",
+          props: { label: "Spring", variant: "hero", aspect: "16:9", loop: true, autoplay: "slow" },
+          children: ["a", "b"],
+        },
+        text("a"),
+        text("b"),
+      ]),
+    );
+    expect(html).toContain('data-loop data-autoplay="slow"');
+    const rotate = html.indexOf('data-ch-carousel="rotate"');
+    expect(rotate).toBeGreaterThan(0);
+    expect(rotate).toBeLessThan(html.indexOf("ch-carousel__track"));
+    expect(html).toMatch(
+      /data-ch-carousel="rotate" data-ch-pending data-state="playing"[^>]*aria-label="Stop slide rotation"/,
+    );
+    expect(renderSurface(rail)).not.toContain('data-ch-carousel="rotate"');
   });
 });

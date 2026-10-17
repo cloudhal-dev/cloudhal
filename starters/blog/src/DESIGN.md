@@ -28,6 +28,7 @@ The blog theme is an editorial theme: articles first, set in a calm reading colu
 - Lists of articles come from the content list section or a surface entry source, not from copied titles.
 
 ## Imagery
+- Carousels: a static hero band is the default. Use a `hero` `Carousel` only for two to five equal offers (same `aspect`, the strongest first); when the header is transparent over it, every slide opens with the same loud `Band`. Autoplay is off unless the site asks, and then `slow`. A `rail` carries logos, products or cards, a `gallery` photographs (with `thumbs`), `testimonials` quotes.
 - Photographs from the media library, landscape for heroes and cards (`16:9` or `4:3`), never the same image twice on a page. Alt text says what is in the picture, in the page's language.
 
 ## Pages

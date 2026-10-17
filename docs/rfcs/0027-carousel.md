@@ -104,7 +104,7 @@ None; `docs/design/carousels.md` decided them.
     - A hero is full width; one frame per slide; wide frames become 4:5 in a narrow carousel.
     - Smooth scrolling only where motion plays.
   - **Checks.** `render_page` adds `carousel-label` and `carousel-lcp`. It now remembers which images the page asked to be lazy before it loads them all.
-  - **Known gap.** A transparent header reads the hero's first slide only (`heroSurface` walks into the carousel), so later slides with other surfaces may differ. `header-contrast` checks the first slide.
+  - **Known gap (closed in 27e).** A transparent header read the hero's first slide only; later slides with other surfaces could differ.
 - **27b shipped.**
   - **Module.** `/_cloudhal/carousel.1.js` is 972 B gzipped and loads only with a carousel.
     - The arrows appear. They move by a slide (hero) or by what is in view (rail), through `scrollIntoView`, so right-to-left and the site's `scroll-behavior` hold. At the ends they carry `aria-disabled`.
@@ -121,3 +121,25 @@ None; `docs/design/carousels.md` decided them.
     - `testimonials`: 2–12 slides, one quote centred, the neighbours' edges showing.
   - **Thumbs.** `markers: "thumbs"` is allowed only on a gallery. Each thumbnail is the slide's first image, decorative (`alt=""`) inside a link named "Slide N".
   - **Module.** `carousel.2.js` (`carousel.1.js` kept as an alias) makes off-screen gallery slides inert too, and moves a gallery by one slide.
+- **27d shipped.**
+  - **Props.** `loop` and `autoplay` (`off`, `slow` 8 s, `normal` 6 s), on a hero only.
+  - **Rules.**
+    - At most one autoplaying carousel per page.
+    - The longest slide's text must fit the interval: at most 3 words per second (24 words for slow, 18 for normal). Otherwise the store asks for shorter text, `slow`, or no autoplay.
+  - **Markup.** A rotation button comes first in the carousel, before the track. It is shown at the start of the controls row, clear of a transparent header, and stays hidden (`data-ch-pending`) until the module allows motion.
+  - **Module.** `carousel.3.js` (`carousel.1.js` and `carousel.2.js` kept as aliases).
+    - A looping hero wraps at its ends.
+    - Autoplay runs only while the site's motion is `standard` or `expressive`, without reduced motion or the page-wide pause, in a visible tab, and with the carousel in view.
+    - It pauses on hover. It stops for good on focus inside, a pointer press or a swipe; the rotation button restarts it.
+    - The live region is silent while it plays.
+  - **Check.** `render_page` adds `carousel-autoplay`: the rotation control is the first focusable element and is named, and only one carousel per page plays. `carousel-focus` now looks only at the arrows: a rotation control that stays hidden under reduced motion is correct.
+- **27e shipped.**
+  - **Theme hero areas.**
+    - `heroSurface` now reads a hero `Carousel` that opens a page. The header turns transparent only when every slide opens with the same loud `Band`, so it reads on whichever slide shows. This closes 27a's known gap.
+    - Under a transparent header, each slide's band keeps the header's room above its content.
+    - A band holding only a picture fills what its padding leaves.
+  - **Guidance.**
+    - `get_design` (`DESIGN_GUIDANCE`) and the starter's DESIGN.md say when a hero carousel is right: equal offers, 2–5 slides, the strongest first, the same loud band under a transparent header, autoplay rarely and slow. They also say which variant fits logos, photographs and quotes.
+  - **Eval.**
+    - The design rubric's lowest motion anchor names a carousel that rotates with no way to stop it.
+    - `CAROUSEL_EVAL_BRIEFS` (`offers`, `logos`; run with `--briefs offers,logos`) test that the model picks a hero carousel and a rail.

@@ -2611,6 +2611,13 @@ button.ch-button--secondary {
   > .ch-surface:first-child
   > :first-child
   > :first-child
+  > .ch-band:first-child,
+.ch-header[data-transparent]
+  ~ main
+  > .ch-surface:first-child
+  .ch-carousel[data-variant="hero"]
+  > .ch-carousel__track
+  > .ch-carousel__slide
   > .ch-band:first-child {
   padding-block-start: calc(var(--ch-header-h) + 3rem);
 }
@@ -3179,6 +3186,12 @@ ul.ch-mega__col {
   display: flex;
   align-items: center;
 }
+/* A band holding only a picture fills what its padding leaves (under a transparent header too). */
+.ch-carousel[data-variant="hero"] .ch-band > .ch-band__inner:has(> .ch-figure:only-child) {
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+}
 /* Controls: arrows the module reveals (their place kept), markers as links. */
 .ch-carousel__controls {
   @apply mt-3 flex items-center justify-center gap-3;
@@ -3267,4 +3280,22 @@ ul.ch-mega__col {
   grid-auto-columns: 100%;
   padding-inline: calc(var(--ch-c-peek) / 2);
   scroll-padding-inline: calc(var(--ch-c-peek) / 2);
+}
+
+/* RFC-0027 27d: a playing hero's rotation control: first in Tab order (first in the markup), shown
+   at the start of the controls row (clear of a transparent header over the hero). */
+.ch-carousel__rotate {
+  @apply absolute bottom-0 start-4 z-10 inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-zinc-300 text-base;
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+}
+.ch-carousel__rotate[data-ch-pending] {
+  display: none;
+}
+.ch-carousel__rotate[data-state="playing"] [data-when="stopped"],
+.ch-carousel__rotate[data-state="stopped"] [data-when="playing"] {
+  display: none;
+}
+.ch-carousel__rotate > span {
+  display: inline-flex;
 }
