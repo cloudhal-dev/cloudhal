@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
-import { CAROUSEL_SCRIPT } from "../src/carousel-client.ts";
+import { CAROUSEL_SCRIPT, CAROUSEL_SCRIPT_ALIASES } from "../src/carousel-client.ts";
 import { renderSurface, surfaceTree } from "../src/surfaces.ts";
 
 const section = (components: SurfaceComponent[]): SurfaceSection => ({
@@ -93,14 +93,52 @@ describe("carousels (RFC-0027 27a)", () => {
     expect(html).toContain(`<script type="module" src="${CAROUSEL_SCRIPT.path}"></script>`);
     // Bump `carousel.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(CAROUSEL_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "680ab0558cf4",
+      "7f92dc92f2d9",
     );
-    expect(CAROUSEL_SCRIPT.path).toBe("/_cloudhal/carousel.1.js");
+    expect(CAROUSEL_SCRIPT.path).toBe("/_cloudhal/carousel.2.js");
+    expect(CAROUSEL_SCRIPT_ALIASES).toEqual(["/_cloudhal/carousel.1.js"]);
     expect(gzipSync(CAROUSEL_SCRIPT.code).length).toBeLessThan(2 * 1024);
     expect(CAROUSEL_SCRIPT.code).not.toMatch(
       /\beval\b|new Function|innerHTML|addEventListener\("wheel"/,
     );
     expect(CAROUSEL_SCRIPT.code).toContain('scrollIntoView({block:"nearest",inline:"start"})');
     expect(CAROUSEL_SCRIPT.code).toContain('setAttribute("aria-live","polite")');
+  });
+
+  it("draws a gallery's thumbnails from its slides' images, decorative inside named links (27c)", () => {
+    const asset = {
+      schemaVersion: 1,
+      id: "asset_GALLERY001",
+      siteId: "site_01HZX8K3Q9EF",
+      kind: "image",
+      mediaType: "image/png",
+      bytes: 10,
+      sha256: "ab".repeat(32),
+      slug: "loaf",
+      image: { width: 800, height: 600 },
+      alt: { en: "A loaf" },
+      storage: { kind: "blob" },
+      status: "active",
+    };
+    const html = renderSurface(
+      section([
+        {
+          id: "root",
+          component: "Carousel",
+          props: { label: "Bakery", variant: "gallery", aspect: "4:3", markers: "thumbs" },
+          children: ["a", "b"],
+        },
+        { id: "a", component: "Image", props: { asset: "asset:asset_GALLERY001", alt: "A loaf" } },
+        { id: "b", component: "Image", props: { asset: "asset:asset_GALLERY001", alt: "Another" } },
+      ]),
+      { media: { assets: new Map([["asset_GALLERY001", asset as never]]) as never } },
+    );
+    expect(html).toContain('data-variant="gallery"');
+    expect(html).toContain(
+      '<nav class="ch-carousel__markers" data-style="thumbs" aria-label="Slides">',
+    );
+    expect(html).toMatch(
+      /<a href="#ch-sec_carousel01-root-2" aria-label="Slide 2"><img [^>]*alt=""/,
+    );
   });
 });

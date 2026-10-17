@@ -115,3 +115,9 @@ None; `docs/design/carousels.md` decided them.
     - No wheel or drag handling.
   - **Check.** `render_page` adds `carousel-focus`: the arrows must have appeared (the module ran), and no focusable element may sit in an off-screen hero slide unless it is inert.
   - **Design note.** Position is measured from geometry rather than an IntersectionObserver. Hidden tabs (and the preview pane) pause observers; geometry stays correct after any move, and a short timer catches moves that cause no scroll.
+- **27c shipped.**
+  - **Variants.**
+    - `gallery`: up to 24 slides, each holding an `Image`. An `aspect` is required. The image shows whole (`contain`) on a muted field until RFC-0028's blur-fill.
+    - `testimonials`: 2–12 slides, one quote centred, the neighbours' edges showing.
+  - **Thumbs.** `markers: "thumbs"` is allowed only on a gallery. Each thumbnail is the slide's first image, decorative (`alt=""`) inside a link named "Slide N".
+  - **Module.** `carousel.2.js` (`carousel.1.js` kept as an alias) makes off-screen gallery slides inert too, and moves a gallery by one slide.

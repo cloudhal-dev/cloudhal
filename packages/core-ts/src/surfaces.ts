@@ -906,14 +906,14 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     name: "Carousel",
     title: { en: "Carousel", tr: "Kaydırmalı alan" },
     description: {
-      en: "Slides a reader moves through: each child is one slide. hero: 2–5 full-width slides (one frame size, aspect); rail: 2–12 cards or logos side by side, perView or as many as fit. Prefer a static hero; never put the only way to something on a later slide.",
+      en: "Slides a reader moves through: each child is one slide. hero: 2–5 full-width slides (one frame size, aspect); rail: 2–12 cards or logos side by side, perView or as many as fit; gallery: up to 24 images, one at a time, with thumbnails (markers thumbs); testimonials: 2–12 quotes, centred, the neighbours peeking in. Prefer a static hero; never put the only way to something on a later slide.",
       tr: "Okurun gezdiği slaytlar; her alt öğe bir slayt. hero: 2–5 tam genişlik slayt; rail: yan yana 2–12 kart.",
     },
     category: "interactive",
     props: schema(
       {
         label: label(80),
-        variant: { type: "string", enum: ["hero", "rail"] },
+        variant: { type: "string", enum: ["hero", "rail", "gallery", "testimonials"] },
         perView: { type: "integer", minimum: 1, maximum: 4 },
         itemWidth: { type: "string", enum: ["s", "m", "l"] },
         peek: { type: "string", enum: ["none", "s", "m"] },
@@ -921,7 +921,7 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         gap: space({ en: "Gap", tr: "Boşluk" }),
         aspect: { type: "string", enum: ["16:9", "21:9", "4:3", "1:1", "3:4"] },
         controls: { type: "string", enum: ["both", "arrows", "markers", "none"] },
-        markers: { type: "string", enum: ["numbers", "dots"] },
+        markers: { type: "string", enum: ["numbers", "dots", "thumbs"] },
       },
       ["label"],
     ),
@@ -2296,19 +2296,36 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     if (c.component !== "Carousel") return;
     const at = `/components/${i}`;
     const p = isObj(c.props) ? c.props : {};
-    const variant = p.variant === "hero" ? "hero" : "rail";
+    const variant = ["hero", "gallery", "testimonials"].includes(String(p.variant))
+      ? String(p.variant)
+      : "rail";
     const kids = kidsOf(c);
-    const [min, max] = variant === "hero" ? [2, 5] : [2, 12];
+    const [min, max] = variant === "hero" ? [2, 5] : variant === "gallery" ? [2, 24] : [2, 12];
     if (kids.length < min || kids.length > max)
       issues.push({
         path: `${at}/children`,
         message: `a ${variant} carousel has ${min} to ${max} slides`,
       });
-    if (variant === "hero" && p.aspect === undefined)
+    if ((variant === "hero" || variant === "gallery") && p.aspect === undefined)
       issues.push({
         path: `${at}/props/aspect`,
-        message: "a hero carousel keeps one frame size: set aspect",
+        message: `a ${variant} carousel keeps one frame size: set aspect`,
       });
+    if (p.markers === "thumbs" && variant !== "gallery")
+      issues.push({ path: `${at}/props/markers`, message: "thumbs only on a gallery" });
+    if (variant === "gallery")
+      for (const k of kids) {
+        const hasImage = (id: string, depth: number): boolean => {
+          const n = byId.get(id)?.c;
+          return (
+            !!n &&
+            (n.component === "Image" ||
+              (depth < 3 && kidsOf(n).some((x) => hasImage(x, depth + 1))))
+          );
+        };
+        if (!hasImage(k, 0))
+          issues.push({ path: `${at}/children`, message: `gallery slide "${k}" has no Image` });
+      }
     if (p.controls === "none" && !(variant === "rail" && p.peek !== undefined && p.peek !== "none"))
       issues.push({
         path: `${at}/props/controls`,
@@ -2990,7 +3007,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
     'Page transitions: when the site\'s pageTransition is morph, give the same "morph" key (motion {"morph":"plan-pro"}) to an element on two pages, a card image and the article cover, a pricing card and its plan page heading, and it moves from one to the other as the reader navigates. One key per element on a page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
-    "Carousel (RFC-0027): each child is a slide; give it a label naming what it shows. variant hero (2–5 full-width slides, aspect required, slide 1 matters most) or rail (2–12 cards or logos, perView 1–4 or itemWidth, peek s so readers see there is more). Prefer a static hero (a Band); use a hero carousel only for 2–5 equally important messages; every slide's content must also be reachable elsewhere.",
+    "Carousel (RFC-0027): each child is a slide; give it a label naming what it shows. variant hero (2–5 full-width slides, aspect required, slide 1 matters most), rail (2–12 cards or logos, perView 1–4 or itemWidth, peek s so readers see there is more), gallery (up to 24 slides each with an Image, aspect required, markers thumbs) or testimonials (2–12 Quote slides, centred). Prefer a static hero (a Band); use a hero carousel only for 2–5 equally important messages; every slide's content must also be reachable elsewhere.",
     `Icons (RFC-0026), by name only: an Icon component ({"name","size","tone","label" only when it stands alone}), "icon" on Button (with "iconPosition"), Badge and Stat, and List "marker". Interface: ${ICON_GROUPS.interface.join(", ")}. Actions: ${ICON_GROUPS.actions.join(", ")}. Content: ${ICON_GROUPS.content.join(", ")}. Social: ${ICON_GROUPS.social.join(", ")}. Icons decorate text; never use one as the only way to say something.`,
     'Overlays (Dialog, Drawer, Popover: at most 3 per section; and Lightbox) open only when the reader asks: a Button with "onClick":{"action":"open","target":"<overlay id>"}; a Button inside one with {"action":"close"} closes it. Never open one on load, on a timer or on leaving; content people read or link to belongs on a page. Dialog and Drawer need a title; give a Dialog a fallbackHref page when its content matters. A Tooltip ({"text","for":"<Button or Link id>"}) repeats what is on the page, never replaces it. A Lightbox shows images from items (asset and alt each).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",

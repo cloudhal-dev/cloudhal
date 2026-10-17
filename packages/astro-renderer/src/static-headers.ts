@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
-import { CAROUSEL_SCRIPT } from "./carousel-client.ts";
+import { CAROUSEL_SCRIPT, CAROUSEL_SCRIPT_ALIASES } from "./carousel-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
 import { CHROME_SCRIPT, CHROME_SCRIPT_ALIASES } from "./chrome-client.ts";
 import { SITE_CSP } from "./csp.ts";
@@ -93,6 +93,7 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
     // RFC-0027 27b: the carousel module, loaded by surfaces with a carousel.
     [CAROUSEL_SCRIPT.path, CAROUSEL_SCRIPT.code],
+    ...CAROUSEL_SCRIPT_ALIASES.map((alias) => [alias, CAROUSEL_SCRIPT.code] as [string, string]),
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));

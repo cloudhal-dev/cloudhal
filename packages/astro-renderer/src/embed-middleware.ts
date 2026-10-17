@@ -4,7 +4,7 @@
  */
 
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
-import { CAROUSEL_SCRIPT } from "./carousel-client.ts";
+import { CAROUSEL_SCRIPT, CAROUSEL_SCRIPT_ALIASES } from "./carousel-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
 import { CHROME_SCRIPT, CHROME_SCRIPT_ALIASES } from "./chrome-client.ts";
 import { EMBED_SCRIPT } from "./embed-client.ts";
@@ -26,6 +26,7 @@ const SCRIPTS = new Map<string, string>([
   ...CHROME_SCRIPT_ALIASES.map((alias) => [alias, CHROME_SCRIPT.code] as [string, string]),
   [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
   [CAROUSEL_SCRIPT.path, CAROUSEL_SCRIPT.code],
+  ...CAROUSEL_SCRIPT_ALIASES.map((alias) => [alias, CAROUSEL_SCRIPT.code] as [string, string]),
   [PREFS_SCRIPT.path, PREFS_SCRIPT.code],
 ]);
 
