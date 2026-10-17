@@ -5,7 +5,7 @@ import type { ComponentType, ReactNode } from "react";
 export interface SwitcherItem {
   id: string;
   name: string;
-  icon?: ComponentType<{ className?: string; weight?: "duotone" | "regular" }>;
+  icon?: ComponentType<{ className?: string; weight?: "fill" | "regular" }>;
 }
 
 export interface SidebarSwitcherProps {
@@ -42,9 +42,7 @@ export function SidebarSwitcher({
           />
         }
       >
-        {CurrentIcon && (
-          <CurrentIcon className="size-4 shrink-0 text-kumo-brand" weight="duotone" />
-        )}
+        {CurrentIcon && <CurrentIcon className="size-4 shrink-0 text-kumo-brand" weight="fill" />}
         <span className="flex min-w-0 flex-1 items-center overflow-hidden text-left">
           <span className="truncate">{current.name}</span>
         </span>
@@ -62,7 +60,7 @@ export function SidebarSwitcher({
               selected={item.id === current.id}
               onClick={() => onSelect(item)}
             >
-              {Icon && <Icon className="size-4 text-kumo-brand" weight="duotone" />}
+              {Icon && <Icon className="size-4 text-kumo-brand" weight="fill" />}
               {item.name}
               {item.id === current.id && <Check className="ml-auto size-4" />}
             </DropdownMenu.Item>

@@ -58,7 +58,7 @@ export function ResetPasswordPage() {
 
   return (
     <AuthLayout
-      brand={<SquaresFour size={20} weight="duotone" />}
+      brand={<SquaresFour size={20} weight="fill" />}
       product={t("app.name")}
       title={done ? t("resetPassword.doneTitle") : t("resetPassword.title")}
       description={

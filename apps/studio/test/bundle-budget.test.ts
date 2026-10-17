@@ -1,5 +1,11 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { type BudgetChunk, checkBundleBudget } from "../bundle-budget.ts";
+import { keepWeights, STUDIO_ICON_WEIGHTS } from "../phosphor-weights.ts";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const chunk = (fileName: string, opts: Partial<BudgetChunk> = {}): [string, BudgetChunk] => [
   fileName,
@@ -93,5 +99,56 @@ describe("checkBundleBudget", () => {
     expect(problems).toHaveLength(2);
     expect(problems[0]).toMatch(/entry chunk index\.js is \d+ B \(budget 100 B\)/);
     expect(problems[1]).toMatch(/initial load is \d+ B gzip \(budget 10 B\)/);
+  });
+});
+
+describe("Phosphor weights (phosphor-weights.ts)", () => {
+  const def = (weights: string[]) =>
+    [
+      'import * as a from "react";',
+      "const e = /* @__PURE__ */ new Map([",
+      weights
+        .map(
+          (w) => `  [\n    "${w}",\n    /* @__PURE__ */ a.createElement("path", { d: "M0" })\n  ]`,
+        )
+        .join(",\n"),
+      "]);",
+      "export {",
+      "  e as default",
+      "};",
+    ].join("\n");
+
+  it("keeps only the weights Studio draws", () => {
+    const out = keepWeights(def(["bold", "duotone", "fill", "light", "regular", "thin"]));
+    expect([...out.matchAll(/^ {4}"([a-z]+)",$/gm)].map((m) => m[1])).toEqual([
+      "bold",
+      "fill",
+      "regular",
+    ]);
+    expect(out).toContain("]);\nexport {");
+    expect(out).not.toMatch(/\],\n\]\);/);
+  });
+
+  it("leaves anything it does not recognise untouched", () => {
+    const odd = 'export const x = new Map([["bold", 1]]);';
+    expect(keepWeights(odd)).toBe(odd);
+  });
+
+  it("Studio and its blocks never ask for a weight it drops", () => {
+    const roots = [path.resolve(here, "../src"), path.resolve(here, "../../../packages/ui/src")];
+    const offenders: string[] = [];
+    const visit = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) visit(p);
+        else if (
+          /\.tsx?$/.test(e.name) &&
+          /weight[=:]\s*\{?["'](thin|light|duotone)["']/.test(readFileSync(p, "utf8"))
+        )
+          offenders.push(path.relative(here, p));
+      }
+    };
+    for (const r of roots) visit(r);
+    expect(offenders, `use ${STUDIO_ICON_WEIGHTS.join(", ")}`).toEqual([]);
   });
 });

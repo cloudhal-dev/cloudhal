@@ -16,9 +16,11 @@ export const BUNDLE_BUDGET = {
    * (light / dark / system: its Sun, Moon and Desktop icons ship every Phosphor weight, ~8.5 kB),
    * which every screen shows (was 276 kB under a 280 kB budget). 283.5 kB on 2026-10-13 with the
    * schedule routes, nav and bell: the command palette loads with its first opening and the
-   * shell's comment and avatar helpers moved out of their screens' modules.
+   * shell's comment and avatar helpers moved out of their screens' modules. 226.9 kB on
+   * 2026-10-17 once Phosphor's icon definitions keep only the weights Studio draws
+   * (`phosphor-weights.ts`: regular, bold, fill; each icon carried six, ~3.6 kB).
    */
-  entryBytes: 290_000,
+  entryBytes: 240_000,
   /**
    * Entry + its static imports, gzip bytes. 456 kB on 2026-10-12, once the analytics wording
    * moved to lazy message namespaces (was 466 kB under a 480 kB budget). 466.5 kB on 2026-10-13
@@ -27,8 +29,9 @@ export const BUNDLE_BUDGET = {
    * shell (text, input, toolbar, popover, …) split into 9 more shared chunks; no new code loads
    * first, the extra gzip is the chunks' own overhead. 467.3 kB on 2026-10-17 once the media
    * library's words (about 300 keys) moved to the lazy `media` namespace (was 475.0 kB).
+   * 443.7 kB on 2026-10-17 with three Phosphor weights instead of six.
    */
-  initialGzipBytes: 475_000,
+  initialGzipBytes: 455_000,
 };
 
 /** Modules that must never be in the initial load (analytics and comments, loaded by lazy routes). */

@@ -2,6 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { bundleBudget } from "./bundle-budget.ts";
+import { phosphorWeights } from "./phosphor-weights.ts";
 
 /**
  * Long-lived vendor chunks: they change only when dependencies do, so a Studio deploy re-downloads
@@ -15,7 +16,7 @@ const vendor = (pkgs: string) =>
   );
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), bundleBudget()],
+  plugins: [phosphorWeights(), react(), tailwindcss(), bundleBudget()],
   server: {
     port: 5173,
     proxy: {
