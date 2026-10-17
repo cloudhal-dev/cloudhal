@@ -89,13 +89,13 @@ header[data-ch-scrolled]{background:#fff}.band{background:#fafafa;padding:120px 
 header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a{color:inherit}.band{background:#111;color:#fff;padding:120px 20px}</style></head><body>
 <a class="skip" href="#main">Skip to content</a><header data-transparent><nav aria-label="Main"><a href="/">Home</a></nav><nav aria-label="Second"><a href="/b">B</a></nav></header>
 <main id="main"><div class="band"><h1>Title</h1></div>${links}</main><footer>f</footer></body></html>`;
-    const run = async (name: string, html: string) => {
+    const run = async (name: string, html: string, widths: (1440 | 768 | 390)[] = [1440]) => {
       const file = path.join(dir, name);
       await writeFile(file, html);
       const r = await renderPage(
         chromeRenderer(chrome as string, { idleMs: 10 }),
         pathToFileURL(file).href,
-        { widths: [1440], fullPage: false },
+        { widths, fullPage: false },
       );
       return (id: string) => r.checks.find((c) => c.id === id);
     };
@@ -208,7 +208,7 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
             kind: "surface",
             catalog: "blog@1",
             components: [
-              { id: "root", component: "Stack", children: ["h", "car"] },
+              { id: "root", component: "Stack", children: ["h", "car", "rail"] },
               { id: "h", component: "Heading", props: { text: "Offers", level: 1 } },
               {
                 id: "car",
@@ -216,6 +216,16 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
                 props: { label: "Offers", variant: "hero", aspect: "16:9" },
                 children: ["a", "b"],
               },
+              {
+                id: "rail",
+                component: "Carousel",
+                props: { label: "Cafés", peek: "s" },
+                children: ["c1", "c2", "c3", "c4"],
+              },
+              { id: "c1", component: "Text", props: { text: "Mavi" } },
+              { id: "c2", component: "Text", props: { text: "Kahve" } },
+              { id: "c3", component: "Text", props: { text: "Liman" } },
+              { id: "c4", component: "Text", props: { text: "Köşe" } },
               { id: "a", component: "Text", props: { text: "Spring" } },
               { id: "b", component: "Link", props: { label: "Order", href: "/order" } },
             ],
@@ -223,8 +233,8 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
         ],
       } as never,
     );
-    const pv = await run("preview.html", preview.html);
-    for (const id of ["skip-link", "landmarks", "carousel-focus"])
+    const pv = await run("preview.html", preview.html, [1440, 390]);
+    for (const id of ["skip-link", "landmarks", "carousel-focus", "tap-target", "overflow-x"])
       expect(pv(id), id).toMatchObject({ ok: true });
     // RFC-0028: a wide picture in a square cover frame is cut to a quarter; a focal point excuses it.
     await writeFile(

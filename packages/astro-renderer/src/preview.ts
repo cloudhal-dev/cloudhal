@@ -501,7 +501,16 @@ const PREVIEW_CSS =
   ".ch-input-wrap{display:flex;align-items:center;gap:.5rem;max-width:20rem}.ch-input{width:100%;max-width:20rem;padding:.4rem .6rem;border:1px solid var(--line);border-radius:6px;font:inherit}.ch-input[aria-invalid=true]{border-color:#b91c1c}.ch-input__unit,.ch-field__help,.ch-noscript{color:var(--muted);font-size:.9rem}" +
   ".ch-check,.ch-radio__option{display:flex;align-items:center;gap:.5rem;width:fit-content;cursor:pointer}.ch-radio{display:grid;gap:.35rem;border:0;margin:0;padding:0;min-width:0}.ch-radio__options{display:flex;flex-direction:column;gap:.35rem}" +
   ".ch-radio[data-variant=buttons] .ch-radio__options{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:.25rem;padding:.25rem;border:1px solid var(--line);border-radius:8px;width:fit-content}.ch-radio[data-variant=buttons] input{position:absolute;opacity:0}.ch-radio[data-variant=buttons] .ch-radio__option span{display:block;padding:.3rem .8rem;border-radius:6px;color:var(--muted)}.ch-radio[data-variant=buttons] input:checked+span{background:var(--fg);color:var(--bg)}" +
-  ".ch-block--missing{padding:.6rem .9rem;border:1px dashed var(--line);border-radius:6px;color:var(--muted);font-size:.9rem}";
+  ".ch-block--missing{padding:.6rem .9rem;border:1px dashed var(--line);border-radius:6px;color:var(--muted);font-size:.9rem}" +
+  // RFC-0027: carousels without the module (previews run no scripts): a scroll-snap track, the
+  // markers as links, the buttons the module would reveal kept hidden.
+  ".ch-carousel{position:relative;margin:1.5rem 0}.ch-carousel__track{display:grid;grid-auto-flow:column;grid-auto-columns:80%;gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain}" +
+  ".ch-carousel:is([data-variant=hero],[data-variant=gallery],[data-variant=testimonials]) .ch-carousel__track{grid-auto-columns:100%}.ch-carousel__slide{scroll-snap-align:start;min-width:0;overflow:hidden;border-radius:8px}" +
+  ".ch-carousel[data-aspect='16:9'] .ch-carousel__slide{aspect-ratio:16/9}.ch-carousel[data-aspect='21:9'] .ch-carousel__slide{aspect-ratio:21/9}.ch-carousel[data-aspect='4:3'] .ch-carousel__slide{aspect-ratio:4/3}.ch-carousel[data-aspect='1:1'] .ch-carousel__slide{aspect-ratio:1}.ch-carousel[data-aspect='3:4'] .ch-carousel__slide{aspect-ratio:3/4}" +
+  ".ch-carousel[data-aspect] .ch-carousel__slide>*{height:100%;margin:0}.ch-carousel[data-aspect] .ch-carousel__slide img{width:100%;height:100%;object-fit:cover}" +
+  ".ch-carousel__controls{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:.75rem}[data-ch-pending]{visibility:hidden}.ch-carousel__rotate[data-ch-pending]{display:none}" +
+  ".ch-carousel__markers{display:flex;flex-wrap:wrap;gap:.4rem;justify-content:center}.ch-carousel__markers a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;border-radius:999px;color:var(--muted);text-decoration:none;font-size:.85rem}" +
+  ".ch-carousel__markers[data-style=thumbs] a{width:56px;height:56px;overflow:hidden;border-radius:6px}.ch-carousel__markers[data-style=thumbs] img{width:100%;height:100%;object-fit:cover}";
 
 /**
  * The same policy `previewResponse` (packages/api) sends as a header, repeated in the document so
