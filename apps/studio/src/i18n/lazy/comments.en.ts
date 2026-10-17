@@ -193,7 +193,8 @@ export const messages = {
       selected: "{count} selected",
       clear: "Clear",
       select: "Select the comment by {name}",
-      notFor: "None of the selected comments can be {action}.",
+      notFor:
+        "{action, select, approve {None of the selected comments can be approved.} restore {None of the selected comments can be restored.} hide {None of the selected comments can be hidden.} spam {None of the selected comments can be marked as spam.} hold {None of the selected comments can be moved back to pending.} other {None of the selected comments can take this action.}}",
     },
     actions: {
       menu: "Comment actions",
@@ -208,13 +209,6 @@ export const messages = {
       commenter: "Commenter…",
       ban: "Ban…",
       resolve: "Resolve report…",
-      past: {
-        approve: "approved",
-        restore: "restored",
-        hide: "hidden",
-        spam: "marked as spam",
-        hold: "moved back to pending",
-      },
     },
     dialog: {
       hideTitle: "{count, plural, one {Hide this comment} other {Hide # comments}}",
@@ -235,8 +229,9 @@ export const messages = {
       deleteConfirm: "Delete text",
     },
     results: {
-      done: "{count, plural, one {# comment {action}} other {# comments {action}}}",
-      partialTitle: "{done} of {total} comments {action}",
+      done: "{action, select, approve {{count, plural, one {# comment approved} other {# comments approved}}} restore {{count, plural, one {# comment restored} other {# comments restored}}} hide {{count, plural, one {# comment hidden} other {# comments hidden}}} spam {{count, plural, one {# comment marked as spam} other {# comments marked as spam}}} hold {{count, plural, one {# comment moved back to pending} other {# comments moved back to pending}}} other {{count, plural, one {# comment changed} other {# comments changed}}}}",
+      partialTitle:
+        "{action, select, approve {{done} of {total} comments approved} restore {{done} of {total} comments restored} hide {{done} of {total} comments hidden} spam {{done} of {total} comments marked as spam} hold {{done} of {total} comments moved back to pending} other {{done} of {total} comments changed}}",
       partialDescription: "The others were left as they are:",
       errors: {
         conflict: "{count} changed since you loaded them",

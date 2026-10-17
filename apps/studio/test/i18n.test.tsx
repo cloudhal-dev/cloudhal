@@ -24,7 +24,7 @@ import {
 afterEach(cleanup);
 
 /** Every catalog module, by path, as the app finds them (`import.meta.glob`, never a list). */
-const CORE = import.meta.glob<{ messages: object }>(
+const CORE = import.meta.glob<{ messages: object; dropped?: Readonly<Record<string, string>> }>(
   [
     "../src/i18n/*.ts",
     "!../src/i18n/en.ts",
@@ -51,17 +51,11 @@ const leaves = (o: object) => flat(o).map(([k]) => k);
 const params = (message: Compiled) => new Set(argumentsOf(message).keys());
 
 /**
- * Messages whose translation leaves a placeholder out because the language cannot inflect it
- * (a Turkish case suffix on an arbitrary name). Every other message keeps every placeholder.
+ * Messages whose translation leaves an argument out on purpose, declared with a reason by the
+ * language's core catalog (`export const dropped`, RFC-0032 §4d; Turkish case suffixes).
  */
-const DROPPED: Partial<Record<Locale, readonly string[]>> = {
-  tr: [
-    "common.deleteResource.warning",
-    "common.deleteResource.delete",
-    "comments.bulk.notFor",
-    "menus.delete.title",
-  ],
-};
+const dropsOf = (l: Locale): Readonly<Record<string, string>> =>
+  CORE[`../src/i18n/${l}.ts`]?.dropped ?? {};
 /** An argument and the forms declared for it (`forms` in `en.ts`, RFC-0032 §4c): any may stand for it. */
 const allowed = (key: string, name: string) => [name, ...(formsOf(key)[name] ?? [])];
 
@@ -80,7 +74,7 @@ function parity(english: object, other: object, locale: Locale): string[] {
     const got = params(translated);
     const known = new Set([...want].flatMap((p) => allowed(key, p)));
     for (const p of got) if (!known.has(p)) problems.push(`${locale}: ${key} has unknown {${p}}`);
-    const dropped = DROPPED[locale]?.includes(key);
+    const dropped = Object.hasOwn(dropsOf(locale), key);
     for (const p of want)
       if (!dropped && !allowed(key, p).some((a) => got.has(a)))
         problems.push(`${locale}: ${key} lost {${p}}`);
@@ -148,6 +142,32 @@ describe("locales", () => {
       OTHERS.flatMap((l) => parity(lazy(ns, "en") as object, lazy(ns, l) as object, l)),
     );
     expect(problems).toEqual([]);
+  });
+
+  it("declares only real drops, each with a reason (RFC-0032 §4d)", () => {
+    const english = new Map([
+      ...flat(en),
+      ...NAMESPACES.flatMap((ns) => flat(lazy(ns, "en") as object)),
+    ]);
+    for (const l of OTHERS) {
+      const theirs = new Map([
+        ...flat(core(l) as object),
+        ...NAMESPACES.flatMap((ns) => flat(lazy(ns, l) as object)),
+      ]);
+      for (const [key, reason] of Object.entries(dropsOf(l))) {
+        expect(reason.length, `${l}: ${key} needs a reason`).toBeGreaterThan(10);
+        const source = english.get(key);
+        const translated = theirs.get(key);
+        expect(source && translated, `${l}: ${key} is not a message`).toBeTruthy();
+        const lost = [...params(source as Compiled)].filter(
+          (p) => !allowed(key, p).some((a) => params(translated as Compiled).has(a)),
+        );
+        expect(
+          lost.length,
+          `${l}: ${key} drops nothing; remove it from \`dropped\``,
+        ).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("keeps lazy namespaces out of the core catalogs", () => {

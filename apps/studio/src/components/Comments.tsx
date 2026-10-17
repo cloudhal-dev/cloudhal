@@ -278,11 +278,6 @@ export function eventOf(row: CommentEventRow): CommentEvent {
 
 const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 
-/** The past-tense action for toasts ("approved", "hidden" …). */
-function pastAction(t: T, action: CommentModerateAction): string {
-  return t(`comments.actions.past.${action}`);
-}
-
 /**
  * Moderates comments (`POST …/comments/moderate`) and says what happened: one toast when all went
  * through, a per-reason summary when some did not (each comment stands alone, §4.4) — the screen
@@ -305,7 +300,7 @@ export function useModerateComments(
     }): Promise<CommentModerationResponse> => api.comments.moderate(siteId, input),
     onSuccess: async (response, input) => {
       const outcome = moderationOutcome(response.results);
-      const action = pastAction(t, input.action);
+      const action = input.action;
       const total = response.results.length;
       if (outcome.failed.length === 0) {
         toast.success(

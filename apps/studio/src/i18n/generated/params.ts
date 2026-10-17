@@ -159,7 +159,7 @@ export interface MessageParams {
   "comments.approvals.threadTo": { mode: string | number };
   "comments.aside.capValue": { used: string | number; cap: string | number };
   "comments.aside.purgingHint": { count: number };
-  "comments.bulk.notFor": { action: string | number };
+  "comments.bulk.notFor": { action: "approve" | "restore" | "hide" | "spam" | "hold" };
   "comments.bulk.select": { name: string | number };
   "comments.bulk.selected": { count: string | number };
   "comments.commenter.bannedHidden": { count: string | number };
@@ -180,12 +180,12 @@ export interface MessageParams {
   "comments.reply.counter": { count: string | number; max: string | number };
   "comments.reply.title": { name: string | number };
   "comments.reports.summary": { open: string | number; total: string | number };
-  "comments.results.done": { count: number; action: string | number };
+  "comments.results.done": { action: "approve" | "restore" | "hide" | "spam" | "hold"; count: number };
   "comments.results.errors.conflict": { count: string | number };
   "comments.results.errors.invalid_transition": { count: string | number };
   "comments.results.errors.not_found": { count: string | number };
   "comments.results.errors.not_own": { count: string | number };
-  "comments.results.partialTitle": { done: string | number; total: string | number; action: string | number };
+  "comments.results.partialTitle": { action: "approve" | "restore" | "hide" | "spam" | "hold"; done: string | number; total: string | number };
   "comments.tabCount": { label: string | number; count: string | number };
   "comments.thread.calendar.daySelected": { date: string | number };
   "comments.thread.calendar.dayToday": { date: string | number };
