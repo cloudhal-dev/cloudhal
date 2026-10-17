@@ -122,13 +122,31 @@ function pngChunk(type: string, data: Uint8Array | number[] | string): Uint8Arra
 
 /** A PNG skeleton (IHDR, optional metadata chunks, one IDAT, IEND). */
 export function makePng(
-  o: { width?: number; height?: number; text?: boolean; exif?: boolean; frames?: number } = {},
+  o: {
+    width?: number;
+    height?: number;
+    text?: boolean;
+    exif?: boolean;
+    frames?: number;
+    /** Colour type 2 (RGB, no alpha) instead of 6 (RGBA); `trns` adds a tRNS chunk to it. */
+    opaque?: boolean;
+    trns?: boolean;
+  } = {},
 ): Uint8Array {
   const parts: Uint8Array[] = [
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    pngChunk("IHDR", [...be32(o.width ?? 64), ...be32(o.height ?? 32), 8, 6, 0, 0, 0]),
+    pngChunk("IHDR", [
+      ...be32(o.width ?? 64),
+      ...be32(o.height ?? 32),
+      8,
+      o.opaque ? 2 : 6,
+      0,
+      0,
+      0,
+    ]),
     pngChunk("sRGB", [0]),
   ];
+  if (o.trns) parts.push(pngChunk("tRNS", [0, 0, 0, 0, 0, 0]));
   if (o.frames) parts.push(pngChunk("acTL", [...be32(o.frames), ...be32(0)]));
   if (o.text)
     parts.push(
@@ -155,11 +173,22 @@ function riffChunk(fourcc: string, data: Uint8Array | number[] | string): Uint8A
 
 /** An extended WebP (VP8X) with a lossy frame and optional EXIF/XMP chunks or animation. */
 export function makeWebp(
-  o: { width?: number; height?: number; exif?: boolean; xmp?: boolean; frames?: number } = {},
+  o: {
+    width?: number;
+    height?: number;
+    exif?: boolean;
+    xmp?: boolean;
+    frames?: number;
+    alpha?: boolean;
+  } = {},
 ): Uint8Array {
   const w = o.width ?? 320;
   const h = o.height ?? 200;
-  const flags = (o.exif ? 0x08 : 0) | (o.xmp ? 0x04 : 0) | (o.frames && o.frames > 1 ? 0x02 : 0);
+  const flags =
+    (o.exif ? 0x08 : 0) |
+    (o.xmp ? 0x04 : 0) |
+    (o.frames && o.frames > 1 ? 0x02 : 0) |
+    (o.alpha ? 0x10 : 0);
   const vp8 = riffChunk("VP8 ", [
     0x10,
     0x02,
@@ -188,7 +217,13 @@ export function makeWebp(
 
 /** A GIF89a with `frames` images and an optional comment extension. */
 export function makeGif(
-  o: { width?: number; height?: number; frames?: number; comment?: boolean } = {},
+  o: {
+    width?: number;
+    height?: number;
+    frames?: number;
+    comment?: boolean;
+    transparent?: boolean;
+  } = {},
 ): Uint8Array {
   const parts: (Uint8Array | number[] | string)[] = [
     "GIF89a",
@@ -200,7 +235,7 @@ export function makeGif(
   if (o.comment) parts.push([0x21, 0xfe, 5], "hello", [0]);
   for (let i = 0; i < (o.frames ?? 1); i++)
     parts.push(
-      [0x21, 0xf9, 4, 0, 10, 0, 0, 0],
+      [0x21, 0xf9, 4, o.transparent ? 1 : 0, 10, 0, 0, 0],
       [0x2c, 0, 0, 0, 0, ...le16(o.width ?? 16), ...le16(o.height ?? 16), 0],
       [2, 2, 0x4c, 0x01, 0],
     );
@@ -214,7 +249,9 @@ function box(type: string, ...payload: (Uint8Array | number[] | string)[]): Uint
 }
 
 /** An AVIF skeleton: ftyp, meta (iinf with an `av01` item and optionally an `Exif` item, ispe). */
-export function makeAvif(o: { width?: number; height?: number; exif?: boolean } = {}): Uint8Array {
+export function makeAvif(
+  o: { width?: number; height?: number; exif?: boolean; alpha?: boolean } = {},
+): Uint8Array {
   const infe = (id: number, type: string) =>
     box("infe", [2, 0, 0, 0], be16(id), be16(0), type, "\0");
   const items = [infe(1, "av01"), ...(o.exif ? [infe(2, "Exif")] : [])];
@@ -225,7 +262,16 @@ export function makeAvif(o: { width?: number; height?: number; exif?: boolean } 
     [0, 0, 0, 0],
     box("hdlr", [0, 0, 0, 0], be32(0), "pict", new Uint8Array(13)),
     iinf,
-    box("iprp", box("ipco", ispe)),
+    box(
+      "iprp",
+      box(
+        "ipco",
+        ispe,
+        ...(o.alpha
+          ? [box("auxC", [0, 0, 0, 0], "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha\0")]
+          : []),
+      ),
+    ),
   );
   return concat(
     box("ftyp", "avif", be32(0), "avifmif1miaf"),

@@ -32,6 +32,7 @@ const attrs =
         locale: archive.locale,
         defaultLocale: media?.defaultLocale ?? archive.locale,
         transform: media?.transform ?? "none",
+        ...(media?.budget ? { budget: media.budget } : {}),
         sizes: "(min-width: 48rem) 48rem, 100vw",
         priority: true,
         ...(media?.preview ? { preview: true } : {}),

@@ -43,6 +43,8 @@ export interface MediaContext {
   readonly icons?:
     | { readonly weight?: string | undefined; readonly set?: IconSet | undefined }
     | undefined;
+  /** RFC-0028 §4: the page's placeholder allowance, shared by every image it draws. */
+  readonly budget?: PlaceholderBudget | undefined;
 }
 
 export interface ImageAttributeOptions {
@@ -54,6 +56,41 @@ export interface ImageAttributeOptions {
   quality?: number;
   priority?: boolean;
   preview?: boolean;
+  /** RFC-0028 §4: the page's placeholder bytes left; spent as LQIPs are drawn (colour only after). */
+  budget?: PlaceholderBudget;
+}
+
+/** A page's placeholder allowance (RFC-0028 §4), shared by every image the page draws. */
+export interface PlaceholderBudget {
+  left: number;
+}
+/** About 24 KB of LQIPs per page; beyond it images get their colour only. */
+export const PLACEHOLDER_BUDGET = 24 * 1024;
+export const placeholderBudget = (): PlaceholderBudget => ({ left: PLACEHOLDER_BUDGET });
+
+/**
+ * The placeholder painted behind an image while it loads (RFC-0028 §2): the dominant colour, and
+ * the LQIP blurred by an SVG filter (no script, nothing hidden), stretched over the box like
+ * `cover`. Under `object-fit: contain` the same layer fills the bars with the blurred image. A
+ * transparent image gets none (its pixels would show the placeholder after it loads).
+ */
+export function placeholderStyle(asset: Asset, budget?: PlaceholderBudget): string | undefined {
+  const img = asset.image;
+  if (!img || img.alpha) return undefined;
+  const color = img.color ? `background-color:${img.color}` : "";
+  let lqip = img.lqip;
+  if (lqip && budget) {
+    if (budget.left < lqip.length) lqip = undefined;
+    else budget.left -= lqip.length;
+  }
+  if (!lqip) return color || undefined;
+  // The LQIP's own pixel grid (≤ 24 px a side): a blur of ~1 of its pixels scales with the box.
+  const long = Math.max(img.width, img.height);
+  const w = Math.max(1, Math.round((24 * img.width) / long));
+  const h = Math.max(1, Math.round((24 * img.height) / long));
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' preserveAspectRatio='xMidYMid slice'><filter id='b' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feGaussianBlur stdDeviation='1' edgeMode='duplicate'/><feComponentTransfer><feFuncA type='discrete' tableValues='1 1'/></feComponentTransfer></filter><image width='100%' height='100%' preserveAspectRatio='none' filter='url(#b)' href='${lqip}'/></svg>`;
+  const url = `data:image/svg+xml,${svg.replaceAll("#", "%23").replaceAll("<", "%3C").replaceAll(">", "%3E")}`;
+  return `${color ? `${color};` : ""}background-image:url("${url}");background-size:100% 100%;background-repeat:no-repeat`;
 }
 
 export interface ImageAttributes {
@@ -135,10 +172,9 @@ export function imageAttributes(
     loading: o.priority ? "eager" : "lazy",
     decoding: "async",
     ...(o.priority ? { fetchpriority: "high" as const } : {}),
-    ...(asset.image?.lqip
-      ? { style: `background-image:url(${asset.image.lqip});background-size:cover` }
-      : {}),
   };
+  const style = placeholderStyle(asset, o.budget);
+  if (style) base.style = style;
   if (!canTransform(asset, o)) return base;
   const quality = o.quality ?? 80;
   const ladder = (o.widths ?? WIDTH_LADDER).filter((w) => w <= width);

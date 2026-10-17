@@ -350,12 +350,20 @@ impl<'de> ::serde::Deserialize<'de> for AssetCredit {
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AssetImage {
+    #[doc = "RFC-0028: the image may have transparent pixels (read from its header at ingest). Absent means opaque; transparent images never show the LQIP."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub alpha: ::std::option::Option<bool>,
     #[doc = "Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub animated: ::std::option::Option<bool>,
     #[doc = "BlurHash of the image for themes that decode it client-side."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub blurhash: ::std::option::Option<AssetImageBlurhash>,
+    #[doc = "RFC-0028: the image's dominant colour, lower-case #rrggbb. Painted under the placeholder and in color-fill bars."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub color: ::std::option::Option<AssetImageColor>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub focal: ::std::option::Option<AssetImageFocal>,
     pub height: ::std::num::NonZeroU64,
     #[doc = "Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
@@ -417,6 +425,65 @@ impl<'de> ::serde::Deserialize<'de> for AssetImageBlurhash {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
     }
+}
+#[doc = "RFC-0028: the image's dominant colour, lower-case #rrggbb. Painted under the placeholder and in color-fill bars."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct AssetImageColor(::std::string::String);
+impl ::std::ops::Deref for AssetImageColor {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<AssetImageColor> for ::std::string::String {
+    fn from(value: AssetImageColor) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for AssetImageColor {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^#[0-9a-f]{6}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^#[0-9a-f]{6}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for AssetImageColor {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for AssetImageColor {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AssetImageColor {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "RFC-0028: where the subject is, from the top-left corner as fractions of the width and height. Cover crops keep it in view."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetImageFocal {
+    pub x: f64,
+    pub y: f64,
 }
 #[doc = "Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

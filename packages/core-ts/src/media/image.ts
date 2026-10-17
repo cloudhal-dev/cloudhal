@@ -28,6 +28,8 @@ export interface ImageInspection {
   height: number;
   /** More than one frame (GIF, APNG, animated WebP, AVIF sequence). */
   animated: boolean;
+  /** Transparent pixels are possible (RFC-0028): PNG alpha or tRNS, WebP alpha, GIF transparency, AVIF alpha plane. */
+  alpha?: true;
   metadata: ImageMetadata;
 }
 
@@ -292,7 +294,10 @@ function inspectPng(b: Uint8Array): ImageInspection {
   const metadata = emptyMeta();
   if ((chunks.at(-1)?.end ?? 0) < b.length) metadata.other = true; // bytes after IEND
   let animated = false;
+  const colorType = b[ihdr.data + 9] as number;
+  let alpha = colorType === 4 || colorType === 6;
   for (const c of chunks) {
+    if (c.type === "tRNS") alpha = true;
     if (c.type === "eXIf") {
       metadata.exif = true;
       const exif = readExif(b.subarray(c.data, c.end - 4));
@@ -302,7 +307,13 @@ function inspectPng(b: Uint8Array): ImageInspection {
     else if (PNG_DROP.has(c.type)) metadata.other = true;
     else if (c.type === "acTL" && be32(b, c.data) > 1) animated = true;
   }
-  return { width: be32(b, ihdr.data), height: be32(b, ihdr.data + 4), animated, metadata };
+  return {
+    width: be32(b, ihdr.data),
+    height: be32(b, ihdr.data + 4),
+    animated,
+    ...(alpha ? { alpha: true as const } : {}),
+    metadata,
+  };
 }
 
 function stripPng(b: Uint8Array): Uint8Array {
@@ -340,11 +351,13 @@ function inspectWebp(b: Uint8Array): ImageInspection {
   let width = 0;
   let height = 0;
   let animated = false;
+  let alpha = false;
   let frames = 0;
   for (const c of chunks) {
     if (c.fourcc === "VP8X") {
       const flags = b[c.data] as number;
       if (flags & 0x02) animated = true;
+      if (flags & 0x10) alpha = true;
       width = le24(b, c.data + 4) + 1;
       height = le24(b, c.data + 7) + 1;
     } else if (c.fourcc === "VP8 " && !width) {
@@ -357,7 +370,9 @@ function inspectWebp(b: Uint8Array): ImageInspection {
       const bits = le32(b, c.data + 1);
       width = (bits & 0x3fff) + 1;
       height = ((bits >>> 14) & 0x3fff) + 1;
-    } else if (c.fourcc === "ANMF") frames++;
+      if ((bits >>> 28) & 1) alpha = true;
+    } else if (c.fourcc === "ALPH") alpha = true;
+    else if (c.fourcc === "ANMF") frames++;
     else if (c.fourcc === "EXIF") {
       metadata.exif = true;
       const body = b.subarray(c.data, c.data + c.size);
@@ -368,7 +383,7 @@ function inspectWebp(b: Uint8Array): ImageInspection {
   }
   if (frames > 1) animated = true;
   if (!width || !height) bad("no frame header");
-  return { width, height, animated, metadata };
+  return { width, height, animated, ...(alpha ? { alpha: true as const } : {}), metadata };
 }
 
 function stripWebp(b: Uint8Array): Uint8Array {
@@ -448,7 +463,18 @@ function inspectGif(b: Uint8Array): ImageInspection {
   }
   const frames = blocks.filter((x) => x.kind === "image").length;
   if (frames === 0) bad("no image");
-  return { width: le16(b, 6), height: le16(b, 8), animated: frames > 1, metadata };
+  // A Graphic Control Extension with its transparency flag set.
+  const alpha = blocks.some(
+    (x) =>
+      x.kind === "extension" && b[x.start + 1] === 0xf9 && ((b[x.start + 3] as number) & 1) === 1,
+  );
+  return {
+    width: le16(b, 6),
+    height: le16(b, 8),
+    animated: frames > 1,
+    ...(alpha ? { alpha: true as const } : {}),
+    metadata,
+  };
 }
 
 function stripGif(b: Uint8Array): Uint8Array {
@@ -509,6 +535,7 @@ function inspectAvif(b: Uint8Array): ImageInspection {
   const metadata = emptyMeta();
   let width = 0;
   let height = 0;
+  let alpha = false;
   const meta = top.find((x) => x.type === "meta");
   if (!meta) bad("no meta box");
   for (const child of boxes(b, meta.data + 4, meta.end)) {
@@ -532,6 +559,10 @@ function inspectAvif(b: Uint8Array): ImageInspection {
       for (const ipco of boxes(b, child.data, child.end)) {
         if (ipco.type !== "ipco") continue;
         for (const prop of boxes(b, ipco.data, ipco.end)) {
+          if (prop.type === "auxC") {
+            const [urn] = cstring(b, prop.data + 4, prop.end);
+            if (/auxiliary:alpha$|auxid:1$/.test(urn)) alpha = true;
+          }
           if (prop.type !== "ispe") continue;
           const w = be32(b, prop.data + 4);
           const h = be32(b, prop.data + 8);
@@ -545,7 +576,7 @@ function inspectAvif(b: Uint8Array): ImageInspection {
   }
   if (!width || !height) bad("no image size");
   const animated = brands.includes("avis") || top.some((x) => x.type === "moov");
-  return { width, height, animated, metadata };
+  return { width, height, animated, ...(alpha ? { alpha: true as const } : {}), metadata };
 }
 
 // ───────────────────────────── public API ─────────────────────────────

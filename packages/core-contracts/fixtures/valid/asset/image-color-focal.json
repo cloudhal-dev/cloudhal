@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "asset_01HZX8K3Q9PH",
+  "siteId": "site_01HZX8K3Q9EF",
+  "kind": "image",
+  "mediaType": "image/jpeg",
+  "bytes": 482113,
+  "sha256": "9f2c4e1a7b3d5f60812a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d",
+  "originalSha256": "3b8e2f1c0d9a7b6e5f4c3d2a1b0e9f8c7d6e5a4b3c2d1e0f9a8b7c6d5e4f3a2b",
+  "slug": "bosphorus-at-dawn",
+  "storage": {
+    "kind": "blob"
+  },
+  "image": {
+    "width": 3000,
+    "height": 2000,
+    "blurhash": "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+    "lqip": "data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA",
+    "color": "#a3b18a",
+    "focal": {
+      "x": 0.3,
+      "y": 0.4
+    }
+  },
+  "title": {
+    "en": "Bosphorus at dawn",
+    "tr": "\u015eafakta Bo\u011faz"
+  },
+  "alt": {
+    "en": "Ferries crossing the Bosphorus at dawn, the bridge lit behind them",
+    "tr": "\u015eafakta Bo\u011faz'\u0131 ge\u00e7en vapurlar, arkada \u0131\u015f\u0131kl\u0131 k\u00f6pr\u00fc"
+  },
+  "caption": {
+    "en": "The 06:40 ferry from Kad\u0131k\u00f6y.",
+    "tr": "Kad\u0131k\u00f6y'den 06.40 vapuru."
+  },
+  "credit": "Photo: Ay\u015fe Y\u0131lmaz",
+  "license": {
+    "kind": "spdx",
+    "id": "CC-BY-4.0"
+  },
+  "status": "active",
+  "uploadedBy": {
+    "kind": "human",
+    "id": "user_01HZX8K3Q9HU",
+    "name": "Halil"
+  },
+  "source": {
+    "kind": "upload",
+    "filename": "IMG_2041 (edited).JPG"
+  },
+  "rev": 2,
+  "createdAt": "2026-10-08T09:00:00Z",
+  "updatedAt": "2026-10-08T09:30:00Z"
+}

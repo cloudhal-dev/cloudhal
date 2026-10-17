@@ -1065,7 +1065,7 @@ export interface UploadFileRequest {
   mediaType: string;
   sha256?: string;
   keepMetadata?: boolean;
-  image?: { blurhash?: string; lqip?: string };
+  image?: { blurhash?: string; lqip?: string; color?: string };
   /** In the site's default locale (or `locale`). */
   alt?: string;
   decorative?: boolean;

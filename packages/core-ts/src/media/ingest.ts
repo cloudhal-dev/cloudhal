@@ -44,7 +44,7 @@ export interface InspectedUpload {
   readonly sha256: string;
   /** SHA-256 of the bytes as uploaded, when stripping changed them. */
   readonly originalSha256?: string;
-  readonly image?: { width: number; height: number; animated?: true };
+  readonly image?: { width: number; height: number; animated?: true; alpha?: true };
   /** `gps`: metadata was kept and contains the place a photo was taken (Studio warns). */
   readonly warnings: readonly ("gps" | "metadata-kept")[];
 }
@@ -145,7 +145,8 @@ export async function inspectUpload(options: InspectOptions): Promise<InspectedU
         `SVG files can't contain scripts, event handlers or external references; remove these, then upload again: ${check.problems.join(", ")}`,
         { problems: check.problems },
       );
-    image = { width: check.width, height: check.height };
+    // RFC-0028: an SVG draws on a transparent canvas unless it paints its own background.
+    image = { width: check.width, height: check.height, alpha: true };
   } else if (RASTER_TYPES.includes(mediaType)) {
     const header = inspectImage(bytes, mediaType);
     if (
@@ -167,6 +168,7 @@ export async function inspectUpload(options: InspectOptions): Promise<InspectedU
       width: header.width,
       height: header.height,
       ...(header.animated ? { animated: true as const } : {}),
+      ...(header.alpha ? { alpha: true as const } : {}),
     };
   }
   const sha256 = await sha256OfBytes(out);

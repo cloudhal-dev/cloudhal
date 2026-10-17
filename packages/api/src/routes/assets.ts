@@ -157,10 +157,12 @@ function license(v: unknown): Asset["license"] | undefined {
   );
 }
 
-function placeholders(v: unknown): { blurhash?: string; lqip?: string } | undefined {
+function placeholders(
+  v: unknown,
+): { blurhash?: string; lqip?: string; color?: string } | undefined {
   if (v === undefined || v === null) return undefined;
-  if (!isRecord(v)) throw new FileProblem("invalid", "image must be {blurhash?, lqip?}");
-  const out: { blurhash?: string; lqip?: string } = {};
+  if (!isRecord(v)) throw new FileProblem("invalid", "image must be {blurhash?, lqip?, color?}");
+  const out: { blurhash?: string; lqip?: string; color?: string } = {};
   if (v.blurhash !== undefined) {
     if (typeof v.blurhash !== "string" || !BLURHASH.test(v.blurhash))
       throw new FileProblem("invalid", "image.blurhash is not a BlurHash");
@@ -170,6 +172,11 @@ function placeholders(v: unknown): { blurhash?: string; lqip?: string } | undefi
     if (typeof v.lqip !== "string" || !LQIP.test(v.lqip) || v.lqip.length > 4096)
       throw new FileProblem("invalid", "image.lqip must be a small raster data: URL");
     out.lqip = v.lqip;
+  }
+  if (v.color !== undefined) {
+    if (typeof v.color !== "string" || !/^#[0-9a-f]{6}$/.test(v.color))
+      throw new FileProblem("invalid", "image.color must be a lower-case #rrggbb colour");
+    out.color = v.color;
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -185,7 +192,7 @@ interface TicketOptions {
     credit?: string;
     license?: Asset["license"];
     decorative?: true;
-    image?: { blurhash?: string; lqip?: string };
+    image?: { blurhash?: string; lqip?: string; color?: string };
   };
 }
 

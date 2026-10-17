@@ -21,7 +21,7 @@ import {
   type AssetKind,
   checkFile,
   formatSize,
-  lqipOf,
+  placeholdersOf,
   readImageInfo,
   sha256OfFile,
   typeLabel,
@@ -51,6 +51,7 @@ export interface UploadItem {
   /** Raster images: the size and whether the photo carries GPS (RFC-0004 §5.3). */
   image?: { width: number; height: number; gps: boolean };
   lqip?: string;
+  color?: string;
   alt: string;
   decorative: boolean;
   keepMetadata: boolean;
@@ -105,12 +106,13 @@ export function useMediaUpload(
           bytes && item.mediaType
             ? readImageInfo(new Uint8Array(bytes), item.mediaType)
             : undefined;
-        const lqip = image ? await lqipOf(item.file) : undefined;
+        const { lqip, color } = image ? await placeholdersOf(item.file) : {};
         patch(item.id, {
           state: "ready",
           sha256,
           ...(image ? { image } : {}),
           ...(lqip ? { lqip } : {}),
+          ...(color ? { color } : {}),
         });
       } catch {
         patch(item.id, { state: "error", error: "unknown" });
@@ -182,7 +184,9 @@ export function useMediaUpload(
       ...(isImage(i) && i.alt.trim() && !i.decorative ? { alt: i.alt.trim() } : {}),
       ...(isImage(i) && i.decorative ? { decorative: true } : {}),
       ...(i.image?.gps && i.keepMetadata ? { keepMetadata: true } : {}),
-      ...(i.lqip ? { image: { lqip: i.lqip } } : {}),
+      ...(i.lqip || i.color
+        ? { image: { ...(i.lqip ? { lqip: i.lqip } : {}), ...(i.color ? { color: i.color } : {}) } }
+        : {}),
     }));
     let tickets: Awaited<ReturnType<typeof api.assets.requestUploads>>["files"];
     try {

@@ -18,6 +18,7 @@ const attrs = asset
       locale,
       defaultLocale,
       transform: media?.transform ?? "none",
+      ...(media?.budget ? { budget: media.budget } : {}),
       sizes: "(min-width: 48rem) 48rem, 100vw",
       ...(media?.preview ? { preview: true } : {}),
     })

@@ -26,6 +26,7 @@ const cover = (e: ContentEntry) => {
     locale,
     defaultLocale: media?.defaultLocale ?? locale,
     transform: media?.transform ?? "none",
+    ...(media?.budget ? { budget: media.budget } : {}),
     sizes: "12rem",
     ...(media?.preview ? { preview: true } : {}),
   });

@@ -17,6 +17,7 @@ const attrs =
         locale: media?.locale ?? defaultLocale,
         defaultLocale,
         transform: media?.transform ?? "none",
+        ...(media?.budget ? { budget: media.budget } : {}),
         sizes: "100vw",
         priority: true,
         ...(media?.preview ? { preview: true } : {}),
