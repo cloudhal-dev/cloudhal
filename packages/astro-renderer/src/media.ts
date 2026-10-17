@@ -58,7 +58,19 @@ export interface ImageAttributeOptions {
   preview?: boolean;
   /** RFC-0028 §4: the page's placeholder bytes left; spent as LQIPs are drawn (colour only after). */
   budget?: PlaceholderBudget;
+  /** RFC-0028 §3: how the image meets its frame (the theme sets `object-fit` to match). */
+  fit?: ImageFit;
 }
+
+/** RFC-0028 §3. `cover` is the default. */
+export type ImageFit = "cover" | "contain" | "blur-fill" | "color-fill" | "natural";
+export const IMAGE_FITS: readonly ImageFit[] = [
+  "cover",
+  "contain",
+  "blur-fill",
+  "color-fill",
+  "natural",
+];
 
 /** A page's placeholder allowance (RFC-0028 §4), shared by every image the page draws. */
 export interface PlaceholderBudget {
@@ -70,14 +82,24 @@ export const placeholderBudget = (): PlaceholderBudget => ({ left: PLACEHOLDER_B
 
 /**
  * The placeholder painted behind an image while it loads (RFC-0028 §2): the dominant colour, and
- * the LQIP blurred by an SVG filter (no script, nothing hidden), stretched over the box like
- * `cover`. Under `object-fit: contain` the same layer fills the bars with the blurred image. A
- * transparent image gets none (its pixels would show the placeholder after it loads).
+ * the LQIP blurred by an SVG filter (no script, nothing hidden). By fit (§3):
+ * - `cover` (default) and `blur-fill`: the blurred LQIP covers the box; under `object-fit:
+ *   contain` (blur-fill) it stays visible in the bars. A cover crop leans towards the focal point.
+ * - `contain`: the blurred LQIP only where the picture will be; the bars stay the page's.
+ * - `color-fill`: the colour fills the box, the blurred LQIP where the picture will be.
+ * A transparent image gets none (its pixels would show the placeholder after it loads), except
+ * `color-fill`'s colour, which is the point of it.
  */
-export function placeholderStyle(asset: Asset, budget?: PlaceholderBudget): string | undefined {
+export function placeholderStyle(
+  asset: Asset,
+  budget?: PlaceholderBudget,
+  fit: ImageFit = "cover",
+): string | undefined {
   const img = asset.image;
-  if (!img || img.alpha) return undefined;
-  const color = img.color ? `background-color:${img.color}` : "";
+  if (!img) return undefined;
+  if (img.alpha)
+    return fit === "color-fill" && img.color ? `background-color:${img.color}` : undefined;
+  const color = img.color && fit !== "contain" ? `background-color:${img.color}` : "";
   let lqip = img.lqip;
   if (lqip && budget) {
     if (budget.left < lqip.length) lqip = undefined;
@@ -88,7 +110,15 @@ export function placeholderStyle(asset: Asset, budget?: PlaceholderBudget): stri
   const long = Math.max(img.width, img.height);
   const w = Math.max(1, Math.round((24 * img.width) / long));
   const h = Math.max(1, Math.round((24 * img.height) / long));
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' preserveAspectRatio='xMidYMid slice'><filter id='b' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feGaussianBlur stdDeviation='1' edgeMode='duplicate'/><feComponentTransfer><feFuncA type='discrete' tableValues='1 1'/></feComponentTransfer></filter><image width='100%' height='100%' preserveAspectRatio='none' filter='url(#b)' href='${lqip}'/></svg>`;
+  const third = (v: number | undefined) =>
+    v === undefined || (v > 1 / 3 && v < 2 / 3) ? "Mid" : v <= 1 / 3 ? "Min" : "Max";
+  const align =
+    fit === "contain" || fit === "color-fill"
+      ? "xMidYMid meet"
+      : fit === "cover"
+        ? `x${third(img.focal?.x)}Y${third(img.focal?.y)} slice`
+        : "xMidYMid slice";
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' preserveAspectRatio='${align}'><filter id='b' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feGaussianBlur stdDeviation='1' edgeMode='duplicate'/><feComponentTransfer><feFuncA type='discrete' tableValues='1 1'/></feComponentTransfer></filter><image width='100%' height='100%' preserveAspectRatio='none' filter='url(#b)' href='${lqip}'/></svg>`;
   const url = `data:image/svg+xml,${svg.replaceAll("#", "%23").replaceAll("<", "%3C").replaceAll(">", "%3E")}`;
   return `${color ? `${color};` : ""}background-image:url("${url}");background-size:100% 100%;background-repeat:no-repeat`;
 }
@@ -173,7 +203,13 @@ export function imageAttributes(
     decoding: "async",
     ...(o.priority ? { fetchpriority: "high" as const } : {}),
   };
-  const style = placeholderStyle(asset, o.budget);
+  const fit = o.fit ?? "cover";
+  // A cover crop keeps the subject in view (RFC-0028 §3).
+  const focal =
+    fit === "cover" && asset.image?.focal
+      ? `object-position:${pct(asset.image.focal.x)} ${pct(asset.image.focal.y)}`
+      : "";
+  const style = [placeholderStyle(asset, o.budget, fit), focal].filter(Boolean).join(";");
   if (style) base.style = style;
   if (!canTransform(asset, o)) return base;
   const quality = o.quality ?? 80;
@@ -188,6 +224,8 @@ export function imageAttributes(
     sizes: o.sizes,
   };
 }
+
+const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
 /** `<img …>` HTML for attributes (every value escaped). */
 export function imgHtml(a: ImageAttributes, extra = ""): string {

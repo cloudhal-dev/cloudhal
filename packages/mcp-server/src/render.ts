@@ -93,6 +93,8 @@ export const RENDER_CHECK_IDS = [
   "carousel-focus",
   // RFC-0027 27d: a playing carousel has its rotation control first; at most one plays per page.
   "carousel-autoplay",
+  // RFC-0028: an image cropped hard by cover with no focal point to keep its subject in view.
+  "image-fit",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -660,6 +662,19 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
           if (i > 0 && !lazy) add("carousel-lcp", img, "slide " + (i + 1) + "'s image loads before anyone sees it; make it lazy");
         }
       });
+  }
+
+  // image-fit: cover crops that cut away much of a picture without a focal point (object-position).
+  for (const img of document.querySelectorAll("[data-section-id] img")) {
+    const box = img.getBoundingClientRect();
+    if (!img.naturalWidth || !img.naturalHeight || box.width < 80 || box.height < 80) continue;
+    const cs = getComputedStyle(img);
+    if (cs.objectFit !== "cover" || /object-position/.test(img.getAttribute("style") || "")) continue;
+    const own = img.naturalWidth / img.naturalHeight;
+    const frame = box.width / box.height;
+    const kept = Math.min(own, frame) / Math.max(own, frame);
+    if (kept < 0.6)
+      add("image-fit", img, "the frame keeps " + Math.round(kept * 100) + "% of the picture with no focal point; set one (update_asset focal) or use fit blur-fill");
   }
 
   const playing = document.querySelectorAll("[data-autoplay]");

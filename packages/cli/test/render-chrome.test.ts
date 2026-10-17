@@ -187,6 +187,19 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
         expect.stringMatching(/one per page at most/),
       ]),
     );
+    // RFC-0028: a wide picture in a square cover frame is cut to a quarter; a focal point excuses it.
+    await writeFile(
+      path.join(dir, "wide.svg"),
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100"><rect width="400" height="100" fill="#369"/></svg>`,
+    );
+    const crops = await run(
+      "crops.html",
+      `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><style>img{width:200px;height:200px;object-fit:cover}</style></head><body><main><h1>C</h1>
+<section data-section-id="sec_crop"><img src="wide.svg" alt="Blind"><img src="wide.svg" alt="Steered" style="object-position:20% 50%"></section></main></body></html>`,
+    );
+    expect(crops("image-fit")?.examples).toEqual([
+      expect.stringMatching(/keeps 25% of the picture with no focal point/),
+    ]);
   }, 90_000);
 });
 

@@ -160,6 +160,14 @@ export const messages = {
     detail: {
       openFile: "Open file",
       preview: "Preview",
+      focal: {
+        title: "Focal point",
+        hint: "Click the subject, or use the arrow keys",
+        position: "Left {x}%, top {y}%",
+        unset: "Not set: crops keep the middle",
+        clear: "Clear focal point",
+        previews: "What crops keep",
+      },
       details: "Description and credit",
       detailsImage:
         "How the image is described wherever it appears. A page can still give its own alt text for one use.",

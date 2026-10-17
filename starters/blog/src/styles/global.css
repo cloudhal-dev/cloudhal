@@ -828,6 +828,20 @@ h4.ch-heading {
 .ch-figure[data-ratio="3:4"] img {
   aspect-ratio: 3 / 4;
 }
+/* RFC-0028 §3: how an image meets its frame. cover (the default) crops around the focal point the
+   renderer sets as object-position; the others show the whole picture, and what fills the bars is
+   the image's placeholder layer: its blurred self (blur-fill), its colour (color-fill) or nothing. */
+.ch-figure:is([data-fit="contain"], [data-fit="blur-fill"], [data-fit="color-fill"]) img,
+.ch-carousel[data-aspect]
+  .ch-carousel__slide
+  .ch-figure:is([data-fit="contain"], [data-fit="blur-fill"], [data-fit="color-fill"])
+  img {
+  object-fit: contain;
+}
+.ch-figure[data-fit="natural"] img {
+  aspect-ratio: auto;
+  height: auto;
+}
 .ch-figure figcaption {
   @apply mt-2 text-sm text-zinc-500;
 }
@@ -2794,14 +2808,14 @@ html:has(dialog:modal) {
 .ch-lightbox__stage {
   @apply px-5 py-4;
 }
+/* RFC-0028: one stage size for every picture; each shows whole, its sides filled by itself blurred
+   (the image's own placeholder layer), so moving between portrait and landscape never jumps. */
 .ch-lightbox__item img {
   display: block;
-  margin-inline: auto;
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  max-height: 70dvh;
+  width: 100%;
+  height: min(70dvh, 56rem);
   object-fit: contain;
+  border-radius: var(--ch-radius-m, 0.5rem);
 }
 .ch-lightbox__item figcaption {
   @apply mt-3 text-center text-sm;

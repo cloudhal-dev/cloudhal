@@ -4,6 +4,7 @@ import {
   Banner,
   Button,
   DeleteResource,
+  FocalPointPicker,
   InlineCopyText,
   Input,
   InputArea,
@@ -57,6 +58,7 @@ import {
   type AssetFormErrors,
   assetForm,
   assetPatch,
+  assetPreviewUrl,
   assetTitle,
   COMMON_LICENSES,
   formatSize,
@@ -224,6 +226,8 @@ export function AssetPage() {
   const purged = data.blob?.state === "purged";
   const retired = asset.status === "retired";
   const errors = validateAssetForm(draft, asset.kind, defaultLocale);
+  // RFC-0028: active images get the focal point picker; other files show their frame.
+  const focalSrc = asset.status === "active" ? assetPreviewUrl(siteId, asset) : undefined;
   const dirty = isDirty(draft, assetForm(asset));
   const readOnlyReason = data.editable ? undefined : (upload.reason ?? t("media.detail.notOwn"));
   const show = (e: unknown) => showErrors && e !== undefined;
@@ -359,12 +363,37 @@ export function AssetPage() {
                 icon={<Images size={16} />}
               >
                 <div data-testid="asset-preview">
-                  <AssetFrame
-                    siteId={siteId}
-                    asset={asset}
-                    size="card"
-                    alt={asset.alt?.[uiLocale] ?? asset.alt?.[defaultLocale] ?? ""}
-                  />
+                  {focalSrc && asset.image ? (
+                    // RFC-0028: where the subject is; cover crops keep it in view.
+                    <FocalPointPicker
+                      src={focalSrc}
+                      width={asset.image.width}
+                      height={asset.image.height}
+                      value={draft.focal}
+                      onChange={(focal) => setDraft({ ...draft, focal })}
+                      disabled={!data.editable}
+                      labels={{
+                        title: t("media.detail.focal.title"),
+                        hint: t("media.detail.focal.hint"),
+                        position: (p) =>
+                          t("media.detail.focal.position", {
+                            x: String(Math.round(p.x * 100)),
+                            y: String(Math.round(p.y * 100)),
+                          }),
+                        unset: t("media.detail.focal.unset"),
+                        clear: t("media.detail.focal.clear"),
+                        previews: t("media.detail.focal.previews"),
+                      }}
+                      data-testid="asset-focal"
+                    />
+                  ) : (
+                    <AssetFrame
+                      siteId={siteId}
+                      asset={asset}
+                      size="card"
+                      alt={asset.alt?.[uiLocale] ?? asset.alt?.[defaultLocale] ?? ""}
+                    />
+                  )}
                 </div>
               </SectionCard>
               <SectionCard

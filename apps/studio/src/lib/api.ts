@@ -1056,6 +1056,8 @@ export interface AssetPatch {
   license?: Asset["license"] | null;
   decorative?: boolean;
   slug?: string;
+  /** RFC-0028: an image's focal point (0–1 from the top-left), or null to clear it. */
+  focal?: { x: number; y: number } | null;
 }
 
 /** One file of `POST /assets/uploads` (RFC-0004 §5.5). */

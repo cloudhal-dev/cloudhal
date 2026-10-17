@@ -243,6 +243,12 @@ export {
   useTimeOfDayDraft,
 } from "./blocks/DateTimeField.tsx";
 export {
+  type FocalPoint,
+  FocalPointPicker,
+  type FocalPointPickerLabels,
+  type FocalPointPickerProps,
+} from "./blocks/FocalPointPicker.tsx";
+export {
   InsetPanel,
   type InsetPanelProps,
   type InsetPanelVariant,

@@ -35,7 +35,7 @@ import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html
 import { CAROUSEL_SCRIPT } from "./carousel-client.ts";
 import { chartInner } from "./chart.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
-import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
+import { IMAGE_FITS, type ImageFit, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { MOTION_SCRIPT } from "./motion-client.ts";
 import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { SURFACE_SCRIPT, scriptJson } from "./surface-client.ts";
@@ -277,7 +277,16 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
       children,
     };
   };
-  return { section, root: node("root", 1), unknown: check.unknown, data, live };
+  const root = node("root", 1);
+  // RFC-0028 §3: a gallery's images show whole, their sides filled with themselves blurred.
+  const galleryFit = (n: SurfaceNode, inGallery: boolean) => {
+    if (inGallery && n.component === "Image" && n.props.fit === undefined)
+      n.props = { ...n.props, fit: "blur-fill" };
+    const g = inGallery || (n.component === "Carousel" && n.props.variant === "gallery");
+    for (const k of n.children) galleryFit(k, g);
+  };
+  if (root) galleryFit(root, false);
+  return { section, root, unknown: check.unknown, data, live };
 }
 
 // ── motion (RFC-0024 §2, §7) ─────────────────────────────────────────────────────────────────
@@ -544,7 +553,9 @@ function lightboxHtml(id: string, p: Record<string, unknown>, media?: MediaConte
     .join("");
   const figures = items
     .map((it, i) => {
-      const img = imgHtml(imageAttributes(it.asset, { alt: it.alt }, { ...opts, sizes: "100vw" }));
+      const img = imgHtml(
+        imageAttributes(it.asset, { alt: it.alt }, { ...opts, sizes: "100vw", fit: "blur-fill" }),
+      );
       return `<figure class="ch-lightbox__item" data-index="${i}"${i === start ? "" : " hidden"}>${img}${it.caption ? `<figcaption>${escapeHtml(it.caption)}</figcaption>` : ""}</figure>`;
     })
     .join("");
@@ -616,6 +627,9 @@ export function primitiveHtml(
         return "";
       }
       const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+      const fit = (IMAGE_FITS as readonly string[]).includes(str(p.fit))
+        ? (str(p.fit) as ImageFit)
+        : undefined;
       const img = imgHtml(
         imageAttributes(
           asset,
@@ -628,11 +642,12 @@ export function primitiveHtml(
             sizes: "(min-width: 64rem) 64rem, 100vw",
             ...(media?.preview ? { preview: true } : {}),
             ...(node.priority ? { priority: true } : {}),
+            ...(fit ? { fit } : {}),
           },
         ),
       );
       const caption = str(p.caption);
-      return `<figure class="ch-figure"${attr("ratio", p.ratio, ["auto", "16:9", "4:3", "1:1", "3:4"])}>${img}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
+      return `<figure class="ch-figure"${attr("ratio", p.ratio, ["auto", "16:9", "4:3", "1:1", "3:4"])}${fit ? ` data-fit="${fit}"` : ""}>${img}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
     }
     case "Button":
     case "Link": {

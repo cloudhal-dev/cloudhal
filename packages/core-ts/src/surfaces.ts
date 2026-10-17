@@ -349,7 +349,10 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
   {
     name: "Image",
     title: { en: "Image", tr: "Görsel" },
-    description: { en: "An image from the media library.", tr: "Medya kitaplığından görsel." },
+    description: {
+      en: "An image from the media library. fit (RFC-0028), when its shape differs from the frame: cover fills it (the default, cropped around the asset's focal point); blur-fill shows it whole with the sides filled by itself blurred (portraits in wide frames, galleries); color-fill shows it whole on its own colour (logos, transparent images); contain shows it whole on the page (screenshots); natural drops the frame.",
+      tr: "Medya kitaplığından görsel. fit: cover çerçeveyi doldurur; blur-fill bütün gösterir, kenarları bulanık; color-fill kendi rengi üstünde; contain sayfa üstünde; natural çerçevesiz.",
+    },
     category: "content",
     props: schema(
       {
@@ -357,6 +360,7 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         alt: { type: "string", maxLength: 300 },
         caption: { type: "string", maxLength: 300 },
         ratio: { type: "string", enum: ["auto", "16:9", "4:3", "1:1", "3:4"] },
+        fit: { type: "string", enum: ["cover", "contain", "blur-fill", "color-fill", "natural"] },
       },
       ["asset"],
     ),
@@ -2294,6 +2298,16 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
     }
   });
   if (tooltips > 8) issues.push({ path: "/components", message: "at most 8 tooltips per section" });
+  // RFC-0028: natural means no frame, so a ratio contradicts it.
+  components.forEach((c, i) => {
+    if (c.component !== "Image" || !isObj(c.props)) return;
+    if (c.props.fit === "natural" && c.props.ratio !== undefined && c.props.ratio !== "auto")
+      issues.push({
+        path: `/components/${i}/props/fit`,
+        message:
+          "natural shows the image at its own shape; drop ratio, or choose cover, blur-fill, color-fill or contain",
+      });
+  });
   // RFC-0027: carousels the evidence allows — few hero slides, a frame size, nothing nested.
   components.forEach((c, i) => {
     if (c.component !== "Carousel") return;

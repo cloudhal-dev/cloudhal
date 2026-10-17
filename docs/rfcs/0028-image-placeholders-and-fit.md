@@ -99,3 +99,20 @@ None; `docs/design/images.md` decided them. Whether the live deployment gets the
     - The LQIP drops the ~450 B ICC profile Chrome's canvas embeds, so a typical one goes from ~780 to ~140 characters.
     - The API accepts `image.color`.
   - **Renderer.** `placeholderStyle` draws the colour and the blurred LQIP as the image's background, nothing for transparent images. A per-page budget (`PLACEHOLDER_BUDGET`, 24 KB, `MediaContext.budget`) falls back to the colour. Both bugs are gone, and gallery and lightbox bars already show the blurred image.
+- **28b shipped.**
+  - **Catalog.** `Image` takes `fit` (`cover`, `contain`, `blur-fill`, `color-fill`, `natural`). `natural` with a ratio is refused.
+  - **Renderer.**
+    - The placeholder follows the fit:
+      - `cover` and `blur-fill` cover the box, the cover crop leaning towards the focal point;
+      - `contain` paints only where the picture will be;
+      - `color-fill` puts the colour under it, and a transparent image keeps its colour.
+    - A cover image with a focal point gets `object-position`.
+    - Images inside a `gallery` carousel default to `blur-fill`.
+    - The lightbox stage is one fixed height, each picture whole with blurred sides, so moving between portrait and landscape never jumps.
+    - Transformations stay `fit=scale-down`, so they never crop and need no `gravity`.
+  - **Focal point.**
+    - People set it in Studio: on the file's page, the new `FocalPointPicker` block (click the subject or use the arrow keys, with wide, square and tall crop previews) saves with the form.
+    - Agents use `update_asset` with `focal` (null clears it); the API takes `focal` on `PUT /assets/:id`.
+    - Changing placeholders keeps the measured fields and the focal point. Before this, they reset `animated` and `alpha`.
+  - **Check.** `render_page` adds `image-fit`: a cover frame that keeps under 60% of a picture with no focal point.
+  - **Guidance.** `get_design` says when to set a focal point or use blur-fill and color-fill.

@@ -483,6 +483,21 @@ export function describeAssetsApi(label: string, backend: AssetsApiBackend): voi
       expect(decorative.body.decorative).toBe(true);
       expect((await put({ rev: 2, slug: "Not A Slug" })).status).toBe(400);
       expect((await audit.list({ siteId, tool: "asset.update" })).length).toBe(2);
+      // RFC-0028: a focal point is set, kept when placeholders change, and cleared.
+      const focal = await put({ rev: 2, focal: { x: 0.25, y: 0.6666 } });
+      expect(focal.status, JSON.stringify(focal.body)).toBe(200);
+      expect((focal.body as unknown as Asset).image).toMatchObject({
+        focal: { x: 0.25, y: 0.667 },
+      });
+      const ph = await put({ rev: 3, image: { color: "#123456" } });
+      expect((ph.body as unknown as Asset).image).toMatchObject({
+        width: 1200,
+        focal: { x: 0.25, y: 0.667 },
+        color: "#123456",
+      });
+      expect((await put({ rev: 4, focal: { x: 2, y: 0 } })).status).toBe(400);
+      const cleared = await put({ rev: 4, focal: null });
+      expect((cleared.body as unknown as Asset).image?.focal).toBeUndefined();
     });
 
     it("retire and restore; delete is refused while the file is used, then removes the node", async () => {

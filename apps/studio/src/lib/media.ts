@@ -355,6 +355,8 @@ export interface AssetForm {
   decorative: boolean;
   slug: string;
   license: LicenseChoice;
+  /** RFC-0028: an image's focal point, or null (crops keep the middle). */
+  focal: { x: number; y: number } | null;
 }
 
 export function assetForm(asset: Asset): AssetForm {
@@ -375,6 +377,7 @@ export function assetForm(asset: Asset): AssetForm {
     decorative: asset.decorative === true,
     slug: asset.slug,
     license,
+    focal: asset.image?.focal ? { x: asset.image.focal.x, y: asset.image.focal.y } : null,
   };
 }
 
@@ -441,6 +444,7 @@ export function assetPatch(form: AssetForm, kind: AssetKind): AssetPatch {
           : { kind: "url", url: l.url.trim(), ...(l.name.trim() ? { name: l.name.trim() } : {}) },
     decorative: kind === "image" ? form.decorative : false,
     slug: form.slug,
+    ...(kind === "image" ? { focal: form.focal } : {}),
   };
 }
 

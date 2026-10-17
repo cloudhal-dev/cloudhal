@@ -143,6 +143,8 @@ describe("carousels (RFC-0027 27a)", () => {
     expect(html).toMatch(
       /<a href="#ch-sec_carousel01-root-2" aria-label="Slide 2"><img [^>]*alt=""/,
     );
+    // RFC-0028: gallery images show whole, their sides filled by themselves blurred.
+    expect(html.match(/<figure class="ch-figure" data-fit="blur-fill">/g)).toHaveLength(2);
   });
 
   it("puts a playing hero's rotation control first, hidden until the module allows motion (27d)", () => {
