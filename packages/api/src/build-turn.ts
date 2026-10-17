@@ -144,7 +144,8 @@ const PAGE_JSON_LIMIT = 30_000;
 export const BUILD_BRIEF_LIMIT = 2_000;
 const TOOL = "build_chat";
 /** Steps held back at most, waiting for a later step (see `applyStep`). */
-const MAX_HELD = 3;
+/** A carousel slide is a few components and models add one per step: enough room for two slides. */
+const MAX_HELD = 8;
 /**
  * Issues a later step can resolve: a missing root, a child id not added yet, a container that has
  * fewer children than it needs so far (carousel slides, a marquee's items).
