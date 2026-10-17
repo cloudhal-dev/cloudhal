@@ -144,6 +144,100 @@
 .ch-richtext h2 {
   @apply pt-4;
 }
+/* The body's own markdown (no class: surface components inside a body keep their styles). The
+   reset clears lists, tables, quotes and code; these bring them back in the theme's roles. */
+.ch-richtext :is(ul, ol):not([class]) {
+  padding-inline-start: 1.5em;
+}
+.ch-richtext ul:not([class]) {
+  list-style: disc;
+}
+.ch-richtext ol:not([class]) {
+  list-style: decimal;
+}
+.ch-richtext :is(ul, ol):not([class]) :is(ul, ol):not([class]) {
+  margin-block-start: 0.35em;
+}
+.ch-richtext ul:not([class]) ul:not([class]) {
+  list-style: circle;
+}
+.ch-richtext li:not([class]) + li:not([class]) {
+  margin-block-start: 0.35em;
+}
+.ch-richtext li::marker {
+  color: var(--ch-color-text-muted);
+}
+/* Task lists: the checkbox is the marker. */
+.ch-richtext ul:not([class]):has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-inline-start: 0.25em;
+}
+.ch-richtext li > input[type="checkbox"] {
+  inline-size: 1em;
+  block-size: 1em;
+  margin-inline-end: 0.5em;
+  vertical-align: -0.125em;
+  accent-color: var(--ch-color-brand);
+}
+.ch-richtext blockquote:not([class]) {
+  border-inline-start: 3px solid var(--ch-color-border-strong);
+  padding-inline-start: 1em;
+  color: var(--ch-color-text-muted);
+  font-style: italic;
+}
+.ch-richtext :not(pre) > code {
+  @apply rounded px-1.5 py-0.5;
+  font-size: 0.9em;
+  background: var(--ch-color-surface-muted);
+}
+.ch-richtext pre:not([class]) {
+  @apply overflow-x-auto rounded-lg px-4 py-3 text-sm leading-relaxed;
+  background: var(--ch-color-surface-muted);
+  border: 1px solid var(--ch-color-border);
+}
+.ch-richtext hr:not([class]) {
+  border: 0;
+  border-block-start: 1px solid var(--ch-color-border);
+  margin-block: 2rem;
+}
+/* Tables: ruled rows, a header, the column alignment markdown asked for; wide ones scroll on
+   their own (the page never scrolls sideways). */
+.ch-richtext table:not([class]) {
+  display: block;
+  inline-size: max-content;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+}
+.ch-richtext table:not([class]) :is(th, td) {
+  padding: 0.45em 0.8em;
+  border-block-end: 1px solid var(--ch-color-border);
+  text-align: start;
+  vertical-align: top;
+}
+.ch-richtext table:not([class]) th {
+  font-weight: 600;
+  border-block-end-color: var(--ch-color-border-strong);
+}
+.ch-richtext table:not([class]) :is(th, td)[align="center"] {
+  text-align: center;
+}
+.ch-richtext table:not([class]) :is(th, td)[align="right"] {
+  text-align: end;
+}
+/* Shown in previews only, where an invalid ```surface would draw nothing. */
+.ch-surface-problem {
+  @apply rounded-lg px-4 py-3 text-sm;
+  border: 1px solid var(--ch-color-accent);
+}
+.ch-surface-problem ul {
+  @apply mt-2 list-disc ps-5;
+}
+.ch-richtext table:not([class]) tbody tr:hover {
+  background: var(--ch-color-surface-muted);
+}
 .ch-image {
   @apply py-6;
 }
