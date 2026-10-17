@@ -170,6 +170,8 @@ export interface BuildEvalRun {
   rounds: number;
   /** Components on the page at the end (built or kept). */
   components: number;
+  /** Which kinds, once each, a Carousel with its variant ("Carousel:hero"): what the model chose. */
+  used?: string[] | undefined;
   /** Components the model left out of every parent's children, as Build reported them. */
   unlinked?: number | undefined;
   firstStepMs?: number | undefined;
@@ -349,6 +351,14 @@ export async function runBuildEvalOnce(input: {
     (n, s) => n + (s.kind === "surface" ? s.components.length : 0),
     0,
   );
+  const used = new Set<string>();
+  for (const s of page.sections ?? [])
+    if (s.kind === "surface")
+      for (const c of s.components) {
+        const variant = c.component === "Carousel" ? (c.props?.variant ?? "rail") : undefined;
+        used.add(variant ? `${c.component}:${String(variant)}` : c.component);
+      }
+  if (used.size) run.used = [...used].sort();
   return run;
 
   /** Renders the result, then asks the judge (RFC-0021 21c). */

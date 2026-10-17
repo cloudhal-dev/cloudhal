@@ -186,7 +186,7 @@ export function describeRun(r: BuildEvalRun): string {
   const design = d
     ? `\n    design: ${d.score !== undefined ? `score ${d.score}` : "no score"}, ${d.failed.length ? `failed ${d.failed.join(", ")}` : "all checks passed"}${d.look ? `, ${lookText(d.look)}` : ""}${d.tool ? `, tool: ${d.tool.results - d.tool.empty}/${d.tool.results} results show with ${d.tool.inputs} sample inputs` : ""}${d.note ? ` — ${d.note}` : ""}${d.error ? ` (${d.error})` : ""}`
     : "";
-  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
+  return `${r.model} · ${r.brief}: ${r.finished ? "finished" : "not finished"}, ${r.steps} step(s), ${r.refused} refused, ${r.repairs} repair(s), ${r.rounds} round(s), ${time}${r.error ? ` (${r.error})` : ""}${r.used?.length ? `\n    used: ${r.used.join(", ")}` : ""}${r.samples?.[0] ? `\n    e.g. ${r.samples[0]}` : ""}${design}`;
 }
 
 export interface JudgeCheckOptions extends SyncOptions {

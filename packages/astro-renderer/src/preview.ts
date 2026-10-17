@@ -449,6 +449,8 @@ const PREVIEW_CSS =
   "@media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--muted:#9198a1;--line:#3d444d;--bg:#0d1117}}" +
   "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,'Segoe UI',sans-serif}" +
   "header{padding:14px 24px;border-bottom:1px solid var(--line)}header a{color:var(--fg);font-weight:600;text-decoration:none}" +
+  ".ch-skip{position:absolute;left:8px;top:-48px;padding:8px 12px;background:var(--bg);color:var(--fg)}.ch-skip:focus{top:8px}" +
+  "footer{padding:14px 24px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}" +
   "main{max-width:720px;margin:0 auto;padding:32px 24px 64px}h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em}h1{font-size:2rem;margin-top:.4em}" +
   "p,ul,ol{margin:0 0 1em}a{color:#0969da}img{max-width:100%;height:auto;border-radius:6px}" +
   "pre,code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}pre{overflow:auto;padding:12px;border:1px solid var(--line);border-radius:6px}" +
@@ -517,5 +519,5 @@ function document(
 ): string {
   return `<!doctype html><html lang="${esc(site.defaultLocale)}"><head><meta charset="utf-8"><meta http-equiv="content-security-policy" content="${PREVIEW_CSP}"><title>${esc(title)}</title>${
     description ? `<meta name="description" content="${esc(description)}">` : ""
-  }${robots ? `<meta name="robots" content="${esc(robots)}">` : ""}<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}</style></head><body><header><a href="/">${esc(site.name)}</a></header><main>${body}</main></body></html>`;
+  }${robots ? `<meta name="robots" content="${esc(robots)}">` : ""}<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}</style></head><body><a class="ch-skip" href="#main">${esc(site.defaultLocale.startsWith("tr") ? "İçeriğe geç" : "Skip to content")}</a><header><a href="/">${esc(site.name)}</a></header><main id="main">${body}</main><footer>${esc(site.name)}</footer></body></html>`;
 }

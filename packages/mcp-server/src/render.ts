@@ -632,6 +632,8 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     window.scrollTo(0, 0);
   }
 
+  // A static preview runs no scripts (its CSP), so checks of what a module does wait for the site.
+  const staticPreview = !!document.querySelector('meta[name="generator"][content="Cloudhal preview"]');
   // carousel-label and carousel-lcp: named carousels and slides; a hero's first slide not lazy.
   for (const c of document.querySelectorAll('[aria-roledescription="carousel"], [aria-roledescription="kaydırmalı alan"]')) {
     const name = (c.getAttribute("aria-label") || "").trim();
@@ -639,9 +641,9 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     else if (/carousel|karusel/i.test(name)) add("carousel-label", c, "its name says carousel; name what it shows");
     const slides = [...c.querySelectorAll('[aria-roledescription="slide"], [aria-roledescription="slayt"]')];
     for (const s of slides) if (!(s.getAttribute("aria-label") || "").trim()) add("carousel-label", s, "a slide without a name");
-    if (c.querySelector('[data-ch-carousel="prev"][data-ch-pending],[data-ch-carousel="next"][data-ch-pending]'))
+    if (!staticPreview && c.querySelector('[data-ch-carousel="prev"][data-ch-pending],[data-ch-carousel="next"][data-ch-pending]'))
       add("carousel-focus", c, "its arrows never appeared: the carousel module did not run");
-    if (c.getAttribute("data-variant") === "hero")
+    if (!staticPreview && c.getAttribute("data-variant") === "hero")
       for (const s of slides.slice(1)) {
         if (s.closest("[inert]")) continue;
         const f = s.querySelector('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])');
