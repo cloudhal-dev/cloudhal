@@ -24,3 +24,6 @@ packages/core-contracts/schemas/.bundled/
 
 # scripts/code-size/measure.ts (removed after each run)
 .size-tsconfig.*.json
+
+# Translation exchange files (`pnpm i18n:export`, ADR-0034)
+.i18n/

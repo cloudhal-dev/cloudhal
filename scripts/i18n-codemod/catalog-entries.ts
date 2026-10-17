@@ -13,12 +13,16 @@ export interface CatalogEntry {
   keyStart: number;
   /** End of the entry, after its trailing comma and newline. */
   lineEnd: number;
+  /** The `/** … *\/` comment right above the key, if any: what translators read as its description. */
+  comment?: string;
 }
 
 class Scanner {
   i = 0;
   readonly src: string;
   readonly entries: CatalogEntry[] = [];
+  /** The last block comment `skip` passed over, until a key takes it. */
+  comment: string | undefined;
   constructor(src: string) {
     this.src = src;
   }
@@ -27,8 +31,17 @@ class Scanner {
     for (;;) {
       while (/\s/.test(this.src[this.i] ?? "")) this.i++;
       if (this.src.startsWith("//", this.i)) this.i = this.src.indexOf("\n", this.i);
-      else if (this.src.startsWith("/*", this.i)) this.i = this.src.indexOf("*/", this.i) + 2;
-      else return;
+      else if (this.src.startsWith("/*", this.i)) {
+        const end = this.src.indexOf("*/", this.i);
+        this.comment = this.src
+          .slice(this.i + 2, end)
+          .replace(/^\*/, "")
+          .split("\n")
+          .map((l) => l.replace(/^\s*\*?\s?/, "").trim())
+          .filter(Boolean)
+          .join(" ");
+        this.i = end + 2;
+      } else return;
       if (this.i < 0) this.i = this.src.length;
     }
   }
@@ -65,6 +78,8 @@ class Scanner {
         return;
       }
       const keyStart = this.i;
+      const comment = this.comment;
+      this.comment = undefined;
       const lineStart = this.src.lastIndexOf("\n", keyStart - 1) + 1;
       const key = this.key();
       this.skip();
@@ -78,7 +93,14 @@ class Scanner {
         if (this.src[this.i] === ",") this.i++;
         const nl = this.src.indexOf("\n", this.i);
         const lineEnd = nl < 0 ? this.src.length : nl + 1;
-        this.entries.push({ path, value, lineStart, keyStart, lineEnd });
+        this.entries.push({
+          path,
+          value,
+          lineStart,
+          keyStart,
+          lineEnd,
+          ...(comment ? { comment } : {}),
+        });
         continue;
       }
       this.skip();
