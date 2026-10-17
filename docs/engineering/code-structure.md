@@ -234,7 +234,8 @@ Studio (`apps/studio`):
   (137 files import it by that path).
 - i18n dictionaries are data, not code, so they have **no line limit** (a long list of strings is
   not hard to read). What they cost is weight and merge conflicts, and the rules aim at those:
-  - the shell imports `en.ts` *and* `tr.ts` eagerly, so every visitor downloads both languages;
+  - only the active language loads: `en.ts` is in the first load (the fallback), `tr.ts` arrives
+    through `loadLocale` (`LAZY_ONLY` keeps it out of the first load);
     `apps/studio/bundle-budget.ts` (`initialGzipBytes`) is the guard, not `size:check`;
   - a new area's strings go in a lazy namespace (`src/i18n/lazy/<ns>.{en,tr}.ts`, DESIGN.md §1),
     loaded with its route; `en.ts`/`tr.ts` keep what the shell needs on first paint;

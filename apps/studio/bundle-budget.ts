@@ -29,9 +29,12 @@ export const BUNDLE_BUDGET = {
    * shell (text, input, toolbar, popover, …) split into 9 more shared chunks; no new code loads
    * first, the extra gzip is the chunks' own overhead. 467.3 kB on 2026-10-17 once the media
    * library's words (about 300 keys) moved to the lazy `media` namespace (was 475.0 kB).
-   * 443.7 kB on 2026-10-17 with three Phosphor weights instead of six.
+   * 443.7 kB on 2026-10-17 with three Phosphor weights instead of six. 401.3 kB on 2026-10-17
+   * once the core catalogs load one language (Turkish, 39 kB gzip, arrives only for Turkish via
+   * `loadLocale`) and the `menus` words moved to a lazy namespace, so the budget came down from
+   * 455 kB.
    */
-  initialGzipBytes: 455_000,
+  initialGzipBytes: 420_000,
 };
 
 /** Modules that must never be in the initial load (analytics and comments, loaded by lazy routes). */
@@ -66,6 +69,8 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]AppearanceColors\.tsx$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
+  // Core catalogs other than English load with their language (`loadLocale`), never with English.
+  /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]tr\.ts$/,
 ];
 
 /** The part of a Rollup/Rolldown output chunk the check reads. */

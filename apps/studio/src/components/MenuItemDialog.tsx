@@ -86,7 +86,7 @@ export function MenuItemDialog({
   defaultParent?: string | null;
   onApply: (item: MenuItem, parentId: string | null) => void;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const { locale: uiLocale } = useI18n();
   const [form, setForm] = useState<ItemForm>(emptyForm);
   const [parent, setParent] = useState<string>(TOP);

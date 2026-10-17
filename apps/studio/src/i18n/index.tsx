@@ -17,7 +17,6 @@ import {
   type Namespace,
   type NamespaceCatalogs,
 } from "./namespaces.ts";
-import { tr } from "./tr.ts";
 
 export {
   loadNamespace,
@@ -30,16 +29,50 @@ export {
 export const LOCALES = { en: "English", tr: "Türkçe" } as const;
 export type Locale = keyof typeof LOCALES;
 export const LOCALE_LIST = Object.keys(LOCALES) as Locale[];
-const catalogs: Record<Locale, Messages> = { en: en as Messages, tr };
+/**
+ * The core catalogs. English is in the first load (it is also every key's fallback); another
+ * language loads once, before the first render in it (`loadLocale`) and on a switch to it, so a
+ * page never ships a language it does not show.
+ */
+const catalogs: Partial<Record<Locale, Messages>> = { en: en as Messages };
+const CORE_LOADERS: Record<Exclude<Locale, "en">, () => Promise<Messages>> = {
+  tr: () => import("./tr.ts").then((m) => m.tr),
+};
+const corePending = new Map<Locale, Promise<void>>();
+
+/** Loads `locale`'s core catalog, once (the same promise until it settles; a failure can retry). */
+export function loadLocale(locale: Locale): Promise<void> {
+  if (catalogs[locale]) return Promise.resolve();
+  let promise = corePending.get(locale);
+  if (!promise) {
+    promise = CORE_LOADERS[locale as Exclude<Locale, "en">]().then(
+      (messages) => {
+        catalogs[locale] = messages;
+        corePending.delete(locale);
+      },
+      (error: unknown) => {
+        corePending.delete(locale);
+        throw error;
+      },
+    );
+    corePending.set(locale, promise);
+  }
+  return promise;
+}
+
+/** Whether `locale`'s core catalog is here. */
+export function localeLoaded(locale: Locale): boolean {
+  return catalogs[locale] !== undefined;
+}
 const STORAGE_KEY = "cloudhal.studio.locale";
 
 function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored in catalogs) return stored as Locale;
+    if (stored && stored in LOCALES) return stored as Locale;
   } catch {}
   const nav = typeof navigator !== "undefined" ? navigator.language.slice(0, 2) : "en";
-  return nav in catalogs ? (nav as Locale) : "en";
+  return nav in LOCALES ? (nav as Locale) : "en";
 }
 
 /**
@@ -127,15 +160,20 @@ export function I18nProvider({
         document.documentElement.lang = next;
       };
       const needed = loadedNamespaces(locale).filter((ns) => !loadedCatalog(ns, next));
-      if (needed.length === 0) apply();
+      if (needed.length === 0 && localeLoaded(next)) apply();
       else
-        void Promise.all(needed.map((ns) => loadNamespace(ns, next))).then(apply, () => {
-          // A namespace failed to load: switch anyway; screens that need it suspend and retry.
-          apply();
-        });
+        void Promise.all([loadLocale(next), ...needed.map((ns) => loadNamespace(ns, next))]).then(
+          apply,
+          () => {
+            // A namespace failed to load: switch anyway; screens that need it suspend and retry.
+            apply();
+          },
+        );
     },
     [locale],
   );
+  // Normally loaded before the first render (main.tsx); otherwise wait for it here.
+  if (!localeLoaded(locale)) use(loadLocale(locale));
   const value = useMemo<I18nValue<Namespace>>(
     () => ({ locale, setLocale, t: (key, params) => translate(locale, key, params) }),
     [locale, setLocale],

@@ -19,7 +19,7 @@ import { ErrorBanner } from "./ErrorBanner.tsx";
 import { HiddenBadge, useMenuName } from "./Menus.tsx";
 
 function OneSnapshot() {
-  const t = useT();
+  const t = useT("menus");
   return (
     <div className="flex items-start gap-2" data-testid="one-snapshot">
       <span className="flex h-lh items-center text-kumo-subtle">
@@ -57,7 +57,7 @@ export function CreateMenuDialog({
   defaultDepth: (key: string) => number;
   onCreated: (result: MenuWrite) => void;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const name = useMenuName();
   const [place, setPlace] = useState<string>(CUSTOM);
   const [key, setKey] = useState("");
@@ -185,7 +185,7 @@ export function FromPagesDialog({
   menuKey: string;
   onCreated: (result: MenuWrite) => void;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const name = useMenuName();
   const [categories, setCategories] = useState(false);
   useEffect(() => {

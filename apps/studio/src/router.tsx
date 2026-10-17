@@ -40,11 +40,12 @@ const ArticleEditorPage = lazyRouteComponent(
       "comments",
       "bodyEditor",
       "media",
+      "menus",
     ]),
   "ArticleEditorPage",
 );
 const ArticlesPage = lazyRouteComponent(
-  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers"]),
+  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers", "menus"]),
   "ArticlesPage",
 );
 const CommentsPage = lazyRouteComponent(
@@ -71,7 +72,13 @@ const ForgotPasswordPage = lazyRouteComponent(
 );
 const MembersPage = lazyRouteComponent(() => import("./routes/MembersPage.tsx"), "MembersPage");
 const PageEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/PageEditorPage.tsx"), ["readers", "bodyEditor", "media"]),
+  () =>
+    withMessages(import("./routes/PageEditorPage.tsx"), [
+      "readers",
+      "bodyEditor",
+      "media",
+      "menus",
+    ]),
   "PageEditorPage",
 );
 const BuildPage = lazyRouteComponent(
@@ -79,7 +86,7 @@ const BuildPage = lazyRouteComponent(
   "BuildPage",
 );
 const PagesPage = lazyRouteComponent(
-  () => withMessages(import("./routes/PagesPage.tsx"), ["readers"]),
+  () => withMessages(import("./routes/PagesPage.tsx"), ["readers", "menus"]),
   "PagesPage",
 );
 const SiteOverviewPage = lazyRouteComponent(
@@ -106,16 +113,16 @@ const SiteSettingsPage = lazyRouteComponent(
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
 const SkillsPage = lazyRouteComponent(() => import("./routes/SkillsPage.tsx"), "SkillsPage");
 const SnapshotsPage = lazyRouteComponent(
-  () => import("./routes/SnapshotsPage.tsx"),
+  () => withMessages(import("./routes/SnapshotsPage.tsx"), ["menus"]),
   "SnapshotsPage",
 );
 const TaxonomyPage = lazyRouteComponent(() => import("./routes/TaxonomyPage.tsx"), "TaxonomyPage");
 const TermEditorPage = lazyRouteComponent(
-  () => withMessages(import("./routes/TermEditorPage.tsx"), ["media"]),
+  () => withMessages(import("./routes/TermEditorPage.tsx"), ["media", "menus"]),
   "TermEditorPage",
 );
 const NavigationPage = lazyRouteComponent(
-  () => import("./routes/NavigationPage.tsx"),
+  () => withMessages(import("./routes/NavigationPage.tsx"), ["menus"]),
   "NavigationPage",
 );
 const MediaPage = lazyRouteComponent(
