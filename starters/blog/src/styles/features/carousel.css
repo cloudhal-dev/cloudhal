@@ -1,0 +1,266 @@
+/*
+ * RFC-0027: carousels. A scroll-snap track (native swipe, momentum and keyboard scrolling, RTL by
+ * logical properties), slides in one frame size, markers as links to the slides.
+ */
+.ch-carousel {
+  --ch-c-gap: calc(var(--spacing) * 4);
+  --ch-c-peek: 0%;
+  --ch-c-n: 1;
+  position: relative;
+}
+.ch-carousel[data-gap="none"] {
+  --ch-c-gap: 0px;
+}
+.ch-carousel[data-gap="s"] {
+  --ch-c-gap: calc(var(--spacing) * 2);
+}
+.ch-carousel[data-gap="l"] {
+  --ch-c-gap: calc(var(--spacing) * 6);
+}
+.ch-carousel[data-gap="xl"] {
+  --ch-c-gap: calc(var(--spacing) * 10);
+}
+.ch-carousel[data-peek="s"] {
+  --ch-c-peek: 12%;
+}
+.ch-carousel[data-peek="m"] {
+  --ch-c-peek: 24%;
+}
+.ch-carousel[data-per-view="2"] {
+  --ch-c-n: 2;
+  --ch-c-n-set: 2;
+}
+.ch-carousel[data-per-view="3"] {
+  --ch-c-n: 3;
+  --ch-c-n-set: 3;
+}
+.ch-carousel[data-per-view="4"] {
+  --ch-c-n: 4;
+  --ch-c-n-set: 4;
+}
+/* perView follows the room the carousel has: at most 2 when medium, 1 when narrow (a peek stays). */
+.ch-carousel {
+  container-type: inline-size;
+}
+@container (max-width: 44rem) {
+  .ch-carousel__track {
+    --ch-c-n: min(var(--ch-c-n-set, 1), 2);
+  }
+}
+@container (max-width: 28rem) {
+  .ch-carousel__track {
+    --ch-c-n: 1;
+  }
+}
+.ch-carousel__track {
+  display: grid;
+  grid-auto-flow: column;
+  /* perView slides, the next one peeking in by --ch-c-peek */
+  grid-auto-columns: calc(
+    (100% - (var(--ch-c-n) - 1) * var(--ch-c-gap) - var(--ch-c-peek)) /
+    var(--ch-c-n)
+  );
+  gap: var(--ch-c-gap);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scrollbar-width: thin;
+  padding-block: 2px;
+}
+/* As many as fit: a rail without perView, by item width. */
+.ch-carousel[data-variant="rail"]:not([data-per-view]) .ch-carousel__track {
+  grid-auto-columns: min(16rem, 85%);
+}
+.ch-carousel[data-item="s"]:not([data-per-view]) .ch-carousel__track {
+  grid-auto-columns: min(12rem, 70%);
+}
+.ch-carousel[data-item="l"]:not([data-per-view]) .ch-carousel__track {
+  grid-auto-columns: min(22rem, 90%);
+}
+.ch-carousel__track:focus-visible {
+  outline: 2px solid var(--ch-color-focus, currentColor);
+  outline-offset: 2px;
+}
+:root:not([data-ch-motion="none"]) .ch-carousel__track {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch-carousel__track {
+    scroll-behavior: auto !important;
+  }
+}
+.ch-carousel__slide {
+  scroll-snap-align: start;
+  min-width: 0;
+}
+.ch-carousel[data-align="center"] .ch-carousel__slide {
+  scroll-snap-align: center;
+}
+/* A hero: full width like a band, one slide at a time, every slide in one frame. */
+.ch-carousel[data-variant="hero"] {
+  margin-inline: calc(50% - 50vw);
+}
+.ch-carousel[data-variant="hero"] .ch-carousel__track {
+  grid-auto-columns: 100%;
+  gap: 0;
+  scrollbar-width: none;
+}
+.ch-carousel[data-variant="hero"] .ch-carousel__slide {
+  scroll-snap-stop: always;
+}
+.ch-carousel[data-aspect] .ch-carousel__slide {
+  overflow: hidden;
+}
+.ch-carousel[data-aspect="16:9"] .ch-carousel__slide {
+  aspect-ratio: 16 / 9;
+}
+.ch-carousel[data-aspect="21:9"] .ch-carousel__slide {
+  aspect-ratio: 21 / 9;
+}
+.ch-carousel[data-aspect="4:3"] .ch-carousel__slide {
+  aspect-ratio: 4 / 3;
+}
+.ch-carousel[data-aspect="1:1"] .ch-carousel__slide {
+  aspect-ratio: 1;
+}
+.ch-carousel[data-aspect="3:4"] .ch-carousel__slide {
+  aspect-ratio: 3 / 4;
+}
+/* A wide hero frame is too short on a phone: narrow carousels use a taller one (still one size). */
+@container (max-width: 40rem) {
+  .ch-carousel[data-variant="hero"]:is([data-aspect="16:9"], [data-aspect="21:9"])
+    .ch-carousel__slide {
+    aspect-ratio: 4 / 5;
+  }
+}
+/* A slide's content fills its frame: images cover it, a band stays inside it. */
+.ch-carousel[data-aspect] .ch-carousel__slide > * {
+  height: 100%;
+}
+.ch-carousel[data-aspect] .ch-carousel__slide :is(.ch-figure, .ch-figure img) {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  margin: 0;
+}
+.ch-carousel .ch-band {
+  margin-inline: 0;
+  padding-inline: clamp(1rem, 6%, 4rem);
+}
+.ch-carousel[data-variant="hero"] .ch-band {
+  display: flex;
+  align-items: center;
+}
+/* A band holding only a picture fills what its padding leaves (under a transparent header too). */
+.ch-carousel[data-variant="hero"] .ch-band > .ch-band__inner:has(> .ch-figure:only-child) {
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+}
+/* Controls: arrows the module reveals (their place kept), markers as links. */
+.ch-carousel__controls {
+  @apply mt-3 flex items-center justify-center gap-3;
+}
+.ch-carousel__arrow {
+  @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-zinc-300 text-lg;
+  background: var(--ch-color-surface);
+}
+.ch-carousel__arrow[data-ch-pending] {
+  visibility: hidden;
+}
+.ch-carousel__arrow[aria-disabled="true"] {
+  @apply cursor-default opacity-40;
+}
+.ch-carousel__markers {
+  @apply flex flex-wrap items-center justify-center gap-1.5;
+  scroll-target-group: auto;
+}
+.ch-carousel__markers a {
+  @apply inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-sm tabular-nums text-zinc-600 no-underline;
+}
+.ch-carousel__markers[data-style="dots"] a {
+  @apply size-6 min-w-6 p-0;
+}
+.ch-carousel__markers[data-style="dots"] a::before {
+  content: "";
+  @apply block size-2 rounded-full bg-current;
+}
+.ch-carousel__markers a:is(:target-current, [aria-current="true"]) {
+  background: var(--ch-color-brand);
+  color: var(--ch-color-on-brand);
+}
+.ch-carousel__markers[data-style="dots"] a:is(:target-current, [aria-current="true"]) {
+  background: transparent;
+  color: var(--ch-color-brand);
+}
+
+/*
+ * RFC-0027 27c: galleries (one image at a time, whole, with thumbnails) and testimonials (centred,
+ * the neighbours peeking in). A gallery shows each image whole on a calm field until RFC-0028's
+ * fit modes (blur-fill) arrive.
+ */
+.ch-carousel[data-variant="gallery"] .ch-carousel__track {
+  grid-auto-columns: 100%;
+  gap: 0;
+  scrollbar-width: none;
+}
+.ch-carousel[data-variant="gallery"] .ch-carousel__slide {
+  scroll-snap-stop: always;
+  background: var(--ch-color-surface-muted);
+  border-radius: var(--ch-radius-m, 0.5rem);
+}
+.ch-carousel[data-variant="gallery"][data-aspect]
+  .ch-carousel__slide
+  :is(.ch-figure, .ch-figure img) {
+  object-fit: contain;
+}
+.ch-carousel__markers[data-style="thumbs"] {
+  @apply flex-nowrap justify-start gap-2 overflow-x-auto;
+  scrollbar-width: thin;
+}
+.ch-carousel__markers[data-style="thumbs"] a {
+  @apply size-16 min-w-16 shrink-0 overflow-hidden rounded p-0 opacity-70;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.ch-carousel__markers[data-style="thumbs"] a img {
+  @apply size-full object-cover;
+}
+.ch-carousel__markers[data-style="thumbs"] a:is(:target-current, [aria-current="true"]) {
+  background: transparent;
+  opacity: 1;
+  outline-color: var(--ch-color-brand);
+}
+.ch-carousel[data-variant="testimonials"] {
+  --ch-c-peek: 24%;
+}
+.ch-carousel[data-variant="testimonials"][data-peek="none"] {
+  --ch-c-peek: 0%;
+}
+.ch-carousel[data-variant="testimonials"] .ch-carousel__slide {
+  scroll-snap-align: center;
+}
+.ch-carousel[data-variant="testimonials"] .ch-carousel__track {
+  /* one quote in the middle, its neighbours' edges showing; the first and last centre too */
+  grid-auto-columns: 100%;
+  padding-inline: calc(var(--ch-c-peek) / 2);
+  scroll-padding-inline: calc(var(--ch-c-peek) / 2);
+}
+
+/* RFC-0027 27d: a playing hero's rotation control: first in Tab order (first in the markup), shown
+   at the start of the controls row (clear of a transparent header over the hero). */
+.ch-carousel__rotate {
+  @apply absolute bottom-0 start-4 z-10 inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-zinc-300 text-base;
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+}
+.ch-carousel__rotate[data-ch-pending] {
+  display: none;
+}
+.ch-carousel__rotate[data-state="playing"] [data-when="stopped"],
+.ch-carousel__rotate[data-state="stopped"] [data-when="playing"] {
+  display: none;
+}
+.ch-carousel__rotate > span {
+  display: inline-flex;
+}
