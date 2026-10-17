@@ -372,6 +372,7 @@ export function promoteFirstHeading(page: Page): PatchOp[] | undefined {
 export function componentPaths(
   page: Page,
   ops: readonly PatchOp[],
+  catalogId = "blog@1",
 ): { ops: PatchOp[]; notes: string[] } {
   const notes: string[] = [];
   // Component ids per section as the ops go: what the page has, plus what earlier ops of the same
@@ -397,7 +398,41 @@ export function componentPaths(
     v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string"
       ? (v as { id: string }).id
       : undefined;
-  const out = ops.map((o) => {
+  const out: PatchOp[] = [];
+  for (const o of ops) {
+    // Components added to the section after the last one, which nobody added: the model meant a
+    // new surface section; it is created first (its first container becomes its root).
+    const target =
+      typeof o.path === "string" ? /^\/sections\/(\d+)\/components\/(?:-|0)$/.exec(o.path) : null;
+    if (o.op === "add" && target && Number(target[1]) === ids.length) {
+      const first = (o as { value?: unknown }).value as
+        | { id?: unknown; children?: unknown }
+        | undefined;
+      const container =
+        Array.isArray(first?.children) &&
+        first.children.length > 0 &&
+        typeof first?.id === "string";
+      const section = {
+        id: `sec_${randomId()}`,
+        kind: "surface",
+        catalog: catalogId,
+        components: [] as unknown[],
+      };
+      if (container && first?.id !== "root") renamed.set(ids.length, first?.id as string);
+      out.push({ op: "add", path: "/sections/-", value: section } as PatchOp);
+      notes.push(
+        `section ${ids.length} did not exist: a new surface section holds what was added to it`,
+      );
+      ids.push([]);
+      if (container && first?.id !== "root") {
+        out.push({ ...o, value: { ...first, id: "root" } } as PatchOp);
+        ids[ids.length - 1]?.push("root");
+        notes.push(
+          `section ${ids.length - 1}: its top component "${String(first?.id)}" is now "root"`,
+        );
+        continue;
+      }
+    }
     const next = {
       ...o,
       ...(typeof o.path === "string" ? { path: fix(o.path) } : {}),
@@ -423,9 +458,16 @@ export function componentPaths(
         else list.splice(Number(m?.[2]), 0, id);
       }
     }
-    return next;
-  });
+    out.push(next);
+  }
   return { ops: out, notes };
+}
+
+/** 12 letters and digits for a new section's id (`sec_…`). */
+function randomId(): string {
+  const abc = "ABCDEFGHJKMNPQRSTVWXYZ0123456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, (b) => abc[b % abc.length]).join("");
 }
 
 /**
@@ -603,7 +645,7 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
 
   /** Writes `ops` on the page (with Cloudhal's repairs); throws what the checks refuse. */
   const write = async (raw: PatchOp[], read: string[] = [], system = false) => {
-    const addressed = componentPaths(page, raw);
+    const addressed = componentPaths(page, raw, deps.catalog.id);
     const ops = addressed.ops;
     const patched = patchPage(page, ops, deps.catalog);
     page = await deps.write(patched.value);
