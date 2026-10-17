@@ -143,6 +143,13 @@ describe("message catalogs (RFC-0032 §5)", () => {
     ]);
   });
 
+  it("has no hand-edited translations: only English is edited, the rest is imported (ADR-0034)", () => {
+    const script = path.resolve(here, "../../../scripts/i18n-exchange.ts");
+    expect(() =>
+      execFileSync(process.execPath, [script, "check"], { stdio: "pipe" }),
+    ).not.toThrow();
+  });
+
   it("has generated parameter types that match the English catalogs (`pnpm gen`)", () => {
     const script = path.resolve(here, "../scripts/i18n-types.ts");
     expect(() =>

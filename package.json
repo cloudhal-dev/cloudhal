@@ -17,6 +17,8 @@
     "size:report": "node scripts/code-size.ts",
     "design:lint": "node apps/studio/scripts/design-lint.ts",
     "design:shots": "node apps/studio/scripts/screenshots.ts",
+    "i18n:export": "node scripts/i18n-exchange.ts export",
+    "i18n:import": "node scripts/i18n-exchange.ts import",
     "kumo": "pnpm --filter @cloudhal/ui exec kumo",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
