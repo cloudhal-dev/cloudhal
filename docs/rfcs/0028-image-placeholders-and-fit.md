@@ -85,7 +85,7 @@ Agent and import uploads get an LQIP and a colour through the Cloudflare Images 
 | 28a | Contract `color`/`alpha`/`focal`; alpha header parsers; Studio adds colour; the blurred placeholder; bugs 1 and 2; budget |
 | 28b | Fit modes and focal point in the catalog, CSS and transformations; `image-fit` check; gallery and lightbox default to blur-fill |
 | 28c | The backfill command, drawing in a local Chrome (shipped); placeholders through the Images binding at upload time (only when a deployment turns it on) |
-| 28d | Optional fade-in module (`@media (scripting: enabled)`); optional `gravity=auto` focal suggestions |
+| 28d | Optional fade-in; optional `gravity=auto` focal suggestions — decided against (see Status) |
 
 ## Open questions
 None; `docs/design/images.md` decided them. Whether the live deployment gets the Images binding is asked of the owner at 28c.
@@ -123,3 +123,6 @@ None; `docs/design/images.md` decided them. Whether the live deployment gets the
     - Measured fields and the focal point stay.
     - Without `--remote` it works on the project's SQLite. With it, it uses the deployment (deployment token): `GET /api/admin/sites/:id/media-placeholders` lists the images, the bytes come from the existing admin media route, and `PUT …/media-placeholders/:assetId` stores the result (CAS on `rev`, both fields validated).
   - **Not done.** Drawing placeholders through an Images binding at upload time stays possible for deployments that want it, but is not built. It waits until a deployment turns the binding on.
+- **28d decided against; RFC-0028 is complete.**
+  - **Fade-in.** The placeholder is the image's own background (§2), so fading the image would fade its placeholder with it. A crossfade needs a second layer: a wrapper element in every theme's markup, or a script that rewrites the DOM after load. Either brings back what §2 avoided, for a cosmetic gain; the image keeps painting straight over its blurred placeholder.
+  - **`gravity=auto` focal suggestions.** Cloudflare's automatic gravity chooses a crop but does not say where the subject is, and Cloudhal's transformations never crop (`fit=scale-down`), so there is nothing to read back. Focal points stay with people (Studio) and agents (`update_asset`); `render_page`'s `image-fit` points at the crops that need one.
