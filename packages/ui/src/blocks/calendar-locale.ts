@@ -6,6 +6,7 @@
  * calendar. Words that are not dates (previous/next month, today, selected) come from the caller,
  * like every block label (DESIGN.md §2v). Every `DatePicker` in Studio takes these props.
  */
+import { dateTimeFormat } from "@cloudhal/messages/format";
 
 export interface CalendarLabels {
   /** The navigation buttons ("Previous month", "Next month"). */
@@ -45,10 +46,10 @@ export function firstDayOfWeek(locale: string): WeekDay {
  */
 export function calendarLocaleProps(locale: string, labels: CalendarLabels, timeZone?: string) {
   const zone = timeZone ? { timeZone } : {};
-  const caption = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", ...zone });
-  const weekdayShort = new Intl.DateTimeFormat(locale, { weekday: "short", ...zone });
-  const weekdayLong = new Intl.DateTimeFormat(locale, { weekday: "long", ...zone });
-  const full = new Intl.DateTimeFormat(locale, { dateStyle: "full", ...zone });
+  const caption = dateTimeFormat(locale, { month: "long", year: "numeric", ...zone });
+  const weekdayShort = dateTimeFormat(locale, { weekday: "short", ...zone });
+  const weekdayLong = dateTimeFormat(locale, { weekday: "long", ...zone });
+  const full = dateTimeFormat(locale, { dateStyle: "full", ...zone });
   return {
     lang: locale,
     weekStartsOn: firstDayOfWeek(locale),

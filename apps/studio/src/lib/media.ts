@@ -3,6 +3,7 @@
  * header reader are the server's own (`@cloudhal/core-ts/media`), so Studio refuses exactly what
  * the upload pipeline refuses — before a byte is sent — and warns about GPS the way §5.3 says.
  */
+
 import type { Asset } from "@cloudhal/core-contracts";
 import {
   dominantColor,
@@ -14,6 +15,7 @@ import {
   normalizeMediaType,
   RASTER_TYPES,
 } from "@cloudhal/core-ts/media";
+import { numberFormat } from "@cloudhal/messages/format";
 import { type AssetListItem, type AssetPatch, api } from "./api.ts";
 import { type ImageRef, previewImageUrl } from "./seo.ts";
 
@@ -72,7 +74,7 @@ export function formatSize(bytes: number, locale: string): string {
     unit += 1;
   }
   const digits = unit === 0 || value >= 10 ? 0 : 1;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
+  return `${numberFormat(locale, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
 }
 
 /** The file name the asset is shown under: its title, else the uploaded name, else the URL's. */

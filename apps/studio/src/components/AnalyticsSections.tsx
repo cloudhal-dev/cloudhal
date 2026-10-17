@@ -52,7 +52,7 @@ import {
 import { type QueryFunction, type QueryKey, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useMemo, useState } from "react";
 import countriesUrl from "../assets/geo/countries-110m.json?url";
-import { useT } from "../i18n/index.tsx";
+import { numberFormat, useT } from "../i18n/index.tsx";
 import {
   type AnalyticsFilter,
   CORE_VITALS,
@@ -195,7 +195,7 @@ export function TrafficCard({
     scope.compare,
   );
   const perVisitFormat = useMemo(
-    () => new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 }),
+    () => numberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 }),
     [locale],
   );
   const s = summary.data?.data;

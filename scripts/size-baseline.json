@@ -2,10 +2,10 @@
   "$comment": "Oversized files and functions as of their last tightening. Entries may only shrink: run `node scripts/size-check.ts --update` after a refactor. See docs/engineering/code-structure.md.",
   "files": {
     "apps/studio/src/components/AnalyticsSections.tsx": 1349,
-    "apps/studio/src/components/CommentSettings.tsx": 838,
+    "apps/studio/src/components/CommentSettings.tsx": 837,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
-    "apps/studio/src/routes/CommentThreadPage.tsx": 811,
+    "apps/studio/src/routes/CommentThreadPage.tsx": 812,
     "apps/studio/src/routes/NavigationPage.tsx": 1177,
     "apps/studio/src/routes/SchedulesPage.tsx": 1295,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 914,
@@ -82,10 +82,10 @@
       "params": 5
     },
     "apps/studio/src/components/CommentSettings.tsx::CommentSettingsSection": {
-      "lines": 504
+      "lines": 502
     },
     "apps/studio/src/components/CommentSettings.tsx::CommentSettingsSection><anonymous>": {
-      "lines": 352
+      "lines": 350
     },
     "apps/studio/src/components/CreateAgentKeyDialog.tsx::CreateAgentKeyDialog": {
       "lines": 338

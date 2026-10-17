@@ -1,3 +1,4 @@
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   Banner,
@@ -142,7 +143,7 @@ function ReplyForm({
               }
               data-testid="reply-count"
             >
-              {t("comments.reply.counter", { count, max: REPLY_MAX.toLocaleString(locale) })}
+              {t("comments.reply.counter", { count, max: formatNumber(locale, REPLY_MAX) })}
             </span>
           </span>
         }
@@ -515,7 +516,7 @@ export function CommentThreadPage() {
       description={t("comments.thread.description")}
       actions={
         counts ? (
-          <Badge variant="secondary">{counts.approved.toLocaleString(locale)}</Badge>
+          <Badge variant="secondary">{formatNumber(locale, counts.approved)}</Badge>
         ) : undefined
       }
       flush
@@ -674,7 +675,7 @@ export function CommentThreadPage() {
           ...(counts
             ? (["approved", "pending", "reported", "hidden", "spam"] as const).map((k) => ({
                 label: t(`comments.thread.${k}Count`),
-                value: <Text as="span">{counts[k].toLocaleString(locale)}</Text>,
+                value: <Text as="span">{formatNumber(locale, counts[k])}</Text>,
               }))
             : []),
         ]}

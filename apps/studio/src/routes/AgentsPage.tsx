@@ -1,3 +1,4 @@
+import { formatDate, NUMERIC_DATE } from "@cloudhal/messages/format";
 import {
   Avatar,
   Badge,
@@ -679,7 +680,7 @@ export function AgentsPage() {
                             <Text variant="secondary" size="sm" as="span">
                               {k.expiresAt
                                 ? t("agents.expires", {
-                                    when: new Date(k.expiresAt).toLocaleDateString(locale),
+                                    when: formatDate(locale, k.expiresAt, NUMERIC_DATE),
                                   })
                                 : t("agents.never")}
                             </Text>

@@ -6,6 +6,7 @@
  * Ranges live in `analytics-range.ts`.
  */
 
+import { dateTimeFormat, displayNames, numberFormat } from "@cloudhal/messages/format";
 import type { AnalyticsGranularity } from "./analytics-range.ts";
 
 /** How a value moved against the previous period. `flat` is within ±2 % (§10.1). */
@@ -78,12 +79,12 @@ function cached<T>(make: () => T): () => T {
 
 /** Builds the formatters for one locale. Cheap to call; memoise per locale in components. */
 export function createAnalyticsFormatter(locale: string): AnalyticsFormatter {
-  const number = cached(() => new Intl.NumberFormat(locale));
-  const compact = cached(
-    () => new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }),
+  const number = cached(() => numberFormat(locale));
+  const compact = cached(() =>
+    numberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }),
   );
   const pct = (digits: number, signDisplay: "auto" | "exceptZero") =>
-    new Intl.NumberFormat(locale, {
+    numberFormat(locale, {
       style: "percent",
       maximumFractionDigits: digits,
       signDisplay,
@@ -92,44 +93,41 @@ export function createAnalyticsFormatter(locale: string): AnalyticsFormatter {
   const pct1 = cached(() => pct(1, "auto"));
   const delta0 = cached(() => pct(0, "exceptZero"));
   const delta1 = cached(() => pct(1, "exceptZero"));
-  const hourTick = cached(
-    () => new Intl.DateTimeFormat(locale, { timeZone: "UTC", hour: "numeric", minute: "2-digit" }),
+  const hourTick = cached(() =>
+    dateTimeFormat(locale, { timeZone: "UTC", hour: "numeric", minute: "2-digit" }),
   );
-  const dayTick = cached(
-    () => new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "short", day: "numeric" }),
+  const dayTick = cached(() =>
+    dateTimeFormat(locale, { timeZone: "UTC", month: "short", day: "numeric" }),
   );
-  const hourFull = cached(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        timeZone: "UTC",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }),
+  const hourFull = cached(() =>
+    dateTimeFormat(locale, {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }),
   );
-  const dayFull = cached(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        timeZone: "UTC",
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
+  const dayFull = cached(() =>
+    dateTimeFormat(locale, {
+      timeZone: "UTC",
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
   );
-  const range = cached(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        timeZone: "UTC",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
+  const range = cached(() =>
+    dateTimeFormat(locale, {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
   );
   const regions = cached(() => {
     try {
-      return new Intl.DisplayNames(locale, { type: "region", fallback: "code" });
+      return displayNames(locale, { type: "region", fallback: "code" });
     } catch {
       return undefined;
     }

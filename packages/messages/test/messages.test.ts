@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { argumentsOf, compileMessage, MessageSyntaxError } from "../src/compile.ts";
-import { formatList, formatMessage } from "../src/format.ts";
+import {
+  collator,
+  displayNames,
+  formatDate,
+  formatList,
+  formatMessage,
+  formatRelative,
+  numberFormat,
+} from "../src/format.ts";
 import { compileCatalogSource } from "../src/transform.ts";
 import { cloudhalMessages } from "../src/vite.ts";
 
@@ -109,6 +117,24 @@ describe("formatList", () => {
     expect(formatList("de", items)).toBe("a, b und c");
     expect(formatList("en", items, "disjunction")).toBe("a, b, or c");
     expect(formatList("en", ["only"])).toBe("only");
+  });
+});
+
+describe("the Intl layer", () => {
+  it("makes one formatter per locale and options, and always takes a locale", () => {
+    expect(numberFormat("de", { style: "percent" })).toBe(numberFormat("de", { style: "percent" }));
+    expect(numberFormat("de")).not.toBe(numberFormat("tr"));
+    expect(numberFormat("tr").format(12345.5)).toBe("12.345,5");
+    expect(formatDate("en", "2026-10-18T12:00:00Z", { dateStyle: "medium", timeZone: "UTC" })).toBe(
+      "Oct 18, 2026",
+    );
+    expect(
+      formatDate("tr", new Date(Date.UTC(2026, 9, 18)), { dateStyle: "long", timeZone: "UTC" }),
+    ).toBe("18 Ekim 2026");
+    expect(formatRelative("en", -1, "day")).toBe("yesterday");
+    expect(formatRelative("de", 3, "day")).toBe("in 3 Tagen");
+    expect(displayNames(["en"], { type: "language" }).of("tr")).toBe("Turkish");
+    expect(["b", "ç", "c"].sort(collator("tr").compare)).toEqual(["b", "c", "ç"]);
   });
 });
 

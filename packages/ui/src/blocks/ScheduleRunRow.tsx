@@ -1,5 +1,6 @@
 import { Badge, cn, Link, Table, Text, Tooltip } from "@cloudflare/kumo";
 import type { ScheduleRunState } from "@cloudhal/core-contracts";
+import { numberFormat } from "@cloudhal/messages/format";
 import { ArrowsClockwise, Package, ShieldWarning } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { ScheduleStatusBadge } from "./ScheduleStatusBadge.tsx";
@@ -106,12 +107,12 @@ export function ScheduleRunHeader({ labels }: { labels: Record<ScheduleRunColumn
 function formatLateness(seconds: number, locale: string): string {
   const minutes = Math.round(seconds / 60);
   if (minutes < 60)
-    return new Intl.NumberFormat(locale, {
+    return numberFormat(locale, {
       style: "unit",
       unit: "minute",
       unitDisplay: "short",
     }).format(minutes);
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: "unit",
     unit: "hour",
     unitDisplay: "short",
@@ -138,7 +139,7 @@ export function ScheduleRunRow({
   origin,
   actions,
 }: ScheduleRunRowProps) {
-  const nf = new Intl.NumberFormat(locale);
+  const nf = numberFormat(locale);
   const pair = (used: number, max: number | undefined) =>
     max === undefined ? nf.format(used) : `${nf.format(used)}/${nf.format(max)}`;
   const over =

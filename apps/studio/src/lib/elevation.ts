@@ -3,6 +3,7 @@
  * it ends by itself. Pure helpers for Studio: which modes a key can be elevated to, the time left,
  * and the words for "until when" in the person's locale and time zone.
  */
+import { formatDate, numberFormat } from "@cloudhal/messages/format";
 import type { MessageKey } from "../i18n/index.tsx";
 import type { AgentKeyElevation, AgentKeySummary, AgentMode, KeyMode } from "./api.ts";
 
@@ -61,9 +62,7 @@ function unit(
   value: number,
   display: UnitDisplay,
 ) {
-  return new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: display }).format(
-    value,
-  );
+  return numberFormat(locale, { style: "unit", unit: name, unitDisplay: display }).format(value);
 }
 
 /**
@@ -82,7 +81,7 @@ export function formatDuration(minutes: number, locale: string, display: UnitDis
 
 /** Calendar day of `date` in `timeZone`, for "same day?" checks. */
 function dayKey(date: Date, timeZone: string | undefined): string {
-  return date.toLocaleDateString("en-CA", { timeZone });
+  return formatDate("en-CA", date, { timeZone });
 }
 
 /**
@@ -99,11 +98,11 @@ export function formatUntil(
   const now = new Date(options.now ?? Date.now());
   const timeZone = options.timeZone;
   const time: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", timeZone };
-  if (dayKey(end, timeZone) === dayKey(now, timeZone)) return end.toLocaleTimeString(locale, time);
+  if (dayKey(end, timeZone) === dayKey(now, timeZone)) return formatDate(locale, end, time);
   if (Math.abs(end.getTime() - now.getTime()) < 6 * 86_400_000) {
-    return end.toLocaleString(locale, { ...time, weekday: "short" });
+    return formatDate(locale, end, { ...time, weekday: "short" });
   }
-  return end.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
+  return formatDate(locale, end, { dateStyle: "medium", timeStyle: "short", timeZone });
 }
 
 export type CustomUnit = "minutes" | "hours";

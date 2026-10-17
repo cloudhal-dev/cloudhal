@@ -4,6 +4,7 @@ import type {
   CommentLabel,
   CommentStatus,
 } from "@cloudhal/core-contracts";
+import { numberFormat } from "@cloudhal/messages/format";
 import { Robot, ShieldWarning } from "@phosphor-icons/react";
 import { type ReactNode, useId } from "react";
 import { type CommentLabelName, formatCommentTime } from "./comment-model.ts";
@@ -104,7 +105,7 @@ export function CommentLabelBadge({ label, words, locale }: CommentLabelBadgePro
   const confidence =
     label.confidence === undefined
       ? undefined
-      : new Intl.NumberFormat(locale, { style: "percent" }).format(label.confidence / 100);
+      : numberFormat(locale, { style: "percent" }).format(label.confidence / 100);
   const hint = `${words.labelHint[label.label]} ${words.labelSource(label, confidence)}`;
   return (
     <Tooltip

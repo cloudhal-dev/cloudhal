@@ -4,6 +4,7 @@
  * the `schedules` namespace only when a schedule notice arrives (never with the shell). It imports
  * no Studio module at run time (types only), so loading it splits nothing out of the shell's chunk.
  */
+import { dateTimeFormat, formatNumber, numberFormat } from "@cloudhal/messages/format";
 import type { TFunction } from "../i18n/index.tsx";
 import type { ScheduleNotification } from "./api.ts";
 
@@ -11,15 +12,13 @@ type T = TFunction<"schedules">;
 
 /** "14:02, 12 Oct" — the last tick, in the reader's zone. */
 const absoluteTime = (iso: string, locale: string) =>
-  new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(iso),
-  );
+  dateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
 /** "3 min", "2 hr", "1 day" from minutes, in the locale's short units. */
 function formatDuration(minutes: number, locale: string): string {
   const unit = minutes >= 1440 ? "day" : minutes >= 60 ? "hour" : "minute";
   const value = unit === "day" ? minutes / 1440 : unit === "hour" ? minutes / 60 : minutes;
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: "unit",
     unit,
     unitDisplay: "short",
@@ -36,9 +35,7 @@ export interface ScheduleNotice {
 }
 
 const time = (iso: string | null | undefined, locale: string) =>
-  iso
-    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso))
-    : "";
+  iso ? dateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "";
 const late = (seconds: number | undefined, locale: string) =>
   formatDuration(Math.max(1, Math.round((seconds ?? 0) / 60)), locale);
 
@@ -74,10 +71,10 @@ export function scheduleNotice(t: T, locale: string, item: ScheduleNotification)
       // The digest's counts in the person's words (its plain-text report is in the run's History).
       body: item.counts
         ? t(`${n}.digest.counts`, {
-            published: (item.counts.published ?? 0).toLocaleString(locale),
-            scheduled: (item.counts.scheduled ?? 0).toLocaleString(locale),
-            attention: (item.counts["needs-attention"] ?? 0).toLocaleString(locale),
-            open: (item.counts["open-findings"] ?? 0).toLocaleString(locale),
+            published: formatNumber(locale, item.counts.published ?? 0),
+            scheduled: formatNumber(locale, item.counts.scheduled ?? 0),
+            attention: formatNumber(locale, item.counts["needs-attention"] ?? 0),
+            open: formatNumber(locale, item.counts["open-findings"] ?? 0),
           })
         : t(`${n}.digest.body`, { name: item.name }),
       tone: "info",

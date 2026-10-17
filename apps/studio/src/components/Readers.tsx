@@ -1,3 +1,4 @@
+import { numberFormat } from "@cloudhal/messages/format";
 import {
   BreakdownMeters,
   LinkButton,
@@ -134,10 +135,10 @@ export function ReadersCard({ siteId, node, kind }: ReadersCardProps) {
       data && data.redirectHits > 0
         ? range === "all"
           ? t("readers.redirectsAll", {
-              count: new Intl.NumberFormat(locale).format(data.redirectHits),
+              count: numberFormat(locale).format(data.redirectHits),
             })
           : t("readers.redirects", {
-              count: new Intl.NumberFormat(locale).format(data.redirectHits),
+              count: numberFormat(locale).format(data.redirectHits),
               period,
             })
         : undefined;
@@ -153,7 +154,7 @@ export function ReadersCard({ siteId, node, kind }: ReadersCardProps) {
               chart: {
                 description: t("readers.chart.description", {
                   period,
-                  total: new Intl.NumberFormat(locale).format(total),
+                  total: numberFormat(locale).format(total),
                 }),
                 timezone: t("readers.chart.timezone"),
                 showTable: t("readers.chart.showTable"),
@@ -333,7 +334,7 @@ export function OverviewAnalyticsCard({ siteId }: { siteId: string }) {
             labels={{
               description: t("readers.chart.description", {
                 period,
-                total: new Intl.NumberFormat(locale).format(s?.pageviews ?? 0),
+                total: numberFormat(locale).format(s?.pageviews ?? 0),
               }),
               timezone: t("readers.chart.timezone"),
               showTable: t("readers.chart.showTable"),

@@ -4,6 +4,7 @@
  * use, and — under "AI Gateway and other providers" — a gateway id and a `provider/model` that runs
  * through it. Words come from the lazy `aiSettings` namespace, loaded with the settings route.
  */
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   Banner,
@@ -286,7 +287,7 @@ export function AiSettingsSection({ siteId }: { siteId: string }) {
             {chosen?.model.contextWindow && !provider ? (
               <Text variant="secondary" size="sm" as="span">
                 {t(`${a}.model.context`, {
-                  tokens: chosen.model.contextWindow.toLocaleString(locale),
+                  tokens: formatNumber(locale, chosen.model.contextWindow),
                 })}
               </Text>
             ) : null}
@@ -313,8 +314,8 @@ export function AiSettingsSection({ siteId }: { siteId: string }) {
             {usage && (
               <Meter
                 label={t(`${a}.limit.used`, {
-                  used: usage.requests.toLocaleString(locale),
-                  limit: saved.dailyLimit.toLocaleString(locale),
+                  used: formatNumber(locale, usage.requests),
+                  limit: formatNumber(locale, saved.dailyLimit),
                 })}
                 value={usage.requests}
                 max={Math.max(1, saved.dailyLimit)}

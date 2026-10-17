@@ -1,4 +1,5 @@
 import { Badge, Text } from "@cloudflare/kumo";
+import { numberFormat } from "@cloudhal/messages/format";
 import { Flag } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { CommentTime } from "./CommentParts.tsx";
@@ -60,7 +61,7 @@ export function CommentReports({
   const counts = COMMENT_REPORT_REASONS.map(
     (reason) => [reason, reports.filter((r) => r.reason === reason).length] as const,
   ).filter(([, n]) => n > 0);
-  const number = new Intl.NumberFormat(locale);
+  const number = numberFormat(locale);
   // Open reports first, newest first within each group.
   const sorted = [...reports].sort(
     (a, b) =>

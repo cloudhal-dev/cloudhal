@@ -1,6 +1,19 @@
 import { type Compiled, formatList, formatMessage, isMessage } from "@cloudhal/messages/format";
 
-export { formatList } from "@cloudhal/messages/format";
+/** Studio's `Intl` layer (the i18n review's Phase 2): cached, always with an explicit locale. */
+export {
+  collator,
+  dateTimeFormat,
+  displayNames,
+  formatDate,
+  formatList,
+  formatNumber,
+  formatRelative,
+  NUMERIC_DATE,
+  NUMERIC_DATE_TIME,
+  numberFormat,
+  relativeTimeFormat,
+} from "@cloudhal/messages/format";
 
 /**
  * Items as a list in the Studio language ("a, b, and c", "a, b ve c"; `Intl.ListFormat`): what a

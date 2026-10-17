@@ -115,6 +115,22 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
     );
   });
 
+  it("finds formatters built on the spot instead of the cached layer (i18n-format)", () => {
+    const hits = (source: string) =>
+      lintText("apps/studio/src/components/X.tsx", source).map((v) => v.rule);
+    expect(hits("const a = new Intl.NumberFormat(locale).format(n);")).toEqual(["i18n-format"]);
+    expect(hits('const a = Intl.DateTimeFormat("en", { timeZone });')).toEqual(["i18n-format"]);
+    expect(hits("const a = n.toLocaleString(locale);")).toEqual(["i18n-format"]);
+    expect(hits("const a = new Date(iso).toLocaleDateString();")).toEqual(["i18n-format"]);
+    expect(hits('const a = formatDate(locale, iso, { dateStyle: "medium" });')).toEqual([]);
+    expect(hits("const a = new Intl.Locale(tag).language;")).toEqual([]);
+    expect(
+      hits(
+        "const z = Intl.DateTimeFormat().resolvedOptions().timeZone; // i18n-ignore: reads the zone",
+      ),
+    ).toEqual([]);
+  });
+
   it("skips Kumo's variant tables and lines marked i18n-ignore", () => {
     const source = `
       export const KUMO_X_VARIANTS = { size: { sm: { classes: "", description: "Small dialog" } } };

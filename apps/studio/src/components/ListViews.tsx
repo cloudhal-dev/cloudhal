@@ -5,6 +5,7 @@
  * the deployment or the site, unreadable (`reader: "none"`), or when the query fails — the lists
  * do not depend on it.
  */
+import { numberFormat } from "@cloudhal/messages/format";
 import { SkeletonLine, Table, Text, Tooltip } from "@cloudhal/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -49,7 +50,7 @@ export function ListViewsHead() {
 export function ListViewsCell({ views, nodeId }: { views: ListViews | undefined; nodeId: string }) {
   const t = useT("readers");
   const { locale } = useI18n("readers");
-  const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+  const number = useMemo(() => numberFormat(locale), [locale]);
   if (!views)
     return (
       <Table.Cell className="text-right">

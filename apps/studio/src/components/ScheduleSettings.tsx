@@ -5,6 +5,7 @@
  * a reason, confirmed) and the daily automation write cap with today's use. Words come from the
  * lazy `scheduleSettings` namespace, loaded with the settings route.
  */
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   Banner,
@@ -288,8 +289,8 @@ export function ScheduleSettingsSection({ siteId }: { siteId: string }) {
                 />
                 <Meter
                   label={t(`${s}.cap.used`, {
-                    used: (data.writesToday ?? 0).toLocaleString(locale),
-                    cap: data.dailyWriteCap.toLocaleString(locale),
+                    used: formatNumber(locale, data.writesToday ?? 0),
+                    cap: formatNumber(locale, data.dailyWriteCap),
                   })}
                   value={data.writesToday ?? 0}
                   max={Math.max(1, data.dailyWriteCap)}

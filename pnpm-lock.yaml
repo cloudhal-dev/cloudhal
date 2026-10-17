@@ -1021,6 +1021,9 @@ importers:
       '@cloudhal/core-ts':
         specifier: workspace:*
         version: link:../core-ts
+      '@cloudhal/messages':
+        specifier: workspace:*
+        version: link:../messages
       '@codemirror/commands':
         specifier: 'catalog:'
         version: 6.11.1

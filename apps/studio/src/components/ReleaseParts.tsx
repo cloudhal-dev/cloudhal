@@ -4,6 +4,7 @@
  * Compare) and the versions compared field by field — base → target, and what is live now after a
  * conflict (the three-way view, §6.4).
  */
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   Button,
@@ -190,7 +191,7 @@ function show(
   if (v === undefined || v === null || v === "") return undefined;
   if (field === "body") {
     const text = typeof v === "object" ? String((v as { value?: unknown }).value ?? "") : String(v);
-    return t("schedules.release.diff.chars", { count: text.length.toLocaleString(locale) });
+    return t("schedules.release.diff.chars", { count: formatNumber(locale, text.length) });
   }
   if (field === "sections" && Array.isArray(v)) return String(v.length);
   if (field === "availability" && typeof v === "object") {

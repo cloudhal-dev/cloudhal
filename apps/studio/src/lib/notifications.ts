@@ -4,6 +4,7 @@
  * sends, the words, and the per-browser memory of what was already shown. The server derives the
  * list from current state on every request; items have stable ids, so each is shown once.
  */
+import { formatNumber } from "@cloudhal/messages/format";
 import type { MessageKey } from "../i18n/index.tsx";
 import { isKeyMode } from "./agents.ts";
 import {
@@ -209,7 +210,7 @@ export function commentNotice(
   item: CommentNotification,
   now: number = Date.now(),
 ): { title: string; body: string } {
-  const n = (count: number) => count.toLocaleString(locale);
+  const n = (count: number) => formatNumber(locale, count);
   switch (item.kind) {
     case "comments-pending":
       return {

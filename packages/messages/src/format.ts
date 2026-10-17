@@ -2,6 +2,8 @@
  * The message runtime (RFC-0032 §2): renders a compiled catalog value in a locale. Worker-safe and
  * dependency-free; `Intl.PluralRules` and `Intl.NumberFormat` are made once per locale and options.
  */
+
+import { numberFormat } from "./intl.ts";
 import {
   type Compiled,
   type Message,
@@ -17,7 +19,6 @@ import {
 export type Params = Readonly<Record<string, string | number | undefined>>;
 
 const pluralRules = new Map<string, Intl.PluralRules>();
-const numberFormats = new Map<string, Intl.NumberFormat>();
 
 function rules(locale: string, ordinal: boolean): Intl.PluralRules {
   const id = `${locale}|${ordinal ? "o" : "c"}`;
@@ -38,13 +39,7 @@ const STYLE_OPTIONS: Record<NumberStyle | "default", Intl.NumberFormatOptions> =
 
 /** `n` in `locale`, cached per locale and style. */
 export function formatNumber(locale: string, n: number, style?: NumberStyle): string {
-  const id = `${locale}|${style ?? "default"}`;
-  let f = numberFormats.get(id);
-  if (!f) {
-    f = new Intl.NumberFormat(locale, STYLE_OPTIONS[style ?? "default"]);
-    numberFormats.set(id, f);
-  }
-  return f.format(n);
+  return numberFormat(locale, STYLE_OPTIONS[style ?? "default"]).format(n);
 }
 
 const listFormats = new Map<string, Intl.ListFormat>();
@@ -130,5 +125,16 @@ export function formatMessage(locale: string, message: Compiled, params: Params 
     : render(message, { locale, params });
 }
 
+export {
+  collator,
+  dateTimeFormat,
+  displayNames,
+  formatDate,
+  formatRelative,
+  NUMERIC_DATE,
+  NUMERIC_DATE_TIME,
+  numberFormat,
+  relativeTimeFormat,
+} from "./intl.ts";
 export type { Compiled, Message } from "./model.ts";
 export { isMessage } from "./model.ts";

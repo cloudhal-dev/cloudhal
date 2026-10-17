@@ -1,4 +1,5 @@
 import type { Page } from "@cloudhal/core-contracts";
+import { formatDate, NUMERIC_DATE_TIME } from "@cloudhal/messages/format";
 import {
   Badge,
   Button,
@@ -163,7 +164,7 @@ export function PagesPage() {
                     </Table.Cell>
                     <Table.Cell>
                       <Text variant="secondary" size="sm" as="span">
-                        {new Date(p.updatedAt).toLocaleString(locale)}
+                        {formatDate(locale, p.updatedAt, NUMERIC_DATE_TIME)}
                       </Text>
                     </Table.Cell>
                     {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={p.id} />}
