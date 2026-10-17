@@ -15,6 +15,7 @@ import {
   componentsIn,
   JsonObjectReader,
   parseLine,
+  promoteFirstHeading,
 } from "../src/build-turn.ts";
 
 const human = { kind: "human" as const, id: "user_builder0001", name: "Halil" };
@@ -243,9 +244,15 @@ describe("build chat", () => {
       "round",
       "writing",
       "step:true",
+      // Cloudhal's repair: the page had no level-1 heading.
+      "step:true",
       "done",
     ]);
     expect(events[3]).toMatchObject({ repairs: ['root: component "Stackk" → "Stack"'] });
+    expect(events[9]).toMatchObject({
+      system: true,
+      repairs: ["the page had no level-1 heading: its first heading is now level 1"],
+    });
     expect(events[5]).toMatchObject({
       issues: ["/sections/1/components/1/props/level at most 4"],
     });
@@ -270,7 +277,7 @@ describe("build chat", () => {
     ]);
     expect(page.status).toBe(about.status);
     expect((await store.listSnapshots(site.id)).length).toBe(before + 1);
-    expect(seen.map((c) => c.kind)).toEqual(["changed", "rejected", "changed"]);
+    expect(seen.map((c) => c.kind)).toEqual(["changed", "rejected", "changed", "changed"]);
 
     const row = (await audit.list({ siteId: site.id })).find((r) => r.tool === "build_chat");
     expect(row).toMatchObject({ actor: human, outcome: "ok", input: { steps: 2, refused: 1 } });
@@ -343,5 +350,34 @@ describe("build chat", () => {
       children: [],
     });
     expect(brief).toContain("Brief: Make it bigger");
+  });
+
+  it("promotes a page's first heading to level 1 only when it has none", () => {
+    const page = (sections: unknown[]) => ({ title: "P", sections }) as never;
+    const surface = (components: unknown[]) => ({
+      id: "sec_h1test00001",
+      kind: "surface",
+      catalog: "blog@1",
+      components,
+    });
+    expect(
+      promoteFirstHeading(
+        page([
+          surface([
+            { id: "root", component: "Stack", children: ["intro", "title"] },
+            { id: "intro", component: "Text", props: { text: "Hi" } },
+            { id: "title", component: "Heading", props: { text: "Hello", level: 2 } },
+          ]),
+        ]),
+      ),
+    ).toEqual([{ op: "add", path: "/sections/0/components/2/props/level", value: 1 }]);
+    expect(
+      promoteFirstHeading(
+        page([surface([{ id: "root", component: "Heading", props: { text: "A", level: 1 } }])]),
+      ),
+    ).toBeUndefined();
+    expect(
+      promoteFirstHeading(page([{ id: "sec_hero0000001", kind: "hero", heading: "H" }])),
+    ).toBeUndefined();
   });
 });

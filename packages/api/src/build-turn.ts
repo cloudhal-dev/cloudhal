@@ -40,7 +40,8 @@ export type BuildTurnEvent =
   | { type: "unlinked"; components: string[] }
   /** The step being written right now: the components named so far (an unvalidated ghost). */
   | { type: "writing"; components: string[] }
-  | { type: "step"; ok: true; rev: number; ops: number; repairs: string[] }
+  /** `system`: Cloudhal's own repair after the model's steps (not counted as one of them). */
+  | { type: "step"; ok: true; rev: number; ops: number; repairs: string[]; system?: true }
   | { type: "step"; ok: false; issues: string[] }
   | {
       type: "done";
@@ -328,6 +329,46 @@ export function lenientJson(text: string): string {
  * Operations that address a surface component by its id (`/sections/2/components/cta/…`) are
  * rewritten to its position, as the page has it now; each rewrite is reported.
  */
+/**
+ * The op that makes a page's first heading (in reading order of its first surface with one) level
+ * 1, or undefined when the page already has a level-1 heading (a Heading or a hero section) or no
+ * heading at all.
+ */
+export function promoteFirstHeading(page: Page): PatchOp[] | undefined {
+  const sections = page.sections ?? [];
+  if (sections.some((s) => s.kind === "hero")) return undefined;
+  const surfaces = sections.flatMap((s, i) => (s.kind === "surface" ? [{ s, i }] : []));
+  if (
+    surfaces.some(({ s }) =>
+      s.components.some(
+        (c) =>
+          c.component === "Heading" && (c.props as { level?: unknown } | undefined)?.level === 1,
+      ),
+    )
+  )
+    return undefined;
+  for (const { s, i } of surfaces) {
+    const byId = new Map(s.components.map((c, j) => [c.id, { c, j }]));
+    const seen = new Set<string>();
+    const visit = (id: string): number | undefined => {
+      if (seen.has(id)) return undefined;
+      seen.add(id);
+      const node = byId.get(id);
+      if (!node) return undefined;
+      if (node.c.component === "Heading") return node.j;
+      for (const k of node.c.children ?? []) {
+        const found = typeof k === "string" ? visit(k) : undefined;
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    };
+    const j = visit("root");
+    if (j !== undefined)
+      return [{ op: "add", path: `/sections/${i}/components/${j}/props/level`, value: 1 }];
+  }
+  return undefined;
+}
+
 export function componentPaths(
   page: Page,
   ops: readonly PatchOp[],
@@ -521,14 +562,21 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
   let heldSteps = 0;
 
   /** Writes `ops` on the page (with Cloudhal's repairs); throws what the checks refuse. */
-  const write = async (raw: PatchOp[], read: string[] = []) => {
+  const write = async (raw: PatchOp[], read: string[] = [], system = false) => {
     const addressed = componentPaths(page, raw);
     const ops = addressed.ops;
     const patched = patchPage(page, ops, deps.catalog);
     page = await deps.write(patched.value);
-    steps++;
+    if (!system) steps++;
     const repairs = [...read, ...addressed.notes, ...patched.notes];
-    deps.emit({ type: "step", ok: true, rev: page.rev, ops: ops.length, repairs });
+    deps.emit({
+      type: "step",
+      ok: true,
+      rev: page.rev,
+      ops: ops.length,
+      repairs,
+      ...(system ? { system: true as const } : {}),
+    });
     await notifyBuild(() =>
       deps.build?.pageChanged({
         siteId: deps.siteId,
@@ -703,6 +751,17 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
           ].join("\n"),
         },
       );
+    }
+    // A page needs one level-1 heading; models often start at level 2. A whole-page build gets
+    // its first heading promoted (a repair the person sees), never a scoped edit.
+    if (steps > 0 && !deps.scope && !deps.signal?.aborted) {
+      const promote = promoteFirstHeading(page);
+      if (promote)
+        await write(
+          promote,
+          ["the page had no level-1 heading: its first heading is now level 1"],
+          true,
+        ).catch(() => undefined);
     }
     // RFC-0021 21c: the model looks at what it built, once, and may fix it.
     if (deps.look && steps > 0 && !deps.signal?.aborted) {
