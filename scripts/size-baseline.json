@@ -543,12 +543,6 @@
     "packages/mcp-server/src/schedules.ts::autoReleaseVerdict": {
       "params": 6
     },
-    "packages/mcp-server/src/server.ts::createCloudhalMcpServer": {
-      "lines": 434
-    },
-    "packages/mcp-server/src/server.ts::createCloudhalMcpServer>server.registerTool(cb)": {
-      "lines": 255
-    },
     "packages/mcp-server/src/taxonomy-tools.ts::taxonomyTools": {
       "lines": 881
     },
