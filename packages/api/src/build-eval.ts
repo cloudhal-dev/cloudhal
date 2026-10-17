@@ -303,7 +303,9 @@ export async function runBuildEvalOnce(input: {
     if (e.type === "look") look = { failed: e.failed, images: e.images, round: false, steps: 0 };
     else if (e.type === "round" && look) look.round = true;
     if (e.type === "round") run.rounds = e.round;
-    else if (e.type === "step" && e.ok) {
+    else if (e.type === "step" && e.ok && e.system) {
+      // Cloudhal's own repair after the model's steps: not the model's work.
+    } else if (e.type === "step" && e.ok) {
       run.firstStepMs ??= now() - started;
       if (look) look.steps++;
       run.repairs += e.repairs.length;
