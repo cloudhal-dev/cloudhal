@@ -20,7 +20,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { type MessageKey, useT } from "../i18n/index.tsx";
+import { listOf, type MessageKey, useT } from "../i18n/index.tsx";
 import {
   ApiRequestError,
   api,
@@ -264,7 +264,7 @@ export function GovernanceDialog({
                 {(term.slugHistory?.length ?? 0) > 0 && (
                   <Text variant="secondary" size="sm">
                     {t("governance.rename.history", {
-                      slugs: (term.slugHistory ?? []).join(", "),
+                      slugs: listOf(term.slugHistory ?? []),
                     })}
                   </Text>
                 )}

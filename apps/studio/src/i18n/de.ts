@@ -1965,7 +1965,7 @@ export const messages: Messages = {
       emptyHint: "ihre Archive antworten mit 404, bis ein Artikel eingeordnet ist",
       oversized: "Sehr große Kategorien ({count})",
       oversizedHint: "über die Hälfte aller Artikel; Unterkategorien würden helfen",
-      andMore: " und {count} weitere",
+      more: "{count, number} weitere",
     },
     rules: {
       title: "So funktionieren {plural}",

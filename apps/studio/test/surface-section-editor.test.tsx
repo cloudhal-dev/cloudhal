@@ -63,7 +63,7 @@ describe("SurfaceSectionEditor", () => {
     expect(within(tree).getByText("BMI · computed (calculate)")).toBeInTheDocument();
     expect(within(tree).getByText("Not on the page")).toBeInTheDocument();
     // RFC-0024: a component's motion shows as its preset names
-    expect(within(tree).getByText("Body mass index · ✦ rise, underline")).toBeInTheDocument();
+    expect(within(tree).getByText("Body mass index · ✦ rise and underline")).toBeInTheDocument();
     // the data is not on screen until asked for
     expect(screen.queryByLabelText("Generated UI as data")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show JSON" })).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("SurfaceSectionEditor", () => {
       ),
     );
     expect(screen.queryByRole("button", { name: /metinlerini düzenle/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Body mass index · ✦ rise, underline")).toBeInTheDocument();
+    expect(screen.getByText("Body mass index · ✦ rise ve underline")).toBeInTheDocument();
     expect(screen.getByText("Weight · /kg gösterir")).toBeInTheDocument();
     expect(screen.getByText("Sayı alanı")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Yapay zekâ ile değiştir" })).toBeInTheDocument();

@@ -2,7 +2,7 @@ import { Banner, Button, InsetPanel, LayerDialog, SkeletonLine, Text } from "@cl
 import { ArrowCounterClockwise, CheckCircle, Tag, Warning } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { listOf, useT } from "../i18n/index.tsx";
 import { api, type TagsMigrationResult } from "../lib/api.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { invalidateTaxonomy } from "./Taxonomy.tsx";
@@ -137,7 +137,7 @@ export function TagsMigrationDialog({
                     <SummaryRow label={t("migration.dialog.tags")}>
                       {r.tags.length === 0
                         ? t("migration.dialog.none")
-                        : `${r.tags.length} · ${r.tags.slice(0, 6).join(", ")}${r.tags.length > 6 ? "…" : ""}`}
+                        : `${r.tags.length} · ${listOf(r.tags.slice(0, 6))}${r.tags.length > 6 ? "…" : ""}`}
                     </SummaryRow>
                     <SummaryRow label={t("migration.dialog.entries")}>{r.entries}</SummaryRow>
                     <SummaryRow label={t("migration.dialog.terms")}>
@@ -148,7 +148,7 @@ export function TagsMigrationDialog({
                     </SummaryRow>
                     <SummaryRow label={t("migration.dialog.taxonomies")}>
                       {r.taxonomiesCreated.length > 0
-                        ? r.taxonomiesCreated.join(", ")
+                        ? listOf(r.taxonomiesCreated)
                         : t("migration.dialog.none")}
                     </SummaryRow>
                   </div>

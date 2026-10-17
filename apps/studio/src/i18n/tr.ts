@@ -1909,7 +1909,7 @@ export const messages: Messages = {
       emptyHint: "bir makale eklenene kadar arşivleri 404 döner",
       oversized: "Çok büyük kategoriler ({count})",
       oversizedHint: "tüm makalelerin yarısından fazlası; alt kategoriler işe yarar",
-      andMore: " ve {count} tane daha",
+      more: "{count, number} tane daha",
     },
     rules: {
       title: "{Plural} nasıl çalışır",

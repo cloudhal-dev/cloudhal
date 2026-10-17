@@ -665,11 +665,11 @@ export interface MessageParams {
   "taxonomy.empty.internal": { plural: string | number; Plural: string | number; singular: string | number };
   "taxonomy.empty.public": { plural: string | number; Plural: string | number; singular: string | number };
   "taxonomy.empty.retired": { plural: string | number; Plural: string | number; singular: string | number };
-  "taxonomy.health.andMore": { count: string | number };
   "taxonomy.health.empty": { count: string | number };
   "taxonomy.health.issues": { count: string | number };
   "taxonomy.health.mergeInto": { source: string | number; target: string | number };
   "taxonomy.health.missingPrimary": { singular: string | number; Singular: string | number; count: string | number };
+  "taxonomy.health.more": { count: number };
   "taxonomy.health.morePairs": { count: string | number };
   "taxonomy.health.nearDuplicates": { count: string | number };
   "taxonomy.health.noIntro": { count: string | number };

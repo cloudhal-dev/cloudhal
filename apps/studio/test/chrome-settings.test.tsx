@@ -42,7 +42,7 @@ describe("Header and footer settings", () => {
     vi.stubGlobal("fetch", fetch);
     render(wrap(<ChromeSettingsSection siteId="site_1" defaultLocale="en" />));
     expect(
-      await screen.findByText("Menus you can name: primary, footer.", { exact: false }),
+      await screen.findByText("Menus you can name: primary and footer.", { exact: false }),
     ).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save changes" });
     expect(save).toBeDisabled();

@@ -11,7 +11,7 @@ import {
 } from "@cloudhal/ui";
 import { Hourglass, Plus, Star, Warning } from "@phosphor-icons/react";
 import { useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { listOf, useT } from "../i18n/index.tsx";
 import type { TermListItem } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import {
@@ -400,10 +400,7 @@ export function TagPicker({
                         </span>
                         <Text size="sm" as="span">
                           {t("pickers.nearDuplicate", {
-                            names: s.similar
-                              .slice(0, 3)
-                              .map((x) => name(x))
-                              .join(", "),
+                            names: listOf(s.similar.slice(0, 3).map((x) => name(x))),
                           })}
                         </Text>
                       </span>

@@ -7,7 +7,7 @@
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 811,
     "apps/studio/src/routes/NavigationPage.tsx": 1177,
-    "apps/studio/src/routes/SchedulesPage.tsx": 1294,
+    "apps/studio/src/routes/SchedulesPage.tsx": 1295,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 914,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 853,
@@ -91,7 +91,7 @@
       "lines": 338
     },
     "apps/studio/src/components/CreateTermDialog.tsx::CreateTermDialog": {
-      "lines": 176
+      "lines": 173
     },
     "apps/studio/src/components/ElevateAgentKeyDialog.tsx::ElevateAgentKeyDialog": {
       "lines": 290
@@ -151,7 +151,7 @@
       "lines": 410
     },
     "apps/studio/src/components/TermPickers.tsx::TagPicker": {
-      "lines": 171
+      "lines": 168
     },
     "apps/studio/src/lib/api/ai.ts::build": {
       "params": 5

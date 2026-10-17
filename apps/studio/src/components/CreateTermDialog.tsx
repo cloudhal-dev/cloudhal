@@ -3,7 +3,7 @@ import { Banner, Field, Input, InputGroup, LayerDialog, Switch, Text } from "@cl
 import { Warning } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { type MessageKey, useT } from "../i18n/index.tsx";
+import { listOf, type MessageKey, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import {
   type SlugError,
@@ -135,10 +135,7 @@ export function CreateTermDialog({
                 icon={<Warning weight="fill" />}
                 title={t("taxonomy.create.similarTitle")}
                 description={t("taxonomy.create.similar", {
-                  names: similar
-                    .slice(0, 3)
-                    .map((x) => data.name(x))
-                    .join(", "),
+                  names: listOf(similar.slice(0, 3).map((x) => data.name(x))),
                 })}
                 data-testid="create-similar"
               />

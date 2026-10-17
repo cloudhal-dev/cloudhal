@@ -20,7 +20,7 @@ import {
 import { GearSix, Sparkle, StopCircle, Target, WarningCircle, X } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { listOf, useT } from "../i18n/index.tsx";
 import { api, errorCode } from "../lib/api.ts";
 
 /**
@@ -120,20 +120,20 @@ export function BuildChat({
           add({ role: "model", text: e.text });
           progress(t("build.chat.thinking"));
         } else if (e.type === "writing")
-          progress(t("build.chat.writing", { components: e.components.join(", ") }));
+          progress(t("build.chat.writing", { components: listOf(e.components) }));
         else if (e.type === "look") {
           looked = true;
           add({
             role: "result",
             text: e.failed.length
               ? t("build.chat.lookedIssues", {
-                  checks: e.failed
-                    .map((id) =>
+                  checks: listOf(
+                    e.failed.map((id) =>
                       (RENDER_CHECKS as readonly string[]).includes(id)
                         ? t(`build.chat.checks.${id as (typeof RENDER_CHECKS)[number]}`)
                         : id,
-                    )
-                    .join(", "),
+                    ),
+                  ),
                 })
               : t("build.chat.lookedClean"),
           });

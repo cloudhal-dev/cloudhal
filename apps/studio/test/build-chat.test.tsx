@@ -108,7 +108,7 @@ describe("Build chat", () => {
     fireEvent.click(screen.getByRole("button", { name: "Build" }));
     expect(
       await screen.findByText(
-        "Looked at the page in a browser: text contrast, small tap targets to fix",
+        "Looked at the page in a browser: text contrast and small tap targets to fix",
       ),
     ).toBeInTheDocument();
     expect(await screen.findByText("2 steps applied to the draft")).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { argumentsOf, compileMessage, MessageSyntaxError } from "../src/compile.ts";
-import { formatMessage } from "../src/format.ts";
+import { formatList, formatMessage } from "../src/format.ts";
 import { compileCatalogSource } from "../src/transform.ts";
 import { cloudhalMessages } from "../src/vite.ts";
 
@@ -98,6 +98,17 @@ describe("formatMessage", () => {
   it("leaves a missing simple argument visible, as before", () => {
     expect(formatMessage("en", "Hello {name}")).toBe("Hello {name}");
     expect(fmt("en", "{k, select, a {A {name}} other {B}}", { k: "a" })).toBe("A {name}");
+  });
+});
+
+describe("formatList", () => {
+  it("joins items the way each language does", () => {
+    const items = ["a", "b", "c"];
+    expect(formatList("en", items)).toBe("a, b, and c");
+    expect(formatList("tr", items)).toBe("a, b ve c");
+    expect(formatList("de", items)).toBe("a, b und c");
+    expect(formatList("en", items, "disjunction")).toBe("a, b, or c");
+    expect(formatList("en", ["only"])).toBe("only");
   });
 });
 

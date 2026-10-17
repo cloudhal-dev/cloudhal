@@ -12,7 +12,7 @@ import { Banner, BlockPropsForm, Button, SkeletonLine, Tabs, Text } from "@cloud
 import { WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { keep, useI18n } from "../i18n/index.tsx";
+import { keep, listOf, useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api, json, request } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { useBlockEnumLabel } from "./BlockSection.tsx";
@@ -298,7 +298,7 @@ export function ChromeSettingsSection({
         <Text variant="secondary" size="sm">
           {disabled && gate.reason
             ? gate.reason
-            : t("appearance.chrome.menusPublish", { menus: saved.menus.join(", ") })}
+            : t("appearance.chrome.menusPublish", { menus: listOf(saved.menus) })}
         </Text>
       </div>
     </SettingsSection>

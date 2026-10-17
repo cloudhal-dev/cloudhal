@@ -2,7 +2,7 @@ import type { ContentEntry, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { Banner, SectionCard, TagInput } from "@cloudhal/ui";
 import { ClockCounterClockwise, Tag } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { appliesTo, assignmentOf, withAssignment } from "../lib/taxonomy.ts";
 import { slugify } from "../lib/workflow.ts";
@@ -84,7 +84,7 @@ export function ArticleTermsCard({
               size="sm"
               icon={<ClockCounterClockwise weight="fill" />}
               title={t("articleTerms.legacyTitle")}
-              description={t("articleTerms.legacyPending", { tags: entry.tags.join(", ") })}
+              description={t("articleTerms.legacyPending", { tags: listOf(entry.tags) })}
               data-testid="legacy-pending"
             />
           )}

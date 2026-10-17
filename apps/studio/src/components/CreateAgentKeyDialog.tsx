@@ -15,7 +15,7 @@ import { CodeHighlighted } from "@cloudhal/ui/code";
 import { ArrowCounterClockwise, Info, Warning } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useT } from "../i18n/index.tsx";
+import { listOf, useT } from "../i18n/index.tsx";
 import {
   type GrantableScope,
   mcpSnippet,
@@ -346,7 +346,7 @@ export function CreateAgentKeyDialog({
                         icon={<Info weight="fill" />}
                         title={t("agents.create.missingScopesTitle")}
                         description={t("agents.create.missingScopes", {
-                          scopes: missing.join(", "),
+                          scopes: listOf(missing),
                           mode: modeName,
                         })}
                       />

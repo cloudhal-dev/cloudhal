@@ -1885,7 +1885,7 @@ export const en = {
       emptyHint: "their archives answer 404 until an article is filed",
       oversized: "Very large categories ({count})",
       oversizedHint: "over half of all articles; sub-categories would help",
-      andMore: " and {count} more",
+      more: "{count, number} more",
     },
     rules: {
       title: "How {plural} work",
