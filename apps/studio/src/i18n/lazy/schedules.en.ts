@@ -206,6 +206,8 @@ export const messages = {
         today: "today",
         noItems: "nothing scheduled",
         items: "{count, plural, one {# item} other {# items}}",
+        kindCount:
+          "{kind, select, publish {{count, plural, one {# publish} other {# publishes}}} expiry {{count, plural, one {# expiry} other {# expiries}}} embargo {{count, plural, one {# embargo} other {# embargoes}}} release {{count, plural, one {# release} other {# releases}}} automation {{count, plural, one {# automation} other {# automations}}} other {{count, number}}}",
         more: "+{count} more",
         emptyDay: "Nothing scheduled",
       },

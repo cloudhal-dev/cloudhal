@@ -353,7 +353,7 @@ export function ElevatedKeysBanner({
                 loading={extending}
                 onClick={() => onExtend(endingSoon)}
               >
-                {endingSoon.length === 1
+                {endingSoon.length === 1 // i18n-ignore: one key's action vs "all", not a form
                   ? t("notifications.extend.button", { duration: extendBy })
                   : t("agents.elevation.extendAll", { duration: extendBy })}
               </Banner.Action>
@@ -363,7 +363,10 @@ export function ElevatedKeysBanner({
               loading={ending}
               onClick={() => onEnd(elevated.map((e) => e.key))}
             >
-              {count === 1 ? t("agents.elevation.endNow") : t("agents.elevation.endAll")}
+              {
+                // i18n-ignore: ending one key vs all keys, not a grammatical form
+                count === 1 ? t("agents.elevation.endNow") : t("agents.elevation.endAll")
+              }
             </Banner.Action>
           </>
         }

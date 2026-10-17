@@ -118,7 +118,7 @@ export function scheduleItemSentence(
   if (entry.approval && entry.status.subject !== "approval")
     parts.push(words.status.approval[entry.approval]);
   if (entry.timeLeft) parts.push(entry.timeLeft);
-  return parts.join(", ");
+  return parts.join(", "); // i18n-ignore: clauses of one spoken sentence (an accessible name), not a list
 }
 
 interface CommonProps {

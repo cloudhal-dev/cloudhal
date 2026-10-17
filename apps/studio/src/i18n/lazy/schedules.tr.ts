@@ -204,6 +204,8 @@ export const messages: NamespaceMessages<"schedules"> = {
         today: "bugün",
         noItems: "zamanlanmış bir şey yok",
         items: "{count, number} öğe",
+        kindCount:
+          "{kind, select, publish {{count, number} yayın} expiry {{count, number} yayından kalkış} embargo {{count, number} ambargo} release {{count, number} yayın paketi} automation {{count, number} otomasyon} other {{count, number}}}",
         more: "+{count} daha",
         emptyDay: "Zamanlanmış bir şey yok",
       },

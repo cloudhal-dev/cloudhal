@@ -1,5 +1,5 @@
 # RFC-0032: ICU plurals and select in Studio messages, compiled at build time
-- Status: Accepted (2026-10-18, by Halil; ADR-0032). Open questions 2 and 3 decided as recommended: a separate private package `@cloudhal/messages`, and `{count}` allowed inside plural branches besides `#`.
+- Status: Implemented (2026-10-18; ADR-0032). Accepted 2026-10-18 by Halil; open questions 2 and 3 decided as recommended: a separate private package `@cloudhal/messages`, and `{count}` allowed inside plural branches besides `#`. Steps a–f landed in PRs #154–#159, the §5.5 lint rules (`i18n-plural`, `i18n-concat`) with the last one.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
   - `docs/reports/2026-10-studio-i18n-review.md` (Phase 1 of its plan; the measurements below update it);

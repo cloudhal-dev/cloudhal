@@ -767,9 +767,9 @@ export function SchedulesPage() {
   // ---- words for the blocks ----
   const c = "schedules.calendar" as const;
   const kindPlural = (e: readonly ScheduleEntry[]) => {
-    const counts = new Map<string, number>();
-    for (const x of e) counts.set(words.kind[x.kind], (counts.get(words.kind[x.kind]) ?? 0) + 1);
-    return listOf([...counts].map(([k, n]) => `${n} ${k.toLocaleLowerCase(locale)}`));
+    const counts = new Map<ScheduleEntry["kind"], number>();
+    for (const x of e) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
+    return listOf([...counts].map(([kind, count]) => t(`${c}.month.kindCount`, { kind, count })));
   };
   const rangeLabel = weekDays
     ? `${formatDay(weekDays.first, locale, "medium")} – ${formatDay(weekDays.last, locale, "medium")}`
@@ -1083,7 +1083,7 @@ export function SchedulesPage() {
                         : `${t(`${c}.month.items`, { count: list.length })}: ${kindPlural(list)}`,
                     ]
                       .filter(Boolean)
-                      .join(", "),
+                      .join(", "), // i18n-ignore: parts of a day's accessible name, not a list
                   more: (n) => t(`${c}.month.more`, { count: n }),
                   emptyDay: t(`${c}.month.emptyDay`),
                 }}

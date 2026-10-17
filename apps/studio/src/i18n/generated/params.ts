@@ -343,7 +343,7 @@ export interface MessageParams {
   "media.upload.remove": { name: string | number };
   "media.upload.start": { count: number };
   "media.upload.summary": { done: string | number; total: string | number };
-  "media.usage.many": { count: string | number };
+  "media.usage.used": { count: number };
   "members.how.expiry": { default: string | number; admin: string | number };
   "members.invites.menu": { email: string | number };
   "members.invites.revokeDescription": { email: string | number };
@@ -554,6 +554,7 @@ export interface MessageParams {
   "schedules.calendar.agenda.moreRuns": { count: number };
   "schedules.calendar.filters.selected": { facet: string | number; count: string | number };
   "schedules.calendar.month.items": { count: number };
+  "schedules.calendar.month.kindCount": { kind: "publish" | "expiry" | "embargo" | "release" | "automation"; count: number };
   "schedules.calendar.month.more": { count: string | number };
   "schedules.calendar.moved": { title: string | number; time: string | number };
   "schedules.calendar.overlap": { count: number };

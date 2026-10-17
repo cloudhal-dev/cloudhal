@@ -130,11 +130,7 @@ export function UsageBadge({ count, overlay = false }: { count: number; overlay?
   return (
     <span className="inline-flex" data-usage={count}>
       <Badge variant={overlay ? "secondary" : count > 0 ? "info" : "outline"}>
-        {count === 0
-          ? t("media.usage.none")
-          : count === 1
-            ? t("media.usage.one")
-            : t("media.usage.many", { count })}
+        {count === 0 ? t("media.usage.none") : t("media.usage.used", { count })}
       </Badge>
     </span>
   );

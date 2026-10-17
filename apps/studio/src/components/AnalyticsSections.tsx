@@ -1147,7 +1147,7 @@ export function VitalsCard({
       {body}
       {vitalsOneIn !== 0 && vitalsOneIn !== undefined && (
         <NoteLine>
-          {vitalsOneIn === 1
+          {vitalsOneIn === 1 // i18n-ignore: 1 in 1 is "every page view", another sentence
             ? t("analytics.vitals.sampleEvery")
             : t("analytics.vitals.sample", { n: vitalsOneIn })}
         </NoteLine>
