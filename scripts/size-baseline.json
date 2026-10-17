@@ -26,7 +26,7 @@
     "packages/core-ts/src/releases.ts": 996,
     "packages/core-ts/src/store.ts": 1883,
     "packages/core-ts/src/surface-interop.ts": 1235,
-    "packages/core-ts/src/surfaces.ts": 3137,
+    "packages/core-ts/src/surfaces.ts": 1223,
     "packages/core-ts/src/taxonomy.ts": 1731,
     "packages/mcp-server/src/menu-tools.ts": 1058,
     "packages/mcp-server/src/render.ts": 943,
