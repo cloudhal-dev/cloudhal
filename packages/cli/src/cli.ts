@@ -22,6 +22,7 @@ import { type DomainTarget, domain } from "./commands/domain.ts";
 import { init } from "./commands/init.ts";
 import { mcp } from "./commands/mcp.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "./commands/media.ts";
+import { describePlaceholders, mediaPlaceholders } from "./commands/media-placeholders.ts";
 import { describeMigration, migrateTags } from "./commands/migrate.ts";
 import { describeMotionAudit, motionAudit } from "./commands/motion.ts";
 import { transferOwner } from "./commands/owner.ts";
@@ -79,6 +80,8 @@ Usage:
                                                           (RFC-0004); revertible
   cloudhal media verify [<assetId>]                       recompute media checksums
   cloudhal media gc [--dry-run]                           delete unreferenced media bytes (> 24 h old)
+  cloudhal media placeholders [--remote] [--all] [--dry-run]
+                                                          draw missing image placeholders in local Chrome
   cloudhal analytics status [--remote]                    site analytics: settings, daily totals, budget
   cloudhal analytics rollup [--days <n>] [--remote] [--redo]
                                                           compute daily totals (--remote backfills the
@@ -144,6 +147,7 @@ export async function main(argv: string[]): Promise<number> {
       "include-markdown": { type: "boolean" },
       "allow-host": { type: "string", multiple: true },
       remote: { type: "boolean" },
+      all: { type: "boolean" },
       redo: { type: "boolean" },
       days: { type: "string" },
       views: { type: "string" },
@@ -380,7 +384,18 @@ export async function main(argv: string[]): Promise<number> {
         );
         return 0;
       }
-      throw new Error("usage: cloudhal media import-urls|verify|gc");
+      if (what === "placeholders") {
+        const r = await mediaPlaceholders({
+          projectDir,
+          ...(values.remote ? { remote: true } : {}),
+          ...(values["admin-url"] ? { adminUrl: values["admin-url"] } : {}),
+          ...(values.all ? { all: true } : {}),
+          ...(values["dry-run"] ? { dryRun: true } : {}),
+        });
+        console.log(describePlaceholders(r));
+        return r.failed.length ? 1 : 0;
+      }
+      throw new Error("usage: cloudhal media import-urls|verify|gc|placeholders");
     }
     case "analytics": {
       const [what] = rest;

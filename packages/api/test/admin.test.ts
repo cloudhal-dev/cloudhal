@@ -1,5 +1,6 @@
 /** `cloudhal push`/`pull` endpoints and the /mcp origin guard. */
 import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
@@ -85,6 +86,54 @@ describe("admin search reindex (RFC-0019 §3)", () => {
     expect((await b.store.search(site.id, "hello", { locale: "en", now: Date.now() })).total).toBe(
       1,
     );
+  });
+});
+
+describe("admin placeholder backfill (RFC-0028 §5)", () => {
+  it("lists images without a colour and stores what the CLI drew, keeping measured fields", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Ph", slug: "ph" });
+    const { asset } = await b.store.ingestAsset({
+      siteId: site.id,
+      bytes: makePng({ width: 40, height: 20 }),
+      filename: "chart.png",
+      uploadedBy: human,
+      source: { kind: "upload" },
+      fields: { alt: { en: "Chart" } },
+    });
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const auth = { authorization: `Bearer ${TOKEN}` };
+    const base = `/api/admin/sites/${site.id}/media-placeholders`;
+    const list = (await (await app.request(base, { headers: auth })).json()) as {
+      assets: { id: string; rev: number; alpha?: true }[];
+    };
+    expect(list.assets).toEqual([
+      expect.objectContaining({
+        id: asset.id,
+        rev: 0,
+        mediaType: "image/png",
+        width: 40,
+        alpha: true,
+      }),
+    ]);
+    const put = (body: unknown) =>
+      app.request(`${base}/${asset.id}`, {
+        method: "PUT",
+        headers: { ...auth, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await put({ rev: 0, color: "#ABCDEF" })).status).toBe(400);
+    expect((await put({ rev: 5, color: "#abcdef" })).status).toBe(409);
+    const saved = await put({ rev: 0, color: "#abcdef" });
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { asset: { image: unknown } }).asset.image).toEqual({
+      width: 40,
+      height: 20,
+      alpha: true,
+      color: "#abcdef",
+    });
+    const again = (await (await app.request(base, { headers: auth })).json()) as { assets: [] };
+    expect(again.assets).toEqual([]);
   });
 });
 

@@ -10,11 +10,9 @@ import {
   assetPreviewUrl,
   assetTitle,
   checkFile,
-  dominantColor,
   formatSize,
   imageRefFor,
   imageRefPreviewUrl,
-  leanWebp,
   needsAlt,
   readImageInfo,
   slugify,
@@ -244,27 +242,5 @@ describe("Activity names media changes", () => {
     expect(translate("tr", `tools.${ASSET_EVENTS["asset.upload"]}`)).toBe("Dosya yükle");
     expect(isKnownTool("fetch_asset_url")).toBe(true);
     expect(translate("en", "tools.fetch_asset_url")).toBe("Add media from a URL");
-  });
-});
-
-describe("dominantColor (RFC-0028)", () => {
-  it("averages the visible pixels, weighted by opacity", () => {
-    expect(dominantColor([255, 0, 0, 255, 0, 0, 255, 255])).toBe("#800080");
-    expect(dominantColor([255, 255, 255, 255, 0, 0, 0, 0])).toBe("#ffffff");
-    expect(dominantColor([10, 20, 30, 0])).toBeUndefined();
-  });
-});
-
-describe("leanWebp (RFC-0028)", () => {
-  it("drops the ICC profile a canvas embeds, and the extended header once nothing needs it", () => {
-    const withIcc =
-      "data:image/webp;base64,UklGRi4CAABXRUJQVlA4WAoAAAAgAAAAFwAADgAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggQAAAAFADAJ0BKhgADwA+0VajS7+koyGwCAPwGglAFYAFoPydArY4AP7d3cE4W/85vFmRhrdfDtzZEUCaWYH33ugAAAA=";
-    const lean = leanWebp(withIcc);
-    expect(lean.length).toBeLessThan(140);
-    const bytes = atob(lean.slice("data:image/webp;base64,".length));
-    expect(bytes.slice(0, 4)).toBe("RIFF");
-    expect(bytes.slice(12, 16)).toBe("VP8 ");
-    expect(bytes.charCodeAt(4) + bytes.charCodeAt(5) * 256).toBe(bytes.length - 8);
-    expect(leanWebp("data:image/png;base64,iVBO")).toBe("data:image/png;base64,iVBO");
   });
 });

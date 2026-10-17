@@ -35,6 +35,9 @@
  *   run, then the summary (RFC-0020 open question 7, `cloudhal ai build-eval --remote`); in memory
  * - `POST /api/admin/sites/:siteId/search/reindex` → rebuilds the search index from the live
  *   snapshot (RFC-0019 §3, `cloudhal search reindex --remote`)
+ * - `GET  /api/admin/sites/:siteId/media-placeholders?all=1` → images without a placeholder, and
+ *   `PUT …/media-placeholders/:assetId` ← {rev, lqip?, color?}: `cloudhal media placeholders
+ *   --remote` draws them in a local Chrome (RFC-0028 §5)
  * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
  *   pins would point into a replaced graph) unless `?cancelSchedules=1` cancels them first
  *   (`cloudhal push --cancel-schedules`).
@@ -61,6 +64,7 @@ import {
   SyncConflictError,
   withPrimaryDomain,
 } from "@cloudhal/core-ts";
+import { candidateOf, needsPlaceholder, type PlaceholderCandidate } from "@cloudhal/core-ts/media";
 import {
   gatedNodeCount,
   ReleaseService,
@@ -571,6 +575,60 @@ export function adminRoutes(
           200,
           NO_STORE,
         );
+      })
+      // RFC-0028 §5: `cloudhal media placeholders --remote` draws placeholders in a local Chrome
+      // for images nothing drew one for (agents, imports), and writes them back here.
+      .get("/sites/:siteId/media-placeholders", async (c) => {
+        const store = c.get("store");
+        const siteId = param(c, "siteId");
+        if (!(await store.getSite(siteId)))
+          return c.json({ error: "not_found", message: "not found: site" }, 404, NO_STORE);
+        const all = c.req.query("all") === "1";
+        const assets: PlaceholderCandidate[] = [];
+        let cursor: string | undefined;
+        do {
+          const page = await store.listAssets(siteId, {
+            kind: ["image"],
+            status: ["active", "retired"],
+            ...(cursor ? { cursor } : {}),
+          });
+          for (const a of page.assets) if (needsPlaceholder(a, all)) assets.push(candidateOf(a));
+          cursor = page.nextCursor;
+        } while (cursor);
+        return c.json({ assets }, 200, NO_STORE);
+      })
+      .put("/sites/:siteId/media-placeholders/:assetId", async (c) => {
+        const store = c.get("store");
+        const asset = await store.getAsset(param(c, "assetId"));
+        if (!asset || asset.siteId !== param(c, "siteId") || !asset.image)
+          return c.json({ error: "not_found", message: "not found: image" }, 404, NO_STORE);
+        const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+        if (!b || b.rev !== asset.rev)
+          return c.json(
+            { error: "conflict", message: `the image is at rev ${asset.rev}; list again` },
+            409,
+            NO_STORE,
+          );
+        const lqip = b.lqip;
+        const color = b.color;
+        if (
+          (lqip !== undefined &&
+            (typeof lqip !== "string" ||
+              !/^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(lqip) ||
+              lqip.length > 4096)) ||
+          (color !== undefined && (typeof color !== "string" || !/^#[0-9a-f]{6}$/.test(color)))
+        )
+          throw badRequest("lqip must be a small raster data: URL and color a lower-case #rrggbb");
+        const { lqip: _l, color: _c, ...kept } = asset.image;
+        const saved = await store.updateAsset({
+          ...asset,
+          image: {
+            ...kept,
+            ...(typeof lqip === "string" ? { lqip } : {}),
+            ...(typeof color === "string" ? { color } : {}),
+          },
+        });
+        return c.json({ asset: saved }, 200, NO_STORE);
       })
       .get("/sites/:siteId/bundle", async (c) => {
         const siteId = param(c, "siteId");
