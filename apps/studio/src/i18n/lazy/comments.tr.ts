@@ -190,7 +190,8 @@ export const messages: NamespaceMessages<"comments"> = {
       selected: "{count} seçili",
       clear: "Temizle",
       select: "{name} adlı kişinin yorumunu seç",
-      notFor: "Seçili yorumların hiçbirine bu işlem uygulanamaz.",
+      notFor:
+        "{action, select, approve {Seçili yorumların hiçbiri onaylanamaz.} restore {Seçili yorumların hiçbiri geri yüklenemez.} hide {Seçili yorumların hiçbiri gizlenemez.} spam {Seçili yorumların hiçbiri spam olarak işaretlenemez.} hold {Seçili yorumların hiçbiri beklemeye geri alınamaz.} other {Seçili yorumların hiçbirine bu işlem uygulanamaz.}}",
     },
     actions: {
       menu: "Yorum işlemleri",
@@ -205,13 +206,6 @@ export const messages: NamespaceMessages<"comments"> = {
       commenter: "Yorum sahibi…",
       ban: "Engelle…",
       resolve: "Bildirimi çöz…",
-      past: {
-        approve: "onaylandı",
-        restore: "geri yüklendi",
-        hide: "gizlendi",
-        spam: "spam olarak işaretlendi",
-        hold: "beklemeye geri alındı",
-      },
     },
     dialog: {
       hideTitle: "{count, plural, one {Bu yorumu gizle} other {# yorumu gizle}}",
@@ -233,8 +227,9 @@ export const messages: NamespaceMessages<"comments"> = {
       deleteConfirm: "Metni sil",
     },
     results: {
-      done: "{count, number} yorum {action}",
-      partialTitle: "{total} yorumdan {done} tanesi {action}",
+      done: "{action, select, approve {{count, number} yorum onaylandı} restore {{count, number} yorum geri yüklendi} hide {{count, number} yorum gizlendi} spam {{count, number} yorum spam olarak işaretlendi} hold {{count, number} yorum beklemeye geri alındı} other {{count, number} yorum güncellendi}}",
+      partialTitle:
+        "{action, select, approve {{total} yorumdan {done} tanesi onaylandı} restore {{total} yorumdan {done} tanesi geri yüklendi} hide {{total} yorumdan {done} tanesi gizlendi} spam {{total} yorumdan {done} tanesi spam olarak işaretlendi} hold {{total} yorumdan {done} tanesi beklemeye geri alındı} other {{total} yorumdan {done} tanesi güncellendi}}",
       partialDescription: "Diğerleri olduğu gibi bırakıldı:",
       errors: {
         conflict: "{count} tanesi sen yükledikten sonra değişti",

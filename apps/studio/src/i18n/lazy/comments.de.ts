@@ -190,7 +190,8 @@ export const messages: NamespaceMessages<"comments"> = {
       selected: "{count} ausgewählt",
       clear: "Leeren",
       select: "Den Kommentar von {name} auswählen",
-      notFor: "Keiner der ausgewählten Kommentare kann {action} werden.",
+      notFor:
+        "{action, select, approve {Keiner der ausgewählten Kommentare kann freigegeben werden.} restore {Keiner der ausgewählten Kommentare kann wiederhergestellt werden.} hide {Keiner der ausgewählten Kommentare kann verborgen werden.} spam {Keiner der ausgewählten Kommentare kann als Spam markiert werden.} hold {Keiner der ausgewählten Kommentare kann zurück auf ausstehend gesetzt werden.} other {Keiner der ausgewählten Kommentare kann so geändert werden.}}",
     },
     actions: {
       menu: "Kommentaraktionen",
@@ -205,13 +206,6 @@ export const messages: NamespaceMessages<"comments"> = {
       commenter: "Kommentierender…",
       ban: "Sperren…",
       resolve: "Meldung erledigen…",
-      past: {
-        approve: "freigegeben",
-        restore: "wiederhergestellt",
-        hide: "verborgen",
-        spam: "als Spam markiert",
-        hold: "zurück auf ausstehend gesetzt",
-      },
     },
     dialog: {
       hideTitle: "{count, plural, one {Diesen Kommentar verbergen} other {# Kommentare verbergen}}",
@@ -233,8 +227,9 @@ export const messages: NamespaceMessages<"comments"> = {
       deleteConfirm: "Text löschen",
     },
     results: {
-      done: "{count, plural, one {# Kommentar {action}} other {# Kommentare {action}}}",
-      partialTitle: "{done} von {total} Kommentaren {action}",
+      done: "{action, select, approve {{count, plural, one {# Kommentar freigegeben} other {# Kommentare freigegeben}}} restore {{count, plural, one {# Kommentar wiederhergestellt} other {# Kommentare wiederhergestellt}}} hide {{count, plural, one {# Kommentar verborgen} other {# Kommentare verborgen}}} spam {{count, plural, one {# Kommentar als Spam markiert} other {# Kommentare als Spam markiert}}} hold {{count, plural, one {# Kommentar zurück auf ausstehend gesetzt} other {# Kommentare zurück auf ausstehend gesetzt}}} other {{count, plural, one {# Kommentar geändert} other {# Kommentare geändert}}}}",
+      partialTitle:
+        "{action, select, approve {{done} von {total} Kommentaren freigegeben} restore {{done} von {total} Kommentaren wiederhergestellt} hide {{done} von {total} Kommentaren verborgen} spam {{done} von {total} Kommentaren als Spam markiert} hold {{done} von {total} Kommentaren zurück auf ausstehend gesetzt} other {{done} von {total} Kommentaren geändert}}",
       partialDescription: "Die anderen blieben unverändert:",
       errors: {
         conflict: "{count} haben sich seit dem Laden geändert",

@@ -452,7 +452,7 @@ export function CommentsPage() {
     const reason = !moderateGate.allowed
       ? moderateGate.reason
       : eligible === 0
-        ? t("comments.bulk.notFor", { action: t(`comments.actions.past.${action}`) })
+        ? t("comments.bulk.notFor", { action })
         : undefined;
     const Icon = ACTION_ICON[action];
     return {

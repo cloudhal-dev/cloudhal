@@ -2847,3 +2847,16 @@ export const messages: Messages = {
     },
   },
 };
+
+/**
+ * Arguments this translation leaves out on purpose (RFC-0032 §4d), with why: Turkish attaches case
+ * suffixes to nouns, and an arbitrary name or type cannot take them. Every other message keeps
+ * every argument English uses (`test/i18n.test.tsx`).
+ */
+export const dropped: Readonly<Record<string, string>> = {
+  "common.deleteResource.warning":
+    "the resource type would need a case suffix after the name; the sentence names only the item",
+  "common.deleteResource.delete": "the button says „Sil“; the type would need an accusative suffix",
+  "menus.delete.title":
+    "a menu's own name cannot take the accusative suffix; the title says „bu menü“",
+};
