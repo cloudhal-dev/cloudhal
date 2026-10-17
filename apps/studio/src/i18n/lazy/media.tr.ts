@@ -169,6 +169,14 @@ export const messages: NamespaceMessages<"media"> = {
     detail: {
       openFile: "Dosyayı aç",
       preview: "Önizleme",
+      focal: {
+        title: "Odak noktası",
+        hint: "Konuya tıklayın ya da ok tuşlarını kullanın",
+        position: "Soldan %{x}, üstten %{y}",
+        unset: "Ayarlı değil: kırpmalar ortayı tutar",
+        clear: "Odak noktasını kaldır",
+        previews: "Kırpmaların tuttuğu",
+      },
       details: "Tanım ve emek sahibi",
       detailsImage:
         "Görselin göründüğü her yerde nasıl tarif edildiği. Bir sayfa yine de tek bir kullanım için kendi alternatif metnini verebilir.",

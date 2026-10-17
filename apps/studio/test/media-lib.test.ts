@@ -220,7 +220,14 @@ describe("the file's details form", () => {
       license: { kind: "spdx", id: "CC-BY-4.0" },
       decorative: true,
       slug: "bosphorus-at-dawn",
+      focal: null,
     });
+    // RFC-0028: the focal point travels with images only.
+    expect(assetPatch({ ...form, focal: { x: 0.2, y: 0.7 } }, "image").focal).toEqual({
+      x: 0.2,
+      y: 0.7,
+    });
+    expect("focal" in assetPatch(form, "document")).toBe(false);
   });
 
   it("makes URL slugs from names", () => {

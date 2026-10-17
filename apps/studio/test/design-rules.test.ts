@@ -1004,14 +1004,26 @@ describe("design rules (DESIGN.md)", () => {
   });
 
   it("images are drawn only by ImagePreview, from a validated source (§2o)", () => {
-    // The one <img> lives in the ImagePreview block, without referrer.
+    // <img> lives only in the ImagePreview block and the focal point picker (RFC-0028), each
+    // without referrer.
     const UI_BLOCKS = path.resolve(here, "../../../packages/ui/src/blocks");
     const withImg = walk(UI_BLOCKS)
       .filter((f) => /<img\b/.test(readFileSync(f, "utf8")))
       .map((f) => path.basename(f));
-    expect(withImg).toEqual(["SeoPreview.tsx"]);
-    const block = readFileSync(path.join(UI_BLOCKS, "SeoPreview.tsx"), "utf8");
-    expect(block).toMatch(/<img\b[^>]*referrerPolicy="no-referrer"/);
+    expect(withImg.sort()).toEqual(["FocalPointPicker.tsx", "SeoPreview.tsx"]);
+    for (const name of withImg) {
+      const block = readFileSync(path.join(UI_BLOCKS, name), "utf8");
+      // Every <img> carries the policy (one per element).
+      expect(block.match(/referrerPolicy="no-referrer"/g)?.length, name).toBe(
+        block.match(/^\s*<img\b/gm)?.length,
+      );
+    }
+    // The picker is fed the media library's private content route only.
+    const assetPage = uiFiles.find((f) => f.file === "routes/AssetPage.tsx") as { text: string };
+    expect(assetPage.text).toMatch(/const focalSrc =[^;]*assetPreviewUrl\(siteId, asset\)/);
+    expect(uiFiles.filter((f) => /<FocalPointPicker\b/.test(f.text)).map((f) => f.file)).toEqual([
+      "routes/AssetPage.tsx",
+    ]);
     // Screens pass ImagePreview a URL that went through previewImageUrl (safe source, site
     // paths resolved against the primary domain), a media-library file's private content route
     // (assetPreviewUrl, drafts included, §2u) or the person's own chosen file (an object URL) —

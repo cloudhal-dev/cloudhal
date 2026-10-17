@@ -265,6 +265,32 @@ describe("media", () => {
     expect(PLACEHOLDER_BUDGET).toBe(24 * 1024);
   });
 
+  it("fits (RFC-0028 28b): the placeholder follows the fit, a cover crop the focal point", () => {
+    const lqip = "data:image/webp;base64,UklGRg==";
+    const at = (image: Record<string, unknown>) =>
+      ({
+        ...photo,
+        image: { width: 300, height: 200, lqip, color: "#336699", ...image },
+      }) as typeof photo;
+    expect(placeholderStyle(at({}), undefined, "blur-fill")).toContain("xMidYMid slice");
+    expect(placeholderStyle(at({}), undefined, "contain")).toMatch(
+      /^background-image:.*xMidYMid meet/,
+    );
+    expect(placeholderStyle(at({}), undefined, "color-fill")).toMatch(
+      /^background-color:#336699;.*meet/,
+    );
+    expect(placeholderStyle(at({ focal: { x: 0.1, y: 0.9 } }))).toContain("xMinYMax slice");
+    expect(placeholderStyle(at({ alpha: true }), undefined, "color-fill")).toBe(
+      "background-color:#336699",
+    );
+    const o = { locale: "en", defaultLocale: "en", sizes: "100vw", transform: "none" as const };
+    const focal = at({ focal: { x: 0.25, y: 0.333 } });
+    expect(imageAttributes(focal, undefined, o).style).toMatch(/;object-position:25% 33\.3%$/);
+    expect(imageAttributes(focal, undefined, { ...o, fit: "blur-fill" }).style).not.toContain(
+      "object-position",
+    );
+  });
+
   it("imageAttributes: passthrough by default; a fixed ladder through /cdn-cgi/image when opted in", () => {
     const o = { locale: "en", defaultLocale: "en", sizes: "100vw" };
     const plain = imageAttributes(photo, { alt: "" }, { ...o, transform: "none" });

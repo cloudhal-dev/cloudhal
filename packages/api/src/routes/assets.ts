@@ -736,12 +736,34 @@ export const assets: Hono<Env> = new Hono<Env>()
     if (b.image !== undefined && asset.image) {
       try {
         const p = placeholders(b.image) ?? {};
-        next.image = { width: asset.image.width, height: asset.image.height, ...p };
+        // Placeholders are replaced; what the server measured (size, animation, transparency)
+        // and the focal point stay.
+        const { blurhash: _b, lqip: _l, color: _c, ...kept } = asset.image;
+        next.image = { ...kept, ...p };
         changed.push("image");
       } catch (e) {
         if (e instanceof FileProblem) throw badRequest(e.message);
         throw e;
       }
+    }
+    // RFC-0028: where the subject is; cover crops keep it in view. null clears it.
+    if (b.focal !== undefined) {
+      const image = (next.image ?? asset.image) as Asset["image"];
+      if (!image) {
+        if (b.focal !== null) throw badRequest("only images have a focal point");
+      } else if (b.focal === null) {
+        const { focal: _f, ...rest } = image;
+        next.image = rest;
+      } else {
+        const { focal: _f, ...rest } = image;
+        const f = b.focal;
+        const ok = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
+        if (!isRecord(f) || !ok(f.x) || !ok(f.y))
+          throw badRequest("focal must be {x, y}, each from 0 to 1 (from the top-left)");
+        const r = (v: number) => Math.round(v * 1000) / 1000;
+        next.image = { ...rest, focal: { x: r(f.x), y: r(f.y) } };
+      }
+      changed.push("focal");
     }
     // Images say what they show, or that they are decorative (RFC-0004 §5.6, §8).
     if (

@@ -411,6 +411,23 @@ describe("media tools", () => {
       call("restore_asset", { siteId: site.id, assetId: asset.id, rev: 3 }, { as: manager }),
     );
     expect(restored.asset.status).toBe("active");
+    // RFC-0028: a focal point for cover crops, kept with the measured fields; null clears it.
+    const focal = await result<{ asset: Asset }>(
+      call("update_asset", {
+        siteId: site.id,
+        assetId: asset.id,
+        rev: 4,
+        focal: { x: 0.3, y: 0.25 },
+      }),
+    );
+    expect(focal.asset.image).toMatchObject({
+      width: asset.image?.width,
+      focal: { x: 0.3, y: 0.25 },
+    });
+    const cleared = await result<{ asset: Asset }>(
+      call("update_asset", { siteId: site.id, assetId: asset.id, rev: 5, focal: null }),
+    );
+    expect(cleared.asset.image?.focal).toBeUndefined();
   });
 
   it("delete_asset: refused while in use before anyone is asked; otherwise approval-gated", async () => {

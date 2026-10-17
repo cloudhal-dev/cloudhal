@@ -551,7 +551,7 @@ export function assetTools(): ToolDefinition[] {
       name: "update_asset",
       title: "Update media details",
       description:
-        "Change a file's alt text, title or caption (in `locale`), credit, license, decorative flag or URL slug. Requires the current `rev`. An old URL keeps working after a slug change (it redirects). Agents with asset:upload edit their own uploads; asset:manage edits any file.",
+        "Change a file's alt text, title or caption (in `locale`), credit, license, decorative flag, URL slug or an image's focal point (`focal`: where the subject is, x and y from 0 to 1 from the top-left; cover crops keep it in view; null clears it). Requires the current `rev`. An old URL keeps working after a slug change (it redirects). Agents with asset:upload edit their own uploads; asset:manage edits any file.",
       inputSchema: obj(
         {
           siteId: id,
@@ -559,6 +559,21 @@ export function assetTools(): ToolDefinition[] {
           rev: { type: "integer", minimum: 0 },
           slug: str("New file name in the URL", { pattern: SLUG_PATTERN, maxLength: 128 }),
           ...TEXT_FIELDS,
+          focal: {
+            description: "An image's focal point (RFC-0028), or null to clear it",
+            anyOf: [
+              {
+                type: "object",
+                additionalProperties: false,
+                required: ["x", "y"],
+                properties: {
+                  x: { type: "number", minimum: 0, maximum: 1 },
+                  y: { type: "number", minimum: 0, maximum: 1 },
+                },
+              },
+              { type: "null" },
+            ],
+          },
         },
         ["siteId", "assetId", "rev"],
       ),
@@ -586,6 +601,7 @@ export function assetTools(): ToolDefinition[] {
           ...(a.credit !== undefined ? { credit: a.credit as string } : {}),
           ...(a.license !== undefined ? { license: a.license as Asset["license"] } : {}),
           ...(a.decorative !== undefined ? { decorative: a.decorative as boolean } : {}),
+          ...(a.focal !== undefined ? { image: withFocal(asset, a.focal) } : {}),
         } as Asset;
         try {
           const saved = await ctx.store.updateAsset(next);
@@ -656,4 +672,14 @@ export function assetTools(): ToolDefinition[] {
       },
     },
   ];
+}
+
+/** RFC-0028: an image's measured fields with a focal point set (rounded to 0.1 %) or cleared. */
+function withFocal(asset: Asset, focal: unknown): Asset["image"] {
+  if (!asset.image) throw new ToolError("invalid", "only images have a focal point");
+  const { focal: _old, ...rest } = asset.image;
+  if (focal === null) return rest;
+  const f = focal as { x: number; y: number };
+  const r = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+  return { ...rest, focal: { x: r(f.x), y: r(f.y) } };
 }

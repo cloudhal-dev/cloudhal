@@ -1288,3 +1288,22 @@ describe("surface styles (RFC-0023 §4)", () => {
     expect(bad.some((m) => m.includes("anchor"))).toBe(true);
   });
 });
+
+describe("image fit (RFC-0028 28b)", () => {
+  const sec = (props: Record<string, unknown>) => ({
+    id: "sec_imagefit01",
+    kind: "surface" as const,
+    catalog: "blog@1",
+    components: [
+      { id: "root", component: "Image", props: { asset: "asset:asset_FIT0000001", ...props } },
+    ],
+  });
+  it("takes a fit, and refuses natural with a frame", () => {
+    expect(messages(sec({ fit: "blur-fill", ratio: "16:9" }) as never)).toEqual([]);
+    expect(messages(sec({ fit: "natural" }) as never)).toEqual([]);
+    expect(messages(sec({ fit: "natural", ratio: "1:1" }) as never)).toEqual([
+      expect.stringMatching(/^\/components\/0\/props\/fit natural shows/),
+    ]);
+    expect(messages(sec({ fit: "stretch" }) as never).length).toBeGreaterThan(0);
+  });
+});

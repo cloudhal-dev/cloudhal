@@ -5,7 +5,7 @@
  */
 import type { Asset, ContentEntry, Site } from "@cloudhal/core-contracts";
 import { makePng } from "@cloudhal/core-ts/media/fixtures";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssetPickerDialog } from "../src/components/MediaPicker.tsx";
 import { UploadDialog } from "../src/components/MediaUpload.tsx";
@@ -315,6 +315,35 @@ describe("a file's page (§2u)", { timeout: 45_000 }, () => {
         alt: null,
         decorative: true,
         slug: "bosphorus-at-dawn",
+      }),
+    );
+  });
+
+  it("sets an image's focal point with the keyboard and saves it (RFC-0028)", async () => {
+    const fetch = serve(
+      ...asRole("editor"),
+      siteRoute,
+      on("GET", "/api/sites/site_1/assets/asset_photo01", { status: 200, body: detail(PHOTO) }),
+      on("PUT", "/api/sites/site_1/assets/asset_photo01", (init) => ({
+        status: 200,
+        body: { ...PHOTO, rev: 3 },
+      })),
+    );
+    render(wrap(<AssetPage />));
+    const area = await screen.findByRole("slider", { name: "Focal point" });
+    expect(area).toHaveAttribute("aria-valuetext", "Not set: crops keep the middle");
+    // Two presses before React re-renders both count (key repeat).
+    act(() => {
+      fireEvent.keyDown(area, { key: "ArrowLeft" });
+      fireEvent.keyDown(area, { key: "ArrowLeft" });
+    });
+    fireEvent.keyDown(area, { key: "ArrowUp", shiftKey: true });
+    expect(area).toHaveAttribute("aria-valuetext", "Left 40%, top 30%");
+    fireEvent.click(screen.getByTestId("save"));
+    await waitFor(() =>
+      expect(bodyOf(fetch, "PUT", "/api/sites/site_1/assets/asset_photo01")).toMatchObject({
+        rev: 2,
+        focal: { x: 0.4, y: 0.3 },
       }),
     );
   });
