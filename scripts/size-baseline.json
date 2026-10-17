@@ -10,7 +10,6 @@
     "apps/studio/src/routes/PageEditorPage.tsx": 802,
     "apps/studio/src/routes/SchedulesPage.tsx": 1299,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
-    "packages/api/src/auth.ts": 999,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 853,
     "packages/api/src/routes/comments.ts": 874,
@@ -321,9 +320,6 @@
     },
     "packages/api/src/app.ts::createApi": {
       "lines": 276
-    },
-    "packages/api/src/auth.ts::createAuth": {
-      "lines": 436
     },
     "packages/api/src/build-turn.ts::runBuildTurn": {
       "lines": 260
