@@ -380,4 +380,43 @@ describe("build chat", () => {
       promoteFirstHeading(page([{ id: "sec_hero0000001", kind: "hero", heading: "H" }])),
     ).toBeUndefined();
   });
+
+  it("makes a new section's single top container its root, and follows its old name", () => {
+    const empty = { title: "P", sections: [] } as never;
+    const out = componentPaths(empty, [
+      {
+        op: "add",
+        path: "/sections/-",
+        value: {
+          id: "sec_rootname001",
+          kind: "surface",
+          catalog: "blog@1",
+          components: [
+            { id: "hero-root", component: "Band", children: ["title"] },
+            { id: "title", component: "Heading", props: { text: "Hi", level: 1 } },
+          ],
+        },
+      },
+      { op: "add", path: "/sections/0/components/hero-root/children/-", value: "cta" },
+    ]);
+    const added = (out.ops[0] as { value: { components: { id: string }[] } }).value;
+    expect(added.components.map((c) => c.id)).toEqual(["root", "title"]);
+    expect(out.ops[1]?.path).toBe("/sections/0/components/0/children/-");
+    expect(out.notes).toContain('section 0: its top component "hero-root" is now "root"');
+    // Ambiguous (two containers) or a lone child: left alone.
+    const two = componentPaths(empty, [
+      {
+        op: "add",
+        path: "/sections/-",
+        value: {
+          id: "sec_rootname002",
+          components: [
+            { id: "a", component: "Stack", children: ["x"] },
+            { id: "b", component: "Stack", children: ["y"] },
+          ],
+        },
+      },
+    ]);
+    expect(two.notes).toEqual([]);
+  });
 });
