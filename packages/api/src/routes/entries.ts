@@ -1,5 +1,5 @@
 import { checkEntryLimit } from "@cloudhal/agent-runtime";
-import { renderEntryPreview } from "@cloudhal/astro-renderer/preview";
+import { renderEntryPreview, renderFragmentPreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import { patchBody } from "../body.ts";
@@ -58,6 +58,16 @@ export const entries: Hono<Env> = new Hono<Env>()
     });
     const entry = await c.get("store").createContentEntry(next, { writer: writerOf(c) });
     return c.json(entry, 201);
+  })
+  // The body editor's inline preview of one piece (a ```surface): rendered, nothing written.
+  .post("/preview-fragment", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    const b = (await c.req.json().catch(() => ({}))) as { markdown?: unknown };
+    if (typeof b.markdown !== "string" || b.markdown.length > 64_000)
+      throw badRequest("markdown must be text of at most 64 000 characters");
+    return c.json(renderFragmentPreview(site, b.markdown, { blocks: store.blocks }));
   })
   .get("/:entryId/preview", async (c) => {
     const store = c.get("store");

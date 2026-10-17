@@ -48,7 +48,7 @@ import {
   useBlockTitle,
   useBlockTypes,
 } from "../components/BlockSection.tsx";
-import { BodyEditor } from "../components/BodyEditor.tsx";
+import { BodyEditor, FocusSaveContext } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
@@ -468,318 +468,335 @@ export function PageEditorPage() {
   );
 
   return (
-    <PageLayout
-      crumbs={
-        <SiteCrumbs siteId={siteId} trail={[pagesCrumb, { label: draft.title }]} copy={draft.id} />
-      }
-      title={draft.title}
-      description={
-        <span className="flex flex-wrap items-center gap-2">
-          <Status status={draft.status} />
-          <Text variant="mono-secondary" as="span">
-            {draft.path}
-          </Text>
-        </span>
-      }
-      actions={
-        <>
-          <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />
-          <Tooltip content={t("editor.buildLiveHint")}>
-            <LinkButton
-              href={`/sites/${siteId}/pages/${pageId}/build`}
-              variant="secondary"
-              icon={Lightning}
-              data-testid="build-live"
-            >
-              {t("editor.buildLive")}
-            </LinkButton>
-          </Tooltip>
-          <StatusActions
-            status={draft.status}
-            busy={save.isPending}
-            onChange={(next: PublishStatus) => {
-              if (valid()) save.mutate({ ...draft, status: next });
-            }}
-            onPublish={() => {
-              if (valid()) setPublishOpen(true);
-            }}
-            readOnlyReason={readOnlyReason ?? lockedReason}
-            menu={
-              readOnlyReason ? (
-                // Disabled items take no pointer events, so the tooltip hangs on a wrapper.
-                <Tooltip content={readOnlyReason} side="left" render={<div />}>
-                  <DropdownMenu.Item icon={Copy} disabled>
-                    {t("editor.duplicate")}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item icon={Trash} variant="danger" disabled>
-                    {t("editor.deletePage")}
-                  </DropdownMenu.Item>
-                </Tooltip>
-              ) : (
-                <>
-                  <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
-                    {t("editor.duplicate")}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    icon={Trash}
-                    variant="danger"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    {t("editor.deletePage")}
-                  </DropdownMenu.Item>
-                </>
-              )
-            }
-          />
-          <ScheduleAction
-            siteId={siteId}
-            node={{ id: draft.id, kind: "page", title: draft.title, status: draft.status }}
-            dirty={dirty}
-            prepare={() =>
-              // Scheduling publishes it at that time: mark it Published and save what is unsaved.
-              dirty || draft.status !== "published"
-                ? save.mutateAsync({ ...draft, status: "published" })
-                : undefined
-            }
-            disabled={readOnlyReason !== undefined || locked}
-            reason={readOnlyReason ?? lockedReason}
-          />
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (valid()) save.mutate(draft);
-            }}
-            loading={save.isPending}
-            disabled={!dirty || readOnlyReason !== undefined || locked}
-            title={readOnlyReason ?? lockedReason}
-            data-testid="save"
-          >
-            {t("common.save")}
-          </Button>
-        </>
-      }
+    <FocusSaveContext.Provider
+      value={{
+        dirty,
+        saving: save.isPending,
+        disabled: readOnlyReason !== undefined || locked,
+        onSave: () => {
+          if (valid()) save.mutate(draft);
+        },
+      }}
     >
-      <ErrorBanner
-        error={
-          (isScheduleError(save.error) ? undefined : save.error) ?? remove.error ?? duplicate.error
-        }
-      />
-      <ViewOnlyBanner reason={readOnlyReason} />
-      <ScheduleLock siteId={siteId} nodeId={draft.id} dirty={dirty} onLockChange={setLocked} />
-      <EditorLayout
-        previewVisible={previewVisible}
-        preview={
-          <DraftEditorPreview
-            queryKey={["page-preview", siteId, pageId]}
-            src={api.preview.page(siteId, pageId)}
-            rev={draft.rev}
-            name={draft.path}
-            dirty={dirty}
-            input={{
-              id: draft.id,
-              siteId: draft.siteId,
-              title: draft.title,
-              seo: draft.seo,
-              sections: draft.sections,
-            }}
-            render={api.pages.previewDraft}
+      <PageLayout
+        crumbs={
+          <SiteCrumbs
+            siteId={siteId}
+            trail={[pagesCrumb, { label: draft.title }]}
+            copy={draft.id}
           />
         }
-        main={
-          // Read-only for roles below Editor: one disabled fieldset turns every field off (§2s).
-          <fieldset
-            disabled={readOnlyReason !== undefined || locked}
-            className="grid min-w-0 content-start gap-6"
-            data-read-only={readOnlyReason || locked ? "true" : undefined}
-          >
-            <SectionCard title={t("editor.page")}>
-              <Grid variant="2up" gap="none" className={FIELD_ROW}>
-                <Input
-                  label={t("editor.title")}
-                  value={draft.title}
-                  onValueChange={(v) => setDraft({ ...draft, title: v })}
-                  className="w-full"
-                />
-                <Input
-                  label={t("editor.path")}
-                  value={draft.path}
-                  onValueChange={(v) => setDraft({ ...draft, path: v })}
-                  description={t("editor.pathHint")}
-                  className="w-full font-mono"
-                />
-              </Grid>
-            </SectionCard>
-            <PageSeoCard
-              page={draft}
-              siteName={site.data?.name ?? ""}
-              host={host}
-              errors={seoErrors}
-              showErrors={showErrors}
-              onChange={setDraft}
-            />
-            <div className="grid gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <Text variant="heading" as="h2">
-                    {t("editor.sections")}
-                  </Text>
-                  <Badge variant="secondary">{draft.sections.length}</Badge>
-                </span>
-                {draft.sections.length > 0 && addMenu}
-              </div>
-              {draft.sections.length === 0 ? (
-                <Empty
-                  icon={<Rows size={48} className="text-kumo-inactive" />}
-                  title={t("editor.noSections")}
-                  description={t("editor.noSectionsDescription")}
-                  contents={addMenu}
-                />
-              ) : (
-                draft.sections.map((s, i) => {
-                  const KindIcon = sectionIcon(s);
-                  return (
-                    <SectionCard
-                      key={s.id}
-                      as="h3"
-                      title={sectionTitle(s)}
-                      icon={<KindIcon size={16} />}
-                      actions={
-                        <>
-                          <span className="hidden sm:inline-flex">
-                            <InlineCopyText>{s.id}</InlineCopyText>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            {iconButton(
-                              t("editor.moveUp"),
-                              <ArrowUp />,
-                              () => move(i, -1),
-                              i === 0,
-                            )}
-                            {iconButton(
-                              t("editor.moveDown"),
-                              <ArrowDown />,
-                              () => move(i, 1),
-                              i === draft.sections.length - 1,
-                            )}
-                            {iconButton(t("editor.remove"), <Trash />, () => setRemoveIndex(i))}
-                          </span>
-                        </>
-                      }
-                    >
-                      <SectionForm
-                        section={s}
-                        onChange={(next) => updateSection(i, next)}
-                        media={{
-                          siteId,
-                          defaultLocale: site.data?.defaultLocale ?? draft.locale,
-                          host,
-                          nodeId: draft.id,
-                          locale: draft.locale,
-                        }}
-                        blocks={blockTypes}
-                        readOnly={readOnlyReason !== undefined || locked}
-                      />
-                      {s.kind === "richText" && s.format === "markdown" && (
-                        <BodyProposals
-                          siteId={siteId}
-                          nodeId={draft.id}
-                          sectionId={s.id}
-                          dirty={dirty}
-                          readOnly={readOnlyReason !== undefined || locked}
-                          onDecided={() => query.refetch()}
-                        />
-                      )}
-                    </SectionCard>
-                  );
-                })
-              )}
-            </div>
-          </fieldset>
+        title={draft.title}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <Status status={draft.status} />
+            <Text variant="mono-secondary" as="span">
+              {draft.path}
+            </Text>
+          </span>
         }
-        aside={
+        actions={
           <>
-            <ScheduleAside
-              siteId={siteId}
-              nodeId={draft.id}
-              kind="page"
-              availability={draft.availability}
-              onChange={(availability) =>
-                setDraft(setOptional(draft, "availability", availability))
+            <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />
+            <Tooltip content={t("editor.buildLiveHint")}>
+              <LinkButton
+                href={`/sites/${siteId}/pages/${pageId}/build`}
+                variant="secondary"
+                icon={Lightning}
+                data-testid="build-live"
+              >
+                {t("editor.buildLive")}
+              </LinkButton>
+            </Tooltip>
+            <StatusActions
+              status={draft.status}
+              busy={save.isPending}
+              onChange={(next: PublishStatus) => {
+                if (valid()) save.mutate({ ...draft, status: next });
+              }}
+              onPublish={() => {
+                if (valid()) setPublishOpen(true);
+              }}
+              readOnlyReason={readOnlyReason ?? lockedReason}
+              menu={
+                readOnlyReason ? (
+                  // Disabled items take no pointer events, so the tooltip hangs on a wrapper.
+                  <Tooltip content={readOnlyReason} side="left" render={<div />}>
+                    <DropdownMenu.Item icon={Copy} disabled>
+                      {t("editor.duplicate")}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item icon={Trash} variant="danger" disabled>
+                      {t("editor.deletePage")}
+                    </DropdownMenu.Item>
+                  </Tooltip>
+                ) : (
+                  <>
+                    <DropdownMenu.Item icon={Copy} onClick={() => duplicate.mutate(draft)}>
+                      {t("editor.duplicate")}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      icon={Trash}
+                      variant="danger"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      {t("editor.deletePage")}
+                    </DropdownMenu.Item>
+                  </>
+                )
               }
-              saveError={save.error}
+            />
+            <ScheduleAction
+              siteId={siteId}
+              node={{ id: draft.id, kind: "page", title: draft.title, status: draft.status }}
+              dirty={dirty}
+              prepare={() =>
+                // Scheduling publishes it at that time: mark it Published and save what is unsaved.
+                dirty || draft.status !== "published"
+                  ? save.mutateAsync({ ...draft, status: "published" })
+                  : undefined
+              }
               disabled={readOnlyReason !== undefined || locked}
+              reason={readOnlyReason ?? lockedReason}
             />
-            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="page" />
-            <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
-            <DetailsCard
-              rows={[
-                {
-                  label: t("editor.id"),
-                  value: <InlineCopyText>{draft.id}</InlineCopyText>,
-                },
-                {
-                  label: t("editor.locale"),
-                  value: <Text as="span">{draft.locale}</Text>,
-                },
-                {
-                  label: t("editor.revision"),
-                  value: <Text as="span">{draft.rev}</Text>,
-                },
-                {
-                  label: t("editor.updatedAt"),
-                  value: <RelativeTime iso={draft.updatedAt} size="base" />,
-                },
-              ]}
-            />
-            <DangerZoneCard
-              title={t("editor.deletePageTitle")}
-              description={t("editor.deletePageHint")}
-              actionLabel={t("editor.deletePage")}
-              onAction={() => setDeleteOpen(true)}
-              disabledReason={readOnlyReason}
-            />
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (valid()) save.mutate(draft);
+              }}
+              loading={save.isPending}
+              disabled={!dirty || readOnlyReason !== undefined || locked}
+              title={readOnlyReason ?? lockedReason}
+              data-testid="save"
+            >
+              {t("common.save")}
+            </Button>
           </>
         }
-      />
-      <ApprovalDialog
-        open={publishOpen}
-        onOpenChange={setPublishOpen}
-        title={t("editor.publishPageTitle")}
-        confirmLabel={t("common.publish")}
-        cancelLabel={t("common.cancel")}
-        busy={save.isPending}
-        onConfirm={async () => {
-          await save.mutateAsync({ ...draft, status: "published" });
-          setPublishOpen(false);
-        }}
-      />
-      <ConfirmDialog
-        open={toRemove !== undefined}
-        onOpenChange={(open) => {
-          if (!open) setRemoveIndex(undefined);
-        }}
-        title={t("editor.removeSectionTitle")}
-        description={t("editor.removeSectionDescription", {
-          kind: toRemove ? kindLabel(toRemove.kind) : "",
-        })}
-        confirmLabel={t("editor.remove")}
-        onConfirm={() => {
-          if (removeIndex !== undefined)
-            setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== removeIndex) });
-          setRemoveIndex(undefined);
-        }}
-      />
-      <DeleteResource
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        resourceType={t("editor.page")}
-        resourceName={draft.path}
-        notice={<MenuDeleteNotice refs={menuRefs.data} kind="page" />}
-        isDeleting={remove.isPending}
-        onDelete={async () => {
-          await remove.mutateAsync(draft);
-        }}
-      />
-    </PageLayout>
+      >
+        <ErrorBanner
+          error={
+            (isScheduleError(save.error) ? undefined : save.error) ??
+            remove.error ??
+            duplicate.error
+          }
+        />
+        <ViewOnlyBanner reason={readOnlyReason} />
+        <ScheduleLock siteId={siteId} nodeId={draft.id} dirty={dirty} onLockChange={setLocked} />
+        <EditorLayout
+          previewVisible={previewVisible}
+          preview={
+            <DraftEditorPreview
+              queryKey={["page-preview", siteId, pageId]}
+              src={api.preview.page(siteId, pageId)}
+              rev={draft.rev}
+              name={draft.path}
+              dirty={dirty}
+              input={{
+                id: draft.id,
+                siteId: draft.siteId,
+                title: draft.title,
+                seo: draft.seo,
+                sections: draft.sections,
+              }}
+              render={api.pages.previewDraft}
+            />
+          }
+          main={
+            // Read-only for roles below Editor: one disabled fieldset turns every field off (§2s).
+            <fieldset
+              disabled={readOnlyReason !== undefined || locked}
+              className="grid min-w-0 content-start gap-6"
+              data-read-only={readOnlyReason || locked ? "true" : undefined}
+            >
+              <SectionCard title={t("editor.page")}>
+                <Grid variant="2up" gap="none" className={FIELD_ROW}>
+                  <Input
+                    label={t("editor.title")}
+                    value={draft.title}
+                    onValueChange={(v) => setDraft({ ...draft, title: v })}
+                    className="w-full"
+                  />
+                  <Input
+                    label={t("editor.path")}
+                    value={draft.path}
+                    onValueChange={(v) => setDraft({ ...draft, path: v })}
+                    description={t("editor.pathHint")}
+                    className="w-full font-mono"
+                  />
+                </Grid>
+              </SectionCard>
+              <PageSeoCard
+                page={draft}
+                siteName={site.data?.name ?? ""}
+                host={host}
+                errors={seoErrors}
+                showErrors={showErrors}
+                onChange={setDraft}
+              />
+              <div className="grid gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <Text variant="heading" as="h2">
+                      {t("editor.sections")}
+                    </Text>
+                    <Badge variant="secondary">{draft.sections.length}</Badge>
+                  </span>
+                  {draft.sections.length > 0 && addMenu}
+                </div>
+                {draft.sections.length === 0 ? (
+                  <Empty
+                    icon={<Rows size={48} className="text-kumo-inactive" />}
+                    title={t("editor.noSections")}
+                    description={t("editor.noSectionsDescription")}
+                    contents={addMenu}
+                  />
+                ) : (
+                  draft.sections.map((s, i) => {
+                    const KindIcon = sectionIcon(s);
+                    return (
+                      <SectionCard
+                        key={s.id}
+                        as="h3"
+                        title={sectionTitle(s)}
+                        icon={<KindIcon size={16} />}
+                        actions={
+                          <>
+                            <span className="hidden sm:inline-flex">
+                              <InlineCopyText>{s.id}</InlineCopyText>
+                            </span>
+                            <span className="flex items-center gap-1">
+                              {iconButton(
+                                t("editor.moveUp"),
+                                <ArrowUp />,
+                                () => move(i, -1),
+                                i === 0,
+                              )}
+                              {iconButton(
+                                t("editor.moveDown"),
+                                <ArrowDown />,
+                                () => move(i, 1),
+                                i === draft.sections.length - 1,
+                              )}
+                              {iconButton(t("editor.remove"), <Trash />, () => setRemoveIndex(i))}
+                            </span>
+                          </>
+                        }
+                      >
+                        <SectionForm
+                          section={s}
+                          onChange={(next) => updateSection(i, next)}
+                          media={{
+                            siteId,
+                            defaultLocale: site.data?.defaultLocale ?? draft.locale,
+                            host,
+                            nodeId: draft.id,
+                            locale: draft.locale,
+                          }}
+                          blocks={blockTypes}
+                          readOnly={readOnlyReason !== undefined || locked}
+                        />
+                        {s.kind === "richText" && s.format === "markdown" && (
+                          <BodyProposals
+                            siteId={siteId}
+                            nodeId={draft.id}
+                            sectionId={s.id}
+                            dirty={dirty}
+                            readOnly={readOnlyReason !== undefined || locked}
+                            onDecided={() => query.refetch()}
+                          />
+                        )}
+                      </SectionCard>
+                    );
+                  })
+                )}
+              </div>
+            </fieldset>
+          }
+          aside={
+            <>
+              <ScheduleAside
+                siteId={siteId}
+                nodeId={draft.id}
+                kind="page"
+                availability={draft.availability}
+                onChange={(availability) =>
+                  setDraft(setOptional(draft, "availability", availability))
+                }
+                saveError={save.error}
+                disabled={readOnlyReason !== undefined || locked}
+              />
+              <ReadersCard siteId={siteId} node={query.data ?? draft} kind="page" />
+              <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
+              <DetailsCard
+                rows={[
+                  {
+                    label: t("editor.id"),
+                    value: <InlineCopyText>{draft.id}</InlineCopyText>,
+                  },
+                  {
+                    label: t("editor.locale"),
+                    value: <Text as="span">{draft.locale}</Text>,
+                  },
+                  {
+                    label: t("editor.revision"),
+                    value: <Text as="span">{draft.rev}</Text>,
+                  },
+                  {
+                    label: t("editor.updatedAt"),
+                    value: <RelativeTime iso={draft.updatedAt} size="base" />,
+                  },
+                ]}
+              />
+              <DangerZoneCard
+                title={t("editor.deletePageTitle")}
+                description={t("editor.deletePageHint")}
+                actionLabel={t("editor.deletePage")}
+                onAction={() => setDeleteOpen(true)}
+                disabledReason={readOnlyReason}
+              />
+            </>
+          }
+        />
+        <ApprovalDialog
+          open={publishOpen}
+          onOpenChange={setPublishOpen}
+          title={t("editor.publishPageTitle")}
+          confirmLabel={t("common.publish")}
+          cancelLabel={t("common.cancel")}
+          busy={save.isPending}
+          onConfirm={async () => {
+            await save.mutateAsync({ ...draft, status: "published" });
+            setPublishOpen(false);
+          }}
+        />
+        <ConfirmDialog
+          open={toRemove !== undefined}
+          onOpenChange={(open) => {
+            if (!open) setRemoveIndex(undefined);
+          }}
+          title={t("editor.removeSectionTitle")}
+          description={t("editor.removeSectionDescription", {
+            kind: toRemove ? kindLabel(toRemove.kind) : "",
+          })}
+          confirmLabel={t("editor.remove")}
+          onConfirm={() => {
+            if (removeIndex !== undefined)
+              setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== removeIndex) });
+            setRemoveIndex(undefined);
+          }}
+        />
+        <DeleteResource
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          resourceType={t("editor.page")}
+          resourceName={draft.path}
+          notice={<MenuDeleteNotice refs={menuRefs.data} kind="page" />}
+          isDeleting={remove.isPending}
+          onDelete={async () => {
+            await remove.mutateAsync(draft);
+          }}
+        />
+      </PageLayout>
+    </FocusSaveContext.Provider>
   );
 }

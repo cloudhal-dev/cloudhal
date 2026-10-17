@@ -30,4 +30,25 @@ describe("body rendering (audit 2026-10)", () => {
     expect(preview).toContain("Bu etkileşimli blok gösterilemiyor");
     expect(preview).toContain("/info/id");
   });
+
+  it("numbers footnotes in order of use and lists them at the end with a way back", () => {
+    const html = renderMarkdown(
+      "Second[^b] and first[^a], again[^b], `[^code]` and a stray[^none].\n\n[^a]: Note **A**.\n[^b]: Note B,\n  continued.\n",
+      ctx,
+    );
+    expect(html).toContain(
+      '<a href="#ch-fn-b" id="ch-fnref-b" aria-describedby="ch-footnotes-label">1</a>',
+    );
+    expect(html).toContain(
+      '<a href="#ch-fn-a" id="ch-fnref-a" aria-describedby="ch-footnotes-label">2</a>',
+    );
+    expect(html).toContain("<code>[^code]</code>");
+    expect(html).toContain("stray[^none]");
+    expect(html).toMatch(
+      /<section class="ch-footnotes">.*<li id="ch-fn-b">Note B, continued\. <a href="#ch-fnref-b"/s,
+    );
+    expect(html).toContain("<strong>A</strong>");
+    expect(html).not.toContain("\uE000");
+    expect(renderMarkdown("No notes here.", ctx)).not.toContain("ch-footnotes");
+  });
 });

@@ -227,6 +227,22 @@
 .ch-richtext table:not([class]) :is(th, td)[align="right"] {
   text-align: end;
 }
+/* Footnotes: small raised numbers, the notes listed at the end under a rule. */
+.ch-fnref a {
+  @apply px-0.5 text-xs no-underline;
+  color: var(--ch-color-link);
+}
+.ch-footnotes {
+  @apply mt-10 pt-4 text-sm;
+  border-block-start: 1px solid var(--ch-color-border);
+  color: var(--ch-color-text-muted);
+}
+.ch-footnotes ol {
+  @apply list-decimal space-y-1 ps-5;
+}
+.ch-fnback {
+  @apply no-underline;
+}
 /* Shown in previews only, where an invalid ```surface would draw nothing. */
 .ch-surface-problem {
   @apply rounded-lg px-4 py-3 text-sm;

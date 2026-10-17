@@ -878,11 +878,16 @@ describe("design rules (DESIGN.md)", () => {
     ];
     const unsandboxed = sources.flatMap((f) =>
       [...f.text.matchAll(/<iframe\b[^>]*>/g)]
-        // DESIGN.md §2ac: a morphing panel needs same-origin access for itself; scripts never run.
+        // DESIGN.md §2ac: a morphing panel needs same-origin access for itself; the body editor's
+        // drawn ```surface (§2y) reads its own height. Scripts never run in either.
         .filter(
           (m) =>
             !/\bsandbox=""/.test(m[0]) &&
-            !/\bsandbox=\{morph \? "allow-same-origin" : ""\}/.test(m[0]),
+            !/\bsandbox=\{morph \? "allow-same-origin" : ""\}/.test(m[0]) &&
+            !(
+              path.basename(f.file) === "extensions.tsx" &&
+              /\bsandbox="allow-same-origin"/.test(m[0])
+            ),
         )
         .map(() => path.basename(f.file)),
     );

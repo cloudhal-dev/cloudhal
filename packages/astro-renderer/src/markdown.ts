@@ -32,6 +32,9 @@ let current: MediaContext | undefined;
 let headingIds: Map<string, number> | undefined;
 /** While true (`renderInlineMarkdown`), images render as their text. */
 let inlineOnly = false;
+/** The footnotes of the document being rendered: definitions by id (rendered), refs in order. */
+let footnotes: { defs: Map<string, string>; order: string[] } | undefined;
+const FN_REF = (id: string) => `\uE000fn:${id}\uE000`;
 
 const TURKISH: Record<string, string> = { ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g" };
 /**
@@ -146,6 +149,39 @@ md.use({
   // own component becomes a slot (`renderBodyParts`). Unknown types and props that do not fit
   // render nothing on the site and a labelled placeholder in previews.
   extensions: [
+    {
+      // Footnotes (GFM): `[^id]` refers, `[^id]: text` defines (continued by indented lines).
+      name: "footnoteDef",
+      level: "block",
+      start: (src: string) => src.match(/^\[\^[\w-]{1,40}\]:/m)?.index,
+      tokenizer(src: string) {
+        const m = /^\[\^([\w-]{1,40})\]:[ \t]+([^\n]*(?:\n(?: {2,}|\t)[^\n]*)*)(?:\n+|$)/.exec(src);
+        if (!m) return undefined;
+        const text = (m[2] ?? "").replace(/\n(?: {2,}|\t)/g, " ");
+        return { type: "footnoteDef", raw: m[0], id: m[1], tokens: this.lexer.inlineTokens(text) };
+      },
+      renderer(token) {
+        const t = token as unknown as { id: string; tokens: never[] };
+        if (footnotes && !footnotes.defs.has(t.id))
+          footnotes.defs.set(t.id, this.parser.parseInline(t.tokens));
+        return "";
+      },
+    },
+    {
+      name: "footnoteRef",
+      level: "inline",
+      start: (src: string) => src.indexOf("[^"),
+      tokenizer(src: string) {
+        const m = /^\[\^([\w-]{1,40})\](?!:)/.exec(src);
+        return m ? { type: "footnoteRef", raw: m[0], id: m[1] } : undefined;
+      },
+      renderer(token) {
+        const id = (token as unknown as { id: string }).id;
+        if (!footnotes || inlineOnly) return escapeHtml(`[^${id}]`);
+        if (!footnotes.order.includes(id)) footnotes.order.push(id);
+        return FN_REF(id);
+      },
+    },
     {
       ...directiveExtension,
       renderer(token) {
@@ -268,13 +304,45 @@ export function renderMarkdown(source: string, ctx?: MediaContext): string {
   const previous = current;
   const outer = headingIds === undefined;
   current = ctx;
-  if (outer) headingIds = new Map();
+  if (outer) {
+    headingIds = new Map();
+    footnotes = { defs: new Map(), order: [] };
+  }
   try {
-    return md.parse(source) as string;
+    const html = md.parse(source) as string;
+    return outer ? withFootnotes(html, ctx?.locale) : html;
   } finally {
     current = previous;
-    if (outer) headingIds = undefined;
+    if (outer) {
+      headingIds = undefined;
+      footnotes = undefined;
+    }
   }
+}
+
+/**
+ * Numbers the footnote references in order of first use and lists their definitions at the end,
+ * each with a link back; a reference without a definition stays as written.
+ */
+function withFootnotes(html: string, locale = "en"): string {
+  const fn = footnotes;
+  if (!fn || !html.includes("\uE000fn:")) return html;
+  const used = fn.order.filter((id) => fn.defs.has(id));
+  const tr = locale.startsWith("tr");
+  const out = html.replace(/\uE000fn:([\w-]{1,40})\uE000/g, (_, id: string) => {
+    const n = used.indexOf(id) + 1;
+    return n === 0
+      ? escapeHtml(`[^${id}]`)
+      : `<sup class="ch-fnref"><a href="#ch-fn-${id}" id="ch-fnref-${id}" aria-describedby="ch-footnotes-label">${n}</a></sup>`;
+  });
+  if (used.length === 0) return out;
+  const items = used
+    .map(
+      (id) =>
+        `<li id="ch-fn-${id}">${fn.defs.get(id)} <a href="#ch-fnref-${id}" class="ch-fnback" aria-label="${tr ? "Metne dön" : "Back to the text"}">↩</a></li>`,
+    )
+    .join("");
+  return `${out}<section class="ch-footnotes"><h2 class="sr-only" id="ch-footnotes-label">${tr ? "Dipnotlar" : "Footnotes"}</h2><ol>${items}</ol></section>`;
 }
 
 /**

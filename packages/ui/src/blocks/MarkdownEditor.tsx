@@ -105,6 +105,10 @@ export interface MarkdownEditorLabels {
   sourceHint: string;
   /** Source block's button that opens it in Markdown mode. */
   editSource: string;
+  /** A drawn ```surface (with `previewSource`): the preview's name, and its code toggles. */
+  surfacePreview?: string;
+  showCode?: string;
+  hideCode?: string;
   /** The headings popover: its button and title, e.g. "Outline". */
   outline: string;
   /** No headings in the body yet. */
@@ -182,6 +186,11 @@ export interface MarkdownEditorProps {
   blocks?: EditorBlocks;
   /** Shown in focus mode's top bar: the host's save state and Save button, so they stay at hand. */
   focusActions?: ReactNode;
+  /**
+   * Draws a ```surface source block as the site would: resolves with a whole HTML document (shown
+   * in a frame without scripts), or `undefined` to show only its code.
+   */
+  previewSource?: (markdown: string) => Promise<string | undefined>;
 }
 
 const SPOTLIGHT_KEY = "cloudhal.editor.spotlight";
@@ -230,6 +239,7 @@ export function MarkdownEditor({
   onAskAi,
   blocks,
   focusActions,
+  previewSource,
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<MarkdownEditorMode>(defaultMode);
   // Focus mode: the editor alone on the screen, entered only on request (never on page load).
@@ -246,6 +256,9 @@ export function MarkdownEditor({
   pickRef.current = onPickImage;
   const askRef = useRef(onAskAi);
   askRef.current = onAskAi;
+  const previewRef = useRef(previewSource);
+  previewRef.current = previewSource;
+  const hasPreview = previewSource !== undefined;
   const labelsRef = useRef(labels);
   labelsRef.current = labels;
   const blocksRef = useRef(blocks);
@@ -277,7 +290,15 @@ export function MarkdownEditor({
           badge: labels.sourceBadge,
           hint: labels.sourceHint,
           edit: labels.editSource,
+          ...(labels.surfacePreview ? { preview: labels.surfacePreview } : {}),
+          ...(labels.showCode ? { showCode: labels.showCode } : {}),
+          ...(labels.hideCode ? { hideCode: labels.hideCode } : {}),
         },
+        ...(hasPreview
+          ? {
+              previewSource: (md: string) => previewRef.current?.(md) ?? Promise.resolve(undefined),
+            }
+          : {}),
         onEditSource: (markdown) => {
           setSourceFocus(markdown);
           setMode("markdown");
@@ -298,6 +319,10 @@ export function MarkdownEditor({
       labels.sourceBadge,
       labels.sourceHint,
       labels.editSource,
+      labels.surfacePreview,
+      labels.showCode,
+      labels.hideCode,
+      hasPreview,
       labels.focus,
       insertImage,
       locale,
