@@ -36,7 +36,7 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      brand={<SquaresFour size={20} weight="duotone" />}
+      brand={<SquaresFour size={20} weight="fill" />}
       product={t("app.name")}
       title={send.isSuccess ? t("forgotPassword.sentTitle") : t("forgotPassword.title")}
       description={send.isSuccess ? undefined : t("forgotPassword.description")}

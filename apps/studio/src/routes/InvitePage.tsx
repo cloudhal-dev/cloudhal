@@ -219,7 +219,7 @@ export function InvitePage() {
 
   return (
     <AuthLayout
-      brand={<SquaresFour size={20} weight="duotone" />}
+      brand={<SquaresFour size={20} weight="fill" />}
       product={t("app.name")}
       title={title}
       description={description}
