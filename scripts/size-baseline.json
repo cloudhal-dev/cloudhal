@@ -26,7 +26,6 @@
     "packages/core-ts/src/surface-interop.ts": 1235,
     "packages/core-ts/src/taxonomy.ts": 1731,
     "packages/mcp-server/src/menu-tools.ts": 1058,
-    "packages/mcp-server/src/render.ts": 943,
     "packages/mcp-server/src/schedule-tools.ts": 1596,
     "packages/mcp-server/src/schedules.ts": 890,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
@@ -606,7 +605,5 @@
       "params": 5
     }
   },
-  "strings": {
-    "packages/mcp-server/src/render.ts::RENDER_CHECK_SCRIPT": 26282
-  }
+  "strings": {}
 }
