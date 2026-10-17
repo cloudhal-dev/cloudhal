@@ -423,6 +423,29 @@ describe("patchPage", () => {
     expect(built.notes).toContain('root: children "title" made a list');
   });
 
+  it("appends a child added past the end of a children list (models count ahead)", () => {
+    const built = patchPage(
+      page,
+      [
+        {
+          op: "add",
+          path: "/sections/-",
+          value: surface([
+            { id: "root", component: "Stack", children: ["a"] },
+            { id: "a", component: "Text", props: { text: "a" } },
+            { id: "b", component: "Text", props: { text: "b" } },
+          ]),
+        },
+        { op: "add", path: "/sections/0/components/0/children/3", value: "b" },
+      ],
+      catalog,
+    );
+    expect((built.value.sections[0] as SurfaceSection).components[0]?.children).toEqual(["a", "b"]);
+    expect(built.notes).toContain(
+      "/sections/0/components/0/children/3 is past the end of its children; appended",
+    );
+  });
+
   it("builds a surface op by op, repairing on the way", () => {
     const s = patchPage(
       page,
