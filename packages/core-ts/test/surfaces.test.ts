@@ -700,7 +700,7 @@ describe("carousels (RFC-0027)", () => {
       '/components/0/props/label name what it shows ("Customer stories"); assistive technology already says carousel',
     ]);
     expect(messages(carousel({ label: "One" }, 1))).toEqual([
-      "/components/0/children a rail carousel has 2 to 12 slides",
+      "/components/0/children a rail carousel needs at least 2 slides (it has 1)",
     ]);
   });
 

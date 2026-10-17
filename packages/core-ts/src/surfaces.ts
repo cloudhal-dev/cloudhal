@@ -2318,7 +2318,13 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
       : "rail";
     const kids = kidsOf(c);
     const [min, max] = variant === "hero" ? [2, 5] : variant === "gallery" ? [2, 24] : [2, 12];
-    if (kids.length < min || kids.length > max)
+    // Too few reads "needs at least" (a later build step may add the rest); too many is final.
+    if (kids.length < min)
+      issues.push({
+        path: `${at}/children`,
+        message: `a ${variant} carousel needs at least ${min} slides (it has ${kids.length})`,
+      });
+    else if (kids.length > max)
       issues.push({
         path: `${at}/children`,
         message: `a ${variant} carousel has ${min} to ${max} slides`,

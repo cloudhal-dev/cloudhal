@@ -145,8 +145,14 @@ export const BUILD_BRIEF_LIMIT = 2_000;
 const TOOL = "build_chat";
 /** Steps held back at most, waiting for a later step (see `applyStep`). */
 const MAX_HELD = 3;
-/** Issues a later step can resolve: a missing root, a child id not added yet. */
-const WAITING = /^(one component has id "root"|no component ")/;
+/**
+ * Issues a later step can resolve: a missing root, a child id not added yet, a container that has
+ * fewer children than it needs so far (carousel slides, a marquee's items).
+ */
+const WAITING =
+  /^(one component has id "root"|no component "|a [a-z]+ carousel needs at least \d+ slides|at least \d+ children to scroll)/;
+/** While a step is held, a path into what it adds does not exist yet. */
+const WAITING_WHILE_HELD = /the path does not exist$/;
 
 function pageForModel(page: Page): string {
   const full = JSON.stringify({ title: page.title, sections: page.sections });
@@ -326,26 +332,48 @@ export function componentPaths(
   ops: readonly PatchOp[],
 ): { ops: PatchOp[]; notes: string[] } {
   const notes: string[] = [];
+  // Component ids per section as the ops go: what the page has, plus what earlier ops of the same
+  // step (or held steps) add, so a step may add a component and then fill its children by id.
+  const ids: (string[] | undefined)[] = page.sections.map((sec) =>
+    sec.kind === "surface" ? sec.components.map((c) => c.id) : undefined,
+  );
   const fix = (path: string): string =>
     path.replace(
       /^\/sections\/(\d+)\/components\/([a-z][a-z0-9-]{0,40})(?=\/|$)/,
       (m, i: string, id: string) => {
-        const section = page.sections[Number(i)];
-        const j =
-          section?.kind === "surface" ? section.components.findIndex((c) => c.id === id) : -1;
+        const j = ids[Number(i)]?.indexOf(id) ?? -1;
         if (j < 0) return m;
         notes.push(`${m} → /sections/${i}/components/${j}`);
         return `/sections/${i}/components/${j}`;
       },
     );
-  return {
-    ops: ops.map((o) => ({
+  const idOf = (v: unknown) =>
+    v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string"
+      ? (v as { id: string }).id
+      : undefined;
+  const out = ops.map((o) => {
+    const next = {
       ...o,
       ...(typeof o.path === "string" ? { path: fix(o.path) } : {}),
       ...(typeof o.from === "string" ? { from: fix(o.from) } : {}),
-    })),
-    notes,
-  };
+    };
+    if (next.op === "add" && typeof next.path === "string") {
+      const v = (next as { value?: unknown }).value;
+      if (next.path === "/sections/-" && v && typeof v === "object") {
+        const comps = (v as { components?: unknown }).components;
+        ids.push(Array.isArray(comps) ? comps.map(idOf).filter((x): x is string => !!x) : []);
+      }
+      const m = /^\/sections\/(\d+)\/components\/(-|\d+)$/.exec(next.path);
+      const list = m ? ids[Number(m[1])] : undefined;
+      const id = idOf(v);
+      if (list && id) {
+        if (m?.[2] === "-") list.push(id);
+        else list.splice(Number(m?.[2]), 0, id);
+      }
+    }
+    return next;
+  });
+  return { ops: out, notes };
 }
 
 /**
@@ -512,7 +540,10 @@ export async function runBuildTurn(brief: string, deps: BuildTurnDeps): Promise<
     );
   };
   const waits = (e: unknown) =>
-    e instanceof SurfacePatchError && e.issues.every((i) => WAITING.test(i.message));
+    e instanceof SurfacePatchError &&
+    e.issues.every(
+      (i) => WAITING.test(i.message) || (held.length > 0 && WAITING_WHILE_HELD.test(i.message)),
+    );
 
   const applyStep = async (ops: PatchOp[], read: string[] = []): Promise<string[]> => {
     let together: unknown;
