@@ -16,7 +16,6 @@
     "packages/api/src/routes/comments.ts": 874,
     "packages/api/src/routes/schedules.ts": 992,
     "packages/api/src/testing-roles.ts": 1936,
-    "packages/astro-renderer/src/surfaces.ts": 1197,
     "packages/cli/src/commands/deploy.ts": 1006,
     "packages/comments/src/pipeline.ts": 898,
     "packages/comments/src/sql/store.ts": 2111,
@@ -388,12 +387,6 @@
     },
     "packages/astro-renderer/src/seo.ts::entryHead": {
       "params": 6
-    },
-    "packages/astro-renderer/src/surfaces.ts::primitiveHtml": {
-      "lines": 414
-    },
-    "packages/astro-renderer/src/surfaces.ts::surfaceTree>node": {
-      "params": 5
     },
     "packages/cli/src/cli.ts::main": {
       "lines": 557
