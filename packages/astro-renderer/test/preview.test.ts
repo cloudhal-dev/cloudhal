@@ -91,7 +91,9 @@ describe("markdown safety (agent-written content)", async () => {
       ].join("\n"),
     );
     expect(html).not.toMatch(/<script|<iframe|<img src=x|onerror="/i);
-    expect(html).toContain("&lt;script&gt;");
+    // A block of HTML is dropped (its words kept, a script's not at all); inline stays escaped.
+    expect(html).not.toContain("alert(1)");
+    expect(html).toContain("&lt;img src=x");
     expect(html).not.toContain("javascript:");
     expect(html).not.toContain("data:text/html");
     expect(html).toContain('<a href="https://example.com">ok</a>');

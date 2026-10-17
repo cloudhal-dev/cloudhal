@@ -17,7 +17,7 @@ import {
 } from "./media.ts";
 import { safeHref, safeSrc } from "./safe-urls.ts";
 import { sanitizeHtml } from "./sanitize.ts";
-import { renderSurface } from "./surfaces.ts";
+import { renderSurface, surfaceProblems } from "./surfaces.ts";
 
 export type { MediaContext } from "./media.ts";
 
@@ -189,8 +189,17 @@ md.use({
     },
   ],
   renderer: {
-    html({ text }) {
-      return escapeHtml(text);
+    // Bodies carry no HTML (it is never trusted). A block of it (`<div>…</div>`, `<details>`)
+    // loses its tags and keeps its words, so a reader never sees markup as text; inline `<…>` is
+    // shown as typed (it is as often words in brackets as a tag).
+    html({ text, block }) {
+      if (inlineOnly || !block) return escapeHtml(text);
+      const words = text
+        .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+        .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
+        .replace(/<\/?[a-zA-Z][^>]*>/g, " ")
+        .replace(/[ \t]+/g, " ");
+      return words.trim() ? escapeHtml(words) : "";
     },
     // RFC-0020 §5: a ```surface fence is generative UI. With the theme's components it becomes a
     // slot `Body.astro` fills with `Surface.astro`; otherwise Cloudhal's own markup. Any other
@@ -199,6 +208,19 @@ md.use({
       const info = /^surface(?:\s+(.*))?$/s.exec(lang ?? "");
       if (!info) return false;
       const fence = parseSurfaceFence(info[1] ?? "", text.split("\n"));
+      // A preview says why a block draws nothing; the published page stays silent about it.
+      if (current?.preview) {
+        const problems = surfaceProblems(fence.section, fence.issues, current.blocks);
+        if (problems.length)
+          return `<div class="ch-surface-problem" role="note"><p><strong>${
+            current.locale?.startsWith("tr")
+              ? "Bu etkileşimli blok gösterilemiyor.</strong> Markdown modunda düzeltin:"
+              : "This interactive block cannot be shown.</strong> Fix it in Markdown mode:"
+          }</p><ul>${problems
+            .slice(0, 5)
+            .map((p) => `<li><code>${escapeHtml(p)}</code></li>`)
+            .join("")}</ul></div>`;
+      }
       if (themed) {
         themed.slots.push({ type: SURFACE_SLOT, props: { surface: fence.section } });
         return SLOT(themed.slots.length - 1);

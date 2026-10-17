@@ -152,6 +152,21 @@ export interface SurfaceContext {
 
 const catalogs = new WeakMap<BlockRegistry, Catalog>();
 const defaultCatalog = createCatalog();
+/**
+ * What keeps a surface from drawing, as "path message" lines (fence problems first): a preview
+ * shows them where an invalid ```surface would otherwise draw nothing.
+ */
+export function surfaceProblems(
+  section: SurfaceSection,
+  fenceIssues: readonly { path: string; message: string }[] = [],
+  registry?: BlockRegistry,
+): string[] {
+  const check = checkSurface(section, catalogFor(registry));
+  return [...fenceIssues, ...check.issues]
+    .map((i) => `${i.path} ${i.message}`)
+    .concat(check.unknown.map((id) => `/components/${id} unknown component`));
+}
+
 function catalogFor(registry: BlockRegistry | undefined): Catalog {
   if (!registry) return defaultCatalog;
   let c = catalogs.get(registry);
