@@ -1,5 +1,5 @@
 # RFC-0032: ICU plurals and select in Studio messages, compiled at build time
-- Status: Draft
+- Status: Accepted (2026-10-18, by Halil; ADR-0032). Open questions 2 and 3 decided as recommended: a separate private package `@cloudhal/messages`, and `{count}` allowed inside plural branches besides `#`.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
   - `docs/reports/2026-10-studio-i18n-review.md` (Phase 1 of its plan; the measurements below update it);
@@ -218,8 +218,8 @@ On acceptance, ADR "Studio messages: ICU MF1 subset, compiled to data" records:
 
 ## Open questions
 1. **MF2 in translation platforms.** Crowdin, Weblate, Tolgee and Lokalise document ICU MF1; we found no MF2 import/export documentation (2026-10). Check again before Phase 4 picks a platform.
-2. **Package location.** Is `@cloudhal/messages` worth a new private package, or should it be `@cloudhal/core-ts/messages`? A package keeps the compiler out of core-ts's dependency graph; a subpath avoids a new `package.json`.
-3. **`{x}` inside plural branches.** Should `{count}` inside a plural branch be allowed in addition to `#`? It is allowed here because translators use it; the lint could prefer `#`.
+2. **Package location.** *Decided (2026-10-18):* a separate private package, `@cloudhal/messages`, which keeps the compiler out of core-ts's dependency graph.
+3. **`{x}` inside plural branches.** *Decided (2026-10-18):* `{count}` is allowed inside a plural branch besides `#`, and is formatted the same way.
 4. **Turkish `forms`.** Should declared forms (section 4c) eventually be replaced by passing the entity (a role key) and letting a shared "terms" catalog inflect it? That would be MF2's custom functions; out of scope here.
 
 [cldr-plurals]: https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
