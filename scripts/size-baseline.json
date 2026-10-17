@@ -1,0 +1,659 @@
+{
+  "$comment": "Oversized files and functions as of their last tightening. Entries may only shrink: run `node scripts/size-check.ts --update` after a refactor. See docs/engineering/code-structure.md.",
+  "files": {
+    "apps/studio/src/components/AnalyticsSections.tsx": 1349,
+    "apps/studio/src/components/CommentSettings.tsx": 841,
+    "apps/studio/src/i18n/en.ts": 3216,
+    "apps/studio/src/i18n/lazy/schedules.en.ts": 971,
+    "apps/studio/src/i18n/lazy/schedules.tr.ts": 995,
+    "apps/studio/src/i18n/tr.ts": 3280,
+    "apps/studio/src/lib/api.ts": 2798,
+    "apps/studio/src/lib/menus.ts": 831,
+    "apps/studio/src/routes/AssetPage.tsx": 854,
+    "apps/studio/src/routes/CommentThreadPage.tsx": 819,
+    "apps/studio/src/routes/NavigationPage.tsx": 1181,
+    "apps/studio/src/routes/PageEditorPage.tsx": 802,
+    "apps/studio/src/routes/SchedulesPage.tsx": 1299,
+    "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
+    "packages/api/src/auth.ts": 999,
+    "packages/api/src/build-turn.ts": 885,
+    "packages/api/src/routes/assets.ts": 853,
+    "packages/api/src/routes/comments.ts": 874,
+    "packages/api/src/routes/schedules.ts": 992,
+    "packages/api/src/testing-roles.ts": 1936,
+    "packages/astro-renderer/src/surfaces.ts": 1197,
+    "packages/cli/src/commands/deploy.ts": 1006,
+    "packages/comments/src/pipeline.ts": 898,
+    "packages/comments/src/sql/store.ts": 2111,
+    "packages/comments/src/testing.ts": 1665,
+    "packages/core-ts/src/assets.ts": 1390,
+    "packages/core-ts/src/automations.ts": 1003,
+    "packages/core-ts/src/menu.ts": 928,
+    "packages/core-ts/src/releases.ts": 996,
+    "packages/core-ts/src/store.ts": 1883,
+    "packages/core-ts/src/surface-interop.ts": 1235,
+    "packages/core-ts/src/surfaces.ts": 3137,
+    "packages/core-ts/src/taxonomy.ts": 1731,
+    "packages/mcp-server/src/menu-tools.ts": 1058,
+    "packages/mcp-server/src/render.ts": 943,
+    "packages/mcp-server/src/schedule-tools.ts": 1596,
+    "packages/mcp-server/src/schedules.ts": 890,
+    "packages/mcp-server/src/taxonomy-tools.ts": 1433,
+    "packages/mcp-server/src/tools.ts": 2073,
+    "packages/schedules/src/recurrence.ts": 939,
+    "packages/schedules/src/scheduler.ts": 1343,
+    "packages/schedules/src/sql/store.ts": 2166,
+    "packages/ui/src/blocks/MarkdownEditor.tsx": 1295,
+    "starters/blog/src/styles/global.css": 3425
+  },
+  "functions": {
+    "apps/demo-newsroom/scripts/editor-agent.ts::runEditorAgent": {
+      "lines": 280
+    },
+    "apps/studio/scripts/design-lint.ts::lintSource": {
+      "lines": 179
+    },
+    "apps/studio/src/components/ActivityDetailDialog.tsx::ActivityDetailDialog": {
+      "lines": 184
+    },
+    "apps/studio/src/components/AiCommandDialog.tsx::AiCommandDialog": {
+      "lines": 210
+    },
+    "apps/studio/src/components/AiSettings.tsx::AiSettingsSection": {
+      "lines": 300
+    },
+    "apps/studio/src/components/AnalyticsSections.tsx::TrafficCard": {
+      "lines": 154
+    },
+    "apps/studio/src/components/AnalyticsSettings.tsx::AnalyticsSettingsSection": {
+      "lines": 284
+    },
+    "apps/studio/src/components/AnalyticsSettings.tsx::AnalyticsSettingsSection><anonymous>": {
+      "lines": 156
+    },
+    "apps/studio/src/components/ApproveElevationDialog.tsx::ApproveElevationDialog": {
+      "lines": 308
+    },
+    "apps/studio/src/components/AutomationDialog.tsx::AutomationDialog": {
+      "lines": 485
+    },
+    "apps/studio/src/components/BodyEditor.tsx::BodyEditor": {
+      "lines": 214
+    },
+    "apps/studio/src/components/BuildChat.tsx::BuildChat": {
+      "lines": 209
+    },
+    "apps/studio/src/components/ChangeAgentModeDialog.tsx::ChangeAgentModeDialog": {
+      "lines": 178
+    },
+    "apps/studio/src/components/ChromeSettings.tsx::ChromeSettingsSection": {
+      "lines": 175
+    },
+    "apps/studio/src/components/CommentApprovals.tsx::ApproveCommentsDialog": {
+      "lines": 161
+    },
+    "apps/studio/src/components/Comments.tsx::CommentMenu>item": {
+      "params": 5
+    },
+    "apps/studio/src/components/Comments.tsx::plural": {
+      "params": 5
+    },
+    "apps/studio/src/components/CommentSettings.tsx::CommentSettingsSection": {
+      "lines": 504
+    },
+    "apps/studio/src/components/CommentSettings.tsx::CommentSettingsSection><anonymous>": {
+      "lines": 352
+    },
+    "apps/studio/src/components/CreateAgentKeyDialog.tsx::CreateAgentKeyDialog": {
+      "lines": 338
+    },
+    "apps/studio/src/components/CreateTermDialog.tsx::CreateTermDialog": {
+      "lines": 177
+    },
+    "apps/studio/src/components/ElevateAgentKeyDialog.tsx::ElevateAgentKeyDialog": {
+      "lines": 290
+    },
+    "apps/studio/src/components/GovernanceDialog.tsx::GovernanceDialog": {
+      "lines": 273
+    },
+    "apps/studio/src/components/GovernanceDialog.tsx::PreviewSection": {
+      "lines": 167
+    },
+    "apps/studio/src/components/InviteDialog.tsx::InviteDialog": {
+      "lines": 279
+    },
+    "apps/studio/src/components/MediaPicker.tsx::AssetPickerDialog": {
+      "lines": 164
+    },
+    "apps/studio/src/components/MediaPicker.tsx::ImageRefField": {
+      "lines": 210
+    },
+    "apps/studio/src/components/MediaUpload.tsx::useMediaUpload": {
+      "lines": 182
+    },
+    "apps/studio/src/components/MenuItemDialog.tsx::MenuItemDialog": {
+      "lines": 286
+    },
+    "apps/studio/src/components/Readers.tsx::OverviewAnalyticsCard": {
+      "lines": 151
+    },
+    "apps/studio/src/components/RedirectDialog.tsx::RedirectDialog": {
+      "lines": 262
+    },
+    "apps/studio/src/components/ScheduleCard.tsx::ScheduleCard": {
+      "lines": 222
+    },
+    "apps/studio/src/components/ScheduleDialog.tsx::ScheduleDialog": {
+      "lines": 344
+    },
+    "apps/studio/src/components/Schedules.tsx::useMoveDialog": {
+      "lines": 177
+    },
+    "apps/studio/src/components/ScheduleSettings.tsx::ScheduleSettingsSection": {
+      "lines": 247
+    },
+    "apps/studio/src/components/Seo.tsx::SeoFields": {
+      "lines": 159
+    },
+    "apps/studio/src/components/SnapshotDiffDialog.tsx::SnapshotDiffDialog": {
+      "lines": 227
+    },
+    "apps/studio/src/components/TagsMigration.tsx::TagsMigrationDialog": {
+      "lines": 154
+    },
+    "apps/studio/src/components/TaxonomyHealthCard.tsx::TaxonomyHealthCard": {
+      "lines": 192
+    },
+    "apps/studio/src/components/TaxonomySettingsDialog.tsx::TaxonomySettingsDialog": {
+      "lines": 410
+    },
+    "apps/studio/src/components/TermPickers.tsx::TagPicker": {
+      "lines": 171
+    },
+    "apps/studio/src/lib/api.ts::build": {
+      "params": 5
+    },
+    "apps/studio/src/lib/api.ts::remove#8": {
+      "params": 5
+    },
+    "apps/studio/src/routes/AccountPage.tsx::ProfileSection": {
+      "lines": 152
+    },
+    "apps/studio/src/routes/AccountPage.tsx::SessionsSection": {
+      "lines": 221
+    },
+    "apps/studio/src/routes/ActivityPage.tsx::ActivityList": {
+      "lines": 231
+    },
+    "apps/studio/src/routes/AgentsPage.tsx::AgentsPage": {
+      "lines": 268
+    },
+    "apps/studio/src/routes/AnalyticsPage.tsx::AnalyticsPage": {
+      "lines": 326
+    },
+    "apps/studio/src/routes/ApprovalsPage.tsx::ApprovalsPage": {
+      "lines": 260
+    },
+    "apps/studio/src/routes/ApprovalsPage.tsx::PendingRequest": {
+      "lines": 191
+    },
+    "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
+      "lines": 478
+    },
+    "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
+      "lines": 373
+    },
+    "apps/studio/src/routes/AssetPage.tsx::AssetPage": {
+      "lines": 740
+    },
+    "apps/studio/src/routes/AutomationsPage.tsx::AutomationsPage": {
+      "lines": 418
+    },
+    "apps/studio/src/routes/AutomationsPage.tsx::AutomationsPage><anonymous>": {
+      "lines": 248
+    },
+    "apps/studio/src/routes/AutomationsPage.tsx::AutomationsPage>>visible.map(cb)": {
+      "lines": 167
+    },
+    "apps/studio/src/routes/BuildPage.tsx::BuildPage": {
+      "lines": 188
+    },
+    "apps/studio/src/routes/CommenterPage.tsx::BanDialog": {
+      "lines": 156
+    },
+    "apps/studio/src/routes/CommenterPage.tsx::CommenterPage": {
+      "lines": 287
+    },
+    "apps/studio/src/routes/CommentsPage.tsx::CommentsPage": {
+      "lines": 385
+    },
+    "apps/studio/src/routes/CommentsPage.tsx::CommentsPage><anonymous>": {
+      "lines": 172
+    },
+    "apps/studio/src/routes/CommentsPage.tsx::QueueAside": {
+      "lines": 161
+    },
+    "apps/studio/src/routes/CommentThreadPage.tsx::CommentThreadPage": {
+      "lines": 427
+    },
+    "apps/studio/src/routes/InvitePage.tsx::InvitePage": {
+      "lines": 252
+    },
+    "apps/studio/src/routes/MediaPage.tsx::MediaPage": {
+      "lines": 290
+    },
+    "apps/studio/src/routes/MembersPage.tsx::InvitesCard": {
+      "lines": 159
+    },
+    "apps/studio/src/routes/MembersPage.tsx::MembersPage": {
+      "lines": 233
+    },
+    "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
+      "lines": 1049
+    },
+    "apps/studio/src/routes/PageEditorPage.tsx::PageEditorPage": {
+      "lines": 504
+    },
+    "apps/studio/src/routes/PageEditorPage.tsx::SectionForm": {
+      "lines": 152
+    },
+    "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
+      "lines": 176
+    },
+    "apps/studio/src/routes/RedirectsPage.tsx::RedirectsPage": {
+      "lines": 297
+    },
+    "apps/studio/src/routes/ReleasePage.tsx::ReleasePage": {
+      "lines": 505
+    },
+    "apps/studio/src/routes/ScheduleHistoryPage.tsx::ScheduleHistoryPage": {
+      "lines": 385
+    },
+    "apps/studio/src/routes/ScheduleHistoryPage.tsx::ScheduleHistoryPage><anonymous>": {
+      "lines": 232
+    },
+    "apps/studio/src/routes/SchedulesPage.tsx::CalendarAside": {
+      "lines": 151
+    },
+    "apps/studio/src/routes/SchedulesPage.tsx::SchedulesPage": {
+      "lines": 710
+    },
+    "apps/studio/src/routes/SchedulesPage.tsx::SchedulesPage><anonymous>": {
+      "lines": 264
+    },
+    "apps/studio/src/routes/SiteOverviewPage.tsx::SiteOverviewPage": {
+      "lines": 239
+    },
+    "apps/studio/src/routes/SiteSettingsPage.tsx::DomainsSection": {
+      "lines": 216
+    },
+    "apps/studio/src/routes/SiteSettingsPage.tsx::GeneralSection": {
+      "lines": 151
+    },
+    "apps/studio/src/routes/SiteSettingsPage.tsx::PreviewLinksSection": {
+      "lines": 164
+    },
+    "apps/studio/src/routes/SiteShell.tsx::SiteShell": {
+      "lines": 385
+    },
+    "apps/studio/src/routes/SkillsPage.tsx::SkillsPage": {
+      "lines": 170
+    },
+    "apps/studio/src/routes/SnapshotsPage.tsx::SnapshotsPage": {
+      "lines": 296
+    },
+    "apps/studio/src/routes/TaxonomyPage.tsx::TaxonomyPage": {
+      "lines": 458
+    },
+    "apps/studio/src/routes/TermEditorPage.tsx::TermEditorPage": {
+      "lines": 553
+    },
+    "packages/agent-runtime/src/policy.ts::classified": {
+      "params": 5
+    },
+    "packages/analytics/src/demo.ts::demoEvents": {
+      "lines": 160
+    },
+    "packages/analytics/src/memory.ts::answerQuery": {
+      "lines": 161
+    },
+    "packages/analytics/src/model.ts::vitalsMetric": {
+      "params": 5
+    },
+    "packages/analytics/src/rollup.ts::RollupReader>#companion": {
+      "params": 5
+    },
+    "packages/analytics/src/rollup.ts::writeDailyRows": {
+      "params": 5
+    },
+    "packages/api/src/ai/store.ts::AiStore>save": {
+      "params": 5
+    },
+    "packages/api/src/app.ts::createApi": {
+      "lines": 276
+    },
+    "packages/api/src/auth.ts::createAuth": {
+      "lines": 436
+    },
+    "packages/api/src/build-turn.ts::runBuildTurn": {
+      "lines": 260
+    },
+    "packages/api/src/routes/admin.ts::adminRoutes": {
+      "lines": 614
+    },
+    "packages/api/src/routes/agent-keys.ts::agentKeys": {
+      "lines": 162
+    },
+    "packages/api/src/routes/ai.ts::aiRoutes": {
+      "lines": 332
+    },
+    "packages/api/src/routes/approvals.ts::newHono<Env>().use(\"*\",async(c,next)=>{if(!c.get(\"approvals\"))thrownotFound(\"...(cb)#2": {
+      "lines": 199
+    },
+    "packages/api/src/routes/assets.ts::audit": {
+      "params": 5
+    },
+    "packages/api/src/routes/comments.ts::audit": {
+      "params": 5
+    },
+    "packages/api/src/routes/invites.ts::inviteRoutes": {
+      "lines": 196
+    },
+    "packages/api/src/routes/members.ts::auditEvent": {
+      "params": 5
+    },
+    "packages/api/src/routes/menus.ts::preview": {
+      "params": 5
+    },
+    "packages/api/src/routes/notifications.ts::scheduleNotifications": {
+      "lines": 182
+    },
+    "packages/api/src/routes/terms.ts::govern": {
+      "params": 5
+    },
+    "packages/api/src/schedules.ts::auditPerson": {
+      "params": 5
+    },
+    "packages/api/src/schedules.ts::runAsPerson": {
+      "params": 5
+    },
+    "packages/astro-renderer/src/comments-html.ts::commentHtml": {
+      "params": 6
+    },
+    "packages/astro-renderer/src/feeds.ts::sitemapUrls": {
+      "params": 5
+    },
+    "packages/astro-renderer/src/integration.ts::cloudhal": {
+      "lines": 181
+    },
+    "packages/astro-renderer/src/preview.ts::document": {
+      "params": 5
+    },
+    "packages/astro-renderer/src/preview.ts::renderPagePreview": {
+      "params": 5
+    },
+    "packages/astro-renderer/src/seo.ts::entryHead": {
+      "params": 6
+    },
+    "packages/astro-renderer/src/surfaces.ts::primitiveHtml": {
+      "lines": 414
+    },
+    "packages/astro-renderer/src/surfaces.ts::surfaceTree>node": {
+      "params": 5
+    },
+    "packages/cli/src/cli.ts::main": {
+      "lines": 557
+    },
+    "packages/cli/src/commands/ai.ts::remoteRuns": {
+      "params": 6
+    },
+    "packages/cli/src/commands/analytics.ts::runLocalRollups": {
+      "params": 5
+    },
+    "packages/cli/src/commands/deploy.ts::deploy": {
+      "lines": 378
+    },
+    "packages/cli/src/commands/deploy.ts::ensureResources": {
+      "params": 5
+    },
+    "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
+      "lines": 273
+    },
+    "packages/cloudflare/src/admin-worker.ts::createAdminWorker>fetch": {
+      "lines": 210
+    },
+    "packages/comments/src/client/comments.browser.js::enhance": {
+      "lines": 205
+    },
+    "packages/comments/src/pipeline.ts::handleCommentSubmission": {
+      "lines": 159
+    },
+    "packages/comments/src/sql/portability.ts::importLines": {
+      "lines": 209
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>#emailInsert": {
+      "params": 5
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>#eventsFromOp": {
+      "params": 10
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>#purgeFromOp": {
+      "params": 5
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>#purgeUpsert": {
+      "params": 6
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>editReply": {
+      "params": 5
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>erase": {
+      "params": 5
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>putSecret": {
+      "params": 5
+    },
+    "packages/comments/src/sql/store.ts::SqlCommentStore>putThread": {
+      "params": 6
+    },
+    "packages/core-ts/src/automations.ts::graphBuiltinSources": {
+      "lines": 351
+    },
+    "packages/core-ts/src/automations.ts::liveIndex": {
+      "params": 5
+    },
+    "packages/core-ts/src/cache-purge.ts::planCachePurge": {
+      "lines": 233
+    },
+    "packages/core-ts/src/media/image.ts::inspectAvif": {
+      "depth": 6
+    },
+    "packages/core-ts/src/media/svg.ts::checkSvg": {
+      "lines": 204
+    },
+    "packages/core-ts/src/release-apply.ts::publishRelease": {
+      "lines": 212
+    },
+    "packages/core-ts/src/surface-interop.ts::fromA2ui": {
+      "lines": 344
+    },
+    "packages/core-ts/src/surface-interop.ts::fromA2ui>convert": {
+      "lines": 298
+    },
+    "packages/core-ts/src/surface-interop.ts::toA2ui": {
+      "lines": 305
+    },
+    "packages/core-ts/src/surfaces.ts::checkSurface": {
+      "lines": 355
+    },
+    "packages/core-ts/src/surfaces.ts::put": {
+      "params": 5
+    },
+    "packages/core-ts/src/tags-migration.ts::migrateTagsToTerms": {
+      "lines": 207
+    },
+    "packages/core-ts/src/taxonomy.ts::TaxonomyEngine>#checkParent": {
+      "params": 5
+    },
+    "packages/core-ts/src/tokens.ts::repair": {
+      "params": 6
+    },
+    "packages/mcp-server/src/analytics-reports.ts::brokenLinksReport": {
+      "params": 5
+    },
+    "packages/mcp-server/src/analytics-reports.ts::nodeReport": {
+      "params": 6
+    },
+    "packages/mcp-server/src/analytics-reports.ts::topContentReport": {
+      "params": 5
+    },
+    "packages/mcp-server/src/analytics-reports.ts::topList": {
+      "params": 6
+    },
+    "packages/mcp-server/src/analytics-tools.ts::analyticsTools": {
+      "lines": 249
+    },
+    "packages/mcp-server/src/asset-tools.ts::assetTools": {
+      "lines": 454
+    },
+    "packages/mcp-server/src/body-tools.ts::bodyTools": {
+      "lines": 331
+    },
+    "packages/mcp-server/src/chrome-tools.ts::chromeTools": {
+      "lines": 167
+    },
+    "packages/mcp-server/src/comment-tools.ts::commentTools": {
+      "lines": 537
+    },
+    "packages/mcp-server/src/comments.ts::agentComment": {
+      "params": 5
+    },
+    "packages/mcp-server/src/comments.ts::threadView": {
+      "params": 6
+    },
+    "packages/mcp-server/src/design-tools.ts::designTools": {
+      "lines": 177
+    },
+    "packages/mcp-server/src/elevation-tools.ts::elevationTools": {
+      "lines": 228
+    },
+    "packages/mcp-server/src/menu-tools.ts::baseMenu": {
+      "params": 6
+    },
+    "packages/mcp-server/src/menu-tools.ts::menuTools": {
+      "lines": 232
+    },
+    "packages/mcp-server/src/render-tools.ts::renderTools": {
+      "lines": 189
+    },
+    "packages/mcp-server/src/schedule-tools.ts::decideRelease": {
+      "params": 5
+    },
+    "packages/mcp-server/src/schedule-tools.ts::fileRequest": {
+      "params": 7
+    },
+    "packages/mcp-server/src/schedule-tools.ts::gateRelease": {
+      "params": 6
+    },
+    "packages/mcp-server/src/schedule-tools.ts::releaseFor": {
+      "params": 5
+    },
+    "packages/mcp-server/src/schedule-tools.ts::scheduleTools": {
+      "lines": 1017
+    },
+    "packages/mcp-server/src/schedules.ts::autoReleaseVerdict": {
+      "params": 6
+    },
+    "packages/mcp-server/src/server.ts::createCloudhalMcpServer": {
+      "lines": 434
+    },
+    "packages/mcp-server/src/server.ts::createCloudhalMcpServer>server.registerTool(cb)": {
+      "lines": 255
+    },
+    "packages/mcp-server/src/taxonomy-tools.ts::taxonomyTools": {
+      "lines": 881
+    },
+    "packages/mcp-server/src/tools.ts::noteRunCall": {
+      "params": 5
+    },
+    "packages/mcp-server/src/tools.ts::rawTools": {
+      "lines": 1057
+    },
+    "packages/mcp-server/src/tools.ts::runRefusal": {
+      "params": 6
+    },
+    "packages/mcp-server/src/tools.ts::runTool": {
+      "lines": 247
+    },
+    "packages/schedules/src/builtins.ts::createBuiltinRunner": {
+      "lines": 249
+    },
+    "packages/schedules/src/builtins.ts::createBuiltinRunner>staleContent": {
+      "params": 5
+    },
+    "packages/schedules/src/builtins.ts::findingsNotice": {
+      "params": 7
+    },
+    "packages/schedules/src/recurrence.ts::intList": {
+      "params": 5
+    },
+    "packages/schedules/src/scheduler.ts::runAutomation": {
+      "lines": 191,
+      "params": 8
+    },
+    "packages/schedules/src/scheduler.ts::runDue": {
+      "lines": 356,
+      "depth": 6
+    },
+    "packages/schedules/src/scheduler.ts::runNotice": {
+      "params": 5
+    },
+    "packages/ui/src/blocks/AgendaList.tsx::AgendaList": {
+      "lines": 182
+    },
+    "packages/ui/src/blocks/AnalyticsRangePicker.tsx::AnalyticsRangePicker": {
+      "lines": 165
+    },
+    "packages/ui/src/blocks/AnalyticsTimeseries.tsx::AnalyticsTimeseries": {
+      "lines": 157
+    },
+    "packages/ui/src/blocks/BlockPropsForm.tsx::BlockPropsForm": {
+      "lines": 286
+    },
+    "packages/ui/src/blocks/BlockPropsForm.tsx::BlockPropsForm>scalar": {
+      "params": 5
+    },
+    "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth": {
+      "lines": 415
+    },
+    "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth>weeks.map(cb)": {
+      "lines": 173
+    },
+    "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth>weeks.map(cb)>week.map(cb)": {
+      "lines": 169
+    },
+    "packages/ui/src/blocks/MarkdownEditor.tsx::FormatToolbar": {
+      "lines": 165
+    },
+    "packages/ui/src/blocks/MarkdownEditor.tsx::MarkdownEditor": {
+      "lines": 352
+    },
+    "packages/ui/src/blocks/MenuTree.tsx::MenuTree": {
+      "lines": 426
+    },
+    "packages/ui/src/blocks/PreviewPanel.tsx::PreviewPanel": {
+      "lines": 257
+    },
+    "packages/ui/src/blocks/RecurrenceEditor.tsx::RecurrenceEditor": {
+      "lines": 313
+    },
+    "packages/ui/src/blocks/ScheduleRunRow.tsx::ScheduleRunRow": {
+      "lines": 159
+    },
+    "scripts/build-packages.ts::rewriteSpecifiersLoose>code.replace(cb)": {
+      "params": 5
+    }
+  },
+  "strings": {
+    "packages/mcp-server/src/render.ts::RENDER_CHECK_SCRIPT": 26282
+  }
+}

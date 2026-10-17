@@ -1,0 +1,6 @@
+# Cloudhal size and complexity limits (docs/engineering/code-structure.md §2), applied to the
+# lints enabled in Cargo.toml `[workspace.lints.clippy]`.
+too-many-lines-threshold = 150
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 5
+excessive-nesting-threshold = 5

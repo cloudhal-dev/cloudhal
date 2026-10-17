@@ -10,9 +10,11 @@
   },
   "type": "module",
   "scripts": {
-    "check": "biome check . && turbo run typecheck && turbo run test --concurrency=3",
+    "check": "biome check --diagnostic-level=error . && node scripts/size-check.ts && turbo run typecheck && turbo run test --concurrency=3",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "size:check": "node scripts/size-check.ts",
+    "size:report": "node scripts/code-size.ts",
     "design:lint": "node apps/studio/scripts/design-lint.ts",
     "design:shots": "node apps/studio/scripts/screenshots.ts",
     "kumo": "pnpm --filter @cloudhal/ui exec kumo",

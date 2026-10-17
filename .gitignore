@@ -21,3 +21,6 @@ packages/core-contracts/schemas/.bundled/
 # Package build output
 .build/
 .shots/
+
+# scripts/code-size/measure.ts (removed after each run)
+.size-tsconfig.*.json
