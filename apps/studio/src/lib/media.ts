@@ -188,29 +188,95 @@ export function readImageInfo(
 }
 
 /**
- * A ≤ 32 px low-quality placeholder (`data:image/webp`, RFC-0004 §5.3), drawn in the browser:
- * Workers cannot decode images. Optional — undefined where the browser cannot draw it.
+ * Placeholders drawn in the browser (Workers cannot decode images; RFC-0004 §5.3, RFC-0028 §1):
+ * a ≤ 24 px `data:image/webp` LQIP and the dominant colour (`#rrggbb`, the mean of the visible
+ * pixels). Optional — each is undefined where the browser cannot draw it.
  */
-export async function lqipOf(file: Blob): Promise<string | undefined> {
+export async function placeholdersOf(file: Blob): Promise<{ lqip?: string; color?: string }> {
   try {
-    if (typeof createImageBitmap !== "function" || typeof document === "undefined")
-      return undefined;
+    if (typeof createImageBitmap !== "function" || typeof document === "undefined") return {};
     const bitmap = await createImageBitmap(file);
-    const scale = 32 / Math.max(bitmap.width, bitmap.height);
+    const scale = 24 / Math.max(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const ctx = canvas.getContext("2d");
-    if (!ctx) return undefined;
+    if (!ctx) return {};
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close?.();
-    const url = canvas.toDataURL("image/webp", 0.6);
-    return /^data:image\/(?:webp|png|jpeg);base64,/.test(url) && url.length <= 3000
-      ? url
-      : undefined;
+    const url = leanWebp(canvas.toDataURL("image/webp", 0.5));
+    const lqip =
+      /^data:image\/(?:webp|png|jpeg);base64,/.test(url) && url.length <= 3000 ? url : undefined;
+    const color = dominantColor(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+    return { ...(lqip ? { lqip } : {}), ...(color ? { color } : {}) };
   } catch {
-    return undefined;
+    return {};
   }
+}
+
+/**
+ * A canvas WebP without its colour profile: Chrome embeds a ~450 B sRGB ICC chunk in every
+ * `toDataURL("image/webp")`, triple the size of a 24 px picture. Without it (and without the
+ * extended header once nothing needs it) the browser assumes sRGB anyway.
+ */
+export function leanWebp(dataUrl: string): string {
+  const prefix = "data:image/webp;base64,";
+  if (!dataUrl.startsWith(prefix)) return dataUrl;
+  try {
+    const b = Uint8Array.from(atob(dataUrl.slice(prefix.length)), (c) => c.charCodeAt(0));
+    const tag = (at: number) => String.fromCharCode(...b.subarray(at, at + 4));
+    if (tag(0) !== "RIFF" || tag(8) !== "WEBP") return dataUrl;
+    const size = (at: number) =>
+      ((b[at] as number) | ((b[at + 1] as number) << 8) | ((b[at + 2] as number) << 16)) +
+      (b[at + 3] as number) * 2 ** 24;
+    const chunks: Uint8Array[] = [];
+    let vp8x: Uint8Array | undefined;
+    for (let i = 12; i + 8 <= b.length; ) {
+      const end = i + 8 + size(i + 4) + (size(i + 4) % 2);
+      const chunk = b.slice(i, Math.min(end, b.length));
+      if (tag(i) === "VP8X") vp8x = chunk;
+      else if (tag(i) !== "ICCP") chunks.push(chunk);
+      i = end;
+    }
+    if (vp8x) {
+      vp8x[8] = (vp8x[8] as number) & ~0x20; // the ICC flag
+      if (vp8x[8] !== 0) chunks.unshift(vp8x); // still needed (alpha, animation)
+    }
+    const body = chunks.reduce((n, c) => n + c.byteLength, 4);
+    const out = new Uint8Array(8 + body);
+    out.set(b.subarray(0, 4), 0);
+    new DataView(out.buffer).setUint32(4, body, true);
+    out.set(b.subarray(8, 12), 8);
+    let at = 12;
+    for (const c of chunks) {
+      out.set(c, at);
+      at += c.byteLength;
+    }
+    return prefix + btoa(String.fromCharCode(...out));
+  } catch {
+    return dataUrl;
+  }
+}
+
+/** The mean colour of RGBA pixels, weighted by their opacity; undefined when nothing is visible. */
+export function dominantColor(rgba: ArrayLike<number>): string | undefined {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let w = 0;
+  for (let i = 0; i + 3 < rgba.length; i += 4) {
+    const a = (rgba[i + 3] as number) / 255;
+    r += (rgba[i] as number) * a;
+    g += (rgba[i + 1] as number) * a;
+    b += (rgba[i + 2] as number) * a;
+    w += a;
+  }
+  if (w === 0) return undefined;
+  const hex = (v: number) =>
+    Math.round(v / w)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
 /** The server's refusal codes (§6.1, §5.5) Studio has words for; others read as `unknown`. */

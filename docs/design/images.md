@@ -34,9 +34,9 @@ Research for the next RFC (images that load gracefully and fit any frame). Sourc
 ## Decisions
 1. **Visitors get LQIP + colour, no hash.** No JavaScript, best quality per byte. `blurhash` stays in the contract (unused, documented); no ThumbHash.
 2. **New optional `AssetImage` fields**: `color` (`#rrggbb`), `alpha: true` (transparency, read from the file's header at ingest: PNG colour type/`tRNS`, WebP VP8X, AVIF `auxC`), `focal` (`{x, y}` in 0–1). The LQIP target tightens to 16–24 px, ≤ ~400 B.
-3. **Renderer**: the placeholder moves from the `<img>` to a wrapper (`--ch-ph`, `--ch-bg`, `--ch-fx`, `--ch-fy`); no LQIP for transparent images (fixes bug 1); bars never show the raw LQIP (fixes bug 2).
+3. **Renderer**: the placeholder stays the `<img>`'s background, but becomes the colour plus the LQIP blurred inside an SVG filter, covering the box; no LQIP for transparent images (fixes bug 1); bars never show the raw LQIP (fixes bug 2). (A wrapper element was considered first; RFC-0028 §2 explains why it was not needed.)
 4. **Fit modes**: `cover` (default with a ratio), `contain`, `blur-fill`, `color-fill`, `natural`. Defaults: Image with a ratio → cover; Lightbox stage → blur-fill; carousel gallery slides → blur-fill; cards and heroes → cover with the focal point.
-5. **Blur-fill** is a wrapper `::before` painted from the LQIP already in the page, statically blurred (~20 px) and slightly scaled, decorative, gone in print and forced colours. No second image download, no `backdrop-filter`.
+5. **Blur-fill** is that same blurred background left visible around a contained image: painted from the LQIP already in the page, decorative, gone in forced colours. No second image download, no `backdrop-filter`.
 6. **No fade-in** for now: the image paints over its placeholder (honest, no script). A later optional module gated by `@media (scripting: enabled)` may add one.
 7. **Budget**: placeholders up to ~24 KB per page; beyond that, colour only. `render_page` counts them and flags images cropped by `cover` with no focal point when the ratios differ a lot.
 8. **Focal point**: set by people in Studio and by agents through the existing policy-checked asset update; per-use overrides and `fit` on `ImageRef` wait until a page needs them (a contract change for every image use).

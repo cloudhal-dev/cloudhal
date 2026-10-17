@@ -204,6 +204,21 @@ export interface AssetImage {
    * Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.
    */
   lqip?: string;
+  /**
+   * RFC-0028: the image's dominant colour, lower-case #rrggbb. Painted under the placeholder and in color-fill bars.
+   */
+  color?: string;
+  /**
+   * RFC-0028: the image may have transparent pixels (read from its header at ingest). Absent means opaque; transparent images never show the LQIP.
+   */
+  alpha?: true;
+  /**
+   * RFC-0028: where the subject is, from the top-left corner as fractions of the width and height. Cover crops keep it in view.
+   */
+  focal?: {
+    x: number;
+    y: number;
+  };
 }
 export interface SpdxLicense {
   kind: "spdx";

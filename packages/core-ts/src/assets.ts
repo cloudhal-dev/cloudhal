@@ -61,7 +61,7 @@ export interface AssetFields {
   readonly slug?: string;
   readonly metadata?: Asset["metadata"];
   /** Client-computed placeholders (Studio); only their format is checked (§5.3). */
-  readonly image?: { readonly blurhash?: string; readonly lqip?: string };
+  readonly image?: { readonly blurhash?: string; readonly lqip?: string; readonly color?: string };
 }
 
 export interface IngestAssetInput {
@@ -587,6 +587,7 @@ export class AssetEngine {
               ...inspected.image,
               ...(fields.image?.blurhash ? { blurhash: fields.image.blurhash } : {}),
               ...(fields.image?.lqip ? { lqip: fields.image.lqip } : {}),
+              ...(fields.image?.color ? { color: fields.image.color } : {}),
             },
           }
         : {}),

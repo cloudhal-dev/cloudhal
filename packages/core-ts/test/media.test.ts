@@ -250,6 +250,21 @@ describe("image headers and metadata stripping", () => {
   });
 });
 
+describe("transparency from the header (RFC-0028)", () => {
+  it("reads PNG alpha and tRNS, WebP VP8X, GIF transparency and AVIF alpha planes", () => {
+    expect(inspectImage(makePng(), "image/png").alpha).toBe(true);
+    expect(inspectImage(makePng({ opaque: true }), "image/png").alpha).toBeUndefined();
+    expect(inspectImage(makePng({ opaque: true, trns: true }), "image/png").alpha).toBe(true);
+    expect(inspectImage(makeWebp(), "image/webp").alpha).toBeUndefined();
+    expect(inspectImage(makeWebp({ alpha: true }), "image/webp").alpha).toBe(true);
+    expect(inspectImage(makeGif(), "image/gif").alpha).toBeUndefined();
+    expect(inspectImage(makeGif({ transparent: true }), "image/gif").alpha).toBe(true);
+    expect(inspectImage(makeAvif(), "image/avif").alpha).toBeUndefined();
+    expect(inspectImage(makeAvif({ alpha: true }), "image/avif").alpha).toBe(true);
+    expect(inspectImage(makeJpeg(), "image/jpeg").alpha).toBeUndefined();
+  });
+});
+
 describe("SVG validator (validate and reject)", () => {
   const ok =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12"><title>Logo</title><defs><linearGradient id="g"><stop offset="0" stop-color="#fff"/></linearGradient></defs><rect width="10" height="10" fill="url(#g)" style="opacity:.5"/><use href="#g"/></svg>';

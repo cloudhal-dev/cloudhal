@@ -11,7 +11,11 @@ import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments"
 import { Comments, Sections } from "@cloudhal/astro-renderer/components";
 import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
-import { loadAssetIndex, type MediaContext } from "@cloudhal/astro-renderer/media";
+import {
+  loadAssetIndex,
+  type MediaContext,
+  placeholderBudget,
+} from "@cloudhal/astro-renderer/media";
 import {
   type ActiveNavItem,
   type ActiveRoute,
@@ -121,6 +125,8 @@ const media: MediaContext = {
     console.warn(`cloudhal: ${path} refers to ${id}, which this version does not have`),
   // RFC-0026: icons in the site's weight, the theme's own drawings over the set's.
   icons: { weight: String(site.theme.config?.iconWeight ?? "regular"), set: iconSet },
+  // RFC-0028: one placeholder allowance for the whole page.
+  budget: placeholderBudget(),
 };
 const t = strings(locale);
 const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);

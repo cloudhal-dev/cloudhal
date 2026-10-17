@@ -17712,12 +17712,12 @@ return errors === 0;
 validate119.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 export const validateAsset = validate122;
-const schema250 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/asset.schema.json","title":"Asset","description":"A media file of a site (image, video, audio, document, data) as a graph node: its bytes are identified by SHA-256 and stored once per site in the blob store under a content-addressed key, or kept elsewhere (`storage.kind: external`, e.g. a Zenodo or Hugging Face file). Pages, entries and terms refer to it by id (`ImageRef.assetId`, markdown `asset:<id>`). Snapshotted like every node, so a deleted asset's bytes stay while any snapshot references it (RFC-0004).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","kind","mediaType","bytes","sha256","slug","storage","status","uploadedBy","source","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"kind":{"type":"string","description":"What the file is, derived from the sniffed media type (never chosen by the client). `other` is allowed for external storage only.","enum":["image","video","audio","document","data","other"]},"mediaType":{"type":"string","description":"MIME type of the stored bytes as sniffed by the server (RFC 6838, lower case, no parameters), e.g. image/webp, text/csv. Served as Content-Type.","pattern":"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$","maxLength":255},"bytes":{"type":"integer","description":"Size of the stored bytes. For external files: the size the source reports or the uploader declares.","minimum":0},"sha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the stored bytes (lower-case hex): the blob key, the public URL prefix, the ETag and the checksum shown with downloads. Unique per site. For external files see `storage.checksum`."},"originalSha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the bytes as uploaded, present only when the server changed them (image metadata stripping)."},"slug":{"$ref":"#/$defs/Slug","description":"File name in the public URL, without extension: /media/<sha256[0..16]>/<slug>.<ext>. May change; the old URL then answers 301 to the new one."},"storage":{"$ref":"#/$defs/AssetStorage"},"image":{"$ref":"#/$defs/AssetImage"},"title":{"type":"object","description":"Display title per locale (download lists, library search).","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":300}},"alt":{"type":"object","description":"Alternative text per locale. An `ImageRef.alt` that is not empty overrides it for one use.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":500}},"decorative":{"type":"boolean","description":"The image carries no information and renders with alt=\"\". Absent means false; the store never writes false."},"caption":{"type":"object","description":"Caption per locale (plain text), the default for figures that show this asset.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":1000}},"credit":{"type":"string","description":"Who made it, as shown next to it (e.g. 'Photo: Ayşe Yılmaz').","minLength":1,"maxLength":300},"license":{"$ref":"#/$defs/AssetLicense"},"status":{"type":"string","description":"active: listed and pickable. retired: hidden from the library and pickers and cannot be newly referenced; existing references keep rendering.","enum":["active","retired"]},"uploadedBy":{"$ref":"#/$defs/Actor"},"source":{"$ref":"#/$defs/AssetSource"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"AssetImage":{"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}},"AssetLicense":{"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]},"AssetSource":{"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]},"AssetStorage":{"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]},"HttpsUrl":{"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Sha256":{"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
+const schema250 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://cloudhal.dev/schemas/v1/asset.schema.json","title":"Asset","description":"A media file of a site (image, video, audio, document, data) as a graph node: its bytes are identified by SHA-256 and stored once per site in the blob store under a content-addressed key, or kept elsewhere (`storage.kind: external`, e.g. a Zenodo or Hugging Face file). Pages, entries and terms refer to it by id (`ImageRef.assetId`, markdown `asset:<id>`). Snapshotted like every node, so a deleted asset's bytes stay while any snapshot references it (RFC-0004).","type":"object","additionalProperties":false,"required":["schemaVersion","id","siteId","kind","mediaType","bytes","sha256","slug","storage","status","uploadedBy","source","rev","createdAt","updatedAt"],"properties":{"schemaVersion":{"$ref":"#/$defs/SchemaVersion"},"id":{"$ref":"#/$defs/Id"},"siteId":{"$ref":"#/$defs/Id"},"kind":{"type":"string","description":"What the file is, derived from the sniffed media type (never chosen by the client). `other` is allowed for external storage only.","enum":["image","video","audio","document","data","other"]},"mediaType":{"type":"string","description":"MIME type of the stored bytes as sniffed by the server (RFC 6838, lower case, no parameters), e.g. image/webp, text/csv. Served as Content-Type.","pattern":"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$","maxLength":255},"bytes":{"type":"integer","description":"Size of the stored bytes. For external files: the size the source reports or the uploader declares.","minimum":0},"sha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the stored bytes (lower-case hex): the blob key, the public URL prefix, the ETag and the checksum shown with downloads. Unique per site. For external files see `storage.checksum`."},"originalSha256":{"$ref":"#/$defs/Sha256","description":"SHA-256 of the bytes as uploaded, present only when the server changed them (image metadata stripping)."},"slug":{"$ref":"#/$defs/Slug","description":"File name in the public URL, without extension: /media/<sha256[0..16]>/<slug>.<ext>. May change; the old URL then answers 301 to the new one."},"storage":{"$ref":"#/$defs/AssetStorage"},"image":{"$ref":"#/$defs/AssetImage"},"title":{"type":"object","description":"Display title per locale (download lists, library search).","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":300}},"alt":{"type":"object","description":"Alternative text per locale. An `ImageRef.alt` that is not empty overrides it for one use.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":500}},"decorative":{"type":"boolean","description":"The image carries no information and renders with alt=\"\". Absent means false; the store never writes false."},"caption":{"type":"object","description":"Caption per locale (plain text), the default for figures that show this asset.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":1000}},"credit":{"type":"string","description":"Who made it, as shown next to it (e.g. 'Photo: Ayşe Yılmaz').","minLength":1,"maxLength":300},"license":{"$ref":"#/$defs/AssetLicense"},"status":{"type":"string","description":"active: listed and pickable. retired: hidden from the library and pickers and cannot be newly referenced; existing references keep rendering.","enum":["active","retired"]},"uploadedBy":{"$ref":"#/$defs/Actor"},"source":{"$ref":"#/$defs/AssetSource"},"rev":{"$ref":"#/$defs/Revision"},"createdAt":{"$ref":"#/$defs/Timestamp"},"updatedAt":{"$ref":"#/$defs/Timestamp"},"metadata":{"$ref":"#/$defs/Metadata"}},"$defs":{"Actor":{"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}},"ActorKind":{"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]},"AssetImage":{"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096},"color":{"type":"string","description":"RFC-0028: the image's dominant colour, lower-case #rrggbb. Painted under the placeholder and in color-fill bars.","pattern":"^#[0-9a-f]{6}$"},"alpha":{"type":"boolean","enum":[true],"description":"RFC-0028: the image may have transparent pixels (read from its header at ingest). Absent means opaque; transparent images never show the LQIP."},"focal":{"type":"object","description":"RFC-0028: where the subject is, from the top-left corner as fractions of the width and height. Cover crops keep it in view.","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1}}}}},"AssetLicense":{"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]},"AssetSource":{"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]},"AssetStorage":{"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]},"HttpsUrl":{"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048},"Id":{"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48},"Locale":{"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},"Metadata":{"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}},"Revision":{"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0},"SchemaVersion":{"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]},"Sha256":{"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"},"Slug":{"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128},"Timestamp":{"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"}}};
 const schema251 = {"type":"integer","description":"Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.","enum":[1]};
 const schema252 = {"type":"string","description":"Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.","pattern":"^[a-z]+_[A-Za-z0-9]{6,32}$","minLength":8,"maxLength":48};
 const schema254 = {"type":"string","description":"Lower-case hex SHA-256 digest.","pattern":"^[0-9a-f]{64}$"};
 const schema256 = {"type":"string","description":"Lower-case URL segment.","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":1,"maxLength":128};
-const schema261 = {"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096}}};
+const schema261 = {"type":"object","description":"Intrinsic size and placeholders of an image. Present for every image stored as a blob.","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":100000},"height":{"type":"integer","minimum":1,"maximum":100000},"animated":{"type":"boolean","description":"Animated GIF or WebP: never resized or re-encoded. Absent means false; the store never writes false."},"blurhash":{"type":"string","description":"BlurHash of the image for themes that decode it client-side.","pattern":"^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$"},"lqip":{"type":"string","description":"Low-quality placeholder: a raster data: URL of at most about 3 KB, shown while the image loads.","pattern":"^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$","maxLength":4096},"color":{"type":"string","description":"RFC-0028: the image's dominant colour, lower-case #rrggbb. Painted under the placeholder and in color-fill bars.","pattern":"^#[0-9a-f]{6}$"},"alpha":{"type":"boolean","enum":[true],"description":"RFC-0028: the image may have transparent pixels (read from its header at ingest). Absent means opaque; transparent images never show the LQIP."},"focal":{"type":"object","description":"RFC-0028: where the subject is, from the top-left corner as fractions of the width and height. Cover crops keep it in view.","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1}}}}};
 const schema262 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
 const schema274 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
 const schema260 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
@@ -17725,6 +17725,7 @@ const schema277 = {"type":"object","description":"Free-form string-to-string map
 const pattern122 = new RegExp("^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$", "u");
 const pattern128 = new RegExp("^[0-9A-Za-z#$%*+,.:;=?@^_{|}~\\[\\]-]{6,100}$", "u");
 const pattern129 = new RegExp("^data:image/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$", "u");
+const pattern130 = new RegExp("^#[0-9a-f]{6}$", "u");
 const schema257 = {"description":"Where the bytes live. `blob`: in this deployment's blob store (R2 or the filesystem) under the content-addressed key media/<siteId>/<sha256>, derived and never stored, so the node is portable between backends. `external`: elsewhere, linked rather than hosted (large research files on Zenodo or Hugging Face).","oneOf":[{"type":"object","title":"BlobStorage","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["blob"]}}},{"type":"object","title":"ExternalStorage","additionalProperties":false,"required":["kind","url","checksum"],"properties":{"kind":{"type":"string","enum":["external"]},"url":{"$ref":"#/$defs/HttpsUrl","description":"Direct download URL of the file."},"landingPage":{"$ref":"#/$defs/HttpsUrl","description":"Human page of the record the file belongs to (e.g. a Zenodo record or a Hugging Face dataset)."},"checksum":{"type":"string","description":"How `sha256` was obtained. computed: the server or `cloudhal media verify` streamed the URL and hashed it. declared: given by the person who linked it, not verified (shown as such).","enum":["computed","declared"]},"verifiedAt":{"$ref":"#/$defs/Timestamp","description":"When the URL last produced bytes with this SHA-256 (checksum `computed`)."}}}]};
 const schema258 = {"type":"string","description":"Absolute https URL without credentials, whitespace or backslashes.","pattern":"^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$","maxLength":2048};
 const pattern126 = new RegExp("^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "u");
@@ -18044,7 +18045,7 @@ return errors === 0;
 validate123.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 const schema265 = {"description":"Terms the asset may be reused under: an SPDX license expression or a license URL.","oneOf":[{"type":"object","title":"SpdxLicense","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"type":"string","enum":["spdx"]},"id":{"type":"string","description":"SPDX license identifier or simple expression, e.g. CC-BY-4.0, CC0-1.0, MIT OR Apache-2.0, LicenseRef-AllRightsReserved.","pattern":"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$","maxLength":200}}},{"type":"object","title":"UrlLicense","additionalProperties":false,"required":["kind","url"],"properties":{"kind":{"type":"string","enum":["url"]},"url":{"$ref":"#/$defs/HttpsUrl"},"name":{"type":"string","minLength":1,"maxLength":200}}}]};
-const pattern133 = new RegExp("^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$", "u");
+const pattern134 = new RegExp("^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$", "u");
 
 function validate125(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -18129,7 +18130,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern133.test(data1)){
+if(!pattern134.test(data1)){
 const err6 = {instancePath:instancePath+"/id",schemaPath:"#/oneOf/0/properties/id/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$"},message:"must match pattern \""+"^[A-Za-z0-9][A-Za-z0-9.+-]*(?: (?:AND|OR|WITH) [A-Za-z0-9][A-Za-z0-9.+-]*)*$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -18503,7 +18504,7 @@ return errors === 0;
 validate127.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 const schema270 = {"description":"How the asset came in. Immutable after create.","oneOf":[{"type":"object","title":"UploadSource","description":"Bytes uploaded by a person (REST) or an agent (MCP upload_asset).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["upload"]},"filename":{"type":"string","description":"Original file name as sent (never used as a storage key or served).","pattern":"^[^/\\\\\\u0000-\\u001f\\u007f]+$","minLength":1,"maxLength":255}}},{"type":"object","title":"FetchSource","description":"Bytes the server fetched from an https URL (MCP fetch_asset_url, Studio 'From URL') under the SSRF rules.","additionalProperties":false,"required":["kind","url","fetchedAt"],"properties":{"kind":{"type":"string","enum":["fetch"]},"url":{"$ref":"#/$defs/HttpsUrl"},"fetchedAt":{"$ref":"#/$defs/Timestamp"}}},{"type":"object","title":"ImportSource","description":"Created by a migration or importer (e.g. `cloudhal media import-urls` from an ImageRef.src).","additionalProperties":false,"required":["kind","from"],"properties":{"kind":{"type":"string","enum":["import"]},"from":{"type":"string","description":"The reference it was imported from: a URL or a site path.","minLength":1,"maxLength":2048},"importer":{"$ref":"#/$defs/Slug"}}},{"type":"object","title":"LinkSource","description":"An external file registered by URL without copying its bytes (storage.kind external).","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["link"]}}}]};
-const pattern136 = new RegExp("^[^/\\\\\\u0000-\\u001f\\u007f]+$", "u");
+const pattern137 = new RegExp("^[^/\\\\\\u0000-\\u001f\\u007f]+$", "u");
 
 function validate129(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -18588,7 +18589,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern136.test(data1)){
+if(!pattern137.test(data1)){
 const err6 = {instancePath:instancePath+"/filename",schemaPath:"#/oneOf/0/properties/filename/pattern",keyword:"pattern",params:{pattern: "^[^/\\\\\\u0000-\\u001f\\u007f]+$"},message:"must match pattern \""+"^[^/\\\\\\u0000-\\u001f\\u007f]+$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -19536,7 +19537,7 @@ vErrors.push(err42);
 errors++;
 }
 for(const key1 in data10){
-if(!(((((key1 === "width") || (key1 === "height")) || (key1 === "animated")) || (key1 === "blurhash")) || (key1 === "lqip"))){
+if(!((((((((key1 === "width") || (key1 === "height")) || (key1 === "animated")) || (key1 === "blurhash")) || (key1 === "lqip")) || (key1 === "color")) || (key1 === "alpha")) || (key1 === "focal"))){
 const err43 = {instancePath:instancePath+"/image",schemaPath:"#/$defs/AssetImage/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err43];
@@ -19689,9 +19690,11 @@ vErrors.push(err55);
 errors++;
 }
 }
-}
-else {
-const err56 = {instancePath:instancePath+"/image",schemaPath:"#/$defs/AssetImage/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(data10.color !== undefined){
+let data16 = data10.color;
+if(typeof data16 === "string"){
+if(!pattern130.test(data16)){
+const err56 = {instancePath:instancePath+"/image/color",schemaPath:"#/$defs/AssetImage/properties/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9a-f]{6}$"},message:"must match pattern \""+"^#[0-9a-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err56];
 }
@@ -19701,11 +19704,8 @@ vErrors.push(err56);
 errors++;
 }
 }
-if(data.title !== undefined){
-let data16 = data.title;
-if(data16 && typeof data16 == "object" && !Array.isArray(data16)){
-if(Object.keys(data16).length < 1){
-const err57 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
+else {
+const err57 = {instancePath:instancePath+"/image/color",schemaPath:"#/$defs/AssetImage/properties/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err57];
 }
@@ -19714,11 +19714,11 @@ vErrors.push(err57);
 }
 errors++;
 }
-for(const key2 in data16){
-const _errs43 = errors;
-if(typeof key2 === "string"){
-if(!pattern11.test(key2)){
-const err58 = {instancePath:instancePath+"/title",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key2};
+}
+if(data10.alpha !== undefined){
+let data17 = data10.alpha;
+if(typeof data17 !== "boolean"){
+const err58 = {instancePath:instancePath+"/image/alpha",schemaPath:"#/$defs/AssetImage/properties/alpha/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
 if(vErrors === null){
 vErrors = [err58];
 }
@@ -19727,9 +19727,8 @@ vErrors.push(err58);
 }
 errors++;
 }
-}
-else {
-const err59 = {instancePath:instancePath+"/title",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key2};
+if(!(data17 === true)){
+const err59 = {instancePath:instancePath+"/image/alpha",schemaPath:"#/$defs/AssetImage/properties/alpha/enum",keyword:"enum",params:{allowedValues: schema261.properties.alpha.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err59];
 }
@@ -19738,9 +19737,12 @@ vErrors.push(err59);
 }
 errors++;
 }
-var valid9 = _errs43 === errors;
-if(!valid9){
-const err60 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/propertyNames",keyword:"propertyNames",params:{propertyName: key2},message:"property name must be valid"};
+}
+if(data10.focal !== undefined){
+let data18 = data10.focal;
+if(data18 && typeof data18 == "object" && !Array.isArray(data18)){
+if(data18.x === undefined){
+const err60 = {instancePath:instancePath+"/image/focal",schemaPath:"#/$defs/AssetImage/properties/focal/required",keyword:"required",params:{missingProperty: "x"},message:"must have required property '"+"x"+"'"};
 if(vErrors === null){
 vErrors = [err60];
 }
@@ -19749,12 +19751,8 @@ vErrors.push(err60);
 }
 errors++;
 }
-}
-for(const key3 in data16){
-let data17 = data16[key3];
-if(typeof data17 === "string"){
-if(func2(data17) > 300){
-const err61 = {instancePath:instancePath+"/title/" + key3.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 300},message:"must NOT have more than 300 characters"};
+if(data18.y === undefined){
+const err61 = {instancePath:instancePath+"/image/focal",schemaPath:"#/$defs/AssetImage/properties/focal/required",keyword:"required",params:{missingProperty: "y"},message:"must have required property '"+"y"+"'"};
 if(vErrors === null){
 vErrors = [err61];
 }
@@ -19763,8 +19761,9 @@ vErrors.push(err61);
 }
 errors++;
 }
-if(func2(data17) < 1){
-const err62 = {instancePath:instancePath+"/title/" + key3.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+for(const key2 in data18){
+if(!((key2 === "x") || (key2 === "y"))){
+const err62 = {instancePath:instancePath+"/image/focal",schemaPath:"#/$defs/AssetImage/properties/focal/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err62];
 }
@@ -19774,8 +19773,11 @@ vErrors.push(err62);
 errors++;
 }
 }
-else {
-const err63 = {instancePath:instancePath+"/title/" + key3.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data18.x !== undefined){
+let data19 = data18.x;
+if((typeof data19 == "number") && (isFinite(data19))){
+if(data19 > 1 || isNaN(data19)){
+const err63 = {instancePath:instancePath+"/image/focal/x",schemaPath:"#/$defs/AssetImage/properties/focal/properties/x/maximum",keyword:"maximum",params:{comparison: "<=", limit: 1},message:"must be <= 1"};
 if(vErrors === null){
 vErrors = [err63];
 }
@@ -19784,10 +19786,8 @@ vErrors.push(err63);
 }
 errors++;
 }
-}
-}
-else {
-const err64 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(data19 < 0 || isNaN(data19)){
+const err64 = {instancePath:instancePath+"/image/focal/x",schemaPath:"#/$defs/AssetImage/properties/focal/properties/x/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
 if(vErrors === null){
 vErrors = [err64];
 }
@@ -19797,11 +19797,8 @@ vErrors.push(err64);
 errors++;
 }
 }
-if(data.alt !== undefined){
-let data18 = data.alt;
-if(data18 && typeof data18 == "object" && !Array.isArray(data18)){
-if(Object.keys(data18).length < 1){
-const err65 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
+else {
+const err65 = {instancePath:instancePath+"/image/focal/x",schemaPath:"#/$defs/AssetImage/properties/focal/properties/x/type",keyword:"type",params:{type: "number"},message:"must be number"};
 if(vErrors === null){
 vErrors = [err65];
 }
@@ -19810,11 +19807,12 @@ vErrors.push(err65);
 }
 errors++;
 }
-for(const key4 in data18){
-const _errs51 = errors;
-if(typeof key4 === "string"){
-if(!pattern11.test(key4)){
-const err66 = {instancePath:instancePath+"/alt",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key4};
+}
+if(data18.y !== undefined){
+let data20 = data18.y;
+if((typeof data20 == "number") && (isFinite(data20))){
+if(data20 > 1 || isNaN(data20)){
+const err66 = {instancePath:instancePath+"/image/focal/y",schemaPath:"#/$defs/AssetImage/properties/focal/properties/y/maximum",keyword:"maximum",params:{comparison: "<=", limit: 1},message:"must be <= 1"};
 if(vErrors === null){
 vErrors = [err66];
 }
@@ -19823,9 +19821,8 @@ vErrors.push(err66);
 }
 errors++;
 }
-}
-else {
-const err67 = {instancePath:instancePath+"/alt",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key4};
+if(data20 < 0 || isNaN(data20)){
+const err67 = {instancePath:instancePath+"/image/focal/y",schemaPath:"#/$defs/AssetImage/properties/focal/properties/y/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
 if(vErrors === null){
 vErrors = [err67];
 }
@@ -19834,9 +19831,9 @@ vErrors.push(err67);
 }
 errors++;
 }
-var valid12 = _errs51 === errors;
-if(!valid12){
-const err68 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/propertyNames",keyword:"propertyNames",params:{propertyName: key4},message:"property name must be valid"};
+}
+else {
+const err68 = {instancePath:instancePath+"/image/focal/y",schemaPath:"#/$defs/AssetImage/properties/focal/properties/y/type",keyword:"type",params:{type: "number"},message:"must be number"};
 if(vErrors === null){
 vErrors = [err68];
 }
@@ -19846,11 +19843,9 @@ vErrors.push(err68);
 errors++;
 }
 }
-for(const key5 in data18){
-let data19 = data18[key5];
-if(typeof data19 === "string"){
-if(func2(data19) > 500){
-const err69 = {instancePath:instancePath+"/alt/" + key5.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 500},message:"must NOT have more than 500 characters"};
+}
+else {
+const err69 = {instancePath:instancePath+"/image/focal",schemaPath:"#/$defs/AssetImage/properties/focal/type",keyword:"type",params:{type: "object"},message:"must be object"};
 if(vErrors === null){
 vErrors = [err69];
 }
@@ -19859,8 +19854,10 @@ vErrors.push(err69);
 }
 errors++;
 }
-if(func2(data19) < 1){
-const err70 = {instancePath:instancePath+"/alt/" + key5.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+}
+}
+else {
+const err70 = {instancePath:instancePath+"/image",schemaPath:"#/$defs/AssetImage/type",keyword:"type",params:{type: "object"},message:"must be object"};
 if(vErrors === null){
 vErrors = [err70];
 }
@@ -19870,8 +19867,11 @@ vErrors.push(err70);
 errors++;
 }
 }
-else {
-const err71 = {instancePath:instancePath+"/alt/" + key5.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(data.title !== undefined){
+let data21 = data.title;
+if(data21 && typeof data21 == "object" && !Array.isArray(data21)){
+if(Object.keys(data21).length < 1){
+const err71 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
 if(vErrors === null){
 vErrors = [err71];
 }
@@ -19880,10 +19880,11 @@ vErrors.push(err71);
 }
 errors++;
 }
-}
-}
-else {
-const err72 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/type",keyword:"type",params:{type: "object"},message:"must be object"};
+for(const key3 in data21){
+const _errs54 = errors;
+if(typeof key3 === "string"){
+if(!pattern11.test(key3)){
+const err72 = {instancePath:instancePath+"/title",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key3};
 if(vErrors === null){
 vErrors = [err72];
 }
@@ -19893,9 +19894,8 @@ vErrors.push(err72);
 errors++;
 }
 }
-if(data.decorative !== undefined){
-if(typeof data.decorative !== "boolean"){
-const err73 = {instancePath:instancePath+"/decorative",schemaPath:"#/properties/decorative/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+else {
+const err73 = {instancePath:instancePath+"/title",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key3};
 if(vErrors === null){
 vErrors = [err73];
 }
@@ -19904,12 +19904,9 @@ vErrors.push(err73);
 }
 errors++;
 }
-}
-if(data.caption !== undefined){
-let data21 = data.caption;
-if(data21 && typeof data21 == "object" && !Array.isArray(data21)){
-if(Object.keys(data21).length < 1){
-const err74 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
+var valid10 = _errs54 === errors;
+if(!valid10){
+const err74 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/propertyNames",keyword:"propertyNames",params:{propertyName: key3},message:"property name must be valid"};
 if(vErrors === null){
 vErrors = [err74];
 }
@@ -19918,11 +19915,12 @@ vErrors.push(err74);
 }
 errors++;
 }
-for(const key6 in data21){
-const _errs61 = errors;
-if(typeof key6 === "string"){
-if(!pattern11.test(key6)){
-const err75 = {instancePath:instancePath+"/caption",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key6};
+}
+for(const key4 in data21){
+let data22 = data21[key4];
+if(typeof data22 === "string"){
+if(func2(data22) > 300){
+const err75 = {instancePath:instancePath+"/title/" + key4.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 300},message:"must NOT have more than 300 characters"};
 if(vErrors === null){
 vErrors = [err75];
 }
@@ -19931,9 +19929,8 @@ vErrors.push(err75);
 }
 errors++;
 }
-}
-else {
-const err76 = {instancePath:instancePath+"/caption",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key6};
+if(func2(data22) < 1){
+const err76 = {instancePath:instancePath+"/title/" + key4.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
 if(vErrors === null){
 vErrors = [err76];
 }
@@ -19942,9 +19939,9 @@ vErrors.push(err76);
 }
 errors++;
 }
-var valid15 = _errs61 === errors;
-if(!valid15){
-const err77 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/propertyNames",keyword:"propertyNames",params:{propertyName: key6},message:"property name must be valid"};
+}
+else {
+const err77 = {instancePath:instancePath+"/title/" + key4.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/title/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err77];
 }
@@ -19954,11 +19951,9 @@ vErrors.push(err77);
 errors++;
 }
 }
-for(const key7 in data21){
-let data22 = data21[key7];
-if(typeof data22 === "string"){
-if(func2(data22) > 1000){
-const err78 = {instancePath:instancePath+"/caption/" + key7.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 1000},message:"must NOT have more than 1000 characters"};
+}
+else {
+const err78 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/type",keyword:"type",params:{type: "object"},message:"must be object"};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -19967,8 +19962,12 @@ vErrors.push(err78);
 }
 errors++;
 }
-if(func2(data22) < 1){
-const err79 = {instancePath:instancePath+"/caption/" + key7.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+}
+if(data.alt !== undefined){
+let data23 = data.alt;
+if(data23 && typeof data23 == "object" && !Array.isArray(data23)){
+if(Object.keys(data23).length < 1){
+const err79 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
 if(vErrors === null){
 vErrors = [err79];
 }
@@ -19977,9 +19976,11 @@ vErrors.push(err79);
 }
 errors++;
 }
-}
-else {
-const err80 = {instancePath:instancePath+"/caption/" + key7.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+for(const key5 in data23){
+const _errs62 = errors;
+if(typeof key5 === "string"){
+if(!pattern11.test(key5)){
+const err80 = {instancePath:instancePath+"/alt",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key5};
 if(vErrors === null){
 vErrors = [err80];
 }
@@ -19989,9 +19990,8 @@ vErrors.push(err80);
 errors++;
 }
 }
-}
 else {
-const err81 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/type",keyword:"type",params:{type: "object"},message:"must be object"};
+const err81 = {instancePath:instancePath+"/alt",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key5};
 if(vErrors === null){
 vErrors = [err81];
 }
@@ -20000,12 +20000,9 @@ vErrors.push(err81);
 }
 errors++;
 }
-}
-if(data.credit !== undefined){
-let data23 = data.credit;
-if(typeof data23 === "string"){
-if(func2(data23) > 300){
-const err82 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/maxLength",keyword:"maxLength",params:{limit: 300},message:"must NOT have more than 300 characters"};
+var valid13 = _errs62 === errors;
+if(!valid13){
+const err82 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/propertyNames",keyword:"propertyNames",params:{propertyName: key5},message:"property name must be valid"};
 if(vErrors === null){
 vErrors = [err82];
 }
@@ -20014,8 +20011,12 @@ vErrors.push(err82);
 }
 errors++;
 }
-if(func2(data23) < 1){
-const err83 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+}
+for(const key6 in data23){
+let data24 = data23[key6];
+if(typeof data24 === "string"){
+if(func2(data24) > 500){
+const err83 = {instancePath:instancePath+"/alt/" + key6.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 500},message:"must NOT have more than 500 characters"};
 if(vErrors === null){
 vErrors = [err83];
 }
@@ -20024,14 +20025,179 @@ vErrors.push(err83);
 }
 errors++;
 }
-}
-else {
-const err84 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(func2(data24) < 1){
+const err84 = {instancePath:instancePath+"/alt/" + key6.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
 if(vErrors === null){
 vErrors = [err84];
 }
 else {
 vErrors.push(err84);
+}
+errors++;
+}
+}
+else {
+const err85 = {instancePath:instancePath+"/alt/" + key6.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/alt/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err85];
+}
+else {
+vErrors.push(err85);
+}
+errors++;
+}
+}
+}
+else {
+const err86 = {instancePath:instancePath+"/alt",schemaPath:"#/properties/alt/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err86];
+}
+else {
+vErrors.push(err86);
+}
+errors++;
+}
+}
+if(data.decorative !== undefined){
+if(typeof data.decorative !== "boolean"){
+const err87 = {instancePath:instancePath+"/decorative",schemaPath:"#/properties/decorative/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err87];
+}
+else {
+vErrors.push(err87);
+}
+errors++;
+}
+}
+if(data.caption !== undefined){
+let data26 = data.caption;
+if(data26 && typeof data26 == "object" && !Array.isArray(data26)){
+if(Object.keys(data26).length < 1){
+const err88 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/minProperties",keyword:"minProperties",params:{limit: 1},message:"must NOT have fewer than 1 properties"};
+if(vErrors === null){
+vErrors = [err88];
+}
+else {
+vErrors.push(err88);
+}
+errors++;
+}
+for(const key7 in data26){
+const _errs72 = errors;
+if(typeof key7 === "string"){
+if(!pattern11.test(key7)){
+const err89 = {instancePath:instancePath+"/caption",schemaPath:"#/$defs/Locale/pattern",keyword:"pattern",params:{pattern: "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"},message:"must match pattern \""+"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"+"\"",propertyName:key7};
+if(vErrors === null){
+vErrors = [err89];
+}
+else {
+vErrors.push(err89);
+}
+errors++;
+}
+}
+else {
+const err90 = {instancePath:instancePath+"/caption",schemaPath:"#/$defs/Locale/type",keyword:"type",params:{type: "string"},message:"must be string",propertyName:key7};
+if(vErrors === null){
+vErrors = [err90];
+}
+else {
+vErrors.push(err90);
+}
+errors++;
+}
+var valid16 = _errs72 === errors;
+if(!valid16){
+const err91 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/propertyNames",keyword:"propertyNames",params:{propertyName: key7},message:"property name must be valid"};
+if(vErrors === null){
+vErrors = [err91];
+}
+else {
+vErrors.push(err91);
+}
+errors++;
+}
+}
+for(const key8 in data26){
+let data27 = data26[key8];
+if(typeof data27 === "string"){
+if(func2(data27) > 1000){
+const err92 = {instancePath:instancePath+"/caption/" + key8.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/maxLength",keyword:"maxLength",params:{limit: 1000},message:"must NOT have more than 1000 characters"};
+if(vErrors === null){
+vErrors = [err92];
+}
+else {
+vErrors.push(err92);
+}
+errors++;
+}
+if(func2(data27) < 1){
+const err93 = {instancePath:instancePath+"/caption/" + key8.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err93];
+}
+else {
+vErrors.push(err93);
+}
+errors++;
+}
+}
+else {
+const err94 = {instancePath:instancePath+"/caption/" + key8.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/caption/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err94];
+}
+else {
+vErrors.push(err94);
+}
+errors++;
+}
+}
+}
+else {
+const err95 = {instancePath:instancePath+"/caption",schemaPath:"#/properties/caption/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err95];
+}
+else {
+vErrors.push(err95);
+}
+errors++;
+}
+}
+if(data.credit !== undefined){
+let data28 = data.credit;
+if(typeof data28 === "string"){
+if(func2(data28) > 300){
+const err96 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/maxLength",keyword:"maxLength",params:{limit: 300},message:"must NOT have more than 300 characters"};
+if(vErrors === null){
+vErrors = [err96];
+}
+else {
+vErrors.push(err96);
+}
+errors++;
+}
+if(func2(data28) < 1){
+const err97 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err97];
+}
+else {
+vErrors.push(err97);
+}
+errors++;
+}
+}
+else {
+const err98 = {instancePath:instancePath+"/credit",schemaPath:"#/properties/credit/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err98];
+}
+else {
+vErrors.push(err98);
 }
 errors++;
 }
@@ -20043,24 +20209,24 @@ errors = vErrors.length;
 }
 }
 if(data.status !== undefined){
-let data25 = data.status;
-if(typeof data25 !== "string"){
-const err85 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/type",keyword:"type",params:{type: "string"},message:"must be string"};
+let data30 = data.status;
+if(typeof data30 !== "string"){
+const err99 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
-vErrors = [err85];
+vErrors = [err99];
 }
 else {
-vErrors.push(err85);
+vErrors.push(err99);
 }
 errors++;
 }
-if(!((data25 === "active") || (data25 === "retired"))){
-const err86 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema250.properties.status.enum},message:"must be equal to one of the allowed values"};
+if(!((data30 === "active") || (data30 === "retired"))){
+const err100 = {instancePath:instancePath+"/status",schemaPath:"#/properties/status/enum",keyword:"enum",params:{allowedValues: schema250.properties.status.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
-vErrors = [err86];
+vErrors = [err100];
 }
 else {
-vErrors.push(err86);
+vErrors.push(err100);
 }
 errors++;
 }
@@ -20078,115 +20244,115 @@ errors = vErrors.length;
 }
 }
 if(data.rev !== undefined){
-let data28 = data.rev;
-if(!(((typeof data28 == "number") && (!(data28 % 1) && !isNaN(data28))) && (isFinite(data28)))){
-const err87 = {instancePath:instancePath+"/rev",schemaPath:"#/$defs/Revision/type",keyword:"type",params:{type: "integer"},message:"must be integer"};
+let data33 = data.rev;
+if(!(((typeof data33 == "number") && (!(data33 % 1) && !isNaN(data33))) && (isFinite(data33)))){
+const err101 = {instancePath:instancePath+"/rev",schemaPath:"#/$defs/Revision/type",keyword:"type",params:{type: "integer"},message:"must be integer"};
 if(vErrors === null){
-vErrors = [err87];
+vErrors = [err101];
 }
 else {
-vErrors.push(err87);
+vErrors.push(err101);
 }
 errors++;
 }
-if((typeof data28 == "number") && (isFinite(data28))){
-if(data28 < 0 || isNaN(data28)){
-const err88 = {instancePath:instancePath+"/rev",schemaPath:"#/$defs/Revision/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if((typeof data33 == "number") && (isFinite(data33))){
+if(data33 < 0 || isNaN(data33)){
+const err102 = {instancePath:instancePath+"/rev",schemaPath:"#/$defs/Revision/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
 if(vErrors === null){
-vErrors = [err88];
+vErrors = [err102];
 }
 else {
-vErrors.push(err88);
+vErrors.push(err102);
 }
 errors++;
 }
 }
 }
 if(data.createdAt !== undefined){
-let data29 = data.createdAt;
-if(typeof data29 === "string"){
-if(!(formats0.validate(data29))){
-const err89 = {instancePath:instancePath+"/createdAt",schemaPath:"#/$defs/Timestamp/format",keyword:"format",params:{format: "date-time"},message:"must match format \""+"date-time"+"\""};
+let data34 = data.createdAt;
+if(typeof data34 === "string"){
+if(!(formats0.validate(data34))){
+const err103 = {instancePath:instancePath+"/createdAt",schemaPath:"#/$defs/Timestamp/format",keyword:"format",params:{format: "date-time"},message:"must match format \""+"date-time"+"\""};
 if(vErrors === null){
-vErrors = [err89];
+vErrors = [err103];
 }
 else {
-vErrors.push(err89);
+vErrors.push(err103);
 }
 errors++;
 }
 }
 else {
-const err90 = {instancePath:instancePath+"/createdAt",schemaPath:"#/$defs/Timestamp/type",keyword:"type",params:{type: "string"},message:"must be string"};
+const err104 = {instancePath:instancePath+"/createdAt",schemaPath:"#/$defs/Timestamp/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
-vErrors = [err90];
+vErrors = [err104];
 }
 else {
-vErrors.push(err90);
+vErrors.push(err104);
 }
 errors++;
 }
 }
 if(data.updatedAt !== undefined){
-let data30 = data.updatedAt;
-if(typeof data30 === "string"){
-if(!(formats0.validate(data30))){
-const err91 = {instancePath:instancePath+"/updatedAt",schemaPath:"#/$defs/Timestamp/format",keyword:"format",params:{format: "date-time"},message:"must match format \""+"date-time"+"\""};
+let data35 = data.updatedAt;
+if(typeof data35 === "string"){
+if(!(formats0.validate(data35))){
+const err105 = {instancePath:instancePath+"/updatedAt",schemaPath:"#/$defs/Timestamp/format",keyword:"format",params:{format: "date-time"},message:"must match format \""+"date-time"+"\""};
 if(vErrors === null){
-vErrors = [err91];
+vErrors = [err105];
 }
 else {
-vErrors.push(err91);
+vErrors.push(err105);
 }
 errors++;
 }
 }
 else {
-const err92 = {instancePath:instancePath+"/updatedAt",schemaPath:"#/$defs/Timestamp/type",keyword:"type",params:{type: "string"},message:"must be string"};
+const err106 = {instancePath:instancePath+"/updatedAt",schemaPath:"#/$defs/Timestamp/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
-vErrors = [err92];
+vErrors = [err106];
 }
 else {
-vErrors.push(err92);
+vErrors.push(err106);
 }
 errors++;
 }
 }
 if(data.metadata !== undefined){
-let data31 = data.metadata;
-if(data31 && typeof data31 == "object" && !Array.isArray(data31)){
-for(const key8 in data31){
-if(typeof data31[key8] !== "string"){
-const err93 = {instancePath:instancePath+"/metadata/" + key8.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/$defs/Metadata/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
+let data36 = data.metadata;
+if(data36 && typeof data36 == "object" && !Array.isArray(data36)){
+for(const key9 in data36){
+if(typeof data36[key9] !== "string"){
+const err107 = {instancePath:instancePath+"/metadata/" + key9.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/$defs/Metadata/additionalProperties/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
-vErrors = [err93];
+vErrors = [err107];
 }
 else {
-vErrors.push(err93);
+vErrors.push(err107);
 }
 errors++;
 }
 }
 }
 else {
-const err94 = {instancePath:instancePath+"/metadata",schemaPath:"#/$defs/Metadata/type",keyword:"type",params:{type: "object"},message:"must be object"};
+const err108 = {instancePath:instancePath+"/metadata",schemaPath:"#/$defs/Metadata/type",keyword:"type",params:{type: "object"},message:"must be object"};
 if(vErrors === null){
-vErrors = [err94];
+vErrors = [err108];
 }
 else {
-vErrors.push(err94);
+vErrors.push(err108);
 }
 errors++;
 }
 }
 }
 else {
-const err95 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+const err109 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
 if(vErrors === null){
-vErrors = [err95];
+vErrors = [err109];
 }
 else {
-vErrors.push(err95);
+vErrors.push(err109);
 }
 errors++;
 }
@@ -20205,10 +20371,10 @@ const schema303 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in
 const schema305 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
 const schema283 = {"description":"One item, discriminated by `kind` (what it links to). Children, in display order, form the tree; an item has exactly one parent by construction, so the tree has no cycles.","oneOf":[{"type":"object","title":"PageMenuItem","description":"Links to a page by id; the label falls back to the page title.","additionalProperties":false,"required":["id","kind","pageId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["page"]},"pageId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"EntryMenuItem","description":"Links to a content entry by id (at /<collection>/<slug>); the label falls back to the entry title.","additionalProperties":false,"required":["id","kind","entryId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["contentEntry"]},"entryId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"TermMenuItem","description":"Links to a term's archive by term id; the label falls back to the term name in the locale.","additionalProperties":false,"required":["id","kind","termId"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["term"]},"termId":{"$ref":"#/$defs/Id"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"CollectionMenuItem","description":"Links to the index of a content collection, wherever the theme serves it. Collections have no node and no title, so labels are required.","additionalProperties":false,"required":["id","kind","collection","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["collection"]},"collection":{"$ref":"#/$defs/Slug"},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"UrlMenuItem","description":"Links to an external https URL. The host is ASCII (internationalised names in punycode) and carries no user-info, so a label cannot hide where the link goes.","additionalProperties":false,"required":["id","kind","href","labels"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["url"]},"href":{"type":"string","pattern":"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$","maxLength":2048},"newTab":{"type":"boolean","description":"Open in a new tab (rendered with rel=\"noopener noreferrer\")."},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}},{"type":"object","title":"GroupMenuItem","description":"A label without a link that holds other items: a dropdown parent or a sidebar section heading. Hidden when none of its children is shown.","additionalProperties":false,"required":["id","kind","labels","children"],"properties":{"id":{"$ref":"#/$defs/Id"},"kind":{"type":"string","enum":["group"]},"labels":{"$ref":"#/$defs/MenuLabels"},"display":{"$ref":"#/$defs/MenuDisplay"},"children":{"type":"array","items":{"$ref":"#/$defs/MenuItem"},"minItems":1,"maxItems":100}}}]};
 const schema288 = {"type":"string","description":"RFC-0025 25d (RFC-0003 amendment): how a top-level item with children opens in the header. `mega`: one wide panel, its children as columns (a group's children are the column's links).","enum":["mega"]};
-const pattern153 = new RegExp("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$", "u");
+const pattern154 = new RegExp("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$", "u");
 const schema286 = {"type":"object","description":"Item label per locale; plain text, no control characters or surrounding whitespace. A locale without a label falls back to the default locale's label, then to the target's own title or name.","propertyNames":{"$ref":"#/$defs/Locale"},"minProperties":1,"additionalProperties":{"type":"string","minLength":1,"maxLength":100,"pattern":"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"}};
 const schema287 = {"type":"string","description":"BCP 47 language tag, e.g. en, tr, en-US.","pattern":"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"};
-const pattern145 = new RegExp("^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$", "u");
+const pattern146 = new RegExp("^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$", "u");
 
 function validate133(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -20290,7 +20456,7 @@ vErrors.push(err5);
 }
 errors++;
 }
-if(!pattern145.test(data0)){
+if(!pattern146.test(data0)){
 const err6 = {instancePath:instancePath+"/" + key1.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/additionalProperties/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -21489,7 +21655,7 @@ vErrors.push(err92);
 }
 errors++;
 }
-if(!pattern153.test(data30)){
+if(!pattern154.test(data30)){
 const err93 = {instancePath:instancePath+"/href",schemaPath:"#/oneOf/4/properties/href/pattern",keyword:"pattern",params:{pattern: "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"},message:"must match pattern \""+"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\\\\\x00-\\x1F\\x7F]*)?$"+"\""};
 if(vErrors === null){
 vErrors = [err93];
@@ -22346,12 +22512,12 @@ const schema334 = {"type":"integer","description":"Whole milliseconds (the serve
 const schema338 = {"type":"integer","description":"WAE double9. One in this many events of this kind was recorded (vitals sampling; render events under a flood); 1 = every event. Counts weight each event by this number. An integer, so a rate never suffers rounding.","minimum":1,"maximum":1000};
 const schema342 = {"type":"string","description":"WAE blob3. The requested path as received: percent-encoded printable ASCII, without query string or fragment, cut to 256 characters.","pattern":"^/[!-~]*$","maxLength":256};
 const schema349 = {"type":"string","description":"WAE blob18. A known crawler identified from the user agent (e.g. googlebot, gptbot, claudebot, perplexitybot). The list and each crawler's class (search, AI, social, monitor) live in code.","pattern":"^[a-z0-9][a-z0-9-]{0,31}$"};
-const pattern159 = new RegExp("^[a-z0-9][a-z0-9._+-]{0,63}$", "u");
-const pattern162 = new RegExp("^[A-Z][A-Z0-9]$", "u");
-const pattern163 = new RegExp("^[0-9a-f]{16}$", "u");
-const pattern170 = new RegExp("^/[!-~]*$", "u");
-const pattern172 = new RegExp("^(?:/|https://)[!-~]*$", "u");
-const pattern176 = new RegExp("^[a-z0-9][a-z0-9-]{0,31}$", "u");
+const pattern160 = new RegExp("^[a-z0-9][a-z0-9._+-]{0,63}$", "u");
+const pattern163 = new RegExp("^[A-Z][A-Z0-9]$", "u");
+const pattern164 = new RegExp("^[0-9a-f]{16}$", "u");
+const pattern171 = new RegExp("^/[!-~]*$", "u");
+const pattern173 = new RegExp("^(?:/|https://)[!-~]*$", "u");
+const pattern177 = new RegExp("^[a-z0-9][a-z0-9-]{0,31}$", "u");
 
 function validate141(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/analytics-event.schema.json" */;
@@ -22791,7 +22957,7 @@ errors++;
 if(data.utmSource !== undefined){
 let data9 = data.utmSource;
 if(typeof data9 === "string"){
-if(!pattern159.test(data9)){
+if(!pattern160.test(data9)){
 const err38 = {instancePath:instancePath+"/utmSource",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err38];
@@ -22816,7 +22982,7 @@ errors++;
 if(data.utmMedium !== undefined){
 let data10 = data.utmMedium;
 if(typeof data10 === "string"){
-if(!pattern159.test(data10)){
+if(!pattern160.test(data10)){
 const err40 = {instancePath:instancePath+"/utmMedium",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err40];
@@ -22841,7 +23007,7 @@ errors++;
 if(data.utmCampaign !== undefined){
 let data11 = data.utmCampaign;
 if(typeof data11 === "string"){
-if(!pattern159.test(data11)){
+if(!pattern160.test(data11)){
 const err42 = {instancePath:instancePath+"/utmCampaign",schemaPath:"#/$defs/AnalyticsUtmValue/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9._+-]{0,63}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9._+-]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err42];
@@ -22866,7 +23032,7 @@ errors++;
 if(data.country !== undefined){
 let data12 = data.country;
 if(typeof data12 === "string"){
-if(!pattern162.test(data12)){
+if(!pattern163.test(data12)){
 const err44 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err44];
@@ -22960,7 +23126,7 @@ errors++;
 if(data.visitor !== undefined){
 let data16 = data.visitor;
 if(typeof data16 === "string"){
-if(!pattern163.test(data16)){
+if(!pattern164.test(data16)){
 const err52 = {instancePath:instancePath+"/visitor",schemaPath:"#/$defs/AnalyticsVisitorHash/pattern",keyword:"pattern",params:{pattern: "^[0-9a-f]{16}$"},message:"must match pattern \""+"^[0-9a-f]{16}$"+"\""};
 if(vErrors === null){
 vErrors = [err52];
@@ -23397,7 +23563,7 @@ errors++;
 if(data.country !== undefined){
 let data28 = data.country;
 if(typeof data28 === "string"){
-if(!pattern162.test(data28)){
+if(!pattern163.test(data28)){
 const err90 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err90];
@@ -23912,7 +24078,7 @@ vErrors.push(err133);
 }
 errors++;
 }
-if(!pattern170.test(data41)){
+if(!pattern171.test(data41)){
 const err134 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/AnalyticsRequestPath/pattern",keyword:"pattern",params:{pattern: "^/[!-~]*$"},message:"must match pattern \""+"^/[!-~]*$"+"\""};
 if(vErrors === null){
 vErrors = [err134];
@@ -24050,7 +24216,7 @@ vErrors.push(err145);
 }
 errors++;
 }
-if(!pattern172.test(data45)){
+if(!pattern173.test(data45)){
 const err146 = {instancePath:instancePath+"/redirectTo",schemaPath:"#/oneOf/2/properties/redirectTo/pattern",keyword:"pattern",params:{pattern: "^(?:/|https://)[!-~]*$"},message:"must match pattern \""+"^(?:/|https://)[!-~]*$"+"\""};
 if(vErrors === null){
 vErrors = [err146];
@@ -24145,7 +24311,7 @@ errors++;
 if(data.country !== undefined){
 let data48 = data.country;
 if(typeof data48 === "string"){
-if(!pattern162.test(data48)){
+if(!pattern163.test(data48)){
 const err154 = {instancePath:instancePath+"/country",schemaPath:"#/$defs/AnalyticsCountry/pattern",keyword:"pattern",params:{pattern: "^[A-Z][A-Z0-9]$"},message:"must match pattern \""+"^[A-Z][A-Z0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err154];
@@ -24193,7 +24359,7 @@ errors++;
 if(data.crawler !== undefined){
 let data50 = data.crawler;
 if(typeof data50 === "string"){
-if(!pattern176.test(data50)){
+if(!pattern177.test(data50)){
 const err158 = {instancePath:instancePath+"/crawler",schemaPath:"#/$defs/AnalyticsCrawlerName/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{0,31}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{0,31}$"+"\""};
 if(vErrors === null){
 vErrors = [err158];
@@ -24344,7 +24510,7 @@ const schema353 = {"type":"integer","description":"Version of this contract. Rea
 const schema354 = {"type":"string","description":"location.pathname as the browser reports it (no query string, no fragment).","pattern":"^/[^?#\\s]*$","maxLength":1024};
 const schema355 = {"type":"string","description":"A raw utm_* value from the page URL; the server lower-cases it and drops it unless it fits the stored alphabet.","minLength":1,"maxLength":128};
 const schema360 = {"type":"number","minimum":0,"maximum":600000};
-const pattern177 = new RegExp("^/[^?#\\s]*$", "u");
+const pattern178 = new RegExp("^/[^?#\\s]*$", "u");
 
 function validate142(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/analytics-beacon.schema.json" */;
@@ -24463,7 +24629,7 @@ vErrors.push(err8);
 }
 errors++;
 }
-if(!pattern177.test(data2)){
+if(!pattern178.test(data2)){
 const err9 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/BeaconPath/pattern",keyword:"pattern",params:{pattern: "^/[^?#\\s]*$"},message:"must match pattern \""+"^/[^?#\\s]*$"+"\""};
 if(vErrors === null){
 vErrors = [err9];
@@ -24768,7 +24934,7 @@ vErrors.push(err34);
 }
 errors++;
 }
-if(!pattern177.test(data10)){
+if(!pattern178.test(data10)){
 const err35 = {instancePath:instancePath+"/path",schemaPath:"#/$defs/BeaconPath/pattern",keyword:"pattern",params:{pattern: "^/[^?#\\s]*$"},message:"must match pattern \""+"^/[^?#\\s]*$"+"\""};
 if(vErrors === null){
 vErrors = [err35];
@@ -25062,13 +25228,13 @@ const schema380 = {"type":"object","description":"The comment text. v1 has only 
 const schema381 = {"type":"string","description":"Lifecycle. `pending` waits for a person (every guest comment starts here); `approved` is public; `hidden` is withdrawn and reversible; `spam` is never shown and is deleted after the retention period; `deleted` is a soft delete, hard-deleted after the retention period unless approved replies keep it as a tombstone.","enum":["pending","approved","hidden","spam","deleted"]};
 const schema383 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
 const schema388 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const pattern179 = new RegExp("^cmt_[A-Za-z0-9]{6,32}$", "u");
-const pattern184 = new RegExp("^[!-~]+$", "u");
-const pattern191 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
+const pattern180 = new RegExp("^cmt_[A-Za-z0-9]{6,32}$", "u");
+const pattern185 = new RegExp("^[!-~]+$", "u");
+const pattern192 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
 const schema372 = {"description":"Who wrote the comment, discriminated by `kind`. There is deliberately no email, address or account handle here.","oneOf":[{"type":"object","title":"GuestCommentAuthor","description":"A guest: only the display name they typed. Guest comments are always held for moderation in v1.","additionalProperties":false,"required":["kind","name"],"properties":{"kind":{"type":"string","enum":["guest"]},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"ReaderCommentAuthor","description":"A verified reader (v1.1: email code or magic link on the site's own host). `readerId` is the site's reader account id, never the email.","additionalProperties":false,"required":["kind","readerId","name"],"properties":{"kind":{"type":"string","enum":["reader"]},"readerId":{"$ref":"#/$defs/Id"},"name":{"$ref":"#/$defs/CommentDisplayName"}}},{"type":"object","title":"StaffCommentAuthor","description":"A reply on the site's behalf. It is always attributed to a person (`personId` is a staff actor id, `user_…`): an agent may draft the text (`draftedBy`), but a person approved it. `draftedBy` names the agent that drafted the text, when one did (shown in Studio and the audit, not on the public page).","additionalProperties":false,"required":["kind","personId","name","badge"],"properties":{"kind":{"type":"string","enum":["staff"]},"personId":{"type":"string","description":"The person who wrote or approved the reply.","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"$ref":"#/$defs/CommentDisplayName"},"badge":{"type":"string","description":"What the public page shows next to the name: `author` when the person wrote the entry, otherwise `team`.","enum":["author","team"]},"draftedBy":{"$ref":"#/$defs/Actor"}}},{"type":"object","title":"ErasedCommentAuthor","description":"The commenter's identity was erased on request (RFC-0007 privacy model). Pages show a localised \"Anonymous\".","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["erased"]}}}]};
 const schema373 = {"type":"string","description":"Plain text chosen by the commenter (or the staff member's name), NFC-normalised and trimmed by the server: 1 to 80 characters, no control characters, no bidirectional overrides, no surrounding whitespace.","minLength":1,"maxLength":80,"pattern":"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"};
-const pattern185 = new RegExp("^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$", "u");
-const pattern188 = new RegExp("^user_[A-Za-z0-9]{6,32}$", "u");
+const pattern186 = new RegExp("^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$", "u");
+const pattern189 = new RegExp("^user_[A-Za-z0-9]{6,32}$", "u");
 const schema377 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
 const schema378 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
@@ -25318,7 +25484,7 @@ vErrors.push(err6);
 }
 errors++;
 }
-if(!pattern185.test(data1)){
+if(!pattern186.test(data1)){
 const err7 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err7];
@@ -25492,7 +25658,7 @@ vErrors.push(err21);
 }
 errors++;
 }
-if(!pattern185.test(data4)){
+if(!pattern186.test(data4)){
 const err22 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err22];
@@ -25618,7 +25784,7 @@ errors++;
 if(data.personId !== undefined){
 let data6 = data.personId;
 if(typeof data6 === "string"){
-if(!pattern188.test(data6)){
+if(!pattern189.test(data6)){
 const err32 = {instancePath:instancePath+"/personId",schemaPath:"#/oneOf/2/properties/personId/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err32];
@@ -25663,7 +25829,7 @@ vErrors.push(err35);
 }
 errors++;
 }
-if(!pattern185.test(data7)){
+if(!pattern186.test(data7)){
 const err36 = {instancePath:instancePath+"/name",schemaPath:"#/$defs/CommentDisplayName/pattern",keyword:"pattern",params:{pattern: "^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"},message:"must match pattern \""+"^[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069](?:[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*[^\\s\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069])?$"+"\""};
 if(vErrors === null){
 vErrors = [err36];
@@ -26023,7 +26189,7 @@ return errors === 0;
 validate148.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 const schema384 = {"type":"object","description":"The latest moderation decision, kept as a statement of reasons (EU DSA Art. 17). The full history is in `comment_events`. Approvals are always a person's decision; agents may only hide, mark as spam or hold.","additionalProperties":false,"required":["action","actor","at","automated"],"properties":{"action":{"type":"string","enum":["approve","hide","spam","hold","restore","delete","erase"]},"actor":{"$ref":"#/$defs/Actor"},"at":{"$ref":"#/$defs/Timestamp"},"reasonCode":{"type":"string","description":"Required by writers for hide, spam, delete and erase.","enum":["spam","abuse","off-topic","personal-data","illegal-content","legal-order","author-request","erasure-request","duplicate","other"]},"note":{"type":"string","description":"Free text from the moderator, plain text, at most 500 characters.","maxLength":500,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},"automated":{"type":"boolean","description":"True when the decision was taken without a person (an agent, a rule or a ban), as a statement of reasons must say."}}};
-const pattern192 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
+const pattern193 = new RegExp("^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
 
 function validate151(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -26178,7 +26344,7 @@ vErrors.push(err11);
 }
 errors++;
 }
-if(!pattern192.test(data4)){
+if(!pattern193.test(data4)){
 const err12 = {instancePath:instancePath+"/note",schemaPath:"#/properties/note/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err12];
@@ -26369,7 +26535,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern179.test(data1)){
+if(!pattern180.test(data1)){
 const err12 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err12];
@@ -26484,7 +26650,7 @@ errors++;
 if(data.parentId !== undefined){
 let data4 = data.parentId;
 if(typeof data4 === "string"){
-if(!pattern179.test(data4)){
+if(!pattern180.test(data4)){
 const err22 = {instancePath:instancePath+"/parentId",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err22];
@@ -26509,7 +26675,7 @@ errors++;
 if(data.inReplyToId !== undefined){
 let data5 = data.inReplyToId;
 if(typeof data5 === "string"){
-if(!pattern179.test(data5)){
+if(!pattern180.test(data5)){
 const err24 = {instancePath:instancePath+"/inReplyToId",schemaPath:"#/$defs/CommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err24];
@@ -26635,7 +26801,7 @@ vErrors.push(err34);
 }
 errors++;
 }
-if(!pattern184.test(data9)){
+if(!pattern185.test(data9)){
 const err35 = {instancePath:instancePath+"/origin/id",schemaPath:"#/$defs/CommentOrigin/properties/id/pattern",keyword:"pattern",params:{pattern: "^[!-~]+$"},message:"must match pattern \""+"^[!-~]+$"+"\""};
 if(vErrors === null){
 vErrors = [err35];
@@ -26756,7 +26922,7 @@ vErrors.push(err44);
 }
 errors++;
 }
-if(!pattern191.test(data13)){
+if(!pattern192.test(data13)){
 const err45 = {instancePath:instancePath+"/body/text",schemaPath:"#/$defs/CommentBody/properties/text/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err45];
@@ -26951,9 +27117,9 @@ const schema393 = {"type":"string","description":"The signed proof-of-work chall
 const schema394 = {"type":"string","description":"The counter that solves the challenge, in decimal.","pattern":"^(?:0|[1-9][0-9]{0,15})$"};
 const schema395 = {"type":"string","description":"Cloudflare Turnstile's response token, when the site turned Turnstile on.","minLength":1,"maxLength":2048};
 const schema396 = {"type":"string","description":"A field people never see. The schema accepts any short value so that a filled honeypot gets the same answer as a real submission (\"held for moderation\") and nothing is stored.","maxLength":2048};
-const pattern195 = new RegExp("^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$", "u");
-const pattern196 = new RegExp("^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$", "u");
-const pattern197 = new RegExp("^(?:0|[1-9][0-9]{0,15})$", "u");
+const pattern196 = new RegExp("^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$", "u");
+const pattern197 = new RegExp("^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$", "u");
+const pattern198 = new RegExp("^(?:0|[1-9][0-9]{0,15})$", "u");
 
 function validate154(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 /*# sourceURL="https://cloudhal.dev/schemas/v1/comment-submission.schema.json" */;
@@ -27127,7 +27293,7 @@ errors++;
 if(data.parentId !== undefined){
 let data3 = data.parentId;
 if(typeof data3 === "string"){
-if(!pattern179.test(data3)){
+if(!pattern180.test(data3)){
 const err14 = {instancePath:instancePath+"/parentId",schemaPath:"#/$defs/SubmissionCommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err14];
@@ -27197,7 +27363,7 @@ vErrors.push(err19);
 }
 errors++;
 }
-if(!pattern195.test(data5)){
+if(!pattern196.test(data5)){
 const err20 = {instancePath:instancePath+"/email",schemaPath:"#/oneOf/0/properties/email/pattern",keyword:"pattern",params:{pattern: "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},message:"must match pattern \""+"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"+"\""};
 if(vErrors === null){
 vErrors = [err20];
@@ -27277,7 +27443,7 @@ vErrors.push(err26);
 }
 errors++;
 }
-if(!pattern196.test(data7)){
+if(!pattern197.test(data7)){
 const err27 = {instancePath:instancePath+"/challenge",schemaPath:"#/$defs/SubmissionChallenge/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},message:"must match pattern \""+"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"+"\""};
 if(vErrors === null){
 vErrors = [err27];
@@ -27302,7 +27468,7 @@ errors++;
 if(data.solution !== undefined){
 let data8 = data.solution;
 if(typeof data8 === "string"){
-if(!pattern197.test(data8)){
+if(!pattern198.test(data8)){
 const err29 = {instancePath:instancePath+"/solution",schemaPath:"#/$defs/SubmissionSolution/pattern",keyword:"pattern",params:{pattern: "^(?:0|[1-9][0-9]{0,15})$"},message:"must match pattern \""+"^(?:0|[1-9][0-9]{0,15})$"+"\""};
 if(vErrors === null){
 vErrors = [err29];
@@ -27504,7 +27670,7 @@ errors++;
 if(data.commentId !== undefined){
 let data13 = data.commentId;
 if(typeof data13 === "string"){
-if(!pattern179.test(data13)){
+if(!pattern180.test(data13)){
 const err46 = {instancePath:instancePath+"/commentId",schemaPath:"#/$defs/SubmissionCommentId/pattern",keyword:"pattern",params:{pattern: "^cmt_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^cmt_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err46];
@@ -27587,7 +27753,7 @@ vErrors.push(err52);
 }
 errors++;
 }
-if(!pattern195.test(data16)){
+if(!pattern196.test(data16)){
 const err53 = {instancePath:instancePath+"/email",schemaPath:"#/oneOf/1/properties/email/pattern",keyword:"pattern",params:{pattern: "^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"},message:"must match pattern \""+"^[^\\s@\\x00-\\x1F\\x7F]{1,64}@[^\\s@\\x00-\\x1F\\x7F]{1,189}$"+"\""};
 if(vErrors === null){
 vErrors = [err53];
@@ -27632,7 +27798,7 @@ vErrors.push(err56);
 }
 errors++;
 }
-if(!pattern196.test(data17)){
+if(!pattern197.test(data17)){
 const err57 = {instancePath:instancePath+"/challenge",schemaPath:"#/$defs/SubmissionChallenge/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"},message:"must match pattern \""+"^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"+"\""};
 if(vErrors === null){
 vErrors = [err57];
@@ -27657,7 +27823,7 @@ errors++;
 if(data.solution !== undefined){
 let data18 = data.solution;
 if(typeof data18 === "string"){
-if(!pattern197.test(data18)){
+if(!pattern198.test(data18)){
 const err59 = {instancePath:instancePath+"/solution",schemaPath:"#/$defs/SubmissionSolution/pattern",keyword:"pattern",params:{pattern: "^(?:0|[1-9][0-9]{0,15})$"},message:"must match pattern \""+"^(?:0|[1-9][0-9]{0,15})$"+"\""};
 if(vErrors === null){
 vErrors = [err59];
@@ -27801,9 +27967,9 @@ const schema419 = {"type":"string","description":"`rl1:` and the lower-case hex 
 const schema415 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
 const schema411 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
 const schema447 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern202 = new RegExp("^rel_[A-Za-z0-9]{6,32}$", "u");
-const pattern204 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
-const pattern210 = new RegExp("^rl1:[0-9a-f]{64}$", "u");
+const pattern203 = new RegExp("^rel_[A-Za-z0-9]{6,32}$", "u");
+const pattern205 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$", "u");
+const pattern211 = new RegExp("^rl1:[0-9a-f]{64}$", "u");
 const schema407 = {"description":"One pinned change, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleaseSetItem","description":"Make `target` the live version of the node. `base` is the version that was live when the item was pinned; absent when the node was not live (a new entry or page).","additionalProperties":false,"required":["kind","nodeId","nodeKind","target"],"properties":{"kind":{"type":"string","enum":["set"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"target":{"$ref":"#/$defs/ReleaseNodeVersion"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}},{"type":"object","title":"ReleaseRemoveItem","description":"Take the node out of the live snapshot. `base` is the live version that is removed.","additionalProperties":false,"required":["kind","nodeId","nodeKind","base"],"properties":{"kind":{"type":"string","enum":["remove"]},"nodeId":{"$ref":"#/$defs/Id"},"nodeKind":{"$ref":"#/$defs/ReleaseNodeKind"},"base":{"$ref":"#/$defs/ReleaseNodeVersion"}}}]};
 const schema409 = {"type":"string","description":"Kinds of graph node a release may carry. The site node is never one of them.","enum":["page","contentEntry","taxonomy","term","redirect","menu","asset"]};
 const schema410 = {"type":"object","description":"One version of a node: its revision and the SHA-256 of its canonical JSON, whose body the blob store keeps under `nodes/<hash>.json`.","additionalProperties":false,"required":["rev","hash"],"properties":{"rev":{"$ref":"#/$defs/Revision"},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}};
@@ -28311,7 +28477,7 @@ validate156.evaluated = {"dynamicProps":true,"dynamicItems":false};
 const schema414 = {"description":"When the release runs, discriminated by `kind`. Absent while a draft has no time yet.","oneOf":[{"type":"object","title":"ReleaseAt","description":"At an instant. `at` is what the scheduler compares with the clock; when a person entered a wall-clock time, `localTime` keeps it and `at` is recomputed from it and `timeZone` before the release runs, never earlier than the wall-clock time.","additionalProperties":false,"required":["kind","at","timeZone"],"properties":{"kind":{"type":"string","enum":["at"]},"at":{"$ref":"#/$defs/Timestamp"},"timeZone":{"$ref":"#/$defs/TimeZone"},"localTime":{"$ref":"#/$defs/LocalDateTime"}}},{"type":"object","title":"ReleaseOnApproval","description":"As soon as it is approved (a gate-only change such as setting an expiry on live content, or \"publish when approved\").","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["on-approval"]}}}]};
 const schema416 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
 const schema417 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
-const pattern209 = new RegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$", "u");
+const pattern210 = new RegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$", "u");
 
 function validate162(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -28456,7 +28622,7 @@ errors++;
 if(data.localTime !== undefined){
 let data3 = data.localTime;
 if(typeof data3 === "string"){
-if(!pattern209.test(data3)){
+if(!pattern210.test(data3)){
 const err11 = {instancePath:instancePath+"/localTime",schemaPath:"#/$defs/LocalDateTime/pattern",keyword:"pattern",params:{pattern: "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},message:"must match pattern \""+"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err11];
@@ -28596,7 +28762,7 @@ validate162.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 const schema420 = {"description":"Why the release may run, discriminated by `kind`.","oneOf":[{"type":"object","title":"ReleasePersonApproval","description":"A person approved these items (bound to `hash`) for `executeAt`, either by deciding an agent's request (`approvalId`) or by scheduling it themselves. The person's rights are checked again when the release runs.","additionalProperties":false,"required":["kind","by","at"],"properties":{"kind":{"type":"string","enum":["person"]},"by":{"$ref":"#/$defs/ReleasePerson"},"at":{"$ref":"#/$defs/Timestamp"},"executeAt":{"$ref":"#/$defs/Timestamp"},"approvalId":{"$ref":"#/$defs/Id"}}},{"type":"object","title":"ReleaseAutoApproval","description":"An agent key in `auto` mode scheduled a low-risk release without a person (ADR-0015). Valid only while the release runs before `windowEnds`: the end of the key's elevation, or 24 hours after scheduling, whichever comes first.","additionalProperties":false,"required":["kind","by","keyId","at","windowEnds"],"properties":{"kind":{"type":"string","enum":["auto"]},"by":{"$ref":"#/$defs/Actor"},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"at":{"$ref":"#/$defs/Timestamp"},"windowEnds":{"$ref":"#/$defs/Timestamp"}}}]};
 const schema421 = {"type":"object","description":"A staff person (`user_…`). Agents never appear here.","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","pattern":"^user_[A-Za-z0-9]{6,32}$"},"name":{"type":"string","maxLength":200}}};
-const pattern214 = new RegExp("^[A-Za-z0-9_-]{6,64}$", "u");
+const pattern215 = new RegExp("^[A-Za-z0-9_-]{6,64}$", "u");
 const schema425 = {"type":"object","additionalProperties":false,"required":["kind","id"],"properties":{"kind":{"$ref":"#/$defs/ActorKind"},"id":{"$ref":"#/$defs/Id"},"name":{"type":"string","maxLength":200}}};
 const schema426 = {"type":"string","description":"Who performed an action. Humans and agents share one actor model so the policy engine treats them uniformly.","enum":["human","agent","system"]};
 
@@ -28861,7 +29027,7 @@ errors++;
 if(data1.id !== undefined){
 let data2 = data1.id;
 if(typeof data2 === "string"){
-if(!pattern188.test(data2)){
+if(!pattern189.test(data2)){
 const err8 = {instancePath:instancePath+"/by/id",schemaPath:"#/$defs/ReleasePerson/properties/id/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err8];
@@ -29128,7 +29294,7 @@ errors = vErrors.length;
 if(data.keyId !== undefined){
 let data9 = data.keyId;
 if(typeof data9 === "string"){
-if(!pattern214.test(data9)){
+if(!pattern215.test(data9)){
 const err30 = {instancePath:instancePath+"/keyId",schemaPath:"#/oneOf/1/properties/keyId/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]{6,64}$"},message:"must match pattern \""+"^[A-Za-z0-9_-]{6,64}$"+"\""};
 if(vErrors === null){
 vErrors = [err30];
@@ -29253,7 +29419,7 @@ return errors === 0;
 validate164.evaluated = {"dynamicProps":true,"dynamicItems":false};
 
 const schema430 = {"description":"What happened when the release was due, discriminated by `kind` (it matches the terminal `state`).","oneOf":[{"type":"object","title":"ReleasePublishedOutcome","description":"Applied: `snapshotId` is the new live snapshot (reason `scheduled`), composed from `baseSnapshotId` and the items. `purge` says how the edge cache followed.","additionalProperties":false,"required":["kind","runId","at","snapshotId","baseSnapshotId","latenessSeconds","purge"],"properties":{"kind":{"type":"string","enum":["published"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"snapshotId":{"$ref":"#/$defs/Id"},"baseSnapshotId":{"$ref":"#/$defs/Id"},"latenessSeconds":{"type":"integer","minimum":0},"purge":{"type":"string","enum":["tags","everything","deferred","failed","none"]}}},{"type":"object","title":"ReleaseConflictOutcome","description":"Held: these nodes changed since the release was pinned. Nothing was published.","additionalProperties":false,"required":["kind","at","conflicts"],"properties":{"kind":{"type":"string","enum":["conflict"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"conflicts":{"type":"array","items":{"$ref":"#/$defs/ReleaseConflict"},"minItems":1,"maxItems":100}}},{"type":"object","title":"ReleaseFailedOutcome","description":"Refused at run time; nothing was published.","additionalProperties":false,"required":["kind","at","code"],"properties":{"kind":{"type":"string","enum":["failed"]},"runId":{"$ref":"#/$defs/Id"},"at":{"$ref":"#/$defs/Timestamp"},"code":{"type":"string","enum":["dependency_missing","invalid_snapshot","site_missing","node_body_missing","store_error"]},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}},{"type":"object","title":"ReleaseMissedOutcome","description":"The scheduler reached the release more than an hour after its time; nothing was published. A person may publish it now.","additionalProperties":false,"required":["kind","at","latenessSeconds"],"properties":{"kind":{"type":"string","enum":["missed"]},"at":{"$ref":"#/$defs/Timestamp"},"latenessSeconds":{"type":"integer","minimum":0}}},{"type":"object","title":"ReleaseExpiredOutcome","description":"No valid approval when the release was due: never approved, the approver can no longer publish it, the agent's `auto` window ended, or its creator left.","additionalProperties":false,"required":["kind","at","reason"],"properties":{"kind":{"type":"string","enum":["expired"]},"at":{"$ref":"#/$defs/Timestamp"},"reason":{"type":"string","enum":["unapproved","approval_lost","auto_window_ended","creator_removed"]}}},{"type":"object","title":"ReleaseCanceledOutcome","description":"Withdrawn by a person or an agent; its nodes are unlocked.","additionalProperties":false,"required":["kind","at","by"],"properties":{"kind":{"type":"string","enum":["canceled"]},"at":{"$ref":"#/$defs/Timestamp"},"by":{"$ref":"#/$defs/Actor"}}}]};
-const pattern221 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
+const pattern222 = new RegExp("^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$", "u");
 const schema437 = {"type":"object","description":"A node whose live version was not the pinned base when the release ran. `expected` absent: the node was not expected to be live; `found` absent: it was not live.","additionalProperties":false,"required":["nodeId"],"properties":{"nodeId":{"$ref":"#/$defs/Id"},"expected":{"$ref":"#/$defs/ReleaseNodeVersion"},"found":{"$ref":"#/$defs/ReleaseNodeVersion"}}};
 
 function validate169(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -30084,7 +30250,7 @@ vErrors.push(err59);
 }
 errors++;
 }
-if(!pattern221.test(data16)){
+if(!pattern222.test(data16)){
 const err60 = {instancePath:instancePath+"/message",schemaPath:"#/oneOf/2/properties/message/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err60];
@@ -30715,7 +30881,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern202.test(data1)){
+if(!pattern203.test(data1)){
 const err13 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/ReleaseId/pattern",keyword:"pattern",params:{pattern: "^rel_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^rel_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err13];
@@ -30805,7 +30971,7 @@ vErrors.push(err20);
 }
 errors++;
 }
-if(!pattern204.test(data3)){
+if(!pattern205.test(data3)){
 const err21 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err21];
@@ -30901,7 +31067,7 @@ errors++;
 if(data.hash !== undefined){
 let data8 = data.hash;
 if(typeof data8 === "string"){
-if(!pattern210.test(data8)){
+if(!pattern211.test(data8)){
 const err28 = {instancePath:instancePath+"/hash",schemaPath:"#/$defs/ReleaseHash/pattern",keyword:"pattern",params:{pattern: "^rl1:[0-9a-f]{64}$"},message:"must match pattern \""+"^rl1:[0-9a-f]{64}$"+"\""};
 if(vErrors === null){
 vErrors = [err28];
@@ -31069,7 +31235,7 @@ const schema459 = {"type":"object","description":"The person who created the aut
 const schema460 = {"type":"string","description":"RFC 3339 / ISO 8601 instant in UTC.","format":"date-time"};
 const schema463 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
 const schema464 = {"type":"object","description":"Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).","additionalProperties":{"type":"string"}};
-const pattern222 = new RegExp("^aut_[A-Za-z0-9]{6,32}$", "u");
+const pattern223 = new RegExp("^aut_[A-Za-z0-9]{6,32}$", "u");
 const schema452 = {"description":"What runs, discriminated by `kind`.","oneOf":[{"type":"object","title":"BuiltinAutomationJob","description":"A deterministic job Cloudhal runs itself, in bounded steps. Its outputs are findings, reports and Studio notifications; it never changes or publishes content.","additionalProperties":false,"required":["kind","builtin"],"properties":{"kind":{"type":"string","enum":["builtin"]},"builtin":{"type":"string","enum":["broken-links","stale-content","feed-check","weekly-digest","cleanup"]},"staleAfterDays":{"type":"integer","description":"`stale-content` only: entries not updated for this many days are listed for review.","minimum":30,"maximum":1095}}},{"type":"object","title":"AgentTaskAutomationJob","description":"A task an external agent performs over MCP. At each occurrence a run window opens for `windowMinutes`; the automation's key (`keyId`, owned by the automation's owner) is valid only inside an open run, which the agent starts with `begin_run` and ends with `end_run`. The run's mode is the key's effective mode capped by `modeCap`; it never waits for a person: calls that need one leave an approval request and the run ends. `readsUntrustedText` declares that the task reads visitor-supplied text (comments, 404 paths, fetched pages); such an automation's key cannot hold write scopes, and any run that reads such text is limited to reading, labelling and hiding from then on.","additionalProperties":false,"required":["kind","keyId","instructions","modeCap","readsUntrustedText","windowMinutes","budget"],"properties":{"kind":{"type":"string","enum":["agent-task"]},"keyId":{"type":"string","pattern":"^[A-Za-z0-9_-]{6,64}$"},"instructions":{"type":"string","description":"What the owner asks the agent to do, shown to the agent by `begin_run`. Plain text.","minLength":1,"maxLength":2000,"pattern":"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},"skill":{"type":"string","description":"A skill the run declares (its scopes and approval list narrow the run further).","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","maxLength":64},"modeCap":{"type":"string","description":"The most autonomous mode a run may use; never `bypass`.","enum":["plan","manual","edits","auto"]},"readsUntrustedText":{"type":"boolean"},"windowMinutes":{"type":"integer","minimum":5,"maximum":240},"budget":{"$ref":"#/$defs/AutomationBudget"}}}]};
 const schema453 = {"type":"object","description":"Per-run limits Cloudhal counts and enforces for an agent task: tool calls, mutations, approval requests filed and minutes since the run began. Exceeding one ends the run (`budget-exceeded`) and pauses the automation.","additionalProperties":false,"required":["maxToolCalls","maxWrites","maxApprovalRequests","maxMinutes"],"properties":{"maxToolCalls":{"type":"integer","minimum":1,"maximum":500},"maxWrites":{"type":"integer","minimum":0,"maximum":200},"maxApprovalRequests":{"type":"integer","minimum":0,"maximum":20},"maxMinutes":{"type":"integer","minimum":1,"maximum":240}}};
 
@@ -31328,7 +31494,7 @@ errors++;
 if(data.keyId !== undefined){
 let data4 = data.keyId;
 if(typeof data4 === "string"){
-if(!pattern214.test(data4)){
+if(!pattern215.test(data4)){
 const err21 = {instancePath:instancePath+"/keyId",schemaPath:"#/oneOf/1/properties/keyId/pattern",keyword:"pattern",params:{pattern: "^[A-Za-z0-9_-]{6,64}$"},message:"must match pattern \""+"^[A-Za-z0-9_-]{6,64}$"+"\""};
 if(vErrors === null){
 vErrors = [err21];
@@ -31373,7 +31539,7 @@ vErrors.push(err24);
 }
 errors++;
 }
-if(!pattern191.test(data5)){
+if(!pattern192.test(data5)){
 const err25 = {instancePath:instancePath+"/instructions",schemaPath:"#/oneOf/1/properties/instructions/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err25];
@@ -31763,7 +31929,7 @@ const schema454 = {"type":"object","description":"When the automation runs: the 
 const schema455 = {"type":"string","description":"A wall-clock date and time without an offset, to the minute (YYYY-MM-DDTHH:mm), as a person entered it; always paired with a TimeZone (RFC-0008).","pattern":"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"};
 const schema456 = {"type":"string","description":"IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.","pattern":"^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$","maxLength":64};
 const schema457 = {"type":"string","description":"The recurrence as an RFC 5545 RRULE value in Cloudhal's subset, without the `RRULE:` prefix: FREQ DAILY, WEEKLY or MONTHLY; INTERVAL; BYDAY (ordinals such as 2TU or -1FR only with MONTHLY); BYMONTHDAY (1–31 or -1); BYHOUR; BYMINUTE; COUNT or UNTIL. The pattern bounds the vocabulary; the parser refuses repeated parts, COUNT with UNTIL, ordinals outside MONTHLY and runs closer than the job's minimum interval.","maxLength":300,"pattern":"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"};
-const pattern230 = new RegExp("^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$", "u");
+const pattern231 = new RegExp("^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$", "u");
 
 function validate179(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -31821,7 +31987,7 @@ errors++;
 if(data.start !== undefined){
 let data0 = data.start;
 if(typeof data0 === "string"){
-if(!pattern209.test(data0)){
+if(!pattern210.test(data0)){
 const err4 = {instancePath:instancePath+"/start",schemaPath:"#/$defs/LocalDateTime/pattern",keyword:"pattern",params:{pattern: "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"},message:"must match pattern \""+"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]$"+"\""};
 if(vErrors === null){
 vErrors = [err4];
@@ -31891,7 +32057,7 @@ vErrors.push(err9);
 }
 errors++;
 }
-if(!pattern230.test(data2)){
+if(!pattern231.test(data2)){
 const err10 = {instancePath:instancePath+"/rule",schemaPath:"#/$defs/AutomationRule/pattern",keyword:"pattern",params:{pattern: "^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"},message:"must match pattern \""+"^FREQ=(?:DAILY|WEEKLY|MONTHLY)(?:;(?:INTERVAL=[1-9][0-9]{0,2}|BYDAY=(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:[+-]?[1-5])?(?:MO|TU|WE|TH|FR|SA|SU)){0,6}|BYMONTHDAY=(?:-1|[1-9]|[12][0-9]|3[01])(?:,(?:-1|[1-9]|[12][0-9]|3[01])){0,30}|BYHOUR=(?:[01]?[0-9]|2[0-3])(?:,(?:[01]?[0-9]|2[0-3])){0,23}|BYMINUTE=[0-5]?[0-9](?:,[0-5]?[0-9]){0,3}|COUNT=[1-9][0-9]{0,3}|UNTIL=[0-9]{8}T[0-9]{6}Z))*$"+"\""};
 if(vErrors === null){
 vErrors = [err10];
@@ -32123,7 +32289,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern222.test(data1)){
+if(!pattern223.test(data1)){
 const err15 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/AutomationId/pattern",keyword:"pattern",params:{pattern: "^aut_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^aut_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err15];
@@ -32213,7 +32379,7 @@ vErrors.push(err22);
 }
 errors++;
 }
-if(!pattern204.test(data3)){
+if(!pattern205.test(data3)){
 const err23 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]+$"+"\""};
 if(vErrors === null){
 vErrors = [err23];
@@ -32346,7 +32512,7 @@ errors++;
 if(data9.id !== undefined){
 let data10 = data9.id;
 if(typeof data10 === "string"){
-if(!pattern188.test(data10)){
+if(!pattern189.test(data10)){
 const err33 = {instancePath:instancePath+"/owner/id",schemaPath:"#/$defs/AutomationOwner/properties/id/pattern",keyword:"pattern",params:{pattern: "^user_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^user_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err33];
@@ -32559,8 +32725,8 @@ const schema471 = {"type":"string","description":"`due`: claimed occurrence not 
 const schema477 = {"type":"object","description":"What the run used against its budget, counted by the server.","additionalProperties":false,"required":["toolCalls","writes","approvalRequests"],"properties":{"toolCalls":{"type":"integer","minimum":0},"writes":{"type":"integer","minimum":0},"approvalRequests":{"type":"integer","minimum":0}}};
 const schema481 = {"type":"object","additionalProperties":false,"required":["code"],"properties":{"code":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"message":{"type":"string","maxLength":500,"pattern":"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"}}};
 const schema484 = {"type":"integer","description":"Monotonic per-node revision used for optimistic locking (compare-and-swap on write).","minimum":0};
-const pattern232 = new RegExp("^run_[A-Za-z0-9]{6,32}$", "u");
-const pattern236 = new RegExp("^[a-z][a-z0-9_]{0,63}$", "u");
+const pattern233 = new RegExp("^run_[A-Za-z0-9]{6,32}$", "u");
+const pattern237 = new RegExp("^[a-z][a-z0-9_]{0,63}$", "u");
 const schema474 = {"type":"object","description":"An agent task's run window: the automation's key is valid only between `opensAt` and `closesAt`, and only inside a run it began.","additionalProperties":false,"required":["opensAt","closesAt"],"properties":{"opensAt":{"$ref":"#/$defs/Timestamp"},"closesAt":{"$ref":"#/$defs/Timestamp"}}};
 
 function validate182(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -32745,7 +32911,7 @@ errors++;
 if(data.tool !== undefined){
 let data1 = data.tool;
 if(typeof data1 === "string"){
-if(!pattern236.test(data1)){
+if(!pattern237.test(data1)){
 const err5 = {instancePath:instancePath+"/tool",schemaPath:"#/properties/tool/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9_]{0,63}$"},message:"must match pattern \""+"^[a-z][a-z0-9_]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -32934,7 +33100,7 @@ errors++;
 if(data.id !== undefined){
 let data1 = data.id;
 if(typeof data1 === "string"){
-if(!pattern232.test(data1)){
+if(!pattern233.test(data1)){
 const err13 = {instancePath:instancePath+"/id",schemaPath:"#/$defs/ScheduleRunId/pattern",keyword:"pattern",params:{pattern: "^run_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^run_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err13];
@@ -33066,7 +33232,7 @@ errors++;
 if(data3.releaseId !== undefined){
 let data5 = data3.releaseId;
 if(typeof data5 === "string"){
-if(!pattern202.test(data5)){
+if(!pattern203.test(data5)){
 const err24 = {instancePath:instancePath+"/subject/releaseId",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/0/properties/releaseId/pattern",keyword:"pattern",params:{pattern: "^rel_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^rel_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err24];
@@ -33175,7 +33341,7 @@ errors++;
 if(data3.automationId !== undefined){
 let data7 = data3.automationId;
 if(typeof data7 === "string"){
-if(!pattern222.test(data7)){
+if(!pattern223.test(data7)){
 const err33 = {instancePath:instancePath+"/subject/automationId",schemaPath:"#/$defs/ScheduleRunSubject/oneOf/1/properties/automationId/pattern",keyword:"pattern",params:{pattern: "^aut_[A-Za-z0-9]{6,32}$"},message:"must match pattern \""+"^aut_[A-Za-z0-9]{6,32}$"+"\""};
 if(vErrors === null){
 vErrors = [err33];
@@ -33641,7 +33807,7 @@ vErrors.push(err68);
 }
 errors++;
 }
-if(!pattern192.test(data24)){
+if(!pattern193.test(data24)){
 const err69 = {instancePath:instancePath+"/summary",schemaPath:"#/properties/summary/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x08\\x0B-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err69];
@@ -33868,7 +34034,7 @@ errors++;
 if(data29.code !== undefined){
 let data30 = data29.code;
 if(typeof data30 === "string"){
-if(!pattern236.test(data30)){
+if(!pattern237.test(data30)){
 const err87 = {instancePath:instancePath+"/error/code",schemaPath:"#/$defs/ScheduleRunError/properties/code/pattern",keyword:"pattern",params:{pattern: "^[a-z][a-z0-9_]{0,63}$"},message:"must match pattern \""+"^[a-z][a-z0-9_]{0,63}$"+"\""};
 if(vErrors === null){
 vErrors = [err87];
@@ -33903,7 +34069,7 @@ vErrors.push(err89);
 }
 errors++;
 }
-if(!pattern221.test(data31)){
+if(!pattern222.test(data31)){
 const err90 = {instancePath:instancePath+"/error/message",schemaPath:"#/$defs/ScheduleRunError/properties/message/pattern",keyword:"pattern",params:{pattern: "^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"},message:"must match pattern \""+"^[^\\x00-\\x1F\\x7F\\u202A-\\u202E\\u2066-\\u2069]*$"+"\""};
 if(vErrors === null){
 vErrors = [err90];

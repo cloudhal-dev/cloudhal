@@ -517,6 +517,7 @@ function lightboxHtml(id: string, p: Record<string, unknown>, media?: MediaConte
     locale,
     defaultLocale,
     transform: media?.transform ?? "none",
+    ...(media?.budget ? { budget: media.budget } : {}),
     ...(media?.preview ? { preview: true } : {}),
   } as const;
   const items = (Array.isArray(p.items) ? p.items : []).slice(0, 24).flatMap((raw) => {
@@ -623,6 +624,7 @@ export function primitiveHtml(
             locale: media?.locale ?? defaultLocale,
             defaultLocale,
             transform: media?.transform ?? "none",
+            ...(media?.budget ? { budget: media.budget } : {}),
             sizes: "(min-width: 64rem) 64rem, 100vw",
             ...(media?.preview ? { preview: true } : {}),
             ...(node.priority ? { priority: true } : {}),
@@ -909,6 +911,7 @@ export function primitiveHtml(
               locale: media?.locale ?? defaultLocale,
               defaultLocale,
               transform: media?.transform ?? "none",
+              ...(media?.budget ? { budget: media.budget } : {}),
               sizes: "5rem",
               ...(media?.preview ? { preview: true } : {}),
             },

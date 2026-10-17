@@ -366,7 +366,7 @@ export function describeAssetsApi(label: string, backend: AssetsApiBackend): voi
         alt: "Logo",
       });
       expect(ok.status, JSON.stringify(ok.body)).toBe(201);
-      expect((ok.body.asset as Asset).image).toEqual({ width: 24, height: 12 });
+      expect((ok.body.asset as Asset).image).toEqual({ width: 24, height: 12, alpha: true });
       const content = await app.request(`${base()}/${(ok.body.asset as Asset).id}/content`, {
         headers: { "x-test-user": "1" },
       });

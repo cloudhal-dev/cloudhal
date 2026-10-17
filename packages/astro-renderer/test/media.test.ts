@@ -10,7 +10,12 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import { rssXml } from "../src/feeds.ts";
 import { renderEntryArticle, renderMarkdown } from "../src/markdown.ts";
-import { imageAttributes, loadAssetIndex } from "../src/media.ts";
+import {
+  imageAttributes,
+  loadAssetIndex,
+  PLACEHOLDER_BUDGET,
+  placeholderStyle,
+} from "../src/media.ts";
 import { type MediaRouteDeps, parseRangeHeader, serveMediaRequest } from "../src/media-route.ts";
 import { entryHead } from "../src/seo.ts";
 import { LiveSource, SnapshotSource } from "../src/source.ts";
@@ -242,6 +247,24 @@ describe("media", () => {
     expect(e.headers.get("cache-control")).toBe("public, max-age=300");
   });
 
+  it("placeholders (RFC-0028): colour and a blurred LQIP, none for transparent images, a page budget", () => {
+    const lqip = "data:image/webp;base64,UklGRg==";
+    const at = (image: Record<string, unknown>) =>
+      ({ ...photo, image: { width: 300, height: 200, ...image } }) as typeof photo;
+    const both = placeholderStyle(at({ lqip, color: "#a3b18a" }));
+    expect(both).toMatch(/^background-color:#a3b18a;background-image:url\("data:image\/svg\+xml,/);
+    expect(both).toContain("viewBox='0 0 24 16'");
+    expect(both).not.toContain("#b)"); // "#" is escaped inside the data: URL
+    expect(placeholderStyle(at({ color: "#a3b18a" }))).toBe("background-color:#a3b18a");
+    expect(placeholderStyle(at({ lqip, color: "#ffffff", alpha: true }))).toBeUndefined();
+    const budget = { left: lqip.length + 5 };
+    expect(placeholderStyle(at({ lqip }), budget)).toContain("background-image");
+    expect(placeholderStyle(at({ lqip, color: "#000000" }), budget)).toBe(
+      "background-color:#000000",
+    );
+    expect(PLACEHOLDER_BUDGET).toBe(24 * 1024);
+  });
+
   it("imageAttributes: passthrough by default; a fixed ladder through /cdn-cgi/image when opted in", () => {
     const o = { locale: "en", defaultLocale: "en", sizes: "100vw" };
     const plain = imageAttributes(photo, { alt: "" }, { ...o, transform: "none" });
@@ -252,7 +275,9 @@ describe("media", () => {
       alt: "Ferries at dawn",
       loading: "lazy",
       decoding: "async",
-      style: "background-image:url(data:image/webp;base64,UklGRg==);background-size:cover",
+      style: expect.stringMatching(
+        /^background-image:url\("data:image\/svg\+xml,%3Csvg [^"]*feGaussianBlur[^"]*href='data:image\/webp;base64,UklGRg=='/,
+      ),
     });
     const t = imageAttributes(
       photo,
