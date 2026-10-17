@@ -66,7 +66,12 @@ console.log(
 const fileRows = (xs: FileMetric[]) =>
   xs
     .sort((a, b) => a.pkg.localeCompare(b.pkg) || b.lines - a.lines)
-    .map((f) => [f.pkg, code(f.file.slice(f.pkg.length + 1)), f.lines, f.lines > 1000 ? "●" : ""]);
+    .map((f) => [
+      f.pkg,
+      code(f.file.slice(f.pkg.length + 1)),
+      f.lines,
+      f.data ? "data (no limit)" : f.lines > 1000 ? "●" : "",
+    ]);
 console.log("\n## Source files over 500 lines (● over 1000)\n");
 console.log(
   table(["package", "file", "Lines", ">1000"], fileRows(src.filter((f) => f.lines > 500))),

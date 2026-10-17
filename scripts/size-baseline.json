@@ -3,10 +3,6 @@
   "files": {
     "apps/studio/src/components/AnalyticsSections.tsx": 1349,
     "apps/studio/src/components/CommentSettings.tsx": 841,
-    "apps/studio/src/i18n/en.ts": 3216,
-    "apps/studio/src/i18n/lazy/schedules.en.ts": 971,
-    "apps/studio/src/i18n/lazy/schedules.tr.ts": 995,
-    "apps/studio/src/i18n/tr.ts": 3280,
     "apps/studio/src/lib/api.ts": 2798,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,

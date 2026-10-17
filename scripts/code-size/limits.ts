@@ -32,7 +32,10 @@ export const FUNCTION_LIMITS = {
 /** One string literal or template (runtime client code, SQL, help text), in characters. */
 export const STRING_LIMITS: Limit = { soft: 6000, hard: 12000 };
 
-export const fileLimit = (f: FileMetric): Limit => FILE_LIMITS[f.test ? "test" : f.lang];
+const UNLIMITED: Limit = { soft: Number.POSITIVE_INFINITY, hard: Number.POSITIVE_INFINITY };
+
+export const fileLimit = (f: FileMetric): Limit =>
+  f.data ? UNLIMITED : FILE_LIMITS[f.test ? "test" : f.lang];
 
 /** The function measures the ratchet enforces (complexity is reported; Biome warns on it). */
 export const ENFORCED_FUNCTION_MEASURES = ["lines", "depth", "params"] as const;

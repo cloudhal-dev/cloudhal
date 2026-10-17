@@ -31,6 +31,11 @@ const IGNORED = [
 ];
 const TEST_FILE =
   /(\.(test|spec)\.[cm]?[jt]sx?$)|(\/(test|tests|__tests__)\/)|(\/testing(-[\w-]+)?\.tsx?$)|(\/fixtures?\.tsx?$)/;
+/**
+ * Translation dictionaries are data, not code: no line limit (the Studio bundle budget guards
+ * their weight instead). docs/engineering/code-structure.md §8.
+ */
+const DATA_FILE = /^apps\/studio\/src\/i18n\/(lazy\/[\w-]+\.)?(en|tr)\.ts$/;
 const PARSED = /\.(ts|tsx|mts|cts|js|mjs|jsx)$/;
 
 export type Lang = "ts" | "astro" | "css" | "rs" | "js";
@@ -39,6 +44,8 @@ export interface FileMetric {
   pkg: string;
   lang: Lang;
   test: boolean;
+  /** A dictionary (DATA_FILE): measured and reported, never limited. */
+  data: boolean;
   lines: number;
 }
 export interface FunctionMetric {
@@ -128,6 +135,7 @@ export function measure(files = listSourceFiles()): Measurement {
       pkg: packageOf(file),
       lang: langOf(file),
       test: isTestFile(file),
+      data: DATA_FILE.test(file),
       lines: countLines(text),
     });
   }

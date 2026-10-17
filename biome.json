@@ -161,6 +161,20 @@
       }
     },
     {
+      "includes": [
+        "apps/studio/src/i18n/en.ts",
+        "apps/studio/src/i18n/tr.ts",
+        "apps/studio/src/i18n/lazy/*.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/ui/src/blocks/kumo/**"],
       "linter": {
         "enabled": false

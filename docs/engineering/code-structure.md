@@ -45,6 +45,7 @@ Physical lines, comments and blanks included (what you scroll through).
 | Positional parameters | 3 | 4 | `size:check`; Biome `useMaxParams` 4; clippy `too_many_arguments` 5 |
 | Cognitive complexity (Biome/Sonar) | 15 | 25 (warning) | Biome `noExcessiveCognitiveComplexity` 25; clippy `cognitive_complexity` 25 |
 | One string literal / template (client code, SQL, help text) | 6 000 chars | 12 000 chars | `size:check` |
+| Translation dictionary (`apps/studio/src/i18n/{en,tr}.ts`, `i18n/lazy/*`) | — | no line limit | Studio bundle budget (§8) |
 
 Why these values:
 
@@ -74,7 +75,7 @@ Generated and vendored code is never measured: `packages/core-contracts/src/gene
 ## 3. The ratchet
 
 `scripts/size-baseline.json` lists every file, function and string that was over a hard limit on
-2026-10-17 (44 files, 201 functions, 1 string), with its size then.
+2026-10-17 (40 files, 201 functions, 1 string), with its size then.
 
 - A **new** file, function or string over a hard limit fails `pnpm size:check`.
 - A **baselined** one may not grow. Changing it is fine; adding lines means moving at least as many
@@ -226,11 +227,16 @@ Studio (`apps/studio`):
   patterns become a `packages/ui` block (AGENTS.md rule 7).
 - Modules imported only by a lazy route stay in its chunk; never import a heavy module from the
   shell (`apps/studio/bundle-budget.ts` `LAZY_ONLY`).
-- `src/lib/api.ts` is split per resource (`lib/api/<area>.ts`) behind `lib/api/index.ts`.
-- i18n: new areas get a lazy namespace (`src/i18n/lazy/<ns>.{en,tr}.ts`, DESIGN.md §1); the eager
-  `en.ts`/`tr.ts` hold only strings the shell needs on first paint and become merges of per-area
-  files (`src/i18n/core/<area>.{en,tr}.ts`). Dictionaries are data: the file limit applies per area
-  file, not to the merged object.
+- `src/lib/api.ts` is split per resource (`lib/api/<area>.ts`); `lib/api.ts` stays as the barrel
+  (137 files import it by that path).
+- i18n dictionaries are data, not code, so they have **no line limit** (a long list of strings is
+  not hard to read). What they cost is weight and merge conflicts, and the rules aim at those:
+  - the shell imports `en.ts` *and* `tr.ts` eagerly, so every visitor downloads both languages;
+    `apps/studio/bundle-budget.ts` (`initialGzipBytes`) is the guard, not `size:check`;
+  - a new area's strings go in a lazy namespace (`src/i18n/lazy/<ns>.{en,tr}.ts`, DESIGN.md §1),
+    loaded with its route; `en.ts`/`tr.ts` keep what the shell needs on first paint;
+  - moving route-specific groups out of the eager files (and loading only the active language) is
+    a bundle improvement, done for the user's sake, not to meet a line count.
 
 CSS (`starters/blog`, themes): one file per feature (`styles/prose.css`, `styles/surfaces.css`,
 `styles/comments.css` …), imported in order by `global.css`, which keeps only tokens, `@layer`
