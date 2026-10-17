@@ -153,3 +153,26 @@ const caption = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric"
 The block (`kumo add DeleteResource`) hard-codes "Delete {name}", "This action cannot be undone. This will permanently delete the …", "Type … to confirm:", "Cancel", `aria-label`s "Close", "Copy … to clipboard", "Type … to confirm deletion", and the button "Delete {resourceType}". It also lower-cases `resourceType` with `toLowerCase()` (wrong for Turkish "I"), and the sentence order is fixed in JSX, so a translation cannot move the name.
 
 **Proposal.** A `labels` object (or `KumoLocaleProvider` keys) with templates that contain `{name}`, rendered with the name as the highlighted chip wherever the template puts it, as Cloudhal's copy does.
+
+---
+
+## 7. Right-to-left: Kumo's styles are physical
+
+**Status in Cloudhal:** Studio and the `@cloudhal/ui` blocks use logical utilities only (lint `rtl-logical`, ADR-0033 D); Base UI's `DirectionProvider` (re-exported by Kumo) wraps Studio, fed by the locale registry's `dir` (ADR-0033 B). Kumo's own components are not patched yet: that waits until a right-to-left language is scheduled (ADR-0033 A1).
+
+### Title
+
+Support right-to-left layouts: logical properties in Kumo's components (and `dir`-aware placement)
+
+### Body
+
+Kumo 2.14's compiled CSS has about 239 physical utilities (`ml-*`, `mr-*`, `pl-*`, `pr-*`, `left-*`, `right-*`, `text-left`/`text-right`, `border-l`/`border-r`, `rounded-l`/`rounded-r`) and 12 logical ones (`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`), plus 3 `rtl:` variants. In an Arabic or Hebrew UI under `<html dir="rtl">`, the sidebar, dialog close buttons, input addons, table cell alignment, toolbars and popover offsets therefore stay left-to-right, although Base UI underneath already supports direction (`DirectionProvider`, which Kumo re-exports at `@cloudflare/kumo/primitives/direction-provider`).
+
+**Proposal.**
+
+- Use Tailwind 4's logical utilities in every component (`ms`/`me`, `ps`/`pe`, `start`/`end`, `text-start`/`text-end`, `border-s`/`border-e`, `rounded-s`/`rounded-e`/`rounded-ss`…). In left-to-right pages they render exactly as today, so the change is invisible to existing users.
+- Read the direction from Base UI's context for placement that is computed (popover side `inline-start`/`inline-end`, sidebar side, the order of icon and label where it matters).
+- Document which icons mirror (back, forward, carets in breadcrumbs and menus) and offer a `mirrored`-aware icon slot.
+- A lint in Kumo's own CI against new physical utilities keeps it that way.
+
+Cloudhal's interim plan, if an RTL language comes before this: a generated `pnpm patch` that rewrites the compiled classes (the same mapping as our codemod, `scripts/i18n-codemod/logical-utilities.ts`), re-generated on each Kumo upgrade.

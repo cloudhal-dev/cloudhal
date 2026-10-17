@@ -9,6 +9,8 @@
  * out of Studio's initial load. Keep blocks free of top-level side effects, or list them there.
  */
 export * from "@cloudflare/kumo";
+/** Base UI's writing-direction context (Kumo re-exports it): menus, popovers and arrow keys follow `dir` (ADR-0033). */
+export { DirectionProvider, useDirection } from "@cloudflare/kumo/primitives/direction-provider";
 export {
   AgendaList,
   type AgendaListLabels,

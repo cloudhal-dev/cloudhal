@@ -174,9 +174,9 @@ export function BreakdownTable({
         <Table.Header>
           <Table.Row>
             <Table.Head>{labels.item}</Table.Head>
-            <Table.Head className="w-0 text-right whitespace-nowrap">{labels.value}</Table.Head>
+            <Table.Head className="w-0 text-end whitespace-nowrap">{labels.value}</Table.Head>
             {secondary && (
-              <Table.Head className="hidden w-0 text-right whitespace-nowrap @lg/breakdown:table-cell">
+              <Table.Head className="hidden w-0 text-end whitespace-nowrap @lg/breakdown:table-cell">
                 {labels.secondary}
               </Table.Head>
             )}
@@ -235,11 +235,11 @@ export function BreakdownTable({
                       </div>
                     </div>
                   </Table.Cell>
-                  <Table.Cell className="text-right whitespace-nowrap tabular-nums">
+                  <Table.Cell className="text-end whitespace-nowrap tabular-nums">
                     {fmt.number(row.value)}
                   </Table.Cell>
                   {secondary && (
-                    <Table.Cell className="hidden text-right whitespace-nowrap tabular-nums @lg/breakdown:table-cell">
+                    <Table.Cell className="hidden text-end whitespace-nowrap tabular-nums @lg/breakdown:table-cell">
                       {row.secondary === undefined ? "—" : fmt.number(row.secondary)}
                     </Table.Cell>
                   )}

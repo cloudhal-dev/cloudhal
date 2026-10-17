@@ -695,7 +695,7 @@ export function ErrorsCard({ scope }: { scope: AnalyticsScope }) {
             <Table.Row>
               <Table.Head>{t("analytics.columns.status")}</Table.Head>
               <Table.Head>{t("analytics.columns.requested")}</Table.Head>
-              <Table.Head className="text-right">{t("analytics.columns.hits")}</Table.Head>
+              <Table.Head className="text-end">{t("analytics.columns.hits")}</Table.Head>
               <Table.Head>{t("analytics.columns.linkedFrom")}</Table.Head>
               <Table.Head>{t("analytics.columns.lastSeen")}</Table.Head>
               <Table.Head sticky="right" />
@@ -726,7 +726,7 @@ export function ErrorsCard({ scope }: { scope: AnalyticsScope }) {
               <Table.Head>{t("analytics.columns.status")}</Table.Head>
               <Table.Head>{t("analytics.columns.oldPath")}</Table.Head>
               <Table.Head>{t("analytics.columns.target")}</Table.Head>
-              <Table.Head className="text-right">{t("analytics.columns.hits")}</Table.Head>
+              <Table.Head className="text-end">{t("analytics.columns.hits")}</Table.Head>
             </Table.Row>
           </Table.Header>
           {redirects.isPending ? (
@@ -748,7 +748,7 @@ export function ErrorsCard({ scope }: { scope: AnalyticsScope }) {
                       {r.redirectTo}
                     </Text>
                   </Table.Cell>
-                  <Table.Cell className="text-right whitespace-nowrap tabular-nums">
+                  <Table.Cell className="text-end whitespace-nowrap tabular-nums">
                     {fmt.number(r.hits)}
                   </Table.Cell>
                 </Table.Row>
@@ -817,7 +817,7 @@ function ErrorRowView({
           {row.path}
         </Text>
       </Table.Cell>
-      <Table.Cell className="text-right whitespace-nowrap tabular-nums">
+      <Table.Cell className="text-end whitespace-nowrap tabular-nums">
         {fmt.number(row.hits)}
       </Table.Cell>
       <Table.Cell className="whitespace-nowrap">{linkedFrom}</Table.Cell>
@@ -830,7 +830,7 @@ function ErrorRowView({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell sticky="right" className="text-right">
+      <Table.Cell sticky="right" className="text-end">
         {row.status === 404 || row.status === 410 ? (
           canRedirect ? (
             <Tooltip
@@ -1193,7 +1193,7 @@ export function CrawlersCard({ scope }: { scope: AnalyticsScope }) {
             <Table.Row>
               <Table.Head>{t("analytics.columns.crawler")}</Table.Head>
               <Table.Head>{t("analytics.columns.kind")}</Table.Head>
-              <Table.Head className="text-right">{t("analytics.columns.rendered")}</Table.Head>
+              <Table.Head className="text-end">{t("analytics.columns.rendered")}</Table.Head>
             </Table.Row>
           </Table.Header>
           {crawlers.isPending ? (
@@ -1210,7 +1210,7 @@ export function CrawlersCard({ scope }: { scope: AnalyticsScope }) {
                       {t(`analytics.crawlers.classes.${r.class}`)}
                     </Badge>
                   </Table.Cell>
-                  <Table.Cell className="text-right whitespace-nowrap tabular-nums">
+                  <Table.Cell className="text-end whitespace-nowrap tabular-nums">
                     {fmt.number(r.hits)}
                   </Table.Cell>
                 </Table.Row>

@@ -287,7 +287,7 @@ export function ActivityList({ source }: { source: ActivitySource }) {
                         )}
                       </Table.Cell>
                     )}
-                    <Table.Cell sticky="right" className="text-right">
+                    <Table.Cell sticky="right" className="text-end">
                       <Button
                         variant="ghost"
                         size="xs"

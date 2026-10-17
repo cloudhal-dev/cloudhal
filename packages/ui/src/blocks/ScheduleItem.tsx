@@ -198,7 +198,7 @@ export function ScheduleItem(props: ScheduleItemProps) {
           if (!e.defaultPrevented) onOpen?.(entry);
         }}
         className={cn(
-          "flex min-h-6 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-left text-sm outline-none",
+          "flex min-h-6 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-start text-sm outline-none",
           "focus-visible:ring-2 focus-visible:ring-kumo-brand",
           CHIP_LOOK[look],
           className,
@@ -270,7 +270,7 @@ export function ScheduleItem(props: ScheduleItemProps) {
           )}
         </div>
       )}
-      {actions && <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>}
+      {actions && <div className="ms-auto flex shrink-0 items-center gap-1.5">{actions}</div>}
     </div>
   );
 }

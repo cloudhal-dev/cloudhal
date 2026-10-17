@@ -325,7 +325,7 @@ export function CreateAgentKeyDialog({
                                   }
                                 />
                                 {(disabled || from) && (
-                                  <span className="pl-6">
+                                  <span className="ps-6">
                                     <Text variant="secondary" size="sm">
                                       {disabled
                                         ? t("agents.create.scopeAboveRole")

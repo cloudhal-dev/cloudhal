@@ -102,7 +102,7 @@ export function SitesPage() {
                         </Badge>
                       )}
                     </Table.Cell>
-                    <Table.Cell sticky="right" className="w-12 text-right">
+                    <Table.Cell sticky="right" className="w-12 text-end">
                       <CaretRight size={16} className="text-kumo-subtle" aria-hidden />
                     </Table.Cell>
                   </Table.Row>

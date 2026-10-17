@@ -38,11 +38,30 @@ export function pseudoText(text: string): string {
   return out;
 }
 
-function parts(message: Message): Part[] {
+/**
+ * Options of the pseudo-locale. `mirror`: the right-to-left variant (like Android's `ar-XB`) — each
+ * run of text is forced right-to-left with U+202E (right-to-left override) … U+202C, and Studio
+ * sets `dir="rtl"`, so a layout that does not mirror stands out.
+ */
+export interface PseudoOptions {
+  mirror?: boolean;
+}
+
+const RLO = "\u202e";
+const PDF = "\u202c";
+
+function text(piece: string, options: PseudoOptions): string {
+  const pseudo = pseudoText(piece);
+  return options.mirror && pseudo.trim() ? `${RLO}${pseudo}${PDF}` : pseudo;
+}
+
+function parts(message: Message, options: PseudoOptions): Part[] {
   return message.map((p) => {
-    if (typeof p === "string") return pseudoText(p);
+    if (typeof p === "string") return text(p, options);
     if (p[0] === PLURAL || p[0] === ORDINAL || p[0] === SELECT) {
-      const cases = Object.fromEntries(Object.entries(p[2]).map(([k, v]) => [k, parts(v)]));
+      const cases = Object.fromEntries(
+        Object.entries(p[2]).map(([k, v]) => [k, parts(v, options)]),
+      );
       return [p[0], p[1], cases] as Part;
     }
     return p;
@@ -50,11 +69,11 @@ function parts(message: Message): Part[] {
 }
 
 /** A compiled message in the pseudo-locale: `{name}` arguments and syntax untouched. */
-export function pseudoLocalize(message: Compiled): Compiled {
-  if (isMessage(message)) return ["[", ...parts(message), "]"];
-  const text = message
+export function pseudoLocalize(message: Compiled, options: PseudoOptions = {}): Compiled {
+  if (isMessage(message)) return ["[", ...parts(message, options), "]"];
+  const out = message
     .split(/(\{\w+\})/)
-    .map((piece) => (/^\{\w+\}$/.test(piece) ? piece : pseudoText(piece)))
+    .map((piece) => (/^\{\w+\}$/.test(piece) ? piece : text(piece, options)))
     .join("");
-  return `[${text}]`;
+  return `[${out}]`;
 }

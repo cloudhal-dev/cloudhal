@@ -323,7 +323,7 @@ export function MediaPage() {
                           <RelativeTime iso={asset.createdAt} />
                         </span>
                       </Table.Cell>
-                      <Table.Cell sticky="right" className="w-0 text-right">
+                      <Table.Cell sticky="right" className="w-0 text-end">
                         <RowMenu
                           onOpen={() =>
                             navigate({

@@ -65,13 +65,13 @@ export function BuildActivity({ items, labels, emptyIcon, renderTime: time }: Bu
               <Badge variant={failed ? "warning" : "success"} appearance="dot">
                 {failed ? labels.rejected : labels.applied}
               </Badge>
-              <span className="ml-auto">
+              <span className="ms-auto">
                 <Text variant="secondary" as="span">
                   {time(item.at)}
                 </Text>
               </span>
             </div>
-            <div className="flex items-start gap-2 pl-6">
+            <div className="flex items-start gap-2 ps-6">
               <span className="flex h-lh items-center">
                 {failed ? (
                   <WarningCircle size={16} className="text-kumo-warning" aria-hidden />

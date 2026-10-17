@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { allFiles, format, lintFile } from "../scripts/design-lint.ts";
 import { ALLOWED, coversText, isWords, lintText } from "../scripts/i18n-lint.ts";
+import { logical } from "../scripts/i18n-message-rules.ts";
 import { I18nProvider, type TFunction, translate } from "../src/i18n/index.tsx";
 import { ApiRequestError } from "../src/lib/api.ts";
 import { apiErrorText } from "../src/lib/api-errors.ts";
@@ -20,7 +21,7 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
       .map((f) =>
         format(
           f,
-          lintFile(f).filter((v) => v.rule.startsWith("i18n")),
+          lintFile(f).filter((v) => v.rule.startsWith("i18n") || v.rule === "rtl-logical"),
         ),
       )
       .filter(Boolean);
@@ -129,6 +130,47 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
         "const z = Intl.DateTimeFormat().resolvedOptions().timeZone; // i18n-ignore: reads the zone",
       ),
     ).toEqual([]);
+  });
+
+  it("finds physical utilities where logical ones mirror (rtl-logical, ADR-0033)", () => {
+    const hits = (source: string) =>
+      lintText("packages/ui/src/blocks/X.tsx", source).map((v) => v.rule);
+    expect(hits('const a = <td className="w-0 text-right" />;')).toEqual(["rtl-logical"]);
+    expect(hits('const a = cn("ml-auto flex", open && "sm:pl-4");')).toEqual([
+      "rtl-logical",
+      "rtl-logical",
+    ]);
+    expect(hits('const a = "absolute -right-1.5 top-0";')).toEqual(["rtl-logical"]);
+    expect(hits('const a = "border-l rounded-tr-md";')).toEqual(["rtl-logical"]);
+    expect(
+      hits('const a = <td className="w-0 text-end ms-auto ps-4 -end-1.5 border-s" />;'),
+    ).toEqual([]);
+    // Words are not utilities; an exception carries its reason.
+    expect(hits('const a = t("x"); // right-to-left and left-to-right')).toEqual([]);
+    expect(
+      hits('// i18n-ignore: Floating UI sets physical left/top\nconst a = "fixed left-0";'),
+    ).toEqual([]);
+  });
+
+  it("rewrites each physical utility to its logical twin (the codemod)", () => {
+    const pairs: [string, string][] = [
+      ["ml-2", "ms-2"],
+      ["-mr-1", "-me-1"],
+      ["md:pl-4", "md:ps-4"],
+      ["pr-0.5", "pe-0.5"],
+      ["left-0", "start-0"],
+      ["-right-1.5", "-end-1.5"],
+      ["text-left", "text-start"],
+      ["group-hover:text-right", "group-hover:text-end"],
+      ["border-l", "border-s"],
+      ["border-r-2", "border-e-2"],
+      ["rounded-tl-md", "rounded-ss-md"],
+      ["rounded-r", "rounded-e"],
+      ["scroll-ml-4", "scroll-ms-4"],
+      ["mx-2", "mx-2"],
+      ["border-red-500", "border-red-500"],
+    ];
+    for (const [from, to] of pairs) expect(logical(from), from).toBe(to);
   });
 
   it("skips Kumo's variant tables and lines marked i18n-ignore", () => {

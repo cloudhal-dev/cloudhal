@@ -421,7 +421,7 @@ export function CalendarMonth({
                         onMove({ entry, fromDay: from, toDay: day, via: "pointer" });
                     }}
                     className={cn(
-                      "relative border-r border-b border-kumo-hairline align-top outline-none last:border-r-0",
+                      "relative border-e border-b border-kumo-hairline align-top outline-none last:border-e-0",
                       "focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset",
                       dots ? "h-12 cursor-pointer" : "h-28",
                       recessed && "bg-kumo-recessed",
@@ -459,7 +459,7 @@ export function CalendarMonth({
                             {waiting && (
                               <span
                                 data-dot="approval"
-                                className="ml-0.5 size-1.5 rounded-full bg-kumo-warning"
+                                className="ms-0.5 size-1.5 rounded-full bg-kumo-warning"
                               />
                             )}
                           </span>
@@ -509,7 +509,7 @@ export function CalendarMonth({
                                     tabIndex={-1}
                                     data-cell-item=""
                                     data-more=""
-                                    className="flex min-h-6 w-full items-center rounded-md px-1.5 text-left text-sm text-kumo-subtle outline-none hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-brand"
+                                    className="flex min-h-6 w-full items-center rounded-md px-1.5 text-start text-sm text-kumo-subtle outline-none hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-brand"
                                   />
                                 }
                               >

@@ -498,7 +498,7 @@ export function MenuTree({
                 finishDrop(dropFor(row, placeOf(e)));
               }}
               className={cn(
-                "group/row relative flex min-h-12 min-w-0 items-center gap-2 border-b border-kumo-hairline py-2 pr-3 outline-none last:border-b-0",
+                "group/row relative flex min-h-12 min-w-0 items-center gap-2 border-b border-kumo-hairline py-2 pe-3 outline-none last:border-b-0",
                 "focus:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset",
                 dragging === item.id && "opacity-50",
                 indicator?.place === "inside" &&
@@ -523,7 +523,7 @@ export function MenuTree({
                   aria-hidden
                   data-drop-line={indicator.place}
                   className={cn(
-                    "pointer-events-none absolute right-2 h-0.5 rounded-full bg-kumo-brand",
+                    "pointer-events-none absolute end-2 h-0.5 rounded-full bg-kumo-brand",
                     indicator.place === "before" ? "-top-px" : "-bottom-px",
                   )}
                   style={{ insetInlineStart: `${0.5 + (depth - 1) * 1.5}rem` }}

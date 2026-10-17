@@ -506,7 +506,7 @@ export function TaxonomyPage() {
                             <Table.Cell className="whitespace-nowrap">
                               <VisibilityBadge term={term} />
                             </Table.Cell>
-                            <Table.Cell sticky="right" className="w-0 text-right">
+                            <Table.Cell sticky="right" className="w-0 text-end">
                               <span className="flex items-center justify-end gap-1.5">
                                 <TermRowMenu
                                   term={term}

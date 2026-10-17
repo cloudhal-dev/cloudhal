@@ -459,7 +459,7 @@ function AllKeys({ onRevoke, now }: { onRevoke: (key: AgentKeySummary) => void; 
                         </Badge>
                       )}
                     </Table.Cell>
-                    <Table.Cell sticky="right" className="w-12 text-right">
+                    <Table.Cell sticky="right" className="w-12 text-end">
                       <OthersKeyMenu
                         agentKey={k}
                         elevated={
@@ -697,7 +697,7 @@ export function AgentsPage() {
                             </Badge>
                           )}
                         </Table.Cell>
-                        <Table.Cell sticky="right" className="w-12 text-right">
+                        <Table.Cell sticky="right" className="w-12 text-end">
                           <KeyMenu
                             agentKey={k}
                             elevated={

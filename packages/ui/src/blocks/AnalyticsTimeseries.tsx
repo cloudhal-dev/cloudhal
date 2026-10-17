@@ -196,7 +196,7 @@ export function AnalyticsTimeseries({
               <Table.Row>
                 <Table.Head>{labels.time}</Table.Head>
                 {series.map((s) => (
-                  <Table.Head key={s.id} className="text-right whitespace-nowrap">
+                  <Table.Head key={s.id} className="text-end whitespace-nowrap">
                     {s.name}
                   </Table.Head>
                 ))}
@@ -211,7 +211,7 @@ export function AnalyticsTimeseries({
                   {series.map((s) => {
                     const v = s.points.find(([at]) => at === t)?.[1];
                     return (
-                      <Table.Cell key={s.id} className="text-right whitespace-nowrap tabular-nums">
+                      <Table.Cell key={s.id} className="text-end whitespace-nowrap tabular-nums">
                         {v === undefined ? "—" : fmt.number(v)}
                       </Table.Cell>
                     );

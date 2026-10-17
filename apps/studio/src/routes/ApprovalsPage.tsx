@@ -448,7 +448,7 @@ function HistoryTable({
                       ) : (
                         <ToolCell tool={r.tool} />
                       )}
-                      <Tooltip content={promptText(r)} className="block min-w-0 text-left">
+                      <Tooltip content={promptText(r)} className="block min-w-0 text-start">
                         <Text variant="secondary" size="sm" truncate>
                           {promptText(r, true)}
                         </Text>
@@ -477,7 +477,7 @@ function HistoryTable({
                               {t("approvals.decidedByYou")}
                             </Text>
                           ) : (
-                            <Tooltip content={r.decidedBy} className="block max-w-40 text-left">
+                            <Tooltip content={r.decidedBy} className="block max-w-40 text-start">
                               <Text variant="mono-secondary" truncate as="span">
                                 {t("approvals.decidedBy", { actor: r.decidedBy })}
                               </Text>

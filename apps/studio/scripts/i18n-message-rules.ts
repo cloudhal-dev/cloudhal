@@ -8,6 +8,9 @@
  * - `i18n-format`: a formatter built on the spot (`new Intl.DateTimeFormat(…)`, `n.toLocaleString(…)`)
  *   instead of the cached, locale-taking layer in `@cloudhal/messages/format` (`formatDate`,
  *   `formatNumber`, `numberFormat`, …) — the i18n review's Phase 2.
+ * - `rtl-logical`: a physical Tailwind utility (`ml-2`, `pr-4`, `left-0`, `text-right`,
+ *   `border-l`, `rounded-r`) where a logical one mirrors in right-to-left languages (`ms-2`, `pe-4`,
+ *   `start-0`, `text-end`, `border-s`, `rounded-e`) — ADR-0033 D.
  * Exceptions carry `i18n-ignore: <reason>` on the line or the line above, as for the words rule.
  */
 
@@ -16,7 +19,7 @@ const isNode = (v: unknown): v is Node =>
   typeof v === "object" && v !== null && typeof (v as Node).type === "string";
 
 export interface RuleHit {
-  rule: "i18n-plural" | "i18n-concat" | "i18n-format";
+  rule: "i18n-plural" | "i18n-concat" | "i18n-format" | "rtl-logical";
   node: Node;
   message: string;
 }
@@ -69,8 +72,66 @@ function checkFormat(node: Node, hits: RuleHit[]) {
     hits.push({ rule: "i18n-format", node, message: FORMAT });
 }
 
+/** A physical utility, after its variants (`md:`, `group-hover:`); `-` for negative values. */
+export const PHYSICAL =
+  /^-?(?:(?:scroll-)?[mp][lr]-|(?:left|right)-|text-(?:left|right)$|border-[lr](?:-|$)|rounded-(?:[lr]|[tb][lr])(?:-|$)|(?:float|clear)-(?:left|right)$)/;
+/** One utility (after its variants and `!`) to its logical twin, or itself. */
+export function logical(token: string): string {
+  const m = /^((?:[^:\s[\]]+:)*!?)(-?)(.*)$/.exec(token);
+  if (!m) return token;
+  const [, variants, neg, body] = m as unknown as [string, string, string, string];
+  const swap: [RegExp, string][] = [
+    [/^(scroll-)?m([lr])-/, ""],
+    [/^(scroll-)?p([lr])-/, ""],
+    [/^left-/, "start-"],
+    [/^right-/, "end-"],
+    [/^text-left$/, "text-start"],
+    [/^text-right$/, "text-end"],
+    [/^border-l(?=-|$)/, "border-s"],
+    [/^border-r(?=-|$)/, "border-e"],
+    [/^rounded-tl(?=-|$)/, "rounded-ss"],
+    [/^rounded-tr(?=-|$)/, "rounded-se"],
+    [/^rounded-bl(?=-|$)/, "rounded-es"],
+    [/^rounded-br(?=-|$)/, "rounded-ee"],
+    [/^rounded-l(?=-|$)/, "rounded-s"],
+    [/^rounded-r(?=-|$)/, "rounded-e"],
+    [/^(float|clear)-left$/, "$1-start"],
+    [/^(float|clear)-right$/, "$1-end"],
+  ];
+  for (const [re, to] of swap) {
+    if (!re.test(body)) continue;
+    const out =
+      to === ""
+        ? body.replace(
+            /^(scroll-)?([mp])([lr])-/,
+            (_x, s = "", mp, lr) => `${s}${mp}${lr === "l" ? "s" : "e"}-`,
+          )
+        : body.replace(re, to);
+    return `${variants}${neg}${out}`;
+  }
+  return token;
+}
+
+const LOGICAL_HINT =
+  "a physical utility — use the logical one so it mirrors in right-to-left languages (ms/me, ps/pe, start/end, text-start/end, border-s/e, rounded-s/e/ss/se/es/ee), ADR-0033";
+
+/** Physical utilities in a string that reads as a class list. */
+function checkPhysical(node: Node, hits: RuleHit[]) {
+  const text =
+    node.type === "Literal" && typeof node.value === "string"
+      ? node.value
+      : node.type === "TemplateElement"
+        ? ((node.value as { cooked?: string }).cooked ?? "")
+        : undefined;
+  if (!text || !/[a-z]-/.test(text)) return;
+  const tokens = text.split(/\s+/).map((t) => t.replace(/^(?:[^:\s[\]]+:)+/, "").replace(/^!/, ""));
+  if (tokens.some((t) => PHYSICAL.test(t)))
+    hits.push({ rule: "rtl-logical", node, message: LOGICAL_HINT });
+}
+
 function check(node: Node, hits: RuleHit[]) {
   checkFormat(node, hits);
+  checkPhysical(node, hits);
   if (node.type === "ConditionalExpression") {
     const test = unwrap(node.test);
     const counted =

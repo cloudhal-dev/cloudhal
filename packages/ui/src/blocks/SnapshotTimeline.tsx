@@ -146,7 +146,7 @@ export function SnapshotTimeline({
                   )}
                 </Table.Cell>
               )}
-              <Table.Cell sticky="right" className="w-0 whitespace-nowrap text-right">
+              <Table.Cell sticky="right" className="w-0 whitespace-nowrap text-end">
                 {!isLive && onPublish && !isOlderThanLive && (
                   <Button
                     variant="secondary"
