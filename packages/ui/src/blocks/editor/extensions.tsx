@@ -10,7 +10,7 @@ import { type AnyExtension, Node } from "@tiptap/core";
 import Image, { type ImageOptions } from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
-import { Placeholder } from "@tiptap/extensions";
+import { Focus, Placeholder } from "@tiptap/extensions";
 import { NodeViewWrapper, type ReactNodeViewProps, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { InsetPanel } from "../InsetPanel.tsx";
@@ -140,6 +140,8 @@ export interface EditorExtensionOptions {
   resolveSrc?: (src: string) => string | undefined;
   /** The slash menu (editing only; the codec leaves it out). */
   slash?: SlashOptions;
+  /** Marks the top-level block being written (`has-focus`) for the focus mode's spotlight. */
+  spotlight?: boolean;
 }
 
 /** The schema shared by the editor and its markdown codec. */
@@ -173,6 +175,7 @@ export function editorExtensions(options: EditorExtensionOptions = {}): AnyExten
     DirectiveLeaf,
     DirectiveContainer,
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),
+    ...(options.spotlight ? [Focus.configure({ className: "has-focus", mode: "shallowest" })] : []),
     ...(options.slash ? [SlashCommand.configure(options.slash)] : []),
   ];
 }

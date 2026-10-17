@@ -1,4 +1,4 @@
-import { InputArea } from "@cloudhal/ui";
+import { Button, InputArea, Text } from "@cloudhal/ui";
 import type {
   AiSelection,
   EditorBlocks,
@@ -55,6 +55,7 @@ export function BodyEditor({
   onChange,
   size = "base",
   readOnly = false,
+  focusSave,
 }: {
   siteId: string;
   /** The page or article (in-editor AI, RFC-0016): without it, no "Ask AI". */
@@ -68,6 +69,8 @@ export function BodyEditor({
   onChange: (value: string) => void;
   size?: "sm" | "base";
   readOnly?: boolean;
+  /** Focus mode keeps the page's save at hand: whether there is something to save, and how. */
+  focusSave?: { dirty: boolean; saving: boolean; disabled: boolean; onSave: () => void };
 }) {
   const t = useT("bodyEditor");
   const { locale } = useI18n();
@@ -127,6 +130,14 @@ export function BodyEditor({
       outlineSkipped: t("bodyEditor.outlineSkipped"),
       outlineExtraH1: t("bodyEditor.outlineExtraH1"),
       askAi: t("bodyEditor.ai.ask"),
+      focus: t("bodyEditor.focus"),
+      focusExit: t("bodyEditor.focusExit"),
+      spotlight: t("bodyEditor.spotlight"),
+      focusShortcut: t("bodyEditor.focusShortcut", {
+        keys: /Mac|iP(hone|ad)/.test(globalThis.navigator?.platform ?? "")
+          ? "⌘⇧\\"
+          : "Ctrl+Shift+\\",
+      }),
     }),
     [t],
   );
@@ -181,6 +192,27 @@ export function BodyEditor({
           readOnly={readOnly}
           locale={locale}
           blocks={blocks}
+          {...(focusSave
+            ? {
+                focusActions: (
+                  <>
+                    <Text variant="secondary" size="sm">
+                      {focusSave.dirty ? t("bodyEditor.focusUnsaved") : t("bodyEditor.focusSaved")}
+                    </Text>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={focusSave.saving}
+                      disabled={!focusSave.dirty || focusSave.disabled}
+                      onClick={focusSave.onSave}
+                      data-testid="focus-save"
+                    >
+                      {t("common.save")}
+                    </Button>
+                  </>
+                ),
+              }
+            : {})}
           {...(readOnly ? {} : { onPickImage: pickImage })}
           {...(ai ? { onAskAi: setAsking } : {})}
         />

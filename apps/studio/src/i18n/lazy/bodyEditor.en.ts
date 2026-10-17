@@ -39,6 +39,12 @@ export const messages = {
     outlineEmpty: "No headings yet. Add one with / or the toolbar.",
     outlineSkipped: "Skips a level",
     outlineExtraH1: "Use H2: the page has its H1",
+    focus: "Focus",
+    focusExit: "Leave focus",
+    spotlight: "Spotlight",
+    focusShortcut: "Focus mode ({keys}, Esc to leave)",
+    focusUnsaved: "Unsaved changes",
+    focusSaved: "All changes saved",
     sourceBadge: "Markdown",
     sourceHint: "Kept exactly as written. Edit it in Markdown mode.",
     blocks: {
