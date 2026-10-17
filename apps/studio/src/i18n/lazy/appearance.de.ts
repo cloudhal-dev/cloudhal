@@ -56,7 +56,8 @@ export const messages: NamespaceMessages<"appearance"> = {
       menus: "Menüs, die du benennen kannst: {menus}.",
       saved: "Kopf- und Fußzeile gespeichert",
       failed: "Kopf- und Fußzeile konnten nicht gespeichert werden",
-      publishHint: "Änderungen erscheinen nach der nächsten Veröffentlichung auf der Website.",
+      menusPublish:
+        "Menüs, die du benennen kannst: {menus}. Änderungen erscheinen nach der nächsten Veröffentlichung auf der Website.",
     },
   },
 };

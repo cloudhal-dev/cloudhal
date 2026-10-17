@@ -49,6 +49,7 @@ export interface MessageParams {
   "agents.howModes.rulesHint.lowRisk": { limit: string | number };
   "agents.keyPrefix": { start: string | number };
   "agents.modes.autoDescription": { limit: string | number };
+  "agents.modes.waitsFor": { mode: "plan" | "manual" | "edits" | "auto" | "bypass" };
   "agents.narrowed.hintRole": { role: string | number };
   "agents.narrowed.stored": { scopes: string | number };
   "agents.noMatches": { query: string | number };
@@ -89,6 +90,7 @@ export interface MessageParams {
   "analyticsSettings.retention.days": { days: string | number };
   "analyticsSettings.vitals.cost": { percent: string | number };
   "appearance.chrome.menus": { menus: string | number };
+  "appearance.chrome.menusPublish": { menus: string | number };
   "appearance.repairFill": { scheme: string | number; role: string | number; direction: string | number; steps: string | number; against: string | number; ratio: string | number };
   "appearance.repairPair": { scheme: string | number; role: string | number; direction: string | number; steps: string | number; against: string | number; ratio: string | number };
   "approvals.approvedDescription": { agent: string | number };
@@ -376,7 +378,7 @@ export interface MessageParams {
   "menus.deleteNotice.title.contentEntry": { count: number };
   "menus.deleteNotice.title.page": { count: number };
   "menus.deleted": { name: string | number };
-  "menus.delta.add": { label: string | number; where: string | number; place: string | number; below: string | number };
+  "menus.delta.add": { label: string | number; where: string | number; place: string | number; below: number };
   "menus.delta.hidden": { label: string | number; reason: string | number };
   "menus.delta.label": { label: string | number; locale: string | number; from: string | number; to: string | number };
   "menus.delta.move": { label: string | number; from: string | number; to: string | number };
@@ -398,7 +400,6 @@ export interface MessageParams {
   "menus.delta.where.term": { where: string | number; taxonomy: string | number; name: string | number };
   "menus.delta.where.url": { host: string | number };
   "menus.delta.where.urlNewTab": { host: string | number };
-  "menus.delta.withBelow": { count: number };
   "menus.depth": { count: number };
   "menus.derived.treeLabel": { place: string | number };
   "menus.diff.items": { before: string | number; after: string | number };
@@ -730,4 +731,5 @@ export interface MessageParams {
   "termEditor.retire.title": { singular: string | number };
   "termEditor.retired.merged": { name: string | number };
   "termEditor.seo.description": { locale: string | number };
+  "theme.current": { name: string | number };
 }

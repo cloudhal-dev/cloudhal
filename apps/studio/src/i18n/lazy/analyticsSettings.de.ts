@@ -53,7 +53,8 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     unique: {
       label: "Eindeutige Besucher zählen",
       hint: "Weiterhin ohne Cookies: Die IP-Adresse und die Browserdetails jedes Besuchers werden mit einem Zufallswert kombiniert, der sich täglich ändert, und nur das Ergebnis wird gespeichert. Der Zufallswert wird innerhalb von 24 Stunden gelöscht, sodass niemand Besucher zurückverfolgen oder tageübergreifend verknüpfen kann.",
-      needsVisits: "Aktiviere zuerst „Besuche zählen“.",
+      hintNeedsVisits:
+        "Weiterhin ohne Cookies: Die IP-Adresse und die Browserdetails jedes Besuchers werden mit einem Zufallswert kombiniert, der sich täglich ändert, und nur das Ergebnis wird gespeichert. Der Zufallswert wird innerhalb von 24 Stunden gelöscht, sodass niemand Besucher zurückverfolgen oder tageübergreifend verknüpfen kann. Aktiviere zuerst „Besuche zählen“.",
       offWarningTitle: "Speichern löscht den heutigen Zufallswert",
       offWarning:
         "Alle Websites auf diesem Deployment teilen ihn, daher wird er für alle gleichzeitig gelöscht. Eindeutige Besucher werden hier nicht mehr gezählt; auf anderen Websites, die sie zählen, kann jemand, der später am heutigen Tag wiederkommt, doppelt gezählt werden.",
@@ -99,7 +100,8 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     notice: {
       title: "Datenschutzhinweis für deine Website",
       hint: "Füge ihn deiner Datenschutzerklärung hinzu. Er richtet sich nach den Schaltern oben.",
-      unsaved: "Er berücksichtigt bereits deine ungespeicherten Änderungen.",
+      hintUnsaved:
+        "Füge ihn deiner Datenschutzerklärung hinzu. Er richtet sich nach den Schaltern oben. Er berücksichtigt bereits deine ungespeicherten Änderungen.",
       languages: "Sprache des Hinweises",
       copy: "Hinweis kopieren",
       copied: "Datenschutzhinweis kopiert",

@@ -40,6 +40,7 @@ export const messages: Messages = {
   },
   theme: {
     label: "Tema",
+    current: "Tema: {name}",
     light: "Açık",
     dark: "Koyu",
     system: "Sistem",
@@ -725,14 +726,8 @@ export const messages: Messages = {
         auto: "Düzenleme gibi çalışır; küçük makale yayınları ise sana sormadan canlıya çıkar.",
         bypass: "Hiçbir şey onay beklemez. Yalnızca kendi bilgisayarındaki cloudhal mcp için.",
       },
-      waitsLabel: "Senin onayını bekler:",
-      waits: {
-        plan: "hiçbir şey, çünkü hiçbir şeyi değiştiremez",
-        manual: "her düzenleme, yayın, geri alma ve silme",
-        edits: "yayın, geri alma ve silme",
-        auto: "büyük yayınlar, geri alma ve silme",
-        bypass: "hiçbir şey",
-      },
+      waitsFor:
+        "{mode, select, plan {Senin onayını bekler: hiçbir şey, çünkü hiçbir şeyi değiştiremez} manual {Senin onayını bekler: her düzenleme, yayın, geri alma ve silme} edits {Senin onayını bekler: yayın, geri alma ve silme} auto {Senin onayını bekler: büyük yayınlar, geri alma ve silme} bypass {Senin onayını bekler: hiçbir şey} other {Senin onayını bekler: her düzenleme, yayın, geri alma ve silme}}",
       risk: {
         safest: "En güvenli",
         recommended: "Önerilen",

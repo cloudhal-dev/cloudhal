@@ -55,9 +55,7 @@ function ModeSummary({ mode }: { mode: AgentMode }) {
   return (
     <span className="grid max-w-72 gap-1">
       <span>{t(`agents.modes.descriptions.${mode}`)}</span>
-      <span>
-        {t("agents.modes.waitsLabel")} {t(`agents.modes.waits.${mode}`)}
-      </span>
+      <span>{t("agents.modes.waitsFor", { mode })}</span>
     </span>
   );
 }
@@ -178,12 +176,7 @@ export function ModePicker({
                   <span className="flex h-lh items-center">
                     <HandPalm size={14} />
                   </span>
-                  <span>
-                    <Text as="span" size="sm" bold>
-                      {t("agents.modes.waitsLabel")}
-                    </Text>{" "}
-                    {t(`agents.modes.waits.${mode}`)}
-                  </span>
+                  <span>{t("agents.modes.waitsFor", { mode })}</span>
                 </span>
               </span>
             }

@@ -233,7 +233,7 @@ export function CreateAgentKeyDialog({
                     <ModeBadge mode={mode} />
                   </div>
                   <Text variant="secondary" size="sm">
-                    {t("agents.modes.waitsLabel")} {t(`agents.modes.waits.${mode}`)}
+                    {t("agents.modes.waitsFor", { mode })}
                   </Text>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setStep("mode")}>

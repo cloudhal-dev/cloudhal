@@ -90,7 +90,8 @@ export const messages: NamespaceMessages<"commentsSettings"> = {
     ai: {
       label: "Kommentare mit Workers AI labeln",
       hint: "Ein Modell in deinem Cloudflare-Konto schlägt Labels vor (Spam, toxisch, Frage…). Labels veröffentlichen oder verbergen nie etwas.",
-      unavailable: "Auf dieser Bereitstellung noch nicht verfügbar.",
+      hintUnavailable:
+        "Ein Modell in deinem Cloudflare-Konto schlägt Labels vor (Spam, toxisch, Frage…). Labels veröffentlichen oder verbergen nie etwas. Auf dieser Bereitstellung noch nicht verfügbar.",
       confirmTitle: "Kommentare an Workers AI senden?",
       confirmDescription:
         "Der Text jedes neuen Kommentars wird an ein Workers-AI-Modell in deinem eigenen Cloudflare-Konto gesendet, um Labels vorzuschlagen. Namen und E-Mail-Adressen werden nicht gesendet.",
@@ -115,7 +116,8 @@ export const messages: NamespaceMessages<"commentsSettings"> = {
     notice: {
       title: "Datenschutzhinweis",
       hint: "Füge ihn in die Datenschutzseite deiner Website ein. Er folgt den Schaltern oben.",
-      unsaved: "Er zeigt deine ungespeicherten Änderungen.",
+      hintUnsaved:
+        "Füge ihn in die Datenschutzseite deiner Website ein. Er folgt den Schaltern oben. Er zeigt deine ungespeicherten Änderungen.",
       languages: "Sprache des Hinweises",
       heading: "Kommentare",
       base: "Wenn Sie einen Kommentar schreiben, speichern wir den Namen und den Text, den Sie übermitteln, sowie Ihre E-Mail-Adresse, falls Sie eine angeben. Ihre E-Mail-Adresse wird nie angezeigt und nur verwendet, um Anfragen zu Ihrem Kommentar zu bearbeiten. Um Missbrauch zu verhindern, bewahren wir eine unkenntlich gemachte Form Ihrer Netzwerkadresse bis zu 30 Tage lang auf; die Adresse selbst speichern wir nie. Kommentare werden geprüft, bevor sie erscheinen. Für Kommentare verwenden wir keine Cookies. Sie können uns jederzeit bitten, Ihren Namen oder Ihren Kommentar zu entfernen.",

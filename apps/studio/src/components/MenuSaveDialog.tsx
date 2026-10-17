@@ -51,8 +51,7 @@ export function useDeltaText(taxonomyName: (key: string) => string) {
         const place = line.parent
           ? t("menus.delta.under", { parent: line.parent, position: line.position })
           : t("menus.delta.topLevel", { position: line.position });
-        const below = line.below === 0 ? "" : t("menus.delta.withBelow", { count: line.below });
-        return t("menus.delta.add", { label, where: where(line.target), place, below });
+        return t("menus.delta.add", { label, where: where(line.target), place, below: line.below });
       }
       case "−":
         return line.below > 0

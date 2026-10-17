@@ -56,7 +56,8 @@ export const messages: NamespaceMessages<"appearance"> = {
       menus: "Adlandırabileceğiniz menüler: {menus}.",
       saved: "Üst ve alt bilgi kaydedildi",
       failed: "Üst ve alt bilgi kaydedilemedi",
-      publishHint: "Değişiklikler bir sonraki yayından sonra sitede görünür.",
+      menusPublish:
+        "Adlandırabileceğiniz menüler: {menus}. Değişiklikler bir sonraki yayından sonra sitede görünür.",
     },
   },
 };

@@ -52,7 +52,8 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     unique: {
       label: "Tekil ziyaretçileri say",
       hint: "Yine çerezsiz: her ziyaretçinin IP adresi ve tarayıcı bilgisi her gün değişen rastgele bir değerle birleştirilir, yalnızca sonuç saklanır. Rastgele değer 24 saat içinde silinir; böylece kimse ziyaretçilerin izini süremez ya da onları günler arasında eşleştiremez.",
-      needsVisits: "Önce Ziyaretleri say'ı aç.",
+      hintNeedsVisits:
+        "Yine çerezsiz: her ziyaretçinin IP adresi ve tarayıcı bilgisi her gün değişen rastgele bir değerle birleştirilir, yalnızca sonuç saklanır. Rastgele değer 24 saat içinde silinir; böylece kimse ziyaretçilerin izini süremez ya da onları günler arasında eşleştiremez. Önce Ziyaretleri say'ı aç.",
       offWarningTitle: "Kaydetmek bugünün rastgele değerini siler",
       offWarning:
         "Bu kurulumdaki tüm siteler bu değeri paylaşır, bu yüzden hepsi için birden silinir. Burada tekil ziyaretçiler artık sayılmaz; tekil ziyaretçi sayan diğer sitelerde bugün yeniden gelen biri iki kez sayılabilir.",
@@ -93,7 +94,8 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     notice: {
       title: "Siten için gizlilik bildirimi",
       hint: "Gizlilik politikana ekle. Yukarıdaki anahtarlara göre değişir.",
-      unsaved: "Kaydedilmemiş değişikliklerini zaten yansıtıyor.",
+      hintUnsaved:
+        "Gizlilik politikana ekle. Yukarıdaki anahtarlara göre değişir. Kaydedilmemiş değişikliklerini zaten yansıtıyor.",
       languages: "Bildirimin dili",
       copy: "Bildirimi kopyala",
       copied: "Gizlilik bildirimi kopyalandı",
