@@ -84,7 +84,7 @@ Agent and import uploads get an LQIP and a colour through the Cloudflare Images 
 |---|---|
 | 28a | Contract `color`/`alpha`/`focal`; alpha header parsers; Studio adds colour; the blurred placeholder; bugs 1 and 2; budget |
 | 28b | Fit modes and focal point in the catalog, CSS and transformations; `image-fit` check; gallery and lightbox default to blur-fill |
-| 28c | Server-side placeholders through the Images binding (the owner turns it on); the backfill command |
+| 28c | The backfill command, drawing in a local Chrome (shipped); placeholders through the Images binding at upload time (only when a deployment turns it on) |
 | 28d | Optional fade-in module (`@media (scripting: enabled)`); optional `gravity=auto` focal suggestions |
 
 ## Open questions
@@ -116,3 +116,10 @@ None; `docs/design/images.md` decided them. Whether the live deployment gets the
     - Changing placeholders keeps the measured fields and the focal point. Before this, they reset `animated` and `alpha`.
   - **Check.** `render_page` adds `image-fit`: a cover frame that keeps under 60% of a picture with no focal point.
   - **Guidance.** `get_design` says when to set a focal point or use blur-fill and color-fill.
+- **28c shipped (no Images binding).** The owner chose a local backfill over turning on the Cloudflare Images binding for the live deployment, so nothing new is billed.
+  - **Command.** `cloudhal media placeholders [--remote] [--all] [--dry-run]` draws missing placeholders in the local Chrome that `render_page` uses, with the same helpers Studio runs (`leanWebp`, `dominantColor`, now in `@cloudhal/core-ts/media`).
+    - It covers images without a colour: agent uploads, imports, `cloudhal push`.
+    - Transparent images get their colour only.
+    - Measured fields and the focal point stay.
+    - Without `--remote` it works on the project's SQLite. With it, it uses the deployment (deployment token): `GET /api/admin/sites/:id/media-placeholders` lists the images, the bytes come from the existing admin media route, and `PUT …/media-placeholders/:assetId` stores the result (CAS on `rev`, both fields validated).
+  - **Not done.** Drawing placeholders through an Images binding at upload time stays possible for deployments that want it, but is not built. It waits until a deployment turns the binding on.

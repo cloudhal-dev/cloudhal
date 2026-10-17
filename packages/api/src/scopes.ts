@@ -57,6 +57,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", "/api/admin/sites/:siteId/ai/judge-check", "deploy-token"],
   // RFC-0019 §3: `cloudhal search reindex --remote`
   ["POST", "/api/admin/sites/:siteId/search/reindex", "deploy-token"],
+  // RFC-0028 §5: `cloudhal media placeholders --remote`
+  ["GET", "/api/admin/sites/:siteId/media-placeholders", "deploy-token"],
+  ["PUT", "/api/admin/sites/:siteId/media-placeholders/:assetId", "deploy-token"],
   // RFC-0006 §7.5: analytics backfill and the operator's status and export
   ["POST", "/api/admin/sites/:siteId/analytics/rollup", "deploy-token"],
   ["GET", "/api/admin/sites/:siteId/analytics/status", "deploy-token"],

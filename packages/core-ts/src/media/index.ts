@@ -7,6 +7,7 @@
 export * from "./fetcher.ts";
 export * from "./image.ts";
 export * from "./ingest.ts";
+export * from "./placeholders.ts";
 export * from "./refs.ts";
 export * from "./sniff.ts";
 export * from "./svg.ts";
