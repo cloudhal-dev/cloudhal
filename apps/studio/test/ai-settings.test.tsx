@@ -80,7 +80,9 @@ describe("AI settings", () => {
     const toggle = await screen.findByRole("switch", { name: "AI in the editor" });
     expect(toggle).not.toBeChecked();
     expect(
-      await screen.findByText("Fast and inexpensive; writes many languages, Turkish included."),
+      await screen.findByText(
+        "Builds pages most reliably in Cloudhal's tests; writes Turkish well.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("131,072 tokens of context")).toBeInTheDocument();
     expect(screen.getByText("7 of 100 used today")).toBeInTheDocument();

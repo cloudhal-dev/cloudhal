@@ -162,7 +162,7 @@ describe("model picker", () => {
     const picker = await modelPicker(live, 1);
     expect(picker.catalog).toBe("live");
     expect(picker.models.map((m) => [m.id, m.recommended, m.listed])).toEqual([
-      ["@cf/zai-org/glm-4.7-flash", "default", true],
+      ["@cf/zai-org/glm-4.7-flash", "budget", true],
       ["@cf/qwen/qwen3-30b", undefined, true],
     ]);
     resetModelCatalogue();
@@ -177,8 +177,8 @@ describe("model picker", () => {
     const offline = await modelPicker(broken, 1);
     expect(offline.catalog).toBe("unavailable");
     expect(offline.models.map((m) => m.id)).toEqual([
-      "@cf/zai-org/glm-4.7-flash",
       "@cf/openai/gpt-oss-120b",
+      "@cf/zai-org/glm-4.7-flash",
       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     ]);
     expect(offline.models.every((m) => m.listed === false)).toBe(true);
@@ -224,7 +224,7 @@ describe("AI routes", () => {
     const { send } = await setup();
     const first = (await (await send("GET", "/settings")).json()) as Record<string, unknown>;
     expect(first).toMatchObject({
-      settings: { enabled: false, model: "@cf/zai-org/glm-4.7-flash", dailyLimit: 100, rev: 0 },
+      settings: { enabled: false, model: "@cf/openai/gpt-oss-120b", dailyLimit: 100, rev: 0 },
       usage: { requests: 0 },
       transport: "binding",
     });

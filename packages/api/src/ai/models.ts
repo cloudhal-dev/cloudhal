@@ -6,13 +6,13 @@
 import type { AiModelInfo, AiTransport } from "./client.ts";
 import { DEFAULT_AI_MODEL } from "./store.ts";
 
-export type RecommendedNote = "default" | "quality" | "general";
+export type RecommendedNote = "default" | "quality" | "budget" | "general";
 
 export const RECOMMENDED_AI_MODELS: readonly { id: string; note: RecommendedNote }[] = [
-  // Inexpensive, multilingual, 131k context (Workers AI, 2026-02).
+  // The strongest in Cloudhal's build evals (2026-10-17): finishes turns, follows the steps.
   { id: DEFAULT_AI_MODEL, note: "default" },
-  // Stronger writing at a higher price.
-  { id: "@cf/openai/gpt-oss-120b", note: "quality" },
+  // Inexpensive, multilingual, 131k context (Workers AI, 2026-02); weaker at building pages.
+  { id: "@cf/zai-org/glm-4.7-flash", note: "budget" },
   { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", note: "general" },
 ];
 

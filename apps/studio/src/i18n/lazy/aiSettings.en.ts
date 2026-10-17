@@ -26,8 +26,9 @@ export const messages = {
       show: "Show models",
       recommended: "Recommended",
       notes: {
-        default: "Fast and inexpensive; writes many languages, Turkish included.",
+        default: "Builds pages most reliably in Cloudhal's tests; writes Turkish well.",
         quality: "Stronger writing, at a higher price.",
+        budget: "Fast and inexpensive; weaker at building pages.",
         general: "A well-known general-purpose model.",
       },
       context: "{tokens} tokens of context",

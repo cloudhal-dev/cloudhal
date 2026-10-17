@@ -5,7 +5,11 @@
  */
 import type { SqlDriver } from "@cloudhal/storage";
 
-export const DEFAULT_AI_MODEL = "@cf/zai-org/glm-4.7-flash";
+/**
+ * The model a site starts with. gpt-oss-120b led Cloudhal's build evals (finished turns, design
+ * score, speed; RFC-0020/0027 runs of 2026-10-17); GLM-4.7-flash stays as the inexpensive choice.
+ */
+export const DEFAULT_AI_MODEL = "@cf/openai/gpt-oss-120b";
 export const DEFAULT_DAILY_LIMIT = 100;
 export const MAX_DAILY_LIMIT = 10_000;
 
@@ -70,7 +74,7 @@ export function checkAiSettings(input: {
     if (!PROVIDER_MODEL.test(model))
       throw new AiSettingsError(
         "invalid",
-        "model: a Workers AI model id such as @cf/zai-org/glm-4.7-flash, or provider/model with a gateway",
+        "model: a Workers AI model id such as @cf/openai/gpt-oss-120b, or provider/model with a gateway",
       );
     if (!gateway)
       throw new AiSettingsError(

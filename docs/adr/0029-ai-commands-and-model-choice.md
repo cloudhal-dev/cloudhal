@@ -70,3 +70,6 @@ Adopt RFC-0016. The owner accepted it on 2026-10-14 with the defaults below.
 - **Risks:**
   - Turkish quality varies by model.
   - Prompt injection through content can at worst produce text the person then sees in a diff before Replace.
+
+## Addendum (2026-10-17): the default model is gpt-oss-120b
+The owner moved the default to `@cf/openai/gpt-oss-120b` after the build evals of RFC-0020/0027 (2026-10-17): on the same briefs gpt-oss-120b finished every turn with a design score of about 3 in ~70 s, while GLM-4.7-flash finished two of three with 1.5 in ~410 s. GLM stays in the recommended list as the inexpensive choice (`budget`), Llama 3.3 as the general one. Sites that already chose a model keep it; the live newsroom was already on gpt-oss-120b. Evals are run by Cloudhal's maintainers on the deployment (`cloudhal ai build-eval --remote`), not delegated to a model.
