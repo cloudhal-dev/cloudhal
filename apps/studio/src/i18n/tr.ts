@@ -1,6 +1,6 @@
 import type { Messages } from "./en.ts";
 
-export const tr: Messages = {
+export const messages: Messages = {
   app: { name: "Cloudhal Studio", tagline: "Sitelerini yönetmek için giriş yap." },
   common: {
     save: "Kaydet",
@@ -13,6 +13,7 @@ export const tr: Messages = {
     signOut: "Çıkış yap",
     live: "Canlı",
     language: "Dil",
+    unreviewedLanguage: "{name} (makine çevirisi)",
     more: "Diğer",
     rev: "rev {rev}",
     updated: "güncellendi {when}",

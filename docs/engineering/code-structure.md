@@ -45,7 +45,7 @@ Physical lines, comments and blanks included (what you scroll through).
 | Positional parameters | 3 | 4 | `size:check`; Biome `useMaxParams` 4; clippy `too_many_arguments` 5 |
 | Cognitive complexity (Biome/Sonar) | 15 | 25 (warning) | Biome `noExcessiveCognitiveComplexity` 25; clippy `cognitive_complexity` 25 |
 | One string literal / template (client code, SQL, help text) | 6 000 chars | 12 000 chars | `size:check` |
-| Translation dictionary (`apps/studio/src/i18n/{en,tr}.ts`, `i18n/lazy/*`) | — | no line limit | Studio bundle budget (§8) |
+| Translation dictionary (`apps/studio/src/i18n/<locale>.ts`, `i18n/lazy/*`; one per registered language) | — | no line limit | Studio bundle budget (§8) |
 
 Why these values:
 
@@ -234,10 +234,10 @@ Studio (`apps/studio`):
   (137 files import it by that path).
 - i18n dictionaries are data, not code, so they have **no line limit** (a long list of strings is
   not hard to read). What they cost is weight and merge conflicts, and the rules aim at those:
-  - only the active language loads: `en.ts` is in the first load (the fallback), `tr.ts` arrives
+  - only the active language loads: `en.ts` is in the first load (the fallback), every other `<locale>.ts` arrives
     through `loadLocale` (`LAZY_ONLY` keeps it out of the first load);
     `apps/studio/bundle-budget.ts` (`initialGzipBytes`) is the guard, not `size:check`;
-  - a new area's strings go in a lazy namespace (`src/i18n/lazy/<ns>.{en,tr}.ts`, DESIGN.md §1),
+  - a new area's strings go in a lazy namespace (`src/i18n/lazy/<ns>.<locale>.ts`, DESIGN.md §1),
     loaded with its route; `en.ts`/`tr.ts` keep what the shell needs on first paint;
   - moving route-specific groups out of the eager files (and loading only the active language) is
     a bundle improvement, done for the user's sake, not to meet a line count.

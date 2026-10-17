@@ -1,0 +1,62 @@
+/** German `appearance.*` (see `appearance.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"appearance"> = {
+  appearance: {
+    preview: "Farbrollen",
+    light: "Hell",
+    dark: "Dunkel",
+    heading: "Eine Überschrift",
+    body: "So liest sich Fließtext, mit einem",
+    link: "Link",
+    button: "Schaltfläche",
+    accent: "Neu",
+    notes: "Für Kontrast angepasst",
+    legacy:
+      "Diese Farben stammen aus den Farbfeldern des Themes. Wähle eine Ausgangsfarbe, um eine vollständige Palette mit Dunkelmodus zu erhalten, auf Kontrast geprüft.",
+    lightened: "aufgehellt",
+    darkened: "abgedunkelt",
+    repairPair:
+      "{scheme}: {role} um {steps} Stufe(n) {direction}, damit es auf {against} lesbar ist ({ratio}:1)",
+    repairFill:
+      "{scheme}: {role} um {steps} Stufe(n) {direction}, damit {against} darauf lesbar ist ({ratio}:1)",
+    roles: {
+      surface: "Seite",
+      "surface-muted": "Gedämpfte Fläche",
+      "surface-raised": "Erhöhte Fläche",
+      "surface-inverse": "Invertierte Fläche",
+      text: "Text",
+      "text-muted": "Gedämpfter Text",
+      "text-subtle": "Dezenter Text",
+      "text-inverse": "Invertierter Text",
+      border: "Rahmen",
+      "border-strong": "Kräftiger Rahmen",
+      brand: "Marke",
+      "on-brand": "Text auf Marke",
+      accent: "Akzent",
+      "on-accent": "Text auf Akzent",
+      link: "Link",
+      focus: "Fokusring",
+      gradient: "Verlaufsende",
+    },
+    chrome: {
+      bars: "Leisten",
+      announcement: "Ankündigung",
+      consent: "Datenschutzleiste",
+      title: "Kopf- und Fußzeile",
+      description:
+        "Das Logo, die Kopfzeile und die Fußzeile, die jede Seite zeigt. Eine Seite kann sie ausblenden oder die Kopfzeile über ihrem ersten Band transparent machen.",
+      brand: "Marke",
+      header: "Kopfzeile",
+      footer: "Fußzeile",
+      chooseLogo: "Bild auswählen",
+      replaceLogo: "Ersetzen",
+      removeLogo: "Entfernen",
+      noLogo: "Kein Bild: Der Name der Website wird als Text angezeigt.",
+      menus: "Menüs, die du benennen kannst: {menus}.",
+      saved: "Kopf- und Fußzeile gespeichert",
+      failed: "Kopf- und Fußzeile konnten nicht gespeichert werden",
+      publishHint: "Änderungen erscheinen nach der nächsten Veröffentlichung auf der Website.",
+    },
+  },
+};

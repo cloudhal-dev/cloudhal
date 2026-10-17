@@ -141,7 +141,7 @@ function DisclosureNotice({ form, unsaved }: { form: CommentsForm; unsaved: bool
             variant="segmented"
             size="sm"
             value={language}
-            onValueChange={(v) => setLanguage(v === "tr" ? "tr" : "en")}
+            onValueChange={(v) => setLanguage(v as Locale)}
             tabs={(Object.keys(LOCALES) as Locale[]).map((l) => ({ value: l, label: LOCALES[l] }))}
           />
         </fieldset>

@@ -32,10 +32,12 @@ const IGNORED = [
 const TEST_FILE =
   /(\.(test|spec)\.[cm]?[jt]sx?$)|(\/(test|tests|__tests__)\/)|(\/testing(-[\w-]+)?\.tsx?$)|(\/fixtures?\.tsx?$)/;
 /**
- * Translation dictionaries are data, not code: no line limit (the Studio bundle budget guards
+ * Translation dictionaries (`<locale>.ts`, `lazy/<ns>.<locale>.ts`, one per registered language) are
+ * data, not code: no line limit (the Studio bundle budget guards
  * their weight instead). docs/engineering/code-structure.md §8.
  */
-const DATA_FILE = /^apps\/studio\/src\/i18n\/(lazy\/[\w-]+\.)?(en|tr)\.ts$/;
+const DATA_FILE =
+  /^apps\/studio\/src\/i18n\/(lazy\/[\w-]+\.)?(?!locales\.ts$|namespaces\.ts$)[a-z]{2,3}(-[A-Za-z0-9]+)*\.ts$/;
 const PARSED = /\.(ts|tsx|mts|cts|js|mjs|jsx)$/;
 
 export type Lang = "ts" | "astro" | "css" | "rs" | "js";

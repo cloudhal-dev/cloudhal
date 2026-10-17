@@ -1,0 +1,472 @@
+/** German `menus.*` (see `menus.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"menus"> = {
+  menus: {
+    places: { primary: "Kopfzeile", footer: "Fußzeile", sidebar: "Seitenleiste" },
+    placeWithKey: "{place} ({key})",
+    newMenu: "Neues Menü",
+    depthOne: "1 Ebene",
+    depthMany: "{count} Ebenen",
+    saved: "{name} gespeichert",
+    created: "Menü {name} erstellt",
+    deleted: "Menü {name} gelöscht",
+    readOnly: {
+      title: "Du kannst ansehen, aber nicht ändern",
+      description:
+        "Menüs erscheinen auf jeder Seite, daher ändern nur Redakteure und höher sie. Bitte eine dieser Personen oder einen Administrator, die Änderung vorzunehmen.",
+    },
+    conflict: {
+      title: "Dieses Menü wurde anderswo geändert",
+      description:
+        "Jemand hat {name} gespeichert, nachdem du mit dem Bearbeiten begonnen hast. Deine Änderungen sind noch da: Vergleiche sie mit der neuesten Version und speichere erneut, oder lade die neueste Version und verwirf deine.",
+      keep: "Mit neuester vergleichen",
+      reload: "Neueste laden",
+    },
+    problems: {
+      title: "Dieses Menü kann noch nicht gespeichert werden",
+      emptyGroup:
+        "„{label}“ ist eine Gruppe ohne Inhalt. Füge darunter einen Eintrag hinzu oder entferne sie.",
+      label:
+        "„{label}“ braucht eine Beschriftung: Gruppen, Sammlungen und externe Links haben keinen eigenen Titel.",
+      depth:
+        "„{label}“ liegt tiefer als die {max} Ebenen dieses Menüs. Verschiebe es nach oben oder erlaube mehr Ebenen in den Einstellungen.",
+      perLevel: "Eine Ebene enthält mehr als {max} Einträge.",
+      total: "Dieses Menü enthält mehr als {max} Einträge.",
+    },
+    items: {
+      title: "Einträge: {place}",
+      titleLoading: "Einträge",
+      add: "Eintrag hinzufügen",
+      count: "{count} / {limit}",
+      countHint: "Einträge auf allen Ebenen. Ein Menü enthält höchstens {limit}.",
+      description:
+        "Ziehe am Griff, oder wähle einen Eintrag aus und nutze Alt mit den Pfeiltasten: Auf und Ab ändern die Reihenfolge, Rechts verschachtelt ihn unter den Eintrag darüber, Links holt ihn heraus. Dieses Menü ist {max} Ebenen tief.",
+      descriptionReadOnly:
+        "Die Einträge, wie Besucher sie nach der nächsten Veröffentlichung sehen.",
+      empty: "Noch keine Einträge",
+      emptyDescription: {
+        primary:
+          "Eine leere Kopfzeile zeigt auf deiner Website keine Links. Füge Seiten, Artikel, Kategorien, Sammlungen, externe Links oder Gruppen hinzu.",
+        footer:
+          "Eine leere Fußzeile zeigt keine Links. Füge Seiten, Artikel, Kategorien, Sammlungen, externe Links oder Gruppen hinzu.",
+        custom: "Füge Seiten, Artikel, Kategorien, Sammlungen, externe Links oder Gruppen hinzu.",
+      },
+    },
+    tree: {
+      label: "Einträge: {place}",
+      instructions:
+        "Pfeiltasten wechseln zwischen Einträgen; Rechts und Links klappen einen Eintrag auf und zu. Alt mit Auf oder Ab verschiebt den Eintrag, Alt mit Rechts verschachtelt ihn unter den Eintrag darüber, Alt mit Links holt ihn eine Ebene heraus. Eingabe bearbeitet, Entf entfernt.",
+      expand: "Einträge unter {label} anzeigen",
+      collapse: "Einträge unter {label} ausblenden",
+      topLevel: "oberste Ebene",
+      under: "unter {parent}, Ebene {level}",
+      moved: "{label} verschoben: Position {position} von {total}, {where}.",
+      indented: "{label} verschachtelt: Position {position} von {total}, {where}.",
+      outdented: "{label} herausgeholt: Position {position} von {total}, {where}.",
+      blocked: {
+        first: "{label} ist bereits der erste Eintrag.",
+        last: "{label} ist bereits der letzte Eintrag.",
+        "no-previous": "{label} hat keinen Eintrag darüber, unter den er kommen könnte.",
+        "top-level": "{label} ist bereits auf der obersten Ebene.",
+        depth: "{label} kann nicht tiefer: Dieses Menü hat höchstens {max} Ebenen.",
+        size: "Diese Ebene ist voll.",
+      },
+      refused: {
+        depth: "{label} kann nicht dorthin: Dieses Menü hat höchstens {max} Ebenen.",
+        size: "{label} kann nicht dorthin: Diese Ebene ist voll.",
+        "inside-itself": "{label} kann nicht in sich selbst liegen.",
+      },
+    },
+    hint: {
+      page: "aus dem Seitentitel",
+      contentEntry: "aus dem Artikeltitel",
+      term: "aus dem Namen des Begriffs",
+    },
+    chips: {
+      page: "Seite {where}",
+      contentEntry: "Artikel {where}",
+      term: "{taxonomy} {name}",
+      termFallback: "Begriff",
+      collection: "Sammlung {where}",
+      url: "Extern {where} ↗",
+      group: "Gruppe",
+      newTab: "(öffnet in einem neuen Tab)",
+      missing: {
+        page: "Gelöschte Seite",
+        contentEntry: "Gelöschter Artikel",
+        term: "Gelöschter Begriff",
+      },
+    },
+    hidden: {
+      badge: "Ausgeblendet: {reason}",
+      bannerOne: "1 Eintrag ist auf deiner Website ausgeblendet",
+      banner: "{count} Einträge sind auf deiner Website ausgeblendet",
+      bannerDescription:
+        "Besucher sehen weder einen ausgeblendeten Eintrag noch etwas darunter, deine Menüs verlinken also nie auf eine Seite, die es nicht mehr gibt. Nutze „Beheben“, um ihn auf ein anderes Ziel zu richten oder zu entfernen.",
+      reasons: {
+        missing: {
+          page: "Seite gelöscht",
+          contentEntry: "Artikel gelöscht",
+          term: "Begriff gelöscht",
+        },
+        unpublished: {
+          page: "Seite nicht veröffentlicht",
+          contentEntry: "Artikel nicht veröffentlicht",
+          term: "nicht veröffentlicht",
+        },
+        "other-locale": "andere Sprache",
+        "not-served": "Archiv leer oder nicht öffentlich",
+        retired: "Begriff ausgemustert",
+        "no-index": "keine Seite listet es",
+        "empty-group": "nichts darin wird angezeigt",
+        "parent-hidden": "Eintrag darüber ist ausgeblendet",
+      },
+      explain: {
+        missing: {
+          page: "Die Seite wurde gelöscht. Der Eintrag bleibt ausgeblendet im Menü, bis du ein anderes Ziel wählst oder ihn entfernst.",
+          contentEntry:
+            "Der Artikel wurde gelöscht. Der Eintrag bleibt ausgeblendet im Menü, bis du ein anderes Ziel wählst oder ihn entfernst.",
+          term: "Der Begriff wurde gelöscht. Der Eintrag bleibt ausgeblendet im Menü, bis du ein anderes Ziel wählst oder ihn entfernst.",
+        },
+        unpublished: {
+          page: "Die Seite ist noch nicht veröffentlicht. Der Eintrag erscheint von selbst, sobald sie es ist.",
+          contentEntry:
+            "Der Artikel ist noch nicht veröffentlicht. Der Eintrag erscheint von selbst, sobald er es ist.",
+          term: "Der Begriff ist noch nicht veröffentlicht.",
+        },
+        "other-locale": "Das Ziel ist in einer anderen Sprache als die Vorschau dieses Menüs.",
+        "not-served":
+          "Sein Archiv wird nicht ausgeliefert: Es hat noch keine veröffentlichten Artikel, ist nicht öffentlich, oder Archive sind deaktiviert.",
+        retired:
+          "Der Begriff wurde ausgemustert. Richte den Eintrag auf den Begriff, der ihn ersetzt hat.",
+        "no-index": "Keine Seite listet diese Sammlung, es gibt also kein Linkziel.",
+        "empty-group":
+          "Keiner der Einträge in dieser Gruppe wird angezeigt, daher ist auch die Gruppe ausgeblendet.",
+        "parent-hidden": "Ein Eintrag darüber ist ausgeblendet, und er blendet alles darunter aus.",
+      },
+    },
+    row: {
+      noLabel: "Keine Beschriftung",
+      edit: "Bearbeiten",
+      editLabel: "{label} bearbeiten",
+      menu: "Weitere Aktionen",
+      menuLabel: "Weitere Aktionen für {label}",
+      fix: "Beheben",
+      retarget: "Anderes Ziel wählen…",
+      addInside: "Eintrag darin hinzufügen",
+      addInsideLimit:
+        "Die Einträge hier liegen bereits auf der tiefsten Ebene, die dieses Menü erlaubt ({max}). Erlaube mehr Ebenen in den Einstellungen, um tiefer zu verschachteln.",
+      moveUp: "Nach oben",
+      moveDown: "Nach unten",
+      indent: "Unter den Eintrag darüber verschieben",
+      indentLimit:
+        "Dieses Menü ist {max} Ebenen tief. Erlaube mehr Ebenen in den Einstellungen, um tiefer zu verschachteln.",
+      indentFull: "Der Eintrag darüber enthält bereits {max} Einträge.",
+      indentNoPrevious: "Es gibt keinen Eintrag darüber, unter den er kommen könnte.",
+      outdent: "Eine Ebene herausholen",
+      remove: "Entfernen",
+    },
+    removeTree: {
+      title: "„{label}“ und alles darunter entfernen?",
+      description:
+        "Die {count} Einträge darunter werden ebenfalls entfernt. Auf deiner Website ändert sich nichts, bis du das Menü speicherst.",
+    },
+    item: {
+      addTitle: "Eintrag hinzufügen",
+      editTitle: "Eintrag bearbeiten",
+      description:
+        "Seiten, Artikel und Kategorien werden über ihre ID verlinkt, Umbenennungen und neue Adressen machen das Menü also nie kaputt.",
+      target: "Verlinkt auf",
+      targetHint:
+        "Durchsuche Seiten, Artikel, Kategorien, Schlagwörter und Sammlungen, oder wähle einen externen Link oder eine Gruppe.",
+      targetPlaceholder: "Suchen oder auswählen…",
+      href: "Webadresse",
+      hrefHint:
+        "Eine https://-Adresse auf einer anderen Website. Eigene Seiten verlinkst du, indem du sie oben auswählst.",
+      leavesFor: "Besucher wechseln zu {host}.",
+      newTab: "In einem neuen Tab öffnen",
+      groupHint:
+        "Eine Gruppe hat keinen eigenen Link: Sie enthält die Einträge, die du darunter verschachtelst, wie ein Dropdown in der Kopfzeile. Sie ist ausgeblendet, solange keiner davon angezeigt wird.",
+      labels: "Beschriftungen",
+      label: "Beschriftung",
+      labelIn: "Beschriftung ({locale})",
+      labelRequired: "Erforderlich: Diese Art von Eintrag hat keinen eigenen Titel.",
+      labelPickFirst: "Wähle zuerst, worauf der Eintrag verlinkt.",
+      labelFallback: {
+        page: "Leer lassen, um den Seitentitel anzuzeigen, damit Umbenennungen übernommen werden.",
+        contentEntry:
+          "Leer lassen, um den Artikeltitel anzuzeigen, damit Umbenennungen übernommen werden.",
+        term: "Leer lassen, um den Namen des Begriffs anzuzeigen, damit Umbenennungen übernommen werden.",
+      },
+      labelOtherLocale: "Leer lassen, um die Beschriftung in {locale} anzuzeigen.",
+      place: "Position",
+      placeHint: "Wohin der neue Eintrag kommt. Du kannst ihn danach beliebig verschieben.",
+      topLevel: "Oberste Ebene",
+      under: "Unter „{label}“",
+      add: "Eintrag hinzufügen",
+      apply: "Übernehmen",
+      targetGone: {
+        page: "Die Seite, auf die dieser Eintrag verlinkte, wurde gelöscht. Wähle ein anderes Ziel oder entferne den Eintrag.",
+        contentEntry:
+          "Der Artikel, auf den dieser Eintrag verlinkte, wurde gelöscht. Wähle ein anderes Ziel oder entferne den Eintrag.",
+        term: "Der Begriff, auf den dieser Eintrag verlinkte, ist gelöscht oder ausgemustert. Wähle ein anderes Ziel oder entferne den Eintrag.",
+      },
+      hiddenUntil: {
+        draft:
+          "Dies ist ein Entwurf. Der Eintrag bleibt auf deiner Website ausgeblendet, bis er veröffentlicht ist.",
+        review:
+          "Dies ist in Prüfung. Der Eintrag bleibt auf deiner Website ausgeblendet, bis es veröffentlicht ist.",
+        archived: "Dies ist archiviert. Der Eintrag bleibt auf deiner Website ausgeblendet.",
+        proposed:
+          "Dieser Begriff ist ein Vorschlag. Der Eintrag bleibt ausgeblendet, bis jemand ihn freigibt.",
+        internal:
+          "Dieser Begriff ist intern. Sein Archiv ist nicht öffentlich, daher bleibt der Eintrag ausgeblendet.",
+      },
+      errors: {
+        target: "Wähle, worauf der Eintrag verlinkt.",
+        href: {
+          required: "Gib eine https://-Adresse ein.",
+          insecure: "Verwende https://. Einfache http://-Links sind in Menüs nicht erlaubt.",
+          invalid:
+            "Verwende eine https://-Adresse mit einem einfachen Hostnamen, ohne Leerzeichen oder Benutzernamen (internationale Namen in Punycode).",
+        },
+        label: {
+          required: "Gib eine Beschriftung ein.",
+          tooLong: "Höchstens {max} Zeichen.",
+          invalid: "Beschriftungen sind einfacher Text in einer Zeile.",
+        },
+      },
+    },
+    picker: {
+      url: "Externer Link",
+      group: "Gruppe (kein Link)",
+      groups: {
+        pages: "Seiten",
+        articles: "Artikel",
+        collections: "Sammlungen",
+        other: "Sonstiges",
+      },
+      status: {
+        draft: "Entwurf",
+        review: "In Prüfung",
+        archived: "Archiviert",
+        proposed: "Vorgeschlagen",
+        internal: "Intern",
+      },
+    },
+    save: {
+      button: "Menü speichern",
+      title: "{name} speichern",
+      summaryOne: "1 Änderung · {before} → {after} Einträge",
+      summary: "{count} Änderungen · {before} → {after} Einträge",
+      changes: "Änderungen",
+      onlyDepth: "Nur die Anzahl der Ebenen ändert sich.",
+      hiddenOne: "1 Eintrag bleibt auf deiner Website ausgeblendet",
+      hidden: "{count} Einträge bleiben auf deiner Website ausgeblendet",
+      hiddenDescription:
+        "Du kannst trotzdem speichern: Sie erscheinen von selbst, sobald ihr Ziel veröffentlicht ist.",
+      confirm: "Menü speichern",
+    },
+    delta: {
+      quoted: "„{label}“",
+      quotedTitle: "„{label}“ (Titel)",
+      none: "(keine)",
+      noArchive: "kein Archiv",
+      topLevel: "oberste Ebene, Position {position}",
+      under: "unter „{parent}“, Position {position}",
+      withBelowOne: ", mit 1 Eintrag darunter",
+      withBelow: ", mit {count} Einträgen darunter",
+      add: "{label} → {where}, {place}{below}",
+      remove: "{label} → {where}",
+      removeTreeOne: "{label} und 1 Eintrag darunter",
+      removeTree: "{label} und {count} Einträge darunter",
+      move: "{label}: Position {from} → {to}",
+      reparent: "{label} unter „{parent}“ verschoben (war unter „{was}“)",
+      reparentFromTop: "{label} unter „{parent}“ verschoben (war oberste Ebene)",
+      toTop: "{label} auf die oberste Ebene verschoben (war unter „{was}“)",
+      label: "{label}: Beschriftung [{locale}] {from} → {to}",
+      target: "{label}: Ziel {from} → {to}",
+      newTabOn: "{label}: öffnet in einem neuen Tab",
+      newTabOff: "{label}: öffnet im selben Tab",
+      hidden: "{label} bleibt ausgeblendet: {reason}",
+      where: {
+        page: "{where} (Seite)",
+        contentEntry: "{where} (Artikel)",
+        term: "{where} ({taxonomy} „{name}“)",
+        collection: "Sammlung {where}",
+        url: "extern: {host}",
+        urlNewTab: "extern: {host}, neuer Tab",
+        group: "Gruppe",
+        missing: {
+          page: "eine gelöschte Seite",
+          contentEntry: "ein gelöschter Artikel",
+          term: "ein gelöschter Begriff",
+        },
+      },
+    },
+    settings: {
+      title: "Einstellungen",
+      depth: "Ebenen",
+      depthHint: {
+        primary:
+          "Wie tief Einträge verschachtelt werden dürfen. Das Blog-Theme zeigt in der Kopfzeile drei Ebenen als Dropdowns.",
+        footer:
+          "Wie tief Einträge verschachtelt werden dürfen. Fußzeilen bleiben meist flach oder zwei Ebenen tief.",
+        custom:
+          "Wie tief Einträge verschachtelt werden dürfen. Dein Theme entscheidet, wie viele es zeigt.",
+      },
+      depthTooLow: "Einträge liegen bereits {depth} Ebenen tief. Verschiebe sie zuerst nach oben.",
+      items: "Einträge",
+      itemsHint: "Auf allen Ebenen, gemessen am Maximum eines Menüs.",
+      levels: "Tiefste Ebene",
+      levelsHint: "Der tiefste Eintrag, gemessen an den Ebenen, die dieses Menü erlaubt.",
+      levelsValue: "{depth} von {max}",
+      fullest: "Vollste Ebene",
+      fullestHint: "Eine Ebene enthält höchstens {limit} Einträge.",
+    },
+    details: { key: "Schlüssel" },
+    delete: {
+      title: "Menü {name} löschen",
+      action: "Menü löschen",
+      confirmTitle: "Menü {name} löschen?",
+      detail: "Frühere Snapshots behalten das Menü, ein Zurücksetzen bringt es also zurück.",
+      hint: {
+        primary:
+          "Mit der nächsten Veröffentlichung kehrt deine Website zur Kopfzeile zurück, die das Theme aus deinen Seiten und Kategorien der obersten Ebene erzeugt.",
+        footer:
+          "Mit der nächsten Veröffentlichung kehrt deine Website zur eigenen Fußzeile des Themes zurück.",
+        custom: "Mit der nächsten Veröffentlichung zeigen Themes dieses Menü nicht mehr an.",
+      },
+    },
+    leave: {
+      title: "Deine Änderungen an {name} verwerfen?",
+      description: "Du hast sie nicht gespeichert. Beim Wechsel des Menüs gehen sie verloren.",
+      confirm: "Änderungen verwerfen",
+    },
+    derived: {
+      title: { primary: "Aktuelle Kopfzeile", footer: "Aktuelle Fußzeile" },
+      description: {
+        primary:
+          "Diese Website hat kein Kopfzeilenmenü, daher erzeugt das Theme die Kopfzeile aus deinen veröffentlichten Seiten und Kategorien der obersten Ebene. Erstelle ein Menü, um Einträge umzusortieren oder umzubenennen, einige auszublenden oder Dropdowns und externe Links hinzuzufügen.",
+        footer:
+          "Diese Website hat kein Fußzeilenmenü, daher zeigt die Fußzeile die eigenen Links des Themes. Erstelle ein Menü, um sie auszuwählen.",
+      },
+      empty: {
+        primary:
+          "Die abgeleitete Kopfzeile ist leer: Veröffentliche eine Seite der obersten Ebene, um sie zu füllen.",
+        footer: "Die eigenen Fußzeilen-Links des Themes (RSS) erscheinen hier.",
+      },
+      treeLabel: "Aktuelle Einträge: {place}",
+      treeHint: "Nur lesbar: So zeigt es das Theme heute.",
+      startEmpty: "Leer beginnen",
+      fromPages: "Menü aus aktuellen Seiten erstellen",
+    },
+    fromPages: {
+      title: "Menü {name} aus aktuellen Seiten erstellen",
+      description:
+        "Das sind die Einträge, die deine Website heute zeigt. Beschriftungen bleiben leer, damit Umbenennungen von Seiten weiter ins Menü übernommen werden.",
+      items: "Einträge",
+      none: "Noch keine Seiten der obersten Ebene. Das Menü beginnt leer.",
+      page: "Seite",
+      category: "Kategorie",
+      categories: "Kategorien der obersten Ebene einbeziehen ({count})",
+      labelsHint:
+        "Entwurfsseiten werden ebenfalls aufgeführt: Sie bleiben ausgeblendet, bis du sie veröffentlichst.",
+      confirm: "Menü erstellen",
+    },
+    create: {
+      title: "Neues Menü",
+      description: "Menüs beginnen leer. Füge Einträge hinzu, sobald es erstellt ist.",
+      place: "Wo es erscheint",
+      placeHint: {
+        primary: "Die Links oben auf jeder Seite.",
+        footer: "Die Links unten auf jeder Seite.",
+      },
+      custom: "Eigener Schlüssel",
+      customHint:
+        "Für Stellen, die dein Theme definiert, etwa eine Seitenleiste oder Social-Links.",
+      key: "Schlüssel",
+      keyHint:
+        "Kleinbuchstaben, Ziffern und einzelne Bindestriche. Er kann später nicht geändert werden.",
+      depth: "Ebenen",
+      depthHint: "Wie tief Einträge verschachtelt werden dürfen. Du kannst es später ändern.",
+      confirm: "Menü erstellen",
+      errors: {
+        required: "Gib einen Schlüssel ein.",
+        invalid: "Verwende Kleinbuchstaben, Ziffern und einzelne Bindestriche.",
+        tooLong: "Höchstens 128 Zeichen.",
+        taken: "Diese Website hat bereits ein Menü mit diesem Schlüssel.",
+      },
+    },
+    preview: {
+      title: "Vorschau",
+      description:
+        "Wie Kopf- und Fußzeile mit deinen ungespeicherten Änderungen aussehen. Gib einen Pfad ein, um zu sehen, welcher Eintrag als aktuell markiert ist.",
+      path: "Vorschau als",
+      pathHint: "Ein Pfad auf deiner Website, etwa /about oder /category/news.",
+      locale: "Sprache",
+      header: "Vorschau der Kopfzeile",
+      footer: "Vorschau der Fußzeile",
+      defaultFooter: "RSS",
+      credit: "Erstellt mit Cloudhal",
+      empty: "Es werden keine Einträge angezeigt",
+      menu: "Menü",
+      customTitle: "Dein Theme platziert dieses Menü",
+      customDescription:
+        "Das Blog-Theme zeigt Kopf- und Fußzeile; ein Menü „{key}“ erscheint dort, wo ein Theme es platziert. Unten: seine Einträge, wie sie aufgelöst werden.",
+      match: {
+        exact: "Der unterstrichene Eintrag passt genau zu diesem Pfad.",
+        prefix: "Der markierte Eintrag ist das nächstgelegene übergeordnete Element dieses Pfads.",
+        context:
+          "Der markierte Eintrag passt über den Kontext: die Kategorie oder Sammlung des Artikels.",
+      },
+    },
+    inMenu: { badge: "Im Menü", hint: "Verlinkt aus {menus}." },
+    usedIn: {
+      title: "In Menüs",
+      none: "In keinem Menü",
+      noneDescription: {
+        page: "Füge sie unter Navigation der Kopf- oder Fußzeile hinzu.",
+        contentEntry: "Füge ihn unter Navigation einem Menü hinzu.",
+        term: "Füge sein Archiv unter Navigation einem Menü hinzu.",
+      },
+      description: {
+        page: "Eine Umbenennung der Seite benennt Einträge ohne eigene Beschriftung um. Löschen blendet sie aus.",
+        contentEntry:
+          "Eine Umbenennung des Artikels benennt Einträge ohne eigene Beschriftung um. Löschen blendet sie aus.",
+        term: "Ausmustern des Begriffs oder ihn intern machen blendet diese Einträge aus.",
+      },
+      open: "Navigation öffnen",
+    },
+    deleteNotice: {
+      titleOne: {
+        page: "Ein Menü verlinkt auf diese Seite",
+        contentEntry: "Ein Menü verlinkt auf diesen Artikel",
+      },
+      title: {
+        page: "{count} Menüeinträge verlinken auf diese Seite",
+        contentEntry: "{count} Menüeinträge verlinken auf diesen Artikel",
+      },
+      description:
+        "Nach dem Löschen bleiben sie im Menü, auf deiner Website ausgeblendet und unter Navigation markiert, bis du sie behebst.",
+    },
+    how: {
+      title: "So funktionieren Menüs",
+      ids: "Über ID verlinkt",
+      idsHint:
+        "Einträge verweisen auf Seiten, Artikel und Kategorien, nicht auf Adressen, Umbenennungen machen sie also nie kaputt.",
+      hidden: "Ausgeblendet, nie kaputt",
+      hiddenHint:
+        "Ein Eintrag, dessen Seite gelöscht oder nicht mehr veröffentlicht ist, wird auf der Website ausgeblendet und hier markiert.",
+      agents: "Agents fragen zuerst",
+      agentsHint:
+        "Jede Menüänderung, die ein Agent vorschlägt, wartet auf die Freigabe durch eine Person.",
+      snapshot: "Ein Speichern, ein Snapshot",
+    },
+    diff: {
+      summary: "+{added} −{removed} ↕{moved} ~{changed}",
+      items: "{before} → {after} Einträge",
+    },
+  },
+};

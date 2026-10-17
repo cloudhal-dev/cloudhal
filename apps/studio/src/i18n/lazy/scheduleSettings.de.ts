@@ -1,0 +1,71 @@
+/** German `scheduleSettings.*` (see `scheduleSettings.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"scheduleSettings"> = {
+  scheduleSettings: {
+    title: "Zeitpläne",
+    description:
+      "Geplante Veröffentlichungen, Embargos und Automatisierungen auf dieser Site. Pausieren stoppt alle auf einmal.",
+    unavailable: "Zeitpläne sind auf diesem Server nicht verfügbar.",
+    timeZone: {
+      label: "Zeitzone",
+      description:
+        "Zeitpläne, Embargos und Automatisierungen laufen nach dieser Uhr. Eine Änderung lässt jeden geplanten Zeitpunkt unverändert.",
+      placeholder: "Zeitzonen durchsuchen",
+      empty: "Keine passende Zeitzone",
+      clear: "Leeren",
+      show: "Zeitzonen anzeigen",
+      useBrowser: "{zone} verwenden",
+      invalid: "Der Server kennt diese Zeitzone nicht. Wähle eine aus der Liste.",
+    },
+    health: {
+      label: "Planer",
+      hint: "Releases laufen etwa innerhalb einer Minute nach ihrem Zeitpunkt.",
+      state: {
+        running: "Läuft",
+        late: "Verspätet",
+        stopped: "Gestoppt",
+        unknown: "Nicht gestartet",
+      },
+      lastTick: "Letzter Tick {time}",
+      never: "Nie gelaufen",
+      modes: {
+        cron: "Geweckt durch einen minütlichen Cron",
+        alarm: "Geweckt durch einen Durable-Object-Alarm",
+        node: "Geweckt durch einen Node-Timer",
+        request: "Nur durch Anfragen geweckt",
+        unknown: "Nicht gemeldet",
+      },
+    },
+    killSwitch: {
+      label: "Zeitpläne und Automatisierungen pausieren",
+      hint: "Fällige Releases warten (und verfallen nach einer Stunde), Automatisierungen starten nicht, offene Läufe werden gestoppt.",
+      paused: "Pausiert {time} von {name}",
+      reasonShown: "„{reason}“",
+      confirmTitle: "Alle Zeitpläne auf dieser Site pausieren?",
+      confirmDescription:
+        "Nichts Geplantes wird veröffentlicht und keine Automatisierung läuft, bis jemand sie fortsetzt. Releases, die in der Zwischenzeit fällig werden, verfallen nach einer Stunde.",
+      reason: "Grund",
+      reasonPlaceholder: "Wahlabend: alles zurückhalten, bis die Ergebnisse feststehen",
+      reasonHint: "Wird auf der Zeitpläne-Seite und unter Aktivität angezeigt.",
+      pause: "Pausieren",
+      resumeTitle: "Zeitpläne fortsetzen?",
+      resumeDescription:
+        "Releases, die noch innerhalb der Stunde liegen, werden verspätet veröffentlicht; Automatisierungen starten zu ihrem nächsten Zeitpunkt.",
+      resume: "Fortsetzen",
+      pausedToast: "Zeitpläne pausiert",
+      resumedToast: "Zeitpläne fortgesetzt",
+    },
+    cap: {
+      label: "Tägliche Schreibvorgänge von Automatisierungen",
+      hint: "Änderungen, die Automatisierungen pro Tag (UTC) vornehmen dürfen, über alle hinweg.",
+      used: "{used} von {cap} heute verbraucht",
+      error: "Eine ganze Zahl von 1 bis 100.000.",
+      saved: "Tageslimit gespeichert",
+    },
+    conflict:
+      "Diese Einstellungen wurden anderswo geändert. Lade den neuesten Stand und versuche es erneut.",
+    reload: "Neuesten Stand laden",
+    failed: "Die Zeitplan-Einstellungen konnten nicht gespeichert werden",
+  },
+};
