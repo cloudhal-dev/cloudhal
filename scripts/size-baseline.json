@@ -30,8 +30,7 @@
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
     "packages/schedules/src/recurrence.ts": 939,
     "packages/schedules/src/scheduler.ts": 1343,
-    "packages/schedules/src/sql/store.ts": 2166,
-    "packages/ui/src/blocks/MarkdownEditor.tsx": 1295
+    "packages/schedules/src/sql/store.ts": 2166
   },
   "functions": {
     "apps/demo-newsroom/scripts/editor-agent.ts::runEditorAgent": {
@@ -576,11 +575,8 @@
     "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth>weeks.map(cb)>week.map(cb)": {
       "lines": 169
     },
-    "packages/ui/src/blocks/MarkdownEditor.tsx::FormatToolbar": {
-      "lines": 165
-    },
     "packages/ui/src/blocks/MarkdownEditor.tsx::MarkdownEditor": {
-      "lines": 352
+      "lines": 193
     },
     "packages/ui/src/blocks/MenuTree.tsx::MenuTree": {
       "lines": 426
