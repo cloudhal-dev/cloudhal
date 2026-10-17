@@ -66,7 +66,7 @@ function ThreadSkeleton({ label }: { label: string }) {
         <div
           key={i}
           aria-hidden
-          className={cn("grid gap-2 px-4 py-3 sm:px-5", i === 1 && "ml-6 sm:ml-10")}
+          className={cn("grid gap-2 px-4 py-3 sm:px-5", i === 1 && "ms-6 sm:ms-10")}
         >
           <SkeletonLine minWidth={20} maxWidth={35} />
           <SkeletonLine minWidth={60} maxWidth={95} />
@@ -250,7 +250,7 @@ function ThreadItem({
         </div>
       )}
       {node.replies.length > 0 && (
-        <div className="ml-4 border-kumo-hairline border-l pb-2 sm:ml-8">
+        <div className="ms-4 border-kumo-hairline border-s pb-2 sm:ms-8">
           <ol
             id={listId}
             aria-label={labels.replies(parentName)}

@@ -38,12 +38,12 @@ export function SidebarSwitcher({
           <button
             type="button"
             aria-label={ariaLabel}
-            className="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-kumo-default text-sm outline-none transition-[padding] duration-(--sidebar-animation-duration) ease-(--sidebar-easing) hover:bg-kumo-tint focus-visible:ring-1 focus-visible:ring-kumo-line group-data-[state=collapsed]/sidebar:px-2"
+            className="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-start font-medium text-kumo-default text-sm outline-none transition-[padding] duration-(--sidebar-animation-duration) ease-(--sidebar-easing) hover:bg-kumo-tint focus-visible:ring-1 focus-visible:ring-kumo-line group-data-[state=collapsed]/sidebar:px-2"
           />
         }
       >
         {CurrentIcon && <CurrentIcon className="size-4 shrink-0 text-kumo-brand" weight="fill" />}
-        <span className="flex min-w-0 flex-1 items-center overflow-hidden text-left">
+        <span className="flex min-w-0 flex-1 items-center overflow-hidden text-start">
           <span className="truncate">{current.name}</span>
         </span>
         <span className="w-4 shrink-0 overflow-hidden transition-[width] duration-(--sidebar-animation-duration) ease-(--sidebar-easing) group-data-[state=collapsed]/sidebar:w-0">
@@ -62,7 +62,7 @@ export function SidebarSwitcher({
             >
               {Icon && <Icon className="size-4 text-kumo-brand" weight="fill" />}
               {item.name}
-              {item.id === current.id && <Check className="ml-auto size-4" />}
+              {item.id === current.id && <Check className="ms-auto size-4" />}
             </DropdownMenu.Item>
           );
         })}

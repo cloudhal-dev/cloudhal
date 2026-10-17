@@ -66,7 +66,7 @@ export function RecentActivity({ siteId, limit = 5 }: { siteId: string; limit?: 
                 </div>
               </div>
             </Table.Cell>
-            <Table.Cell className="w-0 whitespace-nowrap text-right">
+            <Table.Cell className="w-0 whitespace-nowrap text-end">
               <DecisionCell row={r} align="end" />
             </Table.Cell>
           </Table.Row>

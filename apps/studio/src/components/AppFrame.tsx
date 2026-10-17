@@ -135,11 +135,11 @@ function AppFrameShell({
       >
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-kumo-line border-b bg-kumo-canvas px-4">
           {/* The sidebar is a sheet below the mobile breakpoint; this is its only way in there. */}
-          <span className="-ml-1 md:hidden">
+          <span className="-ms-1 md:hidden">
             <Sidebar.Trigger />
           </span>
           <PageCrumbsSlot className="hidden flex-1 sm:flex" />
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ms-auto flex shrink-0 items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -149,7 +149,7 @@ function AppFrameShell({
               aria-label={t("nav.search")}
               className="justify-start text-kumo-subtle sm:w-40 lg:w-64"
             >
-              <span className="hidden min-w-0 flex-1 truncate text-left sm:inline">
+              <span className="hidden min-w-0 flex-1 truncate text-start sm:inline">
                 {t("nav.search")}
               </span>
               <kbd className="hidden rounded bg-kumo-recessed px-1 font-mono text-kumo-subtle text-xs sm:inline">

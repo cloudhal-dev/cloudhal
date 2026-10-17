@@ -45,7 +45,7 @@ export function TimezoneNote({ label, detail, toggle, className }: TimezoneNoteP
               type="button"
               className={cn(
                 props.className,
-                "inline-flex min-w-0 cursor-default rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand",
+                "inline-flex min-w-0 cursor-default rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand",
               )}
             />
           )}

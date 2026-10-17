@@ -399,7 +399,7 @@ export function ArticlesPage() {
                         <RelativeTime iso={e.updatedAt} />
                       </Table.Cell>
                       {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={e.id} />}
-                      <Table.Cell sticky="right" className="w-0 text-right">
+                      <Table.Cell sticky="right" className="w-0 text-end">
                         <RowMenu
                           onOpen={() =>
                             navigate({

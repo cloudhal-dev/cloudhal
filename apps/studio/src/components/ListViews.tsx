@@ -41,9 +41,7 @@ export function useListViews(siteId: string): ListViewsColumn {
 export function ListViewsHead() {
   const t = useT("readers");
   return (
-    <Table.Head className="text-right whitespace-nowrap">
-      {t("readers.listColumn.title")}
-    </Table.Head>
+    <Table.Head className="text-end whitespace-nowrap">{t("readers.listColumn.title")}</Table.Head>
   );
 }
 
@@ -53,13 +51,13 @@ export function ListViewsCell({ views, nodeId }: { views: ListViews | undefined;
   const number = useMemo(() => numberFormat(locale), [locale]);
   if (!views)
     return (
-      <Table.Cell className="text-right">
+      <Table.Cell className="text-end">
         <SkeletonLine minWidth={40} maxWidth={40} />
       </Table.Cell>
     );
   const n = viewsOf(views, nodeId);
   return (
-    <Table.Cell className="text-right whitespace-nowrap tabular-nums" data-testid="views-cell">
+    <Table.Cell className="text-end whitespace-nowrap tabular-nums" data-testid="views-cell">
       {n === undefined ? (
         <Tooltip content={t("readers.listColumn.notTop", { count: views.ranked })}>
           <Text variant="secondary" as="span">

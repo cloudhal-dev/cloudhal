@@ -93,7 +93,7 @@ function Children({
         <div key={child.id} className="grid gap-1.5">
           <ItemText item={child} labels={labels} />
           {child.children.length > 0 && level + 1 <= THEME_LEVELS && (
-            <div className="border-l border-kumo-hairline pl-3">
+            <div className="border-s border-kumo-hairline ps-3">
               <Children items={child.children} labels={labels} level={level + 1} />
             </div>
           )}

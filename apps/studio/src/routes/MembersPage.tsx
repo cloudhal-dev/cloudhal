@@ -367,7 +367,7 @@ function InvitesCard({
                           <RelativeTime iso={invite.createdAt} size="xs" />
                         </div>
                       </Table.Cell>
-                      <Table.Cell sticky="right" className="w-12 text-right">
+                      <Table.Cell sticky="right" className="w-12 text-end">
                         <InviteMenu
                           invite={invite}
                           reason={mine ? undefined : notMine}
@@ -601,7 +601,7 @@ export function MembersPage() {
                         <Table.Cell>
                           <div className="grid min-w-0 gap-1.5 sm:min-w-56">
                             <MemberIdentity member={m} you={m.userId === me?.userId} />
-                            <span className="pl-11 sm:hidden">
+                            <span className="ps-11 sm:hidden">
                               <RoleBadge value={m.role} />
                             </span>
                           </div>
@@ -612,7 +612,7 @@ export function MembersPage() {
                         <Table.Cell className="hidden whitespace-nowrap sm:table-cell">
                           <RelativeTime iso={m.joinedAt} />
                         </Table.Cell>
-                        <Table.Cell sticky="right" className="w-12 text-right">
+                        <Table.Cell sticky="right" className="w-12 text-end">
                           <MemberMenu
                             member={m}
                             problem={roleChangeProblem(manager, m)}

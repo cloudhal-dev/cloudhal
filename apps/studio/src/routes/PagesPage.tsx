@@ -168,7 +168,7 @@ export function PagesPage() {
                       </Text>
                     </Table.Cell>
                     {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={p.id} />}
-                    <Table.Cell className="text-right">
+                    <Table.Cell className="text-end">
                       <RowMenu
                         onOpen={() =>
                           navigate({

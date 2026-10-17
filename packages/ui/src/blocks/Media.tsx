@@ -276,17 +276,17 @@ export function MediaTile({
       <span className="relative block">
         {preview}
         {badges && (
-          <span className="absolute top-1.5 left-1.5 flex max-w-[calc(100%-0.75rem)] flex-wrap gap-1">
+          <span className="absolute top-1.5 start-1.5 flex max-w-[calc(100%-0.75rem)] flex-wrap gap-1">
             {badges}
           </span>
         )}
         {selected && (
-          <span className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-kumo-brand text-kumo-inverse">
+          <span className="absolute top-1.5 end-1.5 flex size-6 items-center justify-center rounded-full bg-kumo-brand text-kumo-inverse">
             <Check size={14} weight="bold" aria-hidden />
           </span>
         )}
       </span>
-      <span className="grid min-w-0 gap-0.5 px-1 pt-2 pb-1 text-left">
+      <span className="grid min-w-0 gap-0.5 px-1 pt-2 pb-1 text-start">
         <Text as="span" truncate>
           {title}
         </Text>

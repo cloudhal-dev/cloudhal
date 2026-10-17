@@ -18,7 +18,7 @@ import { parseAst } from "vite";
 import { messageRuleHits } from "./i18n-message-rules.ts";
 
 export interface TextViolation {
-  rule: "i18n" | "i18n-plural" | "i18n-concat" | "i18n-format";
+  rule: "i18n" | "i18n-plural" | "i18n-concat" | "i18n-format" | "rtl-logical";
   message: string;
   line: number;
   text: string;
