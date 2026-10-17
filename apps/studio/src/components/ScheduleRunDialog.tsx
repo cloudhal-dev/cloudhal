@@ -5,7 +5,9 @@
  * with its stable code in words. Text that came from visitors or a fetched document is marked and
  * shown as plain text only.
  */
+
 import type { ScheduleRun } from "@cloudhal/core-contracts";
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   InsetPanel,
@@ -205,7 +207,7 @@ export function ScheduleRunDialog({
                 <span className="flex flex-wrap gap-1.5">
                   {counts.map(([key, n]) => (
                     <Badge key={key} variant="outline">
-                      {isCode(key) ? t(`${r}.codes.${key}`) : key}: {n.toLocaleString(locale)}
+                      {isCode(key) ? t(`${r}.codes.${key}`) : key}: {formatNumber(locale, n)}
                     </Badge>
                   ))}
                 </span>

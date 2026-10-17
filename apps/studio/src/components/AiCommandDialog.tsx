@@ -4,7 +4,9 @@
  * goes into the editor only (the person saves as usual), and is refused when the selected blocks
  * changed while the model was writing.
  */
+
 import { bodyDiff } from "@cloudhal/core-ts/body-blocks";
+import { displayNames } from "@cloudhal/messages/format";
 import {
   Banner,
   BodyDiff,
@@ -93,7 +95,7 @@ export function AiCommandDialog({
   useEffect(() => () => abort.current?.abort(), []);
 
   const languages = useMemo(() => {
-    const names = new Intl.DisplayNames([locale], { type: "language" });
+    const names = displayNames([locale], { type: "language" });
     return Object.fromEntries(LANGUAGES.map((code) => [code, names.of(code) ?? code]));
   }, [locale]);
 

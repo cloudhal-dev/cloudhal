@@ -1,4 +1,5 @@
 import type { ActorKind } from "@cloudhal/core-contracts";
+import { formatDate, relativeTimeFormat } from "@cloudhal/messages/format";
 import type { AuditDecision, AuditOutcome, AuditRow } from "./api.ts";
 
 /** MCP tools Studio has labels for (`packages/mcp-server/src/tools.ts`); others show their raw name. */
@@ -209,7 +210,7 @@ const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
 /** "3 minutes ago" / "3 dakika önce"; anything under a minute reads as "now". */
 export function relativeTime(iso: string, locale: string, now: number = Date.now()): string {
   const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = relativeTimeFormat(locale, { numeric: "auto" });
   for (const [unit, size] of UNITS) {
     if (Math.abs(seconds) >= size) return rtf.format(Math.trunc(seconds / size), unit);
   }
@@ -218,7 +219,7 @@ export function relativeTime(iso: string, locale: string, now: number = Date.now
 
 /** Full timestamp for tooltips and detail views. */
 export function absoluteTime(iso: string, locale: string): string {
-  return new Date(iso).toLocaleString(locale, { dateStyle: "medium", timeStyle: "medium" });
+  return formatDate(locale, iso, { dateStyle: "medium", timeStyle: "medium" });
 }
 
 /** Pretty-printed tool input for the detail view (the audit log stores at most 4 kB of it). */

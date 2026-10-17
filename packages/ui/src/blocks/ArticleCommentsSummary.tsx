@@ -1,4 +1,5 @@
 import { Badge, Button, LinkButton, SkeletonLine, Tabs, Text } from "@cloudflare/kumo";
+import { numberFormat } from "@cloudhal/messages/format";
 import { CalendarBlank, ChatsCircle } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import {
@@ -108,7 +109,7 @@ export function ArticleCommentsSummary({
         </span>
       </div>
     );
-  const number = new Intl.NumberFormat(locale);
+  const number = numberFormat(locale);
   const fmt = (n: number) => number.format(n);
   const editable = Boolean(onModeChange) && !modeReadOnlyReason;
   return (

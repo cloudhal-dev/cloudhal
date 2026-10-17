@@ -4,6 +4,7 @@
  * (snapshotted with it); `design_lint` warnings show after loading and saving. Agents propose
  * changes with `set_design`, which waits for a person in Approvals.
  */
+import { formatNumber } from "@cloudhal/messages/format";
 import { Banner, Button, Collapsible, InputArea, SkeletonLine, Text } from "@cloudhal/ui";
 import { WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,7 +88,7 @@ export function DesignRulesSettingsSection({
     );
   const dirty = text.trim() !== (saved.site ?? "").trim();
   const disabled = !gate.allowed;
-  const count = (n: number) => n.toLocaleString(locale);
+  const count = (n: number) => formatNumber(locale, n);
   return (
     <SettingsSection
       id={DESIGN_RULES_SECTION}

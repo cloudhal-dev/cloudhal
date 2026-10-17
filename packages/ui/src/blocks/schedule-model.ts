@@ -8,12 +8,14 @@
  * the site's `timeZone`. No date library: recurrence and "next runs" come from the server (RFC-0008
  * §9.4), and Studio only displays them.
  */
+
 import type {
   AutomationState,
   ReleaseState,
   ScheduleRun,
   ScheduleRunState,
 } from "@cloudhal/core-contracts";
+import { dateTimeFormat, relativeTimeFormat } from "@cloudhal/messages/format";
 
 // ---------------------------------------------------------------------------------------------
 // Kinds, states and words
@@ -329,7 +331,7 @@ const partsCache = new Map<string, Intl.DateTimeFormat>();
 export function zonedParts(at: string, timeZone: string) {
   let f = partsCache.get(timeZone);
   if (!f) {
-    f = new Intl.DateTimeFormat("en-US", {
+    f = dateTimeFormat("en-US", {
       timeZone,
       year: "numeric",
       month: "2-digit",
@@ -364,7 +366,7 @@ export function entryDay(entry: Pick<ScheduleEntry, "at" | "day">, timeZone: str
 /** `h23` or `h12`: what the locale writes by default (Turkish: 24-hour). */
 export function hourCycleOf(locale: string): "h23" | "h12" {
   try {
-    const hc = new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
+    const hc = dateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
     return hc === "h11" || hc === "h12" ? "h12" : "h23";
   } catch {
     return "h23";
@@ -378,7 +380,7 @@ export function formatScheduleTime(
   timeZone: string,
   hourCycle: "h23" | "h12" = hourCycleOf(locale),
 ): string {
-  return new Intl.DateTimeFormat(locale, {
+  return dateTimeFormat(locale, {
     timeZone,
     hour: hourCycle === "h23" ? "2-digit" : "numeric",
     minute: "2-digit",
@@ -398,12 +400,12 @@ export function formatDay(
       : style === "full"
         ? { dateStyle: "full" }
         : { dateStyle: "medium" };
-  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(dayToDate(day));
+  return dateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(dayToDate(day));
 }
 
 /** "October 2026". */
 export function formatMonth(month: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
+  return dateTimeFormat(locale, {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -412,7 +414,7 @@ export function formatMonth(month: string, locale: string): string {
 
 /** Weekday names in the locale, by weekday number (0 = Sunday). */
 export function weekdayNames(locale: string, width: "long" | "short" | "narrow"): string[] {
-  const f = new Intl.DateTimeFormat(locale, { weekday: width, timeZone: "UTC" });
+  const f = dateTimeFormat(locale, { weekday: width, timeZone: "UTC" });
   // 2026-10-11 is a Sunday.
   return Array.from({ length: 7 }, (_, i) => f.format(dayToDate(shiftDay("2026-10-11", i))));
 }
@@ -421,7 +423,7 @@ export function weekdayNames(locale: string, width: "long" | "short" | "narrow")
 export function relativeDay(day: string, today: string, locale: string): string | undefined {
   const diff = Math.round((dayToDate(day).getTime() - dayToDate(today).getTime()) / 86_400_000);
   if (Math.abs(diff) > 1) return undefined;
-  const text = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(diff, "day");
+  const text = relativeTimeFormat(locale, { numeric: "auto" }).format(diff, "day");
   return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
 }
 
@@ -455,7 +457,7 @@ export function groupByDay<T extends ScheduleEntry>(
 
 /** The day-period words of a 12-hour locale ("AM", "PM"), from `Intl`. */
 function dayPeriods(locale: string): { am: string; pm: string } {
-  const f = new Intl.DateTimeFormat(locale, { hour: "numeric", hourCycle: "h12", timeZone: "UTC" });
+  const f = dateTimeFormat(locale, { hour: "numeric", hourCycle: "h12", timeZone: "UTC" });
   const period = (h: number) =>
     f.formatToParts(new Date(Date.UTC(2026, 0, 1, h))).find((p) => p.type === "dayPeriod")?.value ??
     "";
@@ -501,7 +503,7 @@ export function formatTimeOfDay(
 ): string {
   const m = /^(\d{2}):(\d{2})$/.exec(time);
   if (!m) return time;
-  return new Intl.DateTimeFormat(locale, {
+  return dateTimeFormat(locale, {
     hour: hourCycle === "h23" ? "2-digit" : "numeric",
     minute: "2-digit",
     hourCycle,

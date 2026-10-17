@@ -1,3 +1,4 @@
+import { dateTimeFormat, formatNumber } from "@cloudhal/messages/format";
 import {
   Badge,
   Banner,
@@ -259,7 +260,7 @@ function TurnstileSecret({
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="success" appearance="dot">
             {t("commentsSettings.protection.secretSavedOn", {
-              date: new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+              date: dateTimeFormat(locale, { dateStyle: "medium" }).format(
                 new Date(info.updatedAt),
               ),
             })}
@@ -685,11 +686,9 @@ export function CommentSettingsSection({ siteId }: { siteId: string }) {
                   label={t("commentsSettings.dailyCap.label")}
                   description={t("commentsSettings.dailyCap.hint", {
                     rows: ROWS_PER_COMMENT,
-                    cap: Number.isFinite(form.dailyCap)
-                      ? form.dailyCap.toLocaleString(locale)
-                      : "—",
+                    cap: Number.isFinite(form.dailyCap) ? formatNumber(locale, form.dailyCap) : "—",
                     writes: Number.isFinite(form.dailyCap)
-                      ? (form.dailyCap * ROWS_PER_COMMENT).toLocaleString(locale)
+                      ? formatNumber(locale, form.dailyCap * ROWS_PER_COMMENT)
                       : "—",
                   })}
                   value={String(form.dailyCap)}
@@ -705,8 +704,8 @@ export function CommentSettingsSection({ siteId }: { siteId: string }) {
                     value={used}
                     max={Math.max(1, draft.base.dailyCap)}
                     customValue={t("commentsSettings.dailyCap.todayValue", {
-                      used: used.toLocaleString(locale),
-                      cap: draft.base.dailyCap.toLocaleString(locale),
+                      used: formatNumber(locale, used),
+                      cap: formatNumber(locale, draft.base.dailyCap),
                     })}
                   />
                 )}

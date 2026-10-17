@@ -7,7 +7,9 @@
  *
  * Loads with the schedule screens only (`bundle-budget.ts` `LAZY_ONLY`).
  */
+
 import type { Release } from "@cloudhal/core-contracts";
+import { dateTimeFormat, numberFormat } from "@cloudhal/messages/format";
 import {
   DEFAULT_RECURRENCE,
   dateToDay,
@@ -121,7 +123,7 @@ export function zoneLabel(timeZone: string, at: number = Date.now()): string {
 /** The viewer's zone (the browser's), UTC when it cannot tell. */
 export function browserZone(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; // i18n-ignore: reads the zone, formats nothing
   } catch {
     return "UTC";
   }
@@ -140,7 +142,7 @@ export function knownZones(): string[] {
 
 export function isKnownZone(timeZone: string): boolean {
   try {
-    new Intl.DateTimeFormat("en", { timeZone });
+    dateTimeFormat("en", { timeZone });
     return true;
   } catch {
     return false;
@@ -154,7 +156,7 @@ export function formatWhen(
   timeZone: string,
   style: "short" | "long" = "short",
 ): string {
-  return new Intl.DateTimeFormat(locale, {
+  return dateTimeFormat(locale, {
     timeZone,
     ...(style === "long"
       ? { weekday: "long", day: "numeric", month: "long", year: "numeric" }
@@ -169,7 +171,7 @@ export function formatMinutes(minutes: number, locale: string): string {
   const m = Math.max(1, Math.round(minutes));
   const unit = m >= 1440 ? "day" : m >= 60 ? "hour" : "minute";
   const value = unit === "day" ? m / 1440 : unit === "hour" ? m / 60 : m;
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: "unit",
     unit,
     unitDisplay: "short",
@@ -179,9 +181,7 @@ export function formatMinutes(minutes: number, locale: string): string {
 
 /** A moment in the reader's own zone ("12 Oct 2026, 14:02"). */
 export function formatMoment(at: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(at),
-  );
+  return dateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(at));
 }
 
 /** What is wrong with a wall-clock time the person picked (the screens word it). */

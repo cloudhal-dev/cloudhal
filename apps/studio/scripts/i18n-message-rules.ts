@@ -5,6 +5,9 @@
  * - `i18n-concat`: a sentence assembled from several messages (`${t(a)} ${t(b)}`, `t(a) + t(b)`,
  *   `{t(a)} {t(b)}` in JSX) or a list joined with a comma (`items.join(", ")`) — one message, or
  *   `listOf(items)`.
+ * - `i18n-format`: a formatter built on the spot (`new Intl.DateTimeFormat(…)`, `n.toLocaleString(…)`)
+ *   instead of the cached, locale-taking layer in `@cloudhal/messages/format` (`formatDate`,
+ *   `formatNumber`, `numberFormat`, …) — the i18n review's Phase 2.
  * Exceptions carry `i18n-ignore: <reason>` on the line or the line above, as for the words rule.
  */
 
@@ -13,7 +16,7 @@ const isNode = (v: unknown): v is Node =>
   typeof v === "object" && v !== null && typeof (v as Node).type === "string";
 
 export interface RuleHit {
-  rule: "i18n-plural" | "i18n-concat";
+  rule: "i18n-plural" | "i18n-concat" | "i18n-format";
   node: Node;
   message: string;
 }
@@ -40,7 +43,34 @@ const CONCAT =
   "a sentence assembled from several messages — make it one message (a `select` for the part that varies), DESIGN.md §1";
 const LIST = 'a list joined with ", " — use listOf(items) (Intl.ListFormat in the Studio language)';
 
+const FORMATTERS = new Set([
+  "NumberFormat",
+  "DateTimeFormat",
+  "RelativeTimeFormat",
+  "ListFormat",
+  "PluralRules",
+  "DisplayNames",
+  "Collator",
+  "Segmenter",
+]);
+const TO_LOCALE = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]);
+const FORMAT =
+  "a formatter built on the spot — use the cached layer in @cloudhal/messages/format (formatDate, formatNumber, numberFormat, dateTimeFormat, …) with the Studio locale";
+
+/** `new Intl.X(…)`, `Intl.X(…)` and `x.toLocaleString(…)` (Phase 2: one cached, locale-taking layer). */
+function checkFormat(node: Node, hits: RuleHit[]) {
+  if (node.type !== "NewExpression" && node.type !== "CallExpression") return;
+  const callee = node.callee as Node;
+  if (callee.type !== "MemberExpression" || callee.computed) return;
+  const object = callee.object as Node;
+  const property = (callee.property as Node).name as string;
+  const intl = object.type === "Identifier" && object.name === "Intl" && FORMATTERS.has(property);
+  if (intl || (node.type === "CallExpression" && TO_LOCALE.has(property)))
+    hits.push({ rule: "i18n-format", node, message: FORMAT });
+}
+
 function check(node: Node, hits: RuleHit[]) {
+  checkFormat(node, hits);
   if (node.type === "ConditionalExpression") {
     const test = unwrap(node.test);
     const counted =

@@ -32,6 +32,7 @@
     "@cloudflare/kumo": "catalog:",
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
+    "@cloudhal/messages": "workspace:*",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-markdown": "catalog:",
     "@codemirror/language": "catalog:",

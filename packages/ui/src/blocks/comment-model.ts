@@ -6,6 +6,7 @@
  * Comment text is **untrusted reader text**. Nothing here produces HTML: the blocks render the
  * segments as React text nodes and Kumo `Link`s, so markup in a comment stays literal text.
  */
+
 import type {
   Comment,
   CommentAuthor,
@@ -13,6 +14,7 @@ import type {
   CommentModeration,
   CommentStatus,
 } from "@cloudhal/core-contracts";
+import { dateTimeFormat, relativeTimeFormat } from "@cloudhal/messages/format";
 
 export type CommentLabelName = CommentLabel["label"];
 export type CommentLabelSource = CommentLabel["source"];
@@ -254,10 +256,10 @@ export function formatCommentTime(
   const seconds = Math.round((at - now) / 1000);
   const abs = Math.abs(seconds);
   const [unit, size] = UNITS.find(([, s]) => abs >= s) ?? ["second", 1];
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = relativeTimeFormat(locale, { numeric: "auto" });
   const relative =
     abs < 45 ? rtf.format(0, "second") : rtf.format(Math.round(seconds / size), unit);
-  const absolute = new Intl.DateTimeFormat(locale, {
+  const absolute = dateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(at);
@@ -268,5 +270,5 @@ export function formatCommentTime(
 export function formatCommentDate(iso: string, locale: string): string {
   const at = Date.parse(iso);
   if (Number.isNaN(at)) return iso;
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(at);
+  return dateTimeFormat(locale, { dateStyle: "medium" }).format(at);
 }

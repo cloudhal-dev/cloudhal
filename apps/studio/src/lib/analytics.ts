@@ -4,6 +4,7 @@
  * the Core Web Vitals ratings and their units, and the state the screen is in. No React and no
  * words of their own beyond what the catalogs give them, so they are tested directly.
  */
+import { numberFormat } from "@cloudhal/messages/format";
 import type { AnalyticsRange } from "@cloudhal/ui";
 import {
   type AnalyticsFilter,
@@ -130,19 +131,19 @@ export function goodShare(m: AnalyticsVitalsMetric): number | null {
 /** A p75 in its unit: LCP in seconds ("2.1 s"), INP in milliseconds ("180 ms"), CLS unitless ("0.05"). */
 export function formatVital(metric: CoreVital, value: number, locale: string): string {
   if (metric === "cls")
-    return new Intl.NumberFormat(locale, {
+    return numberFormat(locale, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
   if (metric === "lcp")
-    return new Intl.NumberFormat(locale, {
+    return numberFormat(locale, {
       style: "unit",
       unit: "second",
       unitDisplay: "short",
       maximumFractionDigits: 1,
       minimumFractionDigits: 1,
     }).format(value / 1000);
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: "unit",
     unit: "millisecond",
     unitDisplay: "short",

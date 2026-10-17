@@ -5,7 +5,9 @@
  * decides. A copy of the rules is kept for servers (and tests) that do not report them, like
  * `scopesForMode` in `agents.ts`.
  */
+
 import type { ContentEntry } from "@cloudhal/core-contracts";
+import { relativeTimeFormat } from "@cloudhal/messages/format";
 import type {
   Ability,
   AgentMode,
@@ -345,7 +347,7 @@ export function validEmail(value: string): boolean {
 export function expiresIn(iso: string, locale: string, now: number = Date.now()): string {
   // Whole minutes first, so 59.98 minutes reads "in 1 hour", not "in 60 minutes".
   const minutes = Math.round((Date.parse(iso) - now) / 60_000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = relativeTimeFormat(locale, { numeric: "auto" });
   if (Math.abs(minutes) >= 1440) return rtf.format(Math.round(minutes / 1440), "day");
   if (Math.abs(minutes) >= 60) return rtf.format(Math.round(minutes / 60), "hour");
   return rtf.format(Math.round(minutes), "minute");

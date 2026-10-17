@@ -5,7 +5,9 @@
  * mutations with their toasts, and "Move to…" (`RescheduleDialog` + Undo). Loads with the
  * schedule screens only (`bundle-budget.ts` `LAZY_ONLY`).
  */
+
 import type { Release } from "@cloudhal/core-contracts";
+import { dateTimeFormat } from "@cloudhal/messages/format";
 import {
   Badge,
   Banner,
@@ -182,7 +184,7 @@ export function problemText(
       return t(`${p}.gap`, {
         time: context.value?.time ?? "",
         date: context.value?.date
-          ? new Intl.DateTimeFormat(locale, {
+          ? dateTimeFormat(locale, {
               day: "numeric",
               month: "long",
               timeZone: "UTC",

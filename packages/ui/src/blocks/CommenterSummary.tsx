@@ -1,5 +1,6 @@
 import { Badge, SkeletonLine, Text } from "@cloudflare/kumo";
 import type { CommentStatus } from "@cloudhal/core-contracts";
+import { numberFormat } from "@cloudhal/messages/format";
 import type { ReactNode } from "react";
 import { CommentStatusBadge, type CommentWords } from "./CommentParts.tsx";
 import { COMMENT_STATUSES, formatCommentDate, formatCommentTime } from "./comment-model.ts";
@@ -125,7 +126,7 @@ export function CommenterSummary({
       </Text>
     );
   };
-  const number = new Intl.NumberFormat(locale);
+  const number = numberFormat(locale);
   return (
     <div className="grid min-w-0 gap-4" data-testid="commenter-summary">
       <dl className="m-0 grid divide-y divide-kumo-hairline">

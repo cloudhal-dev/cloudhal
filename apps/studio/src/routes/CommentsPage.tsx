@@ -1,3 +1,4 @@
+import { formatNumber } from "@cloudhal/messages/format";
 import {
   Banner,
   type BulkAction,
@@ -470,7 +471,7 @@ export function CommentsPage() {
   const tabLabel = (key: QueueTab) => {
     const name = t(`comments.tabs.${key}`);
     const n = key === "pending" || key === "reported" ? counts?.[key] : undefined;
-    return n ? t("comments.tabCount", { label: name, count: n.toLocaleString(locale) }) : name;
+    return n ? t("comments.tabCount", { label: name, count: formatNumber(locale, n) }) : name;
   };
   const notEnabled = isNotEnabled(list.error);
   const conflicts = [...failed.values()].filter((e) => e === "conflict").length;

@@ -65,7 +65,7 @@ import {
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { formatDate, useI18n, useT } from "../i18n/index.tsx";
 import { NAME_MAX, validateName } from "../lib/account.ts";
 import { absoluteTime } from "../lib/activity.ts";
 import {
@@ -664,7 +664,7 @@ function PreviewResult({ link }: { link: PreviewLink }) {
           <Tooltip content={absoluteTime(link.expiresAt, locale)}>
             <Text variant="secondary" size="sm" as="span">
               {t("siteSettings.previews.expires", {
-                when: new Date(link.expiresAt).toLocaleString(locale, {
+                when: formatDate(locale, link.expiresAt, {
                   dateStyle: "medium",
                   timeStyle: "short",
                 }),

@@ -1,3 +1,4 @@
+import { formatDate } from "@cloudhal/messages/format";
 import {
   Avatar,
   Badge,
@@ -153,7 +154,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
               {since && (
                 <Text variant="secondary" size="sm" as="span">
                   {t("account.profile.memberSince", {
-                    date: new Date(since).toLocaleDateString(locale, { dateStyle: "long" }),
+                    date: formatDate(locale, since, { dateStyle: "long" }),
                   })}
                 </Text>
               )}

@@ -1,4 +1,5 @@
 import type { ContentEntry, Correction } from "@cloudhal/core-contracts";
+import { formatDate } from "@cloudhal/messages/format";
 import {
   Button,
   type CorrectionKind,
@@ -37,8 +38,7 @@ export function ArticleCorrectionsCard({
   const [note, setNote] = useState("");
   if (!entry.publishedAt) return null;
   const all = (entry.corrections ?? []) as DraftCorrection[];
-  const when = (at: string) =>
-    new Date(at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+  const when = (at: string) => formatDate(locale, at, { dateStyle: "medium", timeStyle: "short" });
   const items = all
     .map((c, index) => ({ c, index }))
     .sort(

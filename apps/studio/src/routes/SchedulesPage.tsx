@@ -70,7 +70,7 @@ import {
 import { useToast } from "../components/Toast.ts";
 import { useCan, useGate, useMe } from "../components/useMe.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
-import { listOf } from "../i18n/index.tsx";
+import { dateTimeFormat, listOf } from "../i18n/index.tsx";
 import { type Approval, api, type CalendarItem, type ReleaseView } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import {
@@ -635,12 +635,12 @@ export function SchedulesPage() {
       return false;
     const day = e.day ?? e.at;
     if (weekDays) {
-      const d = new Intl.DateTimeFormat("en-CA", { timeZone: displayZone }).format(new Date(e.at));
+      const d = dateTimeFormat("en-CA", { timeZone: displayZone }).format(new Date(e.at));
       return d >= weekDays.first && d <= weekDays.last;
     }
     // The agenda lists the month; the grid also shows the neighbouring days it draws.
     if (view === "agenda") {
-      const d = new Intl.DateTimeFormat("en-CA", { timeZone: displayZone }).format(new Date(e.at));
+      const d = dateTimeFormat("en-CA", { timeZone: displayZone }).format(new Date(e.at));
       return d.slice(0, 7) === month;
     }
     return !!day;
