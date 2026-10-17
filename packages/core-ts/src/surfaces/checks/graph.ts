@@ -37,7 +37,7 @@ export function indexComponents(
   return { components, byId, parentOf: new Map(), issues };
 }
 
-/** Links `c`'s children to it: each exists, is not the root or itself, and has one parent. */
+/** Links `c`'s children to it: each exists, is not the root or itself, has one parent, no loop. */
 export function linkChildren(g: SurfaceGraph, c: SurfaceComponent, at: string): void {
   kidsOf(c).forEach((child, j) => {
     const target = g.byId.get(child);
@@ -49,8 +49,26 @@ export function linkChildren(g: SurfaceGraph, c: SurfaceComponent, at: string): 
         path: `${at}/children/${j}`,
         message: `"${child}" already belongs to "${g.parentOf.get(child)}"`,
       });
+    else if (holds(g, child, c.id))
+      g.issues.push({
+        path: `${at}/children/${j}`,
+        message: `"${child}" already holds "${c.id}"; children cannot loop`,
+      });
     else g.parentOf.set(child, c.id);
   });
+}
+
+/**
+ * Is `ancestor` above `id` in the links made so far? Refusing such a link keeps `parentOf` a
+ * forest, so every walk up through parents (overlays, carousel nesting) ends.
+ */
+function holds(g: SurfaceGraph, ancestor: string, id: string): boolean {
+  const seen = new Set<string>();
+  for (let p = g.parentOf.get(id); p !== undefined && !seen.has(p); p = g.parentOf.get(p)) {
+    if (p === ancestor) return true;
+    seen.add(p);
+  }
+  return false;
 }
 
 /**
