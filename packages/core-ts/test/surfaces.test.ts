@@ -149,6 +149,21 @@ describe("checkSurface", () => {
     expect(messages(cycle)).toEqual(['/components/1/children/0 "root" cannot be a child here']);
   });
 
+  it("refuses a loop of children away from the root, and still finishes with an overlay", () => {
+    // Two components holding each other once hung the overlay and carousel walks up `parentOf`.
+    const loop = surface([
+      { id: "root", component: "Stack" },
+      { id: "a", component: "Stack", children: ["b", "d"] },
+      { id: "b", component: "Stack", children: ["a"] },
+      { id: "d", component: "Dialog", props: { title: "Details" } },
+    ]);
+    const check = checkSurface(loop, catalog);
+    expect(check.issues.map((i) => `${i.path} ${i.message}`)).toContain(
+      '/components/2/children/0 "a" already holds "b"; children cannot loop',
+    );
+    expect(check.unreachable).toEqual(["a", "b", "d"]);
+  });
+
   it("limits depth", () => {
     const chain: SurfaceComponent[] = Array.from({ length: SURFACE_LIMITS.depth + 1 }, (_, i) => ({
       id: i === 0 ? "root" : `n${i}`,
