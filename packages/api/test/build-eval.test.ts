@@ -186,6 +186,65 @@ describe("Build model eval", () => {
     expect(run.samples[0]).toMatch(/no component "missing"/);
   });
 
+  it("lets a hero carousel grow slide by slide, addressed by id (models build in order)", async () => {
+    const line = (ops: unknown[]) => JSON.stringify({ ops });
+    const slide = (id: string) => ({
+      op: "add",
+      path: "/sections/0/components/-",
+      value: { id, component: "Text", props: { text: id } },
+    });
+    const link = (id: string) => ({
+      op: "add",
+      path: "/sections/0/components/hero/children/-",
+      value: id,
+    });
+    const stepwise: AiTransport = {
+      kind: "binding",
+      async *stream(r) {
+        const first = !r.messages.some((m) => m.role === "assistant");
+        const lines = first
+          ? [
+              line([
+                {
+                  op: "add",
+                  path: "/sections/-",
+                  value: {
+                    id: "sec_offers0001",
+                    kind: "surface",
+                    catalog: "blog@1",
+                    components: [
+                      { id: "root", component: "Stack", children: ["hero"] },
+                      {
+                        id: "hero",
+                        component: "Carousel",
+                        props: { label: "Offers", variant: "hero", aspect: "16:9" },
+                        children: [],
+                      },
+                    ],
+                  },
+                },
+              ]),
+              // one slide: a hero needs two, so it waits; the second arrives next
+              line([slide("spring"), link("spring")]),
+              line([slide("easter"), link("easter")]),
+              '{"done":true}',
+            ]
+          : ['{"done":true}'];
+        yield { type: "text", text: `${lines.join("\n")}\n` };
+      },
+      models: async () => [],
+    };
+    const run = await runBuildEvalOnce({
+      transport: stepwise,
+      model: "stepwise",
+      brief: BUILD_EVAL_BRIEFS[0] as (typeof BUILD_EVAL_BRIEFS)[number],
+      catalog,
+      siteId: "site_eval000001",
+    });
+    expect(run).toMatchObject({ refused: 0, components: 4 });
+    expect(run.used).toContain("Carousel:hero");
+  });
+
   it("starts edits from a valid page and scopes the scoped brief", async () => {
     const edit = BUILD_EVAL_BRIEFS.find((b) => b.id === "scoped");
     expect(checkPageSurfaces(edit?.start ?? [], catalog)).toEqual([]);

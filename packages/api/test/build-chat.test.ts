@@ -177,6 +177,24 @@ describe("build chat", () => {
         "/sections/1/components/root → /sections/1/components/0",
       ],
     });
+    // ids added earlier in the same step resolve too (a new section, a new component)
+    expect(
+      componentPaths(page, [
+        {
+          op: "add",
+          path: "/sections/-",
+          value: { id: "sec_new000001", components: [{ id: "root" }, { id: "rail" }] },
+        },
+        { op: "add", path: "/sections/2/components/rail/children/-", value: "a" },
+        { op: "add", path: "/sections/1/components/-", value: { id: "extra" } },
+        { op: "add", path: "/sections/1/components/extra/children/-", value: "b" },
+      ]).ops.map((o) => o.path),
+    ).toEqual([
+      "/sections/-",
+      "/sections/2/components/1/children/-",
+      "/sections/1/components/-",
+      `/sections/1/components/${(page.sections[1] as { components: unknown[] }).components.length}/children/-`,
+    ]);
   });
 
   it("parses one JSON object per line and names the components being written", () => {
