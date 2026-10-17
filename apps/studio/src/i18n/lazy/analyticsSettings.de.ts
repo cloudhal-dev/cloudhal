@@ -1,0 +1,135 @@
+/** German `analyticsSettings.*` (see `analyticsSettings.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"analyticsSettings"> = {
+  analyticsSettings: {
+    title: "Analysen",
+    description:
+      "Besuche auf dieser Website, gezählt ohne Cookies. Änderungen erreichen die Website innerhalb einer Minute.",
+    status: { on: "An", off: "Aus", notRunning: "Läuft nicht" },
+    loadFailed: "Die Analyse-Einstellungen konnten nicht geladen werden",
+    noAccessTitle: "Du kannst die Analysen nicht sehen",
+    notAvailableTitle: "Dieser Server bietet keine Analysen an",
+    notAvailableDescription:
+      "Er läuft ohne den Analysedienst. Aktualisiere Cloudhal und deploye erneut, um Besuche zu zählen.",
+    deployment: {
+      title: "Dieses Deployment",
+      offTitle: "Analysen laufen auf diesem Deployment nicht",
+      offDescription:
+        "Die Website zeichnet keine Besuche auf. Setze analytics.enabled in cloudhal.json und führe cloudhal deploy aus; die Einstellungen unten gelten, sobald sie aufzeichnet.",
+      cantReadTitle: "Besuche werden aufgezeichnet, aber Studio kann sie noch nicht lesen",
+      cantReadDescription:
+        "Dieses Cloudflare-Konto erlaubt dem Deployment noch nicht, Workers Analytics Engine auszulesen. Es geht nichts verloren: Besuche werden weiter aufgezeichnet, und Analysen zeigt die vorhandenen Tagessummen, bis das Auslesen funktioniert.",
+      store: "Aufgezeichnet in",
+      stores: {
+        wae: "Workers Analytics Engine",
+        sql: "Der Datenbank dieses Deployments",
+        none: "Nirgends, keine Aufzeichnung",
+      },
+      reader: "Gelesen aus",
+      readers: {
+        binding: "Analytics Engine SQL",
+        sql: "Der Datenbank dieses Deployments",
+        none: "Noch nicht verfügbar",
+      },
+      rollups: "Tagessummen",
+      rollupModes: {
+        scheduled: "Stündlich berechnet",
+        "on-read": "Berechnet, wenn jemand Analysen öffnet",
+      },
+      rollupHints: {
+        scheduled: "Ein Cron Trigger auf dem Admin-Worker.",
+        "on-read":
+          "Der Admin-Worker hat keinen Cron Trigger, zum Beispiel wenn das Konto sein Limit erreicht hat.",
+      },
+      liveDays: "Live-Daten",
+      liveDaysValue: "Letzte {days} Tage",
+      liveDaysHint: "Ältere Zeiträume stammen aus Tagessummen.",
+    },
+    enabled: {
+      label: "Besuche zählen",
+      hint: "Fügt ein 1 KB großes Skript von deiner eigenen Website hinzu. Keine Cookies, nichts wird auf den Geräten der Besucher gespeichert.",
+    },
+    unique: {
+      label: "Eindeutige Besucher zählen",
+      hint: "Weiterhin ohne Cookies: Die IP-Adresse und die Browserdetails jedes Besuchers werden mit einem Zufallswert kombiniert, der sich täglich ändert, und nur das Ergebnis wird gespeichert. Der Zufallswert wird innerhalb von 24 Stunden gelöscht, sodass niemand Besucher zurückverfolgen oder tageübergreifend verknüpfen kann.",
+      needsVisits: "Aktiviere zuerst „Besuche zählen“.",
+      offWarningTitle: "Speichern löscht den heutigen Zufallswert",
+      offWarning:
+        "Alle Websites auf diesem Deployment teilen ihn, daher wird er für alle gleichzeitig gelöscht. Eindeutige Besucher werden hier nicht mehr gezählt; auf anderen Websites, die sie zählen, kann jemand, der später am heutigen Tag wiederkommt, doppelt gezählt werden.",
+      confirmTitle: "Eindeutige Besucher zählen?",
+      confirmDescription:
+        "Eindeutige Besucher werden ab dem Moment gezählt, in dem du speicherst. Frühere Tage bleiben ohne sie.",
+      confirmBannerTitle: "Dies ist eine Verarbeitung personenbezogener Daten",
+      confirmBanner:
+        "Die IP-Adresse und die Browserdetails deiner Besucher werden mit einem Zufallswert kombiniert, der täglich gelöscht wird. Es wird nichts gespeichert, das jemanden identifiziert, aber es handelt sich um eine Verarbeitung personenbezogener Daten: Aktualisiere deine Datenschutzerklärung.",
+      confirmNotice: "Füge dies deiner Datenschutzerklärung hinzu",
+      confirm: "Eindeutige Besucher zählen",
+    },
+    vitals: {
+      label: "Seitengeschwindigkeit messen",
+      hint: "Core Web Vitals aus einer Stichprobe der Seitenaufrufe.",
+      cost: "Erzeugt etwa {percent} % mehr Anfragen an die Website.",
+      costOff: "Keine zusätzlichen Anfragen.",
+      options: {
+        "0": "Aus",
+        "20": "1 von 20",
+        "10": "1 von 10",
+        "5": "1 von 5 (Standard)",
+        "2": "1 von 2",
+        "1": "Jeder Seitenaufruf",
+      },
+    },
+    retention: {
+      label: "Tagessummen aufbewahren",
+      hint: "Cloudflare bewahrt Rohdaten zu Besuchen 3 Monate auf (90 Tage auf deinem eigenen Rechner); Tagessummen bleiben so lange erhalten, wie du es wählst.",
+      options: {
+        forever: "Unbegrenzt (Standard)",
+        "1825": "5 Jahre",
+        "730": "2 Jahre",
+        "365": "1 Jahr",
+      },
+      days: "{days} Tage",
+    },
+    plan: {
+      label: "Cloudflare-Tarif",
+      hint: "Wird nur genutzt, um dich zu warnen, bevor Besuche das Limit von Workers Free mit 100.000 Anfragen pro Tag erreichen. Cloudhal kann deinen Tarif nicht auslesen.",
+      options: { unknown: "Nicht sicher", free: "Workers Free", paid: "Workers Paid" },
+    },
+    notice: {
+      title: "Datenschutzhinweis für deine Website",
+      hint: "Füge ihn deiner Datenschutzerklärung hinzu. Er richtet sich nach den Schaltern oben.",
+      unsaved: "Er berücksichtigt bereits deine ungespeicherten Änderungen.",
+      languages: "Sprache des Hinweises",
+      copy: "Hinweis kopieren",
+      copied: "Datenschutzhinweis kopiert",
+      heading: "Analysen",
+      base: "Diese Website zählt Besuche mit einer eigenen, cookiefreien Webanalyse, die zusammen mit dem Rest der Website gehostet wird. Wir erfassen, welche Seiten aufgerufen werden, die Website oder Kampagne, über die du gekommen bist (nur den Domainnamen), dein Land sowie deinen Gerätetyp und deine Browserfamilie. Wir verwenden keine Cookies oder ähnliche Speichertechniken, speichern weder deine IP-Adresse noch deine Browserdetails und verfolgen dich nicht über Websites hinweg.",
+      unique:
+        "Um eindeutige Besucher zu zählen, werden deine IP-Adresse und deine Browserdetails mit einem Zufallswert kombiniert, der alle 24 Stunden gelöscht wird, und nur das Ergebnis wird gespeichert; es kann nicht auf dich zurückgeführt oder tageübergreifend verknüpft werden. Wenn dein Browser Global Privacy Control oder Do Not Track sendet, zählen wir den Besuch, überspringen diesen Schritt aber.",
+      legal: "Dies ist eine Information, keine Rechtsberatung.",
+    },
+    conflictTitle: "Diese Einstellungen wurden anderswo geändert",
+    conflictDescription:
+      "Jemand hat die Analyse-Einstellungen dieser Website gespeichert, nachdem du sie geöffnet hast. Lade die neueste Version, prüfe deine Änderung und speichere erneut.",
+    loadLatest: "Neueste laden",
+    failed: "Die Analyse-Einstellungen konnten nicht gespeichert werden",
+    saved: "Analyse-Einstellungen gespeichert",
+    savedPurged: "Die Website übernimmt die Änderung innerhalb einer Minute.",
+    savedNotPurged:
+      "Die Einstellungen sind gespeichert; zwischengespeicherte Seiten übernehmen sie, sobald sie ablaufen.",
+    savedSaltDeleted:
+      "Der heutige Zufallswert wurde für alle Websites auf diesem Deployment gelöscht.",
+    keys: {
+      missing: "Keine Analysen",
+      missingHint:
+        "Dieser Schlüssel wurde erstellt, bevor Agents Analysen lesen konnten, oder ohne diesen Bereich. Schlüssel erhalten nie von selbst Zugriff: Erlaube ihn, damit der Agent die Website-Analysen lesen kann (nur Summen, keine personenbezogenen Daten).",
+      allow: "Analysen erlauben",
+      allowed: "Analysen erlaubt",
+      allowedDescription: "{name} kann ab dem nächsten Aufruf die Website-Analysen lesen.",
+      failed: "Analysen konnten nicht erlaubt werden",
+      ownerCannot:
+        "Die Rolle von {name} kann keine Analysen lesen, daher können es auch deren Schlüssel nicht.",
+    },
+  },
+};

@@ -1,0 +1,65 @@
+/** German `aiSettings.*` (see `aiSettings.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"aiSettings"> = {
+  aiSettings: {
+    title: "KI",
+    description:
+      "Redakteure können ausgewählten Text mit Cloudflare Workers AI verbessern, kürzen, übersetzen oder umschreiben. Es wird nichts gesendet, bis du es einschaltest.",
+    unavailable: {
+      title: "Diese Bereitstellung kann Workers AI noch nicht erreichen",
+      description:
+        'Füge "ai": {} zu cloudhal.json hinzu und stelle erneut bereit. Auf deinem eigenen Server setze CLOUDFLARE_ACCOUNT_ID und CLOUDHAL_AI_TOKEN. Die Einstellungen kannst du schon jetzt wählen.',
+    },
+    enabled: {
+      label: "KI im Editor",
+      hint: "Redakteure sehen bei ausgewähltem Text ein Menü „KI fragen“. Ergebnisse ersetzen den Text nur, wenn sie „Ersetzen“ wählen.",
+    },
+    model: {
+      label: "Modell",
+      hint: "Qualität, Geschwindigkeit und Preis unterscheiden sich je nach Modell. Probiere eines an einem echten Artikel aus, bevor du dich festlegst.",
+      placeholder: "Modelle suchen",
+      empty: "Kein passendes Modell",
+      clear: "Leeren",
+      show: "Modelle anzeigen",
+      recommended: "Empfohlen",
+      notes: {
+        default: "Erstellt in Cloudhals Tests am zuverlässigsten Seiten; schreibt gut Türkisch.",
+        quality: "Stärker beim Schreiben, zu einem höheren Preis.",
+        budget: "Schnell und günstig; schwächer beim Erstellen von Seiten.",
+        general: "Ein bekanntes Allzweckmodell.",
+      },
+      context: "{tokens} Token Kontext",
+      gone: "{model} wird von Workers AI nicht mehr angeboten. Wähle ein anderes Modell, sonst schlagen KI-Befehle fehl.",
+      catalogUnavailable:
+        "Die Modellliste konnte nicht gelesen werden, daher werden nur die empfohlenen Modelle angezeigt.",
+      privacyWorkers: "Ausgewählter Text geht an Workers AI in diesem Cloudflare-Konto.",
+      privacyProvider: "Ausgewählter Text geht über dein AI Gateway an {provider}.",
+    },
+    limit: {
+      label: "Tageslimit",
+      hint: "KI-Befehle, die diese Website pro Tag (UTC) ausführen darf. 0 stoppt sie.",
+      error: "Eine ganze Zahl von 0 bis 10.000",
+      used: "{used} von {limit} heute verbraucht",
+    },
+    advanced: "AI Gateway und andere Anbieter",
+    gateway: {
+      label: "AI Gateway",
+      hint: "Optional. Ein Gateway in diesem Cloudflare-Konto protokolliert, cacht und begrenzt KI-Aufrufe.",
+      placeholder: "my-gateway",
+      error: "Kleinbuchstaben, Ziffern und Bindestriche",
+    },
+    provider: {
+      label: "Modell eines anderen Anbieters",
+      hint: "anbieter/modell, etwa openai/gpt-4.1-mini. Läuft über das Gateway mit dessen gespeicherten Schlüsseln oder Unified Billing; Cloudhal speichert keine Schlüssel.",
+      placeholder: "openai/gpt-4.1-mini",
+      error: "Schreibe es als anbieter/modell",
+      needsGateway: "Richte zuerst ein AI Gateway ein.",
+    },
+    saved: "KI-Einstellungen gespeichert",
+    failed: "Die KI-Einstellungen konnten nicht gespeichert werden",
+    conflict:
+      "Jemand hat diese Einstellungen inzwischen geändert. Lade neu, um diese Version zu sehen.",
+    reload: "Neu laden",
+  },
+};

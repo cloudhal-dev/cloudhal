@@ -1,0 +1,68 @@
+/** German `readers.*` (see `readers.en.ts`). Machine-translated (AI), awaiting human review. */
+import type { NamespaceMessages } from "../namespaces.ts";
+
+export const messages: NamespaceMessages<"readers"> = {
+  readers: {
+    title: "Leser",
+    range: "Zeitraum",
+    ranges: { "7d": "7 Tage", "30d": "30 Tage", all: "Gesamter Zeitraum" },
+    periods: { "7d": "letzte 7 Tage", "30d": "letzte 30 Tage", all: "gesamter Zeitraum" },
+    figures: "Leser, {period}",
+    pageviews: "Seitenaufrufe",
+    visits: "Besuche",
+    delta: "{delta} gegenüber den vorherigen {days} Tagen",
+    channelsLabel: "Woher die Leser kamen",
+    other: "Sonstige",
+    open: "In Analysen öffnen",
+    redirects: "Alte Adressen bringen noch Leser: {count} im Zeitraum {period}",
+    redirectsAll: "Alte Adressen bringen noch Leser: {count} insgesamt",
+    partial:
+      "Ein Teil dieses Zeitraums kann noch nicht gelesen werden, daher sind die Zahlen eventuell zu niedrig.",
+    channels: {
+      search: "Suchmaschinen",
+      social: "Soziale Medien",
+      ai: "KI-Assistenten",
+      email: "E-Mail",
+      paid: "Bezahlte Kampagnen",
+      referral: "Andere Websites",
+      internal: "Diese Website",
+      direct: "Direkt",
+    },
+    chart: {
+      description: "Seitenaufrufe pro Tag, {period}: {total} insgesamt.",
+      timezone: "Zeiten in UTC",
+      showTable: "Als Tabelle anzeigen",
+      showChart: "Als Diagramm anzeigen",
+      time: "Tag (UTC)",
+    },
+    states: {
+      neverPublished: {
+        article: "Die Statistik beginnt, sobald dieser Artikel veröffentlicht ist",
+        page: "Die Statistik beginnt, sobald diese Seite veröffentlicht ist",
+      },
+      neverPublishedHint: "Besuche werden ab der ersten Veröffentlichung ohne Cookies gezählt.",
+      noReaders: "Noch keine Leser",
+      noReadersHint: "Zahlen erscheinen etwa eine Minute nach dem ersten Besuch.",
+      cantRead: "Besuche können noch nicht gelesen werden",
+      cantReadHint:
+        "Besuche werden erfasst. Studio kann sie mit diesem Cloudflare-Tarif noch nicht lesen; sie werden 3 Monate lang aufbewahrt.",
+      notPermitted: "Analysen gehören nicht zu deiner Rolle",
+    },
+    overview: {
+      title: "Letzte 7 Tage",
+      view: "Analysen ansehen",
+      figures: "Besuche in den letzten 7 Tagen",
+      mostRead: "Meistgelesen",
+      topContent: "Meistgelesen in den letzten 7 Tagen",
+      noVisits: "Noch keine Besuche",
+      noVisitsHint:
+        "Zahlen erscheinen etwa eine Minute nach dem ersten Besuch einer veröffentlichten Seite.",
+      untitled: "Ohne Titel",
+      gone: "Existiert nicht mehr",
+    },
+    listColumn: {
+      title: "Aufrufe · 30 Tage",
+      notTop: "Nicht unter den {count} meistgelesenen der letzten 30 Tage",
+    },
+  },
+};

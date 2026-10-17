@@ -101,7 +101,7 @@ function ReplyForm({
   badge: "author" | "team";
   onDone: () => void;
 }) {
-  const { t, words } = useCommentWords();
+  const { t, locale, words } = useCommentWords();
   const toast = useToast();
   const qc = useQueryClient();
   const me = useMe().data;
@@ -142,7 +142,7 @@ function ReplyForm({
               }
               data-testid="reply-count"
             >
-              {t("comments.reply.counter", { count, max: REPLY_MAX.toLocaleString() })}
+              {t("comments.reply.counter", { count, max: REPLY_MAX.toLocaleString(locale) })}
             </span>
           </span>
         }

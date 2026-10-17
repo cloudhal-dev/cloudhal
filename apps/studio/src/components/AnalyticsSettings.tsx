@@ -229,7 +229,7 @@ function PrivacyNotice({ uniqueVisitors, unsaved }: { uniqueVisitors: boolean; u
             variant="segmented"
             size="sm"
             value={language}
-            onValueChange={(v) => setLanguage(v === "tr" ? "tr" : "en")}
+            onValueChange={(v) => setLanguage(v as Locale)}
             tabs={(Object.keys(LOCALES) as Locale[]).map((l) => ({ value: l, label: LOCALES[l] }))}
           />
         </fieldset>

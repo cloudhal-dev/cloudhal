@@ -70,7 +70,7 @@ export const LAZY_ONLY: readonly RegExp[] = [
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
   // Core catalogs other than English load with their language (`loadLocale`), never with English.
-  /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]tr\.ts$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/](?!en\.ts$|locales\.ts$|namespaces\.ts$)[a-z]{2,3}(-[A-Za-z0-9]+)*\.ts$/,
 ];
 
 /** The part of a Rollup/Rolldown output chunk the check reads. */

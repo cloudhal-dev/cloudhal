@@ -1,17 +1,17 @@
 /**
- * Lazy message namespaces (DESIGN.md §1 "Lazy message namespaces"). The core catalogs (`en.ts`,
- * `tr.ts`) are in every page's first load; a feature whose words only its own screens need keeps
+ * Lazy message namespaces (DESIGN.md §1 "Lazy message namespaces"). The core catalogs
+ * (`<locale>.ts`) are in every page's first load; a feature whose words only its own screens need keeps
  * them in `lazy/<namespace>.<locale>.ts`, one top-level key per namespace, loaded with the
  * routes that show it (`withMessages` in `router.tsx`) and read through `useT("<namespace>")`,
  * which suspends until the current locale's module is there.
  *
  * Adding one: move the top-level block out of `en.ts`/`tr.ts` into `lazy/<ns>.en.ts`
- * (`export const messages = { <ns>: { … } } as const`) and `lazy/<ns>.tr.ts`
- * (`export const messages: NamespaceMessages<"<ns>"> = { … }`), register both loaders below and
- * add the type to `NamespaceCatalogs`, then add the namespace to every route's `withMessages` that
- * renders it. The type checks (and `test/i18n.test.tsx`) keep `en` and `tr` on the same keys.
+ * (`export const messages = { <ns>: { … } } as const`) and one `lazy/<ns>.<locale>.ts` per other
+ * language (`export const messages: NamespaceMessages<"<ns>"> = { … }`; found by name), add the
+ * type to `NamespaceCatalogs`, then add the namespace to every route's `withMessages` that renders
+ * it. The type checks (and `test/i18n.test.tsx`) keep every language on English's keys.
  */
-import type { Locale } from "./index.tsx";
+
 import type { messages as aiSettings } from "./lazy/aiSettings.en.ts";
 import type { messages as analytics } from "./lazy/analytics.en.ts";
 import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.ts";
@@ -25,6 +25,7 @@ import type { messages as menus } from "./lazy/menus.en.ts";
 import type { messages as readers } from "./lazy/readers.en.ts";
 import type { messages as scheduleSettings } from "./lazy/scheduleSettings.en.ts";
 import type { messages as schedules } from "./lazy/schedules.en.ts";
+import type { Locale } from "./locales.ts";
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
@@ -48,70 +49,23 @@ export type Namespace = keyof NamespaceCatalogs;
 /** What a namespace module exports as `messages`: `{ [namespace]: catalog }`. */
 export type NamespaceMessages<N extends Namespace> = { [K in N]: NamespaceCatalogs[K] };
 
-type Loader<N extends Namespace> = () => Promise<{ messages: NamespaceMessages<N> }>;
+/**
+ * Every namespace module, by path (`./lazy/<namespace>.<locale>.ts`): one dynamic import per
+ * namespace and locale, so a page loads only the language it shows, and a new language's files
+ * are found by name.
+ */
+const MODULES = import.meta.glob<{ messages: Record<string, object> }>("./lazy/*.ts");
+const PREFIX = "./lazy/";
+const ENGLISH = ".en.ts";
 
-/** One dynamic import per namespace and locale, so a page loads only the language it shows. */
-const LOADERS: { [N in Namespace]: Record<Locale, Loader<N>> } = {
-  aiSettings: {
-    en: () => import("./lazy/aiSettings.en.ts"),
-    tr: () => import("./lazy/aiSettings.tr.ts"),
-  },
-  analytics: {
-    en: () => import("./lazy/analytics.en.ts"),
-    tr: () => import("./lazy/analytics.tr.ts"),
-  },
-  analyticsSettings: {
-    en: () => import("./lazy/analyticsSettings.en.ts"),
-    tr: () => import("./lazy/analyticsSettings.tr.ts"),
-  },
-  appearance: {
-    en: () => import("./lazy/appearance.en.ts"),
-    tr: () => import("./lazy/appearance.tr.ts"),
-  },
-  bodyEditor: {
-    en: () => import("./lazy/bodyEditor.en.ts"),
-    tr: () => import("./lazy/bodyEditor.tr.ts"),
-  },
-  build: {
-    en: () => import("./lazy/build.en.ts"),
-    tr: () => import("./lazy/build.tr.ts"),
-  },
-
-  comments: {
-    en: () => import("./lazy/comments.en.ts"),
-    tr: () => import("./lazy/comments.tr.ts"),
-  },
-  commentsSettings: {
-    en: () => import("./lazy/commentsSettings.en.ts"),
-    tr: () => import("./lazy/commentsSettings.tr.ts"),
-  },
-  media: {
-    en: () => import("./lazy/media.en.ts"),
-    tr: () => import("./lazy/media.tr.ts"),
-  },
-  menus: {
-    en: () => import("./lazy/menus.en.ts"),
-    tr: () => import("./lazy/menus.tr.ts"),
-  },
-
-  readers: {
-    en: () => import("./lazy/readers.en.ts"),
-    tr: () => import("./lazy/readers.tr.ts"),
-  },
-  scheduleSettings: {
-    en: () => import("./lazy/scheduleSettings.en.ts"),
-    tr: () => import("./lazy/scheduleSettings.tr.ts"),
-  },
-  schedules: {
-    en: () => import("./lazy/schedules.en.ts"),
-    tr: () => import("./lazy/schedules.tr.ts"),
-  },
-};
-
-export const NAMESPACES = Object.keys(LOADERS) as Namespace[];
+/** The namespaces, one per English module. */
+export const NAMESPACES = Object.keys(MODULES)
+  .filter((path) => path.endsWith(ENGLISH))
+  .map((path) => path.slice(PREFIX.length, -ENGLISH.length))
+  .sort() as Namespace[];
 
 export function isNamespace(name: string): name is Namespace {
-  return Object.hasOwn(LOADERS, name);
+  return Object.hasOwn(MODULES, `${PREFIX}${name}${ENGLISH}`);
 }
 
 const loaded = new Map<string, object>();
@@ -137,9 +91,11 @@ export function loadNamespace(ns: Namespace, locale: Locale): Promise<void> {
   if (loaded.has(key)) return Promise.resolve();
   let promise = pending.get(key);
   if (!promise) {
-    promise = LOADERS[ns][locale]().then(
+    const load = MODULES[`${PREFIX}${ns}.${locale}.ts`];
+    if (!load) return Promise.reject(new Error(`no "${ns}" messages for locale "${locale}"`));
+    promise = load().then(
       (module) => {
-        loaded.set(key, (module.messages as Record<string, object>)[ns] as object);
+        loaded.set(key, module.messages[ns] as object);
         pending.delete(key);
       },
       (error: unknown) => {

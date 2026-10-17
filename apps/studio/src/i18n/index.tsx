@@ -11,6 +11,14 @@ import {
 } from "react";
 import { en, type Messages } from "./en.ts";
 import {
+  fallbackChain,
+  isLocale,
+  LOCALE_LIST,
+  LOCALE_REGISTRY,
+  type Locale,
+  matchLocale,
+} from "./locales.ts";
+import {
   isNamespace,
   loadedCatalog,
   loadedNamespaces,
@@ -20,6 +28,16 @@ import {
 } from "./namespaces.ts";
 
 export {
+  fallbackChain,
+  isLocale,
+  LOCALE_LIST,
+  LOCALE_REGISTRY,
+  LOCALES,
+  type Locale,
+  type LocaleInfo,
+  matchLocale,
+} from "./locales.ts";
+export {
   loadNamespace,
   NAMESPACES,
   type Namespace,
@@ -27,18 +45,19 @@ export {
   resetNamespaces,
 } from "./namespaces.ts";
 
-export const LOCALES = { en: "English", tr: "Türkçe" } as const;
-export type Locale = keyof typeof LOCALES;
-export const LOCALE_LIST = Object.keys(LOCALES) as Locale[];
 /**
  * The core catalogs. English is in the first load (it is also every key's fallback); another
  * language loads once, before the first render in it (`loadLocale`) and on a switch to it, so a
- * page never ships a language it does not show.
+ * page never ships a language it does not show. Each is `./<locale>.ts` exporting
+ * `messages: Messages`, found by name: one dynamic import per language, no loader to write.
  */
 const catalogs: Partial<Record<Locale, Messages>> = { en: en as Messages };
-const CORE_LOADERS: Record<Exclude<Locale, "en">, () => Promise<Messages>> = {
-  tr: () => import("./tr.ts").then((m) => m.tr),
-};
+const CORE_MODULES = import.meta.glob<{ messages: Messages }>([
+  "./*.ts",
+  "!./en.ts",
+  "!./locales.ts",
+  "!./namespaces.ts",
+]);
 const corePending = new Map<Locale, Promise<void>>();
 
 /** Loads `locale`'s core catalog, once (the same promise until it settles; a failure can retry). */
@@ -46,8 +65,10 @@ export function loadLocale(locale: Locale): Promise<void> {
   if (catalogs[locale]) return Promise.resolve();
   let promise = corePending.get(locale);
   if (!promise) {
-    promise = CORE_LOADERS[locale as Exclude<Locale, "en">]().then(
-      (messages) => {
+    const load = CORE_MODULES[`./${locale}.ts`];
+    if (!load) return Promise.reject(new Error(`no core catalog for locale "${locale}"`));
+    promise = load().then(
+      ({ messages }) => {
         catalogs[locale] = messages;
         corePending.delete(locale);
       },
@@ -70,10 +91,10 @@ const STORAGE_KEY = "cloudhal.studio.locale";
 function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored in LOCALES) return stored as Locale;
+    if (stored && isLocale(stored)) return stored;
   } catch {}
-  const nav = typeof navigator !== "undefined" ? navigator.language.slice(0, 2) : "en";
-  return nav in LOCALES ? (nav as Locale) : "en";
+  if (typeof navigator === "undefined") return "en";
+  return matchLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
 }
 
 /**
@@ -113,7 +134,8 @@ function find(locale: Locale, key: string): string | undefined {
 }
 
 /**
- * Translates `key`, substituting `{name}` placeholders. Falls back to English, then to the key.
+ * Translates `key`, substituting `{name}` placeholders. Falls back along the locale's chain
+ * (`fallbackChain`: its fallbacks, then English), then to the key.
  * A key of a lazy namespace resolves only once that namespace is loaded in the locale (use
  * `useT(namespace)`, which waits for it).
  */
@@ -122,8 +144,11 @@ export function translate(
   key: MessageKey | NamespaceKey<Namespace>,
   params: Params = {},
 ): string {
-  let text = find(locale, key);
-  if (text === undefined && locale !== "en") text = find("en", key);
+  let text: string | undefined;
+  for (const l of fallbackChain(locale)) {
+    text = find(l, key);
+    if (text !== undefined) break;
+  }
   return (text ?? key).replace(/\{(\w+)\}/g, (_m, name: string) =>
     String(params[name] ?? `{${name}}`),
   );
@@ -176,6 +201,7 @@ export function I18nProvider({
   // not only after a switch: `index.html` ships `lang="en"`.
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = LOCALE_REGISTRY[locale].dir;
   }, [locale]);
   // Normally loaded before the first render (main.tsx); otherwise wait for it here.
   if (!localeLoaded(locale)) use(loadLocale(locale));
