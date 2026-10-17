@@ -869,8 +869,8 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
     name: "Marquee",
     title: { en: "Marquee", tr: "Kayan şerit" },
     description: {
-      en: "A row that scrolls by itself (logos, quotes, tags); at least 3 children. Readers can pause it; at low motion levels it is a still row.",
-      tr: "Kendiliğinden kayan bir sıra (logolar, alıntılar); en az 3 öğe.",
+      en: "A row that moves by itself (logos or quotes passing by, tags); at least 3 children. Readers can pause it; at low motion levels it is a still row. When the reader should move through the items themselves (scroll, swipe, arrows), use a Carousel rail instead.",
+      tr: "Kendiliğinden kayan bir sıra (logolar, alıntılar); en az 3 öğe. Okur öğeler arasında kendisi gezecekse Carousel rail kullanın.",
     },
     category: "layout",
     props: schema({
@@ -2816,15 +2816,29 @@ export function patchPage(
     notes.push(...r.notes);
     return { ...o, value: r.value };
   });
-  let value: Page;
-  try {
-    value = applyPatch(page, repaired);
-  } catch (e) {
-    if (e instanceof PatchError)
+  let value: Page | undefined;
+  // An add into a children list past its end (models count ahead) becomes an append.
+  for (let tries = 0; value === undefined; tries++) {
+    try {
+      value = applyPatch(page, repaired);
+    } catch (e) {
+      if (!(e instanceof PatchError)) throw e;
+      const op = repaired[e.index];
+      const appended = op?.path.replace(/\/children\/\d+$/, "/children/-");
+      if (
+        e.message.endsWith(": index out of range") &&
+        op?.op === "add" &&
+        appended !== op.path &&
+        tries < repaired.length
+      ) {
+        notes.push(`${op.path} is past the end of its children; appended`);
+        repaired[e.index] = { ...op, path: appended as string };
+        continue;
+      }
       throw new SurfacePatchError([
         { code: "VALIDATION_FAILED", path: e.path, message: e.message, op: e.index },
       ]);
-    throw e;
+    }
   }
   // A build changes the page's parts, never its shape: it keeps a title and a list of sections.
   if (!Array.isArray(value.sections) || typeof value.title !== "string")
