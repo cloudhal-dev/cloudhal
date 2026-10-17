@@ -202,7 +202,7 @@ export function FormatToolbar({
       className="max-w-full flex-wrap"
     >
       {groups.map((group, i) => (
-        <span key={group[0]?.key} className={cn("flex", i > 0 && "border-kumo-hairline border-l")}>
+        <span key={group[0]?.key} className={cn("flex", i > 0 && "border-kumo-hairline border-s")}>
           {group.map((item) => (
             <ToolbarButton key={item.key} item={item} />
           ))}

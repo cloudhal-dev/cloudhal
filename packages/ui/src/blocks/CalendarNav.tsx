@@ -95,7 +95,7 @@ export function CalendarNav({
       </span>
       {goTo}
       {view && onViewChange && (
-        <div className="ml-auto flex items-center">
+        <div className="ms-auto flex items-center">
           <Tabs
             variant="segmented"
             value={view}

@@ -34,9 +34,9 @@ export function TermChip({
     <span
       data-term-chip=""
       className={cn(
-        "inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-sm pl-2 text-sm ring-1 ring-kumo-hairline",
+        "inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-sm ps-2 text-sm ring-1 ring-kumo-hairline",
         tone === "pending" ? "bg-kumo-base text-kumo-subtle" : "bg-kumo-overlay",
-        onRemove ? "pr-0.5" : "pr-2",
+        onRemove ? "pe-0.5" : "pe-2",
         className,
       )}
     >

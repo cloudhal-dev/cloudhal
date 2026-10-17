@@ -170,6 +170,7 @@ export function SlashMenu({ state, labels }: { state: SlashState; labels: Markdo
       role="listbox"
       aria-label={labels.insertMenu}
       data-slash-menu=""
+      // i18n-ignore: Floating UI places the menu in physical left/top coordinates
       className="fixed top-0 left-0 z-50 max-h-72 w-64 overflow-y-auto rounded-lg bg-kumo-elevated p-1 shadow-lg ring ring-kumo-line"
     >
       {state.items.length === 0 ? (

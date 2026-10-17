@@ -350,7 +350,7 @@ function PasswordSection() {
           onCheckedChange={(on) => setSignOutOthers(on === true)}
           label={t("account.password.signOutOthers")}
         />
-        <span className="pl-6">
+        <span className="ps-6">
           <Text variant="secondary" size="sm">
             {t("account.password.signOutOthersHint")}
           </Text>
@@ -532,7 +532,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
                     <Table.Cell className="whitespace-nowrap">
                       {signedIn && <RelativeTime iso={signedIn} />}
                     </Table.Cell>
-                    <Table.Cell sticky="right" className="text-right">
+                    <Table.Cell sticky="right" className="text-end">
                       {!isCurrent && (
                         <Button
                           variant="ghost"

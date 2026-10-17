@@ -51,7 +51,7 @@ export function NotificationBell({
           }
         />
         {count > 0 && (
-          <span aria-hidden className="pointer-events-none absolute -top-1.5 -right-1.5 flex">
+          <span aria-hidden className="pointer-events-none absolute -top-1.5 -end-1.5 flex">
             <Badge variant="primary" className="h-4 min-w-4 justify-center px-1 py-0 leading-4">
               {count > 9 ? "9+" : count}
             </Badge>

@@ -230,7 +230,7 @@ export function SkillsPage() {
                         </Text>
                       )}
                     </Table.Cell>
-                    <Table.Cell sticky="right" className="w-12 text-right align-top">
+                    <Table.Cell sticky="right" className="w-12 text-end align-top">
                       <Button
                         variant="ghost"
                         size="xs"

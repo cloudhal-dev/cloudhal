@@ -148,6 +148,10 @@ describe("pseudoLocalize", () => {
     expect(formatMessage("en", pseudo, { count: 1 })).toBe("[1 ƒííĺéé]");
     expect(formatMessage("en", pseudo, { count: 3 })).toBe("[3 ƒííĺééš]");
     expect(pseudoText("Save").length / "Save".length).toBeGreaterThan(1.3);
+    // The right-to-left variant forces each run of text right-to-left; arguments stay as they are.
+    expect(pseudoLocalize("Delete {name}?", { mirror: true })).toBe(
+      "[\u202eĐééĺééţéé \u202c{name}\u202e?\u202c]",
+    );
   });
 });
 

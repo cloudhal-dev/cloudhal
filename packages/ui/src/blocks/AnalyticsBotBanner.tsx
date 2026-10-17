@@ -55,7 +55,7 @@ export function AnalyticsBotBanner({
             <Collapsible.DefaultTrigger>{labels.details}</Collapsible.DefaultTrigger>
             <Collapsible.DefaultPanel>
               <span className="grid gap-3">
-                <ul className="m-0 grid list-disc gap-1.5 pl-5">
+                <ul className="m-0 grid list-disc gap-1.5 ps-5">
                   {reasons.map((r) => (
                     <li key={r.id}>
                       <Text as="span">{r.text}</Text>

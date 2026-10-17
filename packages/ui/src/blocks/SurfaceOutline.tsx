@@ -92,7 +92,7 @@ export function SurfaceOutline({
           <li
             key={node.id}
             data-component-id={node.id}
-            className="relative grid min-w-0 gap-2 border-b border-kumo-hairline py-2 pr-3 last:border-b-0"
+            className="relative grid min-w-0 gap-2 border-b border-kumo-hairline py-2 pe-3 last:border-b-0"
             style={{ paddingInlineStart: `${0.5 + (depth - 1) * 1.5}rem` }}
           >
             {Array.from({ length: depth - 1 }, (_, level) => (
@@ -145,7 +145,7 @@ export function SurfaceOutline({
               </div>
             </div>
             {editable && node.fields?.length && editing.has(node.id) ? (
-              <div className="grid min-w-0 gap-3 pb-1 pl-8">
+              <div className="grid min-w-0 gap-3 pb-1 ps-8">
                 {node.fields.map((f) =>
                   f.multiline ? (
                     <InputArea

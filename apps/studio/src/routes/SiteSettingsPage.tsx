@@ -495,7 +495,7 @@ function DomainsSection({
                         <Badge variant="outline">{t("siteSettings.domains.alias")}</Badge>
                       )}
                     </Table.Cell>
-                    <Table.Cell sticky="right" className="text-right">
+                    <Table.Cell sticky="right" className="text-end">
                       <DomainMenu
                         domain={d}
                         onMakePrimary={() =>

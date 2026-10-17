@@ -200,26 +200,34 @@ function find(locale: Locale, key: string): Compiled | undefined {
  * `useT(namespace)`, which waits for it).
  */
 const PSEUDO_KEY = "cloudhal.studio.pseudo";
+/** The pseudo-locale's mode: off, on, or its right-to-left variant (ADR-0033). */
+export type PseudoMode = false | true | "rtl";
 /**
  * The pseudo-locale (the i18n review's Phase 5, DESIGN.md §1): every catalog message accented,
  * lengthened and bracketed, to find hard-coded text, cut-off labels and layouts too tight for
- * longer languages. Dev and test only — `import.meta.env.DEV` removes it from production builds
- * (the bundle budget checks) — and never a language in the menus. Turn it on with `?pseudo` or
- * `localStorage["cloudhal.studio.pseudo"] = "1"` (`SHOTS_PSEUDO=1 pnpm design:shots`).
+ * longer languages; `"rtl"` also forces the text right-to-left and sets `dir="rtl"` (ADR-0033),
+ * to find layouts that do not mirror. Dev and test only — `import.meta.env.DEV` removes it from
+ * production builds (the bundle budget checks) — and never a language in the menus. Turn it on
+ * with `?pseudo` / `?pseudo=rtl` or `localStorage["cloudhal.studio.pseudo"] = "1"` / `"rtl"`
+ * (`SHOTS_PSEUDO=1|rtl pnpm design:shots`).
  */
-let pseudo = import.meta.env.DEV && pseudoRequested();
-function pseudoRequested(): boolean {
+let pseudo: PseudoMode = import.meta.env.DEV && pseudoRequested();
+function pseudoRequested(): PseudoMode {
   try {
-    return (
-      new URLSearchParams(location.search).has("pseudo") || localStorage.getItem(PSEUDO_KEY) === "1"
-    );
+    const value =
+      new URLSearchParams(location.search).get("pseudo") ?? localStorage.getItem(PSEUDO_KEY);
+    return value === "rtl" ? "rtl" : value !== null && value !== "0";
   } catch {
     return false;
   }
 }
-/** Dev and test only: turns the pseudo-locale on or off (a no-op in production). */
-export function setPseudo(on: boolean): void {
-  if (import.meta.env.DEV) pseudo = on;
+/** Dev and test only: sets the pseudo-locale's mode (a no-op in production). */
+export function setPseudo(mode: PseudoMode): void {
+  if (import.meta.env.DEV) pseudo = mode;
+}
+/** The writing direction Studio shows `locale` in: the registry's, or the RTL pseudo-locale's. */
+export function directionOf(locale: Locale): "ltr" | "rtl" {
+  return import.meta.env.DEV && pseudo === "rtl" ? "rtl" : LOCALE_REGISTRY[locale].dir;
 }
 
 export function translate(
@@ -232,7 +240,10 @@ export function translate(
     text = find(l, key);
     if (text !== undefined) break;
   }
-  const message = import.meta.env.DEV && pseudo && text !== undefined ? pseudoLocalize(text) : text;
+  const message =
+    import.meta.env.DEV && pseudo && text !== undefined
+      ? pseudoLocalize(text, { mirror: pseudo === "rtl" })
+      : text;
   return formatMessage(locale, message ?? key, params);
 }
 
@@ -283,7 +294,7 @@ export function I18nProvider({
   // not only after a switch: `index.html` ships `lang="en"`.
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.documentElement.dir = LOCALE_REGISTRY[locale].dir;
+    document.documentElement.dir = directionOf(locale);
   }, [locale]);
   // Normally loaded before the first render (main.tsx); otherwise wait for it here.
   if (!localeLoaded(locale)) use(loadLocale(locale));

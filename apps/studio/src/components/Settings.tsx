@@ -109,7 +109,7 @@ export function SettingsLayout({
     <Columns variant="1-2" className="@4xl/page:gap-x-8">
       <div className="hidden @4xl/page:sticky @4xl/page:top-20 @4xl/page:grid @4xl/page:gap-3">
         {/* Not TableOfContents.Title: Kumo styles it all-caps; labels stay sentence case. */}
-        <span aria-hidden className="pl-4">
+        <span aria-hidden className="ps-4">
           <Text variant="secondary" size="sm" as="span">
             {title}
           </Text>

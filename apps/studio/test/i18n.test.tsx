@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { en, formsOf } from "../src/i18n/en.ts";
 import {
+  directionOf,
   fallbackChain,
   I18nProvider,
   LOCALE_LIST,
@@ -245,6 +246,19 @@ describe("the pseudo-locale (dev and test only)", () => {
     expect(translate("en", "nope.missing" as MessageKey)).toBe("nope.missing");
     setPseudo(false);
     expect(translate("en", "common.save")).toBe("Save");
+  });
+  it("has a right-to-left variant that mirrors the page (ADR-0033)", () => {
+    setPseudo("rtl");
+    expect(translate("en", "common.save")).toBe("[\u202eŠààṽéé\u202c]");
+    expect(directionOf("en")).toBe("rtl");
+    render(
+      <I18nProvider initialLocale="en">
+        <span>x</span>
+      </I18nProvider>,
+    );
+    expect(document.documentElement.dir).toBe("rtl");
+    setPseudo(false);
+    expect(directionOf("en")).toBe("ltr");
   });
 });
 

@@ -118,7 +118,7 @@ export function ColorRolePreview({
           <Text as="span" size="sm" bold>
             {labels.notes}
           </Text>
-          <ul className="m-0 grid list-disc gap-1 pl-5">
+          <ul className="m-0 grid list-disc gap-1 ps-5">
             {notes.map((n) => (
               <li key={n}>
                 <Text as="span" size="sm" variant="secondary">

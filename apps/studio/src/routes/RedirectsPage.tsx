@@ -282,7 +282,7 @@ export function RedirectsPage() {
                         <Table.Cell className="whitespace-nowrap">
                           <RelativeTime iso={r.updatedAt} />
                         </Table.Cell>
-                        <Table.Cell sticky="right" className="w-0 text-right">
+                        <Table.Cell sticky="right" className="w-0 text-end">
                           <DropdownMenu>
                             <Tooltip
                               content={t("site.rowMenu")}

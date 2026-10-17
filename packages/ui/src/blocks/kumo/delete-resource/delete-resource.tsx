@@ -175,12 +175,12 @@ export function DeleteResource({
                   {resourceName}
 
                   {copied ? (
-                    <Check size={12} weight="bold" className="ml-1.5 inline" />
+                    <Check size={12} weight="bold" className="ms-1.5 inline" />
                   ) : (
                     <Copy
                       size={12}
                       weight="bold"
-                      className="ml-1.5 inline text-kumo-subtle group-hover:text-kumo-default"
+                      className="ms-1.5 inline text-kumo-subtle group-hover:text-kumo-default"
                     />
                   )}
                 </button>,
