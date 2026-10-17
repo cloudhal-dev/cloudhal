@@ -36,6 +36,20 @@ const files = walk(SRC).map((f) => ({
   file: path.relative(SRC, f),
   text: readFileSync(f, "utf8"),
 }));
+/**
+ * A screen split into its route and a components folder of its own (docs/engineering/
+ * code-structure.md §8) is checked as one text: its rules hold for the screen, wherever the
+ * markup lives.
+ */
+const SCREEN_PARTS: Readonly<Record<string, string>> = {
+  "routes/PageEditorPage.tsx": "components/page-editor",
+};
+function screenText(file: string): string {
+  const own = (files.find((f) => f.file === file) as { text: string }).text;
+  const dir = SCREEN_PARTS[file];
+  if (!dir) return own;
+  return [own, ...walkAll(path.join(SRC, dir)).map((f) => readFileSync(f, "utf8"))].join("\n");
+}
 const uiFiles = files.filter(
   (f) => f.file.startsWith("routes/") || f.file.startsWith("components/"),
 );
@@ -858,7 +872,7 @@ describe("design rules (DESIGN.md)", () => {
     (key, required) => {
       // `file#topic` lets one file carry several independent requirements.
       const file = key.split("#")[0] as string;
-      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      const text = screenText(file);
       const missing = required.filter((name) => !new RegExp(`\\b${name}\\b`).test(text));
       expect(missing, `${file} must use ${missing.join(", ")}`).toEqual([]);
     },
@@ -1127,7 +1141,7 @@ describe("design rules (DESIGN.md)", () => {
       "routes/PageEditorPage.tsx",
       "routes/TermEditorPage.tsx",
     ]) {
-      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      const text = screenText(file);
       const saves = text.match(/save\.mutate\(/g) ?? [];
       const guarded = text.match(/if \(valid\([^)]*\)\) save\.mutate\(/g) ?? [];
       expect(saves.length, file).toBeGreaterThan(0);
@@ -1206,7 +1220,7 @@ describe("design rules (DESIGN.md)", () => {
     // read from location.hash, stripped at once with replaceState
     expect(take).toMatch(/window\.location\.hash[\s\S]*window\.history\.replaceState\(/);
     for (const file of ["routes/InvitePage.tsx", "routes/ResetPasswordPage.tsx"]) {
-      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      const text = screenText(file);
       expect(text, file).toMatch(/useState\(\(\) => takeHashToken\(/);
       expect(text, file).not.toMatch(/searchParams|location\.search|\?token=/);
     }
@@ -1301,7 +1315,7 @@ describe("design rules (DESIGN.md)", () => {
       "routes/PagesPage.tsx",
       "routes/ArticlesPage.tsx",
     ]) {
-      const text = (files.find((f) => f.file === file) as { text: string }).text;
+      const text = screenText(file);
       expect(text, file).toMatch(/<DeleteResource[\s\S]*?notice=\{<MenuDeleteNotice/);
     }
   });

@@ -7,7 +7,6 @@
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 819,
     "apps/studio/src/routes/NavigationPage.tsx": 1181,
-    "apps/studio/src/routes/PageEditorPage.tsx": 802,
     "apps/studio/src/routes/SchedulesPage.tsx": 1299,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
     "packages/api/src/build-turn.ts": 885,
@@ -238,12 +237,6 @@
     },
     "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
       "lines": 1049
-    },
-    "apps/studio/src/routes/PageEditorPage.tsx::PageEditorPage": {
-      "lines": 504
-    },
-    "apps/studio/src/routes/PageEditorPage.tsx::SectionForm": {
-      "lines": 152
     },
     "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
       "lines": 176

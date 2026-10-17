@@ -225,6 +225,9 @@ Studio (`apps/studio`):
   `.tsx` there as a route that needs a template). The route file keeps what its template requires
   (`PageLayout`, `crumbs=`, `title=`, and `EditorLayout`/`SectionCard` for editors). Reusable visual
   patterns become a `packages/ui` block (AGENTS.md rule 7).
+- Register a split screen's folder in `SCREEN_PARTS` (`apps/studio/test/design-rules.test.ts`): the
+  design-rules tests then read the route and its folder as one screen (first done for
+  `routes/PageEditorPage.tsx` → `components/page-editor/`).
 - Modules imported only by a lazy route stay in its chunk; never import a heavy module from the
   shell (`apps/studio/bundle-budget.ts` `LAZY_ONLY`).
 - `src/lib/api.ts` is split per resource (`lib/api/<area>.ts`); `lib/api.ts` stays as the barrel
