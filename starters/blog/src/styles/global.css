@@ -3215,3 +3215,56 @@ ul.ch-mega__col {
   background: transparent;
   color: var(--ch-color-brand);
 }
+
+/*
+ * RFC-0027 27c: galleries (one image at a time, whole, with thumbnails) and testimonials (centred,
+ * the neighbours peeking in). A gallery shows each image whole on a calm field until RFC-0028's
+ * fit modes (blur-fill) arrive.
+ */
+.ch-carousel[data-variant="gallery"] .ch-carousel__track {
+  grid-auto-columns: 100%;
+  gap: 0;
+  scrollbar-width: none;
+}
+.ch-carousel[data-variant="gallery"] .ch-carousel__slide {
+  scroll-snap-stop: always;
+  background: var(--ch-color-surface-muted);
+  border-radius: var(--ch-radius-m, 0.5rem);
+}
+.ch-carousel[data-variant="gallery"][data-aspect]
+  .ch-carousel__slide
+  :is(.ch-figure, .ch-figure img) {
+  object-fit: contain;
+}
+.ch-carousel__markers[data-style="thumbs"] {
+  @apply flex-nowrap justify-start gap-2 overflow-x-auto;
+  scrollbar-width: thin;
+}
+.ch-carousel__markers[data-style="thumbs"] a {
+  @apply size-16 min-w-16 shrink-0 overflow-hidden rounded p-0 opacity-70;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.ch-carousel__markers[data-style="thumbs"] a img {
+  @apply size-full object-cover;
+}
+.ch-carousel__markers[data-style="thumbs"] a:is(:target-current, [aria-current="true"]) {
+  background: transparent;
+  opacity: 1;
+  outline-color: var(--ch-color-brand);
+}
+.ch-carousel[data-variant="testimonials"] {
+  --ch-c-peek: 24%;
+}
+.ch-carousel[data-variant="testimonials"][data-peek="none"] {
+  --ch-c-peek: 0%;
+}
+.ch-carousel[data-variant="testimonials"] .ch-carousel__slide {
+  scroll-snap-align: center;
+}
+.ch-carousel[data-variant="testimonials"] .ch-carousel__track {
+  /* one quote in the middle, its neighbours' edges showing; the first and last centre too */
+  grid-auto-columns: 100%;
+  padding-inline: calc(var(--ch-c-peek) / 2);
+  scroll-padding-inline: calc(var(--ch-c-peek) / 2);
+}

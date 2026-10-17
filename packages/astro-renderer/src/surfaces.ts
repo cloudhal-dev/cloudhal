@@ -879,19 +879,54 @@ export function primitiveHtml(
     case "Carousel": {
       const tr = (media?.locale ?? "en").startsWith("tr");
       const n = node.children.length;
-      const variant = p.variant === "hero" ? "hero" : "rail";
+      const variant = ["hero", "gallery", "testimonials"].includes(str(p.variant))
+        ? str(p.variant)
+        : "rail";
       const controls = ["arrows", "markers", "none"].includes(str(p.controls))
         ? str(p.controls)
         : "both";
       const arrows = controls === "both" || controls === "arrows";
       const arrow = (dir: "prev" | "next") =>
         `<button type="button" class="ch-carousel__arrow" data-ch-carousel="${dir}" data-ch-pending aria-controls="${id}-track" aria-label="${dir === "prev" ? (tr ? "Önceki slayt" : "Previous slide") : tr ? "Sonraki slayt" : "Next slide"}">${iconOf(dir === "prev" ? "chevron-left" : "chevron-right", media)}</button>`;
+      // RFC-0027 27c: a gallery's markers can be its slides' first images, small.
+      const thumb = (slide: SurfaceNode | undefined, i: number): string => {
+        const find = (n: SurfaceNode | undefined, depth: number): SurfaceNode | undefined =>
+          !n || depth > 3
+            ? undefined
+            : n.component === "Image"
+              ? n
+              : n.children.map((c) => find(c, depth + 1)).find(Boolean);
+        const img = find(slide, 0);
+        const m = /^asset:([a-z]+_[A-Za-z0-9]{6,32})$/.exec(str(img?.props.asset));
+        const asset = m ? media?.assets?.get(m[1] as string) : undefined;
+        if (!asset) return String(i + 1);
+        const defaultLocale = media?.defaultLocale ?? media?.locale ?? "en";
+        return imgHtml(
+          imageAttributes(
+            asset,
+            { alt: "" },
+            {
+              locale: media?.locale ?? defaultLocale,
+              defaultLocale,
+              transform: media?.transform ?? "none",
+              sizes: "5rem",
+              ...(media?.preview ? { preview: true } : {}),
+            },
+          ),
+        ).replace(/ alt="[^"]*"/, ' alt=""');
+      };
+      const style =
+        p.markers === "dots"
+          ? "dots"
+          : p.markers === "thumbs" && variant === "gallery"
+            ? "thumbs"
+            : "numbers";
       const markers =
         controls === "both" || controls === "markers"
-          ? `<nav class="ch-carousel__markers" data-style="${p.markers === "dots" ? "dots" : "numbers"}" aria-label="${tr ? "Slaytlar" : "Slides"}">${node.children
+          ? `<nav class="ch-carousel__markers" data-style="${style}" aria-label="${tr ? "Slaytlar" : "Slides"}">${node.children
               .map(
-                (_, i) =>
-                  `<a href="#${id}-${i + 1}" aria-label="${tr ? "Slayt" : "Slide"} ${i + 1}">${p.markers === "dots" ? "" : i + 1}</a>`,
+                (c, i) =>
+                  `<a href="#${id}-${i + 1}" aria-label="${tr ? "Slayt" : "Slide"} ${i + 1}">${style === "dots" ? "" : style === "thumbs" ? thumb(c, i) : i + 1}</a>`,
               )
               .join("")}</nav>`
           : "";

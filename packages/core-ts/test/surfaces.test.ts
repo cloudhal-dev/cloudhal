@@ -703,6 +703,48 @@ describe("carousels (RFC-0027)", () => {
     ]);
   });
 
+  it("takes galleries of images with thumbnails and centred testimonials (27c)", () => {
+    const img = (id: string) => ({
+      id,
+      component: "Image",
+      props: { asset: "asset:ast_example01", alt: id },
+    });
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Carousel",
+            props: { label: "The bakery", variant: "gallery", aspect: "4:3", markers: "thumbs" },
+            children: ["a", "b"],
+          },
+          img("a"),
+          img("b"),
+        ]),
+      ),
+    ).toEqual([]);
+    expect(
+      messages(
+        surface([
+          {
+            id: "root",
+            component: "Carousel",
+            props: { label: "Photos", variant: "gallery", markers: "thumbs" },
+            children: ["a", "t"],
+          },
+          img("a"),
+          { id: "t", component: "Text", props: { text: "no picture" } },
+        ]),
+      ),
+    ).toEqual([
+      "/components/0/props/aspect a gallery carousel keeps one frame size: set aspect",
+      '/components/0/children gallery slide "t" has no Image',
+    ]);
+    expect(
+      messages(carousel({ label: "Kind words", variant: "testimonials", markers: "thumbs" }, 3)),
+    ).toEqual(["/components/0/props/markers thumbs only on a gallery"]);
+  });
+
   it("never nests a carousel or takes an overlay as a slide", () => {
     expect(
       messages(
