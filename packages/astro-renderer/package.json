@@ -45,7 +45,8 @@
     "./kit": "./src/kit.ts",
     "./surfaces": "./src/surfaces.ts",
     "./chrome": "./src/chrome-client.ts",
-    "./prefs": "./src/prefs-client.ts"
+    "./prefs": "./src/prefs-client.ts",
+    "./carousel": "./src/carousel-client.ts"
   },
   "files": [
     "dist",
@@ -226,6 +227,10 @@
       "./prefs": {
         "types": "./dist/src/prefs-client.d.ts",
         "default": "./dist/src/prefs-client.js"
+      },
+      "./carousel": {
+        "types": "./dist/src/carousel-client.d.ts",
+        "default": "./dist/src/carousel-client.js"
       }
     }
   }

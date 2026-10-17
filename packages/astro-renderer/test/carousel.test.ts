@@ -1,6 +1,10 @@
 /** RFC-0027: carousels drawn without JavaScript — a scroll-snap track, named slides, link markers. */
+
+import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
+import { CAROUSEL_SCRIPT } from "../src/carousel-client.ts";
 import { renderSurface, surfaceTree } from "../src/surfaces.ts";
 
 const section = (components: SurfaceComponent[]): SurfaceSection => ({
@@ -83,5 +87,20 @@ describe("carousels (RFC-0027 27a)", () => {
     expect(one?.priority).toBe(true);
     expect(one?.children[0]?.priority).toBe(true);
     expect(two?.priority).toBeUndefined();
+  });
+
+  it("loads the carousel module with a carousel, pinned to its versioned name (27b)", () => {
+    expect(html).toContain(`<script type="module" src="${CAROUSEL_SCRIPT.path}"></script>`);
+    // Bump `carousel.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
+    expect(createHash("sha256").update(CAROUSEL_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
+      "680ab0558cf4",
+    );
+    expect(CAROUSEL_SCRIPT.path).toBe("/_cloudhal/carousel.1.js");
+    expect(gzipSync(CAROUSEL_SCRIPT.code).length).toBeLessThan(2 * 1024);
+    expect(CAROUSEL_SCRIPT.code).not.toMatch(
+      /\beval\b|new Function|innerHTML|addEventListener\("wheel"/,
+    );
+    expect(CAROUSEL_SCRIPT.code).toContain('scrollIntoView({block:"nearest",inline:"start"})');
+    expect(CAROUSEL_SCRIPT.code).toContain('setAttribute("aria-live","polite")');
   });
 });

@@ -32,6 +32,7 @@ import {
   usesMotion,
 } from "@cloudhal/core-ts/surfaces";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
+import { CAROUSEL_SCRIPT } from "./carousel-client.ts";
 import { chartInner } from "./chart.ts";
 import { escapeHtml, renderMarkdown, safeHref } from "./markdown.ts";
 import { imageAttributes, imgHtml, type MediaContext } from "./media.ts";
@@ -1073,6 +1074,10 @@ export function surfaceWrapper(
     // RFC-0025 §3: the overlay module, only for surfaces with an overlay.
     (section.components.some((c) => OVERLAY_COMPONENTS.has(c.component))
       ? `<script type="module" src="${OVERLAY_SCRIPT.path}"></script>`
+      : "") +
+    // RFC-0027 27b: the carousel module, only for surfaces with a carousel.
+    (section.components.some((c) => c.component === "Carousel")
+      ? `<script type="module" src="${CAROUSEL_SCRIPT.path}"></script>`
       : "");
   return [
     `<section class="ch-surface" data-section-id="${escapeHtml(section.id)}" data-kind="surface" data-catalog="${escapeHtml(section.catalog)}"${live ? ` data-ch-surface="${escapeHtml(scope)}"` : ""}>`,

@@ -105,3 +105,13 @@ None; `docs/design/carousels.md` decided them.
     - Smooth scrolling only where motion plays.
   - **Checks.** `render_page` adds `carousel-label` and `carousel-lcp`. It now remembers which images the page asked to be lazy before it loads them all.
   - **Known gap.** A transparent header reads the hero's first slide only (`heroSurface` walks into the carousel), so later slides with other surfaces may differ. `header-contrast` checks the first slide.
+- **27b shipped.**
+  - **Module.** `/_cloudhal/carousel.1.js` is 972 B gzipped and loads only with a carousel.
+    - The arrows appear. They move by a slide (hero) or by what is in view (rail), through `scrollIntoView`, so right-to-left and the site's `scroll-behavior` hold. At the ends they carry `aria-disabled`.
+    - The current slide is measured from the slides' boxes on `scroll`/`scrollend`. It shows on its marker (`aria-current`).
+    - Marker clicks scroll the track without jumping the page or changing the hash.
+    - A polite live region names the slide after the reader moves.
+    - A hero's off-screen slides are `inert`.
+    - No wheel or drag handling.
+  - **Check.** `render_page` adds `carousel-focus`: the arrows must have appeared (the module ran), and no focusable element may sit in an off-screen hero slide unless it is inert.
+  - **Design note.** Position is measured from geometry rather than an IntersectionObserver. Hidden tabs (and the preview pane) pause observers; geometry stays correct after any move, and a short timer catches moves that cause no scroll.

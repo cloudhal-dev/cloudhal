@@ -69,6 +69,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "overlay-open": "overlays",
   "carousel-label": "carousel names",
   "carousel-lcp": "carousel image loading",
+  "carousel-focus": "carousel focus",
 };
 
 function summary(r: RenderPageResult): string {
