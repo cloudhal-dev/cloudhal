@@ -57,7 +57,7 @@ export const messages = {
       menus: "Menus you can name: {menus}.",
       saved: "Header and footer saved",
       failed: "The header and footer could not be saved",
-      publishHint: "Changes show on the site after the next publish.",
+      menusPublish: "Menus you can name: {menus}. Changes show on the site after the next publish.",
     },
   },
 } as const;

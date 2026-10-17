@@ -56,7 +56,8 @@ export const messages = {
     unique: {
       label: "Count unique visitors",
       hint: "Still cookie-less: each visitor's IP address and browser details are combined with a random value that changes every day, and only the result is kept. The random value is deleted within 24 hours, so nobody can trace visitors or link them across days.",
-      needsVisits: "Turn on Count visits first.",
+      hintNeedsVisits:
+        "Still cookie-less: each visitor's IP address and browser details are combined with a random value that changes every day, and only the result is kept. The random value is deleted within 24 hours, so nobody can trace visitors or link them across days. Turn on Count visits first.",
       offWarningTitle: "Saving deletes today's random value",
       offWarning:
         "Every site on this deployment shares it, so it is deleted for all of them at once. Unique visitors stop being counted here; on other sites that count them, someone who comes back later today may be counted twice.",
@@ -102,7 +103,8 @@ export const messages = {
     notice: {
       title: "Privacy notice for your site",
       hint: "Add it to your privacy policy. It follows the switches above.",
-      unsaved: "It already reflects your unsaved changes.",
+      hintUnsaved:
+        "Add it to your privacy policy. It follows the switches above. It already reflects your unsaved changes.",
       languages: "Language of the notice",
       copy: "Copy notice",
       copied: "Privacy notice copied",

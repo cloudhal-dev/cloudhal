@@ -219,7 +219,7 @@ function PrivacyNotice({ uniqueVisitors, unsaved }: { uniqueVisitors: boolean; u
           </Text>
           <Text variant="secondary" size="sm">
             {unsaved
-              ? `${t("analyticsSettings.notice.hint")} ${t("analyticsSettings.notice.unsaved")}`
+              ? t("analyticsSettings.notice.hintUnsaved")
               : t("analyticsSettings.notice.hint")}
           </Text>
         </div>
@@ -477,7 +477,7 @@ export function AnalyticsSettingsSection({ siteId }: { siteId: string }) {
               hint={
                 form.enabled
                   ? t("analyticsSettings.unique.hint")
-                  : `${t("analyticsSettings.unique.hint")} ${t("analyticsSettings.unique.needsVisits")}`
+                  : t("analyticsSettings.unique.hintNeedsVisits")
               }
               checked={form.uniqueVisitors}
               onChange={(on) => {

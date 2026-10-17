@@ -298,7 +298,7 @@ export function ChromeSettingsSection({
         <Text variant="secondary" size="sm">
           {disabled && gate.reason
             ? gate.reason
-            : `${t("appearance.chrome.menus", { menus: saved.menus.join(", ") })} ${t("appearance.chrome.publishHint")}`}
+            : t("appearance.chrome.menusPublish", { menus: saved.menus.join(", ") })}
         </Text>
       </div>
     </SettingsSection>

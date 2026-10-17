@@ -37,7 +37,7 @@ export function ThemeSwitch() {
   const t = useT();
   const [preference] = useThemePreference();
   const Current = themeIcon(preference);
-  const label = `${t("theme.label")}: ${t(`theme.${preference}`)}`;
+  const label = t("theme.current", { name: t(`theme.${preference}`) });
   return (
     <DropdownMenu>
       <Tooltip

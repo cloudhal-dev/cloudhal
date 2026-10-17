@@ -41,6 +41,7 @@ export const en = {
   },
   theme: {
     label: "Theme",
+    current: "Theme: {name}",
     light: "Light",
     dark: "Dark",
     system: "System",
@@ -718,14 +719,8 @@ export const en = {
         auto: "Works like Edits, and small article publishes go live without you.",
         bypass: "Nothing waits for a person. Only for cloudhal mcp on your own machine.",
       },
-      waitsLabel: "Waits for you:",
-      waits: {
-        plan: "nothing, because it can't change anything",
-        manual: "every edit, publish, rollback and deletion",
-        edits: "publish, rollback and deletions",
-        auto: "larger publishes, rollback and deletions",
-        bypass: "nothing",
-      },
+      waitsFor:
+        "{mode, select, plan {Waits for you: nothing, because it can't change anything} manual {Waits for you: every edit, publish, rollback and deletion} edits {Waits for you: publish, rollback and deletions} auto {Waits for you: larger publishes, rollback and deletions} bypass {Waits for you: nothing} other {Waits for you: every edit, publish, rollback and deletion}}",
       risk: {
         safest: "Safest",
         recommended: "Recommended",

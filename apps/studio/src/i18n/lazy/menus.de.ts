@@ -274,9 +274,7 @@ export const messages: NamespaceMessages<"menus"> = {
       noArchive: "kein Archiv",
       topLevel: "oberste Ebene, Position {position}",
       under: "unter „{parent}“, Position {position}",
-      withBelow:
-        "{count, plural, one {, mit # Eintrag darunter} other {, mit # Einträgen darunter}}",
-      add: "{label} → {where}, {place}{below}",
+      add: "{label} → {where}, {place}{below, plural, =0 {} one {, mit # Eintrag darunter} other {, mit # Einträgen darunter}}",
       remove: "{label} → {where}",
       removeTree:
         "{count, plural, one {{label} und # Eintrag darunter} other {{label} und # Einträge darunter}}",

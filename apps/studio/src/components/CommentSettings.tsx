@@ -130,9 +130,7 @@ function DisclosureNotice({ form, unsaved }: { form: CommentsForm; unsaved: bool
             {t("commentsSettings.notice.title")}
           </Text>
           <Text variant="secondary" size="sm">
-            {unsaved
-              ? `${t("commentsSettings.notice.hint")} ${t("commentsSettings.notice.unsaved")}`
-              : t("commentsSettings.notice.hint")}
+            {unsaved ? t("commentsSettings.notice.hintUnsaved") : t("commentsSettings.notice.hint")}
           </Text>
         </div>
         <fieldset className="min-w-0 overflow-x-auto">
@@ -739,7 +737,7 @@ export function CommentSettingsSection({ siteId }: { siteId: string }) {
             hint={
               feature?.aiLabels
                 ? t("commentsSettings.ai.hint")
-                : `${t("commentsSettings.ai.hint")} ${t("commentsSettings.ai.unavailable")}`
+                : t("commentsSettings.ai.hintUnavailable")
             }
             checked={form.aiLabels === "workers-ai"}
             onChange={(on) => {

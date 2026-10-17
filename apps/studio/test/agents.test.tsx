@@ -120,7 +120,7 @@ describe("CreateAgentKeyDialog", () => {
       "caution",
     ]);
     expect(within(step).getByText("Recommended")).toBeInTheDocument();
-    expect(within(step).getByText("publish, rollback and deletions")).toBeInTheDocument();
+    expect(within(step).getByText("Waits for you: publish, rollback and deletions")).toBeInTheDocument();
     // Bypass is only explained, with the local command.
     expect(screen.getByTestId("bypass-hint")).toHaveTextContent("cloudhal mcp --mode bypass");
   });

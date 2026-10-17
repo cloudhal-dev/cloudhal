@@ -88,7 +88,8 @@ export const messages: NamespaceMessages<"commentsSettings"> = {
     ai: {
       label: "Yorumları Workers AI ile etiketle",
       hint: "Cloudflare hesabındaki bir model etiket önerir (spam, saldırgan, soru…). Etiketler hiçbir şeyi yayımlamaz ya da gizlemez.",
-      unavailable: "Bu kurulumda henüz kullanılamıyor.",
+      hintUnavailable:
+        "Cloudflare hesabındaki bir model etiket önerir (spam, saldırgan, soru…). Etiketler hiçbir şeyi yayımlamaz ya da gizlemez. Bu kurulumda henüz kullanılamıyor.",
       confirmTitle: "Yorumlar Workers AI'a gönderilsin mi?",
       confirmDescription:
         "Etiket önermek için her yeni yorumun metni kendi Cloudflare hesabındaki bir Workers AI modeline gönderilir. Adlar ve e-postalar gönderilmez.",
@@ -113,7 +114,8 @@ export const messages: NamespaceMessages<"commentsSettings"> = {
     notice: {
       title: "Gizlilik bildirimi",
       hint: "Sitendeki gizlilik sayfasına yapıştır. Yukarıdaki anahtarları izler.",
-      unsaved: "Kaydedilmemiş değişikliklerini gösteriyor.",
+      hintUnsaved:
+        "Sitendeki gizlilik sayfasına yapıştır. Yukarıdaki anahtarları izler. Kaydedilmemiş değişikliklerini gösteriyor.",
       languages: "Bildirimin dili",
       heading: "Yorumlar",
       base: "Yorum yaptığında gönderdiğin adı ve metni, verirsen e-posta adresini saklarız. E-postan hiçbir zaman gösterilmez ve yalnızca yorumunla ilgili talepleri yanıtlamak için kullanılır. Kötüye kullanımı önlemek için ağ adresinin karıştırılmış bir biçimini en çok 30 gün tutarız; adresin kendisini hiçbir zaman saklamayız. Yorumlar yayımlanmadan önce incelenir. Yorumlar için çerez kullanmayız. Adının ya da yorumunun kaldırılmasını istediğin zaman isteyebilirsin.",

@@ -91,7 +91,8 @@ export const messages = {
     ai: {
       label: "Label comments with Workers AI",
       hint: "A model in your Cloudflare account suggests labels (spam, toxic, question…). Labels never publish or hide anything.",
-      unavailable: "Not available on this deployment yet.",
+      hintUnavailable:
+        "A model in your Cloudflare account suggests labels (spam, toxic, question…). Labels never publish or hide anything. Not available on this deployment yet.",
       confirmTitle: "Send comments to Workers AI?",
       confirmDescription:
         "Each new comment's text is sent to a Workers AI model in your own Cloudflare account to suggest labels. Names and emails are not sent.",
@@ -116,7 +117,8 @@ export const messages = {
     notice: {
       title: "Privacy notice",
       hint: "Paste it into your site's privacy page. It follows the switches above.",
-      unsaved: "It shows your unsaved changes.",
+      hintUnsaved:
+        "Paste it into your site's privacy page. It follows the switches above. It shows your unsaved changes.",
       languages: "Notice language",
       heading: "Comments",
       base: "When you comment, we store the name and text you submit, and your email address if you give one. Your email is never shown and is used only to handle requests about your comment. To prevent abuse, we keep a scrambled form of your network address for up to 30 days; we never store the address itself. Comments are reviewed before they appear. We do not use cookies for comments. You can ask us to remove your name or your comment at any time.",

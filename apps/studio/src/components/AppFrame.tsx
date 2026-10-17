@@ -93,7 +93,7 @@ function AppFrameShell({
     ...commands,
     ...THEME_PREFERENCES.filter((p) => p !== theme).map((p) => ({
       id: `theme-${p}`,
-      label: `${t("theme.label")}: ${t(`theme.${p}`)}`,
+      label: t("theme.current", { name: t(`theme.${p}`) }),
       run: () => setThemePreference(p),
     })),
   ];

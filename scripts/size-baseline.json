@@ -2,7 +2,7 @@
   "$comment": "Oversized files and functions as of their last tightening. Entries may only shrink: run `node scripts/size-check.ts --update` after a refactor. See docs/engineering/code-structure.md.",
   "files": {
     "apps/studio/src/components/AnalyticsSections.tsx": 1349,
-    "apps/studio/src/components/CommentSettings.tsx": 840,
+    "apps/studio/src/components/CommentSettings.tsx": 838,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 811,

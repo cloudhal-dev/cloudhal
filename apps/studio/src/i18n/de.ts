@@ -47,6 +47,7 @@ export const messages: Messages = {
   },
   theme: {
     label: "Design",
+    current: "Design: {name}",
     light: "Hell",
     dark: "Dunkel",
     system: "System",
@@ -754,14 +755,8 @@ export const messages: Messages = {
         auto: "Wie Bearbeiten, und kleine Artikel-Veröffentlichungen gehen ohne dich live.",
         bypass: "Nichts wartet auf eine Person. Nur für cloudhal mcp auf deinem eigenen Rechner.",
       },
-      waitsLabel: "Wartet auf dich:",
-      waits: {
-        plan: "nichts, da er nichts ändern kann",
-        manual: "jede Bearbeitung, Veröffentlichung, Zurücksetzung und Löschung",
-        edits: "Veröffentlichung, Zurücksetzung und Löschungen",
-        auto: "größere Veröffentlichungen, Zurücksetzung und Löschungen",
-        bypass: "nichts",
-      },
+      waitsFor:
+        "{mode, select, plan {Wartet auf dich: nichts, da er nichts ändern kann} manual {Wartet auf dich: jede Bearbeitung, Veröffentlichung, Zurücksetzung und Löschung} edits {Wartet auf dich: Veröffentlichung, Zurücksetzung und Löschungen} auto {Wartet auf dich: größere Veröffentlichungen, Zurücksetzung und Löschungen} bypass {Wartet auf dich: nichts} other {Wartet auf dich: jede Bearbeitung, Veröffentlichung, Zurücksetzung und Löschung}}",
       risk: {
         safest: "Am sichersten",
         recommended: "Empfohlen",

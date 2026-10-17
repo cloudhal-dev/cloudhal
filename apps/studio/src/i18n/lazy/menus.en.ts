@@ -262,8 +262,7 @@ export const messages = {
       noArchive: "no archive",
       topLevel: "top level, position {position}",
       under: "under “{parent}”, position {position}",
-      withBelow: "{count, plural, one {, with # item below it} other {, with # items below it}}",
-      add: "{label} → {where}, {place}{below}",
+      add: "{label} → {where}, {place}{below, plural, =0 {} one {, with # item below it} other {, with # items below it}}",
       remove: "{label} → {where}",
       removeTree:
         "{count, plural, one {{label} and # item below it} other {{label} and # items below it}}",
