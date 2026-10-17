@@ -1,4 +1,5 @@
 import { type Compiled, formatList, formatMessage, isMessage } from "@cloudhal/messages/format";
+import { pseudoLocalize } from "@cloudhal/messages/pseudo";
 
 /** Studio's `Intl` layer (the i18n review's Phase 2): cached, always with an explicit locale. */
 export {
@@ -198,6 +199,29 @@ function find(locale: Locale, key: string): Compiled | undefined {
  * A key of a lazy namespace resolves only once that namespace is loaded in the locale (use
  * `useT(namespace)`, which waits for it).
  */
+const PSEUDO_KEY = "cloudhal.studio.pseudo";
+/**
+ * The pseudo-locale (the i18n review's Phase 5, DESIGN.md §1): every catalog message accented,
+ * lengthened and bracketed, to find hard-coded text, cut-off labels and layouts too tight for
+ * longer languages. Dev and test only — `import.meta.env.DEV` removes it from production builds
+ * (the bundle budget checks) — and never a language in the menus. Turn it on with `?pseudo` or
+ * `localStorage["cloudhal.studio.pseudo"] = "1"` (`SHOTS_PSEUDO=1 pnpm design:shots`).
+ */
+let pseudo = import.meta.env.DEV && pseudoRequested();
+function pseudoRequested(): boolean {
+  try {
+    return (
+      new URLSearchParams(location.search).has("pseudo") || localStorage.getItem(PSEUDO_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+/** Dev and test only: turns the pseudo-locale on or off (a no-op in production). */
+export function setPseudo(on: boolean): void {
+  if (import.meta.env.DEV) pseudo = on;
+}
+
 export function translate(
   locale: Locale,
   key: MessageKey | NamespaceKey<Namespace>,
@@ -208,7 +232,8 @@ export function translate(
     text = find(l, key);
     if (text !== undefined) break;
   }
-  return formatMessage(locale, text ?? key, params);
+  const message = import.meta.env.DEV && pseudo && text !== undefined ? pseudoLocalize(text) : text;
+  return formatMessage(locale, message ?? key, params);
 }
 
 interface I18nValue<N extends Namespace = never> {

@@ -204,7 +204,6 @@ export const messages: NamespaceMessages<"comments"> = {
       reply: "Yanıtla",
       openThread: "Yorum dizisini aç",
       commenter: "Yorum sahibi…",
-      ban: "Engelle…",
       resolve: "Bildirimi çöz…",
     },
     dialog: {
@@ -364,7 +363,6 @@ export const messages: NamespaceMessages<"comments"> = {
       hideConfirmDescription:
         "Okurlar hiç yorum görmez ve yorum yapamaz. Yorumlar burada kalır; Varsayılan ya da Açık onları geri getirir.",
       hideConfirm: "Diziyi gizle",
-      counts: "Sayılar",
       entryId: "Yazı kimliği",
       path: "Yol",
       openArticle: "Yazıyı aç",
@@ -479,7 +477,6 @@ export const messages: NamespaceMessages<"comments"> = {
       erased: "Yorum sahibinin verileri silindi",
       erasedDescription: "{count} yorum değişti.",
       eraseFailed: "Yorum sahibinin verileri silinemedi",
-      fromComment: "Bir yorumdan",
     },
     editorCard: {
       title: "Yorumlar",

@@ -10,7 +10,6 @@ export const messages = {
     description:
       "Visits to this site, counted without cookies. Changes reach the site within a minute.",
     status: { on: "On", off: "Off", notRunning: "Not running" },
-    loadFailed: "Couldn't load the analytics settings",
     noAccessTitle: "You can't see analytics",
     notAvailableTitle: "This server doesn't offer analytics",
     notAvailableDescription:

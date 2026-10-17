@@ -11,6 +11,7 @@ import { type ArgInfo, argumentsOf } from "@cloudhal/messages/compile";
 import { type Compiled, isMessage } from "@cloudhal/messages/format";
 import { compileCatalogSource } from "@cloudhal/messages/transform";
 import { describe, expect, it } from "vitest";
+import { unusedKeys } from "../scripts/i18n-usage.ts";
 import { en } from "../src/i18n/en.ts";
 import { LOCALE_LIST, type Locale, NAMESPACES, translate } from "../src/i18n/index.tsx";
 
@@ -132,6 +133,14 @@ describe("message catalogs (RFC-0032 §5)", () => {
     expect(sorted("en")).toEqual(["one", "other"]);
     expect(sorted("ru")).toEqual(["few", "many", "one", "other"]);
     expect(sorted("ar")).toEqual(["few", "many", "one", "other", "two", "zero"]);
+  });
+
+  it("has no unused keys: every key is reachable from Studio's code (Phase 5)", () => {
+    expect(unusedKeys(messages("en").keys())).toEqual([]);
+    // The check itself: a key no code names is reported, a key built from a bound prefix is not.
+    expect(unusedKeys(["nothing.uses.this", "comments.approvals.approveTitle"])).toEqual([
+      "nothing.uses.this",
+    ]);
   });
 
   it("has generated parameter types that match the English catalogs (`pnpm gen`)", () => {

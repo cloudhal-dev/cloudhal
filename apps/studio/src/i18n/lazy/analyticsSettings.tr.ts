@@ -7,7 +7,6 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     description:
       "Bu sitenin ziyaretleri, çerezsiz sayılır. Değişiklikler bir dakika içinde siteye yansır.",
     status: { on: "Açık", off: "Kapalı", notRunning: "Çalışmıyor" },
-    loadFailed: "İstatistik ayarları yüklenemedi",
     noAccessTitle: "İstatistikleri göremezsin",
     notAvailableTitle: "Bu sunucu istatistik sunmuyor",
     notAvailableDescription:

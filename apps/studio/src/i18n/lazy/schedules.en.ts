@@ -494,7 +494,6 @@ export const messages = {
       notFound: "This release doesn't exist",
     },
     automations: {
-      title: "Automations",
       description:
         "Jobs that run on a schedule: Cloudhal's built-in checks, and agent tasks with a key, a budget and a time window.",
       new: "New automation",
