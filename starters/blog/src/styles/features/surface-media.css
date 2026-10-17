@@ -1,0 +1,123 @@
+/* RFC-0028 §3: how an image meets its frame. cover (the default) crops around the focal point the
+   renderer sets as object-position; the others show the whole picture, and what fills the bars is
+   the image's placeholder layer: its blurred self (blur-fill), its colour (color-fill) or nothing. */
+.ch-figure:is([data-fit="contain"], [data-fit="blur-fill"], [data-fit="color-fill"]) img,
+.ch-carousel[data-aspect]
+  .ch-carousel__slide
+  .ch-figure:is([data-fit="contain"], [data-fit="blur-fill"], [data-fit="color-fill"])
+  img {
+  object-fit: contain;
+}
+.ch-figure[data-fit="natural"] img {
+  aspect-ratio: auto;
+  height: auto;
+}
+.ch-figure figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-button--ghost {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-link {
+  @apply font-medium underline underline-offset-4;
+}
+.ch-badge {
+  @apply inline-block w-fit rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700;
+}
+.ch-badge[data-tone="info"] {
+  @apply bg-sky-100 text-sky-800;
+}
+.ch-badge[data-tone="success"] {
+  @apply bg-emerald-100 text-emerald-800;
+}
+.ch-badge[data-tone="warning"] {
+  @apply bg-amber-100 text-amber-900;
+}
+.ch-badge[data-tone="danger"] {
+  @apply bg-red-100 text-red-800;
+}
+.ch-stat {
+  @apply flex flex-col gap-1;
+}
+.ch-stat__value {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-stat__label {
+  @apply text-sm font-medium text-zinc-700;
+}
+.ch-stat__detail {
+  @apply text-sm text-zinc-500;
+}
+.ch-quote blockquote {
+  @apply border-l-4 border-zinc-300 pl-4 text-lg italic;
+}
+.ch-quote figcaption {
+  @apply mt-2 text-sm text-zinc-600;
+}
+.ch-quote cite {
+  @apply font-medium not-italic text-zinc-900;
+}
+.ch-list {
+  @apply space-y-2 pl-5;
+}
+ul.ch-list {
+  @apply list-disc;
+}
+ol.ch-list {
+  @apply list-decimal;
+}
+.ch-list[data-marker="none"] {
+  @apply list-none pl-0;
+}
+/* RFC-0026: an icon of the set as the bullet ("check" included), in the brand color. */
+.ch-list[data-marker="icon"] {
+  @apply list-none pl-0;
+}
+.ch-list[data-marker="icon"] li {
+  @apply flex items-start gap-2;
+}
+.ch-list__marker {
+  @apply mt-[0.2em];
+  color: var(--ch-color-brand);
+}
+/* Tabs without JavaScript: the n-th checked radio shows the n-th panel. */
+.ch-tabs {
+  @apply flex flex-wrap gap-x-1;
+}
+.ch-tabs__radio {
+  @apply sr-only;
+}
+.ch-tabs__tab {
+  @apply cursor-pointer rounded-t border-b-2 border-transparent px-4 py-2 text-sm font-medium text-zinc-600;
+}
+.ch-tabs__radio:checked + .ch-tabs__tab {
+  @apply border-current text-zinc-900;
+}
+.ch-tabs__radio:focus-visible + .ch-tabs__tab {
+  @apply outline-2 outline-offset-2;
+}
+.ch-tabs__panels {
+  @apply w-full border-t border-zinc-200 pt-4;
+}
+.ch-tabs__panel {
+  @apply hidden;
+}
+.ch-tabs__radio:nth-of-type(1):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(1),
+.ch-tabs__radio:nth-of-type(2):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(2),
+.ch-tabs__radio:nth-of-type(3):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(3),
+.ch-tabs__radio:nth-of-type(4):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(4),
+.ch-tabs__radio:nth-of-type(5):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(5),
+.ch-tabs__radio:nth-of-type(6):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(6),
+.ch-tabs__radio:nth-of-type(7):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(7),
+.ch-tabs__radio:nth-of-type(8):checked ~ .ch-tabs__panels > .ch-tabs__panel:nth-child(8) {
+  @apply flex flex-col gap-4;
+}
+.ch-accordion {
+  @apply divide-y divide-zinc-200 border-y border-zinc-200;
+}
+.ch-disclosure summary {
+  @apply cursor-pointer py-3 font-medium;
+}
+.ch-disclosure__body {
+  @apply flex flex-col gap-3 pb-4;
+}

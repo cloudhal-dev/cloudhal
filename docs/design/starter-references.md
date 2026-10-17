@@ -95,4 +95,4 @@ Already ahead of most competitors: Article JSON-LD with section, keywords and br
 
 ## 6. Local development note
 
-Tailwind v4 detects sources automatically from the project. For a project inside a git-ignored folder of another repository (`examples/` here), the scanner walked up the file system and the first CSS request never finished. The starter therefore names its sources: `@import "tailwindcss" source("..");` in `src/styles/global.css`.
+Tailwind v4 detects sources automatically from the project. For a project inside a git-ignored folder of another repository (`examples/` here), the scanner walked up the file system and the first CSS request never finished. The starter therefore names its sources: `@import "tailwindcss" source("..");` in `src/styles/global.css` (the path is relative to that file, so the import stays there; the rules live in `src/styles/features/`).

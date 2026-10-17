@@ -39,8 +39,7 @@
     "packages/schedules/src/recurrence.ts": 939,
     "packages/schedules/src/scheduler.ts": 1343,
     "packages/schedules/src/sql/store.ts": 2166,
-    "packages/ui/src/blocks/MarkdownEditor.tsx": 1295,
-    "starters/blog/src/styles/global.css": 3425
+    "packages/ui/src/blocks/MarkdownEditor.tsx": 1295
   },
   "functions": {
     "apps/demo-newsroom/scripts/editor-agent.ts::runEditorAgent": {

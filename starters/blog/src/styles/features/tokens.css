@@ -1,0 +1,100 @@
+/*
+ * RFC-0023: the theme's greys and white are color roles (`--ch-color-<role>`, written by
+ * themeVariables from the site's seed, or the former greys when it has none), so a seed restyles
+ * them and dark mode works. Text on brand and inverse fills uses its own roles below.
+ */
+@theme inline {
+  --color-white: var(--ch-color-surface-raised);
+  --color-zinc-50: var(--ch-color-surface-muted);
+  --color-zinc-100: var(--ch-color-surface-muted);
+  --color-zinc-200: var(--ch-color-border);
+  --color-zinc-300: var(--ch-color-border-strong);
+  --color-zinc-400: var(--ch-color-text-subtle);
+  --color-zinc-500: var(--ch-color-text-subtle);
+  --color-zinc-600: var(--ch-color-text-muted);
+  --color-zinc-700: var(--ch-color-text);
+  --color-zinc-800: var(--ch-color-text);
+  --color-zinc-900: var(--ch-color-text);
+  /*
+   * RFC-0023 §2: with a type scale the sizes are fluid steps (`--ch-step-<n>`, written by
+   * themeVariables); without one, Tailwind's fixed sizes. Small print stays fixed.
+   */
+  --text-base: var(--ch-step-0, 1rem);
+  --text-lg: var(--ch-step-1, 1.125rem);
+  --text-xl: var(--ch-step-2, 1.25rem);
+  --text-2xl: var(--ch-step-3, 1.5rem);
+  --text-3xl: var(--ch-step-4, 1.875rem);
+  --text-4xl: var(--ch-step-5, 2.25rem);
+  --text-5xl: var(--ch-step-6, 3rem);
+  /*
+   * RFC-0023 §3: corners and spacing follow the `radius` and `density` settings
+   * (`--ch-radius-*`, `--ch-space-unit`); the fallbacks are Tailwind's own values.
+   */
+  --radius: var(--ch-radius-s, 0.25rem);
+  --radius-sm: var(--ch-radius-s, 0.25rem);
+  --radius-md: var(--ch-radius-m, 0.375rem);
+  --radius-lg: var(--ch-radius-l, 0.5rem);
+  --spacing: var(--ch-space-unit, 0.25rem);
+}
+
+/* Design settings (src/settings.ts, RFC-0017): CSS variables and data-ch-* attributes on <html>. */
+.ch-body {
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+  /* Full-width bands (RFC-0020) use 100vw, which counts a classic scrollbar: never scroll sideways. */
+  overflow-x: clip;
+}
+[data-ch-font="serif"] .ch-body {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+}
+[data-ch-font="humanist"] .ch-body {
+  font-family:
+    Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", source-sans-pro, sans-serif;
+}
+[data-ch-font="mono"] .ch-body {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+/*
+ * Font pairings (RFC-0023 §2): the families come from fonts.css and load only when used. They win
+ * over the older typeface setting; `system` keeps it.
+ */
+[data-ch-type-pairing="editorial"] {
+  --ch-font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+[data-ch-type-pairing="modern"] {
+  --ch-font-display: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+[data-ch-type-pairing="humanist"] {
+  --ch-font-display: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-text: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+}
+[data-ch-type-pairing="technical"] {
+  --ch-font-display: "JetBrains Mono Variable", ui-monospace, monospace;
+  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-code: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+[data-ch-type-pairing="classic"] {
+  --ch-font-display: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  --ch-font-text: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+}
+[data-ch-type-pairing]:not([data-ch-type-pairing="system"]) .ch-body {
+  font-family: var(--ch-font-text);
+}
+[data-ch-type-pairing]:not([data-ch-type-pairing="system"]) .ch-body :is(h1, h2, h3, h4) {
+  font-family: var(--ch-font-display);
+}
+[data-ch-type-pairing="technical"] .ch-body :is(code, pre, kbd) {
+  font-family: var(--ch-font-code);
+}
+/* Headings without a lonely last word, paragraphs without orphans, where supported. */
+.ch-body :is(h1, h2, h3, h4) {
+  text-wrap: balance;
+}
+.ch-body :is(p, li, blockquote) {
+  text-wrap: pretty;
+}
+.ch-richtext a {
+  color: var(--ch-color-link);
+}

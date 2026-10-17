@@ -152,7 +152,7 @@ Per-package conventions:
 - `packages/cli`: `commands/<name>/` per command with a `{ name, help, run }` table in `cli.ts`.
 - `packages/astro-renderer`: `surfaces/render/<primitive>.ts` renderers keyed in a table.
 - `apps/studio`: see §8.
-- `starters/blog`: `src/styles/<feature>.css` per feature, imported by `global.css` (§8).
+- `starters/blog`: `src/styles/features/<feature>.css` per feature, imported by `global.css` (§8).
 
 ## 5. Dispatch tables, not giant switches
 
@@ -238,9 +238,13 @@ Studio (`apps/studio`):
   - moving route-specific groups out of the eager files (and loading only the active language) is
     a bundle improvement, done for the user's sake, not to meet a line count.
 
-CSS (`starters/blog`, themes): one file per feature (`styles/prose.css`, `styles/surfaces.css`,
-`styles/comments.css` …), imported in order by `global.css`, which keeps only tokens, `@layer`
-order and base. Same 400/800 limits.
+CSS (`starters/blog`, themes): one file per feature (`styles/features/prose.css`,
+`styles/features/surfaces.css`, `styles/features/comments.css` …), imported in cascade order by
+`global.css`, which keeps only the Tailwind import (its `source("..")` is relative to that file),
+`fonts.css` and the feature imports. CSS needs every `@import` before other rules, so tokens and
+`@theme` live in `features/tokens.css`. The features stay unlayered (`layer(...)` would let
+utilities beat component classes) and in order: later files override earlier ones at equal
+specificity. Same 400/800 limits.
 
 ## 9. Workflow
 

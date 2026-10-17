@@ -3,7 +3,7 @@
  * (`get_theme_settings` / `set_theme_settings`) and the generator may change about its look.
  * The site's values live in `Site.theme.config`, are checked against this schema, and reach the
  * page as CSS variables and `data-ch-*` attributes (`themeVariables` in `layouts/Base.astro`,
- * used by `styles/global.css`). Defaults keep the starter's look.
+ * used by `styles/features/*.css`). Defaults keep the starter's look.
  *
  * Keep this file data only, with type imports only (the CLI loads it on its own).
  */
