@@ -1,5 +1,5 @@
 # ADR-0034: Translation workflow — catalogs stay in the repo, ICU JSON exchange, Weblate self-hosted (or Tolgee), AI drafts reviewed by people
-- Status: Proposed (draft for the owner's decision; nothing implemented)
+- Status: Accepted (2026-10-18, by Halil, as recommended). The open questions below stay open for the owner: platform hosting, reviewers, visitor-facing strings.
 - Date: 2026-10-18
 - Related: `docs/reports/2026-10-studio-i18n-review.md` (Phase 4), ADR-0032 (ICU messages, compiled), DESIGN.md §1 ("Languages", "Adding a language"), the locale registry's `reviewed` flag
 - Sources:

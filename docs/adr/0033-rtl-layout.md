@@ -1,5 +1,5 @@
 # ADR-0033: Right-to-left Studio — logical properties, `dir` from the registry, a Kumo patch until upstream
-- Status: Proposed (draft for the owner's decision; nothing implemented)
+- Status: Accepted (2026-10-18, by Halil, as recommended). The open questions below stay open for the owner: the first RTL language and its numerals.
 - Date: 2026-10-18
 - Related: `docs/reports/2026-10-studio-i18n-review.md` (Phase 3), DESIGN.md §1 ("Languages", "Adding a language"), §2v "Kumo locale", ADR-0032, `docs/design/kumo-upstream-notes.md`
 - Sources:
