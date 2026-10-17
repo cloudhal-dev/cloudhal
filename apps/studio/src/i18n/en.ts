@@ -2795,6 +2795,24 @@ export const en = {
   },
 } as const;
 
+/**
+ * Declared forms (RFC-0032 §4c): for keys starting with a prefix, the call site passes these other
+ * forms of an argument English uses, so a translation can take the form its grammar needs. A role
+ * reads "Editors and above" in English (`{roles}`) but once, in the singular, in Turkish (`{role}`);
+ * a taxonomy's own labels are data, so `select` cannot list them. Each form becomes a required
+ * parameter of those keys (`generated/params.ts`), and only declared forms may replace an
+ * argument in a translation (`test/i18n.test.tsx`).
+ */
+export const forms: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  "gating.abilities.": { roles: ["role"] },
+  "taxonomy.": { plural: ["Plural", "singular"], singular: ["Singular"] },
+};
+
+/** The forms declared for `key`, by English argument. */
+export function formsOf(key: string): Readonly<Record<string, readonly string[]>> {
+  return Object.entries(forms).find(([prefix]) => key.startsWith(prefix))?.[1] ?? {};
+}
+
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 /** Catalog shape: same keys as `en`, any string values. */
 export type Messages = DeepString<typeof en>;

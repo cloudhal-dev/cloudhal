@@ -52,6 +52,16 @@ export function useTaxonomyData(siteId: string, enabled = true) {
   const defaultLocale = site.data?.defaultLocale ?? "en";
   const items = terms.data ?? [];
   const byId = new Map(items.map((i) => [i.term.id, i]));
+  /**
+   * A taxonomy's label in Studio's language: the site's own label in that language, else
+   * Studio's word for the default `category`/`tag`, else the site's label (custom taxonomies).
+   */
+  const label = (tax: Pick<Taxonomy, "labels" | "key">, form: "singular" | "plural" = "plural") =>
+    tax.labels[uiLocale]
+      ? taxonomyLabel(tax, [uiLocale], form)
+      : tax.key === "category" || tax.key === "tag"
+        ? t(`taxonomy.defaults.${tax.key}.${form}`)
+        : taxonomyLabel(tax, [uiLocale, defaultLocale, ...locales], form);
   return {
     site,
     taxonomies,
@@ -63,16 +73,12 @@ export function useTaxonomyData(siteId: string, enabled = true) {
     defaults: defaultTaxonomies(taxonomies.data ?? []),
     /** A term's name in the site's default locale. */
     name: (term: Pick<Term, "labels" | "slug">) => termLabel(term, defaultLocale, ...locales),
-    /**
-     * A taxonomy's label in Studio's language: the site's own label in that language, else
-     * Studio's word for the default `category`/`tag`, else the site's label (custom taxonomies).
-     */
-    label: (tax: Pick<Taxonomy, "labels" | "key">, form: "singular" | "plural" = "plural") =>
-      tax.labels[uiLocale]
-        ? taxonomyLabel(tax, [uiLocale], form)
-        : tax.key === "category" || tax.key === "tag"
-          ? t(`taxonomy.defaults.${tax.key}.${form}`)
-          : taxonomyLabel(tax, [uiLocale, defaultLocale, ...locales], form),
+    label,
+    /** The singular label's declared forms (`forms` in `en.ts`): lower-case in sentences, as is. */
+    singularForms: (tax: Pick<Taxonomy, "labels" | "key"> | undefined) => {
+      const Singular = tax ? label(tax, "singular") : "";
+      return { singular: Singular.toLocaleLowerCase(uiLocale), Singular };
+    },
     itemsOf: (tax: Pick<Taxonomy, "id"> | undefined): TermListItem[] =>
       tax ? items.filter((i) => i.term.taxonomyId === tax.id) : [],
     usage: (id: string): TermUsage => byId.get(id)?.usage ?? { total: 0, published: 0 },

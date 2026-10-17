@@ -3,7 +3,7 @@ import { type Compiled, isMessage } from "@cloudhal/messages/format";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { en } from "../src/i18n/en.ts";
+import { en, formsOf } from "../src/i18n/en.ts";
 import {
   fallbackChain,
   I18nProvider,
@@ -51,15 +51,6 @@ const leaves = (o: object) => flat(o).map(([k]) => k);
 const params = (message: Compiled) => new Set(argumentsOf(message).keys());
 
 /**
- * Placeholders the call sites always pass together, so a language may use the form its grammar
- * needs: Turkish names a role once (`{role}`) where English says "Editors and above" (`{roles}`),
- * and inflects a taxonomy's own name (`{singular}` where English has `{plural}`).
- */
-const ALTERNATES: readonly (readonly string[])[] = [
-  ["role", "roles"],
-  ["plural", "Plural", "singular", "Singular"],
-];
-/**
  * Messages whose translation leaves a placeholder out because the language cannot inflect it
  * (a Turkish case suffix on an arbitrary name). Every other message keeps every placeholder.
  */
@@ -71,7 +62,8 @@ const DROPPED: Partial<Record<Locale, readonly string[]>> = {
     "menus.delete.title",
   ],
 };
-const allowed = (name: string) => ALTERNATES.find((g) => g.includes(name)) ?? [name];
+/** An argument and the forms declared for it (`forms` in `en.ts`, RFC-0032 §4c): any may stand for it. */
+const allowed = (key: string, name: string) => [name, ...(formsOf(key)[name] ?? [])];
 
 /** What breaks between English and a translation: missing or extra keys, unknown placeholders. */
 function parity(english: object, other: object, locale: Locale): string[] {
@@ -86,11 +78,11 @@ function parity(english: object, other: object, locale: Locale): string[] {
     theirs.delete(key);
     const want = params(text);
     const got = params(translated);
-    const known = new Set([...want].flatMap(allowed));
+    const known = new Set([...want].flatMap((p) => allowed(key, p)));
     for (const p of got) if (!known.has(p)) problems.push(`${locale}: ${key} has unknown {${p}}`);
     const dropped = DROPPED[locale]?.includes(key);
     for (const p of want)
-      if (!dropped && !allowed(p).some((a) => got.has(a)))
+      if (!dropped && !allowed(key, p).some((a) => got.has(a)))
         problems.push(`${locale}: ${key} lost {${p}}`);
   }
   for (const key of theirs.keys()) problems.push(`${locale}: extra ${key}`);
@@ -99,6 +91,19 @@ function parity(english: object, other: object, locale: Locale): string[] {
 
 /** Sentences a language keeps in English on purpose (none so far). */
 const ENGLISH_LEFT: Partial<Record<Locale, number>> = {};
+
+describe("declared forms (RFC-0032 §4c)", () => {
+  it("let a translation take another form only where English declares it", () => {
+    expect(formsOf("gating.abilities.rollback")).toEqual({ roles: ["role"] });
+    expect(formsOf("editor.words")).toEqual({});
+    const english = { gating: { abilities: { x: "Only {roles} can" } }, editor: { y: "{roles}" } };
+    const turkish = { gating: { abilities: { x: "En az {role}" } }, editor: { y: "{role}" } };
+    expect(parity(english, turkish, "tr")).toEqual([
+      "tr: editor.y has unknown {role}",
+      "tr: editor.y lost {roles}",
+    ]);
+  });
+});
 
 describe("locales", () => {
   it("every registered language has its core catalog and every namespace, and nothing else does", () => {

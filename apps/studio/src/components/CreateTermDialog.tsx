@@ -3,7 +3,7 @@ import { Banner, Field, Input, InputGroup, LayerDialog, Switch, Text } from "@cl
 import { Warning } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
+import { type MessageKey, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import {
   type SlugError,
@@ -45,7 +45,6 @@ export function CreateTermDialog({
   onCreated?: (term: Term) => void;
 }) {
   const t = useT();
-  const { locale } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState("");
@@ -73,7 +72,7 @@ export function CreateTermDialog({
       : undefined;
   const slugError = validateSlug(effectiveSlug, terms);
   const similar = name.trim() ? similarTerms(terms, name, data.defaultLocale) : [];
-  const singular = tax ? data.label(tax, "singular").toLocaleLowerCase(locale) : "";
+  const forms = data.singularForms(tax);
   const create = useMutation({
     mutationFn: () =>
       api.terms.create(data.site.data?.id ?? (tax as Taxonomy).siteId, {
@@ -102,7 +101,7 @@ export function CreateTermDialog({
   return (
     <LayerDialog.Root open={open} onOpenChange={onOpenChange} dismissDisabled={create.isPending}>
       <LayerDialog.Content size="base" closeLabel={t("common.close")}>
-        <LayerDialog.Title>{t("taxonomy.create.title", { singular })}</LayerDialog.Title>
+        <LayerDialog.Title>{t("taxonomy.create.title", forms)}</LayerDialog.Title>
         <LayerDialog.Description>
           {tax?.hierarchical
             ? t("taxonomy.create.descriptionTree")
@@ -201,7 +200,7 @@ export function CreateTermDialog({
             onClick={submit}
             data-testid="create-submit"
           >
-            {t("taxonomy.create.submit", { singular })}
+            {t("taxonomy.create.submit", forms)}
           </LayerDialog.Actions.Primary>
         </LayerDialog.Actions>
       </LayerDialog.Content>

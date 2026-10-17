@@ -91,7 +91,7 @@
       "lines": 338
     },
     "apps/studio/src/components/CreateTermDialog.tsx::CreateTermDialog": {
-      "lines": 177
+      "lines": 176
     },
     "apps/studio/src/components/ElevateAgentKeyDialog.tsx::ElevateAgentKeyDialog": {
       "lines": 290
@@ -145,7 +145,7 @@
       "lines": 154
     },
     "apps/studio/src/components/TaxonomyHealthCard.tsx::TaxonomyHealthCard": {
-      "lines": 191
+      "lines": 189
     },
     "apps/studio/src/components/TaxonomySettingsDialog.tsx::TaxonomySettingsDialog": {
       "lines": 410
