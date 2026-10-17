@@ -10,7 +10,7 @@ import { Banner, BlockPropsForm, blockIcon, InputArea } from "@cloudhal/ui";
 import { WarningCircle } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
-import { useI18n } from "../i18n/index.tsx";
+import { keep, useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 
 export { blockIcon };
@@ -89,7 +89,7 @@ export function ComponentSectionForm({
       disabled={readOnly}
       enumLabel={values}
       labels={{
-        item: t("editor.blocks.item"),
+        item: t("editor.blocks.item", keep("n")),
         addItem: t("editor.blocks.addItem"),
         removeItem: t("editor.blocks.removeItem"),
         moveUp: t("editor.blocks.moveUp"),

@@ -73,6 +73,23 @@ describe("checkBundleBudget", () => {
     expect(problems.join("\n")).toContain("chunks/date-picker-abc.js");
   });
 
+  it("reports the message compiler in any chunk, lazy ones too (build-time only, RFC-0032)", () => {
+    const bundle = Object.fromEntries([
+      chunk("index.js", {
+        isEntry: true,
+        moduleIds: [
+          "/repo/packages/messages/src/format.ts",
+          "/repo/packages/messages/src/model.ts",
+        ],
+      }),
+      chunk("SettingsPage.js", { moduleIds: ["/repo/packages/messages/src/compile.ts"] }),
+    ]);
+    const { problems } = checkBundleBudget(bundle, budget);
+    expect(problems).toEqual([
+      "SettingsPage.js contains /repo/packages/messages/src/compile.ts (build-time only)",
+    ]);
+  });
+
   it("reports comment blocks in the initial load, but not the generic bulk action bar", () => {
     const bundle = Object.fromEntries([
       chunk("index.js", {

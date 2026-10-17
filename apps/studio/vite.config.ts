@@ -2,6 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { bundleBudget } from "./bundle-budget.ts";
+import { catalogs } from "./catalogs.ts";
 import { phosphorWeights } from "./phosphor-weights.ts";
 
 /**
@@ -16,7 +17,7 @@ const vendor = (pkgs: string) =>
   );
 
 export default defineConfig({
-  plugins: [phosphorWeights(), react(), tailwindcss(), bundleBudget()],
+  plugins: [catalogs(), phosphorWeights(), react(), tailwindcss(), bundleBudget()],
   server: {
     port: 5173,
     proxy: {

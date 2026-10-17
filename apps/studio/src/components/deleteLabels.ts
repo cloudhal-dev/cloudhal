@@ -1,5 +1,5 @@
 import type { DeleteResourceLabels } from "@cloudhal/ui";
-import { currentLocale, type TFunction } from "../i18n/index.tsx";
+import { currentLocale, keep, type TFunction } from "../i18n/index.tsx";
 import { apiErrorText } from "../lib/api-errors.ts";
 
 /**
@@ -15,11 +15,11 @@ export function deleteResourceProps(
 ): { labels: DeleteResourceLabels; errorMessage?: string } {
   const lower = type.toLocaleLowerCase(currentLocale());
   const labels: DeleteResourceLabels = {
-    title: t("common.deleteResource.title"),
-    warning: t("common.deleteResource.warning", { type: lower }),
-    typeToConfirm: t("common.deleteResource.typeToConfirm"),
-    copy: t("common.deleteResource.copy"),
-    confirmInput: t("common.deleteResource.confirmInput"),
+    title: t("common.deleteResource.title", keep("name")),
+    warning: t("common.deleteResource.warning", { type: lower, ...keep("name") }),
+    typeToConfirm: t("common.deleteResource.typeToConfirm", keep("name")),
+    copy: t("common.deleteResource.copy", keep("name")),
+    confirmInput: t("common.deleteResource.confirmInput", keep("name")),
     close: t("common.close"),
     cancel: t("common.cancel"),
     delete: options.action ?? t("common.deleteResource.delete", { type: lower }),

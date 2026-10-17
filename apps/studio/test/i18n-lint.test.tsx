@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { allFiles, format, lintFile } from "../scripts/design-lint.ts";
 import { ALLOWED, coversText, isWords, lintText } from "../scripts/i18n-lint.ts";
-import { I18nProvider, translate } from "../src/i18n/index.tsx";
+import { I18nProvider, type TFunction, translate } from "../src/i18n/index.tsx";
 import { ApiRequestError } from "../src/lib/api.ts";
 import { apiErrorText } from "../src/lib/api-errors.ts";
 
@@ -112,8 +112,8 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
 });
 
 describe("apiErrorText", () => {
-  const t = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) =>
-    translate("tr", key, params);
+  const t = ((key: Parameters<typeof translate>[1], params?: Record<string, string | number>) =>
+    translate("tr", key, params)) as TFunction;
   const fail = (status: number, error: string, message = "English from the server") =>
     new ApiRequestError(status, { error, message });
 

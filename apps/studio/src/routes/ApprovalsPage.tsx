@@ -48,7 +48,7 @@ import { useToast } from "../components/Toast.ts";
 import { useMe, useMemberRoles, useRoleRules, useSelf } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
-import { type TFunction, useI18n, useT, withMessages } from "../i18n/index.tsx";
+import { type MessageKey, type TFunction, useI18n, useT, withMessages } from "../i18n/index.tsx";
 import { autoCheckHeldBack, isManualModeRequest } from "../lib/agents.ts";
 import {
   type Approval,
@@ -148,7 +148,7 @@ function cannotDecideMessage(t: TFunction, error: unknown): string | undefined {
   const code = errorDetail(error, "code");
   const known = ["own_request", "not_key_creator", "mode_above_role", "missing_scope", "not_own"];
   return code && known.includes(code)
-    ? t(`approvals.decide.${code as "own_request"}`, { mode: "" })
+    ? t(`approvals.decide.${code}` as MessageKey, { mode: "" })
     : t("approvals.decide.missing_scope");
 }
 

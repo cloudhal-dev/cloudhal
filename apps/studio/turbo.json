@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "gen:ts": {
+      "inputs": [
+        "src/i18n/*.ts",
+        "src/i18n/lazy/**",
+        "scripts/i18n-types.ts",
+        "$TURBO_ROOT$/packages/messages/src/**"
+      ],
+      "outputs": ["src/i18n/generated/**"]
+    }
+  }
+}

@@ -149,7 +149,6 @@ export function TaxonomyHealthCard({
               label={t("taxonomy.health.missingPrimary", {
                 count: report.missingPrimary.length,
                 singular,
-                Singular,
               })}
               hint={t("taxonomy.health.missingPrimaryHint")}
             />
@@ -162,7 +161,7 @@ export function TaxonomyHealthCard({
                 singular,
                 Singular,
               })}
-              hint={t("taxonomy.health.unfiledHint", { singular })}
+              hint={t("taxonomy.health.unfiledHint")}
             />
           )}
           {report.noIntro.length > 0 && (

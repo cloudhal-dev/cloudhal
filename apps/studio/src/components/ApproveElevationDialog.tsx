@@ -66,6 +66,7 @@ export function ApproveElevationDialog({
   const mode: KeyMode = elevation?.mode ?? "edits";
   const agent = request ? (request.actor.name ?? request.actor.id) : "";
   const modeName = t(`agents.modes.names.${mode}`);
+  const ownName = ownMode ? t(`agents.modes.names.${ownMode}`) : "";
   const presets = grantPresets(requested, rules.elevation);
 
   const [preset, setPreset] = useState<Preset>(`${requested}`);
@@ -89,7 +90,7 @@ export function ApproveElevationDialog({
         ownMode
           ? t("approvals.elevation.doneDescription", {
               ...params,
-              from: t(`agents.modes.names.${ownMode}`),
+              from: ownName,
             })
           : t("approvals.elevation.doneDescriptionNoOwn", params),
       );
@@ -315,7 +316,7 @@ export function ApproveElevationDialog({
                               agent,
                               mode: modeName,
                               time: formatUntil(until, locale, { now }),
-                              from: t(`agents.modes.names.${ownMode}`),
+                              from: ownName,
                             })
                           : t("approvals.elevation.summaryNoOwn", {
                               agent,
