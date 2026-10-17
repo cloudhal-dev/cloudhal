@@ -191,25 +191,38 @@ const TONE_HERO: Record<string, HeroSurface> = { inverse: "inverse", brand: "bra
 /**
  * The loud surface a page opens with: its first section a generated surface whose root is (or
  * starts with, three levels deep at most) a `Band` painted `inverse`, `brand`, `accent` or
- * `gradient` (an old `tone` counts). Undefined otherwise.
+ * `gradient` (an old `tone` counts), or a hero `Carousel` whose slides all open with the same such
+ * band (RFC-0027 27e). Undefined otherwise.
  */
 export function heroSurface(page: Partial<Pick<Page, "sections">>): HeroSurface | undefined {
   const first = page.sections?.[0];
   if (!first || first.kind !== "surface") return undefined;
   const byId = new Map(first.components.map((c) => [c.id, c]));
-  let c = byId.get("root");
-  for (let depth = 0; c && depth < 3; depth++) {
+  const childIds = (c: (typeof first.components)[number]) =>
+    (Array.isArray(c.children) ? c.children : []).filter((k): k is string => typeof k === "string");
+  const walk = (id: string | undefined, depth: number): HeroSurface | undefined => {
+    const c = id === undefined ? undefined : byId.get(id);
+    if (!c || depth >= 3) return undefined;
     if (c.component === "Band") {
       const p = (c.props ?? {}) as Record<string, unknown>;
       if ((HERO_SURFACES as readonly unknown[]).includes(p.surface))
         return p.surface as HeroSurface;
       return p.surface === undefined && typeof p.tone === "string" ? TONE_HERO[p.tone] : undefined;
     }
-    const kids = c.children;
-    const firstChild = Array.isArray(kids) ? kids[0] : undefined;
-    c = typeof firstChild === "string" ? byId.get(firstChild) : undefined;
-  }
-  return undefined;
+    // RFC-0027 27e: a hero carousel counts when every slide opens with the same loud band (the
+    // header must read on whichever slide is showing).
+    if (
+      c.component === "Carousel" &&
+      (c.props as Record<string, unknown> | undefined)?.variant === "hero"
+    ) {
+      const each = childIds(c).map((k) => walk(k, depth + 1));
+      return each.length > 0 && each.every((x) => x !== undefined && x === each[0])
+        ? each[0]
+        : undefined;
+    }
+    return walk(childIds(c)[0], depth + 1);
+  };
+  return walk("root", 0);
 }
 
 /** The legal line with its only placeholders filled: `{year}` and `{site}`. */

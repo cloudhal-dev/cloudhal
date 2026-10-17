@@ -134,10 +134,28 @@ export const TOOL_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
   },
 ];
 
+/**
+ * RFC-0027 27e: carousels — when one is right, and the right variant. Run with
+ * `--briefs offers,logos`; the store's rules (slide counts, aspect, autoplay) apply.
+ */
+export const CAROUSEL_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
+  {
+    id: "offers",
+    brief:
+      "A bakery home page that opens with its three seasonal offers the reader can move between (spring tart, Easter bread, strawberry cake), each with a headline, a sentence and an order button, then opening hours and a short story of the bakery.",
+  },
+  {
+    id: "logos",
+    brief:
+      "A section showing the eight cafés that serve our coffee, by name, in a row the reader can scroll sideways, under a heading and one sentence.",
+  },
+];
+
 /** Every brief the eval knows, for `--briefs`. */
 export const ALL_EVAL_BRIEFS: readonly BuildEvalBrief[] = [
   ...BUILD_EVAL_BRIEFS,
   ...TOOL_EVAL_BRIEFS,
+  ...CAROUSEL_EVAL_BRIEFS,
 ];
 
 export interface BuildEvalRun {

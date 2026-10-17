@@ -930,11 +930,22 @@ export function primitiveHtml(
               )
               .join("")}</nav>`
           : "";
+      // RFC-0027 27d: a hero that plays on its own puts its rotation control first in Tab order;
+      // the module shows it only where motion may play, and swaps its words and icon.
+      const autoplay =
+        variant === "hero" && (p.autoplay === "slow" || p.autoplay === "normal")
+          ? str(p.autoplay)
+          : "";
+      const stopWord = tr ? "Slayt geçişini durdur" : "Stop slide rotation";
+      const startWord = tr ? "Slayt geçişini başlat" : "Start slide rotation";
+      const rotate = autoplay
+        ? `<button type="button" class="ch-carousel__rotate" data-ch-carousel="rotate" data-ch-pending data-state="playing" data-stop="${stopWord}" data-start="${startWord}" aria-label="${stopWord}"><span data-when="playing">${iconOf("pause", media)}</span><span data-when="stopped">${iconOf("play", media)}</span></button>`
+        : "";
       const bar =
         arrows || markers
           ? `<div class="ch-carousel__controls">${arrows ? arrow("prev") : ""}${markers}${arrows ? arrow("next") : ""}</div>`
           : "";
-      return `<section class="ch-carousel" id="${id}" data-variant="${variant}"${attr("per-view", p.perView === undefined ? undefined : String(p.perView), ["1", "2", "3", "4"])}${attr("item", p.itemWidth, ["s", "m", "l"])}${attr("peek", p.peek, ["none", "s", "m"])}${attr("align", p.align, ["start", "center"])}${attr("gap", p.gap, SPACE)}${attr("aspect", p.aspect, ["16:9", "21:9", "4:3", "1:1", "3:4"])} data-count="${n}" role="region" aria-roledescription="${tr ? "kaydırmalı alan" : "carousel"}" aria-label="${escapeHtml(str(p.label))}"><div class="ch-carousel__track" id="${id}-track" tabindex="0">${CHILDREN}</div>${bar}</section>`;
+      return `<section class="ch-carousel" id="${id}" data-variant="${variant}"${attr("per-view", p.perView === undefined ? undefined : String(p.perView), ["1", "2", "3", "4"])}${attr("item", p.itemWidth, ["s", "m", "l"])}${attr("peek", p.peek, ["none", "s", "m"])}${attr("align", p.align, ["start", "center"])}${attr("gap", p.gap, SPACE)}${attr("aspect", p.aspect, ["16:9", "21:9", "4:3", "1:1", "3:4"])}${variant === "hero" && p.loop === true ? " data-loop" : ""}${autoplay ? ` data-autoplay="${autoplay}"` : ""} data-count="${n}" role="region" aria-roledescription="${tr ? "kaydırmalı alan" : "carousel"}" aria-label="${escapeHtml(str(p.label))}">${rotate}<div class="ch-carousel__track" id="${id}-track" tabindex="0">${CHILDREN}</div>${bar}</section>`;
     }
     // RFC-0025 §3: overlays, closed until the reader opens them (top layer when open).
     case "Dialog":

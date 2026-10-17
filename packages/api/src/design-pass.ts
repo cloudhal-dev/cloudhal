@@ -150,7 +150,7 @@ export const DESIGN_RUBRIC = [
     question:
       "Does motion serve the page: entrances, a scroll story or a kinetic headline that guide the eye, and nothing that distracts? (RFC-0024; judge from the frames and the layout: scroll stories, marquees, counters and moving backgrounds show in them)",
     anchors: [
-      "distracting: several things loop or move at once, or text people read moves",
+      "distracting: several things loop or move at once, text people read moves, or a carousel rotates without a way to stop it",
       "still, or motion that adds little (one fade on everything)",
       "a few purposeful entrances and one signature moment (a scroll story, a kinetic headline or a moving hero background) that lead the eye",
     ],

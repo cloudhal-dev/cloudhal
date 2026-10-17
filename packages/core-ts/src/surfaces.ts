@@ -922,6 +922,9 @@ export const PRIMITIVES: readonly PrimitiveType[] = [
         aspect: { type: "string", enum: ["16:9", "21:9", "4:3", "1:1", "3:4"] },
         controls: { type: "string", enum: ["both", "arrows", "markers", "none"] },
         markers: { type: "string", enum: ["numbers", "dots", "thumbs"] },
+        // RFC-0027 27d: a hero only; autoplay off unless the site asks, and guarded.
+        loop: { type: "boolean" },
+        autoplay: { type: "string", enum: ["off", "slow", "normal"] },
       },
       ["label"],
     ),
@@ -2311,6 +2314,37 @@ export function checkSurface(surface: SurfaceSection, catalog: Catalog): Surface
         path: `${at}/props/aspect`,
         message: `a ${variant} carousel keeps one frame size: set aspect`,
       });
+    if (p.loop === true && variant !== "hero")
+      issues.push({
+        path: `${at}/props/loop`,
+        message: "only a hero loops; a rail keeps its ends",
+      });
+    if (p.autoplay !== undefined && p.autoplay !== "off") {
+      if (variant !== "hero")
+        issues.push({ path: `${at}/props/autoplay`, message: "only a hero may move on its own" });
+      else {
+        // Long enough to read every slide: about 3 words a second.
+        const seconds = p.autoplay === "slow" ? 8 : 6;
+        const words = (id: string, depth: number): number => {
+          const n = byId.get(id)?.c;
+          if (!n || depth > 6) return 0;
+          const own = ["text", "label", "value", "summary", "title"]
+            .map((k) =>
+              isObj(n.props) && typeof n.props[k] === "string" ? (n.props[k] as string) : "",
+            )
+            .join(" ")
+            .split(/\s+/)
+            .filter(Boolean).length;
+          return own + kidsOf(n).reduce((sum, k) => sum + words(k, depth + 1), 0);
+        };
+        const longest = Math.max(0, ...kids.map((k) => words(k, 0)));
+        if (longest > seconds * 3)
+          issues.push({
+            path: `${at}/props/autoplay`,
+            message: `a slide has ${longest} words; ${p.autoplay} (${seconds} s) suits ${seconds * 3} at most — shorten it, use slow, or turn autoplay off`,
+          });
+      }
+    }
     if (p.markers === "thumbs" && variant !== "gallery")
       issues.push({ path: `${at}/props/markers`, message: "thumbs only on a gallery" });
     if (variant === "gallery")
@@ -2414,6 +2448,20 @@ export function checkPageSurfaces(sections: readonly Section[], catalog: Catalog
     if (s.kind !== "surface") return;
     for (const issue of checkSurface(s, catalog).issues)
       out.push({ path: `/sections/${i}${issue.path}`, message: issue.message });
+  });
+  // RFC-0027 27d: one thing turning on its own per page, at most.
+  let playing = 0;
+  sections.forEach((s, i) => {
+    if (s.kind !== "surface") return;
+    s.components.forEach((c, j) => {
+      const auto = c.component === "Carousel" && isObj(c.props) ? c.props.autoplay : undefined;
+      if (auto === undefined || auto === "off") return;
+      if (++playing > 1)
+        out.push({
+          path: `/sections/${i}/components/${j}/props/autoplay`,
+          message: "one carousel per page may play on its own",
+        });
+    });
   });
   return out;
 }
@@ -3007,7 +3055,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     'Ambient backgrounds: Band (or Card, CSS kinds only) "ambient": {"kind":"aurora"|"gradient-shift"|"grain"|"beams"|"particles","preset":"dots"|"links"|"stars"|"snow"|"bubbles"|"fireflies" (particles only),"density":"low"|"medium"|"high","colors":"brand"|"accent"|"brand-accent"|"neutral","interactive":true}. One per section, best on the hero; text keeps its contrast, and readers who pause motion or ask for less see a still version.',
     'Page transitions: when the site\'s pageTransition is morph, give the same "morph" key (motion {"morph":"plan-pro"}) to an element on two pages, a card image and the article cover, a pricing card and its plan page heading, and it moves from one to the other as the reader navigates. One key per element on a page.',
     'Scroll story: a Scrolly holds one child that stays in view (a Chart, a Stat, an Image or a Stack of them), then 2–12 Step children with the text; the step being read (1, 2, …) is written to its "step" binding, so the first child changes with it: {"visible":{"eq":[{"path":"/step"},2]}} or {"call":"choose","args":{"value":{"path":"/step"},"cases":{"1":…,"2":…}}}. Put the starting step in the data ({"step":1}). ScrollProgress shows how far the reader is (placement page or section).',
-    "Carousel (RFC-0027): each child is a slide; give it a label naming what it shows. variant hero (2–5 full-width slides, aspect required, slide 1 matters most), rail (2–12 cards or logos, perView 1–4 or itemWidth, peek s so readers see there is more), gallery (up to 24 slides each with an Image, aspect required, markers thumbs) or testimonials (2–12 Quote slides, centred). Prefer a static hero (a Band); use a hero carousel only for 2–5 equally important messages; every slide's content must also be reachable elsewhere.",
+    "Carousel (RFC-0027): each child is a slide; give it a label naming what it shows. variant hero (2–5 full-width slides, aspect required, slide 1 matters most), rail (2–12 cards or logos, perView 1–4 or itemWidth, peek s so readers see there is more), gallery (up to 24 slides each with an Image, aspect required, markers thumbs) or testimonials (2–12 Quote slides, centred). Prefer a static hero (a Band); use a hero carousel only for 2–5 equally important messages; every slide's content must also be reachable elsewhere. A hero may loop; autoplay (slow 8 s, normal 6 s) stays off unless the owner asks — it then plays only where motion allows, stops for good when the reader touches it, and one per page.",
     `Icons (RFC-0026), by name only: an Icon component ({"name","size","tone","label" only when it stands alone}), "icon" on Button (with "iconPosition"), Badge and Stat, and List "marker". Interface: ${ICON_GROUPS.interface.join(", ")}. Actions: ${ICON_GROUPS.actions.join(", ")}. Content: ${ICON_GROUPS.content.join(", ")}. Social: ${ICON_GROUPS.social.join(", ")}. Icons decorate text; never use one as the only way to say something.`,
     'Overlays (Dialog, Drawer, Popover: at most 3 per section; and Lightbox) open only when the reader asks: a Button with "onClick":{"action":"open","target":"<overlay id>"}; a Button inside one with {"action":"close"} closes it. Never open one on load, on a timer or on leaving; content people read or link to belongs on a page. Dialog and Drawer need a title; give a Dialog a fallbackHref page when its content matters. A Tooltip ({"text","for":"<Button or Link id>"}) repeats what is on the page, never replaces it. A Lightbox shows images from items (asset and alt each).',
     "- Motion guides the eye: one entrance per section (a hero heading with rise and its buttons after it, a grid with stagger), hover on things people click, never on body text people are reading. The site's motion level and the reader's reduced-motion setting decide how much actually moves, and pages are complete without it.",

@@ -70,6 +70,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "carousel-label": "carousel names",
   "carousel-lcp": "carousel image loading",
   "carousel-focus": "carousel focus",
+  "carousel-autoplay": "carousel autoplay",
 };
 
 function summary(r: RenderPageResult): string {

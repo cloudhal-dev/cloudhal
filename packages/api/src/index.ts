@@ -31,6 +31,7 @@ export {
   type BuildEvalRun,
   type BuildEvalSummary,
   buildEvalTable,
+  CAROUSEL_EVAL_BRIEFS,
   type JudgeCheckRow,
   judgeCheck,
   judgeCheckTable,

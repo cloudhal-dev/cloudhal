@@ -7,6 +7,7 @@ import {
   calculateExpression,
   catalogPrompt,
   checkBodySurfaces,
+  checkPageSurfaces,
   checkSurface,
   createCatalog,
   evaluateCondition,
@@ -743,6 +744,59 @@ describe("carousels (RFC-0027)", () => {
     expect(
       messages(carousel({ label: "Kind words", variant: "testimonials", markers: "thumbs" }, 3)),
     ).toEqual(["/components/0/props/markers thumbs only on a gallery"]);
+  });
+
+  it("loops and plays only a hero, slowly enough to read every slide (27d)", () => {
+    expect(
+      messages(
+        carousel(
+          { label: "Spring", variant: "hero", aspect: "21:9", loop: true, autoplay: "slow" },
+          3,
+        ),
+      ),
+    ).toEqual([]);
+    expect(messages(carousel({ label: "Features", loop: true, autoplay: "normal" }, 3))).toEqual([
+      "/components/0/props/loop only a hero loops; a rail keeps its ends",
+      "/components/0/props/autoplay only a hero may move on its own",
+    ]);
+    const wordy = surface([
+      {
+        id: "root",
+        component: "Carousel",
+        props: { label: "Spring", variant: "hero", aspect: "21:9", autoplay: "normal" },
+        children: ["a", "b"],
+      },
+      { id: "a", component: "Text", props: { text: "word ".repeat(20).trim() } },
+      { id: "b", component: "Text", props: { text: "short" } },
+    ]);
+    expect(messages(wordy)).toEqual([
+      "/components/0/props/autoplay a slide has 20 words; normal (6 s) suits 18 at most — shorten it, use slow, or turn autoplay off",
+    ]);
+  });
+
+  it("lets one carousel per page play on its own", () => {
+    const hero = (id: string) => ({
+      id: `sec_${id}00001`,
+      kind: "surface" as const,
+      catalog: "blog@1",
+      components: [
+        {
+          id: "root",
+          component: "Carousel",
+          props: { label: "Spring", variant: "hero", aspect: "21:9", autoplay: "slow" },
+          children: ["a", "b"],
+        },
+        { id: "a", component: "Text", props: { text: "a" } },
+        { id: "b", component: "Text", props: { text: "b" } },
+      ],
+    });
+    expect(
+      checkPageSurfaces([hero("one"), hero("two")] as never, catalog).map(
+        (i) => `${i.path} ${i.message}`,
+      ),
+    ).toEqual([
+      "/sections/1/components/0/props/autoplay one carousel per page may play on its own",
+    ]);
   });
 
   it("never nests a carousel or takes an overlay as a slide", () => {

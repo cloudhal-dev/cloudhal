@@ -39,6 +39,27 @@ describe("heroSurface and the transparent header (RFC-0025 §2)", () => {
     expect(heroSurface({ sections: [tone] })).toBe("brand");
   });
 
+  it("reads a hero carousel only when every slide opens with the same loud band (RFC-0027 27e)", () => {
+    const carousel = (a: string, b: string) => ({
+      id: "sec_herocar0001",
+      kind: "surface" as const,
+      catalog: "blog@1",
+      components: [
+        {
+          id: "root",
+          component: "Carousel",
+          props: { label: "Spring", variant: "hero", aspect: "16:9" },
+          children: ["s1", "s2"],
+        },
+        { id: "s1", component: "Band", props: { surface: a }, children: [] },
+        { id: "s2", component: "Band", props: { surface: b }, children: [] },
+      ],
+    });
+    expect(heroSurface({ sections: [carousel("inverse", "inverse")] as never })).toBe("inverse");
+    expect(heroSurface({ sections: [carousel("inverse", "brand")] as never })).toBeUndefined();
+    expect(heroSurface({ sections: [carousel("inverse", "muted")] as never })).toBeUndefined();
+  });
+
   it("keeps the header solid where the page opens without a loud band", () => {
     const site = { chrome: { header: { overHero: "transparent" as const } } };
     expect(resolveChrome(site, { sections: [hero("muted")] }).header).toMatchObject({
