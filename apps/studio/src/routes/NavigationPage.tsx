@@ -779,11 +779,7 @@ export function NavigationPage() {
             <Banner
               variant="alert"
               icon={<EyeSlash weight="fill" />}
-              title={
-                hidden.length === 1
-                  ? t("menus.hidden.bannerOne")
-                  : t("menus.hidden.banner", { count: hidden.length })
-              }
+              title={t("menus.hidden.banner", { count: hidden.length })}
               description={t("menus.hidden.bannerDescription")}
               data-testid="hidden-banner"
             />
@@ -898,7 +894,7 @@ export function NavigationPage() {
                 items={Object.fromEntries(
                   Array.from({ length: limits.maxDepth }, (_, i) => [
                     String(i + 1),
-                    t(i === 0 ? "menus.depthOne" : "menus.depthMany", { count: i + 1 }),
+                    t("menus.depth", { count: i + 1 }),
                   ]),
                 )}
               />

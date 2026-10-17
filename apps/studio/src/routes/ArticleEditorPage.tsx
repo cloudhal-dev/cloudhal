@@ -456,8 +456,7 @@ export function ArticleEditorPage() {
               title={t("editor.bodyTitle")}
               actions={
                 <Text variant="secondary" size="sm" as="span">
-                  {t("editor.markdown")} ·{" "}
-                  {words === 1 ? t("editor.wordsOne") : t("editor.wordsOther", { count: words })}
+                  {t("editor.markdown")} · {t("editor.words", { count: words })}
                 </Text>
               }
             >

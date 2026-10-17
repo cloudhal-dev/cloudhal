@@ -207,9 +207,7 @@ export function ScheduleDialog({
       const closure =
         closureAdded.length === 0
           ? undefined
-          : closureAdded.length === 1
-            ? t(`${s}.closureAddedOne`)
-            : t(`${s}.closureAdded`, { count: closureAdded.length });
+          : t(`${s}.closureAdded`, { count: closureAdded.length });
       const waiting =
         result.status === "approval-pending" || result.release.state === "awaiting_approval";
       toast.notice({

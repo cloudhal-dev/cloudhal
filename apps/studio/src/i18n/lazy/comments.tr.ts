@@ -72,8 +72,7 @@ export const messages: NamespaceMessages<"comments"> = {
       removed: "Bu yorum kaldırıldı",
       edited: "Düzenlendi",
       noScript: "JavaScript'siz",
-      reports: "{count} bildirim",
-      reportsOne: "1 bildirim",
+      reports: "{count, number} bildirim",
       labels: "Etiketler",
       newTab: "yeni sekmede açılır",
       untrustedTitle: "Güvenilmeyen okur metni",
@@ -215,12 +214,11 @@ export const messages: NamespaceMessages<"comments"> = {
       },
     },
     dialog: {
-      hideTitle: "{count} yorumu gizle",
-      hideTitleOne: "Bu yorumu gizle",
+      hideTitle: "{count, plural, one {Bu yorumu gizle} other {# yorumu gizle}}",
       hideDescription:
         "Okurlar artık görmez. Sonra geri yükleyebilirsin; gerekçe, yorumun gerekçe beyanına yazılır.",
-      spamTitle: "{count} yorumu spam olarak işaretle",
-      spamTitleOne: "Bu yorumu spam olarak işaretle",
+      spamTitle:
+        "{count, plural, one {Bu yorumu spam olarak işaretle} other {# yorumu spam olarak işaretle}}",
       spamDescription:
         "Herkese açık sayfadan kalkar ve spam saklama süresi dolunca silinir. O zamana kadar geri yükleyebilirsin.",
       deleteTitle: "Bu yorumu sil",
@@ -235,8 +233,7 @@ export const messages: NamespaceMessages<"comments"> = {
       deleteConfirm: "Metni sil",
     },
     results: {
-      done: "{count} yorum {action}",
-      doneOne: "1 yorum {action}",
+      done: "{count, number} yorum {action}",
       partialTitle: "{total} yorumdan {done} tanesi {action}",
       partialDescription: "Diğerleri olduğu gibi bırakıldı:",
       errors: {
@@ -294,9 +291,8 @@ export const messages: NamespaceMessages<"comments"> = {
     },
     noAccessTitle: "Okur yorumlarını göremiyorsun",
     agentRequests: {
-      title: "{agent}, {count} yorumu onaylamak istiyor",
-      titleOne: "{agent}, 1 yorumu onaylamak istiyor",
-      titleMany: "Agent'lar {count} yorum isteği için seni bekliyor",
+      title: "{agent}, {count, number} yorumu onaylamak istiyor",
+      titleSeveral: "Agent'lar {count, number} yorum isteği için seni bekliyor",
       description:
         "Agent'lar kendi başlarına hiçbir zaman onaylamaz, geri yüklemez ya da yanıtlamaz. Yorumları oku, sonra karar ver.",
       review: "İncele",
@@ -318,8 +314,8 @@ export const messages: NamespaceMessages<"comments"> = {
       paused:
         "Durduruldu: bugünün sınırına ulaşıldı. Yeni yorumlar gece yarısına (UTC) kadar reddediliyor.",
       purging: "Canlı sayfa güncelleniyor",
-      purgingHint: "{count} sayfa önbelleğin yenilenmesini bekliyor; genellikle bir dakika içinde.",
-      purgingHintOne: "1 sayfa önbelleğin yenilenmesini bekliyor; genellikle bir dakika içinde.",
+      purgingHint:
+        "{count, number} sayfa önbelleğin yenilenmesini bekliyor; genellikle bir dakika içinde.",
       purgeNow: "Site önbelleğini temizle",
       purged: "Sitenin önbelleği temizlendi",
       purgeFailed: "Önbellek temizlenemedi",
@@ -334,8 +330,7 @@ export const messages: NamespaceMessages<"comments"> = {
       notFoundDescription: "Silinmiş olabilir ya da bağlantı yanlış.",
       listLabel: "{title} yazısındaki yorumlar",
       replies: "{name} adlı kişiye yanıtlar",
-      showMore: "{count} yanıt daha göster",
-      showMoreOne: "1 yanıt daha göster",
+      showMore: "{count, number} yanıt daha göster",
       showFewer: "Daha az yanıt göster",
       loadMore: "Daha fazla yorum yükle",
       calendar: {
@@ -512,10 +507,8 @@ export const messages: NamespaceMessages<"comments"> = {
       notOwn: "Başkasının yazısındaki yorumları yalnızca bir Editör değiştirebilir.",
     },
     approvals: {
-      approveTitle: "{count} yorumu onayla",
-      approveTitleOne: "1 yorumu onayla",
-      restoreTitle: "{count} yorumu geri yükle",
-      restoreTitleOne: "1 yorumu geri yükle",
+      approveTitle: "{count, number} yorumu onayla",
+      restoreTitle: "{count, number} yorumu geri yükle",
       moderateTitle: {
         hide: "{count} yorumu gizle",
         spam: "{count} yorumu spam olarak işaretle",
@@ -539,8 +532,7 @@ export const messages: NamespaceMessages<"comments"> = {
       threadTo: "{mode} olarak ayarla",
       closesAt: "{date} tarihinde kapanır",
       noClose: "Kapanış tarihi olmadan",
-      approveConfirm: "{count} yorumu onayla",
-      approveConfirmOne: "1 yorumu onayla",
+      approveConfirm: "{count, number} yorumu onayla",
       restoreConfirm: "{count} yorumu geri yükle",
       publishReply: "Yanıtı yayımla",
       openThread: "Yorum dizisini aç",

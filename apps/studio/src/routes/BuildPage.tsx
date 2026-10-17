@@ -91,18 +91,13 @@ export function BuildPage() {
   const summary = (e: BuildEntry): Pick<BuildActivityItem, "summary" | "details"> => {
     if (e.kind === "rejected")
       return {
-        summary:
-          e.issues.length === 1
-            ? t("build.activity.refusedOne")
-            : t("build.activity.refused", { count: e.issues.length }),
+        summary: t("build.activity.refused", { count: e.issues.length }),
         details: e.issues,
       };
     const changed =
       e.changed.length === 0
         ? t("build.activity.unchanged")
-        : e.changed.length === 1
-          ? t("build.activity.changedOne")
-          : t("build.activity.changed", { count: e.changed.length });
+        : t("build.activity.changed", { count: e.changed.length });
     const ops = e.ops ? ` · ${t("build.activity.operations", { count: e.ops })}` : "";
     return {
       summary: `${changed}${ops}`,

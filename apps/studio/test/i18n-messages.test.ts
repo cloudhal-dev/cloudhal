@@ -122,6 +122,11 @@ describe("message catalogs (RFC-0032 §5)", () => {
     expect(problems).toEqual([]);
   });
 
+  it("has no plurals by hand: no `…One`/`…Many` keys (RFC-0032 step b)", () => {
+    const byHand = [...messages("en").keys()].filter((k) => /(One|Many)$/.test(k));
+    expect(byHand).toEqual([]);
+  });
+
   it("knows the categories that make one/other wrong elsewhere", () => {
     const sorted = (l: string) => categories(l, false).sort();
     expect(sorted("en")).toEqual(["one", "other"]);

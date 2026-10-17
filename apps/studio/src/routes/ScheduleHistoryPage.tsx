@@ -391,7 +391,7 @@ export function ScheduleHistoryPage() {
         {runs.isSuccess && loaded.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Text variant="secondary" size="sm">
-              {rows.length === 1 ? t(`${h}.showingOne`) : t(`${h}.showing`, { count: rows.length })}
+              {t(`${h}.showing`, { count: rows.length })}
             </Text>
             {runs.hasNextPage ? (
               <Button

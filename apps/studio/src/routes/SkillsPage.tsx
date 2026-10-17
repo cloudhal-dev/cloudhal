@@ -89,7 +89,7 @@ function AddYourOwn() {
 
 function referencesLabel(t: TFunction, count: number) {
   if (count === 0) return t("skills.none");
-  return count === 1 ? t("skills.referenceOne") : t("skills.referenceCount", { count });
+  return t("skills.referenceCount", { count });
 }
 
 /** Account surface › Agents › Skills (DESIGN.md §2a list, §2l). */

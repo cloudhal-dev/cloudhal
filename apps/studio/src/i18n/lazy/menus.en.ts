@@ -9,8 +9,7 @@ export const messages = {
     places: { primary: "Header", footer: "Footer", sidebar: "Sidebar" },
     placeWithKey: "{place} ({key})",
     newMenu: "New menu",
-    depthOne: "1 level",
-    depthMany: "{count} levels",
+    depth: "{count, plural, one {# level} other {# levels}}",
     saved: "{name} saved",
     created: "{name} menu created",
     deleted: "{name} menu deleted",
@@ -101,8 +100,8 @@ export const messages = {
     },
     hidden: {
       badge: "Hidden: {reason}",
-      bannerOne: "1 item is hidden on your site",
-      banner: "{count} items are hidden on your site",
+      banner:
+        "{count, plural, one {# item is hidden on your site} other {# items are hidden on your site}}",
       bannerDescription:
         "Visitors don't see a hidden item or anything under it, so your menus never link to a page that's gone. Use Fix to point it somewhere else or remove it.",
       reasons: {
@@ -246,12 +245,12 @@ export const messages = {
     save: {
       button: "Save menu",
       title: "Save {name}",
-      summaryOne: "1 change · {before} → {after} items",
-      summary: "{count} changes · {before} → {after} items",
+      summary:
+        "{count, plural, one {# change · {before} → {after} items} other {# changes · {before} → {after} items}}",
       changes: "Changes",
       onlyDepth: "Only the number of levels changes.",
-      hiddenOne: "1 item stays hidden on your site",
-      hidden: "{count} items stay hidden on your site",
+      hidden:
+        "{count, plural, one {# item stays hidden on your site} other {# items stay hidden on your site}}",
       hiddenDescription:
         "You can save anyway: they show up on their own once their target is published.",
       confirm: "Save menu",
@@ -263,12 +262,11 @@ export const messages = {
       noArchive: "no archive",
       topLevel: "top level, position {position}",
       under: "under “{parent}”, position {position}",
-      withBelowOne: ", with 1 item below it",
-      withBelow: ", with {count} items below it",
+      withBelow: "{count, plural, one {, with # item below it} other {, with # items below it}}",
       add: "{label} → {where}, {place}{below}",
       remove: "{label} → {where}",
-      removeTreeOne: "{label} and 1 item below it",
-      removeTree: "{label} and {count} items below it",
+      removeTree:
+        "{count, plural, one {{label} and # item below it} other {{label} and # items below it}}",
       move: "{label}: position {from} → {to}",
       reparent: "{label} moved under “{parent}” (was under “{was}”)",
       reparentFromTop: "{label} moved under “{parent}” (was top level)",
@@ -420,13 +418,10 @@ export const messages = {
       open: "Open Navigation",
     },
     deleteNotice: {
-      titleOne: {
-        page: "A menu links to this page",
-        contentEntry: "A menu links to this article",
-      },
       title: {
-        page: "{count} menu items link to this page",
-        contentEntry: "{count} menu items link to this article",
+        page: "{count, plural, one {A menu links to this page} other {# menu items link to this page}}",
+        contentEntry:
+          "{count, plural, one {A menu links to this article} other {# menu items link to this article}}",
       },
       description:
         "After you delete it they stay in the menu, hidden on your site and flagged in Navigation until you fix them.",

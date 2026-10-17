@@ -20,8 +20,8 @@ export const messages: NamespaceMessages<"schedules"> = {
       automation: "Neue Automatisierung…",
     },
     attention: {
-      titleOne: "1 Zeitplan braucht Aufmerksamkeit",
-      title: "{count} Zeitpläne brauchen Aufmerksamkeit",
+      title:
+        "{count, plural, one {# Zeitplan braucht Aufmerksamkeit} other {# Zeitpläne brauchen Aufmerksamkeit}}",
       description:
         "Etwas wurde verpasst, ist fehlgeschlagen oder steht im Konflikt. Davon wurde nichts veröffentlicht.",
       review: "Prüfen",
@@ -191,10 +191,9 @@ export const messages: NamespaceMessages<"schedules"> = {
       agenda: {
         list: "Agenda",
         now: "Jetzt",
-        doneTodayOne: "1 heute erledigt",
-        doneToday: "{count} heute erledigt",
-        moreRunsOne: "1 weiterer Automatisierungslauf",
-        moreRuns: "{count} weitere Automatisierungsläufe",
+        doneToday: "{count, number} heute erledigt",
+        moreRuns:
+          "{count, plural, one {# weiterer Automatisierungslauf} other {# weitere Automatisierungsläufe}}",
         loadMore: "Mehr laden",
         loading: "Zeitpläne werden geladen",
         emptyTitle: "Diesen Monat ist nichts geplant",
@@ -208,14 +207,13 @@ export const messages: NamespaceMessages<"schedules"> = {
           "Pfeiltasten wechseln zwischen Tagen, Bild auf und Bild ab zwischen Monaten. Enter öffnet die Einträge eines Tages; Alt mit einer Pfeiltaste verschiebt den Eintrag auf einen anderen Tag; Escape kehrt zum Tag zurück.",
         today: "heute",
         noItems: "nichts geplant",
-        itemsOne: "1 Eintrag",
-        items: "{count} Einträge",
+        items: "{count, plural, one {# Eintrag} other {# Einträge}}",
         more: "+{count} weitere",
         emptyDay: "Nichts geplant",
       },
       moved: "„{title}“ auf {time} verschoben",
-      overlapOne: "1 Eintrag ist auch in einem anderen Release",
-      overlap: "{count} Einträge sind auch in anderen Releases",
+      overlap:
+        "{count, plural, one {# Eintrag ist auch in einem anderen Release} other {# Einträge sind auch in anderen Releases}}",
     },
     aside: {
       waiting: {
@@ -285,10 +283,8 @@ export const messages: NamespaceMessages<"schedules"> = {
       cancel: "Abbrechen",
       close: "Schließen",
       field: "Neuer Zeitpunkt",
-      clashOne:
-        "Ein anderes Release wird um {time} veröffentlicht. Releases in derselben Minute laufen nacheinander.",
       clash:
-        "{count} andere Releases werden um {time} veröffentlicht. Releases in derselben Minute laufen nacheinander.",
+        "{count, plural, one {Ein anderes Release wird um {time} veröffentlicht. Releases in derselben Minute laufen nacheinander.} other {# andere Releases werden um {time} veröffentlicht. Releases in derselben Minute laufen nacheinander.}}",
       moved: "Auf {time} verschoben",
       undo: "Rückgängig",
       undone: "Zurück auf {time} verschoben",
@@ -341,8 +337,8 @@ export const messages: NamespaceMessages<"schedules"> = {
       requested: "Wartet auf Freigabe",
       requestedDescription: "Jemand mit Veröffentlichungsrecht gibt es unter Freigaben frei.",
       openRelease: "Release öffnen",
-      closureAddedOne: "1 benötigter Eintrag wurde hinzugefügt.",
-      closureAdded: "{count} benötigte Einträge wurden hinzugefügt.",
+      closureAdded:
+        "{count, plural, one {# benötigter Eintrag wurde hinzugefügt.} other {# benötigte Einträge wurden hinzugefügt.}}",
       failed: "Konnte nicht geplant werden",
       errors: {
         nothing_to_publish: "Alles hier ist in dieser Version bereits live. Ändere zuerst etwas.",
@@ -352,8 +348,7 @@ export const messages: NamespaceMessages<"schedules"> = {
       },
     },
     release: {
-      untitledOne: "1 Eintrag",
-      untitled: "{count} Einträge",
+      untitled: "{count, plural, one {# Eintrag} other {# Einträge}}",
       publishes: "Wird veröffentlicht {time} · {zone}",
       published: "Veröffentlicht {time}",
       onApproval: "Wird veröffentlicht, sobald es freigegeben ist",
@@ -374,8 +369,8 @@ export const messages: NamespaceMessages<"schedules"> = {
         notLive: "Festgehaltene Version {pinned} · noch nicht live",
         removes: "Live-Version {live} wird entfernt",
         closure: "Hinzugefügt, weil ein anderer Eintrag es verwendet",
-        overlapOne: "Auch in einem anderen offenen Release",
-        overlap: "Auch in {count} anderen offenen Releases",
+        overlap:
+          "{count, plural, one {Auch in einem anderen offenen Release} other {Auch in # anderen offenen Releases}}",
         overlapHint:
           "Releases laufen in zeitlicher Reihenfolge; das spätere wird zum Konflikt, sofern es nicht nach dem ersten Lauf neu festgehalten wird.",
         locked: "Gesperrt",
@@ -668,12 +663,9 @@ export const messages: NamespaceMessages<"schedules"> = {
         lastDay: "Letzter Tag",
         interval: "Alle",
         frequency: "Einheit",
-        days: "Tage",
-        dayOne: "Tag",
-        weeks: "Wochen",
-        weekOne: "Woche",
-        months: "Monate",
-        monthOne: "Monat",
+        days: "{count, plural, one {Tag} other {Tage}}",
+        weeks: "{count, plural, one {Woche} other {Wochen}}",
+        months: "{count, plural, one {Monat} other {Monate}}",
         weekdays: "An diesen Tagen",
         monthlyOn: "Am",
         monthlyDay: "Tag des Monats",
@@ -811,8 +803,7 @@ export const messages: NamespaceMessages<"schedules"> = {
         title: "Keine passenden Läufe",
         description: "Setze die Filter zurück, um alle Läufe zu sehen.",
       },
-      showingOne: "1 Lauf wird angezeigt",
-      showing: "{count} Läufe werden angezeigt",
+      showing: "{count, plural, one {# Lauf wird angezeigt} other {# Läufe werden angezeigt}}",
       allShown: "Du hast den ersten Lauf erreicht",
       loadMore: "Mehr laden",
       forAutomation: "Läufe von {name}",
@@ -942,8 +933,7 @@ export const messages: NamespaceMessages<"schedules"> = {
       prompt: "Die Freigabe plant genau diese Versionen; jede Änderung fragt erneut.",
       at: "Wird veröffentlicht {time} · {zone}",
       onApproval: "Wird veröffentlicht, sobald es freigegeben ist",
-      itemsOne: "1 Eintrag",
-      items: "{count} Einträge",
+      items: "{count, plural, one {# Eintrag} other {# Einträge}}",
       open: "Release öffnen",
       loading: "Release wird geladen",
       missing: "Das Release existiert nicht mehr.",
@@ -967,8 +957,8 @@ export const messages: NamespaceMessages<"schedules"> = {
       },
       onTime: "pünktlich",
       conflict: {
-        titleOne: "„{title}“: 1 Eintrag seit der Freigabe geändert",
-        title: "„{title}“: {count} Einträge seit der Freigabe geändert",
+        title:
+          "{count, plural, one {„{title}“: # Eintrag seit der Freigabe geändert} other {„{title}“: # Einträge seit der Freigabe geändert}}",
         body: "Nichts wurde veröffentlicht. Halte es neu fest oder brich es ab.",
       },
       missed: {

@@ -59,17 +59,6 @@ type T = TFunction<"comments">;
 
 // ---- words for the blocks -------------------------------------------------------------------
 
-/** "1 report" / "3 reports": the `One` key for one, the plain key otherwise. */
-export function plural(
-  t: T,
-  key: Parameters<T>[0],
-  one: Parameters<T>[0],
-  count: number,
-  params: Record<string, string | number> = {},
-): string {
-  return count === 1 ? t(one, params) : t(key, { count, ...params });
-}
-
 /** The words every comment block shares (DESIGN.md §2w `CommentWords`), built once per screen. */
 export function commentWords(t: T): CommentWords {
   const w = "comments.words" as const;
@@ -133,7 +122,7 @@ export function commentWords(t: T): CommentWords {
     removed: t(`${w}.removed`),
     edited: t(`${w}.edited`),
     noScript: t(`${w}.noScript`),
-    reports: (count) => plural(t, `${w}.reports`, `${w}.reportsOne`, count),
+    reports: (count) => t(`${w}.reports`, { count }),
     labels: t(`${w}.labels`),
     newTab: t(`${w}.newTab`),
     untrusted: { title: t(`${w}.untrustedTitle`), description: t(`${w}.untrustedDescription`) },
@@ -236,8 +225,7 @@ export function threadLabels(t: T, title: string): CommentThreadLabels {
   return {
     thread: t("comments.thread.listLabel", { title }),
     replies: (name) => t("comments.thread.replies", { name }),
-    showMore: (count) =>
-      plural(t, "comments.thread.showMore", "comments.thread.showMoreOne", count),
+    showMore: (count) => t("comments.thread.showMore", { count }),
     showFewer: t("comments.thread.showFewer"),
     loading: t("comments.loading"),
   };
@@ -321,7 +309,7 @@ export function useModerateComments(
       const total = response.results.length;
       if (outcome.failed.length === 0) {
         toast.success(
-          plural(t, "comments.results.done", "comments.results.doneOne", total, { action }),
+          t("comments.results.done", { count: total, action }),
           response.purge === "queued" ? t("comments.results.purgeQueued") : undefined,
         );
       } else {
@@ -423,8 +411,8 @@ export function ModerateDialog({
     action === "delete"
       ? t("comments.dialog.deleteTitle")
       : action === "spam"
-        ? plural(t, "comments.dialog.spamTitle", "comments.dialog.spamTitleOne", count)
-        : plural(t, "comments.dialog.hideTitle", "comments.dialog.hideTitleOne", count);
+        ? t("comments.dialog.spamTitle", { count })
+        : t("comments.dialog.hideTitle", { count });
   const description = t(
     action === "delete"
       ? "comments.dialog.deleteDescription"

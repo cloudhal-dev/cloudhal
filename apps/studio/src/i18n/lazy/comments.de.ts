@@ -72,8 +72,7 @@ export const messages: NamespaceMessages<"comments"> = {
       removed: "Dieser Kommentar wurde entfernt",
       edited: "Bearbeitet",
       noScript: "Ohne JavaScript",
-      reports: "{count} Meldungen",
-      reportsOne: "1 Meldung",
+      reports: "{count, plural, one {# Meldung} other {# Meldungen}}",
       labels: "Labels",
       newTab: "öffnet in einem neuen Tab",
       untrustedTitle: "Nicht vertrauenswürdiger Lesertext",
@@ -215,12 +214,11 @@ export const messages: NamespaceMessages<"comments"> = {
       },
     },
     dialog: {
-      hideTitle: "{count} Kommentare verbergen",
-      hideTitleOne: "Diesen Kommentar verbergen",
+      hideTitle: "{count, plural, one {Diesen Kommentar verbergen} other {# Kommentare verbergen}}",
       hideDescription:
         "Leser sehen ihn nicht mehr. Du kannst ihn später wiederherstellen; der Grund kommt in seine Begründung.",
-      spamTitle: "{count} Kommentare als Spam markieren",
-      spamTitleOne: "Diesen Kommentar als Spam markieren",
+      spamTitle:
+        "{count, plural, one {Diesen Kommentar als Spam markieren} other {# Kommentare als Spam markieren}}",
       spamDescription:
         "Er verschwindet von der öffentlichen Seite und wird nach der Aufbewahrungsfrist für Spam gelöscht. Bis dahin kannst du ihn wiederherstellen.",
       deleteTitle: "Diesen Kommentar löschen",
@@ -235,8 +233,7 @@ export const messages: NamespaceMessages<"comments"> = {
       deleteConfirm: "Text löschen",
     },
     results: {
-      done: "{count} Kommentare {action}",
-      doneOne: "1 Kommentar {action}",
+      done: "{count, plural, one {# Kommentar {action}} other {# Kommentare {action}}}",
       partialTitle: "{done} von {total} Kommentaren {action}",
       partialDescription: "Die anderen blieben unverändert:",
       errors: {
@@ -294,9 +291,10 @@ export const messages: NamespaceMessages<"comments"> = {
     },
     noAccessTitle: "Du kannst keine Leserkommentare sehen",
     agentRequests: {
-      title: "{agent} bittet darum, {count} Kommentare freizugeben",
-      titleOne: "{agent} bittet darum, 1 Kommentar freizugeben",
-      titleMany: "Agents warten bei {count} Kommentaranfragen auf dich",
+      title:
+        "{count, plural, one {{agent} bittet darum, # Kommentar freizugeben} other {{agent} bittet darum, # Kommentare freizugeben}}",
+      titleSeveral:
+        "{count, plural, one {Agents warten bei # Kommentaranfrage auf dich} other {Agents warten bei # Kommentaranfragen auf dich}}",
       description:
         "Agents geben nie von selbst frei, stellen nie selbst wieder her und antworten nie selbst. Lies die Kommentare und entscheide dann.",
       review: "Prüfen",
@@ -320,9 +318,7 @@ export const messages: NamespaceMessages<"comments"> = {
         "Pausiert: Das heutige Limit ist erreicht. Neue Kommentare werden bis Mitternacht UTC abgelehnt.",
       purging: "Live-Seite wird aktualisiert",
       purgingHint:
-        "{count} Seiten warten darauf, dass der Cache aktualisiert wird, meist innerhalb einer Minute.",
-      purgingHintOne:
-        "1 Seite wartet darauf, dass der Cache aktualisiert wird, meist innerhalb einer Minute.",
+        "{count, plural, one {# Seite wartet darauf, dass der Cache aktualisiert wird, meist innerhalb einer Minute.} other {# Seiten warten darauf, dass der Cache aktualisiert wird, meist innerhalb einer Minute.}}",
       purgeNow: "Website-Cache leeren",
       purged: "Der Cache der Website wurde geleert",
       purgeFailed: "Der Cache konnte nicht geleert werden",
@@ -337,8 +333,8 @@ export const messages: NamespaceMessages<"comments"> = {
       notFoundDescription: "Er wurde möglicherweise gelöscht, oder der Link ist falsch.",
       listLabel: "Kommentare zu {title}",
       replies: "Antworten auf {name}",
-      showMore: "{count} weitere Antworten anzeigen",
-      showMoreOne: "1 weitere Antwort anzeigen",
+      showMore:
+        "{count, plural, one {# weitere Antwort anzeigen} other {# weitere Antworten anzeigen}}",
       showFewer: "Weniger Antworten anzeigen",
       loadMore: "Weitere Kommentare laden",
       calendar: {
@@ -521,10 +517,9 @@ export const messages: NamespaceMessages<"comments"> = {
       notOwn: "Nur ein Redakteur ändert Kommentare zum Artikel einer anderen Person.",
     },
     approvals: {
-      approveTitle: "{count} Kommentare freigeben",
-      approveTitleOne: "1 Kommentar freigeben",
-      restoreTitle: "{count} Kommentare wiederherstellen",
-      restoreTitleOne: "1 Kommentar wiederherstellen",
+      approveTitle: "{count, plural, one {# Kommentar freigeben} other {# Kommentare freigeben}}",
+      restoreTitle:
+        "{count, plural, one {# Kommentar wiederherstellen} other {# Kommentare wiederherstellen}}",
       moderateTitle: {
         hide: "{count} Kommentare verbergen",
         spam: "{count} Kommentare als Spam markieren",
@@ -548,8 +543,7 @@ export const messages: NamespaceMessages<"comments"> = {
       threadTo: "Auf {mode} gesetzt",
       closesAt: "Schließt am {date}",
       noClose: "Ohne Schließdatum",
-      approveConfirm: "{count} Kommentare freigeben",
-      approveConfirmOne: "1 Kommentar freigeben",
+      approveConfirm: "{count, plural, one {# Kommentar freigeben} other {# Kommentare freigeben}}",
       restoreConfirm: "{count} Kommentare wiederherstellen",
       publishReply: "Antwort veröffentlichen",
       openThread: "Thread öffnen",

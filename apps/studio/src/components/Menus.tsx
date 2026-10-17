@@ -268,11 +268,7 @@ export function MenuDeleteNotice({
       <Banner
         variant="alert"
         icon={<WarningCircle weight="fill" />}
-        title={
-          items.length === 1
-            ? t(`menus.deleteNotice.titleOne.${kind}`)
-            : t(`menus.deleteNotice.title.${kind}`, { count: items.length })
-        }
+        title={t(`menus.deleteNotice.title.${kind}`, { count: items.length })}
         description={`${items.join(" · ")}. ${t("menus.deleteNotice.description")}`}
       />
     </div>

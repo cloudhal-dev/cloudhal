@@ -159,7 +159,7 @@ function Proposal({
             </Text>
           ) : chosen.length === 0 ? (
             <Text variant="secondary" size="sm">
-              {t("proposals.chooseOne")}
+              {t("proposals.chooseRequired")}
             </Text>
           ) : diff ? (
             <BodyDiff diff={diff} labels={labels} />

@@ -560,11 +560,7 @@ export function UploadDialog({
             onClick={() => (pending ? void upload.start() : close(false))}
             data-testid="upload-primary"
           >
-            {pending
-              ? upload.ready === 1
-                ? t("media.upload.startOne")
-                : t("media.upload.start", { count: upload.ready })
-              : t("media.upload.done")}
+            {pending ? t("media.upload.start", { count: upload.ready }) : t("media.upload.done")}
           </LayerDialog.Actions.Primary>
         </LayerDialog.Actions>
       </LayerDialog.Content>

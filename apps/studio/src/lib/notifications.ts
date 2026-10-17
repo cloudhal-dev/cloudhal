@@ -213,20 +213,14 @@ export function commentNotice(
   switch (item.kind) {
     case "comments-pending":
       return {
-        title:
-          item.count === 1
-            ? t("notifications.comments.pending.titleOne")
-            : t("notifications.comments.pending.title", { count: n(item.count) }),
+        title: t("notifications.comments.pending.title", { count: item.count }),
         body: item.oldestAt
           ? t("notifications.comments.pending.body", { age: waitedFor(item.oldestAt, locale, now) })
           : t("notifications.comments.pending.bodyNew"),
       };
     case "comments-reported":
       return {
-        title:
-          item.count === 1
-            ? t("notifications.comments.reported.titleOne")
-            : t("notifications.comments.reported.title", { count: n(item.count) }),
+        title: t("notifications.comments.reported.title", { count: item.count }),
         body: t("notifications.comments.reported.body"),
       };
     case "comments-paused":

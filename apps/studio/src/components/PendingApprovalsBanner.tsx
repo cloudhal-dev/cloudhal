@@ -16,9 +16,7 @@ export function PendingApprovalsBanner({ siteId }: { siteId: string }) {
       <Banner
         variant="alert"
         icon={<HandPalm weight="fill" />}
-        title={
-          count === 1 ? t("approvals.banner.titleOne") : t("approvals.banner.title", { count })
-        }
+        title={t("approvals.banner.title", { count })}
         description={t("approvals.banner.description")}
         action={
           <Banner.Action

@@ -139,9 +139,7 @@ export function ReleaseItems({
                   {item.overlaps.length > 0 && (
                     <Tooltip content={t(`${r}.overlapHint`)}>
                       <Badge variant="warning" icon={<Warning />}>
-                        {item.overlaps.length === 1
-                          ? t(`${r}.overlapOne`)
-                          : t(`${r}.overlap`, { count: item.overlaps.length })}
+                        {t(`${r}.overlap`, { count: item.overlaps.length })}
                       </Badge>
                     </Tooltip>
                   )}

@@ -21,9 +21,7 @@ export function CommentsWaitingBanner({ siteId }: { siteId: string }) {
       <Banner
         variant="alert"
         icon={<ChatsCircle weight="fill" />}
-        title={
-          count === 1 ? t("overview.commentsWaitingOne") : t("overview.commentsWaiting", { count })
-        }
+        title={t("overview.commentsWaiting", { count })}
         description={t("overview.commentsWaitingDescription")}
         action={
           <Banner.Action

@@ -115,10 +115,7 @@ export function scheduleNotice(t: T, locale: string, item: ScheduleNotification)
       };
     case "schedule-conflict":
       return {
-        title:
-          (item.changed ?? 1) === 1
-            ? t(`${n}.conflict.titleOne`, { title })
-            : t(`${n}.conflict.title`, { title, count: item.changed ?? 1 }),
+        title: t(`${n}.conflict.title`, { title, count: item.changed ?? 1 }),
         body: t(`${n}.conflict.body`),
         tone: "warning",
         action: t(`${a}.resolve`),

@@ -16,10 +16,7 @@ export function useBodyDiffLabels(): BodyDiffLabels {
       added: t("diff.textChanges.added"),
       removed: t("diff.textChanges.removed"),
       changed: t("diff.textChanges.edited"),
-      unchanged: (count) =>
-        count === 1
-          ? t("diff.textChanges.unchangedOne")
-          : t("diff.textChanges.unchangedOther", { count }),
+      unchanged: (count) => t("diff.textChanges.unchanged", { count }),
       wordsAdded: (count) => t("diff.textChanges.wordsAdded", { count }),
       wordsRemoved: (count) => t("diff.textChanges.wordsRemoved", { count }),
       same: t("diff.textChanges.same"),

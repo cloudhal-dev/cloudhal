@@ -316,8 +316,6 @@ export function AutomationDialog({
       : t(`${d}.can.${form.modeCap}`);
   const occurrences = preview.data?.occurrences ?? [];
   const r = `${d}.recurrence` as const;
-  const unit = (one: string, many: string) => (n: number) =>
-    n === 1 ? t(one as never) : t(many as never);
 
   return (
     <LayerDialog.Root open={open} onOpenChange={onOpenChange} dismissDisabled={save.isPending}>
@@ -515,9 +513,9 @@ export function AutomationDialog({
                   interval: t(`${r}.interval`),
                   frequency: t(`${r}.frequency`),
                   frequencies: {
-                    daily: unit(`${r}.dayOne`, `${r}.days`),
-                    weekly: unit(`${r}.weekOne`, `${r}.weeks`),
-                    monthly: unit(`${r}.monthOne`, `${r}.months`),
+                    daily: (count) => t(`${r}.days`, { count }),
+                    weekly: (count) => t(`${r}.weeks`, { count }),
+                    monthly: (count) => t(`${r}.months`, { count }),
                   },
                   weekdays: t(`${r}.weekdays`),
                   monthlyOn: t(`${r}.monthlyOn`),

@@ -145,7 +145,7 @@ export function CreateMenuDialog({
               items={Object.fromEntries(
                 Array.from({ length: MENU_LIMITS.maxDepth }, (_, i) => [
                   String(i + 1),
-                  t(i === 0 ? "menus.depthOne" : "menus.depthMany", { count: i + 1 }),
+                  t("menus.depth", { count: i + 1 }),
                 ]),
               )}
             />

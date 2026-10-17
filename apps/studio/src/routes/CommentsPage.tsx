@@ -45,7 +45,6 @@ import {
   ConflictBanner,
   FailedBadge,
   ModerateDialog,
-  plural,
   type ReasonAction,
   rowData,
   useCommentWords,
@@ -258,12 +257,7 @@ function QueueAside({ siteId, t }: { siteId: string; t: T }) {
                     {t("comments.aside.purging")}
                   </Text>
                   <Text variant="secondary" size="sm" as="span">
-                    {plural(
-                      t,
-                      "comments.aside.purgingHint",
-                      "comments.aside.purgingHintOne",
-                      pendingPurges,
-                    )}
+                    {t("comments.aside.purgingHint", { count: pendingPurges })}
                   </Text>
                 </div>
                 {exportGate.allowed && (
@@ -511,7 +505,7 @@ export function CommentsPage() {
               title={
                 requests.length === 1
                   ? requestTitle(t, requests[0] as (typeof requests)[number])
-                  : t("comments.agentRequests.titleMany", { count: requests.length })
+                  : t("comments.agentRequests.titleSeveral", { count: requests.length })
               }
               description={t("comments.agentRequests.description")}
               action={
@@ -709,7 +703,5 @@ function requestTitle(t: T, request: { actor: { name?: string; id: string }; inp
   const agent = request.actor.name ?? request.actor.id;
   const ids = (request.input as { ids?: unknown } | undefined)?.ids;
   const count = Array.isArray(ids) ? ids.length : 1;
-  return plural(t, "comments.agentRequests.title", "comments.agentRequests.titleOne", count, {
-    agent,
-  });
+  return t("comments.agentRequests.title", { count, agent });
 }

@@ -6,8 +6,7 @@ export const messages: NamespaceMessages<"menus"> = {
     places: { primary: "Kopfzeile", footer: "Fußzeile", sidebar: "Seitenleiste" },
     placeWithKey: "{place} ({key})",
     newMenu: "Neues Menü",
-    depthOne: "1 Ebene",
-    depthMany: "{count} Ebenen",
+    depth: "{count, plural, one {# Ebene} other {# Ebenen}}",
     saved: "{name} gespeichert",
     created: "Menü {name} erstellt",
     deleted: "Menü {name} gelöscht",
@@ -100,8 +99,8 @@ export const messages: NamespaceMessages<"menus"> = {
     },
     hidden: {
       badge: "Ausgeblendet: {reason}",
-      bannerOne: "1 Eintrag ist auf deiner Website ausgeblendet",
-      banner: "{count} Einträge sind auf deiner Website ausgeblendet",
+      banner:
+        "{count, plural, one {# Eintrag ist auf deiner Website ausgeblendet} other {# Einträge sind auf deiner Website ausgeblendet}}",
       bannerDescription:
         "Besucher sehen weder einen ausgeblendeten Eintrag noch etwas darunter, deine Menüs verlinken also nie auf eine Seite, die es nicht mehr gibt. Nutze „Beheben“, um ihn auf ein anderes Ziel zu richten oder zu entfernen.",
       reasons: {
@@ -258,12 +257,12 @@ export const messages: NamespaceMessages<"menus"> = {
     save: {
       button: "Menü speichern",
       title: "{name} speichern",
-      summaryOne: "1 Änderung · {before} → {after} Einträge",
-      summary: "{count} Änderungen · {before} → {after} Einträge",
+      summary:
+        "{count, plural, one {# Änderung · {before} → {after} Einträge} other {# Änderungen · {before} → {after} Einträge}}",
       changes: "Änderungen",
       onlyDepth: "Nur die Anzahl der Ebenen ändert sich.",
-      hiddenOne: "1 Eintrag bleibt auf deiner Website ausgeblendet",
-      hidden: "{count} Einträge bleiben auf deiner Website ausgeblendet",
+      hidden:
+        "{count, plural, one {# Eintrag bleibt auf deiner Website ausgeblendet} other {# Einträge bleiben auf deiner Website ausgeblendet}}",
       hiddenDescription:
         "Du kannst trotzdem speichern: Sie erscheinen von selbst, sobald ihr Ziel veröffentlicht ist.",
       confirm: "Menü speichern",
@@ -275,12 +274,12 @@ export const messages: NamespaceMessages<"menus"> = {
       noArchive: "kein Archiv",
       topLevel: "oberste Ebene, Position {position}",
       under: "unter „{parent}“, Position {position}",
-      withBelowOne: ", mit 1 Eintrag darunter",
-      withBelow: ", mit {count} Einträgen darunter",
+      withBelow:
+        "{count, plural, one {, mit # Eintrag darunter} other {, mit # Einträgen darunter}}",
       add: "{label} → {where}, {place}{below}",
       remove: "{label} → {where}",
-      removeTreeOne: "{label} und 1 Eintrag darunter",
-      removeTree: "{label} und {count} Einträge darunter",
+      removeTree:
+        "{count, plural, one {{label} und # Eintrag darunter} other {{label} und # Einträge darunter}}",
       move: "{label}: Position {from} → {to}",
       reparent: "{label} unter „{parent}“ verschoben (war unter „{was}“)",
       reparentFromTop: "{label} unter „{parent}“ verschoben (war oberste Ebene)",
@@ -440,13 +439,10 @@ export const messages: NamespaceMessages<"menus"> = {
       open: "Navigation öffnen",
     },
     deleteNotice: {
-      titleOne: {
-        page: "Ein Menü verlinkt auf diese Seite",
-        contentEntry: "Ein Menü verlinkt auf diesen Artikel",
-      },
       title: {
-        page: "{count} Menüeinträge verlinken auf diese Seite",
-        contentEntry: "{count} Menüeinträge verlinken auf diesen Artikel",
+        page: "{count, plural, one {Ein Menü verlinkt auf diese Seite} other {# Menüeinträge verlinken auf diese Seite}}",
+        contentEntry:
+          "{count, plural, one {Ein Menü verlinkt auf diesen Artikel} other {# Menüeinträge verlinken auf diesen Artikel}}",
       },
       description:
         "Nach dem Löschen bleiben sie im Menü, auf deiner Website ausgeblendet und unter Navigation markiert, bis du sie behebst.",
