@@ -208,6 +208,8 @@ export const messages: NamespaceMessages<"schedules"> = {
         today: "heute",
         noItems: "nichts geplant",
         items: "{count, plural, one {# Eintrag} other {# Einträge}}",
+        kindCount:
+          "{kind, select, publish {{count, plural, one {# Veröffentlichung} other {# Veröffentlichungen}}} expiry {{count, plural, one {# Ablauf} other {# Abläufe}}} embargo {{count, plural, one {# Embargo} other {# Embargos}}} release {{count, plural, one {# Release} other {# Releases}}} automation {{count, plural, one {# Automatisierung} other {# Automatisierungen}}} other {{count, number}}}",
         more: "+{count} weitere",
         emptyDay: "Nichts geplant",
       },

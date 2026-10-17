@@ -20,7 +20,7 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
       .map((f) =>
         format(
           f,
-          lintFile(f).filter((v) => v.rule === "i18n"),
+          lintFile(f).filter((v) => v.rule.startsWith("i18n")),
         ),
       )
       .filter(Boolean);
@@ -82,6 +82,37 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
         );
       }`;
     expect(flagged(source)).toEqual([]);
+  });
+
+  it("finds plurals by hand (i18n-plural), not choices between states", () => {
+    const rules = (source: string) =>
+      lintText("apps/studio/src/components/X.tsx", source).map((v) => v.rule);
+    expect(rules('const a = n === 1 ? t("x.one") : t("x.many", { count: n });')).toEqual([
+      "i18n-plural",
+    ]);
+    expect(rules('const a = (items.length !== 1) ? t("x.many") : t("x.one");')).toEqual([
+      "i18n-plural",
+    ]);
+    expect(rules('const a = n > 0 ? t("x.some", { count: n }) : t("x.none");')).toEqual([]);
+    expect(rules('const a = n === 1 ? "" : t("x.many");')).toEqual([]);
+    expect(rules('const a = t("x.words", { count: n });')).toEqual([]);
+  });
+
+  it("finds sentences assembled from messages and comma-joined lists (i18n-concat)", () => {
+    const hits = (source: string) =>
+      lintText("apps/studio/src/components/X.tsx", source).map((v) => v.rule);
+    expect(hits('const a = `${t("a")} ${t("b")}`;')).toEqual(["i18n-concat"]);
+    expect(hits('const a = t("a") + ": " + x;')).toEqual(["i18n-concat"]);
+    expect(hits('const a = <p>{t("a")} {t("b")}</p>;')).toEqual(["i18n-concat"]);
+    expect(hits('const a = names.join(", ");')).toEqual(["i18n-concat"]);
+    expect(hits('const a = names.join("、");')).toEqual(["i18n-concat"]);
+    // One message with a value, protocol joins and visual separators are fine.
+    expect(hits('const a = `${t("a")} · ${count}`;')).toEqual([]);
+    expect(hits('const a = ids.join(","); const b = parts.join(" · ");')).toEqual([]);
+    expect(hits('const a = <p>{t("a")} <b>{name}</b></p>;')).toEqual([]);
+    expect(hits('const a = names.join(", "); // i18n-ignore: clauses of a spoken label')).toEqual(
+      [],
+    );
   });
 
   it("skips Kumo's variant tables and lines marked i18n-ignore", () => {

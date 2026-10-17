@@ -36,7 +36,10 @@ export const messages = {
       other: "Other files",
     },
     columns: { file: "File", type: "Type", size: "Size", usage: "Used in", added: "Added" },
-    usage: { none: "Unused", one: "Used in 1 place", many: "Used in {count} places" },
+    usage: {
+      none: "Unused",
+      used: "{count, plural, one {Used in # place} other {Used in # places}}",
+    },
     badges: {
       retired: "Retired",
       retiredHint:

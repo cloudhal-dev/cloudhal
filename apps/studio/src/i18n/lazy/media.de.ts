@@ -42,8 +42,7 @@ export const messages: NamespaceMessages<"media"> = {
     },
     usage: {
       none: "Unbenutzt",
-      one: "An 1 Stelle verwendet",
-      many: "An {count} Stellen verwendet",
+      used: "{count, plural, one {An # Stelle verwendet} other {An # Stellen verwendet}}",
     },
     badges: {
       retired: "Ausgemustert",

@@ -15,9 +15,10 @@
  * `i18n-ignore: <reason>` comment on the line or the line above (one literal, reviewed in the PR).
  */
 import { parseAst } from "vite";
+import { messageRuleHits } from "./i18n-message-rules.ts";
 
 export interface TextViolation {
-  rule: "i18n";
+  rule: "i18n" | "i18n-plural" | "i18n-concat";
   message: string;
   line: number;
   text: string;
@@ -245,6 +246,13 @@ export function lintText(file: string, source: string): TextViolation[] {
     }
   };
   visit(program, undefined, 0);
+  // RFC-0032 §5.5: plurals by hand, assembled sentences, comma-joined lists.
+  for (const hit of messageRuleHits(program)) {
+    const line = lineAt(hit.node.start);
+    if (ignored(line)) continue;
+    const text = source.slice(hit.node.start, hit.node.end).replace(/\s+/g, " ").slice(0, 60);
+    out.push({ rule: hit.rule, line, text, message: `${text} — ${hit.message}` });
+  }
   return out.sort((a, b) => a.line - b.line);
 }
 
