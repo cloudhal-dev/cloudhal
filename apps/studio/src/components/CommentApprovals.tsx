@@ -20,7 +20,7 @@ import {
   requestCommentIds,
 } from "../lib/comments.ts";
 import { isOwnEntry } from "../lib/roles.ts";
-import { plural, rowData, useCommentWords } from "./Comments.tsx";
+import { rowData, useCommentWords } from "./Comments.tsx";
 import { useMe, useSelf } from "./useMe.ts";
 
 /** "Approve 8 comments", "Publish a reply", "Open comments on an article". */
@@ -32,10 +32,8 @@ export function useCommentRequestTitle() {
     if (request.kind === "thread") return t(`${a}.threadTitle`);
     const n = request.ids.length;
     if (request.kind === "label") return t(`${a}.labelTitle`, { count: n });
-    if (request.action === "approve")
-      return plural(t, `${a}.approveTitle`, `${a}.approveTitleOne`, n);
-    if (request.action === "restore")
-      return plural(t, `${a}.restoreTitle`, `${a}.restoreTitleOne`, n);
+    if (request.action === "approve") return t(`${a}.approveTitle`, { count: n });
+    if (request.action === "restore") return t(`${a}.restoreTitle`, { count: n });
     return t(`${a}.moderateTitle.${request.action}`, { count: n });
   };
 }
@@ -50,7 +48,7 @@ function useConfirmLabel() {
     const n = request.ids.length;
     if (request.kind === "moderate" && request.action === "restore")
       return t(`${a}.restoreConfirm`, { count: n });
-    return plural(t, `${a}.approveConfirm`, `${a}.approveConfirmOne`, n);
+    return t(`${a}.approveConfirm`, { count: n });
   };
 }
 

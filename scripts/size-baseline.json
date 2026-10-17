@@ -6,8 +6,8 @@
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 811,
-    "apps/studio/src/routes/NavigationPage.tsx": 1181,
-    "apps/studio/src/routes/SchedulesPage.tsx": 1300,
+    "apps/studio/src/routes/NavigationPage.tsx": 1177,
+    "apps/studio/src/routes/SchedulesPage.tsx": 1294,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 914,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 853,
@@ -61,7 +61,7 @@
       "lines": 309
     },
     "apps/studio/src/components/AutomationDialog.tsx::AutomationDialog": {
-      "lines": 485
+      "lines": 483
     },
     "apps/studio/src/components/BodyEditor.tsx::BodyEditor": {
       "lines": 214
@@ -79,9 +79,6 @@
       "lines": 161
     },
     "apps/studio/src/components/Comments.tsx::CommentMenu>item": {
-      "params": 5
-    },
-    "apps/studio/src/components/Comments.tsx::plural": {
       "params": 5
     },
     "apps/studio/src/components/CommentSettings.tsx::CommentSettingsSection": {
@@ -130,10 +127,10 @@
       "lines": 222
     },
     "apps/studio/src/components/ScheduleDialog.tsx::ScheduleDialog": {
-      "lines": 344
+      "lines": 342
     },
     "apps/studio/src/components/Schedules.tsx::useMoveDialog": {
-      "lines": 178
+      "lines": 174
     },
     "apps/studio/src/components/ScheduleSettings.tsx::ScheduleSettingsSection": {
       "lines": 247
@@ -184,7 +181,7 @@
       "lines": 191
     },
     "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
-      "lines": 478
+      "lines": 477
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
       "lines": 370
@@ -202,7 +199,7 @@
       "lines": 167
     },
     "apps/studio/src/routes/BuildPage.tsx::BuildPage": {
-      "lines": 188
+      "lines": 183
     },
     "apps/studio/src/routes/CommenterPage.tsx::BanDialog": {
       "lines": 156
@@ -217,7 +214,7 @@
       "lines": 172
     },
     "apps/studio/src/routes/CommentsPage.tsx::QueueAside": {
-      "lines": 161
+      "lines": 156
     },
     "apps/studio/src/routes/CommentThreadPage.tsx::CommentThreadPage": {
       "lines": 427
@@ -235,7 +232,7 @@
       "lines": 233
     },
     "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
-      "lines": 1049
+      "lines": 1045
     },
     "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
       "lines": 173
@@ -256,10 +253,10 @@
       "lines": 151
     },
     "apps/studio/src/routes/SchedulesPage.tsx::SchedulesPage": {
-      "lines": 710
+      "lines": 704
     },
     "apps/studio/src/routes/SchedulesPage.tsx::SchedulesPage><anonymous>": {
-      "lines": 264
+      "lines": 258
     },
     "apps/studio/src/routes/SiteOverviewPage.tsx::SiteOverviewPage": {
       "lines": 239

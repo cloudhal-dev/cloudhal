@@ -23,8 +23,7 @@ export const messages = {
       automation: "New automation…",
     },
     attention: {
-      titleOne: "1 schedule needs attention",
-      title: "{count} schedules need attention",
+      title: "{count, plural, one {# schedule needs attention} other {# schedules need attention}}",
       description: "Something is missed, failed or in conflict. Nothing in it was published.",
       review: "Review",
     },
@@ -191,10 +190,8 @@ export const messages = {
       agenda: {
         list: "Agenda",
         now: "Now",
-        doneTodayOne: "1 done today",
-        doneToday: "{count} done today",
-        moreRunsOne: "1 more automation run",
-        moreRuns: "{count} more automation runs",
+        doneToday: "{count, number} done today",
+        moreRuns: "{count, plural, one {# more automation run} other {# more automation runs}}",
         loadMore: "Load more",
         loading: "Loading schedules",
         emptyTitle: "Nothing scheduled this month",
@@ -208,14 +205,13 @@ export const messages = {
           "Arrow keys move between days, Page Up and Page Down between months. Enter goes into a day's items; Alt with an arrow moves the item to another day; Escape returns to the day.",
         today: "today",
         noItems: "nothing scheduled",
-        itemsOne: "1 item",
-        items: "{count} items",
+        items: "{count, plural, one {# item} other {# items}}",
         more: "+{count} more",
         emptyDay: "Nothing scheduled",
       },
       moved: "“{title}” moved to {time}",
-      overlapOne: "1 item is in another release too",
-      overlap: "{count} items are in other releases too",
+      overlap:
+        "{count, plural, one {# item is in another release too} other {# items are in other releases too}}",
     },
     aside: {
       waiting: {
@@ -279,10 +275,8 @@ export const messages = {
       cancel: "Cancel",
       close: "Close",
       field: "New time",
-      clashOne:
-        "Another release publishes at {time}. Releases at the same minute run one after another.",
       clash:
-        "{count} other releases publish at {time}. Releases at the same minute run one after another.",
+        "{count, plural, one {Another release publishes at {time}. Releases at the same minute run one after another.} other {# other releases publish at {time}. Releases at the same minute run one after another.}}",
       moved: "Moved to {time}",
       undo: "Undo",
       undone: "Moved back to {time}",
@@ -334,8 +328,8 @@ export const messages = {
       requested: "Waiting for approval",
       requestedDescription: "Someone who may publish it approves it in Approvals.",
       openRelease: "Open release",
-      closureAddedOne: "1 item it needs was added.",
-      closureAdded: "{count} items it needs were added.",
+      closureAdded:
+        "{count, plural, one {# item it needs was added.} other {# items it needs were added.}}",
       failed: "Couldn't schedule it",
       errors: {
         nothing_to_publish:
@@ -345,8 +339,7 @@ export const messages = {
       },
     },
     release: {
-      untitledOne: "1 item",
-      untitled: "{count} items",
+      untitled: "{count, plural, one {# item} other {# items}}",
       publishes: "Publishes {time} · {zone}",
       published: "Published {time}",
       onApproval: "Publishes as soon as it's approved",
@@ -366,8 +359,8 @@ export const messages = {
         notLive: "Pinned version {pinned} · not live yet",
         removes: "Live version {live} is removed",
         closure: "Added because another item uses it",
-        overlapOne: "Also in another open release",
-        overlap: "Also in {count} other open releases",
+        overlap:
+          "{count, plural, one {Also in another open release} other {Also in # other open releases}}",
         overlapHint:
           "Releases run in time order; the later one will be a conflict unless it is re-pinned after the first runs.",
         locked: "Locked",
@@ -647,12 +640,9 @@ export const messages = {
         lastDay: "Last day",
         interval: "Every",
         frequency: "Unit",
-        days: "days",
-        dayOne: "day",
-        weeks: "weeks",
-        weekOne: "week",
-        months: "months",
-        monthOne: "month",
+        days: "{count, plural, one {day} other {days}}",
+        weeks: "{count, plural, one {week} other {weeks}}",
+        months: "{count, plural, one {month} other {months}}",
         weekdays: "On these days",
         monthlyOn: "On",
         monthlyDay: "Day of the month",
@@ -774,8 +764,7 @@ export const messages = {
         title: "No runs match",
         description: "Clear the filters to see every run.",
       },
-      showingOne: "Showing 1 run",
-      showing: "Showing {count} runs",
+      showing: "{count, plural, one {Showing # run} other {Showing # runs}}",
       allShown: "You've reached the first run",
       loadMore: "Load more",
       forAutomation: "Runs of {name}",
@@ -900,8 +889,7 @@ export const messages = {
       prompt: "Approving schedules exactly these versions; any change asks again.",
       at: "Publishes {time} · {zone}",
       onApproval: "Publishes as soon as it's approved",
-      itemsOne: "1 item",
-      items: "{count} items",
+      items: "{count, plural, one {# item} other {# items}}",
       open: "Open release",
       loading: "Loading the release",
       missing: "The release is gone.",
@@ -919,8 +907,8 @@ export const messages = {
       published: { title: "“{title}” was published", body: "Published at {time}, {late}." },
       onTime: "on time",
       conflict: {
-        titleOne: "“{title}”: 1 item changed since approval",
-        title: "“{title}”: {count} items changed since approval",
+        title:
+          "{count, plural, one {“{title}”: # item changed since approval} other {“{title}”: # items changed since approval}}",
         body: "Nothing was published. Re-pin it or cancel it.",
       },
       missed: {

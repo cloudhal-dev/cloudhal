@@ -51,19 +51,12 @@ export function useDeltaText(taxonomyName: (key: string) => string) {
         const place = line.parent
           ? t("menus.delta.under", { parent: line.parent, position: line.position })
           : t("menus.delta.topLevel", { position: line.position });
-        const below =
-          line.below === 0
-            ? ""
-            : line.below === 1
-              ? t("menus.delta.withBelowOne")
-              : t("menus.delta.withBelow", { count: line.below });
+        const below = line.below === 0 ? "" : t("menus.delta.withBelow", { count: line.below });
         return t("menus.delta.add", { label, where: where(line.target), place, below });
       }
       case "−":
         return line.below > 0
-          ? line.below === 1
-            ? t("menus.delta.removeTreeOne", { label })
-            : t("menus.delta.removeTree", { label, count: line.below })
+          ? t("menus.delta.removeTree", { label, count: line.below })
           : t("menus.delta.remove", { label, where: where(line.target) });
       case "↕":
         return t("menus.delta.move", { label, from: line.from, to: line.to });
@@ -128,16 +121,11 @@ export function MenuSaveDialog({
       <LayerDialog.Content size="lg" closeLabel={t("common.close")}>
         <LayerDialog.Title>{t("menus.save.title", { name: title })}</LayerDialog.Title>
         <LayerDialog.Description>
-          {changes === 1
-            ? t("menus.save.summaryOne", {
-                before: delta?.before ?? 0,
-                after: delta?.after ?? 0,
-              })
-            : t("menus.save.summary", {
-                count: changes,
-                before: delta?.before ?? 0,
-                after: delta?.after ?? 0,
-              })}
+          {t("menus.save.summary", {
+            count: changes,
+            before: delta?.before ?? 0,
+            after: delta?.after ?? 0,
+          })}
         </LayerDialog.Description>
         <LayerDialog.Body>
           <div className="grid gap-4" data-testid="menu-save-dialog">
@@ -177,11 +165,7 @@ export function MenuSaveDialog({
                 variant="alert"
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
-                title={
-                  hidden === 1
-                    ? t("menus.save.hiddenOne")
-                    : t("menus.save.hidden", { count: hidden })
-                }
+                title={t("menus.save.hidden", { count: hidden })}
                 description={t("menus.save.hiddenDescription")}
               />
             )}

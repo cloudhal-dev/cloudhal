@@ -64,11 +64,7 @@ export function ReleaseRequestDetails({ siteId, request }: { siteId: string; req
             <Text bold as="span">
               {r.title ?? itemsLabel(t, r.items.length)}
             </Text>
-            <Badge variant="outline">
-              {r.items.length === 1
-                ? t(`${a}.itemsOne`)
-                : t(`${a}.items`, { count: r.items.length })}
-            </Badge>
+            <Badge variant="outline">{t(`${a}.items`, { count: r.items.length })}</Badge>
           </span>
           <Text>
             {r.when?.kind === "on-approval" || !at

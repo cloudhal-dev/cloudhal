@@ -6,8 +6,7 @@ export const messages: NamespaceMessages<"menus"> = {
     places: { primary: "Üst menü", footer: "Alt menü", sidebar: "Kenar menüsü" },
     placeWithKey: "{place} ({key})",
     newMenu: "Yeni menü",
-    depthOne: "1 seviye",
-    depthMany: "{count} seviye",
+    depth: "{count, number} seviye",
     saved: "{name} kaydedildi",
     created: "{name} oluşturuldu",
     deleted: "{name} silindi",
@@ -98,8 +97,7 @@ export const messages: NamespaceMessages<"menus"> = {
     },
     hidden: {
       badge: "Gizli: {reason}",
-      bannerOne: "1 öğe sitende görünmüyor",
-      banner: "{count} öğe sitende görünmüyor",
+      banner: "{count, number} öğe sitende görünmüyor",
       bannerDescription:
         "Ziyaretçiler gizli bir öğeyi ve altındakileri görmez; böylece menülerin kaybolmuş bir sayfaya asla bağlantı vermez. Başka bir hedef seçmek ya da kaldırmak için Düzelt'i kullan.",
       reasons: {
@@ -250,12 +248,10 @@ export const messages: NamespaceMessages<"menus"> = {
     save: {
       button: "Menüyü kaydet",
       title: "{name} kaydedilsin mi?",
-      summaryOne: "1 değişiklik · {before} → {after} öğe",
-      summary: "{count} değişiklik · {before} → {after} öğe",
+      summary: "{count, number} değişiklik · {before} → {after} öğe",
       changes: "Değişiklikler",
       onlyDepth: "Yalnızca seviye sayısı değişiyor.",
-      hiddenOne: "1 öğe sitende gizli kalacak",
-      hidden: "{count} öğe sitende gizli kalacak",
+      hidden: "{count, number} öğe sitende gizli kalacak",
       hiddenDescription:
         "Yine de kaydedebilirsin: hedefleri yayınlandığında kendiliğinden görünürler.",
       confirm: "Menüyü kaydet",
@@ -267,12 +263,10 @@ export const messages: NamespaceMessages<"menus"> = {
       noArchive: "arşiv yok",
       topLevel: "en üst seviye, {position}. sıra",
       under: "“{parent}” altında, {position}. sıra",
-      withBelowOne: ", altında 1 öğeyle",
-      withBelow: ", altında {count} öğeyle",
+      withBelow: ", altında {count, number} öğeyle",
       add: "{label} → {where}, {place}{below}",
       remove: "{label} → {where}",
-      removeTreeOne: "{label} ve altındaki 1 öğe",
-      removeTree: "{label} ve altındaki {count} öğe",
+      removeTree: "{label} ve altındaki {count, number} öğe",
       move: "{label}: {from}. sıradan {to}. sıraya",
       reparent: "{label}, “{parent}” altına taşındı (önceden “{was}” altındaydı)",
       reparentFromTop: "{label}, “{parent}” altına taşındı (önceden en üst seviyedeydi)",
@@ -427,13 +421,10 @@ export const messages: NamespaceMessages<"menus"> = {
       open: "Menüler'i aç",
     },
     deleteNotice: {
-      titleOne: {
-        page: "Bir menü bu sayfaya bağlanıyor",
-        contentEntry: "Bir menü bu makaleye bağlanıyor",
-      },
       title: {
-        page: "{count} menü öğesi bu sayfaya bağlanıyor",
-        contentEntry: "{count} menü öğesi bu makaleye bağlanıyor",
+        page: "{count, plural, one {Bir menü bu sayfaya bağlanıyor} other {# menü öğesi bu sayfaya bağlanıyor}}",
+        contentEntry:
+          "{count, plural, one {Bir menü bu makaleye bağlanıyor} other {# menü öğesi bu makaleye bağlanıyor}}",
       },
       description:
         "Sildikten sonra menüde kalırlar; sen düzeltene kadar sitende gizlenir ve Menüler ekranında işaretlenirler.",

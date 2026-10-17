@@ -213,8 +213,7 @@ export const messages: Messages = {
     newSchedule: "Veröffentlichung planen…",
   },
   overview: {
-    commentsWaiting: "{count} Kommentare warten",
-    commentsWaitingOne: "1 Kommentar wartet",
+    commentsWaiting: "{count, plural, one {# Kommentar wartet} other {# Kommentare warten}}",
     commentsWaitingDescription: "Leser sehen sie erst, wenn jemand sie freigibt.",
     liveSnapshotLabel: "Live-Snapshot",
     liveSnapshot: "Live-Snapshot {id}",
@@ -436,8 +435,7 @@ export const messages: Messages = {
     },
     bodyTitle: "Text",
     markdown: "Markdown",
-    wordsOne: "1 Wort",
-    wordsOther: "{count} Wörter",
+    words: "{count, plural, one {# Wort} other {# Wörter}}",
     id: "ID",
     revision: "Revision",
     locale: "Sprache",
@@ -878,8 +876,8 @@ export const messages: Messages = {
       ended: "Erhöhung beendet",
       endedDescription: "{name} ist wieder im Modus {mode}.",
       endFailed: "Die Erhöhung konnte nicht beendet werden",
-      bannerTitleOne: "1 Agent-Schlüssel ist erhöht",
-      bannerTitleOther: "{count} Agent-Schlüssel sind erhöht",
+      bannerTitle:
+        "{count, plural, one {# Agent-Schlüssel ist erhöht} other {# Agent-Schlüssel sind erhöht}}",
       bannerItem: "{name}: {from} → {to} bis {time}",
       endNow: "Jetzt beenden",
       endAll: "Alle jetzt beenden",
@@ -1338,8 +1336,7 @@ export const messages: Messages = {
       resource: "Ressource",
     },
     none: "Keine",
-    referenceCount: "{count} Dateien",
-    referenceOne: "1 Datei",
+    referenceCount: "{count, plural, one {# Datei} other {# Dateien}}",
     empty: "Keine Skills geladen",
     emptyDescription:
       "Lege in deinem Projekt unter skills/ einen Ordner mit einer SKILL.md an und starte Studio dann neu.",
@@ -1409,14 +1406,14 @@ export const messages: Messages = {
     },
     comments: {
       pending: {
-        title: "{count} Kommentare warten auf Moderation",
-        titleOne: "1 Kommentar wartet auf Moderation",
+        title:
+          "{count, plural, one {# Kommentar wartet auf Moderation} other {# Kommentare warten auf Moderation}}",
         body: "Der älteste wartet seit {age}.",
         bodyNew: "Niemand sieht sie, bis jemand sie freigibt.",
       },
       reported: {
-        title: "{count} Kommentare wurden gemeldet",
-        titleOne: "1 Kommentar wurde gemeldet",
+        title:
+          "{count, plural, one {# Kommentar wurde gemeldet} other {# Kommentare wurden gemeldet}}",
         body: "Leser haben sie markiert. Eine Meldung verbirgt nie von selbst etwas.",
       },
       paused: {
@@ -1612,8 +1609,8 @@ export const messages: Messages = {
       submit: "Freigeben",
     },
     banner: {
-      title: "{count} Agent-Anfragen warten auf deine Freigabe",
-      titleOne: "Eine Agent-Anfrage wartet auf deine Freigabe",
+      title:
+        "{count, plural, one {Eine Agent-Anfrage wartet auf deine Freigabe} other {# Agent-Anfragen warten auf deine Freigabe}}",
       description:
         "Agents können nicht veröffentlichen, zurücksetzen oder löschen, und Agents im manuellen Modus können nichts ändern, bis eine Person entscheidet.",
       action: "Anfragen prüfen",
@@ -1742,7 +1739,7 @@ export const messages: Messages = {
     failed: "Über den Vorschlag konnte nicht entschieden werden",
     steps: "Anzunehmende Änderungen",
     acceptSome: "{count} von {total} annehmen",
-    chooseOne: "Wähle mindestens eine Änderung aus.",
+    chooseRequired: "Wähle mindestens eine Änderung aus.",
     step: {
       replace: "„{before}“ umschreiben",
       replaceText: "„{before}“ zu „{after}“ ändern",
@@ -1805,8 +1802,7 @@ export const messages: Messages = {
       added: "Hinzugefügt",
       removed: "Entfernt",
       edited: "Bearbeitet",
-      unchangedOne: "1 unveränderter Block",
-      unchangedOther: "{count} unveränderte Blöcke",
+      unchanged: "{count, plural, one {# unveränderter Block} other {# unveränderte Blöcke}}",
       wordsAdded: "+{count} Wörter",
       wordsRemoved: "−{count} Wörter",
       same: "Keine Textänderungen",

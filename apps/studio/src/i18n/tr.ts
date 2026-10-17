@@ -204,8 +204,7 @@ export const messages: Messages = {
     newSchedule: "Yayın zamanla…",
   },
   overview: {
-    commentsWaiting: "{count} yorum onay bekliyor",
-    commentsWaitingOne: "1 yorum onay bekliyor",
+    commentsWaiting: "{count, number} yorum onay bekliyor",
     commentsWaitingDescription: "Biri onaylayana kadar okurlar bu yorumları görmez.",
     liveSnapshotLabel: "Canlı snapshot",
     liveSnapshot: "Canlı snapshot {id}",
@@ -413,8 +412,7 @@ export const messages: Messages = {
     },
     bodyTitle: "Gövde",
     markdown: "Markdown",
-    wordsOne: "1 kelime",
-    wordsOther: "{count} kelime",
+    words: "{count, number} kelime",
     id: "Kimlik",
     revision: "Revizyon",
     locale: "Dil",
@@ -848,8 +846,7 @@ export const messages: Messages = {
       ended: "Yükseltme bitti",
       endedDescription: "{name} yeniden {mode} modunda çalışıyor.",
       endFailed: "Yükseltme bitirilemedi",
-      bannerTitleOne: "1 agent anahtarı yükseltilmiş durumda",
-      bannerTitleOther: "{count} agent anahtarı yükseltilmiş durumda",
+      bannerTitle: "{count, number} agent anahtarı yükseltilmiş durumda",
       bannerItem: "{name}: {from} → {to}, bitiş {time}",
       endNow: "Şimdi bitir",
       endAll: "Hepsini şimdi bitir",
@@ -1298,8 +1295,7 @@ export const messages: Messages = {
       resource: "Kaynak kimliği",
     },
     none: "Yok",
-    referenceCount: "{count} dosya",
-    referenceOne: "1 dosya",
+    referenceCount: "{count, number} dosya",
     empty: "Yüklü skill yok",
     emptyDescription:
       "Projendeki skills/ klasörüne SKILL.md içeren bir klasör ekle, sonra Studio'yu yeniden başlat.",
@@ -1369,14 +1365,12 @@ export const messages: Messages = {
     },
     comments: {
       pending: {
-        title: "{count} yorum onay bekliyor",
-        titleOne: "1 yorum onay bekliyor",
+        title: "{count, number} yorum onay bekliyor",
         body: "En eskisi {age} bekliyor.",
         bodyNew: "Biri onaylayana kadar kimse görmez.",
       },
       reported: {
-        title: "{count} yorum bildirildi",
-        titleOne: "1 yorum bildirildi",
+        title: "{count, number} yorum bildirildi",
         body: "Okurlar bu yorumları işaretledi. Bildirim tek başına hiçbir şeyi gizlemez.",
       },
       paused: {
@@ -1570,8 +1564,8 @@ export const messages: Messages = {
       submit: "Onayla",
     },
     banner: {
-      title: "{count} agent isteği onayını bekliyor",
-      titleOne: "Bir agent isteği onayını bekliyor",
+      title:
+        "{count, plural, one {Bir agent isteği onayını bekliyor} other {# agent isteği onayını bekliyor}}",
       description:
         "Bir kişi karar verene kadar agent'lar yayınlayamaz, geri alamaz ya da silemez; Manuel moddaki agent'lar hiçbir şeyi değiştiremez.",
       action: "İstekleri incele",
@@ -1698,7 +1692,7 @@ export const messages: Messages = {
     failed: "Öneri hakkında karar verilemedi",
     steps: "Kabul edilecek değişiklikler",
     acceptSome: "{total} değişiklikten {count} tanesini kabul et",
-    chooseOne: "En az bir değişiklik seç.",
+    chooseRequired: "En az bir değişiklik seç.",
     step: {
       replace: "Yeniden yaz: “{before}”",
       replaceText: "“{before}” ifadesini “{after}” yap",
@@ -1757,8 +1751,7 @@ export const messages: Messages = {
       added: "Eklendi",
       removed: "Kaldırıldı",
       edited: "Düzenlendi",
-      unchangedOne: "1 değişmeyen blok",
-      unchangedOther: "{count} değişmeyen blok",
+      unchanged: "{count, number} değişmeyen blok",
       wordsAdded: "+{count} kelime",
       wordsRemoved: "−{count} kelime",
       same: "Metinde değişiklik yok",

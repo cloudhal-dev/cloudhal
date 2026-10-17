@@ -206,8 +206,7 @@ export const en = {
     newSchedule: "Schedule a publish…",
   },
   overview: {
-    commentsWaiting: "{count} comments are waiting",
-    commentsWaitingOne: "1 comment is waiting",
+    commentsWaiting: "{count, plural, one {# comment is waiting} other {# comments are waiting}}",
     commentsWaitingDescription: "Readers don't see them until someone approves them.",
     liveSnapshotLabel: "Live snapshot",
     liveSnapshot: "Live snapshot {id}",
@@ -414,8 +413,7 @@ export const en = {
     },
     bodyTitle: "Body",
     markdown: "Markdown",
-    wordsOne: "1 word",
-    wordsOther: "{count} words",
+    words: "{count, plural, one {# word} other {# words}}",
     id: "ID",
     revision: "Revision",
     locale: "Language",
@@ -838,8 +836,8 @@ export const en = {
       ended: "Elevation ended",
       endedDescription: "{name} is back in {mode} mode.",
       endFailed: "Couldn't end the elevation",
-      bannerTitleOne: "1 agent key is elevated",
-      bannerTitleOther: "{count} agent keys are elevated",
+      bannerTitle:
+        "{count, plural, one {# agent key is elevated} other {# agent keys are elevated}}",
       bannerItem: "{name}: {from} → {to} until {time}",
       endNow: "End now",
       endAll: "End all now",
@@ -1287,8 +1285,7 @@ export const en = {
       resource: "Resource",
     },
     none: "None",
-    referenceCount: "{count} files",
-    referenceOne: "1 file",
+    referenceCount: "{count, plural, one {# file} other {# files}}",
     empty: "No skills loaded",
     emptyDescription:
       "Add a folder with a SKILL.md under skills/ in your project, then restart Studio.",
@@ -1355,14 +1352,13 @@ export const en = {
     },
     comments: {
       pending: {
-        title: "{count} comments wait for moderation",
-        titleOne: "1 comment waits for moderation",
+        title:
+          "{count, plural, one {# comment waits for moderation} other {# comments wait for moderation}}",
         body: "The oldest has waited {age}.",
         bodyNew: "Nobody sees them until someone approves them.",
       },
       reported: {
-        title: "{count} comments were reported",
-        titleOne: "1 comment was reported",
+        title: "{count, plural, one {# comment was reported} other {# comments were reported}}",
         body: "Readers flagged them. A report never hides anything by itself.",
       },
       paused: {
@@ -1546,8 +1542,8 @@ export const en = {
       submit: "Approve",
     },
     banner: {
-      title: "{count} agent requests are waiting for your approval",
-      titleOne: "An agent request is waiting for your approval",
+      title:
+        "{count, plural, one {An agent request is waiting for your approval} other {# agent requests are waiting for your approval}}",
       description:
         "Agents can't publish, roll back or delete, and agents in Manual mode can't change anything, until a person decides.",
       action: "Review requests",
@@ -1674,7 +1670,7 @@ export const en = {
     failed: "Could not decide on the suggestion",
     steps: "Changes to accept",
     acceptSome: "Accept {count} of {total}",
-    chooseOne: "Choose at least one change.",
+    chooseRequired: "Choose at least one change.",
     step: {
       replace: "Rewrite “{before}”",
       replaceText: "Change “{before}” to “{after}”",
@@ -1733,8 +1729,7 @@ export const en = {
       added: "Added",
       removed: "Removed",
       edited: "Edited",
-      unchangedOne: "1 unchanged block",
-      unchangedOther: "{count} unchanged blocks",
+      unchanged: "{count, plural, one {# unchanged block} other {# unchanged blocks}}",
       wordsAdded: "+{count} words",
       wordsRemoved: "−{count} words",
       same: "No text changes",

@@ -315,11 +315,7 @@ export function ElevatedKeysBanner({
         // Two actions do not fit next to the text on a phone: let them wrap under it.
         className="[&>div]:flex-wrap"
         icon={<ClockCountdown weight="fill" />}
-        title={
-          count === 1
-            ? t("agents.elevation.bannerTitleOne")
-            : t("agents.elevation.bannerTitleOther", { count })
-        }
+        title={t("agents.elevation.bannerTitle", { count })}
         description={
           <span className="grid gap-1">
             {elevated.map(({ key, elevation }) => (

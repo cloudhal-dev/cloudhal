@@ -75,8 +75,7 @@ export const messages = {
       removed: "This comment was removed",
       edited: "Edited",
       noScript: "No JavaScript",
-      reports: "{count} reports",
-      reportsOne: "1 report",
+      reports: "{count, plural, one {# report} other {# reports}}",
       labels: "Labels",
       newTab: "opens in a new tab",
       untrustedTitle: "Untrusted reader text",
@@ -218,12 +217,10 @@ export const messages = {
       },
     },
     dialog: {
-      hideTitle: "Hide {count} comments",
-      hideTitleOne: "Hide this comment",
+      hideTitle: "{count, plural, one {Hide this comment} other {Hide # comments}}",
       hideDescription:
         "Readers stop seeing it. You can restore it later; the reason goes into its statement of reasons.",
-      spamTitle: "Mark {count} comments as spam",
-      spamTitleOne: "Mark this comment as spam",
+      spamTitle: "{count, plural, one {Mark this comment as spam} other {Mark # comments as spam}}",
       spamDescription:
         "It leaves the public page and is deleted after the spam retention period. You can restore it until then.",
       deleteTitle: "Delete this comment",
@@ -238,8 +235,7 @@ export const messages = {
       deleteConfirm: "Delete text",
     },
     results: {
-      done: "{count} comments {action}",
-      doneOne: "1 comment {action}",
+      done: "{count, plural, one {# comment {action}} other {# comments {action}}}",
       partialTitle: "{done} of {total} comments {action}",
       partialDescription: "The others were left as they are:",
       errors: {
@@ -296,9 +292,10 @@ export const messages = {
     },
     noAccessTitle: "You can't see reader comments",
     agentRequests: {
-      title: "{agent} asks to approve {count} comments",
-      titleOne: "{agent} asks to approve 1 comment",
-      titleMany: "Agents wait for you on {count} comment requests",
+      title:
+        "{count, plural, one {{agent} asks to approve # comment} other {{agent} asks to approve # comments}}",
+      titleSeveral:
+        "{count, plural, one {Agents wait for you on # comment request} other {Agents wait for you on # comment requests}}",
       description:
         "Agents never approve, restore or reply on their own. Read the comments, then decide.",
       review: "Review",
@@ -319,8 +316,8 @@ export const messages = {
       capValue: "{used} of {cap}",
       paused: "Paused: today's limit was reached. New comments are refused until midnight UTC.",
       purging: "Updating the live page",
-      purgingHint: "{count} pages wait for the cache to refresh, usually within a minute.",
-      purgingHintOne: "1 page waits for the cache to refresh, usually within a minute.",
+      purgingHint:
+        "{count, plural, one {# page waits for the cache to refresh, usually within a minute.} other {# pages wait for the cache to refresh, usually within a minute.}}",
       purgeNow: "Purge site cache",
       purged: "The site's cache was purged",
       purgeFailed: "Couldn't purge the cache",
@@ -335,8 +332,7 @@ export const messages = {
       notFoundDescription: "It may have been deleted, or the link is wrong.",
       listLabel: "Comments on {title}",
       replies: "Replies to {name}",
-      showMore: "Show {count} more replies",
-      showMoreOne: "Show 1 more reply",
+      showMore: "{count, plural, one {Show # more reply} other {Show # more replies}}",
       showFewer: "Show fewer replies",
       loadMore: "Load more comments",
       calendar: {
@@ -513,10 +509,8 @@ export const messages = {
       notOwn: "Only an Editor changes comments on someone else's article.",
     },
     approvals: {
-      approveTitle: "Approve {count} comments",
-      approveTitleOne: "Approve 1 comment",
-      restoreTitle: "Restore {count} comments",
-      restoreTitleOne: "Restore 1 comment",
+      approveTitle: "{count, plural, one {Approve # comment} other {Approve # comments}}",
+      restoreTitle: "{count, plural, one {Restore # comment} other {Restore # comments}}",
       moderateTitle: {
         hide: "Hide {count} comments",
         spam: "Mark {count} comments as spam",
@@ -540,8 +534,7 @@ export const messages = {
       threadTo: "Set to {mode}",
       closesAt: "Closes on {date}",
       noClose: "Without a close date",
-      approveConfirm: "Approve {count} comments",
-      approveConfirmOne: "Approve 1 comment",
+      approveConfirm: "{count, plural, one {Approve # comment} other {Approve # comments}}",
       restoreConfirm: "Restore {count} comments",
       publishReply: "Publish reply",
       openThread: "Open thread",

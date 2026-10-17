@@ -158,8 +158,7 @@ export function useScheduleWords() {
 }
 
 /** "1 item", "3 items": what a release without a title is called. */
-export const itemsLabel = (t: ST, count: number) =>
-  count === 1 ? t("schedules.release.untitledOne") : t("schedules.release.untitled", { count });
+export const itemsLabel = (t: ST, count: number) => t("schedules.release.untitled", { count });
 
 /** A field problem in words ("02:30 does not exist on 29 March in Berlin; it runs at 03:30"). */
 export function problemText(
@@ -440,11 +439,7 @@ export function useMoveDialog(
       nextLabel={nextLabel}
       approvalEffect={release.data ? moveEffect(release.data, abilities.approve) : "none"}
       conflict={
-        clash > 0
-          ? clash === 1
-            ? t("schedules.move.clashOne", { time: nextLabel ?? "" })
-            : t("schedules.move.clash", { count: clash, time: nextLabel ?? "" })
-          : undefined
+        clash > 0 ? t("schedules.move.clash", { count: clash, time: nextLabel ?? "" }) : undefined
       }
       error={
         problem && problem.code !== "incomplete" && problem.code !== "gap"
@@ -651,11 +646,7 @@ export function SchedulesBanners({
         <Banner
           variant="alert"
           icon={<WarningCircle weight="fill" />}
-          title={
-            attention === 1
-              ? t("schedules.attention.titleOne")
-              : t("schedules.attention.title", { count: attention })
-          }
+          title={t("schedules.attention.title", { count: attention })}
           description={t("schedules.attention.description")}
           action={
             onReviewAttention ? (

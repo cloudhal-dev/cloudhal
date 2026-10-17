@@ -1003,9 +1003,7 @@ export function SchedulesPage() {
                     {overlaps > 0 && (
                       <Tooltip content={t("schedules.release.items.overlapHint")}>
                         <Badge variant="warning">
-                          {overlaps === 1
-                            ? t("schedules.calendar.overlapOne")
-                            : t("schedules.calendar.overlap", { count: overlaps })}
+                          {t("schedules.calendar.overlap", { count: overlaps })}
                         </Badge>
                       </Tooltip>
                     )}
@@ -1015,12 +1013,8 @@ export function SchedulesPage() {
               labels={{
                 list: t(`${c}.agenda.list`),
                 now: t(`${c}.agenda.now`),
-                doneToday: (n) =>
-                  n === 1
-                    ? t(`${c}.agenda.doneTodayOne`)
-                    : t(`${c}.agenda.doneToday`, { count: n }),
-                moreRuns: (n) =>
-                  n === 1 ? t(`${c}.agenda.moreRunsOne`) : t(`${c}.agenda.moreRuns`, { count: n }),
+                doneToday: (n) => t(`${c}.agenda.doneToday`, { count: n }),
+                moreRuns: (n) => t(`${c}.agenda.moreRuns`, { count: n }),
                 loadMore: t(`${c}.agenda.loadMore`),
                 loading: t(`${c}.agenda.loading`),
                 emptyTitle: filtered ? t(`${c}.agenda.filteredTitle`) : t(`${c}.agenda.emptyTitle`),
@@ -1085,7 +1079,7 @@ export function SchedulesPage() {
                       isToday ? t(`${c}.month.today`) : undefined,
                       list.length === 0
                         ? t(`${c}.month.noItems`)
-                        : `${list.length === 1 ? t(`${c}.month.itemsOne`) : t(`${c}.month.items`, { count: list.length })}: ${kindPlural(list)}`,
+                        : `${t(`${c}.month.items`, { count: list.length })}: ${kindPlural(list)}`,
                     ]
                       .filter(Boolean)
                       .join(", "),
