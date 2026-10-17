@@ -10,6 +10,7 @@ import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useLocation } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
+import { isApplePlatform } from "../lib/platform.ts";
 import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../lib/theme.ts";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { NotificationsBell } from "./NotificationsBell.tsx";
@@ -153,7 +154,7 @@ function AppFrameShell({
                 {t("nav.search")}
               </span>
               <kbd className="hidden rounded bg-kumo-recessed px-1 font-mono text-kumo-subtle text-xs sm:inline">
-                {t("nav.shortcutHint")}
+                {t(isApplePlatform() ? "nav.shortcutHint" : "nav.shortcutHintCtrl")}
               </kbd>
             </Button>
             {actions}
