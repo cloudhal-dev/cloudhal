@@ -34,27 +34,11 @@ import {
   type UploadTicket,
   type UploadTicketRequest,
 } from "./assets.ts";
-import {
-  checkAvailability,
-  checkTimeZone,
-  type GateSupport,
-  isTimeZone,
-  sameAvailability,
-} from "./availability.ts";
-import {
-  BLOCK_LIMITS,
-  type BlockRegistry,
-  createBlockRegistry,
-  type PropsSchema,
-  validateProps,
-} from "./blocks.ts";
-import { bodyDirectives } from "./body-blocks.ts";
-import { type BlockWriter, indexMarkdown, withoutIndex } from "./body-index.ts";
+import { checkAvailability, type GateSupport, sameAvailability } from "./availability.ts";
+import { type BlockRegistry, createBlockRegistry, type PropsSchema } from "./blocks.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
-import { BLOB_CONCURRENCY, eachLimited } from "./concurrency.ts";
-import { addedCorrections, type CorrectionInput, prepareCorrections } from "./corrections.ts";
-import { checkDirective } from "./directives.ts";
+import { addedCorrections, type CorrectionInput } from "./corrections.ts";
 import {
   ConflictError,
   InvariantError,
@@ -72,20 +56,12 @@ import {
 } from "./holds.ts";
 import { ID_PREFIX, newId } from "./ids.ts";
 import { fillMissingSrc } from "./media/refs.ts";
-import { isReservedMediaPath, MEDIA_LIMITS } from "./media/types.ts";
+import { MEDIA_LIMITS } from "./media/types.ts";
 import type { TargetRef } from "./menu.ts";
 import { MenuEngine } from "./menu-store.ts";
 import type { Resolution } from "./names.ts";
-import {
-  and,
-  type Cond,
-  casUpdateStatement,
-  insertNodeStatement,
-  OpBatch,
-  type Row,
-  runOpBatch,
-} from "./node-sql.ts";
-import { type Creatable, type NodeKind, type SiteNode, uniquenessKey } from "./nodes.ts";
+import type { Cond, Row } from "./node-sql.ts";
+import type { Creatable, NodeKind, SiteNode } from "./nodes.ts";
 import { BodyProposals } from "./proposals.ts";
 import type { RedirectMatch } from "./redirects.ts";
 import {
@@ -95,16 +71,13 @@ import {
 } from "./release-apply.ts";
 import {
   planSearch,
-  SEARCH_PATH,
   type SearchOptions,
   type SearchPlan,
   type SearchResults,
-  type SiteGuard,
   searchIndex,
   searchState,
   searchStatements,
 } from "./search.ts";
-import { checkBodySurfaces, checkPageSurfaces, createCatalog } from "./surfaces.ts";
 import {
   migrateTagsToTerms,
   revertTagsToTerms,
@@ -112,7 +85,6 @@ import {
   type TagsRevertResult,
 } from "./tags-migration.ts";
 import {
-  canonicalTerms,
   type DefaultTaxonomyOptions,
   type EntryQuery,
   type GovernanceResult,
@@ -135,106 +107,30 @@ export {
   uniquenessKey,
 } from "./nodes.ts";
 
-export interface SiteGraphStoreOptions {
-  readonly sql: SqlDriver;
-  readonly blobs: BlobStore;
-  /** Clock, injectable for tests. */
-  readonly now?: () => Date;
-  readonly idGen?: (prefix: string) => string;
-  /**
-   * Called after the published pointer moved (publish and rollback). Deployments use it to purge
-   * edge caches — `planCachePurge(change)` says which tags. Failures are reported to `onHookError`
-   * and never undo the publish.
-   */
-  readonly onPublished?: (site: Site, change: PublishChange) => Promise<void>;
-  readonly onHookError?: (error: unknown) => void;
-  /** Media (RFC-0004): per-site quota of stored bytes (default 10 GB; 0 = unlimited). */
-  readonly media?: { readonly quotaBytes?: number };
-  /**
-   * Called after a takedown removed content (`purgeBlob`): deployments purge the edge cache of the
-   * asset's media URLs (`cloudhal-asset-<id>`). Failures go to `onHookError`.
-   */
-  readonly onMediaPurged?: (siteId: string, assetIds: string[]) => Promise<void>;
-  /**
-   * RFC-0008 S15: whether the renderer serving a site enforces time gates. Writes that set or
-   * change `availability` are refused (`gates_unsupported`) until it says so; without this option
-   * they are always refused. Node stores pass `GATES_ENFORCED` (renderer and writer are one
-   * process); the admin Worker asks the site Worker's `/__cloudhal/features`.
-   */
-  readonly gates?: GateSupport;
-  /**
-   * RFC-0015: the block registry component sections are validated against (default: the
-   * built-ins; deployments pass the theme's types too). Unknown types are kept, not refused.
-   */
-  readonly blocks?: BlockRegistry;
-  /**
-   * RFC-0017 §1: the theme's design settings (`src/settings.ts`), which `Site.theme.config` is
-   * checked against when it changes. Without it the config is left alone.
-   */
-  readonly themeSettings?: PropsSchema;
-  /** RFC-0021 §1: the theme's DESIGN.md (`src/DESIGN.md`), read by agents with the site's rules. */
-  readonly themeDesign?: string;
-}
+import type { StoreContext } from "./store/context.ts";
+import { EntryEngine } from "./store/entries.ts";
+import { PageEngine } from "./store/pages.ts";
+import { SiteEngine } from "./store/sites.ts";
+import { SnapshotEngine } from "./store/snapshots.ts";
+import {
+  firstPublication,
+  type NodeWriteOptions,
+  type PublishChange,
+  type SiteGraphStoreOptions,
+  type SnapshotDiff,
+  type SnapshotInput,
+} from "./store/types.ts";
+import { checkReservedPath, diffNodeRefs } from "./store/validation.ts";
 
-/**
- * Where the published pointer moved from and to: `from` is absent on a first publish, `to` when the
- * site is no longer published (an import that replaced it).
- */
-export interface PublishChange {
-  readonly from?: string;
-  readonly to?: string;
-}
+export type {
+  NodeWriteOptions,
+  PublishChange,
+  SiteGraphStoreOptions,
+  SnapshotDiff,
+  SnapshotInput,
+} from "./store/types.ts";
+export { diffNodeRefs } from "./store/validation.ts";
 
-/**
- * Options of a page or entry update (RFC-0008 §6.2). `releaseEdit` is a person's "Edit and
- * re-approve": the node may change while held by that release (and only that one, not running);
- * the caller re-pins the item right after (`ReleaseService.editHeld…`). Agents never pass it.
- */
-export interface NodeWriteOptions {
-  readonly releaseEdit?: string;
-  /** Who is writing: the provenance of body blocks this write changes (RFC-0014 §3). */
-  readonly writer?: BlockWriter;
-  /**
-   * RFC-0019 §2: a person with `site:publish` may edit the note of a correction that has been live
-   * (the caller checks and audits). Agents never set it.
-   */
-  readonly correctionEdit?: boolean;
-}
-
-export interface SnapshotInput {
-  readonly actor: Actor;
-  readonly reason: Snapshot["reason"];
-  readonly label?: string;
-  /** Namespaced keys (e.g. `cloudhal.migration`), kept on the snapshot. */
-  readonly metadata?: Record<string, string>;
-}
-
-export interface SnapshotDiff {
-  readonly added: NodeRef[];
-  readonly removed: NodeRef[];
-  readonly changed: Array<{ before: NodeRef; after: NodeRef }>;
-}
-
-/**
- * The first time an entry is marked published it gets its publication date, whichever path made
- * the change (Studio, REST, MCP, import). An explicit `publishedAt` (e.g. imported) is kept. An
- * entry under embargo is dated at its `from` (RFC-0008 §7.5): its date, feed item and sitemap
- * entry show the embargo time, not the moment someone pressed publish.
- */
-function firstPublication(
-  entry: Pick<ContentEntry, "status" | "publishedAt" | "availability">,
-  ts: string,
-): { publishedAt?: string } {
-  return entry.status === "published" && !entry.publishedAt
-    ? { publishedAt: entry.availability?.from ?? ts }
-    : {};
-}
-
-/**
- * The Site Graph store: typed CRUD with optimistic locking, snapshots, diff, publish, rollback,
- * taxonomies, terms and redirects. Every multi-statement write is one atomic `batch()`; see
- * ADR-0002, RFC-0001 and RFC-0002.
- */
 export class SiteGraphStore {
   readonly #sql: SqlDriver;
   readonly #blobs: BlobStore;
@@ -245,6 +141,10 @@ export class SiteGraphStore {
   readonly #tax: TaxonomyEngine;
   readonly #menus: MenuEngine;
   readonly #assets: AssetEngine;
+  readonly #sites: SiteEngine;
+  readonly #pages: PageEngine;
+  readonly #entries: EntryEngine;
+  readonly #snapshots: SnapshotEngine;
 
   constructor(options: SiteGraphStoreOptions) {
     this.#sql = options.sql;
@@ -284,6 +184,24 @@ export class SiteGraphStore {
       newId: (prefix) => this.#newId(prefix),
       getSite: (id) => this.getSite(id),
     });
+    const ctx: StoreContext = {
+      graph: this,
+      sql: this.#sql,
+      blobs: this.#blobs,
+      stamp: () => this.#stamp(),
+      newId: (prefix) => this.#newId(prefix),
+      tax: this.#tax,
+      assets: this.#assets,
+      revOf: (id) => this.#revOf(id),
+      runUnique: (statement, kind, key, extra) => this.#runUnique(statement, kind, key, extra),
+      checkGates: (siteId, before, after) => this.#checkGates(siteId, before, after),
+      liveEntry: (site, id) => this.#liveEntry(site, id),
+      shownLive: (site, id) => this.#shownLive(site, id),
+    };
+    this.#sites = new SiteEngine(ctx);
+    this.#pages = new PageEngine(ctx);
+    this.#entries = new EntryEngine(ctx);
+    this.#snapshots = new SnapshotEngine(ctx);
   }
 
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
@@ -416,24 +334,7 @@ export class SiteGraphStore {
   }
 
   async createSite(input: Creatable<Site>): Promise<Site> {
-    const ts = this.#stamp();
-    const site: Site = {
-      ...input,
-      schemaVersion: 1,
-      id: input.id ?? this.#newId(ID_PREFIX.site),
-      rev: 0,
-      createdAt: ts,
-      updatedAt: ts,
-    };
-    assertValid("site", site);
-    checkTimeZone(site.timeZone);
-    checkThemeConfig(this.themeSettings, site.theme.config, undefined);
-    await this.#runUnique(
-      await insertNodeStatement("site", site, ts),
-      "site",
-      uniquenessKey("site", site),
-    );
-    return site;
+    return this.#sites.create(input);
   }
 
   async getSite(id: string): Promise<Site | undefined> {
@@ -450,60 +351,7 @@ export class SiteGraphStore {
   }
 
   async updateSite(site: Site): Promise<Site> {
-    return this.#updateSite(site);
-  }
-
-  /** `updateSite` with statements in the same batch, guarded on the site's new hash. */
-  async #updateSite(
-    site: Site,
-    extra?: (guard: SiteGuard, at: string) => SqlStatement[],
-  ): Promise<Site> {
-    const next: Site = structuredClone({ ...site, rev: site.rev + 1, updatedAt: this.#stamp() });
-    fillMissingSrc("site", next);
-    assertValid("site", next);
-    // RFC-0025 §2: the footer's region is a surface, checked like a page's.
-    const region = next.chrome?.footer?.region;
-    if (region) {
-      if (region.kind !== "surface")
-        throw new InvariantError("invalid_surface", "chrome.footer.region: a surface section");
-      const issues = checkPageSurfaces([region], createCatalog({ blocks: this.blocks }));
-      if (issues.length)
-        throw new InvariantError(
-          "invalid_surface",
-          `chrome.footer.region: ${issues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
-          { issues },
-        );
-    }
-    // Only a config that changes is checked: values a theme change made misfit stay as written.
-    if (this.themeSettings && next.theme.config !== undefined)
-      checkThemeConfig(
-        this.themeSettings,
-        next.theme.config,
-        (await this.getSite(site.id))?.theme.config,
-      );
-    // §4.1: a known zone needs no read; an unknown one is refused unless it is the stored one.
-    if (next.timeZone !== undefined && !isTimeZone(next.timeZone))
-      checkTimeZone(next.timeZone, (await this.getSite(site.id))?.timeZone);
-    // RFC-0025: the brand's logos are uses of their assets (checked, made canonical, indexed).
-    const stored = await this.getSite(site.id);
-    const refs = await this.#assets.planRefs("site", site.id, next, stored);
-    const written = refs.node;
-    const s = await casUpdateStatement("site", written, site.rev, refs.guard);
-    const hash = await nodeHash(written);
-    const more = [
-      ...(extra?.({ siteId: site.id, hash }, written.updatedAt) ?? []),
-      ...refs.statements(hash),
-    ];
-    const r =
-      more.length > 0
-        ? ((await this.#sql.batch([s, ...more]))[0] ?? { changes: 0 })
-        : await this.#sql.run(s.sql, s.params ?? []);
-    if (r.changes !== 1) {
-      const rev = await this.#revOf(site.id);
-      if (rev === site.rev) await refs.diagnose();
-      throw new ConflictError("site", site.id, site.rev, rev);
-    }
-    return written;
+    return this.#sites.update(site);
   }
 
   /**
@@ -516,54 +364,7 @@ export class SiteGraphStore {
     input: Creatable<Page>,
     options: NodeWriteOptions = {},
   ): Promise<{ page: Page; site: Site }> {
-    const ts = this.#stamp();
-    let draft: Page = structuredClone({
-      ...input,
-      schemaVersion: 1,
-      id: input.id ?? this.#newId(ID_PREFIX.page),
-      rev: 0,
-      createdAt: ts,
-      updatedAt: ts,
-    });
-    fillMissingSrc("page", draft);
-    draft = await this.#indexSections(draft, undefined, ts, options.writer);
-    assertValid("page", draft);
-    checkComponentSections(this.blocks, draft);
-    if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
-    checkReservedPath(draft.path);
-    await this.#checkGates(site.id, undefined, draft.availability);
-    const refs = await this.#assets.planRefs("page", site.id, draft, undefined);
-    const page = refs.node;
-    const nextSite: Site = {
-      ...site,
-      pageIds: [...site.pageIds, page.id],
-      rev: site.rev + 1,
-      updatedAt: ts,
-    };
-    assertValid("site", nextSite);
-    await this.#tax.checkPagePath(page);
-    const plan = await this.#tax.planPathChange(site, ts, {
-      locale: page.locale,
-      wasPublished: false,
-      isPublished: page.status === "published",
-      oldPath: undefined,
-      newPath: page.path,
-      source: { kind: "page", id: page.id },
-    });
-    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
-    await batch.update("site", site, nextSite);
-    await batch.insert("page", page, and(this.#tax.pageGuard(page), refs.guard));
-    batch.append(...refs.statements(await nodeHash(page)));
-    await plan?.emit(batch);
-    await runOpBatch(this.#sql, batch, {
-      uniqueKind: "page",
-      uniqueKey: uniquenessKey("page", page),
-      diagnose: async () => {
-        await this.#tax.checkPagePath(page);
-        await refs.diagnose();
-      },
-    });
-    return { page, site: nextSite };
+    return this.#pages.createPage(site, input, options);
   }
 
   async getPage(id: string): Promise<Page | undefined> {
@@ -583,99 +384,12 @@ export class SiteGraphStore {
    * default locale whose path changes leaves a 301 redirect (RFC-0002 accepted answer 5).
    */
   async updatePage(page: Page, options: NodeWriteOptions = {}): Promise<Page> {
-    const ts = this.#stamp();
-    let draft: Page = structuredClone({ ...page, rev: page.rev + 1, updatedAt: ts });
-    fillMissingSrc("page", draft);
-    const stored = await this.getPage(page.id);
-    if (!stored || stored.rev !== page.rev)
-      throw new ConflictError("page", page.id, page.rev, stored?.rev);
-    checkReservedPath(draft.path, stored.path);
-    draft = await this.#indexSections(draft, stored, ts, options.writer);
-    assertValid("page", draft);
-    checkComponentSections(this.blocks, draft);
-    await assertUnlocked(this.#sql, stored.siteId, [page.id], options.releaseEdit);
-    await this.#checkGates(draft.siteId, stored.availability, draft.availability);
-    const refs = await this.#assets.planRefs("page", draft.siteId, draft, stored);
-    const next = refs.node;
-    await this.#tax.checkPagePath(next);
-    const site = await this.getSite(next.siteId);
-    if (!site) throw new NotFoundError("site", next.siteId);
-    const sameLocale = stored.locale === next.locale;
-    const plan = await this.#tax.planPathChange(site, ts, {
-      locale: next.locale,
-      wasPublished: sameLocale && stored.status === "published",
-      isPublished: next.status === "published",
-      oldPath: sameLocale ? stored.path : undefined,
-      newPath: next.path,
-      source: { kind: "page", id: next.id },
-    });
-    const key = uniquenessKey("page", next);
-    const extra = refs.statements(await nodeHash(next));
-    if (!plan) {
-      const r = await this.#runUnique(
-        await casUpdateStatement(
-          "page",
-          next,
-          page.rev,
-          and(this.#tax.pageGuard(next), refs.guard),
-        ),
-        "page",
-        key,
-        extra,
-      );
-      if (r.changes !== 1) {
-        const rev = await this.#revOf(page.id);
-        if (rev === page.rev) {
-          await this.#tax.checkPagePath(next);
-          await refs.diagnose();
-        }
-        throw new ConflictError("page", page.id, page.rev, rev);
-      }
-      return next;
-    }
-    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
-    await batch.update("page", stored, next, and(this.#tax.pageGuard(next), refs.guard));
-    batch.append(...extra);
-    await plan.emit(batch);
-    await runOpBatch(this.#sql, batch, {
-      uniqueKind: "page",
-      uniqueKey: key,
-      diagnose: async () => {
-        await this.#tax.checkPagePath(next);
-        await refs.diagnose();
-      },
-    });
-    return next;
+    return this.#pages.updatePage(page, options);
   }
 
   /** Deletes a page and removes it from `Site.pageIds` atomically (CAS on both). */
   async deletePage(site: Site, page: Page): Promise<Site> {
-    await assertUnlocked(this.#sql, site.id, [page.id]);
-    const ts = this.#stamp();
-    const nextSite: Site = {
-      ...site,
-      pageIds: site.pageIds.filter((id) => id !== page.id),
-      rev: site.rev + 1,
-      updatedAt: ts,
-    };
-    assertValid("site", nextSite);
-    const siteHash = await nodeHash(nextSite);
-    const results = await this.#sql.batch([
-      await casUpdateStatement("site", nextSite, site.rev),
-      {
-        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'page' AND site_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)",
-        params: [page.id, page.rev, site.id, site.id, siteHash],
-      },
-      this.#assets.dropRefsStatement(page.id),
-    ]);
-    if (results[0]?.changes !== 1)
-      throw new ConflictError("site", site.id, site.rev, await this.#revOf(site.id));
-    if (results[1]?.changes !== 1) {
-      // Site moved forward but the page was stale: surface as conflict on the page. The site change
-      // stands (pageIds no longer lists the page); callers should reload both.
-      throw new ConflictError("page", page.id, page.rev, await this.#revOf(page.id));
-    }
-    return nextSite;
+    return this.#pages.deletePage(site, page);
   }
 
   /**
@@ -697,7 +411,7 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(input, ts),
     };
-    return this.#writeEntry(undefined, entry, ts, options);
+    return this.#entries.write(undefined, entry, ts, options);
   }
 
   async getContentEntry(id: string): Promise<ContentEntry | undefined> {
@@ -731,7 +445,7 @@ export class SiteGraphStore {
       updatedAt: ts,
       ...firstPublication(entry, ts),
     };
-    return this.#writeEntry(entry, next, ts, options);
+    return this.#entries.write(entry, next, ts, options);
   }
 
   /**
@@ -771,144 +485,6 @@ export class SiteGraphStore {
         out.add(ref.id);
     }
     return out;
-  }
-
-  /** A page with its markdown rich-text sections indexed against `stored`'s (RFC-0014 §3). */
-  async #indexSections(
-    page: Page,
-    stored: Page | undefined,
-    ts: string,
-    writer: BlockWriter | undefined,
-  ): Promise<Page> {
-    const before = new Map((stored?.sections ?? []).map((s) => [s.id, s]));
-    const sections = await Promise.all(
-      page.sections.map(async (section) => {
-        if (section.kind !== "richText") return section;
-        const bare = withoutIndex(section) as typeof section;
-        if (bare.format !== "markdown") return bare;
-        const old = before.get(section.id);
-        const previous = old?.kind === "richText" && old.format === "markdown" ? old : undefined;
-        const index = await indexMarkdown({
-          markdown: bare.body,
-          previous: previous?.blocks,
-          previousMarkdown: previous?.body,
-          writer,
-          at: ts,
-          newId: () => this.#newId(ID_PREFIX.block),
-        });
-        return { ...bare, ...index };
-      }),
-    );
-    return { ...page, sections };
-  }
-
-  async #writeEntry(
-    prev: ContentEntry | undefined,
-    draft: ContentEntry,
-    ts: string,
-    options: NodeWriteOptions = {},
-  ): Promise<ContentEntry> {
-    fillMissingSrc("contentEntry", draft);
-    // The block index is the store's (RFC-0014 §3): a client's is dropped before validation.
-    draft = { ...draft, body: withoutIndex(draft.body) };
-    const site = await this.getSite(draft.siteId);
-    if (!site) throw new NotFoundError("site", draft.siteId);
-    let stored: ContentEntry | undefined;
-    if (prev) {
-      stored = await this.getContentEntry(prev.id);
-      if (!stored || stored.rev !== prev.rev)
-        throw new ConflictError("contentEntry", prev.id, prev.rev, stored?.rev);
-    }
-    // RFC-0019 §2: the store stamps new corrections and keeps live ones as they are.
-    if (draft.corrections !== undefined || stored?.corrections !== undefined) {
-      const { corrections: _c, ...rest } = draft;
-      const corrections = prepareCorrections(draft.corrections, stored?.corrections, {
-        live: new Set(
-          stored?.corrections
-            ? (await this.#liveEntry(site, draft.id))?.corrections?.map((c) => c.id)
-            : [],
-        ),
-        at: ts,
-        personEdit: options.correctionEdit === true,
-        newId: () => this.#newId(ID_PREFIX.correction),
-      });
-      draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
-    }
-    assertValid("content-entry", canonicalTerms(draft));
-    if (stored) await assertUnlocked(this.#sql, stored.siteId, [stored.id], options.releaseEdit);
-    if (draft.body.format === "markdown") {
-      checkBodyDirectives(this.blocks, draft.body.value, "body");
-      const previous = stored?.body.format === "markdown" ? stored.body : undefined;
-      const index = await indexMarkdown({
-        markdown: draft.body.value,
-        previous: previous?.blocks,
-        previousMarkdown: previous?.value,
-        writer: options.writer,
-        at: ts,
-        newId: () => this.#newId(ID_PREFIX.block),
-      });
-      draft = { ...draft, body: { ...draft.body, ...index } };
-    }
-    await this.#checkGates(site.id, stored?.availability, draft.availability);
-    // §7.5: an entry not shown yet keeps its date on its embargo. When a write moves `from` and
-    // the caller left `publishedAt` alone, the date follows, until the entry has been shown.
-    const from = draft.availability?.from;
-    if (
-      stored &&
-      from !== undefined &&
-      draft.status === "published" &&
-      from !== stored.availability?.from &&
-      draft.publishedAt === stored.publishedAt &&
-      draft.publishedAt !== from &&
-      !(await this.#shownLive(site, draft.id))
-    )
-      draft = { ...draft, publishedAt: from };
-    const refs = await this.#assets.planRefs("contentEntry", site.id, draft, stored);
-    const prepared = await this.#tax.prepareEntry(refs.node, site, ts);
-    const { entry, newTerms } = prepared;
-    const guard = and(prepared.guard, refs.guard);
-    const extra = refs.statements(await nodeHash(entry));
-    const key = uniquenessKey("contentEntry", entry);
-    const sameLocale = stored?.locale === entry.locale;
-    const plan = await this.#tax.planPathChange(site, ts, {
-      locale: entry.locale,
-      wasPublished:
-        !!stored && sameLocale && (stored.status === "published" || !!stored.publishedAt),
-      isPublished: entry.status === "published",
-      oldPath: stored && sameLocale ? `/${stored.collection}/${stored.slug}` : undefined,
-      newPath: `/${entry.collection}/${entry.slug}`,
-      source: { kind: "contentEntry", id: entry.id },
-    });
-    if (newTerms.length === 0 && !plan) {
-      const statement = stored
-        ? await casUpdateStatement("contentEntry", entry, stored.rev, guard)
-        : await insertNodeStatement("contentEntry", entry, ts, guard);
-      const r = await this.#runUnique(statement, "contentEntry", key, extra);
-      if (r.changes !== 1) {
-        const rev = await this.#revOf(entry.id);
-        if (stored && rev !== stored.rev)
-          throw new ConflictError("contentEntry", entry.id, stored.rev, rev);
-        await this.#tax.diagnoseEntry(entry);
-        await refs.diagnose();
-        throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
-      }
-      return entry;
-    }
-    const batch = new OpBatch(this.#newId(ID_PREFIX.operation), site.id, ts);
-    for (const term of newTerms) await batch.insert("term", term, this.#tax.termSlugGuard(term));
-    if (stored) await batch.update("contentEntry", stored, entry, guard);
-    else await batch.insert("contentEntry", entry, guard);
-    batch.append(...extra);
-    await plan?.emit(batch);
-    await runOpBatch(this.#sql, batch, {
-      uniqueKind: "contentEntry",
-      uniqueKey: key,
-      diagnose: async () => {
-        await this.#tax.diagnoseEntry(entry);
-        await refs.diagnose();
-      },
-    });
-    return entry;
   }
 
   async deleteContentEntry(entry: ContentEntry): Promise<void> {
@@ -1371,95 +947,7 @@ export class SiteGraphStore {
    * the blob store under `nodes/<hash>.json`, summary relative to the previous snapshot.
    */
   async createSnapshot(siteId: string, input: SnapshotInput): Promise<Snapshot> {
-    const site = await this.getSite(siteId);
-    if (!site) throw new NotFoundError("site", siteId);
-    let rows = await this.#sql.all<Row>("SELECT * FROM nodes WHERE site_id = ? ORDER BY id", [
-      siteId,
-    ]);
-    // RFC-0008 §6.2 (S5): an ordinary publish keeps nodes held by a release at their live version
-    // (or leaves them out when they are not live). History snapshots capture the whole working copy.
-    let heldRefs: NodeRef[] = [];
-    if (input.reason === "publish") {
-      const held = new Set((await readHolds(this.#sql, siteId)).keys());
-      if (held.size > 0) {
-        const live = site.publishedSnapshotId
-          ? await this.getSnapshot(site.publishedSnapshotId)
-          : undefined;
-        rows = rows.filter((r) => !held.has(r.id));
-        heldRefs = (live?.nodes ?? []).filter((n) => held.has(n.id));
-      }
-    }
-    // Node bodies are content-addressed and never deleted, so a hash the previous snapshot holds is
-    // already stored: only new hashes are checked and written, a few at a time. (Every agent edit
-    // snapshots; checking each node in turn cost one blob round trip per node of the site.)
-    const parent = await this.latestSnapshot(siteId);
-    const stored = new Set((parent?.nodes ?? []).map((n) => n.hash));
-    const fresh = new Map<string, string>();
-    for (const row of rows) if (!stored.has(row.hash)) fresh.set(row.hash, row.body);
-    await eachLimited([...fresh], BLOB_CONCURRENCY, async ([hash, body]) => {
-      const key = `nodes/${hash}.json`;
-      if (!(await this.#blobs.head(key)))
-        await this.#blobs.put(key, new TextEncoder().encode(body), {
-          contentType: "application/json",
-        });
-    });
-    const nodes: NodeRef[] = composeWithHolds(
-      rows.map((r) => ({ id: r.id, kind: r.kind, rev: r.rev, hash: r.hash })),
-      heldRefs,
-      new Set(heldRefs.map((n) => n.id)),
-    );
-    const diff = diffNodeRefs(parent?.nodes ?? [], nodes);
-    const snapshot: Snapshot = {
-      schemaVersion: 1,
-      id: this.#newId(ID_PREFIX.snapshot),
-      siteId,
-      ...(parent ? { parentId: parent.id } : {}),
-      siteRev: site.rev,
-      reason: input.reason,
-      ...(input.label !== undefined ? { label: input.label } : {}),
-      actor: input.actor,
-      nodes,
-      summary: {
-        added: diff.added.length,
-        changed: diff.changed.length,
-        removed: diff.removed.length,
-      },
-      createdAt: this.#stamp(),
-      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
-    };
-    assertValid("snapshot", snapshot);
-    // Snapshots record the content their blob assets need, in the same batch (RFC-0004 §4.4).
-    const heldAssets = await Promise.all(
-      heldRefs
-        .filter((r) => r.kind === "asset")
-        .map(async (r) => canonicalJson(await this.readSnapshotNode(r))),
-    );
-    const blobs = this.#assets.snapshotBlobsStatement(snapshot.id, siteId, [
-      ...rows.filter((r) => r.kind === "asset").map((r) => r.body),
-      ...heldAssets,
-    ]);
-    await this.#sql.batch([
-      {
-        sql: "INSERT INTO snapshots (id, site_id, parent_id, site_rev, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        params: [
-          snapshot.id,
-          siteId,
-          snapshot.parentId ?? null,
-          snapshot.siteRev,
-          canonicalJson(snapshot),
-          snapshot.createdAt,
-        ],
-      },
-      ...(blobs ? [blobs] : []),
-    ]);
-    // RFC-0010: a snapshot made to be published gets its bundle now, while the bodies are at hand,
-    // so the site Worker's first render after the flip reads a few shards. A bundle is a cache:
-    // failing to write it never fails the snapshot (the site Worker writes it on first render).
-    if (input.reason === "publish") {
-      const bodies = new Map(rows.map((r) => [r.hash, r.body]));
-      await this.writeSnapshotBundle(snapshot, bodies).catch(() => {});
-    }
-    return snapshot;
+    return this.#snapshots.create(siteId, input);
   }
 
   /** The bodies of `snapshot` by node hash from its bundle, or undefined (RFC-0010). */
@@ -1616,7 +1104,7 @@ export class SiteGraphStore {
   async #publishPointer(site: Site, snapshotId: string): Promise<Site> {
     // RFC-0019 §3: the search index follows the pointer in the same batch.
     const plan = await this.#planSearch(site.id, snapshotId);
-    const updated = await this.#updateSite(
+    const updated = await this.#sites.update(
       { ...site, publishedSnapshotId: snapshotId },
       plan ? (guard, at) => searchStatements(plan, guard, at) : undefined,
     );
@@ -1769,115 +1257,5 @@ export class SiteGraphStore {
       if (isUniqueViolation(e)) throw new UniqueConstraintError(kind, key);
       throw e;
     }
-  }
-}
-
-/**
- * Invariant 12 (RFC-0004): `/media/<16 hex>/…` belongs to the media route; RFC-0019 §3: `/search`
- * to the site's search page.
- */
-function checkReservedPath(path: string | undefined, current?: string): void {
-  if (path && isReservedMediaPath(path))
-    throw new InvariantError(
-      "reserved_path",
-      `${path} is reserved for media URLs (/media/<16 hex>/…); choose another path`,
-    );
-  // A page that already had the path (before search existed) keeps it; it wins over search.
-  if (path === SEARCH_PATH && current !== SEARCH_PATH)
-    throw new InvariantError(
-      "reserved_path",
-      `${path} is the site's search page; choose another path`,
-    );
-}
-
-/** Set difference of node refs by id; a node is "changed" when its hash differs. */
-export function diffNodeRefs(before: readonly NodeRef[], after: readonly NodeRef[]): SnapshotDiff {
-  const b = new Map(before.map((n) => [n.id, n]));
-  const a = new Map(after.map((n) => [n.id, n]));
-  const added: NodeRef[] = [];
-  const removed: NodeRef[] = [];
-  const changed: Array<{ before: NodeRef; after: NodeRef }> = [];
-  for (const [id, node] of a) {
-    const prev = b.get(id);
-    if (!prev) added.push(node);
-    else if (prev.hash !== node.hash) changed.push({ before: prev, after: node });
-  }
-  for (const [id, node] of b) if (!a.has(id)) removed.push(node);
-  return { added, removed, changed };
-}
-
-/**
- * RFC-0015 §7: every component section of a known type follows its props schema; unknown types
- * are kept (a theme may have removed them) but still capped at the prop limit.
- */
-/** A site's design settings must fit the theme's schema when they change (RFC-0017 §1). */
-function checkThemeConfig(
-  schema: PropsSchema | undefined,
-  config: Record<string, unknown> | undefined,
-  stored: Record<string, unknown> | undefined,
-): void {
-  if (!schema || config === undefined) return;
-  if (stored !== undefined && JSON.stringify(stored) === JSON.stringify(config)) return;
-  const issues = validateProps(schema, config);
-  if (issues.length)
-    throw new InvariantError(
-      "invalid_props",
-      `theme settings: ${issues.map((i) => `${i.path || "settings"} ${i.message}`).join("; ")}`,
-      { type: "theme", issues },
-    );
-}
-
-/** Body directives of known types must fit them (RFC-0015 §7); unknown ones are kept. */
-/** RFC-0020 §5: a body's ```surface fences follow the same rules as page surfaces. */
-function checkBodyFences(blocks: BlockRegistry, markdown: string, where: string): void {
-  if (!markdown.includes("surface")) return;
-  const issues = checkBodySurfaces(markdown, createCatalog({ blocks }));
-  if (issues.length)
-    throw new InvariantError(
-      "invalid_surface",
-      `${where}: ${issues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
-      { issues },
-    );
-}
-
-function checkBodyDirectives(blocks: BlockRegistry, markdown: string, where: string): void {
-  checkBodyFences(blocks, markdown, where);
-  if (!markdown.includes("::")) return;
-  for (const d of bodyDirectives(markdown)) {
-    const issues = checkDirective(blocks, d);
-    if (issues?.length)
-      throw new InvariantError(
-        "invalid_props",
-        `${where}: ${d.name}: ${issues.map((i) => `${i.path || "props"} ${i.message}`).join("; ")}`,
-        { type: d.name, issues },
-      );
-  }
-}
-
-function checkComponentSections(blocks: BlockRegistry, page: Page): void {
-  // RFC-0020 §1: surfaces must hold together; unknown components are kept, not refused.
-  const surfaceIssues = page.sections.some((s) => s.kind === "surface")
-    ? checkPageSurfaces(page.sections, createCatalog({ blocks }))
-    : [];
-  if (surfaceIssues.length)
-    throw new InvariantError(
-      "invalid_surface",
-      `page ${page.id}: ${surfaceIssues.map((i) => `${i.path} ${i.message}`).join("; ")}`,
-      { issues: surfaceIssues },
-    );
-  for (const section of page.sections) {
-    if (section.kind === "richText" && section.format === "markdown")
-      checkBodyDirectives(blocks, section.body, `section ${section.id}`);
-    if (section.kind !== "component") continue;
-    const issues =
-      Object.keys(section.props).length > BLOCK_LIMITS.props
-        ? [{ path: "", message: `at most ${BLOCK_LIMITS.props} props` }]
-        : (blocks.checkSection(section.type, section.props) ?? []);
-    if (issues.length)
-      throw new InvariantError(
-        "invalid_props",
-        `section ${section.id} (${section.type}): ${issues.map((i) => `${i.path || "props"} ${i.message}`).join("; ")}`,
-        { sectionId: section.id, type: section.type, issues },
-      );
   }
 }
