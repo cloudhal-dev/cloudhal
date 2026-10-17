@@ -16,7 +16,6 @@
     "packages/api/src/routes/comments.ts": 874,
     "packages/api/src/routes/schedules.ts": 992,
     "packages/api/src/testing-roles.ts": 1936,
-    "packages/cli/src/commands/deploy.ts": 1006,
     "packages/comments/src/pipeline.ts": 898,
     "packages/comments/src/sql/store.ts": 2111,
     "packages/comments/src/testing.ts": 1665,
@@ -387,12 +386,6 @@
       "params": 6
     },
     "packages/cli/src/commands/analytics.ts::runLocalRollups": {
-      "params": 5
-    },
-    "packages/cli/src/commands/deploy.ts::deploy": {
-      "lines": 378
-    },
-    "packages/cli/src/commands/deploy.ts::ensureResources": {
       "params": 5
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
