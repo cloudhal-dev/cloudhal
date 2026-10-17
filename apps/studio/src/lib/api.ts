@@ -417,7 +417,7 @@ export interface AiPickerModel {
   description?: string;
   contextWindow?: number;
   beta?: boolean;
-  recommended?: "default" | "quality" | "general";
+  recommended?: "default" | "quality" | "budget" | "general";
   /** In the live catalogue (false: recommended, but the catalogue could not be read). */
   listed: boolean;
 }

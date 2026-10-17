@@ -24,8 +24,9 @@ export const messages: NamespaceMessages<"aiSettings"> = {
       show: "Modelleri göster",
       recommended: "Önerilen",
       notes: {
-        default: "Hızlı ve ucuz; Türkçe dahil birçok dilde yazar.",
+        default: "Cloudhal testlerinde sayfayı en güvenilir kuran model; Türkçe iyi yazar.",
         quality: "Daha güçlü yazım, daha yüksek fiyatla.",
+        budget: "Hızlı ve ucuz; sayfa kurmada daha zayıf.",
         general: "Bilinen, genel amaçlı bir model.",
       },
       context: "{tokens} token bağlam",
