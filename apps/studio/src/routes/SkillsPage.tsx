@@ -24,7 +24,7 @@ import { ListToolbar } from "../components/ListToolbar.tsx";
 import { ApprovalTool, SkillDetailDialog, SkillScope } from "../components/SkillDetailDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { usePaging } from "../components/usePaging.ts";
-import { type TFunction, useT } from "../i18n/index.tsx";
+import { listOf, type TFunction, useT } from "../i18n/index.tsx";
 import { api, type SkillSummary } from "../lib/api.ts";
 import { matchesSkill, orderSkillScopes, SKILL_META_KEY, skillCallSnippet } from "../lib/skills.ts";
 
@@ -221,7 +221,7 @@ export function SkillsPage() {
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap align-top">
                       {s.references.length > 0 ? (
-                        <Tooltip content={s.references.join(", ")}>
+                        <Tooltip content={listOf(s.references)}>
                           <Text as="span">{referencesLabel(t, s.references.length)}</Text>
                         </Tooltip>
                       ) : (

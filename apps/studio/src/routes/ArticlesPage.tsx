@@ -44,7 +44,7 @@ import { type TaxonomyData, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { treeOptions } from "../components/TermPickers.tsx";
 import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { imageRefPreviewUrl } from "../lib/media.ts";
 import { entryAccess } from "../lib/roles.ts";
@@ -354,7 +354,7 @@ export function ArticlesPage() {
                               )}
                               <Text as="span">{cats.names[0]}</Text>
                               {cats.names.length > 1 && (
-                                <Tooltip content={cats.names.slice(1).join(", ")}>
+                                <Tooltip content={listOf(cats.names.slice(1))}>
                                   <span className="inline-flex">
                                     <Badge variant="secondary">+{cats.names.length - 1}</Badge>
                                   </span>
@@ -377,7 +377,7 @@ export function ArticlesPage() {
                               </Badge>
                             ))}
                             {tags.length > 2 && (
-                              <Tooltip content={tags.slice(2).join(", ")}>
+                              <Tooltip content={listOf(tags.slice(2))}>
                                 <span className="inline-flex">
                                   <Badge variant="secondary">+{tags.length - 2}</Badge>
                                 </span>

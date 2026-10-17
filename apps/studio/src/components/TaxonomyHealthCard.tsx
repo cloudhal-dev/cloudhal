@@ -3,7 +3,7 @@ import { taxonomyReport } from "@cloudhal/core-ts/taxonomy-report";
 import { Badge, Button, SectionCard, SectionEmpty, Text } from "@cloudhal/ui";
 import { ArrowsMerge, Heartbeat, Sparkle } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { useI18n } from "../i18n/index.tsx";
+import { listOf, useI18n } from "../i18n/index.tsx";
 import type { TaxonomyData } from "./Taxonomy.tsx";
 
 const SHOWN = 3;
@@ -41,13 +41,13 @@ export function TaxonomyHealthCard({
   });
   const forms = data.singularForms(tax);
   const names = (ids: readonly string[]) =>
-    ids
-      .slice(0, 4)
-      .map((id) => {
+    listOf([
+      ...ids.slice(0, 4).map((id) => {
         const term = byId.get(id);
         return term ? data.name(term) : id;
-      })
-      .join(", ") + (ids.length > 4 ? t("taxonomy.health.andMore", { count: ids.length - 4 }) : "");
+      }),
+      ...(ids.length > 4 ? [t("taxonomy.health.more", { count: ids.length - 4 })] : []),
+    ]);
   const issues =
     report.nearDuplicates.length +
     report.proposed.length +

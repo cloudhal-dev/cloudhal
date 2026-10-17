@@ -17,7 +17,7 @@ import {
 } from "@cloudhal/ui";
 import { Sparkle } from "@phosphor-icons/react";
 import { useMemo } from "react";
-import { type TFunction, useI18n } from "../i18n/index.tsx";
+import { listOf, type TFunction, useI18n } from "../i18n/index.tsx";
 
 const catalog = createCatalog();
 
@@ -86,7 +86,7 @@ function motionOf(c: SurfaceComponent): string | undefined {
   const names = [m.reveal, m.scroll, m.hover, m.loop, m.morph && `morph ${m.morph}`]
     .concat(isObj(props.ambient) ? [props.ambient.kind] : [])
     .filter((v): v is string => typeof v === "string" && v !== "");
-  return names.length ? `✦ ${names.join(", ")}` : undefined;
+  return names.length ? `✦ ${listOf(names)}` : undefined;
 }
 
 /** The editable texts of a component: its literal string props the catalog declares as text. */

@@ -62,7 +62,7 @@ import { canFrom, useMe } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { type Fold, usePaging } from "../components/usePaging.ts";
 import { usePendingElevations } from "../components/usePendingApprovals.ts";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { initials } from "../lib/account.ts";
 import { mcpSnippet, ownModeOf, type SnippetKind, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
@@ -105,7 +105,7 @@ function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
                     : t("agents.narrowed.hint")}
                 </span>
                 <span className="font-mono text-[0.9em]">
-                  {t("agents.narrowed.stored", { scopes: scopes.join(", ") })}
+                  {t("agents.narrowed.stored", { scopes: listOf(scopes) })}
                 </span>
               </span>
             }

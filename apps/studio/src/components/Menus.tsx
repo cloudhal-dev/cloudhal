@@ -11,7 +11,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type MessageKey, useT } from "../i18n/index.tsx";
+import { listOf, type MessageKey, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import {
   isWellKnown,
@@ -148,7 +148,7 @@ export function InMenuBadge({ keys }: { keys: string[] | undefined }) {
   if (!keys?.length) return null;
   return (
     <Tooltip
-      content={t("menus.inMenu.hint", { menus: keys.map(title).join(", ") })}
+      content={t("menus.inMenu.hint", { menus: listOf(keys.map(title)) })}
       render={
         <span className="inline-flex" data-testid="in-menu-badge">
           <Badge variant="outline" icon={<TreeStructure />}>

@@ -47,6 +47,27 @@ export function formatNumber(locale: string, n: number, style?: NumberStyle): st
   return f.format(n);
 }
 
+const listFormats = new Map<string, Intl.ListFormat>();
+
+/**
+ * Items as a list in `locale` (`Intl.ListFormat`, cached): "a, b, and c", "a, b ve c", "a、b、c".
+ * Never `items.join(", ")` in text a person reads (RFC-0032 §4f): the separator and the last "and"
+ * are the language's.
+ */
+export function formatList(
+  locale: string,
+  items: readonly string[],
+  type: "conjunction" | "disjunction" = "conjunction",
+): string {
+  const id = `${locale}|${type}`;
+  let f = listFormats.get(id);
+  if (!f) {
+    f = new Intl.ListFormat(locale, { type, style: "long" });
+    listFormats.set(id, f);
+  }
+  return f.format(items);
+}
+
 /** `{name}` substitution, as Studio has always done it: a missing value leaves the placeholder. */
 function substitute(text: string, params: Params): string {
   return text.replace(/\{(\w+)\}/g, (_m, name: string) => String(params[name] ?? `{${name}}`));

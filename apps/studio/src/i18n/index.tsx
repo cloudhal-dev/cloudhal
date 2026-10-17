@@ -1,4 +1,16 @@
-import { type Compiled, formatMessage, isMessage } from "@cloudhal/messages/format";
+import { type Compiled, formatList, formatMessage, isMessage } from "@cloudhal/messages/format";
+
+export { formatList } from "@cloudhal/messages/format";
+
+/**
+ * Items as a list in the Studio language ("a, b, and c", "a, b ve c"; `Intl.ListFormat`): what a
+ * person reads is never `items.join(", ")` (RFC-0032 §4f). Components re-render on a language
+ * switch, so the module-level locale is current.
+ */
+export function listOf(items: readonly string[], type?: "conjunction" | "disjunction"): string {
+  return formatList(currentLocale(), items, type);
+}
+
 import {
   createContext,
   type ReactNode,

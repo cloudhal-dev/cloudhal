@@ -70,6 +70,7 @@ import {
 import { useToast } from "../components/Toast.ts";
 import { useCan, useGate, useMe } from "../components/useMe.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
+import { listOf } from "../i18n/index.tsx";
 import { type Approval, api, type CalendarItem, type ReleaseView } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import {
@@ -768,7 +769,7 @@ export function SchedulesPage() {
   const kindPlural = (e: readonly ScheduleEntry[]) => {
     const counts = new Map<string, number>();
     for (const x of e) counts.set(words.kind[x.kind], (counts.get(words.kind[x.kind]) ?? 0) + 1);
-    return [...counts].map(([k, n]) => `${n} ${k.toLocaleLowerCase(locale)}`).join(", ");
+    return listOf([...counts].map(([k, n]) => `${n} ${k.toLocaleLowerCase(locale)}`));
   };
   const rangeLabel = weekDays
     ? `${formatDay(weekDays.first, locale, "medium")} – ${formatDay(weekDays.last, locale, "medium")}`
