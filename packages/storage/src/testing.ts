@@ -8,6 +8,8 @@ import {
   type BlobStore,
   SQL_LIMITS,
   type SqlDriver,
+  type SqlStatement,
+  type SqlValue,
   StorageError,
   StorageLimitError,
   sha256OfBytes,
@@ -279,6 +281,56 @@ export async function dropAllTables(driver: SqlDriver): Promise<void> {
         `dropAllTables: could not drop ${tables.map((t) => t.name).join(", ")}`,
       );
   }
+}
+
+/** Resets a shared database to the state `init` leaves on an empty one. */
+export type TableReset = (driver: SqlDriver, init: () => Promise<void>) => Promise<void>;
+
+/**
+ * The cheap reset between tests on a shared database. The first call drops every table, runs `init`
+ * and records the rows the migrations seeded; later calls empty every table and put those rows back in
+ * one atomic batch, keeping the schema and `_migrations`, so `init` is two queries instead of every
+ * migration. On Miniflare D1 each round trip costs ~10 ms: drop + migrate is ~1 s per test and times
+ * tests out on a loaded machine. FTS5 shadow tables are left to their virtual table. D1 refuses
+ * `sqlite_sequence`, so AUTOINCREMENT counters keep counting across tests.
+ */
+export function createTableReset(): TableReset {
+  let seeded: { tables: string[]; rows: SqlStatement[] } | undefined;
+  return async (driver, init) => {
+    if (!seeded) {
+      await dropAllTables(driver);
+      await init();
+      seeded = await captureSeed(driver);
+      return;
+    }
+    await driver.batch([
+      { sql: "PRAGMA defer_foreign_keys = ON" },
+      ...seeded.tables.map((t) => ({ sql: `DELETE FROM "${t}"` })),
+      ...seeded.rows,
+    ]);
+    await init();
+  };
+}
+
+async function captureSeed(driver: SqlDriver): Promise<{ tables: string[]; rows: SqlStatement[] }> {
+  const all = await driver.all<{ name: string; sql: string | null }>(
+    "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name <> '_migrations'",
+  );
+  const virtual = all.filter((t) => t.sql?.startsWith("CREATE VIRTUAL TABLE")).map((t) => t.name);
+  const tables = all
+    .map((t) => t.name)
+    .filter((name) => !virtual.some((v) => name.startsWith(`${v}_`)));
+  const rows: SqlStatement[] = [];
+  for (const table of tables) {
+    for (const row of await driver.all<Record<string, unknown>>(`SELECT * FROM "${table}"`)) {
+      const columns = Object.keys(row);
+      rows.push({
+        sql: `INSERT INTO "${table}" (${columns.map((c) => `"${c}"`).join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+        params: Object.values(row) as SqlValue[],
+      });
+    }
+  }
+  return { tables, rows };
 }
 
 /** Spins up a Miniflare-backed D1 database (workerd in-process, no Cloudflare account). */

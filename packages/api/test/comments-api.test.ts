@@ -2,7 +2,7 @@ import { SiteGraphStore } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
-import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
+import { createMiniflareD1, createTableReset } from "@cloudhal/storage/testing";
 import { describeCommentsApi } from "../src/testing-comments.ts";
 
 describeCommentsApi("better-sqlite3", {
@@ -15,13 +15,13 @@ describeCommentsApi("better-sqlite3", {
 });
 
 let d1: Awaited<ReturnType<typeof createMiniflareD1>> | undefined;
+const reset = createTableReset();
 describeCommentsApi("Cloudflare D1 (Miniflare)", {
   async create() {
     d1 ??= await createMiniflareD1();
     const sql = new D1Driver(d1.db);
-    await dropAllTables(sql);
     const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
-    await store.init();
+    await reset(sql, () => store.init());
     return { store, sql };
   },
   async dispose() {
