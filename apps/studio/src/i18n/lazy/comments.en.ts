@@ -207,7 +207,6 @@ export const messages = {
       reply: "Reply",
       openThread: "Open thread",
       commenter: "Commenter…",
-      ban: "Ban…",
       resolve: "Resolve report…",
     },
     dialog: {
@@ -366,7 +365,6 @@ export const messages = {
       hideConfirmDescription:
         "Readers see no comments and can't post. The comments stay here, and Default or Open brings them back.",
       hideConfirm: "Hide thread",
-      counts: "Counts",
       entryId: "Article ID",
       path: "Path",
       openArticle: "Open article",
@@ -481,7 +479,6 @@ export const messages = {
       erased: "Commenter erased",
       erasedDescription: "{count} comments changed.",
       eraseFailed: "Couldn't erase the commenter",
-      fromComment: "From a comment",
     },
     editorCard: {
       title: "Comments",

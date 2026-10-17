@@ -493,7 +493,6 @@ export const messages: NamespaceMessages<"schedules"> = {
       notFound: "Böyle bir yayın paketi yok",
     },
     automations: {
-      title: "Otomasyonlar",
       description:
         "Belirli zamanlarda çalışan işler: Cloudhal'ın hazır denetimleri ve anahtarı, bütçesi ve zaman penceresi olan agent görevleri.",
       new: "Yeni otomasyon",

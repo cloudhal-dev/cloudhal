@@ -7,7 +7,6 @@ export const messages: NamespaceMessages<"analyticsSettings"> = {
     description:
       "Besuche auf dieser Website, gezählt ohne Cookies. Änderungen erreichen die Website innerhalb einer Minute.",
     status: { on: "An", off: "Aus", notRunning: "Läuft nicht" },
-    loadFailed: "Die Analyse-Einstellungen konnten nicht geladen werden",
     noAccessTitle: "Du kannst die Analysen nicht sehen",
     notAvailableTitle: "Dieser Server bietet keine Analysen an",
     notAvailableDescription:

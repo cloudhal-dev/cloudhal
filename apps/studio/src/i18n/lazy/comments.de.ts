@@ -204,7 +204,6 @@ export const messages: NamespaceMessages<"comments"> = {
       reply: "Antworten",
       openThread: "Thread öffnen",
       commenter: "Kommentierender…",
-      ban: "Sperren…",
       resolve: "Meldung erledigen…",
     },
     dialog: {
@@ -369,7 +368,6 @@ export const messages: NamespaceMessages<"comments"> = {
       hideConfirmDescription:
         "Leser sehen keine Kommentare und können nichts posten. Die Kommentare bleiben hier, und „Standard“ oder „Offen“ bringt sie zurück.",
       hideConfirm: "Thread verbergen",
-      counts: "Anzahlen",
       entryId: "Artikel-ID",
       path: "Pfad",
       openArticle: "Artikel öffnen",
@@ -489,7 +487,6 @@ export const messages: NamespaceMessages<"comments"> = {
       erased: "Person gelöscht",
       erasedDescription: "{count} Kommentare geändert.",
       eraseFailed: "Die Person konnte nicht gelöscht werden",
-      fromComment: "Aus einem Kommentar",
     },
     editorCard: {
       title: "Kommentare",

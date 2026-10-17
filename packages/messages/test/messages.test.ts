@@ -9,6 +9,7 @@ import {
   formatRelative,
   numberFormat,
 } from "../src/format.ts";
+import { pseudoLocalize, pseudoText } from "../src/pseudo.ts";
 import { compileCatalogSource } from "../src/transform.ts";
 import { cloudhalMessages } from "../src/vite.ts";
 
@@ -135,6 +136,18 @@ describe("the Intl layer", () => {
     expect(formatRelative("de", 3, "day")).toBe("in 3 Tagen");
     expect(displayNames(["en"], { type: "language" }).of("tr")).toBe("Turkish");
     expect(["b", "ç", "c"].sort(collator("tr").compare)).toEqual(["b", "c", "ç"]);
+  });
+});
+
+describe("pseudoLocalize", () => {
+  it("accents, lengthens and brackets text, keeping arguments and plural branches", () => {
+    expect(pseudoText("Save")).toBe("Šààṽéé");
+    expect(pseudoLocalize("Delete {name}?")).toBe("[Đééĺééţéé {name}?]");
+    const plural = compileMessage("{count, plural, one {# file} other {# files}}");
+    const pseudo = pseudoLocalize(plural);
+    expect(formatMessage("en", pseudo, { count: 1 })).toBe("[1 ƒííĺéé]");
+    expect(formatMessage("en", pseudo, { count: 3 })).toBe("[3 ƒííĺééš]");
+    expect(pseudoText("Save").length / "Save".length).toBeGreaterThan(1.3);
   });
 });
 

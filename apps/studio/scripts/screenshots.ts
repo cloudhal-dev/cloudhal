@@ -6,6 +6,9 @@
  *   STUDIO_URL=http://localhost:5173 STUDIO_EMAIL=… STUDIO_PASSWORD=… \
  *     pnpm design:shots -- --out .shots --widths 1440,390 /sites /sites/<id>/pages
  *
+ * `SHOTS_PSEUDO=1` renders in the pseudo-locale ("[Šààṽéé]": accented, longer, bracketed) to find
+ * hard-coded text and labels with no room for longer languages.
+ *
  * Credentials are those of a local test account on your own dev server (never a real one);
  * without them only public routes (/login) render. `route@<js>` runs JS after load (open a dialog) and tags the file `_action`.
  */
@@ -33,6 +36,8 @@ interface Options {
   scheme: "dark" | "light" | undefined;
   /** `SHOTS_LOCALE=tr`: Studio's language for the run. */
   locale: string | undefined;
+  /** `SHOTS_PSEUDO=1`: the pseudo-locale (dev server only; DESIGN.md §1, i18n Phase 5). */
+  pseudo: boolean;
 }
 
 function parse(argv: string[]): Options {
@@ -47,6 +52,7 @@ function parse(argv: string[]): Options {
         ? process.env.SHOTS_SCHEME
         : undefined,
     locale: process.env.SHOTS_LOCALE || undefined,
+    pseudo: process.env.SHOTS_PSEUDO === "1",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
@@ -174,15 +180,18 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
       );
       if (status !== 200) problems.push(`sign-in failed (${status})`);
     }
-    // SHOTS_LOCALE=tr picks Studio's language (stored per browser, read on load).
-    if (opts.locale) {
+    // SHOTS_LOCALE=tr picks Studio's language, SHOTS_PSEUDO=1 the pseudo-locale (stored per
+    // browser, read on load; the pseudo-locale exists on a dev server only).
+    if (opts.locale || opts.pseudo) {
       if (!process.env.STUDIO_EMAIL) {
         await cdp.send("Page.navigate", { url: `${opts.base}/login` });
         await sleep(800);
       }
-      await cdp.evaluate(
-        `localStorage.setItem('cloudhal.studio.locale', ${JSON.stringify(opts.locale)})`,
-      );
+      if (opts.locale)
+        await cdp.evaluate(
+          `localStorage.setItem('cloudhal.studio.locale', ${JSON.stringify(opts.locale)})`,
+        );
+      if (opts.pseudo) await cdp.evaluate("localStorage.setItem('cloudhal.studio.pseudo', '1')");
     }
     for (const route of opts.routes) {
       const [p, action] = route.split("@") as [string, string | undefined];
@@ -205,7 +214,7 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
       const shot = (await cdp.send("Page.captureScreenshot", { format: "png" })) as {
         result?: { data?: string };
       };
-      const tag = `${opts.scheme ? `_${opts.scheme}` : ""}${opts.locale ? `_${opts.locale}` : ""}`;
+      const tag = `${opts.scheme ? `_${opts.scheme}` : ""}${opts.locale ? `_${opts.locale}` : ""}${opts.pseudo ? "_pseudo" : ""}`;
       const name = `${p.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}${action ? "_action" : ""}${tag}_${width}.png`;
       const file = path.join(opts.out, name);
       writeFileSync(file, Buffer.from(shot.result?.data ?? "", "base64"));

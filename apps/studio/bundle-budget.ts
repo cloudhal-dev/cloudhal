@@ -75,10 +75,10 @@ export const LAZY_ONLY: readonly RegExp[] = [
 
 /**
  * Modules that must never be in any chunk: the message compiler runs at build time only
- * (RFC-0032 §2, ADR-0032); catalogs ship already compiled.
+ * (RFC-0032 §2, ADR-0032); catalogs ship already compiled. The pseudo-locale is dev and test only.
  */
 export const NEVER_BUNDLED: readonly RegExp[] = [
-  /[\\/]packages[\\/]messages[\\/]src[\\/](compile|transform|vite)\.ts$/,
+  /[\\/]packages[\\/]messages[\\/]src[\\/](compile|transform|vite|pseudo)\.ts$/,
 ];
 
 /** The part of a Rollup/Rolldown output chunk the check reads. */

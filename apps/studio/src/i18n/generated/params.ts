@@ -220,7 +220,6 @@ export interface MessageParams {
   "common.deleteResource.warning": { name: string | number; type: string | number };
   "common.rev": { rev: string | number };
   "common.unreviewedLanguage": { name: string | number };
-  "common.updated": { when: string | number };
   "diff.assignments.added": { taxonomy: string | number; name: string | number };
   "diff.assignments.primary": { taxonomy: string | number; name: string | number };
   "diff.assignments.removed": { taxonomy: string | number; name: string | number };
@@ -478,9 +477,6 @@ export interface MessageParams {
   "notifications.toast.endingBody": { time: string | number; from: string | number };
   "notifications.toast.endingTitle": { name: string | number; mode: string | number; left: string | number };
   "overview.commentsWaiting": { count: number };
-  "overview.counts": { pages: string | number; articles: string | number; snapshots: string | number };
-  "overview.liveSnapshot": { id: string | number };
-  "pagination.showing": { from: string | number; to: string | number; total: string | number };
   "passwords.advice.empty": { min: string | number };
   "passwords.advice.tooShort": { min: string | number };
   "passwords.errors.tooLong": { max: string | number };

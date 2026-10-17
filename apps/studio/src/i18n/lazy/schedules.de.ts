@@ -508,7 +508,6 @@ export const messages: NamespaceMessages<"schedules"> = {
       notFound: "Dieses Release existiert nicht",
     },
     automations: {
-      title: "Automatisierungen",
       description:
         "Aufgaben, die nach Zeitplan laufen: die integrierten Prüfungen von Cloudhal und Agent-Aufgaben mit einem Schlüssel, einem Budget und einem Zeitfenster.",
       new: "Neue Automatisierung",

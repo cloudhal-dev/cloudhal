@@ -9,7 +9,6 @@ export const messages: Messages = {
   common: {
     save: "Speichern",
     cancel: "Abbrechen",
-    confirm: "Bestätigen",
     delete: "Löschen",
     publish: "Veröffentlichen",
     rollBack: "Zurücksetzen",
@@ -21,19 +20,16 @@ export const messages: Messages = {
     unreviewedLanguage: "{name} (maschinelle Übersetzung)",
     more: "Mehr",
     rev: "rev {rev}",
-    updated: "aktualisiert {when}",
     close: "Schließen",
     copy: "Kopieren",
     copied: "Kopiert",
     retry: "Erneut versuchen",
-    open: "Öffnen",
     discard: "Verwerfen",
     saveChanges: "Änderungen speichern",
     unsaved: "Ungespeicherte Änderungen",
     onThisPage: "Auf dieser Seite",
     on: "An",
     off: "Aus",
-    current: "Aktuell",
     /** The `DeleteResource` dialog (`components/deleteLabels.ts`); `{name}` is the resource's name. */
     deleteResource: {
       title: "{name} löschen",
@@ -165,17 +161,13 @@ export const messages: Messages = {
     articles: "Artikel",
     snapshots: "Snapshots",
     agents: "Agents",
-    soon: "Bald",
     allSites: "Alle Sites",
     sites: "Sites",
     switchSite: "Site wechseln",
-    commands: "Befehle",
     search: "Suchen oder Befehl ausführen…",
     shortcutHint: "⌘K",
-    agentRuns: "Läufe",
     agentSkills: "Skills",
     schedules: "Zeitpläne",
-    toggleSidebar: "Seitenleiste umschalten",
     activity: "Aktivität",
     agentKeys: "Schlüssel und MCP",
     approvals: "Freigaben",
@@ -217,16 +209,13 @@ export const messages: Messages = {
     commentsWaiting: "{count, plural, one {# Kommentar wartet} other {# Kommentare warten}}",
     commentsWaitingDescription: "Leser sehen sie erst, wenn jemand sie freigibt.",
     liveSnapshotLabel: "Live-Snapshot",
-    liveSnapshot: "Live-Snapshot {id}",
     notPublished: "Noch nicht veröffentlicht",
     newPage: "Neue Seite",
     pages: "Seiten",
-    pagesDescription: "Routbare Seiten dieser Site in Navigationsreihenfolge.",
     columns: {
       title: "Titel",
       path: "Pfad",
       status: "Status",
-      rev: "Rev",
       updated: "Aktualisiert",
     },
     empty: "Noch keine Seiten",
@@ -234,15 +223,11 @@ export const messages: Messages = {
     search: "Seiten durchsuchen",
     status: "Status",
     live: "Live",
-    counts: "{pages} Seiten · {articles} Artikel · {snapshots} Snapshots",
-    quickActions: "Schnellaktionen",
     recentArticles: "Neueste Artikel",
     viewAll: "Alle anzeigen",
     cli: "Im Terminal",
-    openPage: "Öffnen",
   },
   articles: {
-    title: "Artikel",
     description: "Beiträge in der Sammlung „posts“.",
     newArticle: "Neuer Artikel",
     empty: "Noch keine Artikel",
@@ -250,13 +235,11 @@ export const messages: Messages = {
     untitled: "Ohne Titel",
     columns: {
       title: "Titel",
-      slug: "Slug",
       author: "Autor",
       status: "Status",
       updated: "Aktualisiert",
     },
     search: "Artikel durchsuchen",
-    open: "Öffnen",
     none: "—",
     noCategory: "Keine Kategorie",
     primary: "Hauptkategorie",
@@ -353,8 +336,6 @@ export const messages: Messages = {
     moveDown: "Nach unten",
     heading: "Überschrift",
     subheading: "Unterüberschrift",
-    imageUrl: "Bild-URL",
-    altText: "Alternativtext",
     caption: "Bildunterschrift",
     collection: "Sammlung",
     limit: "Limit",
@@ -376,7 +357,6 @@ export const messages: Messages = {
     deletePage: "Seite löschen",
     article: "Artikel",
     page: "Seite",
-    content: "Inhalt",
     slugHint: "Kleinbuchstaben, mit Bindestrichen; wird zur URL.",
     metadata: "Details",
     moreActions: "Weitere Aktionen",
@@ -501,7 +481,6 @@ export const messages: Messages = {
       descriptionLong: "{count} Zeichen. Suchergebnisse kürzen nach etwa 160.",
       summaryMissing:
         "Füge eine Zusammenfassung hinzu. Ohne sie wählen Suchmaschinen Text aus dem Artikel.",
-      descriptionMissing: "Ohne sie wählen Suchmaschinen Text von der Seite.",
       image: "Vorschaubild",
       imageSet: "Das Titelbild wird verwendet.",
       imageMissing: "Kein Titelbild, daher zeigen geteilte Links kein Bild.",
@@ -563,30 +542,17 @@ export const messages: Messages = {
     archived: "Archiviert",
   },
   site: {
-    tabs: {
-      overview: "Übersicht",
-      pages: "Seiten",
-      articles: "Artikel",
-      snapshots: "Snapshots",
-      activity: "Aktivität",
-      settings: "Einstellungen",
-    },
-    snapshot: "Snapshot",
     publish: "Veröffentlichen",
     publishDescription:
       "Einen Snapshot des aktuellen Graphen erstellen und ihn zur Live-Version machen.",
     description: "/{slug} · {locale}",
     rowMenu: "Weitere Aktionen",
   },
-  pagination: { showing: "{from}–{to} von {total}" },
   snapshots: {
-    title: "Snapshots",
     description:
       "Jeder Snapshot ist unveränderlich; beim Veröffentlichen zeigt die Site auf einen davon.",
     label: "Bezeichnung",
     labelPlaceholder: "z. B. Morgenausgabe",
-    snapshot: "Snapshot",
-    snapshotAndPublish: "Snapshot erstellen und veröffentlichen",
     empty: "Noch keine Snapshots",
     emptyDescription: "Erstelle einen Snapshot, um den aktuellen Zustand der Site einzufrieren.",
     created: "Snapshot erstellt",
@@ -657,7 +623,6 @@ export const messages: Messages = {
     },
   },
   agents: {
-    title: "Agents",
     description:
       "Mit Schlüsseln arbeiten Agents, CI-Jobs und MCP-Clients an deinen Sites. Jeder Schlüssel hat einen Modus, der bestimmt, was der Agent selbst erledigt und was auf dich wartet. Jeder Aufruf wird per Richtlinie geprüft und in der Aktivität der Site protokolliert.",
     createKey: "Schlüssel erstellen",
@@ -711,7 +676,6 @@ export const messages: Messages = {
     keyResource: "Agent-Schlüssel",
     revoked: "Schlüssel widerrufen",
     revokedDescription: "{name} kann Studio nicht mehr erreichen.",
-    revokeFailed: "Der Schlüssel konnte nicht widerrufen werden",
     scopes: {
       "site:read": "Sites und Snapshots sehen",
       "content:read": "Seiten und Artikel lesen",
@@ -942,7 +906,6 @@ export const messages: Messages = {
     },
   },
   activity: {
-    title: "Aktivität",
     search: "Tool, Akteur oder Skill suchen",
     refresh: "Aktivität aktualisieren",
     filters: {
@@ -1021,7 +984,6 @@ export const messages: Messages = {
     recentEmptyDescription: "Verbinde einen Agent, dann erscheinen seine Tool-Aufrufe hier.",
   },
   account: {
-    title: "Konto",
     description:
       "Dein Profil, wie du dich anmeldest und wer sonst noch Zugang zu diesem Studio hat.",
     sections: {
@@ -1127,12 +1089,10 @@ export const messages: Messages = {
         "Alle Browser und Clients außer diesem müssen sich erneut anmelden. Agent-Schlüssel funktionieren weiter.",
       revoked: "Sitzung abgemeldet",
       revokedOthers: "Andere Sitzungen abgemeldet",
-      failed: "Die Sitzung konnte nicht abgemeldet werden",
       staleTitle: "Melde dich erneut an, um deine Sitzungen zu sehen",
       staleDescription:
         "Zu deiner Sicherheit erfordert die Sitzungsliste eine Anmeldung innerhalb der letzten 24 Stunden.",
       signInAgain: "Erneut anmelden",
-      empty: "Keine anderen Sitzungen",
     },
     access: {
       description:
@@ -1156,7 +1116,6 @@ export const messages: Messages = {
         "Jedes Konto erhält vollen Zugriff auf jede Website. Schließe die Registrierung, bevor du diese Adresse teilst.",
       howToChange:
         "Setze auf Cloudflare CLOUDHAL_SIGNUP im Admin-Worker auf open oder closed (nicht gesetzt bedeutet nur Inhaber). cloudhal studio auf deinem Rechner ist immer nur für den Inhaber.",
-      server: "Dieser Server",
       serverDescription: "Was diese Studio-Installation ausführt.",
       features: {
         members: "Team und Rollen",
@@ -1319,7 +1278,6 @@ export const messages: Messages = {
     },
   },
   skills: {
-    title: "Skills",
     description:
       "Playbooks, die Agents über MCP lesen. Ein Aufruf unter einem Skill kann nur die Scopes nutzen, die er deklariert, und die Tools, die er auflistet, warten immer auf eine Person.",
     search: "Skills durchsuchen",
@@ -1328,7 +1286,6 @@ export const messages: Messages = {
       scopes: "Scopes",
       approval: "Braucht Freigabe",
       references: "Referenzen",
-      resource: "Ressource",
     },
     none: "Keine",
     referenceCount: "{count, plural, one {# Datei} other {# Dateien}}",
@@ -1456,7 +1413,6 @@ export const messages: Messages = {
     },
   },
   approvals: {
-    title: "Freigaben",
     refresh: "Freigaben aktualisieren",
     pending: "Wartet auf dich",
     pendingDescription:
@@ -1526,7 +1482,6 @@ export const messages: Messages = {
     expiresSoon: "Läuft bald ab",
     arguments: "Argumente",
     noArguments: "Dieser Aufruf hat keine Argumente.",
-    prompt: "Anfrage",
     approve: "Freigeben",
     deny: "Ablehnen",
     withdraw: "Zurückziehen",
@@ -1845,7 +1800,6 @@ export const messages: Messages = {
       value: "{published} / {total}",
       hint: "{published} von {total} Artikeln veröffentlicht. Öffnet sie unter Artikel.",
       none: "Keine",
-      never: "Nie",
     },
     index: {
       indexed: "Indexiert",

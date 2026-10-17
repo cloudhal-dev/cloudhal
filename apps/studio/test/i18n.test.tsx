@@ -15,6 +15,7 @@ import {
   matchLocale,
   NAMESPACES,
   resetNamespaces,
+  setPseudo,
   translate,
   useI18n,
   useT,
@@ -231,6 +232,19 @@ describe("i18n", () => {
     );
     expect(document.documentElement.lang).toBe("de");
     expect(document.documentElement.dir).toBe("ltr");
+  });
+});
+
+describe("the pseudo-locale (dev and test only)", () => {
+  afterEach(() => setPseudo(false));
+  it("accents, lengthens and brackets every message, keeping arguments and plurals", () => {
+    setPseudo(true);
+    expect(translate("en", "common.save")).toBe("[Šààṽéé]");
+    expect(translate("en", "common.rev", { rev: 3 })).toBe("[ŕééṽ 3]");
+    expect(translate("en", "editor.words", { count: 2 })).toBe("[2 ŵóóŕđš]");
+    expect(translate("en", "nope.missing" as MessageKey)).toBe("nope.missing");
+    setPseudo(false);
+    expect(translate("en", "common.save")).toBe("Save");
   });
 });
 
