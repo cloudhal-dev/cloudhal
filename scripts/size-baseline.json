@@ -33,7 +33,6 @@
     "packages/mcp-server/src/schedule-tools.ts": 1596,
     "packages/mcp-server/src/schedules.ts": 890,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
-    "packages/mcp-server/src/tools.ts": 2073,
     "packages/schedules/src/recurrence.ts": 939,
     "packages/schedules/src/scheduler.ts": 1343,
     "packages/schedules/src/sql/store.ts": 2166,
@@ -558,9 +557,6 @@
     },
     "packages/mcp-server/src/tools.ts::noteRunCall": {
       "params": 5
-    },
-    "packages/mcp-server/src/tools.ts::rawTools": {
-      "lines": 1057
     },
     "packages/mcp-server/src/tools.ts::runRefusal": {
       "params": 6
