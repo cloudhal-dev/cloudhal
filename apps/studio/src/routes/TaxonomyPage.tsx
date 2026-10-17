@@ -201,7 +201,7 @@ export function TaxonomyPage() {
       title={structure.reason}
       data-testid="new-term"
     >
-      {t("taxonomy.newTerm", { singular: singular.toLocaleLowerCase(locale) })}
+      {t("taxonomy.newTerm", { singular: singular.toLocaleLowerCase(locale), Singular: singular })}
     </Button>
   );
 

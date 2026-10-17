@@ -29,7 +29,7 @@ export function TaxonomyHealthCard({
   onMerge: (sourceId: string, targetId: string) => void;
   onReview: () => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const items = data.itemsOf(tax);
   const byId = new Map(items.map((i) => [i.term.id, i.term]));
   const report = taxonomyReport({
@@ -39,8 +39,7 @@ export function TaxonomyHealthCard({
     ...(entries ? { entries } : {}),
     locale: data.defaultLocale,
   });
-  const Singular = data.label(tax, "singular");
-  const singular = Singular.toLocaleLowerCase(locale);
+  const forms = data.singularForms(tax);
   const names = (ids: readonly string[]) =>
     ids
       .slice(0, 4)
@@ -148,7 +147,7 @@ export function TaxonomyHealthCard({
               id="missing-primary"
               label={t("taxonomy.health.missingPrimary", {
                 count: report.missingPrimary.length,
-                singular,
+                ...forms,
               })}
               hint={t("taxonomy.health.missingPrimaryHint")}
             />
@@ -158,8 +157,7 @@ export function TaxonomyHealthCard({
               id="unfiled"
               label={t("taxonomy.health.unfiled", {
                 count: report.unfiled.length,
-                singular,
-                Singular,
+                ...forms,
               })}
               hint={t("taxonomy.health.unfiledHint")}
             />
