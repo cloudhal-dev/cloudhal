@@ -218,9 +218,40 @@ function okResult(result: unknown): CallToolResult {
   };
 }
 
+/**
+ * The HTTP transport builds a server per request, so the tool list and the compiled validators are
+ * built once per process: compiling every tool's schemas took most of each call's time, and each
+ * fresh schema object stayed in the validator's cache for good.
+ */
+let defaultTools: ToolDefinition[] | undefined;
+function defaultToolList(): ToolDefinition[] {
+  if (!defaultTools) defaultTools = defineTools();
+  return defaultTools;
+}
+const compiled = new WeakMap<object, Map<string, ReturnType<typeof fromJsonSchema>>>();
+
+/** `fromJsonSchema` once per schema object and variant (the extra approval fields it gets). */
+function compiledSchema(
+  schema: ToolDefinition["inputSchema"],
+  variant: string,
+  build: () => ToolDefinition["inputSchema"],
+): ReturnType<typeof fromJsonSchema<Record<string, unknown>>> {
+  let byVariant = compiled.get(schema);
+  if (!byVariant) {
+    byVariant = new Map();
+    compiled.set(schema, byVariant);
+  }
+  let out = byVariant.get(variant);
+  if (!out) {
+    out = fromJsonSchema<Record<string, unknown>>(build() as Parameters<typeof fromJsonSchema>[0]);
+    byVariant.set(variant, out);
+  }
+  return out as ReturnType<typeof fromJsonSchema<Record<string, unknown>>>;
+}
+
 /** Builds a Cloudhal MCP server for one principal. */
 export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer {
-  const tools = options.tools ?? defineTools();
+  const tools = options.tools ?? defaultToolList();
   const policy = options.policy ?? new PolicyEngine(toolPolicies(tools));
   const skills = new Map((options.skills ?? []).map((s) => [s.manifest.name, s]));
   const fallback = options.confirmTokenFallback ?? false;
@@ -273,8 +304,10 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
 
   for (const def of tools) {
     // Any tool that writes can need a person (manual mode makes every write gated).
-    const inputSchema =
-      gated(def) || (options.approvals && def.annotations.readOnlyHint !== true)
+    const extended = gated(def) || (options.approvals && def.annotations.readOnlyHint !== true);
+    const variant = extended ? `${options.approvals ? "a" : ""}${fallback ? "c" : ""}` : "";
+    const inputSchema = compiledSchema(def.inputSchema, variant, () =>
+      extended
         ? {
             ...def.inputSchema,
             properties: {
@@ -300,19 +333,16 @@ export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer 
                 : {}),
             },
           }
-        : def.inputSchema;
+        : def.inputSchema,
+    );
 
     server.registerTool(
       def.name,
       {
         title: def.title,
         description: def.description,
-        inputSchema: fromJsonSchema<Record<string, unknown>>(
-          inputSchema as Parameters<typeof fromJsonSchema>[0],
-        ),
-        outputSchema: fromJsonSchema<Record<string, unknown>>(
-          def.outputSchema as Parameters<typeof fromJsonSchema>[0],
-        ),
+        inputSchema,
+        outputSchema: compiledSchema(def.outputSchema, "", () => def.outputSchema),
         annotations: { ...def.annotations, title: def.title },
         // MCP Apps: hosts that render UI show the tool's results in Cloudhal's View; others ignore it.
         ...(def.ui ? { _meta: { ui: { ...def.ui } } } : {}),
