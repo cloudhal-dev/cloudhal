@@ -2029,6 +2029,12 @@ export const api = {
           coverImage: entry.coverImage ?? null,
         }),
       }),
+    /** One piece of a body (a ```surface) as the preview draws it. Nothing is written. */
+    previewFragment: (siteId: string, markdown: string) =>
+      request<{ html: string }>(`/api/sites/${siteId}/entries/preview-fragment`, {
+        method: "POST",
+        ...json({ markdown }),
+      }),
     create: (siteId: string, entry: NewEntry) =>
       request<ContentEntry>(`/api/sites/${siteId}/entries`, { method: "POST", ...json(entry) }),
     update: (entry: ContentEntry) =>

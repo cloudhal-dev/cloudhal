@@ -6,7 +6,16 @@ import type {
   PickedImage,
 } from "@cloudhal/ui/editor";
 import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { previewImageUrl } from "../lib/seo.ts";
@@ -23,6 +32,20 @@ type Picked = PickedImage | undefined;
 const MarkdownEditor = lazy(() =>
   import("@cloudhal/ui/editor").then((m) => ({ default: m.MarkdownEditor })),
 );
+
+/** What focus mode's Save does: whether there is something to save, and how. */
+export interface FocusSave {
+  dirty: boolean;
+  saving: boolean;
+  disabled: boolean;
+  onSave: () => void;
+}
+
+/**
+ * The page editor's save for body editors deep in its sections (focus mode keeps it at hand);
+ * an editor's own `focusSave` wins.
+ */
+export const FocusSaveContext = createContext<FocusSave | undefined>(undefined);
 
 /** `asset:<id>` → the private content route (drafts too); other addresses as the SEO preview does. */
 export function bodyImageSrc(
@@ -55,7 +78,7 @@ export function BodyEditor({
   onChange,
   size = "base",
   readOnly = false,
-  focusSave,
+  focusSave: ownSave,
 }: {
   siteId: string;
   /** The page or article (in-editor AI, RFC-0016): without it, no "Ask AI". */
@@ -70,9 +93,11 @@ export function BodyEditor({
   size?: "sm" | "base";
   readOnly?: boolean;
   /** Focus mode keeps the page's save at hand: whether there is something to save, and how. */
-  focusSave?: { dirty: boolean; saving: boolean; disabled: boolean; onSave: () => void };
+  focusSave?: FocusSave;
 }) {
   const t = useT("bodyEditor");
+  const pageSave = useContext(FocusSaveContext);
+  const focusSave = ownSave ?? pageSave;
   const { locale } = useI18n();
   // The picker answers the editor's promise: an image, or nothing when it closes.
   const [picking, setPicking] = useState(false);
@@ -130,6 +155,9 @@ export function BodyEditor({
       outlineSkipped: t("bodyEditor.outlineSkipped"),
       outlineExtraH1: t("bodyEditor.outlineExtraH1"),
       askAi: t("bodyEditor.ai.ask"),
+      surfacePreview: t("bodyEditor.surfacePreview"),
+      showCode: t("bodyEditor.showCode"),
+      hideCode: t("bodyEditor.hideCode"),
       focus: t("bodyEditor.focus"),
       focusExit: t("bodyEditor.focusExit"),
       spotlight: t("bodyEditor.spotlight"),
@@ -166,6 +194,22 @@ export function BodyEditor({
   const ai = useAiAvailable(siteId, nodeId !== undefined && !readOnly);
   const [asking, setAsking] = useState<AiSelection | undefined>();
   const resolveSrc = useCallback((src: string) => bodyImageSrc(siteId, host, src), [siteId, host]);
+  // ```surface blocks drawn as the preview draws them, once per text.
+  const drawn = useRef(new Map<string, Promise<string | undefined>>());
+  const previewSource = useCallback(
+    (markdown: string) => {
+      let html = drawn.current.get(markdown);
+      if (!html) {
+        html = api.entries.previewFragment(siteId, markdown).then(
+          (r) => r.html,
+          () => undefined,
+        );
+        drawn.current.set(markdown, html);
+      }
+      return html;
+    },
+    [siteId],
+  );
   const fallback = (
     <InputArea
       aria-label={t("editor.body")}
@@ -192,6 +236,7 @@ export function BodyEditor({
           readOnly={readOnly}
           locale={locale}
           blocks={blocks}
+          previewSource={previewSource}
           {...(focusSave
             ? {
                 focusActions: (

@@ -120,6 +120,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/entries`, "content:draft:own"],
   ["GET", `${S}/entries/:entryId/preview`, "content:read"],
   ["POST", `${S}/entries/:entryId/preview`, "content:read"],
+  // the body editor's inline preview of one ```surface (writes nothing)
+  ["POST", `${S}/entries/preview-fragment`, "content:read"],
   ["GET", `${S}/entries/:entryId`, "content:read"],
   ["PUT", `${S}/entries/:entryId`, "content:draft:own"],
   ["DELETE", `${S}/entries/:entryId`, "content:draft:own"],

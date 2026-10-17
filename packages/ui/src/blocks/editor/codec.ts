@@ -33,6 +33,29 @@ export interface MarkdownCodec {
   block(node: JSONContent): string;
 }
 
+/**
+ * A table as people write it (`| a | b |`, `|:---|---:|`), not padded to its widest cell: an
+ * edited cell then changes one line of the stored markdown, not every line.
+ */
+export function compactTable(markdown: string): string {
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (!line.trimStart().startsWith("|")) return line;
+      const cells = line
+        .trim()
+        .slice(1, -1)
+        .split(/(?<!\\)\|/);
+      const delimiter = cells.every((c) => /^\s*:?-+:?\s*$/.test(c));
+      const out = cells.map((c) => {
+        const v = c.trim();
+        return delimiter ? `${v.startsWith(":") ? ":" : ""}---${v.endsWith(":") ? ":" : ""}` : v;
+      });
+      return `| ${out.join(" | ")} |`;
+    })
+    .join("\n");
+}
+
 export function createMarkdownCodec(extensions: AnyExtension[]): MarkdownCodec {
   const manager = new MarkdownManager({ extensions });
 
@@ -49,7 +72,13 @@ export function createMarkdownCodec(extensions: AnyExtension[]): MarkdownCodec {
         inner,
       );
     }
-    return manager.serialize({ type: "doc", content: [node] }).trimEnd();
+    // Footnote references and definitions (`[^1]`, `[^1]: …`) are markdown the serializer
+    // would escape into plain brackets.
+    const text = manager
+      .serialize({ type: "doc", content: [node] })
+      .trimEnd()
+      .replace(/\\\[\^([\w-]{1,40})\\\]/g, "[^$1]");
+    return node.type === "table" ? compactTable(text.trimStart()) : text;
   };
 
   const loadUnits = (

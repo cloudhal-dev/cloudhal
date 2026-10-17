@@ -133,4 +133,21 @@ describe("surface fences (RFC-0020 §5)", () => {
     expect(kinds).toEqual(["paragraph", "sourceBlock", "codeBlock"]);
     expect(codec.save(loaded.doc, loaded.base)).toBe(md);
   });
+
+  it("keeps footnotes as markdown when their paragraph is written anew", () => {
+    const codec = createMarkdownCodec(editorExtensions());
+    const loaded = codec.load("Text[^1] here.\n\n[^1]: The note.\n");
+    const out = (loaded.doc.content ?? []).map((n: JSONContent) => codec.block(n)).join("\n\n");
+    expect(out).toBe("Text[^1] here.\n\n[^1]: The note.");
+  });
+
+  it("writes an edited table compactly, keeping its alignment", () => {
+    const codec = createMarkdownCodec(editorExtensions());
+    const md = "| Plan | Price | Notes |\n|:-----|------:|:-----:|\n| Free | $0 | `a \\| b` |";
+    const loaded = codec.load(md);
+    const out = codec.block((loaded.doc.content ?? [])[0] as JSONContent);
+    expect(out).toBe(
+      "| Plan | Price | Notes |\n| :--- | ---: | :---: |\n| Free | $0 | `a \\| b` |",
+    );
+  });
 });

@@ -24,7 +24,7 @@ What writers expect from all of them: one click or one shortcut in and out, the 
 
 ## Later
 - **Typewriter scrolling** (keep the caret line at a fixed height): useful for long drafts, but it fights selection while editing (iA's own warning); add as an opt-in switch if writers ask.
-- **Page editor sections**: the page editor's rich-text sections get focus mode without a save slot (the page's own Save is one Esc away); pass `focusSave` there when the section editor learns the page's save state.
+- ~~Page editor sections~~: done — the page editor provides its save through `FocusSaveContext`, so its rich-text sections show the same save state and Save in focus mode.
 - Word count and reading time in the layer's top bar.
 
 ## Sources

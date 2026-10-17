@@ -129,6 +129,34 @@ describe("MarkdownEditor", () => {
     localStorage.removeItem("cloudhal.editor.spotlight");
   });
 
+  it("draws a ```surface source block with the host's preview, its code behind a toggle", async () => {
+    const md =
+      '```surface {"id":"calc","catalog":"blog@1"}\n{"id":"root","component":"Text","props":{"text":"Hi"}}\n```\n';
+    const previewSource = vi.fn(async () => "<!doctype html><p>drawn</p>");
+    render(
+      <MarkdownEditor
+        value={md}
+        onChange={() => {}}
+        label="Body"
+        labels={{
+          ...labels,
+          surfacePreview: "Preview",
+          showCode: "Show code",
+          hideCode: "Hide code",
+        }}
+        previewSource={previewSource}
+      />,
+    );
+    const frame = await screen.findByTitle("Preview");
+    expect(frame.tagName).toBe("IFRAME");
+    expect(frame).toHaveAttribute("sandbox", "allow-same-origin");
+    expect(frame.getAttribute("srcdoc")).toContain("drawn");
+    expect(previewSource).toHaveBeenCalledWith(md.trimEnd());
+    expect(editable().querySelector("[data-source-block] code")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show code" }));
+    expect(editable().querySelector("[data-source-block] code")?.textContent).toContain('"calc"');
+  });
+
   it("offers no focus mode without its words", () => {
     render(<Harness initial={"Hi\n"} />);
     expect(screen.queryByRole("button", { name: "Focus" })).toBeNull();

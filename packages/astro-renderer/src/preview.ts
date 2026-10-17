@@ -233,6 +233,21 @@ export function renderEntryPreview(
   };
 }
 
+/**
+ * One piece of a body (a ```surface, a block) as a document of its own, for the body editor's
+ * inline preview: the preview's policy and styles, no site header or footer, nothing else.
+ */
+export function renderFragmentPreview(
+  site: Site,
+  markdown: string,
+  media?: MediaContext,
+): { html: string } {
+  const body = `<div class="ch-richtext">${renderMarkdown(markdown, previewMedia(site, media))}</div>`;
+  return {
+    html: `<!doctype html><html lang="${esc(site.defaultLocale)}"><head><meta charset="utf-8"><meta http-equiv="content-security-policy" content="${PREVIEW_CSP}"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}body{background:transparent}main{max-width:none;padding:0}</style></head><body><main>${body}</main></body></html>`,
+  };
+}
+
 export interface ArchivePreviewInput {
   readonly taxonomies: readonly Taxonomy[];
   /** The site's terms (any status), with the previewed one as it is being edited. */
@@ -503,6 +518,7 @@ const PREVIEW_CSS =
   ".ch-radio[data-variant=buttons] .ch-radio__options{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:.25rem;padding:.25rem;border:1px solid var(--line);border-radius:8px;width:fit-content}.ch-radio[data-variant=buttons] input{position:absolute;opacity:0}.ch-radio[data-variant=buttons] .ch-radio__option span{display:block;padding:.3rem .8rem;border-radius:6px;color:var(--muted)}.ch-radio[data-variant=buttons] input:checked+span{background:var(--fg);color:var(--bg)}" +
   // Markdown tables in bodies (no class): ruled rows, the alignment asked for, their own scroll.
   "main table:not([class]){display:block;width:max-content;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:.95em}main table:not([class]) :is(th,td){padding:.45em .8em;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}main table:not([class]) th{font-weight:600}main table:not([class]) [align=center]{text-align:center}main table:not([class]) [align=right]{text-align:right}" +
+  ".ch-fnref a{text-decoration:none;font-size:.75em;padding:0 .1em}.ch-footnotes{margin-top:2.5rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}.ch-fnback{text-decoration:none}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}" +
   ".ch-surface-problem{border:1px solid #d97706;border-radius:8px;padding:.6rem .9rem;font-size:.9rem}.ch-surface-problem ul{margin:.4rem 0 0}" +
   ".ch-block--missing{padding:.6rem .9rem;border:1px dashed var(--line);border-radius:6px;color:var(--muted);font-size:.9rem}" +
   // RFC-0027: carousels without the module (previews run no scripts): a scroll-snap track, the

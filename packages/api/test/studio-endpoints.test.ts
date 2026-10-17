@@ -160,6 +160,27 @@ describe("draft preview", () => {
     ).toBe(404);
   });
 
+  it("draws one ```surface of a body for the editor's inline preview, writing nothing", async () => {
+    const { site, app } = await setup();
+    const post = (body: unknown) =>
+      app.request(`/api/sites/${site.id}/entries/preview-fragment`, {
+        method: "POST",
+        headers: { "x-test-user": "1", "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const res = await post({
+      markdown:
+        '```surface {"id":"hello","catalog":"blog@1"}\n{"id":"root","component":"Text","props":{"text":"Hello"}}\n```',
+    });
+    expect(res.status).toBe(200);
+    const { html } = (await res.json()) as { html: string };
+    expect(html).toMatch(/^<!doctype html>/);
+    expect(html).toContain("default-src 'none'");
+    expect(html).toContain('data-section-id="hello"');
+    expect(html).toContain("Hello");
+    expect((await post({ markdown: 3 })).status).toBe(400);
+  });
+
   it("renders a page's unsaved sections, keeping only valid ones", async () => {
     const { store, site, app } = await setup();
     const home = (await store.listPages(site.id)).find((p) => p.path === "/");
