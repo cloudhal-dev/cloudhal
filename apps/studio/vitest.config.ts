@@ -1,8 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { catalogs } from "./catalogs.ts";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [catalogs(), react()],
   test: {
     environment: "happy-dom",
     include: ["test/**/*.test.{ts,tsx}"],

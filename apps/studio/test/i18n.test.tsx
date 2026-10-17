@@ -1,3 +1,5 @@
+import { argumentsOf } from "@cloudhal/messages/compile";
+import { type Compiled, isMessage } from "@cloudhal/messages/format";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
@@ -38,13 +40,15 @@ const lazy = (ns: string, l: Locale): object | undefined =>
   LAZY[`../src/i18n/lazy/${ns}.${l}.ts`]?.messages;
 const OTHERS = LOCALE_LIST.filter((l) => l !== "en");
 
-const flat = (o: object, prefix = ""): [string, string][] =>
+/** Every message by key; a value is a string or a message compiled at build time (RFC-0032). */
+const flat = (o: object, prefix = ""): [string, Compiled][] =>
   Object.entries(o).flatMap(([k, v]) =>
-    typeof v === "string" ? [[`${prefix}${k}`, v]] : flat(v as object, `${prefix}${k}.`),
+    typeof v === "string" || isMessage(v)
+      ? [[`${prefix}${k}`, v as Compiled]]
+      : flat(v as object, `${prefix}${k}.`),
   );
 const leaves = (o: object) => flat(o).map(([k]) => k);
-const params = (text: string) =>
-  new Set([...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as string));
+const params = (message: Compiled) => new Set(argumentsOf(message).keys());
 
 /**
  * Placeholders the call sites always pass together, so a language may use the form its grammar
@@ -161,7 +165,9 @@ describe("locales", () => {
       ];
       const same = sources.flatMap(([english, other]) => {
         const source = new Map(flat(english));
-        return flat(other).filter(([k, v]) => source.get(k) === v && sentence(v));
+        return flat(other).filter(
+          ([k, v]) => typeof v === "string" && source.get(k) === v && sentence(v),
+        );
       });
       expect(
         same.length,

@@ -11,7 +11,7 @@ export const messages = {
     unavailable: {
       title: "This deployment can't reach Workers AI yet",
       description:
-        'Add "ai": {} to cloudhal.json and deploy again. On your own server, set CLOUDFLARE_ACCOUNT_ID and CLOUDHAL_AI_TOKEN. You can choose the settings now.',
+        "Add \"ai\": '{}' to cloudhal.json and deploy again. On your own server, set CLOUDFLARE_ACCOUNT_ID and CLOUDHAL_AI_TOKEN. You can choose the settings now.",
     },
     enabled: {
       label: "AI in the editor",

@@ -1,0 +1,27 @@
+{
+  "name": "@cloudhal/messages",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudhal UI messages (RFC-0032, ADR-0032): an ICU MessageFormat 1 subset (plural, select, selectordinal, number) compiled to data at build time, and the Worker-safe formatter that renders it. No dependencies.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./format": "./src/format.ts",
+    "./compile": "./src/compile.ts",
+    "./vite": "./src/vite.ts",
+    "./transform": "./src/transform.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

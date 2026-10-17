@@ -17,7 +17,7 @@ import {
 } from "@cloudhal/ui";
 import { Sparkle } from "@phosphor-icons/react";
 import { useMemo } from "react";
-import { useI18n } from "../i18n/index.tsx";
+import { type TFunction, useI18n } from "../i18n/index.tsx";
 
 const catalog = createCatalog();
 
@@ -48,10 +48,7 @@ function titleOf(c: SurfaceComponent, locale: string): string {
 }
 
 /** A few words for what the component shows: its text, then where its value comes from. */
-function summaryOf(
-  c: SurfaceComponent,
-  t: (k: "editor.surface.bound" | "editor.surface.computed", p: Record<string, string>) => string,
-): string | undefined {
+function summaryOf(c: SurfaceComponent, t: TFunction): string | undefined {
   const props = isObj(c.props) ? c.props : {};
   const parts: string[] = [];
   const text = TEXT_PROPS.map((k) => props[k]).find(

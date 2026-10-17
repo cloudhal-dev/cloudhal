@@ -9,7 +9,7 @@ export const messages: NamespaceMessages<"aiSettings"> = {
     unavailable: {
       title: "Diese Bereitstellung kann Workers AI noch nicht erreichen",
       description:
-        'Füge "ai": {} zu cloudhal.json hinzu und stelle erneut bereit. Auf deinem eigenen Server setze CLOUDFLARE_ACCOUNT_ID und CLOUDHAL_AI_TOKEN. Die Einstellungen kannst du schon jetzt wählen.',
+        "Füge \"ai\": '{}' zu cloudhal.json hinzu und stelle erneut bereit. Auf deinem eigenen Server setze CLOUDFLARE_ACCOUNT_ID und CLOUDHAL_AI_TOKEN. Die Einstellungen kannst du schon jetzt wählen.",
     },
     enabled: {
       label: "KI im Editor",

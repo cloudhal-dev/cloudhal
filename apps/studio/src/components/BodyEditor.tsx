@@ -16,7 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useI18n, useT } from "../i18n/index.tsx";
+import { keep, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { previewImageUrl } from "../lib/seo.ts";
 import { AiCommandDialog } from "./AiCommandDialog.tsx";
@@ -182,7 +182,7 @@ export function BodyEditor({
         unknown: t("editor.blocks.unknown", { type: "{type}" }),
         unknownHint: t("editor.blocks.unknownHint"),
         editSource: t("bodyEditor.editSource"),
-        item: t("editor.blocks.item"),
+        item: t("editor.blocks.item", keep("n")),
         addItem: t("editor.blocks.addItem"),
         removeItem: t("editor.blocks.removeItem"),
         moveUp: t("editor.blocks.moveUp"),

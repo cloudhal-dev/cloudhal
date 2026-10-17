@@ -21,7 +21,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "gen": "turbo run gen:ts gen:rs",
-    "drift": "pnpm gen && git diff --exit-code -- packages/core-contracts/src/generated crates/cloudhal-schema/src/generated",
+    "drift": "pnpm gen && git diff --exit-code -- packages/core-contracts/src/generated crates/cloudhal-schema/src/generated apps/studio/src/i18n/generated",
     "cargo:test": "cargo test --workspace --locked",
     "cargo:clippy": "cargo clippy --workspace --all-targets --locked -- -D warnings",
     "changeset": "changeset",

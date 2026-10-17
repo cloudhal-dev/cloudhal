@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!**/src/generated",
+      "!apps/studio/src/i18n/generated",
       "!**/.bundled",
       "!**/dist",
       "!**/target",

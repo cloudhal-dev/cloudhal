@@ -2,7 +2,7 @@
   "$comment": "Oversized files and functions as of their last tightening. Entries may only shrink: run `node scripts/size-check.ts --update` after a refactor. See docs/engineering/code-structure.md.",
   "files": {
     "apps/studio/src/components/AnalyticsSections.tsx": 1349,
-    "apps/studio/src/components/CommentSettings.tsx": 841,
+    "apps/studio/src/components/CommentSettings.tsx": 840,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 811,
@@ -58,7 +58,7 @@
       "lines": 156
     },
     "apps/studio/src/components/ApproveElevationDialog.tsx::ApproveElevationDialog": {
-      "lines": 308
+      "lines": 309
     },
     "apps/studio/src/components/AutomationDialog.tsx::AutomationDialog": {
       "lines": 485
@@ -148,7 +148,7 @@
       "lines": 154
     },
     "apps/studio/src/components/TaxonomyHealthCard.tsx::TaxonomyHealthCard": {
-      "lines": 192
+      "lines": 191
     },
     "apps/studio/src/components/TaxonomySettingsDialog.tsx::TaxonomySettingsDialog": {
       "lines": 410

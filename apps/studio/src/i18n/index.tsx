@@ -1,3 +1,4 @@
+import { type Compiled, formatMessage, isMessage } from "@cloudhal/messages/format";
 import {
   createContext,
   type ReactNode,
@@ -10,6 +11,7 @@ import {
   useState,
 } from "react";
 import { en, type Messages } from "./en.ts";
+import type { MessageParams } from "./generated/params.ts";
 import {
   fallbackChain,
   isLocale,
@@ -117,15 +119,46 @@ export type NamespaceKey<N extends Namespace> = Leaves<Pick<NamespaceCatalogs, N
 /** Every key a `t` from `useT(...namespaces)` accepts. */
 export type KeyIn<N extends Namespace = never> = MessageKey | NamespaceKey<N>;
 type Params = Record<string, string | number>;
-export type TFunction<N extends Namespace = never> = (key: KeyIn<N>, params?: Params) => string;
-
-function lookup(messages: object | undefined, parts: readonly string[]): string | undefined {
-  let cur: unknown = messages;
-  for (const part of parts) cur = (cur as Record<string, unknown> | undefined)?.[part];
-  return typeof cur === "string" ? cur : undefined;
+type UnionToIntersection<U> = (U extends unknown ? (u: U) => void : never) extends (
+  i: infer I,
+) => void
+  ? I
+  : never;
+/**
+ * The arguments `t(key, …)` takes for `key` (RFC-0032 §3, `generated/params.ts`): none for a key
+ * without parameters, its typed parameters otherwise. A template key whose every possible key
+ * takes parameters (``t(`errors.api.${code}`)``) takes what all of them need.
+ */
+type ParamsOf<K extends string> = K extends keyof MessageParams ? MessageParams[K] : never;
+export type ArgsOf<K extends string> = [K] extends [never]
+  ? [params?: Params]
+  : [Exclude<K, keyof MessageParams>] extends [never]
+    ? [params: UnionToIntersection<ParamsOf<K>>]
+    : [ParamsOf<K>] extends [never]
+      ? [params?: Record<string, never>]
+      : // A key computed at run time from a mix (`as MessageKey`): checked by the catalog tests.
+        [params?: Params];
+/**
+ * Parameters that stay placeholders, for a message a block fills in itself (`DeleteResource`'s
+ * `{name}`, an editor's "Item {n}"): `t("editor.blocks.item", keep("n"))` → "Item {n}".
+ */
+export function keep<P extends string>(...names: P[]): Record<P, string> {
+  return Object.fromEntries(names.map((n) => [n, `{${n}}`])) as Record<P, string>;
 }
 
-function find(locale: Locale, key: string): string | undefined {
+export type TFunction<N extends Namespace = never> = <K extends KeyIn<N>>(
+  key: K,
+  ...args: ArgsOf<K>
+) => string;
+
+/** A catalog value: a string, or a message compiled at build time (RFC-0032, `isMessage`). */
+function lookup(messages: object | undefined, parts: readonly string[]): Compiled | undefined {
+  let cur: unknown = messages;
+  for (const part of parts) cur = (cur as Record<string, unknown> | undefined)?.[part];
+  return typeof cur === "string" || isMessage(cur) ? cur : undefined;
+}
+
+function find(locale: Locale, key: string): Compiled | undefined {
   const parts = key.split(".");
   const top = parts[0] ?? "";
   // A lazy namespace is read from its module, once loaded; the core catalogs never hold it.
@@ -134,7 +167,8 @@ function find(locale: Locale, key: string): string | undefined {
 }
 
 /**
- * Translates `key`, substituting `{name}` placeholders. Falls back along the locale's chain
+ * Translates `key`: substitutes `{name}` and renders plurals, selects and numbers in `locale`
+ * (`formatMessage`, RFC-0032). Falls back along the locale's chain
  * (`fallbackChain`: its fallbacks, then English), then to the key.
  * A key of a lazy namespace resolves only once that namespace is loaded in the locale (use
  * `useT(namespace)`, which waits for it).
@@ -144,14 +178,12 @@ export function translate(
   key: MessageKey | NamespaceKey<Namespace>,
   params: Params = {},
 ): string {
-  let text: string | undefined;
+  let text: Compiled | undefined;
   for (const l of fallbackChain(locale)) {
     text = find(l, key);
     if (text !== undefined) break;
   }
-  return (text ?? key).replace(/\{(\w+)\}/g, (_m, name: string) =>
-    String(params[name] ?? `{${name}}`),
-  );
+  return formatMessage(locale, text ?? key, params);
 }
 
 interface I18nValue<N extends Namespace = never> {
@@ -206,7 +238,12 @@ export function I18nProvider({
   // Normally loaded before the first render (main.tsx); otherwise wait for it here.
   if (!localeLoaded(locale)) use(loadLocale(locale));
   const value = useMemo<I18nValue<Namespace>>(
-    () => ({ locale, setLocale, t: (key, params) => translate(locale, key, params) }),
+    () => ({
+      locale,
+      setLocale,
+      t: ((key: string, params?: Params) =>
+        translate(locale, key as MessageKey, params)) as TFunction<Namespace>,
+    }),
     [locale, setLocale],
   );
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

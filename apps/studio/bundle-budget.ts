@@ -73,6 +73,14 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/](?!en\.ts$|locales\.ts$|namespaces\.ts$)[a-z]{2,3}(-[A-Za-z0-9]+)*\.ts$/,
 ];
 
+/**
+ * Modules that must never be in any chunk: the message compiler runs at build time only
+ * (RFC-0032 §2, ADR-0032); catalogs ship already compiled.
+ */
+export const NEVER_BUNDLED: readonly RegExp[] = [
+  /[\\/]packages[\\/]messages[\\/]src[\\/](compile|transform|vite)\.ts$/,
+];
+
 /** The part of a Rollup/Rolldown output chunk the check reads. */
 export interface BudgetChunk {
   type: "chunk" | "asset";
@@ -97,6 +105,7 @@ export function checkBundleBudget(
   bundle: Record<string, BudgetChunk>,
   budget = BUNDLE_BUDGET,
   lazyOnly = LAZY_ONLY,
+  neverBundled = NEVER_BUNDLED,
 ): BudgetReport {
   const entries = Object.values(bundle).filter((c) => c.type === "chunk" && c.isEntry);
   if (entries.length !== 1) throw new Error(`expected one entry chunk, found ${entries.length}`);
@@ -110,6 +119,10 @@ export function checkBundleBudget(
   visit(entry.fileName);
 
   const problems: string[] = [];
+  for (const chunk of Object.values(bundle))
+    for (const id of chunk.moduleIds ?? [])
+      if (neverBundled.some((re) => re.test(id)))
+        problems.push(`${chunk.fileName} contains ${id} (build-time only)`);
   const initial = [...seen].map((fileName) => {
     const code = bundle[fileName]?.code ?? "";
     for (const id of bundle[fileName]?.moduleIds ?? []) {
@@ -142,7 +155,10 @@ export function checkBundleBudget(
   };
 }
 
-/** Fails `vite build` when the initial load breaks {@link BUNDLE_BUDGET} or {@link LAZY_ONLY}. */
+/**
+ * Fails `vite build` when the initial load breaks {@link BUNDLE_BUDGET} or {@link LAZY_ONLY}, or a
+ * chunk holds a {@link NEVER_BUNDLED} module.
+ */
 export function bundleBudget(): Plugin {
   return {
     name: "cloudhal:bundle-budget",

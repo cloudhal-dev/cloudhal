@@ -9,7 +9,7 @@ export const messages: NamespaceMessages<"aiSettings"> = {
     unavailable: {
       title: "Bu kurulum henüz Workers AI'a ulaşamıyor",
       description:
-        'cloudhal.json dosyasına "ai": {} ekleyip yeniden dağıt. Kendi sunucunda CLOUDFLARE_ACCOUNT_ID ve CLOUDHAL_AI_TOKEN değişkenlerini ayarla. Ayarları şimdiden seçebilirsin.',
+        "cloudhal.json dosyasına \"ai\": '{}' ekleyip yeniden dağıt. Kendi sunucunda CLOUDFLARE_ACCOUNT_ID ve CLOUDHAL_AI_TOKEN değişkenlerini ayarla. Ayarları şimdiden seçebilirsin.",
     },
     enabled: {
       label: "Editörde yapay zekâ",

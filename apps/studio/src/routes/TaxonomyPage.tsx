@@ -644,7 +644,7 @@ function TaxonomyRulesCard({
   editReason,
 }: {
   tax: Taxonomy;
-  names: Record<string, string>;
+  names: { plural: string; Plural: string; singular: string };
   onEdit: () => void;
   /** Why the person may not change the taxonomy's settings (structure.write), if they may not. */
   editReason?: string | undefined;
