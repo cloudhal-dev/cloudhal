@@ -330,9 +330,6 @@
     "packages/api/src/build-turn.ts::runBuildTurn": {
       "lines": 260
     },
-    "packages/api/src/routes/admin.ts::adminRoutes": {
-      "lines": 614
-    },
     "packages/api/src/routes/agent-keys.ts::agentKeys": {
       "lines": 162
     },

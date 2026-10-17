@@ -265,3 +265,39 @@ describe("/mcp origin guard", () => {
     expect((await call()).status).not.toBe(403);
   });
 });
+
+describe("admin token guard", () => {
+  // Every area is a sub-app mounted after the token check; none may answer without the token.
+  const AREAS: [string, string][] = [
+    ["POST", "/api/admin/owner"],
+    ["POST", "/api/admin/sites/site_x/analytics/rollup"],
+    ["GET", "/api/admin/sites/site_x/analytics/status"],
+    ["GET", "/api/admin/sites/site_x/comments/status"],
+    ["POST", "/api/admin/sites/site_x/comments/import"],
+    ["GET", "/api/admin/schedules/status"],
+    ["POST", "/api/admin/schedules/run-due"],
+    ["GET", "/api/admin/sites/site_x/schedules/releases"],
+    ["POST", "/api/admin/sites/site_x/ai/build-eval"],
+    ["POST", "/api/admin/sites/site_x/ai/judge-check"],
+    ["POST", "/api/admin/sites/site_x/search/reindex"],
+    ["GET", "/api/admin/sites/site_x/media-placeholders"],
+    ["PUT", "/api/admin/sites/site_x/media-placeholders/asset_x"],
+    ["GET", "/api/admin/sites/site_x/bundle"],
+    ["PUT", "/api/admin/sites/site_x/bundle"],
+    ["PUT", "/api/admin/sites/site_x/domains"],
+    ["GET", "/api/admin/sites/site_x/media/abc"],
+    ["PUT", "/api/admin/sites/site_x/media/abc"],
+  ];
+
+  it("answers 401 on every area without the deployment token", async () => {
+    const b = await backend();
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    for (const [method, path] of AREAS) {
+      const res = await app.request(path, {
+        method,
+        headers: { authorization: "Bearer nope" },
+      });
+      expect(`${method} ${path} ${res.status}`).toBe(`${method} ${path} 401`);
+    }
+  });
+});
