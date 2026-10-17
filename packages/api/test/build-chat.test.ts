@@ -419,4 +419,38 @@ describe("build chat", () => {
     ]);
     expect(two.notes).toEqual([]);
   });
+
+  it("creates the surface section a step adds components to when nobody added it", () => {
+    const empty = { title: "P", sections: [] } as never;
+    const out = componentPaths(
+      empty,
+      [
+        {
+          op: "add",
+          path: "/sections/0/components/-",
+          value: { id: "hero", component: "Band", children: ["t"] },
+        },
+        {
+          op: "add",
+          path: "/sections/0/components/-",
+          value: { id: "t", component: "Heading", props: { text: "Hi", level: 1 } },
+        },
+        { op: "add", path: "/sections/0/components/hero/children/-", value: "x" },
+      ],
+      "blog@1",
+    );
+    expect(out.ops[0]).toMatchObject({
+      op: "add",
+      path: "/sections/-",
+      value: { kind: "surface", catalog: "blog@1", components: [] },
+    });
+    expect((out.ops[0] as { value: { id: string } }).value.id).toMatch(/^sec_[A-Z0-9]{12}$/);
+    expect(out.ops[1]).toMatchObject({ value: { id: "root", component: "Band" } });
+    expect(out.ops[3]?.path).toBe("/sections/0/components/0/children/-");
+    // A section that exists, or one further ahead, is left to the checks.
+    expect(
+      componentPaths(empty, [{ op: "add", path: "/sections/1/components/-", value: { id: "a" } }])
+        .ops,
+    ).toHaveLength(1);
+  });
 });
