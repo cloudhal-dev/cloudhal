@@ -1,29 +1,27 @@
 /**
  * The typed schedules client (RFC-0008 §13, `packages/api/src/routes/schedules.ts`): the calendar,
- * releases, gates, automations, runs and the site's schedule settings. The types live in `api.ts`
- * with every other contract; the calls live here so they load with the schedule screens and the
+ * releases, gates, automations, runs and the site's schedule settings. The types live in
+ * `api/schedules-types.ts`; the calls live here so they load with the schedule screens and the
  * lazily loaded "Schedule…" dialog rather than with the shell (`bundle-budget.ts`). `api.scheduler`
- * (the health the shell polls) stays in `api.ts`.
+ * (the health the shell polls) stays on `api` (`api/team.ts`).
  *
  * Every write takes the `rev` the caller read (CAS): a 409 `conflict` means the release or the
  * automation changed meanwhile ("Load the latest").
  */
 import type { Automation, ContentEntry, Page, ScheduleRun } from "@cloudhal/core-contracts";
-import {
-  type AutomationInput,
-  type CalendarQuery,
-  json,
-  query,
-  type ReleaseDiff,
-  type ReleaseResult,
-  type ReleaseView,
-  type ReleaseWhenInput,
-  type RulePreview,
-  type RunDetail,
-  request,
-  type SchedulePage,
-  type ScheduleSettings,
-} from "./api.ts";
+import { json, query, request } from "./api/http.ts";
+import type {
+  AutomationInput,
+  CalendarQuery,
+  ReleaseDiff,
+  ReleaseResult,
+  ReleaseView,
+  ReleaseWhenInput,
+  RulePreview,
+  RunDetail,
+  SchedulePage,
+  ScheduleSettings,
+} from "./api/schedules-types.ts";
 
 const site = (siteId: string) => `/api/sites/${encodeURIComponent(siteId)}`;
 const rel = (siteId: string, id: string) => `${site(siteId)}/releases/${encodeURIComponent(id)}`;

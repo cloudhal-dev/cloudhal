@@ -3,7 +3,6 @@
   "files": {
     "apps/studio/src/components/AnalyticsSections.tsx": 1349,
     "apps/studio/src/components/CommentSettings.tsx": 841,
-    "apps/studio/src/lib/api.ts": 2798,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
     "apps/studio/src/routes/CommentThreadPage.tsx": 819,
@@ -166,10 +165,10 @@
     "apps/studio/src/components/TermPickers.tsx::TagPicker": {
       "lines": 171
     },
-    "apps/studio/src/lib/api.ts::build": {
+    "apps/studio/src/lib/api/ai.ts::build": {
       "params": 5
     },
-    "apps/studio/src/lib/api.ts::remove#8": {
+    "apps/studio/src/lib/api/comments.ts::remove": {
       "params": 5
     },
     "apps/studio/src/routes/AccountPage.tsx::ProfileSection": {

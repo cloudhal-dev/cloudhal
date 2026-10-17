@@ -1076,7 +1076,7 @@ describe("design rules (DESIGN.md)", () => {
     expect(queue.text).toMatch(
       /api\.assets\.requestUploads\(siteId, requests\)[\s\S]*isOpenTicket\(ticket\)[\s\S]*putUpload\(ticket, item\.file/,
     );
-    const api = sources.find((f) => f.file === "lib/api.ts") as { text: string };
+    const api = sources.find((f) => f.file === "lib/api/media.ts") as { text: string };
     expect(api.text).toMatch(/\/assets\/uploads`, \{\s*method: "POST"/);
   });
 
@@ -1210,7 +1210,7 @@ describe("design rules (DESIGN.md)", () => {
       expect(text, file).toMatch(/useState\(\(\) => takeHashToken\(/);
       expect(text, file).not.toMatch(/searchParams|location\.search|\?token=/);
     }
-    const api = readFileSync(path.join(SRC, "lib/api.ts"), "utf8");
+    const api = readFileSync(path.join(SRC, "lib/api/team.ts"), "utf8");
     for (const route of [
       "/api/invites/inspect",
       "/api/invites/accept",
