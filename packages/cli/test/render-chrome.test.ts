@@ -9,6 +9,7 @@ import { pathToFileURL } from "node:url";
 import { renderPage } from "@cloudhal/mcp-server/render";
 import { afterAll, describe, expect, it } from "vitest";
 import { CAROUSEL_SCRIPT } from "../../astro-renderer/src/carousel-client.ts";
+import { renderPagePreview } from "../../astro-renderer/src/preview.ts";
 import { chromeRenderer, findChrome, localRender } from "../src/render-chrome.ts";
 
 const chrome = findChrome();
@@ -187,6 +188,44 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
         expect.stringMatching(/one per page at most/),
       ]),
     );
+    // Build chat's fallback and the eval look at the static preview: a proper shell, and no
+    // complaint that a carousel's module did not run (previews run no scripts by design).
+    const preview = renderPagePreview(
+      {
+        schemaVersion: 1,
+        id: "site_PREVIEW0001",
+        name: "Preview",
+        slug: "preview",
+        defaultLocale: "en",
+        locales: ["en"],
+      } as never,
+      {
+        path: "/p",
+        title: "P",
+        sections: [
+          {
+            id: "sec_previewcar1",
+            kind: "surface",
+            catalog: "blog@1",
+            components: [
+              { id: "root", component: "Stack", children: ["h", "car"] },
+              { id: "h", component: "Heading", props: { text: "Offers", level: 1 } },
+              {
+                id: "car",
+                component: "Carousel",
+                props: { label: "Offers", variant: "hero", aspect: "16:9" },
+                children: ["a", "b"],
+              },
+              { id: "a", component: "Text", props: { text: "Spring" } },
+              { id: "b", component: "Link", props: { label: "Order", href: "/order" } },
+            ],
+          },
+        ],
+      } as never,
+    );
+    const pv = await run("preview.html", preview.html);
+    for (const id of ["skip-link", "landmarks", "carousel-focus"])
+      expect(pv(id), id).toMatchObject({ ok: true });
     // RFC-0028: a wide picture in a square cover frame is cut to a quarter; a focal point excuses it.
     await writeFile(
       path.join(dir, "wide.svg"),

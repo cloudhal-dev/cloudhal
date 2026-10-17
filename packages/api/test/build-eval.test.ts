@@ -90,6 +90,7 @@ describe("Build model eval", () => {
       repairs: 0,
       rounds: 1,
       components: 2,
+      used: expect.arrayContaining(["Heading"]),
       inputTokens: 900,
       outputTokens: 120,
     });
