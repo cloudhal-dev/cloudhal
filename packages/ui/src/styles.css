@@ -96,3 +96,17 @@
   @apply pointer-events-none float-left h-0 text-kumo-placeholder;
   content: attr(data-placeholder);
 }
+
+/* The body editor's focus mode (spotlight on): the block being written stays clear, the rest
+   fades back. Nothing animates for readers who asked for reduced motion. */
+.ch-md-editor[data-spotlight] .ch-md-content > * {
+  transition: opacity 150ms ease-out;
+}
+.ch-md-editor[data-spotlight] .ch-md-content > :not(.has-focus) {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch-md-editor[data-spotlight] .ch-md-content > * {
+    transition: none;
+  }
+}

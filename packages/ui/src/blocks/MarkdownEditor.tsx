@@ -5,6 +5,7 @@ import {
   Input,
   InputArea,
   Popover,
+  Switch,
   Tabs,
   Text,
   Toolbar,
@@ -13,6 +14,8 @@ import { localized } from "@cloudhal/core-ts/blocks";
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
+  ArrowsIn,
+  ArrowsOut,
   Code,
   CodeBlock,
   Image as ImageIcon,
@@ -112,6 +115,15 @@ export interface MarkdownEditorLabels {
   outlineExtraH1: string;
   /** The selection toolbar's AI button (shown only with `onAskAi`), e.g. "Ask AI". */
   askAi?: string;
+  /**
+   * Focus mode (shown only with these): the button that opens it ("Focus"), the one that leaves
+   * ("Leave focus mode"), the spotlight switch ("Spotlight"), and the shortcut as the person's
+   * keyboard writes it ("Ctrl+Shift+\\").
+   */
+  focus?: string;
+  focusExit?: string;
+  spotlight?: string;
+  focusShortcut?: string;
 }
 
 /**
@@ -168,7 +180,25 @@ export interface MarkdownEditorProps {
    * their generated forms. Without it, directives still load and save unchanged.
    */
   blocks?: EditorBlocks;
+  /** Shown in focus mode's top bar: the host's save state and Save button, so they stay at hand. */
+  focusActions?: ReactNode;
 }
+
+const SPOTLIGHT_KEY = "cloudhal.editor.spotlight";
+const readSpotlight = () => {
+  try {
+    return globalThis.localStorage?.getItem(SPOTLIGHT_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+const writeSpotlight = (on: boolean) => {
+  try {
+    globalThis.localStorage?.setItem(SPOTLIGHT_KEY, on ? "1" : "0");
+  } catch {
+    // private windows and blocked storage: the choice lasts until the page closes
+  }
+};
 
 /**
  * The markdown body editor (RFC-0014 phase 1): rich editing on Tiptap (MIT), a Markdown mode for
@@ -199,8 +229,14 @@ export function MarkdownEditor({
   locale = "en",
   onAskAi,
   blocks,
+  focusActions,
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<MarkdownEditorMode>(defaultMode);
+  // Focus mode: the editor alone on the screen, entered only on request (never on page load).
+  const [focused, setFocused] = useState(false);
+  const [spotlight, setSpotlight] = useState(readSpotlight);
+  const focusButton = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // The text a source block asked to open in Markdown mode (selected there once).
   const [sourceFocus, setSourceFocus] = useState<string | undefined>();
   const [slash, setSlash] = useState<SlashState | null>(null);
@@ -247,6 +283,7 @@ export function MarkdownEditor({
           setMode("markdown");
         },
         resolveSrc: (src) => (resolveRef.current ? resolveRef.current(src) : src),
+        spotlight: labels.focus !== undefined,
         slash: {
           items: () => [
             ...slashItems(labelsRef.current, pickRef.current ? insertImage : undefined),
@@ -261,6 +298,7 @@ export function MarkdownEditor({
       labels.sourceBadge,
       labels.sourceHint,
       labels.editSource,
+      labels.focus,
       insertImage,
       locale,
       codec,
@@ -314,9 +352,82 @@ export function MarkdownEditor({
     editor?.setEditable(!readOnly);
   }, [editor, readOnly]);
 
+  const leaveFocus = useCallback(() => {
+    setFocused(false);
+    // Back where the person left from.
+    requestAnimationFrame(() => focusButton.current?.focus());
+  }, []);
+  const toggleFocus = useCallback(() => {
+    if (focused) leaveFocus();
+    else {
+      setFocused(true);
+      requestAnimationFrame(() => editorRef.current?.commands.focus());
+    }
+  }, [focused, leaveFocus]);
+  // While focused: the page behind does not scroll, and Esc leaves (unless a menu or popover of
+  // the editor took it first).
+  useEffect(() => {
+    if (!focused) return;
+    const root = document.documentElement;
+    const before = root.style.overflow;
+    root.style.overflow = "hidden";
+    // Everything outside the editor is out of reach (Tab, screen readers) while it covers it.
+    const quieted: Element[] = [];
+    for (
+      let el: HTMLElement | null = rootRef.current;
+      el && el !== document.body;
+      el = el.parentElement
+    )
+      for (const sib of el.parentElement?.children ?? [])
+        if (sib !== el && !sib.hasAttribute("inert") && sib.tagName !== "SCRIPT") {
+          sib.setAttribute("inert", "");
+          quieted.push(sib);
+        }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !slash) leaveFocus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      root.style.overflow = before;
+      for (const el of quieted) el.removeAttribute("inert");
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [focused, slash, leaveFocus]);
+  const canFocus = labels.focus !== undefined;
+  // Ctrl/⌘+Shift+\ (WordPress' convention) opens and closes focus mode from inside this editor.
+  useEffect(() => {
+    if (!canFocus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "Backslash")) return;
+      if (!focused && !rootRef.current?.contains(document.activeElement)) return;
+      e.preventDefault();
+      toggleFocus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [canFocus, focused, toggleFocus]);
+
   return (
-    <div className={cn("ch-md-editor grid min-w-0 gap-2", className)} data-mode={mode}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div
+      ref={rootRef}
+      className={cn(
+        "ch-md-editor grid min-w-0 gap-2",
+        focused &&
+          "fixed inset-0 z-50 content-start overflow-y-auto bg-kumo-base px-4 pt-3 pb-16 sm:px-8",
+        className,
+      )}
+      data-mode={mode}
+      data-focused={focused ? "" : undefined}
+      data-spotlight={focused && spotlight ? "" : undefined}
+      {...(focused ? { role: "dialog", "aria-modal": true, "aria-label": label } : {})}
+    >
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-2",
+          focused &&
+            "sticky top-0 z-10 mx-auto w-full max-w-3xl border-b border-kumo-line bg-kumo-base py-2",
+        )}
+      >
         {mode === "rich" && editor ? (
           <FormatToolbar
             editor={editor}
@@ -327,7 +438,19 @@ export function MarkdownEditor({
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {focused && focusActions}
+          {focused && labels.spotlight && mode === "rich" && (
+            <Switch
+              size="sm"
+              label={labels.spotlight}
+              checked={spotlight}
+              onCheckedChange={(on) => {
+                setSpotlight(on);
+                writeSpotlight(on);
+              }}
+            />
+          )}
           {mode === "rich" && editor && <OutlineButton editor={editor} labels={labels} />}
           <Tabs
             variant="segmented"
@@ -342,12 +465,29 @@ export function MarkdownEditor({
               { value: "markdown", label: labels.markdown },
             ]}
           />
+          {canFocus && (
+            <Button
+              ref={focusButton}
+              variant={focused ? "secondary" : "ghost"}
+              size="sm"
+              icon={focused ? <ArrowsIn size={16} /> : <ArrowsOut size={16} />}
+              aria-pressed={focused}
+              title={labels.focusShortcut}
+              onClick={toggleFocus}
+              data-testid="editor-focus"
+            >
+              {focused ? (labels.focusExit ?? labels.focus) : labels.focus}
+            </Button>
+          )}
         </div>
       </div>
       {/* The rich editor stays mounted in Markdown mode, so its undo history survives a switch. */}
       <div
         hidden={mode !== "rich"}
-        className="min-w-0 rounded-lg bg-kumo-control ring ring-kumo-line focus-within:ring-kumo-focus"
+        className={cn(
+          "min-w-0 rounded-lg bg-kumo-control ring ring-kumo-line focus-within:ring-kumo-focus",
+          focused && "mx-auto w-full max-w-3xl bg-kumo-base text-base ring-0 focus-within:ring-0",
+        )}
       >
         <DirectiveContext.Provider
           value={

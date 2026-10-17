@@ -77,6 +77,63 @@ const tiptap = () => (editable() as HTMLElement & { editor: Editor }).editor;
 describe("MarkdownEditor", () => {
   afterEach(cleanup);
 
+  it("opens a focus mode that covers the page, keeps the host's actions, and leaves on Esc", async () => {
+    const focusLabels = {
+      ...labels,
+      focus: "Focus",
+      focusExit: "Leave focus",
+      spotlight: "Spotlight",
+      focusShortcut: "Ctrl+Shift+\\",
+    };
+    render(
+      <div>
+        <nav data-testid="outside">
+          <button type="button">Sidebar</button>
+        </nav>
+        <main>
+          <MarkdownEditor
+            value={"One\n\nTwo\n"}
+            onChange={() => {}}
+            label="Body"
+            labels={focusLabels}
+            focusActions={<button type="button">Save now</button>}
+          />
+        </main>
+      </div>,
+    );
+    expect(screen.queryByText("Save now")).toBeNull();
+    const button = screen.getByRole("button", { name: "Focus" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(button);
+    const layer = await screen.findByRole("dialog", { name: "Body" });
+    expect(layer).toHaveAttribute("data-focused");
+    expect(screen.getByTestId("outside")).toHaveAttribute("inert");
+    expect(screen.getByText("Save now")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Leave focus" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    // The spotlight is a remembered preference.
+    fireEvent.click(screen.getByRole("switch", { name: "Spotlight" }));
+    expect(layer).toHaveAttribute("data-spotlight");
+    expect(localStorage.getItem("cloudhal.editor.spotlight")).toBe("1");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("outside")).not.toHaveAttribute("inert");
+    expect(document.documentElement.style.overflow).toBe("");
+    // The shortcut opens it again from inside the editor.
+    editable().focus();
+    fireEvent.keyDown(document, { key: "\\", code: "Backslash", ctrlKey: true, shiftKey: true });
+    expect(await screen.findByRole("dialog", { name: "Body" })).toBeInTheDocument();
+    localStorage.removeItem("cloudhal.editor.spotlight");
+  });
+
+  it("offers no focus mode without its words", () => {
+    render(<Harness initial={"Hi\n"} />);
+    expect(screen.queryByRole("button", { name: "Focus" })).toBeNull();
+  });
+
   it("shows the body richly, with source blocks for what it keeps as written", async () => {
     render(
       <Harness

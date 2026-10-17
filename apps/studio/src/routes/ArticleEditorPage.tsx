@@ -479,6 +479,14 @@ export function ArticleEditorPage() {
                   value={draft.body.value}
                   onChange={(v) => set("body", { ...draft.body, value: v })}
                   readOnly={readOnlyReason !== undefined || locked}
+                  focusSave={{
+                    dirty,
+                    saving: save.isPending,
+                    disabled: readOnlyReason !== undefined || locked,
+                    onSave: () => {
+                      if (valid()) save.mutate(draft);
+                    },
+                  }}
                 />
               ) : (
                 <InputArea

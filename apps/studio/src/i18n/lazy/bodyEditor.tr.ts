@@ -37,6 +37,12 @@ export const messages: NamespaceMessages<"bodyEditor"> = {
     outlineEmpty: "Henüz başlık yok. / ya da araç çubuğuyla ekle.",
     outlineSkipped: "Bir seviye atlıyor",
     outlineExtraH1: "H2 kullan: sayfanın H1’i var",
+    focus: "Odak",
+    focusExit: "Odaktan çık",
+    spotlight: "Paragrafı vurgula",
+    focusShortcut: "Odak modu ({keys}, çıkmak için Esc)",
+    focusUnsaved: "Kaydedilmemiş değişiklikler",
+    focusSaved: "Tüm değişiklikler kaydedildi",
     sourceBadge: "Markdown",
     sourceHint: "Yazıldığı gibi korunur. Markdown modunda düzenle.",
     blocks: {
