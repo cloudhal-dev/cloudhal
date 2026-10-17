@@ -379,10 +379,14 @@ export function componentPaths(
   const ids: (string[] | undefined)[] = page.sections.map((sec) =>
     sec.kind === "surface" ? sec.components.map((c) => c.id) : undefined,
   );
+  // A new section's top container the model named something else (`hero-root`) became `root`:
+  // later paths that use the old name follow it.
+  const renamed = new Map<number, string>();
   const fix = (path: string): string =>
     path.replace(
       /^\/sections\/(\d+)\/components\/([a-z][a-z0-9-]{0,40})(?=\/|$)/,
-      (m, i: string, id: string) => {
+      (m, i: string, name: string) => {
+        const id = renamed.get(Number(i)) === name ? "root" : name;
         const j = ids[Number(i)]?.indexOf(id) ?? -1;
         if (j < 0) return m;
         notes.push(`${m} → /sections/${i}/components/${j}`);
@@ -402,7 +406,13 @@ export function componentPaths(
     if (next.op === "add" && typeof next.path === "string") {
       const v = (next as { value?: unknown }).value;
       if (next.path === "/sections/-" && v && typeof v === "object") {
-        const comps = (v as { components?: unknown }).components;
+        const named = rootNamed(v);
+        if (named) {
+          renamed.set(ids.length, named.from);
+          (next as { value?: unknown }).value = named.value;
+          notes.push(`section ${ids.length}: its top component "${named.from}" is now "root"`);
+        }
+        const comps = ((next as { value?: unknown }).value as { components?: unknown }).components;
         ids.push(Array.isArray(comps) ? comps.map(idOf).filter((x): x is string => !!x) : []);
       }
       const m = /^\/sections\/(\d+)\/components\/(-|\d+)$/.exec(next.path);
@@ -416,6 +426,36 @@ export function componentPaths(
     return next;
   });
   return { ops: out, notes };
+}
+
+/**
+ * A new surface section without a `root`: when exactly one of its components is nobody's child and
+ * holds children of its own, it is the root the model meant (`hero-root`, `page`): renamed.
+ */
+function rootNamed(v: object): { from: string; value: unknown } | undefined {
+  const comps = (v as { components?: unknown }).components;
+  if (!Array.isArray(comps) || comps.length === 0) return undefined;
+  const list = comps as { id?: unknown; children?: unknown }[];
+  if (list.some((c) => c?.id === "root")) return undefined;
+  const children = new Set(
+    list
+      .flatMap((c) => (Array.isArray(c?.children) ? c.children : []))
+      .filter((k) => typeof k === "string"),
+  );
+  const tops = list.filter(
+    (c) =>
+      typeof c?.id === "string" &&
+      !children.has(c.id) &&
+      Array.isArray(c.children) &&
+      c.children.length > 0,
+  );
+  const top = tops.length === 1 ? tops[0] : undefined;
+  if (!top || typeof top.id !== "string") return undefined;
+  const from = top.id;
+  return {
+    from,
+    value: { ...v, components: list.map((c) => (c === top ? { ...c, id: "root" } : c)) },
+  };
 }
 
 /**
