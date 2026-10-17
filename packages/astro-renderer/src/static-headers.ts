@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMBIENT_SCRIPT } from "./ambient-client.ts";
+import { CAROUSEL_SCRIPT } from "./carousel-client.ts";
 import { CHART_SCRIPT } from "./chart.ts";
 import { CHROME_SCRIPT, CHROME_SCRIPT_ALIASES } from "./chrome-client.ts";
 import { SITE_CSP } from "./csp.ts";
@@ -90,6 +91,8 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     [PREFS_SCRIPT.path, PREFS_SCRIPT.code],
     // RFC-0025 §3: the overlay module, loaded by surfaces with an overlay.
     [OVERLAY_SCRIPT.path, OVERLAY_SCRIPT.code],
+    // RFC-0027 27b: the carousel module, loaded by surfaces with a carousel.
+    [CAROUSEL_SCRIPT.path, CAROUSEL_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));
@@ -111,6 +114,7 @@ export async function buildShowsLiveSurfaces(dir: URL | string): Promise<boolean
       html.includes(MOTION_SCRIPT.path) ||
       html.includes(CHROME_SCRIPT.path) ||
       html.includes(OVERLAY_SCRIPT.path) ||
+      html.includes(CAROUSEL_SCRIPT.path) ||
       html.includes(PREFS_SCRIPT.path)
     )
       return true;

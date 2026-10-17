@@ -89,6 +89,8 @@ export const RENDER_CHECK_IDS = [
   "carousel-label",
   // RFC-0027: a hero carousel's first slide loads first; the others wait.
   "carousel-lcp",
+  // RFC-0027: Tab never lands in a hero slide out of view; the controls are working.
+  "carousel-focus",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
@@ -633,6 +635,14 @@ export const RENDER_CHECK_SCRIPT = `(async () => {
     else if (/carousel|karusel/i.test(name)) add("carousel-label", c, "its name says carousel; name what it shows");
     const slides = [...c.querySelectorAll('[aria-roledescription="slide"], [aria-roledescription="slayt"]')];
     for (const s of slides) if (!(s.getAttribute("aria-label") || "").trim()) add("carousel-label", s, "a slide without a name");
+    if (c.querySelector("[data-ch-pending]"))
+      add("carousel-focus", c, "its arrows never appeared: the carousel module did not run");
+    if (c.getAttribute("data-variant") === "hero")
+      for (const s of slides.slice(1)) {
+        if (s.closest("[inert]")) continue;
+        const f = s.querySelector('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])');
+        if (f) add("carousel-focus", f, "Tab can land in a slide out of view (make off-screen slides inert)");
+      }
     if (c.getAttribute("data-variant") === "hero")
       slides.forEach((s, i) => {
         for (const img of s.querySelectorAll("img")) {

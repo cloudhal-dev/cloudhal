@@ -8,6 +8,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { renderPage } from "@cloudhal/mcp-server/render";
 import { afterAll, describe, expect, it } from "vitest";
+import { CAROUSEL_SCRIPT } from "../../astro-renderer/src/carousel-client.ts";
 import { chromeRenderer, findChrome, localRender } from "../src/render-chrome.ts";
 
 const chrome = findChrome();
@@ -144,6 +145,33 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
         expect.stringMatching(/slide 2's image loads before anyone sees it/),
       ]),
     );
+    // RFC-0027 27b: without the module, arrows stay hidden and Tab reaches slides out of view;
+    // with it, neither. (A classic script here: Chrome loads no module from file://.)
+    await writeFile(path.join(dir, "carousel.js"), CAROUSEL_SCRIPT.code);
+    const hero = (
+      module: string,
+    ) => `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<style>.ch-carousel__track{display:grid;grid-auto-flow:column;grid-auto-columns:100%;overflow-x:auto}.ch-carousel__arrow[data-ch-pending]{visibility:hidden}</style></head><body>
+<a href="#main">Skip</a><header>h</header><main id="main"><h1>C</h1>
+<section class="ch-carousel" data-variant="hero" role="region" aria-roledescription="carousel" aria-label="Spring">
+<div class="ch-carousel__track" tabindex="0">
+<div class="ch-carousel__slide" role="group" aria-roledescription="slide" aria-label="1 of 2"><a href="/a">One</a></div>
+<div class="ch-carousel__slide" role="group" aria-roledescription="slide" aria-label="2 of 2"><a href="/b">Two</a></div></div>
+<div><button type="button" class="ch-carousel__arrow" data-ch-carousel="prev" data-ch-pending aria-label="Previous slide">‹</button>
+<button type="button" class="ch-carousel__arrow" data-ch-carousel="next" data-ch-pending aria-label="Next slide">›</button></div>
+</section></main><footer>f</footer>${module}</body></html>`;
+    const without = await run("hero-bare.html", hero(""));
+    expect(without("carousel-focus")?.examples).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/the carousel module did not run/),
+        expect.stringMatching(/Tab can land in a slide out of view/),
+      ]),
+    );
+    const withModule = await run(
+      "hero-module.html",
+      hero('<script defer src="carousel.js"></script>'),
+    );
+    expect(withModule("carousel-focus")).toMatchObject({ ok: true });
   }, 90_000);
 });
 
