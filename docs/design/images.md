@@ -37,7 +37,7 @@ Research for the next RFC (images that load gracefully and fit any frame). Sourc
 3. **Renderer**: the placeholder stays the `<img>`'s background, but becomes the colour plus the LQIP blurred inside an SVG filter, covering the box; no LQIP for transparent images (fixes bug 1); bars never show the raw LQIP (fixes bug 2). (A wrapper element was considered first; RFC-0028 §2 explains why it was not needed.)
 4. **Fit modes**: `cover` (default with a ratio), `contain`, `blur-fill`, `color-fill`, `natural`. Defaults: Image with a ratio → cover; Lightbox stage → blur-fill; carousel gallery slides → blur-fill; cards and heroes → cover with the focal point.
 5. **Blur-fill** is that same blurred background left visible around a contained image: painted from the LQIP already in the page, decorative, gone in forced colours. No second image download, no `backdrop-filter`.
-6. **No fade-in** for now: the image paints over its placeholder (honest, no script). A later optional module gated by `@media (scripting: enabled)` may add one.
+6. **No fade-in**: the image paints over its placeholder (honest, no script). A fade would need a second layer under every image (RFC-0028 Status, 28d).
 7. **Budget**: placeholders up to ~24 KB per page; beyond that, colour only. `render_page` counts them and flags images cropped by `cover` with no focal point when the ratios differ a lot.
 8. **Focal point**: set by people in Studio and by agents through the existing policy-checked asset update; per-use overrides and `fit` on `ImageRef` wait until a page needs them (a contract change for every image use).
 9. **Server-side placeholders** for agent and import uploads: through the Cloudflare Images binding **when the deployment has one** (a 16–24 px WebP + colour; 5,000 unique transformations a month are free, then billed). Otherwise Studio computes them, and a `cloudhal media placeholders` backfill fills old assets. *Turning the binding on for the live deployment is the owner's call.*
@@ -46,7 +46,7 @@ Research for the next RFC (images that load gracefully and fit any frame). Sourc
 1. Contract `color`/`alpha`/`focal`; alpha from the header parsers; Studio adds colour and alpha; the wrapper placeholder; bugs 1 and 2 fixed; budgets.
 2. Fit modes and focal point in the catalog, CSS and transformations; `render_page` checks.
 3. Server-side placeholders through the Images binding; the backfill command.
-4. Optional fade-in; optional `gravity=auto` focal suggestions.
+4. Fade-in and `gravity=auto` focal suggestions: decided against (RFC-0028 Status).
 
 ## Sources
 - ThumbHash https://evanw.github.io/thumbhash/ · CSS-only LQIP https://leanrada.com/notes/css-only-lqip/ · Mux https://www.mux.com/blog/blurry-image-placeholders-on-the-web · Facebook preview photos https://engineering.fb.com/2015/08/06/android/the-technology-behind-preview-photos/ · Medium https://jmperezperez.com/medium-image-progressive-loading-placeholder/ · Unsplash https://unsplash.com/documentation/changelog · Next.js Image https://nextjs.org/docs/app/api-reference/components/image
