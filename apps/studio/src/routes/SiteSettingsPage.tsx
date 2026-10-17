@@ -69,13 +69,13 @@ import { useI18n, useT } from "../i18n/index.tsx";
 import { NAME_MAX, validateName } from "../lib/account.ts";
 import { absoluteTime } from "../lib/activity.ts";
 import {
-  ApiRequestError,
   api,
   errorCode,
   isNotEnabled,
   type PreviewLink,
   type PreviewLinkInput,
 } from "../lib/api.ts";
+import { apiErrorText, isConflict } from "../lib/api-errors.ts";
 import {
   addDomain,
   applyGeneral,
@@ -104,8 +104,6 @@ const SECTIONS = [
   AI_SETTINGS_SECTION,
   "previews",
 ] as const;
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 
 /** Saves a whole Site document (PUT, CAS on `rev`) and keeps every cached copy in step. */
 function useSaveSite(siteId: string) {
@@ -155,6 +153,7 @@ function SaveError({
   onReload: () => void;
   reloading: boolean;
 }) {
+  const t = useT();
   if (!error) return null;
   if (isConflict(error)) return <ConflictBanner onReload={onReload} reloading={reloading} />;
   return (
@@ -163,7 +162,7 @@ function SaveError({
       size="sm"
       icon={<WarningCircle weight="fill" />}
       title={title}
-      description={errorMessage(error)}
+      description={apiErrorText(t, error)}
     />
   );
 }
@@ -590,7 +589,7 @@ function DomainsSection({
           save.error
             ? isConflict(save.error)
               ? t("siteSettings.conflictDescription")
-              : errorMessage(save.error)
+              : apiErrorText(t, save.error)
             : undefined
         }
         onConfirm={() => {
@@ -773,7 +772,7 @@ function PreviewLinksSection({
               size="sm"
               icon={<WarningCircle weight="fill" />}
               title={t("siteSettings.previews.failed")}
-              description={errorMessage(create.error)}
+              description={apiErrorText(t, create.error)}
             />
           )}
           <Radio.Group

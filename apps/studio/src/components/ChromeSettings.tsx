@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api, json, request } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { useBlockEnumLabel } from "./BlockSection.tsx";
 import { AssetFrame } from "./Media.tsx";
 import { AssetPickerDialog } from "./MediaPicker.tsx";
@@ -237,7 +238,7 @@ export function ChromeSettingsSection({
             isConflict(save.error)
               ? t("siteSettings.conflictDescription")
               : save.error instanceof Error
-                ? save.error.message
+                ? apiErrorText(t, save.error)
                 : String(save.error)
           }
         />

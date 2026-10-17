@@ -137,3 +137,19 @@ const caption = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric"
   labels={{ labelPrevious: () => t.previousMonth, labelNext: () => t.nextMonth, labelDayButton: … }}
 />
 ```
+
+---
+
+## 6. `DeleteResource` block: every word is English
+
+**Status in Cloudhal:** fixed in our copy (`packages/ui/src/blocks/kumo/delete-resource/`): a required `labels` prop replaces `resourceType`/`deleteButtonText`; Studio fills it with `deleteResourceProps` (`apps/studio/src/components/deleteLabels.ts`).
+
+### Title
+
+`DeleteResource` block: take its words as props (title, warning, "Type … to confirm", Cancel, aria-labels)
+
+### Body
+
+The block (`kumo add DeleteResource`) hard-codes "Delete {name}", "This action cannot be undone. This will permanently delete the …", "Type … to confirm:", "Cancel", `aria-label`s "Close", "Copy … to clipboard", "Type … to confirm deletion", and the button "Delete {resourceType}". It also lower-cases `resourceType` with `toLowerCase()` (wrong for Turkish "I"), and the sentence order is fixed in JSX, so a translation cannot move the name.
+
+**Proposal.** A `labels` object (or `KumoLocaleProvider` keys) with templates that contain `{name}`, rendered with the name as the highlighted chip wherever the template puts it, as Cloudhal's copy does.

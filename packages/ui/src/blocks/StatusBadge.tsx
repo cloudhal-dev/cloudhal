@@ -3,16 +3,10 @@ import type { PublishStatus } from "@cloudhal/core-contracts";
 
 export interface StatusBadgeProps {
   status: PublishStatus;
-  /** Localised label; defaults to English. */
-  label?: string | undefined;
+  /** The words, from the screen's catalog (`status.*` in Studio). */
+  label: string;
 }
 
-const LABEL: Record<PublishStatus, string> = {
-  draft: "Draft",
-  review: "In review",
-  published: "Published",
-  archived: "Archived",
-};
 const VARIANT: Record<PublishStatus, "secondary" | "warning" | "success" | "outline"> = {
   draft: "secondary",
   review: "warning",
@@ -26,7 +20,7 @@ export function StatusBadge({ status, label }: StatusBadgeProps) {
   return (
     <span data-status={status} className="inline-flex">
       {/* biome-ignore lint/suspicious/noExplicitAny: Kumo's Badge variant union is wider than ours */}
-      <Badge variant={VARIANT[status] as any}>{label ?? LABEL[status]}</Badge>
+      <Badge variant={VARIANT[status] as any}>{label}</Badge>
     </span>
   );
 }

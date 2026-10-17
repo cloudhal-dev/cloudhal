@@ -34,6 +34,7 @@ import {
   type Member,
   type Role,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { assignableRoles, expiresIn, type RankProblem, rank } from "../lib/roles.ts";
 import { ModeBadge } from "./AgentModes.tsx";
 import { PasswordField } from "./PasswordField.tsx";
@@ -41,8 +42,6 @@ import { RoleBadge } from "./Roles.tsx";
 import { ScopeBadge } from "./ScopeBadge.tsx";
 import { useToast } from "./Toast.ts";
 import { MEMBERS_KEY, useRoleRules } from "./useMe.ts";
-
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Keep showing the last member while a dialog animates closed (`undefined` closes it). */
 function useLast<T>(value: T | undefined): T | undefined {
@@ -176,7 +175,7 @@ export function ChangeRoleDialog({
   const from = member?.role ?? "contributor";
   const demotion = rank(role) < rank(from);
   const unchanged = role === from;
-  const failure = change.error ? (rankMessage(change.error) ?? errorMessage(change.error)) : "";
+  const failure = change.error ? (rankMessage(change.error) ?? apiErrorText(t, change.error)) : "";
 
   return (
     <LayerDialog.Root
@@ -384,7 +383,7 @@ export function RemoveMemberDialog({
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
                 title={t("members.remove.failed")}
-                description={rankMessage(remove.error) ?? errorMessage(remove.error)}
+                description={rankMessage(remove.error) ?? apiErrorText(t, remove.error)}
               />
             )}
           </div>
@@ -501,7 +500,7 @@ export function ResetLinkDialog({
                   size="sm"
                   icon={<WarningCircle weight="fill" />}
                   title={t("members.reset.failed")}
-                  description={rankMessage(issue.error) ?? errorMessage(issue.error)}
+                  description={rankMessage(issue.error) ?? apiErrorText(t, issue.error)}
                 />
               )}
             </div>
@@ -584,7 +583,7 @@ export function TransferOwnershipDialog({
     transfer.error && code !== "wrong_password"
       ? code === "not_administrator"
         ? t("members.transfer.notAdministrator")
-        : (rankMessage(transfer.error) ?? errorMessage(transfer.error))
+        : (rankMessage(transfer.error) ?? apiErrorText(t, transfer.error))
       : undefined;
   return (
     <LayerDialog.Alert

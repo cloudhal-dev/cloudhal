@@ -255,6 +255,7 @@ export {
 } from "./blocks/InsetPanel.tsx";
 export {
   DeleteResource,
+  type DeleteResourceLabels,
   type DeleteResourceProps,
 } from "./blocks/kumo/delete-resource/delete-resource.tsx";
 export { PageHeader, type PageHeaderProps } from "./blocks/kumo/page-header/page-header.tsx";

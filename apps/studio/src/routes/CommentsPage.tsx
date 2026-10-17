@@ -67,6 +67,7 @@ import {
   type CommentView,
   isNotEnabled,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   bulkActionsFor,
   commentsKey,
@@ -151,7 +152,7 @@ function QueueAside({ siteId, t }: { siteId: string; t: T }) {
     } catch (e) {
       toast.error(
         t(personal ? "comments.aside.exportPersonal" : "comments.aside.export"),
-        e instanceof Error ? e.message : String(e),
+        apiErrorText(t, e),
       );
     } finally {
       setExporting(undefined);
@@ -440,7 +441,7 @@ export function CommentsPage() {
           });
         else toast.error(t("comments.commenter.title"), t("comments.commenter.noEmail"));
       } catch (e) {
-        toast.error(t("comments.commenter.title"), e instanceof Error ? e.message : String(e));
+        toast.error(t("comments.commenter.title"), apiErrorText(t, e));
       }
     } else start(action, [comment]);
   };

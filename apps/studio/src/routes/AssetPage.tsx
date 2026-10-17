@@ -40,6 +40,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ActorCell } from "../components/Audit.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { DangerZoneCard, DetailsCard, EditorLayout } from "../components/EditorLayout.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
@@ -832,10 +833,9 @@ export function AssetPage() {
       <DeleteResource
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        resourceType={t("media.detail.resourceType")}
+        {...deleteResourceProps(t, t("media.detail.resourceType"), { error: remove.error })}
         resourceName={name}
         isDeleting={remove.isPending}
-        errorMessage={remove.error instanceof Error ? remove.error.message : undefined}
         onDelete={async () => {
           await remove.mutateAsync();
         }}
@@ -846,7 +846,7 @@ export function AssetPage() {
         open={takedownOpen}
         onOpenChange={setTakedownOpen}
         busy={takedown.isPending}
-        error={takedown.error instanceof Error ? takedown.error.message : undefined}
+        error={takedown.error}
         onConfirm={(input) => takedown.mutate(input)}
       />
     </PageLayout>

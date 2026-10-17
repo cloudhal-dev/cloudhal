@@ -3,6 +3,7 @@ import { Banner, Checkbox, InputArea, InsetPanel, LayerDialog, Text } from "@clo
 import { ProhibitInset, WarningCircle } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n/index.tsx";
+import { apiErrorText } from "../lib/api-errors.ts";
 
 /**
  * Take down a file (RFC-0004 §4.6, Owner only): the bytes are deleted from storage and from every
@@ -24,7 +25,8 @@ export function TakedownDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   busy: boolean;
-  error: string | undefined;
+  /** The failed takedown, worded by `apiErrorText`. */
+  error: unknown;
   onConfirm: (input: { reason: string; legal: boolean }) => void;
 }) {
   const t = useT("media");
@@ -82,13 +84,13 @@ export function TakedownDialog({
               checked={legal}
               onCheckedChange={(v: boolean) => setLegal(v)}
             />
-            {error && (
+            {Boolean(error) && (
               <Banner
                 variant="error"
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
                 title={t("errors.title")}
-                description={error}
+                description={apiErrorText(t, error)}
               />
             )}
           </div>

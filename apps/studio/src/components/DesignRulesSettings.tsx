@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { SettingsSection } from "./Settings.tsx";
 import { useToast } from "./Toast.ts";
 import { useGate } from "./useMe.ts";
@@ -120,7 +121,7 @@ export function DesignRulesSettingsSection({
             isConflict(save.error)
               ? t("siteSettings.conflictDescription")
               : save.error instanceof Error
-                ? save.error.message
+                ? apiErrorText(t, save.error)
                 : String(save.error)
           }
         />

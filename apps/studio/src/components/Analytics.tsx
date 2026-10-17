@@ -38,6 +38,7 @@ import {
   errorCode,
   isNotEnabled,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { useGate, useMe } from "./useMe.ts";
 
 export const analyticsKeys = {
@@ -237,7 +238,7 @@ export function AnalyticsErrorBanner({
           busy
             ? t("analytics.errors.busyDescription")
             : error instanceof Error
-              ? error.message
+              ? apiErrorText(t, error)
               : String(error)
         }
         action={

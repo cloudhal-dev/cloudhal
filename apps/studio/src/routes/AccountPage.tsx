@@ -55,6 +55,7 @@ import {
   validatePasswordChange,
 } from "../lib/account.ts";
 import { api, type InstanceFeature, type InstanceInfo, type SignUpPolicy } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   AuthRequestError,
   account,
@@ -68,8 +69,6 @@ import {
 const SESSION_LIMIT = 5;
 
 const SECTIONS = ["profile", "password", "sessions", "notifications", "access", "server"] as const;
-
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; pending: boolean }) {
   const { t, locale } = useI18n();
@@ -166,7 +165,7 @@ function ProfileSection({ me, pending }: { me: CurrentUser | null | undefined; p
               size="sm"
               icon={<WarningCircle weight="fill" />}
               title={t("account.profile.failed")}
-              description={errorMessage(save.error)}
+              description={apiErrorText(t, save.error)}
             />
           )}
           <div className="@container">
@@ -308,7 +307,7 @@ function PasswordSection() {
           size="sm"
           icon={<WarningCircle weight="fill" />}
           title={t("account.password.failed")}
-          description={errorMessage(change.error)}
+          description={apiErrorText(t, change.error)}
         />
       )}
       {/* One grid for all three fields, so every input has the same width and the pair aligns. */}
@@ -576,7 +575,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
         detail={toRevoke?.ipAddress ?? undefined}
         confirmLabel={t("account.sessions.revoke")}
         busy={revoke.isPending}
-        error={revoke.error ? errorMessage(revoke.error) : undefined}
+        error={revoke.error}
         onConfirm={() => toRevoke && revoke.mutate(toRevoke)}
       />
       <ConfirmDialog
@@ -589,7 +588,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
         description={t("account.sessions.revokeOthersDescription")}
         confirmLabel={t("account.sessions.signOutOthers")}
         busy={revokeOthers.isPending}
-        error={revokeOthers.error ? errorMessage(revokeOthers.error) : undefined}
+        error={revokeOthers.error}
         onConfirm={() => revokeOthers.mutate()}
       />
     </SettingsSection>

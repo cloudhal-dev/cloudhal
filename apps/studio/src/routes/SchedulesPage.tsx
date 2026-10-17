@@ -71,6 +71,7 @@ import { useToast } from "../components/Toast.ts";
 import { useCan, useGate, useMe } from "../components/useMe.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { type Approval, api, type CalendarItem, type ReleaseView } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   APPROVAL_FACET,
   BUILTIN_VIEWS,
@@ -152,7 +153,7 @@ function useDecide(siteId: string, t: ST) {
     },
     onError: async (e) => {
       await qc.invalidateQueries({ queryKey: ["approvals", siteId] });
-      toast.error(t("schedules.actions.gone"), e instanceof Error ? e.message : String(e));
+      toast.error(t("schedules.actions.gone"), apiErrorText(t, e));
     },
   });
 }

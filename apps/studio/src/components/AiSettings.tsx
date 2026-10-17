@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { type AiPickerModel, type AiSettings, ApiRequestError, api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { SettingRow, SettingsSection } from "./Settings.tsx";
 import { useToast } from "./Toast.ts";
 import { useGate } from "./useMe.ts";
@@ -198,7 +199,7 @@ export function AiSettingsSection({ siteId }: { siteId: string }) {
           variant={isConflict(save.error) ? "alert" : "error"}
           icon={<WarningCircle weight="fill" />}
           title={t(`${a}.failed`)}
-          description={isConflict(save.error) ? t(`${a}.conflict`) : save.error.message}
+          description={isConflict(save.error) ? t(`${a}.conflict`) : apiErrorText(t, save.error)}
           action={
             isConflict(save.error) ? (
               <Banner.Action

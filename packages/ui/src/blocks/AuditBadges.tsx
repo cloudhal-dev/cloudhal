@@ -13,34 +13,28 @@ export type AuditDecision = "allow" | "deny" | "approval-required";
 export type AuditOutcome = "ok" | "error" | "pending";
 export type AuditActorKind = "human" | "agent" | "system";
 
-const DECISION: Record<
-  AuditDecision,
-  { variant: "success" | "warning" | "error"; icon: Icon; label: string }
-> = {
-  allow: { variant: "success", icon: CheckCircle, label: "Allowed" },
-  "approval-required": { variant: "warning", icon: HandPalm, label: "Needs approval" },
-  deny: { variant: "error", icon: Prohibit, label: "Denied" },
+const DECISION: Record<AuditDecision, { variant: "success" | "warning" | "error"; icon: Icon }> = {
+  allow: { variant: "success", icon: CheckCircle },
+  "approval-required": { variant: "warning", icon: HandPalm },
+  deny: { variant: "error", icon: Prohibit },
 };
 
-const OUTCOME: Record<AuditOutcome, { variant: "success" | "warning" | "error"; label: string }> = {
-  ok: { variant: "success", label: "Succeeded" },
-  pending: { variant: "warning", label: "Pending" },
-  error: { variant: "error", label: "Failed" },
+const OUTCOME: Record<AuditOutcome, { variant: "success" | "warning" | "error" }> = {
+  ok: { variant: "success" },
+  pending: { variant: "warning" },
+  error: { variant: "error" },
 };
 
-const ACTOR: Record<
-  AuditActorKind,
-  { variant: "info" | "secondary" | "outline"; icon: Icon; label: string }
-> = {
-  agent: { variant: "info", icon: Robot, label: "Agent" },
-  human: { variant: "secondary", icon: User, label: "Human" },
-  system: { variant: "outline", icon: GearSix, label: "System" },
+const ACTOR: Record<AuditActorKind, { variant: "info" | "secondary" | "outline"; icon: Icon }> = {
+  agent: { variant: "info", icon: Robot },
+  human: { variant: "secondary", icon: User },
+  system: { variant: "outline", icon: GearSix },
 };
 
 export interface DecisionBadgeProps {
   decision: AuditDecision;
-  /** Localised label; defaults to English. */
-  label?: string | undefined;
+  /** The words, from the screen's catalog (`activity.decisions.*` in Studio). */
+  label: string;
 }
 
 /** Policy decision for one tool call: allowed (green), needs approval (amber), denied (red). */
@@ -50,7 +44,7 @@ export function DecisionBadge({ decision, label }: DecisionBadgeProps) {
   return (
     <span data-decision={decision} className="inline-flex">
       <Badge variant={d.variant} icon={<d.icon weight="fill" />}>
-        {label ?? d.label}
+        {label}
       </Badge>
     </span>
   );
@@ -58,7 +52,8 @@ export function DecisionBadge({ decision, label }: DecisionBadgeProps) {
 
 export interface OutcomeBadgeProps {
   outcome: AuditOutcome;
-  label?: string | undefined;
+  /** The words, from the screen's catalog. */
+  label: string;
 }
 
 /** What happened after the decision, as a status dot (the decision badge is the filled one). */
@@ -67,7 +62,7 @@ export function OutcomeBadge({ outcome, label }: OutcomeBadgeProps) {
   return (
     <span data-outcome={outcome} className="inline-flex">
       <Badge variant={o.variant} appearance="dot">
-        {label ?? o.label}
+        {label}
       </Badge>
     </span>
   );
@@ -75,7 +70,8 @@ export function OutcomeBadge({ outcome, label }: OutcomeBadgeProps) {
 
 export interface ActorBadgeProps {
   kind: AuditActorKind;
-  label?: string | undefined;
+  /** The words, from the screen's catalog. */
+  label: string;
 }
 
 /** Who acted: agents are tinted blue so they stand out from people in a mixed log. */
@@ -84,7 +80,7 @@ export function ActorBadge({ kind, label }: ActorBadgeProps) {
   return (
     <span data-actor-kind={kind} className="inline-flex">
       <Badge variant={a.variant} icon={<a.icon />}>
-        {label ?? a.label}
+        {label}
       </Badge>
     </span>
   );

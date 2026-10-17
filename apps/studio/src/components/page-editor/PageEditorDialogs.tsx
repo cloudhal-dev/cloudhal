@@ -3,6 +3,7 @@ import type { Page } from "@cloudhal/core-contracts";
 import { ApprovalDialog, DeleteResource } from "@cloudhal/ui";
 import { useT } from "../../i18n/index.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { deleteResourceProps } from "../deleteLabels.ts";
 import { MenuDeleteNotice } from "../Menus.tsx";
 import type { PageEditorState } from "./usePageEditor.ts";
 
@@ -43,7 +44,7 @@ export function PageEditorDialogs({ ed, draft }: { ed: PageEditorState; draft: P
       <DeleteResource
         open={ed.deleteOpen}
         onOpenChange={ed.setDeleteOpen}
-        resourceType={t("editor.page")}
+        {...deleteResourceProps(t, t("editor.page"))}
         resourceName={draft.path}
         notice={<MenuDeleteNotice refs={ed.menuRefs.data} kind="page" />}
         isDeleting={remove.isPending}

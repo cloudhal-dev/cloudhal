@@ -17,6 +17,7 @@ import {
   type CommentThreadMode,
   type CommentThreadView,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { closeInstant, commentsKey } from "../lib/comments.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { useToast } from "./Toast.ts";
@@ -59,7 +60,7 @@ export function useSetThread(siteId: string, nodeId: string) {
       const conflict = error instanceof ApiRequestError && error.status === 409;
       toast.error(
         t("comments.thread.failed"),
-        conflict ? t("comments.thread.conflict") : error.message,
+        conflict ? t("comments.thread.conflict") : apiErrorText(t, error),
       );
       if (conflict) await qc.invalidateQueries({ queryKey: commentsKey(siteId) });
     },

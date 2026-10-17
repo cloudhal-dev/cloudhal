@@ -30,6 +30,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { errorCode, type ReleaseView } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   formatWhen,
   holdsOf,
@@ -331,8 +332,7 @@ export function LockedBanner({
       else
         toast.success(t("schedules.lock.unscheduled"), t("schedules.lock.unscheduledDescription"));
     },
-    onError: (e) =>
-      toast.error(t("schedules.actions.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("schedules.actions.failed"), apiErrorText(t, e)),
   });
   const reapprove = useMutation({
     mutationFn: async (release: ReleaseView) => {
@@ -363,8 +363,7 @@ export function LockedBanner({
           : t("schedules.lock.editing.sent"),
       );
     },
-    onError: (e) =>
-      toast.error(t("schedules.actions.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("schedules.actions.failed"), apiErrorText(t, e)),
   });
 
   const l = "schedules.lock" as const;

@@ -2,6 +2,7 @@ import { Badge, Tooltip } from "@cloudhal/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import type { DraftPreview } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { EditorPreview } from "./EditorPreview.tsx";
 import { useSettled } from "./useSettled.ts";
 
@@ -51,9 +52,7 @@ export function DraftEditorPreview<I>({
       dirty={false}
       status={
         preview.error ? (
-          <Tooltip
-            content={preview.error instanceof Error ? preview.error.message : String(preview.error)}
-          >
+          <Tooltip content={apiErrorText(t, preview.error)}>
             <span className="inline-flex">
               <Badge variant="error">{t("preview.failed")}</Badge>
             </span>

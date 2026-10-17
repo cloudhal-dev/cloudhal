@@ -5,10 +5,10 @@
     "apps/studio/src/components/CommentSettings.tsx": 841,
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 854,
-    "apps/studio/src/routes/CommentThreadPage.tsx": 819,
+    "apps/studio/src/routes/CommentThreadPage.tsx": 811,
     "apps/studio/src/routes/NavigationPage.tsx": 1181,
-    "apps/studio/src/routes/SchedulesPage.tsx": 1299,
-    "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
+    "apps/studio/src/routes/SchedulesPage.tsx": 1300,
+    "apps/studio/src/routes/SiteSettingsPage.tsx": 914,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 853,
     "packages/api/src/routes/comments.ts": 874,
@@ -37,7 +37,7 @@
       "lines": 280
     },
     "apps/studio/scripts/design-lint.ts::lintSource": {
-      "lines": 179
+      "lines": 173
     },
     "apps/studio/src/components/ActivityDetailDialog.tsx::ActivityDetailDialog": {
       "lines": 184
@@ -133,7 +133,7 @@
       "lines": 344
     },
     "apps/studio/src/components/Schedules.tsx::useMoveDialog": {
-      "lines": 177
+      "lines": 178
     },
     "apps/studio/src/components/ScheduleSettings.tsx::ScheduleSettingsSection": {
       "lines": 247
@@ -172,7 +172,7 @@
       "lines": 231
     },
     "apps/studio/src/routes/AgentsPage.tsx::AgentsPage": {
-      "lines": 268
+      "lines": 269
     },
     "apps/studio/src/routes/AnalyticsPage.tsx::AnalyticsPage": {
       "lines": 326
@@ -187,13 +187,13 @@
       "lines": 478
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
-      "lines": 373
+      "lines": 370
     },
     "apps/studio/src/routes/AssetPage.tsx::AssetPage": {
-      "lines": 740
+      "lines": 739
     },
     "apps/studio/src/routes/AutomationsPage.tsx::AutomationsPage": {
-      "lines": 418
+      "lines": 417
     },
     "apps/studio/src/routes/AutomationsPage.tsx::AutomationsPage><anonymous>": {
       "lines": 248
@@ -238,7 +238,7 @@
       "lines": 1049
     },
     "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
-      "lines": 176
+      "lines": 173
     },
     "apps/studio/src/routes/RedirectsPage.tsx::RedirectsPage": {
       "lines": 297
@@ -283,7 +283,7 @@
       "lines": 296
     },
     "apps/studio/src/routes/TaxonomyPage.tsx::TaxonomyPage": {
-      "lines": 458
+      "lines": 457
     },
     "apps/studio/src/routes/TermEditorPage.tsx::TermEditorPage": {
       "lines": 553

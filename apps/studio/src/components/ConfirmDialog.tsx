@@ -1,6 +1,7 @@
 import { Banner, LayerDialog, Text } from "@cloudhal/ui";
 import { WarningCircle } from "@phosphor-icons/react";
 import { useT } from "../i18n/index.tsx";
+import { apiErrorText } from "../lib/api-errors.ts";
 
 /**
  * Non-typed destructive confirmation (DESIGN.md §2d): `LayerDialog.Alert`, always rendered and
@@ -24,7 +25,8 @@ export function ConfirmDialog({
   detail?: string | undefined;
   confirmLabel: string;
   busy?: boolean;
-  error?: string | undefined;
+  /** A failure: a sentence, or the failed request's error (worded by `apiErrorText`). */
+  error?: unknown;
   onConfirm: () => void;
 }) {
   const t = useT();
@@ -36,13 +38,13 @@ export function ConfirmDialog({
         <LayerDialog.Body>
           <div className="grid gap-4">
             {detail && <Text variant="secondary">{detail}</Text>}
-            {error && (
+            {Boolean(error) && (
               <Banner
                 variant="error"
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
                 title={t("errors.title")}
-                description={error}
+                description={typeof error === "string" ? error : apiErrorText(t, error)}
               />
             )}
           </div>

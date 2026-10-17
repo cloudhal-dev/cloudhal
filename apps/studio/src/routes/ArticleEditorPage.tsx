@@ -28,6 +28,7 @@ import { BodyEditor } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DraftEditorPreview } from "../components/DraftPreview.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import {
   DangerZoneCard,
   type DetailRow,
@@ -556,7 +557,7 @@ export function ArticleEditorPage() {
       <DeleteResource
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        resourceType={t("editor.article")}
+        {...deleteResourceProps(t, t("editor.article"))}
         resourceName={draft.slug}
         notice={<MenuDeleteNotice refs={menuRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}

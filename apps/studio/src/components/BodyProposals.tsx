@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { type TFunction, useT } from "../i18n/index.tsx";
 import { api, type ProposalItem, type ProposalStep } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { useBodyDiffLabels } from "./BodyChanges.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
 import { useToast } from "./Toast.ts";
@@ -56,7 +57,7 @@ export function BodyProposals({
       if (accept) onDecided();
     },
     onError: (e) => {
-      toast.error(t("proposals.failed"), e instanceof Error ? e.message : String(e));
+      toast.error(t("proposals.failed"), apiErrorText(t, e));
       onDecided();
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),

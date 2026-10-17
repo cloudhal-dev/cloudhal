@@ -52,6 +52,7 @@ import {
 } from "../components/Schedules.tsx";
 import { useToast } from "../components/Toast.ts";
 import { isNotEnabled, type ReleaseItemView, type ReleaseView } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   formatWhen,
   localDateTime,
@@ -62,8 +63,6 @@ import {
   whenProblem,
 } from "../lib/schedules.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
  * One release (RFC-0008 §15.1, §6, §10.4; DESIGN.md §2x), the editor template without a preview:
@@ -138,7 +137,7 @@ export function ReleasePage() {
       await qc.invalidateQueries({ queryKey: scheduleKeys.all(siteId) });
       toast.success(t("schedules.release.done.retitled"));
     },
-    onError: (e) => toast.error(t("schedules.actions.failed"), message(e)),
+    onError: (e) => toast.error(t("schedules.actions.failed"), apiErrorText(t, e)),
   });
 
   const rel = "schedules.release" as const;
@@ -557,7 +556,7 @@ export function ReleasePage() {
         description={t(`${rel}.danger.cancel.confirmDescription`)}
         confirmLabel={t(`${rel}.danger.cancel.action`)}
         busy={mutations.cancel.isPending}
-        error={mutations.cancel.error ? message(mutations.cancel.error) : undefined}
+        error={mutations.cancel.error}
         onConfirm={() => mutations.cancel.mutate(r, { onSuccess: () => setCancelOpen(false) })}
       />
       <ApprovalDialog

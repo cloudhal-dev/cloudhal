@@ -43,6 +43,7 @@ import {
   type CommentReasonCode,
   type CommentView,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   actionsFor,
   commentsKey,
@@ -341,7 +342,7 @@ export function useModerateComments(
     onError: (error) =>
       toast.error(
         isConflict(error) ? t("comments.results.conflictTitle") : t("comments.results.failed"),
-        isConflict(error) ? t("comments.results.conflictDescription") : error.message,
+        isConflict(error) ? t("comments.results.conflictDescription") : apiErrorText(t, error),
       ),
   });
 }
@@ -367,7 +368,7 @@ export function useDeleteComment(siteId: string) {
     onError: (error) =>
       toast.error(
         isConflict(error) ? t("comments.results.conflictTitle") : t("comments.results.failed"),
-        isConflict(error) ? t("comments.results.conflictDescription") : error.message,
+        isConflict(error) ? t("comments.results.conflictDescription") : apiErrorText(t, error),
       ),
   });
 }

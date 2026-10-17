@@ -45,6 +45,7 @@ import {
   type KeyMode,
   type ReleaseView,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   formatMinutes,
   formatWhen,
@@ -241,8 +242,6 @@ export function useReleaseAbilities(release: Pick<Release, "createdBy"> | undefi
 // Release mutations
 // ---------------------------------------------------------------------------------------------
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 /** Unschedule, cancel, publish now and re-pin, each with its toast; the schedules refetch after. */
 export function useReleaseMutations(siteId: string) {
   const { t } = useI18n("schedules");
@@ -256,7 +255,7 @@ export function useReleaseMutations(siteId: string) {
     ]);
   const fail = (e: unknown) => {
     void refresh();
-    toast.error(t("schedules.actions.failed"), message(e));
+    toast.error(t("schedules.actions.failed"), apiErrorText(t, e));
   };
   const d = "schedules.release.done" as const;
   return {
@@ -416,7 +415,8 @@ export function useMoveDialog(
                           }),
                         );
                       },
-                      onError: (e) => toast.error(t("schedules.actions.failed"), message(e)),
+                      onError: (e) =>
+                        toast.error(t("schedules.actions.failed"), apiErrorText(t, e)),
                     },
                   ),
               },
@@ -474,7 +474,7 @@ export function useMoveDialog(
               ),
             }
           : move.error
-            ? { title: t("schedules.actions.failed"), description: message(move.error) }
+            ? { title: t("schedules.actions.failed"), description: apiErrorText(t, move.error) }
             : undefined
       }
       onConfirm={confirm}

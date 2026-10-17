@@ -55,6 +55,7 @@ import {
   api,
   isNotEnabled,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { ReadOnly } from "./Gating.tsx";
 import { SettingRow, SettingsSection } from "./Settings.tsx";
@@ -202,7 +203,7 @@ function PrivacyNotice({ uniqueVisitors, unsaved }: { uniqueVisitors: boolean; u
       await navigator.clipboard.writeText(noticeText(heading, paragraphs));
       toast.success(t("analyticsSettings.notice.copied"));
     } catch (e) {
-      toast.error(t("errors.title"), e instanceof Error ? e.message : undefined);
+      toast.error(t("errors.title"), e ? apiErrorText(t, e) : undefined);
     }
   };
   return (
@@ -456,7 +457,7 @@ export function AnalyticsSettingsSection({ siteId }: { siteId: string }) {
               size="sm"
               icon={<WarningCircle weight="fill" />}
               title={t("analyticsSettings.failed")}
-              description={save.error.message}
+              description={apiErrorText(t, save.error)}
             />
           ))}
         <ReadOnly reason={gate.reason} className="grid min-w-0 gap-5">

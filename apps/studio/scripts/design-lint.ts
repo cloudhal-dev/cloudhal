@@ -11,11 +11,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { coversText, lintText } from "./i18n-lint.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO = path.resolve(here, "../../..");
 export const STUDIO_SRC = path.join(REPO, "apps/studio/src");
 export const UI_BLOCKS = path.join(REPO, "packages/ui/src/blocks");
+const UI_SRC = path.join(REPO, "packages/ui/src");
 
 export interface Violation {
   rule: string;
@@ -417,12 +419,6 @@ export function lintSource(rel: string, text: string, scope: Scope): Violation[]
     }
   }
 
-  // Every user-facing string goes through useT() (JSX text nodes with letters).
-  for (const m of text.matchAll(/>\s*([A-Za-z][A-Za-z ,.'!?-]{2,})\s*</g)) {
-    if (/ID$/.test(m[1] ?? "")) continue;
-    add("i18n", `hard-coded text "${m[1]}" — use t("…") with keys in en.ts and tr.ts`, m.index);
-  }
-
   // Route files: registered template and its blocks.
   if (rel.startsWith("routes/")) {
     const template = ROUTE_TEMPLATES[rel];
@@ -447,27 +443,35 @@ export function lintSource(rel: string, text: string, scope: Scope): Violation[]
   return out;
 }
 
+/** Whether the lint has anything to say about a file: design rules or the words rule. */
+export function covered(absPath: string): boolean {
+  return scopeOf(absPath) !== "none" || coversText(path.relative(REPO, path.resolve(absPath)));
+}
+
 export function lintFile(absPath: string): Violation[] {
+  const source = readFileSync(absPath, "utf8");
+  // No hard-coded words (AGENTS.md hard rule 10): every `.ts`/`.tsx` of Studio and `@cloudhal/ui`.
+  const repoRel = path.relative(REPO, path.resolve(absPath));
+  const out: Violation[] = coversText(repoRel)
+    ? lintText(repoRel, source).map(({ rule, message, line }) => ({ rule, message, line }))
+    : [];
   const scope = scopeOf(absPath);
-  if (scope === "none") return [];
+  if (scope === "none") return out;
   const rel = path.relative(scope === "screen" ? STUDIO_SRC : REPO, absPath);
-  return lintSource(rel, readFileSync(absPath, "utf8"), scope);
+  return [...out, ...lintSource(rel, source, scope)];
 }
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const p = path.join(dir, name);
-    return statSync(p).isDirectory() ? walk(p) : p.endsWith(".tsx") ? [p] : [];
+    if (statSync(p).isDirectory()) return name === "node_modules" ? [] : walk(p);
+    return /\.tsx?$/.test(p) ? [p] : [];
   });
 }
 
 /** Every file the lint covers. */
 export function allFiles(): string[] {
-  return [
-    ...walk(path.join(STUDIO_SRC, "routes")),
-    ...walk(path.join(STUDIO_SRC, "components")),
-    ...walk(UI_BLOCKS),
-  ].filter((f) => scopeOf(f) !== "none");
+  return [...walk(STUDIO_SRC), ...walk(UI_SRC)].filter(covered);
 }
 
 export function format(file: string, violations: Violation[]): string {
@@ -492,7 +496,7 @@ async function main(argv: string[]) {
     } catch {
       return;
     }
-    if (!file || scopeOf(file) === "none") return;
+    if (!file || !covered(file)) return;
     let violations: Violation[];
     try {
       violations = lintFile(file);

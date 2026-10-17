@@ -13,6 +13,7 @@ import { Hourglass, Plus, Star, Warning } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import type { TermListItem } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   type Assignment,
   foldName,
@@ -324,7 +325,7 @@ export function TagPicker({
       const term = await onCreate(s.name, s.slug);
       onChange({ ...value, ids: [...value.ids, term.id] });
     } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e));
+      setCreateError(apiErrorText(t, e));
     } finally {
       setCreating(false);
     }

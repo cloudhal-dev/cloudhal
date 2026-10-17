@@ -11,6 +11,9 @@ import {
 import { Check, Copy, WarningCircle, X } from "@phosphor-icons/react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
+// Copied with `kumo add DeleteResource` and owned by Cloudhal. Changes from upstream: `notice`, and
+// every word comes from `labels` (upstream hard-codes English; AGENTS.md hard rule 10).
+
 export const KUMO_DELETE_RESOURCE_VARIANTS = {
   size: {
     sm: {
@@ -34,13 +37,34 @@ export interface KumoDeleteResourceVariantsProps {
   size?: KumoDeleteResourceSize;
 }
 
+/**
+ * The dialog's words, from the screen's catalog. `{name}` is replaced by the resource's name
+ * (drawn as a code chip in `warning` and `typeToConfirm`); the screen fills in the resource type.
+ */
+export interface DeleteResourceLabels {
+  /** "Delete {name}" */
+  title: string;
+  /** "This action cannot be undone. This will permanently delete the {name} page." */
+  warning: string;
+  /** "Type {name} to confirm:" */
+  typeToConfirm: string;
+  /** Accessible name of the copy button: "Copy {name} to clipboard". */
+  copy: string;
+  /** Accessible name of the confirmation input: "Type {name} to confirm deletion". */
+  confirmInput: string;
+  close: string;
+  cancel: string;
+  /** The destructive button: "Delete page", "Revoke key". */
+  delete: string;
+}
+
 export interface DeleteResourceProps extends KumoDeleteResourceVariantsProps {
   /** Whether the dialog is open */
   open: boolean;
   /** Callback when open state changes */
   onOpenChange: (open: boolean) => void;
-  /** The type of resource being deleted (e.g., "Zone", "Worker", "KV Namespace") */
-  resourceType: string;
+  /** Every word of the dialog (Cloudhal: replaces upstream's `resourceType` and English text). */
+  labels: DeleteResourceLabels;
   /** The name of the specific resource being deleted */
   resourceName: string;
   /** Callback when delete is confirmed */
@@ -49,8 +73,6 @@ export interface DeleteResourceProps extends KumoDeleteResourceVariantsProps {
   isDeleting?: boolean;
   /** Whether the confirmation input should be case-sensitive (default: true) */
   caseSensitive?: boolean;
-  /** Custom delete button text (defaults to "Delete {resourceType}") */
-  deleteButtonText?: string;
   /** Additional className for the dialog */
   className?: string;
   /** Error message to display if the delete action fails */
@@ -62,12 +84,11 @@ export interface DeleteResourceProps extends KumoDeleteResourceVariantsProps {
 export function DeleteResource({
   open,
   onOpenChange,
-  resourceType,
+  labels,
   resourceName,
   onDelete,
   isDeleting = false,
   caseSensitive = true,
-  deleteButtonText,
   size = KUMO_DELETE_RESOURCE_DEFAULT_VARIANTS.size,
   errorMessage,
   notice,
@@ -106,7 +127,9 @@ export function DeleteResource({
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <Dialog size={size} className={cn("p-0", className)}>
         <div className="flex items-center justify-between border-b border-kumo-line px-6 py-4">
-          <DialogTitle className="text-lg font-semibold">Delete {resourceName}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">
+            {fill(labels.title, resourceName)}
+          </DialogTitle>
           <DialogClose
             render={(props) => (
               <Button
@@ -114,7 +137,7 @@ export function DeleteResource({
                 variant="ghost"
                 shape="square"
                 size="sm"
-                aria-label="Close"
+                aria-label={labels.close}
                 disabled={isDeleting}
               >
                 <X size={18} />
@@ -131,9 +154,10 @@ export function DeleteResource({
               </Banner>
             )}
             <p className="max-w-prose text-base text-pretty text-kumo-subtle">
-              This action cannot be undone. This will permanently delete the{" "}
-              <span className="font-medium text-kumo-default">{resourceName}</span>{" "}
-              {resourceType.toLowerCase()}.
+              {withName(
+                labels.warning,
+                <span className="font-medium text-kumo-default">{resourceName}</span>,
+              )}
             </p>
             {notice}
           </div>
@@ -141,11 +165,12 @@ export function DeleteResource({
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1.5 text-base">
               <span>
-                Type{" "}
-                <button
+                {withName(
+                  labels.typeToConfirm,
+                  <button
                   className="group inline rounded-md bg-kumo-tint px-2 py-1 font-mono text-sm font-semibold hover:cursor-pointer hover:bg-kumo-fill"
                   onClick={handleCopy}
-                  aria-label={`Copy ${resourceName} to clipboard`}
+                  aria-label={fill(labels.copy, resourceName)}
                 >
                   {resourceName}
 
@@ -158,8 +183,8 @@ export function DeleteResource({
                       className="ml-1.5 inline text-kumo-subtle group-hover:text-kumo-default"
                     />
                   )}
-                </button>{" "}
-                to confirm:
+                </button>,
+                )}
               </span>
             </div>
             <Input
@@ -171,7 +196,7 @@ export function DeleteResource({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              aria-label={`Type ${resourceName} to confirm deletion`}
+              aria-label={fill(labels.confirmInput, resourceName)}
               className="w-full"
             />
           </div>
@@ -181,7 +206,7 @@ export function DeleteResource({
           <DialogClose
             render={(props) => (
               <Button {...props} variant="secondary" disabled={isDeleting}>
-                Cancel
+                {labels.cancel}
               </Button>
             )}
           />
@@ -191,7 +216,7 @@ export function DeleteResource({
             disabled={!isConfirmed || isDeleting}
             loading={isDeleting}
           >
-            {deleteButtonText || `Delete ${resourceType}`}
+            {labels.delete}
           </Button>
         </div>
       </Dialog>
@@ -200,3 +225,18 @@ export function DeleteResource({
 }
 
 DeleteResource.displayName = "DeleteResource";
+
+const fill = (template: string, name: string) => template.replaceAll("{name}", name);
+
+/** `template` with its `{name}` drawn as `node` (word order stays the translator's). */
+function withName(template: string, node: ReactNode): ReactNode {
+  const [before, ...rest] = template.split("{name}");
+  if (rest.length === 0) return template;
+  return (
+    <>
+      {before}
+      {node}
+      {rest.join("")}
+    </>
+  );
+}

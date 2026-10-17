@@ -2,17 +2,21 @@ import { Button, cn } from "@cloudflare/kumo";
 import { XIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
-export interface TermChipProps {
+export type TermChipProps = {
   children: ReactNode;
   /** Shown before the label (a star for the primary term). */
   icon?: ReactNode;
-  /** Accessible name of the remove button ("Remove AI"); no button without `onRemove`. */
-  removeLabel?: string;
-  onRemove?: () => void;
   /** Quieter chip for a proposed or otherwise pending term. */
   tone?: "default" | "pending";
   className?: string;
-}
+} & (
+  | {
+      /** Accessible name of the remove button ("Remove AI"), from the screen's catalog. */
+      removeLabel: string;
+      onRemove: () => void;
+    }
+  | { removeLabel?: undefined; onRemove?: undefined }
+);
 
 /**
  * A removable chip with Kumo `Combobox.Chip`'s anatomy (h-6, hairline ring, overlay fill), for
@@ -43,7 +47,7 @@ export function TermChip({
           variant="ghost"
           size="xs"
           shape="square"
-          aria-label={removeLabel ?? "Remove"}
+          aria-label={removeLabel}
           icon={<XIcon size={10} />}
           onClick={onRemove}
         />

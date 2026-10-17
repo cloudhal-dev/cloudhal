@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { type Approval, api, type KeyMode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   elevationRequestOf,
   grantPresets,
@@ -271,11 +272,11 @@ export function ApproveElevationDialog({
                     description={
                       conflict ? (
                         <span className="grid gap-1">
-                          <span>{grant.error.message}</span>
+                          <span>{apiErrorText(t, grant.error)}</span>
                           <span>{t("approvals.elevation.stillPending")}</span>
                         </span>
                       ) : (
-                        grant.error.message
+                        apiErrorText(t, grant.error)
                       )
                     }
                   />

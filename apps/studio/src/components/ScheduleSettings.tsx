@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api, isNotEnabled, type ScheduleSettings } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { browserZone, formatMoment, knownZones, zoneLabel } from "../lib/schedules.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
 import { SettingRow, SettingsSection } from "./Settings.tsx";
@@ -213,7 +214,7 @@ export function ScheduleSettingsSection({ siteId }: { siteId: string }) {
               variant={isConflict(put.error) ? "alert" : "error"}
               icon={<WarningCircle weight="fill" />}
               title={t(`${s}.failed`)}
-              description={isConflict(put.error) ? t(`${s}.conflict`) : put.error.message}
+              description={isConflict(put.error) ? t(`${s}.conflict`) : apiErrorText(t, put.error)}
               action={
                 isConflict(put.error) ? (
                   <Banner.Action

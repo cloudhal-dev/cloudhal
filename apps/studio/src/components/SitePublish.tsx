@@ -11,6 +11,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { usePublishMode, usePublishSite } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
 
@@ -35,7 +36,7 @@ export function SitePublish({ siteId }: { siteId: string }) {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
       toast.success(t("snapshots.created"));
     },
-    onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
   });
   const request = mode === "request";
   return (
