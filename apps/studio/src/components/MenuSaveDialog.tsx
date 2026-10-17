@@ -17,7 +17,7 @@ const SIGN_TONE: Record<DeltaLine["sign"], string> = {
 
 /** The RFC-0003 §6.3 sentence of one delta line, in Studio's language. */
 export function useDeltaText(taxonomyName: (key: string) => string) {
-  const t = useT();
+  const t = useT("menus");
   const reason = useHiddenReason();
   const quoted = (label: string, fallback: boolean) =>
     fallback ? t("menus.delta.quotedTitle", { label }) : t("menus.delta.quoted", { label });
@@ -119,7 +119,7 @@ export function MenuSaveDialog({
   onConfirm: () => void;
   taxonomyName: (key: string) => string;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const text = useDeltaText(taxonomyName);
   const changes = delta?.changes ?? 0;
   const hidden = lines.filter((l) => l.sign === "!").length;

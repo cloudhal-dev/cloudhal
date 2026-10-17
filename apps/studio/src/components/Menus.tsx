@@ -29,13 +29,13 @@ export const menuKeys = {
 
 /** "Header", "Footer", "Sidebar" or the key itself for custom menus. */
 export function useMenuName() {
-  const t = useT();
+  const t = useT("menus");
   return (key: string) => (isWellKnown(key) ? t(`menus.places.${key}`) : key);
 }
 
 /** "Header (primary)" — the place and the key, as diffs and lists name a menu. */
 export function useMenuTitle() {
-  const t = useT();
+  const t = useT("menus");
   const name = useMenuName();
   return (key: string) =>
     isWellKnown(key) ? t("menus.placeWithKey", { place: name(key), key }) : key;
@@ -59,7 +59,7 @@ export function TargetChip({
   /** The term's taxonomy in Studio's words ("Category"). */
   taxonomyName?: string | undefined;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const Icon = CHIP_ICON[target.kind];
   const text = target.missing
     ? t(`menus.chips.missing.${target.kind as "page" | "contentEntry" | "term"}`)
@@ -90,7 +90,7 @@ const REASON_BY_KIND: Partial<Record<MenuHiddenReason, true>> = {
 
 /** The words of a hidden reason, by the item's kind where it matters ("page deleted"). */
 export function useHiddenReason() {
-  const t = useT();
+  const t = useT("menus");
   return (reason: MenuHiddenReason, kind: string, part: "badge" | "explain") => {
     const node = kind === "page" || kind === "contentEntry" || kind === "term" ? kind : "page";
     const group = part === "badge" ? "reasons" : "explain";
@@ -103,7 +103,7 @@ export function useHiddenReason() {
 
 /** "Hidden: page deleted" with the full explanation in a tooltip. */
 export function HiddenBadge({ reason, kind }: { reason: MenuHiddenReason; kind: string }) {
-  const t = useT();
+  const t = useT("menus");
   const words = useHiddenReason();
   return (
     <Tooltip
@@ -143,7 +143,7 @@ export function usePageMenus(siteId: string): Map<string, string[]> {
 
 /** "In menu" next to a page title, the menus in a tooltip. */
 export function InMenuBadge({ keys }: { keys: string[] | undefined }) {
-  const t = useT();
+  const t = useT("menus");
   const title = useMenuTitle();
   if (!keys?.length) return null;
   return (
@@ -189,7 +189,7 @@ export function UsedInMenusCard({
   kind: "page" | "contentEntry" | "term";
   id: string;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const title = useMenuTitle();
   const refs = useMenuReferences(siteId, { kind, id });
   const count = (refs.data ?? []).reduce((n, r) => n + r.items.length, 0);
@@ -257,7 +257,7 @@ export function MenuDeleteNotice({
   refs: MenuReference[] | undefined;
   kind: "page" | "contentEntry";
 }) {
-  const t = useT();
+  const t = useT("menus");
   const title = useMenuTitle();
   const items = (refs ?? []).flatMap((r) =>
     r.items.map((i) => `${title(r.key)}: “${i.label || t("menus.row.noLabel")}”`),

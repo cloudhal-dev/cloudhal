@@ -7,7 +7,7 @@ import { AppLink } from "./components/AppLink.tsx";
 import { CodeProvider } from "./components/CodeProvider.tsx";
 import { KumoLocale } from "./components/KumoLocale.tsx";
 import { reloadForNewDeploy } from "./components/RouteStates.tsx";
-import { I18nProvider } from "./i18n/index.tsx";
+import { currentLocale, I18nProvider, type Locale, loadLocale } from "./i18n/index.tsx";
 import { createStudioRouter } from "./router.tsx";
 import "./styles.css";
 
@@ -21,22 +21,30 @@ const queryClient = new QueryClient({
 });
 const router = createStudioRouter(queryClient);
 
-createRoot(document.getElementById("root") as HTMLElement).render(
-  <StrictMode>
-    <I18nProvider>
-      <KumoLocale>
-        <QueryClientProvider client={queryClient}>
-          <LinkProvider component={AppLink}>
-            <TooltipProvider>
-              <CodeProvider>
-                <Toasty>
-                  <RouterProvider router={router} />
-                </Toasty>
-              </CodeProvider>
-            </TooltipProvider>
-          </LinkProvider>
-        </QueryClientProvider>
-      </KumoLocale>
-    </I18nProvider>
-  </StrictMode>,
+// The Studio's language (unless English, which is in this chunk) arrives before the first render,
+// so no screen flashes English; if it cannot load, the Studio starts in English.
+const start = (initialLocale?: Locale) => {
+  createRoot(document.getElementById("root") as HTMLElement).render(
+    <StrictMode>
+      <I18nProvider initialLocale={initialLocale}>
+        <KumoLocale>
+          <QueryClientProvider client={queryClient}>
+            <LinkProvider component={AppLink}>
+              <TooltipProvider>
+                <CodeProvider>
+                  <Toasty>
+                    <RouterProvider router={router} />
+                  </Toasty>
+                </CodeProvider>
+              </TooltipProvider>
+            </LinkProvider>
+          </QueryClientProvider>
+        </KumoLocale>
+      </I18nProvider>
+    </StrictMode>,
+  );
+};
+loadLocale(currentLocale()).then(
+  () => start(),
+  () => start("en"),
 );

@@ -126,7 +126,7 @@ function previewItems(items: NavItemView[] | undefined): NavItemView[] {
  * "Create menu from current pages".
  */
 export function NavigationPage() {
-  const t = useT();
+  const t = useT("menus");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const search = useSearch({ strict: false }) as { menu?: string; item?: string };
   const navigate = useNavigate();

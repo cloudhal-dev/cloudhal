@@ -47,7 +47,7 @@ import { type TaxonomyData, taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx
  * "− Tag LLMs", "Primary category → News", as quiet badges under the article's row.
  */
 function AssignmentDeltas({ deltas, data }: { deltas: AssignmentDelta[]; data: TaxonomyData }) {
-  const t = useT();
+  const t = useT("menus");
   const name = (id: string | null) => {
     if (!id) return t("diff.assignments.none");
     const term = data.byId.get(id)?.term;
@@ -87,7 +87,7 @@ function AssignmentDeltas({ deltas, data }: { deltas: AssignmentDelta[]; data: T
 
 /** A menu's delta under its row (RFC-0003 §6.3 counts): "+2 −1 ↕1 ~1" and "3 → 4 items". */
 function MenuDeltaBadges({ summary }: { summary: MenuDiffSummary }) {
-  const t = useT();
+  const t = useT("menus");
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-1" data-testid="menu-delta-summary">
       <Badge variant="outline">
@@ -218,7 +218,7 @@ export function SnapshotDiffDialog({
   publishedSnapshotId: string | undefined;
   onOpenChange: (open: boolean) => void;
 }) {
-  const t = useT();
+  const t = useT("menus");
   const open = current !== undefined;
   // Keep the last snapshot on screen while the dialog animates closed.
   const last = useRef(current);

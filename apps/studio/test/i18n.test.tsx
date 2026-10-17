@@ -33,6 +33,8 @@ import { messages as commentsSettingsEn } from "../src/i18n/lazy/commentsSetting
 import { messages as commentsSettingsTr } from "../src/i18n/lazy/commentsSettings.tr.ts";
 import { messages as mediaEn } from "../src/i18n/lazy/media.en.ts";
 import { messages as mediaTr } from "../src/i18n/lazy/media.tr.ts";
+import { messages as menusEn } from "../src/i18n/lazy/menus.en.ts";
+import { messages as menusTr } from "../src/i18n/lazy/menus.tr.ts";
 import { messages as readersEn } from "../src/i18n/lazy/readers.en.ts";
 import { messages as readersTr } from "../src/i18n/lazy/readers.tr.ts";
 import { messages as scheduleSettingsEn } from "../src/i18n/lazy/scheduleSettings.en.ts";
@@ -81,6 +83,7 @@ describe("lazy message namespaces", () => {
     analyticsSettings: [analyticsSettingsEn, analyticsSettingsTr],
     appearance: [appearanceEn, appearanceTr],
     media: [mediaEn, mediaTr],
+    menus: [menusEn, menusTr],
     bodyEditor: [bodyEditorEn, bodyEditorTr],
     build: [buildEn, buildTr],
     comments: [commentsEn, commentsTr],
