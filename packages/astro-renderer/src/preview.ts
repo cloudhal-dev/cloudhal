@@ -244,7 +244,7 @@ export function renderFragmentPreview(
 ): { html: string } {
   const body = `<div class="ch-richtext">${renderMarkdown(markdown, previewMedia(site, media))}</div>`;
   return {
-    html: `<!doctype html><html lang="${esc(site.defaultLocale)}"><head><meta charset="utf-8"><meta http-equiv="content-security-policy" content="${PREVIEW_CSP}"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}body{background:transparent}main{max-width:none;padding:0}</style></head><body><main>${body}</main></body></html>`,
+    html: `<!doctype html><html lang="${esc(site.defaultLocale)}"><head><meta charset="utf-8"><meta http-equiv="content-security-policy" content="${PREVIEW_CSP}"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Cloudhal preview"><style>${PREVIEW_CSS}body{background:transparent}main{max-width:none;padding:16px 24px}</style></head><body><main>${body}</main></body></html>`,
   };
 }
 

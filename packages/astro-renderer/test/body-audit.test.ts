@@ -1,6 +1,7 @@
 /** Findings of the body rendering audit (docs/reports/2026-10-body-rendering-audit.md). */
 import { describe, expect, it } from "vitest";
 import { renderInlineMarkdown, renderMarkdown } from "../src/markdown.ts";
+import { renderFragmentPreview } from "../src/preview.ts";
 
 const ctx = { locale: "en", defaultLocale: "en" } as never;
 
@@ -50,5 +51,10 @@ describe("body rendering (audit 2026-10)", () => {
     expect(html).toContain("<strong>A</strong>");
     expect(html).not.toContain("\uE000");
     expect(renderMarkdown("No notes here.", ctx)).not.toContain("ch-footnotes");
+  });
+
+  it("gives a fragment preview's content room inside its frame (nothing flush to the edges)", () => {
+    const { html } = renderFragmentPreview({ defaultLocale: "en", name: "S" } as never, "Hello");
+    expect(html).toContain("main{max-width:none;padding:16px 24px}");
   });
 });
