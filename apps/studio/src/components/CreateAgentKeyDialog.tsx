@@ -26,6 +26,7 @@ import {
   scopeOptions,
 } from "../lib/agents.ts";
 import { api, type CreatedAgentKey, errorCode, type KeyMode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 
@@ -219,7 +220,7 @@ export function CreateAgentKeyDialog({
                       ? t("agents.create.errors.scopeAboveRole")
                       : errorCode(create.error) === "mode_above_role"
                         ? t("agents.create.errors.modeAboveRole")
-                        : create.error.message
+                        : apiErrorText(t, create.error)
                   }
                 />
               )}

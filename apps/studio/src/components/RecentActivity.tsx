@@ -3,6 +3,7 @@ import { ClockCounterClockwise } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import { api, isNotEnabled } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { DecisionCell, useToolLabel } from "./Audit.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
 
@@ -38,7 +39,7 @@ export function RecentActivity({ siteId, limit = 5 }: { siteId: string; limit?: 
           isNotEnabled(recent.error)
             ? t("activity.notEnabledDescription")
             : recent.error
-              ? recent.error.message
+              ? apiErrorText(t, recent.error)
               : t("activity.recentEmptyDescription")
         }
       />

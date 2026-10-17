@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { api, errorCode, type ReleaseResult } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   formatWhen,
   localDateTime,
@@ -77,8 +78,6 @@ function firstGuess(today: string): DateTimeValue {
   d.setUTCDate(d.getUTCDate() + 1);
   return { date: d.toISOString().slice(0, 10), time: "09:00" };
 }
-
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function ScheduleDialog({
   siteId,
@@ -406,7 +405,7 @@ export function ScheduleDialog({
                 variant="error"
                 icon={<WarningCircle weight="fill" />}
                 title={t(`${s}.failed`)}
-                description={knownError ?? errorMessage(schedule.error)}
+                description={knownError ?? apiErrorText(t, schedule.error)}
               />
             )}
           </div>

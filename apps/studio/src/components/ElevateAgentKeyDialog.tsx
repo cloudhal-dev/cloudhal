@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ownModeOf } from "../lib/agents.ts";
 import { type AgentKeySummary, api, type ElevationInput, type KeyMode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   activeElevation,
   type CustomUnit,
@@ -262,7 +263,7 @@ export function ElevateAgentKeyDialog({
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
                 title={t("agents.elevate.failed")}
-                description={elevate.error.message}
+                description={apiErrorText(t, elevate.error)}
               />
             )}
             {/* What will happen, right above the action that makes it happen. */}

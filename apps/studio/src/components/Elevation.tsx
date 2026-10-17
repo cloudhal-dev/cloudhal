@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ownModeOf } from "../lib/agents.ts";
 import { type AgentKeyElevation, type AgentKeySummary, api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import type { PendingElevation } from "../lib/approvals.ts";
 import {
   activeElevation,
@@ -179,7 +180,7 @@ export function useEndElevation() {
       );
       await refreshAfterElevationChange(qc);
     },
-    onError: (error) => toast.error(t("agents.elevation.endFailed"), error.message),
+    onError: (error) => toast.error(t("agents.elevation.endFailed"), apiErrorText(t, error)),
   });
 }
 
@@ -249,7 +250,7 @@ export function useExtendElevation() {
         toast.error(t("notifications.extend.gone"), t("notifications.extend.goneDescription"));
         await refreshAfterElevationChange(qc);
       } else {
-        toast.error(t("notifications.extend.failed"), error.message);
+        toast.error(t("notifications.extend.failed"), apiErrorText(t, error));
       }
     },
   });

@@ -17,9 +17,11 @@ export function CommandMenu({
   onOpenChange: (open: boolean) => void;
   commands: PaletteCommand[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
-  const filtered = commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()));
+  // Folded in the Studio language: Turkish "İ" lower-cases to "i", not "i̇".
+  const q = query.toLocaleLowerCase(locale);
+  const filtered = commands.filter((c) => c.label.toLocaleLowerCase(locale).includes(q));
   return (
     <CommandPalette.Root
       open={open}

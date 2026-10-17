@@ -28,7 +28,7 @@ export function SitesPage() {
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites.list });
   const paging = usePaging(
     sites.data,
-    (s, q) => s.name.toLowerCase().includes(q) || s.slug.includes(q),
+    (s, q, fold) => fold(s.name).includes(q) || s.slug.includes(q),
   );
   const open = (siteId: string) => navigate({ to: "/sites/$siteId", params: { siteId } });
   return (

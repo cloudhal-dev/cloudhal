@@ -27,6 +27,15 @@ export const en = {
     on: "On",
     off: "Off",
     current: "Current",
+    /** The `DeleteResource` dialog (`components/deleteLabels.ts`); `{name}` is the resource's name. */
+    deleteResource: {
+      title: "Delete {name}",
+      warning: "This action cannot be undone. This will permanently delete the {name} {type}.",
+      typeToConfirm: "Type {name} to confirm:",
+      copy: "Copy {name} to clipboard",
+      confirmInput: "Type {name} to confirm deletion",
+      delete: "Delete {type}",
+    },
   },
   theme: {
     label: "Theme",
@@ -588,6 +597,27 @@ export const en = {
   errors: {
     title: "Something went wrong",
     conflict: "Someone else changed this since you opened it. Reload to get the latest version.",
+    /** What a failed request says, by the API's error code (`lib/api-errors.ts`, `apiErrorText`). */
+    api: {
+      not_found: "It's no longer here. Someone may have deleted it.",
+      forbidden: "You don't have permission to do this.",
+      unauthorized: "Your session has ended. Sign in again.",
+      rank: "Your role doesn't allow this.",
+      not_own: "You can only do this to your own work.",
+      missing_scope: "This key or session isn't allowed to do this.",
+      rate_limited: "Too many requests. Wait a moment and try again.",
+      internal: "Something went wrong on the server. Try again.",
+      invalid_json: "The server sent an answer Studio couldn't read. Try again.",
+      unique: "Something with this name or address already exists.",
+      slug_taken: "This address is already in use.",
+      path_conflict: "Another page or article already uses this path.",
+      in_use: "It's still in use, so it can't be removed.",
+      quota_exceeded: "The storage quota is full.",
+      too_large: "This change is too large for one operation. Split it up.",
+      state_changed: "This changed in the meantime. Reload and try again.",
+      network: "Can't reach the server. Check your connection and try again.",
+      status: "The request failed (HTTP {status}).",
+    },
   },
   agents: {
     title: "Agents",

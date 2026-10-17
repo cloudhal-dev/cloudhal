@@ -163,7 +163,8 @@ export const SourceBlock = Node.create<SourceBlockOptions>({
   selectable: true,
   draggable: false,
   addOptions() {
-    return { labels: { badge: "Markdown", hint: "Kept as written." } };
+    // No words of its own: the editor passes them (`sourceBlock`); the codec draws nothing.
+    return { labels: { badge: "", hint: "" } };
   },
   addAttributes() {
     return { markdown: { default: "" } };
@@ -215,6 +216,7 @@ export const AssetImage = Image.extend<
 
 export interface EditorExtensionOptions {
   placeholder?: string;
+  /** The source block's words; only the markdown codec, which draws nothing, leaves them out. */
   sourceBlock?: SourceBlockLabels;
   onEditSource?: (markdown: string) => void;
   /** Draws ```surface source blocks (the host's preview document). */

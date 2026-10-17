@@ -172,15 +172,7 @@ function ReplyForm({
           )}
         </div>
       </InsetPanel>
-      {publish.error && (
-        <Banner
-          variant="error"
-          size="sm"
-          icon={<WarningCircle weight="fill" />}
-          title={t("comments.reply.failed")}
-          description={publish.error.message}
-        />
-      )}
+      <ErrorBanner error={publish.error} title={t("comments.reply.failed")} size="sm" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Text variant="secondary" size="sm" as="span">
           {t("comments.reply.badgeLine", { badge: words.author[badge] })}

@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { AppearanceColors } from "./AppearanceColors.tsx";
 import { useBlockEnumLabel } from "./BlockSection.tsx";
 import { SettingsSection } from "./Settings.tsx";
@@ -102,7 +103,7 @@ export function AppearanceSettingsSection({ siteId }: { siteId: string }) {
             isConflict(save.error)
               ? t("siteSettings.conflictDescription")
               : save.error instanceof Error
-                ? save.error.message
+                ? apiErrorText(t, save.error)
                 : String(save.error)
           }
         />

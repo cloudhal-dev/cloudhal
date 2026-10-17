@@ -30,6 +30,7 @@ import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { pendingCommentsCount } from "../lib/comments-shell.ts";
 
 /** Site surface: sidebar scoped to one site, with the site switcher in the header. */
@@ -105,7 +106,7 @@ export function SiteShell() {
       await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
       toast.success(t("snapshots.created"));
     },
-    onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
   });
   // Publishing follows the role: live, a request an Editor approves (202), or not at all (§2s).
   const publish = usePublishSite(siteId);

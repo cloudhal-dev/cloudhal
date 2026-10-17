@@ -5,6 +5,7 @@ import {
   use,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -157,7 +158,6 @@ export function I18nProvider({
         try {
           localStorage.setItem(STORAGE_KEY, next);
         } catch {}
-        document.documentElement.lang = next;
       };
       const needed = loadedNamespaces(locale).filter((ns) => !loadedCatalog(ns, next));
       if (needed.length === 0 && localeLoaded(next)) apply();
@@ -172,6 +172,11 @@ export function I18nProvider({
     },
     [locale],
   );
+  // The page's language from the first render on (screen readers, hyphenation, `text-transform`),
+  // not only after a switch: `index.html` ships `lang="en"`.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   // Normally loaded before the first render (main.tsx); otherwise wait for it here.
   if (!localeLoaded(locale)) use(loadLocale(locale));
   const value = useMemo<I18nValue<Namespace>>(

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import { missesAnalytics } from "../lib/analytics-settings.ts";
 import { type AgentKeySummary, api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { roleCan } from "../lib/roles.ts";
 import { useToast } from "./Toast.ts";
 import { useGate, useRoleRules } from "./useMe.ts";
@@ -60,7 +61,7 @@ export function AllowAnalytics({
         }),
       );
     },
-    onError: (error) => toast.error(t("analyticsSettings.keys.failed"), error.message),
+    onError: (error) => toast.error(t("analyticsSettings.keys.failed"), apiErrorText(t, error)),
   });
   if (!agentKey.enabled || !missesAnalytics(agentKey)) return null;
   return (

@@ -30,6 +30,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { ListViewsCell, ListViewsHead, useListViews } from "../components/ListViews.tsx";
@@ -112,10 +113,7 @@ export function ArticlesPage() {
     toDelete ? { kind: "contentEntry", id: toDelete.id } : undefined,
   );
   const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const paging = usePaging(
-    sorted,
-    (e, q) => e.title.toLowerCase().includes(q) || e.slug.includes(q),
-  );
+  const paging = usePaging(sorted, (e, q, fold) => fold(e.title).includes(q) || e.slug.includes(q));
   const setFacets = (next: { category?: string | undefined; tag?: string | undefined }) =>
     navigate({
       to: "/sites/$siteId/articles",
@@ -436,7 +434,7 @@ export function ArticlesPage() {
       <DeleteResource
         open={toDelete !== undefined}
         onOpenChange={(o) => !o && setToDelete(undefined)}
-        resourceType={t("editor.article")}
+        {...deleteResourceProps(t, t("editor.article"))}
         resourceName={toDelete?.slug ?? ""}
         notice={<MenuDeleteNotice refs={deleteRefs.data} kind="contentEntry" />}
         isDeleting={remove.isPending}

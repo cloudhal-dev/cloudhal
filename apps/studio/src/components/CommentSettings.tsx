@@ -38,7 +38,8 @@ import {
   useI18n,
   useMessages,
 } from "../i18n/index.tsx";
-import { ApiRequestError, api, type CommentSettingsPatch, isNotEnabled } from "../lib/api.ts";
+import { api, type CommentSettingsPatch, isNotEnabled } from "../lib/api.ts";
+import { apiErrorText, isConflict } from "../lib/api-errors.ts";
 import {
   CLOSE_OPTIONS,
   type CommentsForm,
@@ -64,8 +65,6 @@ import { useGate, useMe } from "./useMe.ts";
 
 /** The section's id in the settings table of contents (`#comments` deep links land here). */
 export const COMMENT_SETTINGS_SECTION = "comments";
-
-const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 
 /** A switch with its explanation right under it (related text closer together). */
 function SwitchField({
@@ -120,7 +119,7 @@ function DisclosureNotice({ form, unsaved }: { form: CommentsForm; unsaved: bool
       await navigator.clipboard.writeText(`${heading}\n\n${paragraphs.join(" ")}`);
       toast.success(t("commentsSettings.notice.copied"));
     } catch (e) {
-      toast.error(t("errors.title"), e instanceof Error ? e.message : undefined);
+      toast.error(t("errors.title"), e ? apiErrorText(t, e) : undefined);
     }
   };
   return (
@@ -517,7 +516,7 @@ export function CommentSettingsSection({ siteId }: { siteId: string }) {
               size="sm"
               icon={<WarningCircle weight="fill" />}
               title={t("commentsSettings.failed")}
-              description={save.error.message}
+              description={apiErrorText(t, save.error)}
             />
           ))}
         <ReadOnly reason={gate.reason} className="grid min-w-0 gap-5">

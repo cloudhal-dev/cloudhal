@@ -35,6 +35,7 @@ import {
   errorDetail,
   type KeyMode,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { localDateTime, recurrenceValueOf, wallClockOf } from "../lib/schedules.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
 import { AutoModeConfirm, ModePicker } from "./AgentModes.tsx";
@@ -578,7 +579,7 @@ export function AutomationDialog({
                   description={t(`${d}.nextRuns.invalid`, {
                     message:
                       preview.error instanceof Error
-                        ? preview.error.message
+                        ? apiErrorText(t, preview.error)
                         : String(preview.error),
                   })}
                 />
@@ -632,7 +633,7 @@ export function AutomationDialog({
                           ),
                         })
                       : save.error instanceof Error
-                        ? save.error.message
+                        ? apiErrorText(t, save.error)
                         : String(save.error)
                   }
                 />

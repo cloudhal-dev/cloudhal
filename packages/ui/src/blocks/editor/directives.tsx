@@ -82,7 +82,9 @@ function DirectiveView({ node, updateAttributes, editor }: ReactNodeViewProps) {
   const labels = ctx?.labels;
   const title = type
     ? localized(type.title, ctx?.locale ?? "en")
-    : (labels?.unknown ?? "Unknown block · {type}").replace("{type}", name);
+    : labels
+      ? labels.unknown.replace("{type}", name)
+      : name;
   const summary = type ? summaryOf(type, props) : directiveAttrsText(raw);
   return (
     <NodeViewWrapper data-directive={name} data-directive-known={type ? "" : undefined}>

@@ -90,7 +90,7 @@ export function RedirectsPage() {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const paging = usePaging(
     list,
-    (r, q) => r.from.toLowerCase().includes(q) || r.to.toLowerCase().includes(q),
+    (r, q, fold) => fold(r.from).includes(q) || fold(r.to).includes(q),
   );
   const served = servedPaths({
     pages: pages.data ?? [],
@@ -355,7 +355,7 @@ export function RedirectsPage() {
         }
         confirmLabel={t("redirects.deleteConfirm")}
         busy={remove.isPending}
-        error={remove.error instanceof Error ? remove.error.message : undefined}
+        error={remove.error}
         onConfirm={() => toDelete && remove.mutate(toDelete)}
       />
     </PageLayout>

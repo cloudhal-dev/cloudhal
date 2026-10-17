@@ -3,6 +3,7 @@ import { ChatsCircle, Warning } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import { type AgentKeySummary, api, errorCode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { missesComments } from "../lib/comment-settings.ts";
 import { holds, roleCan } from "../lib/roles.ts";
 import { useToast } from "./Toast.ts";
@@ -79,7 +80,7 @@ export function AllowComments({
       if (errorCode(error) === "scope_not_addable") {
         qc.setQueryData(ALLOW_COMMENTS_UNSUPPORTED, true);
         toast.error(t("commentsSettings.keys.failed"), t("commentsSettings.keys.unsupported"));
-      } else toast.error(t("commentsSettings.keys.failed"), error.message);
+      } else toast.error(t("commentsSettings.keys.failed"), apiErrorText(t, error));
     },
   });
   if (!agentKey.enabled || instance.data?.features.comments?.available !== true) return null;

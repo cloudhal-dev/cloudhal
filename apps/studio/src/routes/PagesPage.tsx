@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { ListViewsCell, ListViewsHead, useListViews } from "../components/ListViews.tsx";
@@ -55,10 +56,7 @@ export function PagesPage() {
   const sorted = [...(pages.data ?? [])].sort(
     (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
   );
-  const paging = usePaging(
-    sorted,
-    (p, q) => p.title.toLowerCase().includes(q) || p.path.includes(q),
-  );
+  const paging = usePaging(sorted, (p, q, fold) => fold(p.title).includes(q) || p.path.includes(q));
   const create = useMutation({
     mutationFn: () =>
       api.pages.create(siteId, {
@@ -199,7 +197,7 @@ export function PagesPage() {
       <DeleteResource
         open={toDelete !== undefined}
         onOpenChange={(o) => !o && setToDelete(undefined)}
-        resourceType={t("editor.page")}
+        {...deleteResourceProps(t, t("editor.page"))}
         resourceName={toDelete?.path ?? ""}
         notice={<MenuDeleteNotice refs={deleteRefs.data} kind="page" />}
         isDeleting={remove.isPending}

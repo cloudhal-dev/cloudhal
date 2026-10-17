@@ -3,6 +3,7 @@ import { Badge, Tooltip } from "@cloudhal/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { archiveIndexStatus } from "../lib/taxonomy.ts";
 import { EditorPreview } from "./EditorPreview.tsx";
 import { IndexBadge } from "./Taxonomy.tsx";
@@ -66,9 +67,7 @@ export function TermArchivePreview({
             </Tooltip>
           </span>
         ) : preview.error ? (
-          <Tooltip
-            content={preview.error instanceof Error ? preview.error.message : String(preview.error)}
-          >
+          <Tooltip content={apiErrorText(t, preview.error)}>
             <span className="inline-flex">
               <Badge variant="error">{t("preview.failed")}</Badge>
             </span>

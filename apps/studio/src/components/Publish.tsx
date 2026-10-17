@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useT } from "../i18n/index.tsx";
 import { ApiRequestError, api, type PublishResult, publishResultOf } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { ownOnlyGuess } from "../lib/roles.ts";
 import { taxonomyKeys } from "./Taxonomy.tsx";
 import { useToast } from "./Toast.ts";
@@ -125,7 +126,7 @@ export function usePublishSite(siteId: string, options: { onDone?: () => void } 
       const refused = e instanceof ApiRequestError && e.status === 403;
       toast.error(
         refused ? t("publishing.refused") : t("snapshots.failed"),
-        refused ? (gate.reason ?? e.message) : e instanceof Error ? e.message : String(e),
+        refused ? (gate.reason ?? e.message) : apiErrorText(t, e),
       );
     },
   });

@@ -2,33 +2,38 @@ import { Banner } from "@cloudhal/ui";
 import { ArrowClockwise, WarningCircle } from "@phosphor-icons/react";
 import { useT } from "../i18n/index.tsx";
 import { ApiRequestError } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 
-/** Page/section error (DESIGN.md §5): plain-language message, optional retry action. */
+/**
+ * Page/section error (DESIGN.md §5): plain-language message (`apiErrorText`), optional retry
+ * action; `title` names what failed ("Couldn't publish the reply"), `size="sm"` inside a form.
+ */
 export function ErrorBanner({
   error,
   onRetry,
   retrying,
+  title,
+  size,
 }: {
   error: unknown;
   onRetry?: (() => void) | undefined;
   retrying?: boolean | undefined;
+  title?: string | undefined;
+  size?: "sm" | undefined;
 }) {
   const t = useT();
   if (!error) return null;
   const message =
-    error instanceof ApiRequestError
-      ? error.status === 409
-        ? t("errors.conflict")
-        : error.message
-      : error instanceof Error
-        ? error.message
-        : String(error);
+    error instanceof ApiRequestError && error.status === 409
+      ? t("errors.conflict")
+      : apiErrorText(t, error);
   return (
     <div role="alert">
       <Banner
         variant="error"
+        {...(size ? { size } : {})}
         icon={<WarningCircle weight="fill" />}
-        title={t("errors.title")}
+        title={title ?? t("errors.title")}
         description={message}
         action={
           onRetry ? (

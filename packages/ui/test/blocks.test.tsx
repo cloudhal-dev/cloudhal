@@ -18,6 +18,7 @@ const labels: SnapshotTimelineLabels = {
   live: "Live",
   publish: "Publish",
   rollBack: "Roll back",
+  compare: "Compare",
   columns: { snapshot: "Snapshot", actor: "By", changes: "Changes", when: "When" },
   reasons: {
     manual: "Manual",
@@ -43,7 +44,7 @@ const snap = (id: string, createdAt: string): Snapshot => ({
 
 describe("StatusBadge", () => {
   it("renders the lifecycle label", () => {
-    render(<StatusBadge status="review" />);
+    render(<StatusBadge status="review" label="In review" />);
     expect(screen.getByText("In review").closest("[data-status]")).toHaveAttribute(
       "data-status",
       "review",
@@ -65,6 +66,7 @@ describe("SnapshotTimeline", () => {
         onPublish={onPublish}
         onRollback={onRollback}
         labels={labels}
+        renderTime={(iso) => iso}
       />,
     );
     expect(screen.getByText("Live")).toBeInTheDocument();
@@ -79,6 +81,7 @@ describe("SnapshotTimeline", () => {
       <SnapshotTimeline
         snapshots={[]}
         labels={labels}
+        renderTime={(iso) => iso}
         emptyContents={<button type="button">Create snapshot</button>}
       />,
     );
@@ -113,7 +116,8 @@ describe("SnapshotTimeline", () => {
       <SnapshotTimeline
         snapshots={[second, first]}
         onCompare={onCompare}
-        labels={{ ...labels, compare: "Compare" }}
+        labels={labels}
+        renderTime={(iso) => iso}
       />,
     );
     const buttons = screen.getAllByText("Compare");
@@ -128,8 +132,8 @@ describe("audit badges", () => {
     render(
       <>
         <DecisionBadge decision="deny" label="Reddedildi" />
-        <OutcomeBadge outcome="pending" />
-        <ActorBadge kind="agent" />
+        <OutcomeBadge outcome="pending" label="Pending" />
+        <ActorBadge kind="agent" label="Agent" />
       </>,
     );
     expect(screen.getByText("Reddedildi").closest("[data-decision]")).toHaveAttribute(

@@ -58,7 +58,7 @@ import {
   useRoleRules,
 } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
-import { usePaging } from "../components/usePaging.ts";
+import { type Fold, usePaging } from "../components/usePaging.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { absoluteTime } from "../lib/activity.ts";
 import { api, type Invite, isNotEnabled, type Member } from "../lib/api.ts";
@@ -75,12 +75,8 @@ import { ActivityList } from "./ActivityPage.tsx";
 
 export type TeamView = "members" | "activity";
 
-const matches = (m: Member, q: string) =>
-  m.name.toLowerCase().includes(q) ||
-  (m.email ?? "").toLowerCase().includes(q) ||
-  m.role.includes(q);
-
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const matches = (m: Member, q: string, fold: Fold) =>
+  fold(m.name).includes(q) || fold(m.email ?? "").includes(q) || m.role.includes(q);
 
 /** A menu item that cannot be used right now keeps its place and says why (DESIGN.md §2s). */
 function GatedItem({
@@ -399,7 +395,7 @@ function InvitesCard({
         description={t("members.invites.revokeDescription", { email: toRevoke?.email ?? "" })}
         confirmLabel={t("members.invites.revoke")}
         busy={revoke.isPending}
-        error={revoke.error ? errorMessage(revoke.error) : undefined}
+        error={revoke.error}
         onConfirm={() => toRevoke && revoke.mutate(toRevoke)}
       />
     </SectionCard>

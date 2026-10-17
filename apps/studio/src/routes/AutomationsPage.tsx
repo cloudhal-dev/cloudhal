@@ -21,6 +21,7 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { ModeBadge } from "../components/AgentModes.tsx";
 import { AutomationDialog } from "../components/AutomationDialog.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import {
@@ -36,12 +37,12 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { api, errorCode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { formatWhen, zoneLabel } from "../lib/schedules.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
 import { type AutomationsSearch, validateSchedulesSearch } from "../lib/schedules-search.ts";
 
 const ROUTE = "/sites/$siteId/schedules/automations" as const;
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
  * Site › Automation › Schedules › Automations (RFC-0008 §15.1, §11; DESIGN.md §2x): the site's
@@ -120,7 +121,7 @@ export function AutomationsPage() {
     },
     onError: async (e) => {
       await refresh();
-      toast.error(t("schedules.actions.failed"), message(e));
+      toast.error(t("schedules.actions.failed"), apiErrorText(t, e));
     },
   });
   const runNow = useMutation({
@@ -141,7 +142,7 @@ export function AutomationsPage() {
         t("schedules.actions.failed"),
         errorCode(e) === "conflict"
           ? t("schedules.automations.runConflict", { name: a.name })
-          : message(e),
+          : apiErrorText(t, e),
       ),
   });
   const remove = useMutation({
@@ -449,7 +450,7 @@ export function AutomationsPage() {
         onOpenChange={(open) => {
           if (!open) setDeleting(undefined);
         }}
-        resourceType={t("schedules.automations.deleteType")}
+        {...deleteResourceProps(t, t("schedules.automations.deleteType"), { error: remove.error })}
         resourceName={deleting?.name ?? ""}
         notice={
           <Banner
@@ -459,7 +460,6 @@ export function AutomationsPage() {
           />
         }
         isDeleting={remove.isPending}
-        errorMessage={remove.error ? message(remove.error) : undefined}
         onDelete={async () => {
           if (deleting) await remove.mutateAsync(deleting).catch(() => undefined);
         }}

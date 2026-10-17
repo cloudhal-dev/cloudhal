@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { absoluteTime } from "../lib/activity.ts";
 import { api, type CreatedInvite, errorCode, type Role } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { formatDuration } from "../lib/elevation.ts";
 import {
   expiresIn,
@@ -238,7 +239,7 @@ export function InviteDialog({
                   description={
                     apiError
                       ? t(`invites.errors.${apiError}`, { email: email.trim(), role: roleName })
-                      : create.error.message
+                      : apiErrorText(t, create.error)
                   }
                 />
               )}

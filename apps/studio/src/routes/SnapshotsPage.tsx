@@ -29,6 +29,7 @@ import { usePaging } from "../components/usePaging.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type PublishResult, publishResultOf } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 
 type Pending =
   | { kind: "publish"; snapshot: Snapshot }
@@ -54,7 +55,7 @@ export function SnapshotsPage() {
   });
   const paging = usePaging(
     snapshots.data,
-    (s, q) => (s.label ?? "").toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
+    (s, q, fold) => fold(s.label ?? "").includes(q) || fold(s.id).includes(q),
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [label, setLabel] = useState("");
@@ -133,7 +134,7 @@ export function SnapshotsPage() {
             : t("snapshots.rolledBack"),
       );
     },
-    onError: (e) => toast.error(t("snapshots.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
   });
 
   /** The dialog's primary action: create now, or hand over to the publish confirmation. */

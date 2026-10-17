@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { DEFAULT_MODE, isKeyMode } from "../lib/agents.ts";
 import { type AgentKeySummary, api, type KeyMode } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { activeElevation, formatUntil, isMoreAutonomous } from "../lib/elevation.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
 import { useToast } from "./Toast.ts";
@@ -143,7 +144,7 @@ export function ChangeAgentModeDialog({
                 size="sm"
                 icon={<WarningCircle weight="fill" />}
                 title={t("agents.changeMode.failed")}
-                description={change.error.message}
+                description={apiErrorText(t, change.error)}
               />
             )}
             {/* The change as it will apply, right above the action that makes it. */}

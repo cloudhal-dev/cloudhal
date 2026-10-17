@@ -41,6 +41,7 @@ import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { AllowComments } from "../components/CommentKeyAccess.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
+import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ElevateAgentKeyDialog } from "../components/ElevateAgentKeyDialog.tsx";
 import {
   ElevatedKeysBanner,
@@ -59,17 +60,18 @@ import { useToast } from "../components/Toast.ts";
 import { useAgentModeRules } from "../components/useAgentModeRules.ts";
 import { canFrom, useMe } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
-import { usePaging } from "../components/usePaging.ts";
+import { type Fold, usePaging } from "../components/usePaging.ts";
 import { usePendingElevations } from "../components/usePendingApprovals.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { initials } from "../lib/account.ts";
 import { mcpSnippet, ownModeOf, type SnippetKind, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import { activeElevation, modesAbove } from "../lib/elevation.ts";
 
-const matches = (k: AgentKeySummary, q: string) =>
-  (k.name ?? "").toLowerCase().includes(q) ||
-  (k.start ?? "").toLowerCase().includes(q) ||
+const matches = (k: AgentKeySummary, q: string, fold: Fold) =>
+  fold(k.name ?? "").includes(q) ||
+  fold(k.start ?? "").includes(q) ||
   (k.mode ?? "").includes(q) ||
   (k.elevation?.mode ?? "").includes(q) ||
   k.scopes.some((s) => s.includes(q));
@@ -369,7 +371,7 @@ function AllKeys({ onRevoke, now }: { onRevoke: (key: AgentKeySummary) => void; 
   );
   const paging = usePaging(
     sorted,
-    (k, q) => matches(k, q) || (k.owner?.name ?? "").toLowerCase().includes(q),
+    (k, q, fold) => matches(k, q, fold) || fold(k.owner?.name ?? "").includes(q),
   );
   return (
     <>
@@ -744,11 +746,12 @@ export function AgentsPage() {
             revoke.reset();
           }
         }}
-        resourceType={t("agents.keyResource")}
+        {...deleteResourceProps(t, t("agents.keyResource"), {
+          action: t("agents.revokeKey"),
+          error: revoke.error,
+        })}
         resourceName={toRevoke?.name ?? toRevoke?.id ?? ""}
-        deleteButtonText={t("agents.revokeKey")}
         isDeleting={revoke.isPending}
-        errorMessage={revoke.error ? revoke.error.message : undefined}
         onDelete={async () => {
           if (toRevoke) await revoke.mutateAsync(toRevoke).catch(() => undefined);
         }}

@@ -11,7 +11,7 @@ export interface SnapshotTimelineLabels {
   publish: string;
   rollBack: string;
   /** Label of the "compare" action (shown when `onCompare` is set). */
-  compare?: string;
+  compare: string;
   /** Accessible name of the actions column (it has no visible header). */
   actions?: string;
   columns: { snapshot: string; actor: string; changes: string; when: string };
@@ -37,7 +37,7 @@ export interface SnapshotTimelineProps {
   /** CTA under the empty state (e.g. the page's "Create snapshot" button). */
   emptyContents?: ReactNode;
   /** Renders the creation time; lists pass a relative time with the absolute one in a tooltip. */
-  renderTime?: ((iso: string) => ReactNode) | undefined;
+  renderTime: (iso: string) => ReactNode;
 }
 
 const ACTOR_ICON: Record<Snapshot["actor"]["kind"], Icon> = {
@@ -62,7 +62,7 @@ export function SnapshotTimeline({
   labels,
   emptyIcon,
   emptyContents,
-  renderTime,
+  renderTime: time,
 }: SnapshotTimelineProps) {
   if (snapshots.length === 0) {
     return (
@@ -75,7 +75,6 @@ export function SnapshotTimeline({
     );
   }
   const publishedIndex = snapshots.findIndex((s) => s.id === publishedSnapshotId);
-  const time = renderTime ?? ((iso: string) => new Date(iso).toLocaleString());
   const showCompare = onCompare !== undefined;
   return (
     <Table data-testid="snapshot-timeline">
@@ -142,7 +141,7 @@ export function SnapshotTimeline({
                       icon={<GitDiff />}
                       onClick={() => onCompare(s)}
                     >
-                      {labels.compare ?? "Compare"}
+                      {labels.compare}
                     </Button>
                   )}
                 </Table.Cell>

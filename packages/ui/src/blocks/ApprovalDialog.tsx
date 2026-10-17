@@ -6,8 +6,10 @@ export interface ApprovalDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: ReactNode | undefined;
-  confirmLabel?: string | undefined;
-  cancelLabel?: string | undefined;
+  /** The confirm button's words (from the screen's catalog). */
+  confirmLabel: string;
+  /** The cancel button's words. */
+  cancelLabel: string;
   destructive?: boolean | undefined;
   busy?: boolean | undefined;
   onConfirm: () => void | Promise<void>;
@@ -24,8 +26,8 @@ export function ApprovalDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   destructive,
   busy,
   onConfirm,

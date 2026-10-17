@@ -59,6 +59,7 @@ import {
   type KeyMode,
   type Role,
 } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   elevationRequestOf,
   expiresSoon,
@@ -79,7 +80,6 @@ const ReleaseRequestDetails = lazy(() =>
 );
 
 type Decision = "approve" | "deny";
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
  * The request's question as plain text. Manual-mode writes (ADR-0015) carry a terse policy reason
@@ -594,7 +594,7 @@ export function ApprovalsPage() {
         ]);
       } else if (errorCode(error) === "carry_out_failed") {
         setCommenting(undefined);
-        toast.error(t("comments.approvals.carryFailed"), errorMessage(error));
+        toast.error(t("comments.approvals.carryFailed"), apiErrorText(t, error));
         await Promise.all([
           qc.invalidateQueries({ queryKey: approvalsKey(siteId) }),
           qc.invalidateQueries({ queryKey: commentsKey(siteId) }),
@@ -616,7 +616,7 @@ export function ApprovalsPage() {
           qc.invalidateQueries({ queryKey: ["notifications"] }),
         ]);
       } else if (!confirming && !commenting) {
-        toast.error(t("approvals.failed"), errorMessage(error));
+        toast.error(t("approvals.failed"), apiErrorText(t, error));
       }
     },
   });
@@ -730,7 +730,7 @@ export function ApprovalsPage() {
         busy={decide.isPending}
         error={
           confirming && decide.error && !isNoLongerPending(decide.error)
-            ? errorMessage(decide.error)
+            ? apiErrorText(t, decide.error)
             : undefined
         }
         onConfirm={(request) => decide.mutate({ request, decision: "approve" })}
@@ -747,7 +747,7 @@ export function ApprovalsPage() {
         busy={decide.isPending}
         error={
           commenting && decide.error && !isNoLongerPending(decide.error)
-            ? errorMessage(decide.error)
+            ? apiErrorText(t, decide.error)
             : undefined
         }
         onConfirm={(request) => decide.mutate({ request, decision: "approve" })}

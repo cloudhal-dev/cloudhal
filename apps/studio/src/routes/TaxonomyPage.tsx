@@ -61,6 +61,7 @@ import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api, type TermListItem } from "../lib/api.ts";
+import { apiErrorText } from "../lib/api-errors.ts";
 import {
   archiveCounts,
   foldName,
@@ -164,8 +165,7 @@ export function TaxonomyPage() {
         t("governance.oneSnapshot"),
       );
     },
-    onError: (e) =>
-      toast.error(t("taxonomy.review.failed"), e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(t("taxonomy.review.failed"), apiErrorText(t, e)),
   });
 
   const open = (kind: GovernanceTarget["kind"], term: Term, into?: string) =>

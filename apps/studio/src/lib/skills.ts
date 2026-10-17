@@ -14,14 +14,18 @@ export function orderSkillScopes(scopes: readonly string[]): string[] {
   return [...known, ...scopes.filter((s) => !isAgentScope(s))];
 }
 
-export function matchesSkill(skill: SkillSummary, query: string): boolean {
-  const q = query.trim().toLowerCase();
+/** Whether a skill matches a search query already folded with `fold` (the Studio locale's). */
+export function matchesSkill(
+  skill: SkillSummary,
+  q: string,
+  fold: (text: string) => string,
+): boolean {
   if (!q) return true;
   return (
-    skill.name.toLowerCase().includes(q) ||
-    skill.description.toLowerCase().includes(q) ||
-    skill.scopes.some((s) => s.toLowerCase().includes(q)) ||
-    skill.approval.some((s) => s.toLowerCase().includes(q))
+    fold(skill.name).includes(q) ||
+    fold(skill.description).includes(q) ||
+    skill.scopes.some((s) => fold(s).includes(q)) ||
+    skill.approval.some((s) => fold(s).includes(q))
   );
 }
 

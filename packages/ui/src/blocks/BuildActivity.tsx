@@ -30,7 +30,7 @@ export interface BuildActivityProps {
   labels: BuildActivityLabels;
   emptyIcon?: ReactNode;
   /** Renders a time; screens pass a relative time. */
-  renderTime?: ((iso: string) => ReactNode) | undefined;
+  renderTime: (iso: string) => ReactNode;
 }
 
 const ACTOR_ICON: Record<string, Icon> = { human: User, agent: Robot, system: GearSix };
@@ -40,12 +40,11 @@ const ACTOR_ICON: Record<string, Icon> = { human: User, agent: Robot, system: Ge
  * which tool, what changed, and Cloudhal's repairs or the refused parts the agent will fix. Render
  * it inside a `SectionCard`.
  */
-export function BuildActivity({ items, labels, emptyIcon, renderTime }: BuildActivityProps) {
+export function BuildActivity({ items, labels, emptyIcon, renderTime: time }: BuildActivityProps) {
   if (items.length === 0)
     return (
       <SectionEmpty icon={emptyIcon} title={labels.empty} description={labels.emptyDescription} />
     );
-  const time = renderTime ?? ((iso: string) => new Date(iso).toLocaleTimeString());
   return (
     <ol className="grid gap-4" aria-live="polite" data-testid="build-activity">
       {items.map((item) => {
