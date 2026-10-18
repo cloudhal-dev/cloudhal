@@ -14,6 +14,10 @@ export const en = {
     more: "More",
     rev: "rev {rev}",
     close: "Close",
+    /** Kumo's `Label` suffix on a field marked `required={false}` (patches/kumo/label-locale.patch). */
+    optional: "(optional)",
+    /** The accessible name of a Kumo `Label`'s tooltip button. */
+    moreInformation: "More information",
     copy: "Copy",
     copied: "Copied",
     retry: "Try again",

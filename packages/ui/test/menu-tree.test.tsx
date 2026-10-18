@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DirectionProvider,
   MenuTree,
   type MenuTreeEvent,
   type MenuTreeItem,
@@ -188,6 +189,34 @@ describe("MenuTree", () => {
     expect(live()).toBe("blocked Home: no-previous (max 3)");
     key("home", "ArrowLeft", true);
     expect(live()).toBe("blocked Home: top-level (max 3)");
+  });
+
+  it("swaps Left and Right in right-to-left languages (ADR-0033)", () => {
+    const onMove = vi.fn();
+    render(
+      <DirectionProvider direction="rtl">
+        <Harness initial={tree()} onMove={onMove} />
+      </DirectionProvider>,
+    );
+    row("docs").focus();
+    // Right closes and Left opens: the tree's children sit towards the left.
+    key("docs", "ArrowRight");
+    expect(row("docs")).toHaveAttribute("aria-expanded", "false");
+    key("docs", "ArrowLeft");
+    expect(row("docs")).toHaveAttribute("aria-expanded", "true");
+    key("docs", "ArrowLeft");
+    expect(document.activeElement).toBe(row("guide"));
+    key("guide", "ArrowRight");
+    expect(document.activeElement).toBe(row("docs"));
+
+    // Alt+Left nests under the item above, Alt+Right moves it out.
+    row("blog").focus();
+    key("blog", "ArrowLeft", true);
+    expect(onMove).toHaveBeenLastCalledWith({ itemId: "blog", parentId: "docs", index: 2 });
+    expect(live()).toBe("indented Blog: 3 of 3, level 2 under Docs");
+    key("blog", "ArrowRight", true);
+    expect(onMove).toHaveBeenLastCalledWith({ itemId: "blog", parentId: null, index: 2 });
+    expect(live()).toBe("outdented Blog: 3 of 3, level 1");
   });
 
   it("refuses an indent beyond maxDepth, counting the item's own subtree", () => {

@@ -62,6 +62,7 @@ import {
   HiddenBadge,
   menuKeys,
   TargetChip,
+  useMenuKeyHelp,
   useMenuName,
   useMenuTitle,
 } from "../components/Menus.tsx";
@@ -130,6 +131,7 @@ export function NavigationPage() {
   const toast = useToast();
   const name = useMenuName();
   const title = useMenuTitle();
+  const keyHelp = useMenuKeyHelp();
   // Menus are structure: Editors and above (RFC-0005 §2.2). Cosmetic; the API refuses anyway.
   const can = useGate("structure.write").allowed;
   const [previewVisible, setPreviewVisible] = usePreviewVisible();
@@ -811,11 +813,7 @@ export function NavigationPage() {
                 )}
               </>
             }
-            description={
-              can
-                ? t("menus.items.description", { max: draft.maxDepth })
-                : t("menus.items.descriptionReadOnly")
-            }
+            description={keyHelp.description(can, draft.maxDepth)}
             flush
           >
             {draft.items.length === 0 ? (
@@ -856,7 +854,7 @@ export function NavigationPage() {
                 actions={rowActions}
                 labels={{
                   tree: t("menus.tree.label", { place }),
-                  instructions: t("menus.tree.instructions"),
+                  instructions: keyHelp.instructions,
                   expand: (label) => t("menus.tree.expand", { label }),
                   collapse: (label) => t("menus.tree.collapse", { label }),
                 }}

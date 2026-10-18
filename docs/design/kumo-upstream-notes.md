@@ -158,7 +158,7 @@ The block (`kumo add DeleteResource`) hard-codes "Delete {name}", "This action c
 
 ## 7. Right-to-left: Kumo's styles are physical
 
-**Status in Cloudhal:** Studio and the `@cloudhal/ui` blocks use logical utilities only (lint `rtl-logical`, ADR-0033 D); Base UI's `DirectionProvider` (re-exported by Kumo) wraps Studio, fed by the locale registry's `dir` (ADR-0033 B). Kumo's own components are patched (ADR-0033 A1, decided 2026-10-18 with Arabic as the first RTL language): `scripts/kumo-patch.ts` rewrites the 217 physical utilities of Kumo 2.14's `dist` to logical ones into the generated `patches/@cloudflare__kumo@2.14.0.patch`; offsets that are centred (`left-1/2`) or measured by a physical `translate-x` (the tabs' indicator, centred dialogs) stay physical. Studio's and the blocks' directional icons mirror through `DirectionalIcon` (ADR-0033 C1); Kumo's own ten (`DropdownMenu`'s submenu caret, the sidebar's caret, `Pagination`, `DateRangePicker`, `CommandPalette`'s arrow and caret) do not yet. The issue below is ready to paste; **the owner files it**, not an agent.
+**Status in Cloudhal:** Studio and the `@cloudhal/ui` blocks use logical utilities only (lint `rtl-logical`, ADR-0033 D); Base UI's `DirectionProvider` (re-exported by Kumo) wraps Studio, fed by the locale registry's `dir` (ADR-0033 B). Kumo's own components are patched (ADR-0033 A1, decided 2026-10-18 with Arabic as the first RTL language): `scripts/kumo-patch.ts` rewrites the 217 physical utilities of Kumo 2.14's `dist` to logical ones into the generated `patches/@cloudflare__kumo@2.14.0.patch`; offsets that are centred (`left-1/2`) or measured by a physical `translate-x` (the tabs' indicator, centred dialogs) stay physical. Studio's and the blocks' directional icons mirror through `DirectionalIcon` (ADR-0033 C1). Kumo's own ten (`DropdownMenu`'s submenu caret, the sidebar's caret, `Pagination`'s four, `DateRangePicker`'s two, `CommandPalette`'s arrow and breadcrumb caret) and `Breadcrumbs.Separator`'s inline SVG chevron are patched too (`patches/kumo/rtl-icons.patch`): each gets `rtl:-scale-x-100`, and the sidebar caret's open `rotate-90` gets `rtl:-rotate-90` so it still points down. That variant reads `dir` from the DOM (Studio sets `<html dir>`), not Base UI's `DirectionProvider`, because several of the icons sit in conditional JSX where a hook cannot be called; a subtree given only `DirectionProvider direction="rtl"` without a `dir` attribute does not mirror them. **Still open upstream:** everything in the issue below — Cloudhal re-applies both the conversion and the icon patch on each Kumo upgrade until Kumo ships them. The issue below is ready to paste; **the owner files it**, not an agent.
 
 ### Title
 
@@ -176,3 +176,38 @@ Kumo 2.14's compiled CSS has about 239 physical utilities (`ml-*`, `mr-*`, `pl-*
 - A lint in Kumo's own CI against new physical utilities keeps it that way.
 
 Cloudhal's interim plan, if an RTL language comes before this: a generated `pnpm patch` that rewrites the compiled classes (the same mapping as our codemod, `scripts/i18n-codemod/logical-utilities.ts`), re-generated on each Kumo upgrade.
+
+---
+
+## 8. `Label`: "(optional)" and "More information" are hard-coded English
+
+**Status in Cloudhal:** patched locally (`patches/kumo/label-locale.patch`): `KumoLocaleProvider` takes `translations.label.{optional, moreInformation}`, and Studio passes `common.optional` / `common.moreInformation`. Seen in the Arabic and Hebrew screenshots, where every optional field read "(optional)".
+
+### Title
+
+`Label`: translatable optional suffix and tooltip button name (`KumoLocaleProvider`)
+
+### Body
+
+`Label` (used by `Field`, `Checkbox` and `Select` when `required={false}`) renders the literal `"(optional)"`, and its tooltip trigger has `aria-label="More information"`. Neither has a prop, and `KumoLocaleProvider` does not cover them, so an app in another language shows English next to every optional field.
+
+**Proposal.** Add them to the provider, as `layerDialog` already is:
+
+```ts
+interface KumoTranslations {
+  layerDialog: { close: string; cancel: string };
+  label: { optional: string; moreInformation: string };
+}
+```
+
+```diff
++ const { label: words } = useKumoLocale();
+  …
+- children: "(optional)"
++ children: words.optional
+  …
+- "aria-label": "More information",
++ "aria-label": words.moreInformation,
+```
+
+The parentheses belong in the string: some languages write the suffix differently (Arabic "(اختياري)", Japanese "（任意）" with full-width brackets). This is the change Cloudhal applies today; happy to open the PR.

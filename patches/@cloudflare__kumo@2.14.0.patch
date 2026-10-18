@@ -32,7 +32,7 @@ index f6abf6d..bb73d96 100644
  						})]
  					})]
 diff --git a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
-index 2b383c4..0e75e8f 100644
+index 2b383c4..c330003 100644
 --- a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
 +++ b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
 @@ -21,7 +21,7 @@ const KUMO_BREADCRUMBS_VARIANTS = { size: {
@@ -44,6 +44,14 @@ index 2b383c4..0e75e8f 100644
  }
  const Link = ({ href, icon, children }) => {
  	const LinkComponent = useLinkComponent();
+@@ -61,6 +61,7 @@ function Separator() {
+ 		className: "flex shrink-0 items-center text-kumo-inactive",
+ 		"aria-hidden": "true",
+ 		children: /* @__PURE__ */ jsx("svg", {
++			className: "rtl:-scale-x-100",
+ 			width: "24",
+ 			height: "24",
+ 			fill: "none",
 diff --git a/dist/chunks/chart-kd1xd6crso2i956o.js b/dist/chunks/chart-kd1xd6crso2i956o.js
 index e3f77e5..0caf455 100644
 --- a/dist/chunks/chart-kd1xd6crso2i956o.js
@@ -202,7 +210,7 @@ index 87feff9..0e760b6 100644
  			"data-kumo-component": "Combobox",
  			"data-kumo-part": "chip-remove",
 diff --git a/dist/chunks/command-palette-crtm3nd32yjhuax1.js b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
-index ceb2dbb..0d73cfc 100644
+index ceb2dbb..dfee7d2 100644
 --- a/dist/chunks/command-palette-crtm3nd32yjhuax1.js
 +++ b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
 @@ -162,7 +162,7 @@ function Item({ value, disabled, children, className, onClick }) {
@@ -223,28 +231,52 @@ index ceb2dbb..0d73cfc 100644
  		children: [
  			icon && /* @__PURE__ */ jsx("div", {
  				className: "flex flex-shrink-0 items-center text-kumo-subtle",
+@@ -264,7 +264,7 @@ function ResultItem({ title, breadcrumbs, titleHighlights, breadcrumbHighlights,
+ 								highlights: breadcrumbHighlights?.[index],
+ 								className: "text-base text-kumo-default"
+ 							}), /* @__PURE__ */ jsx(CaretRightIcon, {
+-								className: "h-3 w-3 flex-shrink-0 text-kumo-subtle",
++								className: "h-3 w-3 flex-shrink-0 text-kumo-subtle rtl:-scale-x-100",
+ 								weight: "bold"
+ 							})]
+ 						}, index)),
+@@ -284,7 +284,7 @@ function ResultItem({ title, breadcrumbs, titleHighlights, breadcrumbHighlights,
+ 					]
+ 				})
+ 			}),
+-			showArrow && !external && !nonInteractive && /* @__PURE__ */ jsx(ArrowRightIcon, { className: "h-4 w-4 flex-shrink-0 text-kumo-subtle opacity-0 transition-opacity group-data-[highlighted]:opacity-100" })
++			showArrow && !external && !nonInteractive && /* @__PURE__ */ jsx(ArrowRightIcon, { className: "h-4 w-4 flex-shrink-0 text-kumo-subtle rtl:-scale-x-100 opacity-0 transition-opacity group-data-[highlighted]:opacity-100" })
+ 		]
+ 	});
+ }
 diff --git a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
-index 8b0f021..676c6f3 100644
+index 8b0f021..3d8a3aa 100644
 --- a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
 +++ b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
-@@ -164,7 +164,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+@@ -164,9 +164,9 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
  					/* @__PURE__ */ jsx("button", {
  						type: "button",
  						"aria-label": "Previous month",
 -						className: "absolute top-0 left-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
 +						className: "absolute top-0 start-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
  						onClick: () => adjustMonth(-1),
- 						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize })
+-						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize })
++						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize, className: "rtl:-scale-x-100" })
  					}),
-@@ -200,7 +200,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+ 					/* @__PURE__ */ jsx(DateRangeMonthHeader, {
+ 						month: getMonthName(viewingMonth),
+@@ -200,9 +200,9 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
  					/* @__PURE__ */ jsx("button", {
  						type: "button",
  						"aria-label": "Next month",
 -						className: "absolute top-0 right-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
 +						className: "absolute top-0 end-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
  						onClick: () => adjustMonth(1),
- 						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize })
+-						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize })
++						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize, className: "rtl:-scale-x-100" })
  					}),
+ 					/* @__PURE__ */ jsx(DateRangeMonthHeader, {
+ 						month: getMonthName(viewingMonth, 1),
 @@ -252,8 +252,8 @@ function DateRangeDayCell({ date, mode, size = KUMO_DATE_RANGE_PICKER_DEFAULT_VA
  		switch (mode) {
  			case 0: return "bg-transparent";
@@ -257,7 +289,7 @@ index 8b0f021..676c6f3 100644
  			case 5: return "bg-kumo-fill";
  		}
 diff --git a/dist/chunks/dropdown-m53ji1d66mws89wh.js b/dist/chunks/dropdown-m53ji1d66mws89wh.js
-index 4cb82af..7f3f464 100644
+index 4cb82af..95dd585 100644
 --- a/dist/chunks/dropdown-m53ji1d66mws89wh.js
 +++ b/dist/chunks/dropdown-m53ji1d66mws89wh.js
 @@ -29,12 +29,12 @@ const DropdownMenuSubTrigger = React$1.forwardRef(({ className, inset, children,
@@ -272,7 +304,7 @@ index 4cb82af..7f3f464 100644
 +		IconComponent && /* @__PURE__ */ jsx(IconComponent, { className: "me-2 h-4 w-4" }),
  		children,
 -		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ml-auto h-4 w-4" })
-+		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ms-auto h-4 w-4" })
++		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ms-auto h-4 w-4 rtl:-scale-x-100" })
  	]
  }));
  DropdownMenuSubTrigger.displayName = MenuSubmenuTrigger.displayName;
@@ -502,6 +534,41 @@ index c4cea93..ca73e34 100644
  				children: [label && /* @__PURE__ */ jsx("label", {
  					htmlFor: inputId,
  					className: "absolute inset-0 z-0 mb-0! cursor-text",
+diff --git a/dist/chunks/label-gzyfw17u08irhdo8.js b/dist/chunks/label-gzyfw17u08irhdo8.js
+index 69fc0cf..f1cbcc7 100644
+--- a/dist/chunks/label-gzyfw17u08irhdo8.js
++++ b/dist/chunks/label-gzyfw17u08irhdo8.js
+@@ -4,6 +4,7 @@ import { t as Tooltip } from "./tooltip-o4natsv01lpq8oq2.js";
+ import { t as Button } from "./button-pa1bq9b85hawg41a.js";
+ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+ import { Info } from "@phosphor-icons/react";
++import { n as useKumoLocale } from "./locale-provider-kjlnws7jln3ak0dr.js";
+ //#region src/components/label/label.tsx
+ /** Label variant definitions (currently empty, reserved for future additions). */
+ const KUMO_LABEL_VARIANTS = {};
+@@ -40,11 +41,12 @@ function labelContentVariants() {
+ * </Label>
+ */
+ function Label({ children, showOptional = false, tooltip, className, htmlFor, asContent = false }) {
++	const { label: words } = useKumoLocale();
+ 	const content = /* @__PURE__ */ jsxs(Fragment, { children: [
+ 		children,
+ 		showOptional && /* @__PURE__ */ jsx("span", {
+ 			className: "font-normal text-kumo-subtle",
+-			children: "(optional)"
++			children: words.optional
+ 		}),
+ 		tooltip && /* @__PURE__ */ jsx(Tooltip, {
+ 			content: tooltip,
+@@ -52,7 +54,7 @@ function Label({ children, showOptional = false, tooltip, className, htmlFor, as
+ 				variant: "ghost",
+ 				size: "xs",
+ 				shape: "square",
+-				"aria-label": "More information",
++				"aria-label": words.moreInformation,
+ 				children: /* @__PURE__ */ jsx(Info, { className: "size-4" })
+ 			})
+ 		})
 diff --git a/dist/chunks/layer-card-idh3863vdgprgqai.js b/dist/chunks/layer-card-idh3863vdgprgqai.js
 index 8d2a8d4..b7abc64 100644
 --- a/dist/chunks/layer-card-idh3863vdgprgqai.js
@@ -537,6 +604,51 @@ index 028c18c..2d4424f 100644
  		disabled,
  		icon: /* @__PURE__ */ jsx(X, { size: 15 }),
  		shape: "square",
+diff --git a/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js b/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
+index 797f8b4..45a9223 100644
+--- a/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
++++ b/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
+@@ -2,20 +2,32 @@
+ import { createContext, useContext, useMemo } from "react";
+ import { jsx } from "react/jsx-runtime";
+ //#region src/utils/locale-provider.tsx
+-const defaultTranslations = { layerDialog: {
+-	close: "Close",
+-	cancel: "Cancel"
+-} };
++const defaultTranslations = {
++	layerDialog: {
++		close: "Close",
++		cancel: "Cancel"
++	},
++	label: {
++		optional: "(optional)",
++		moreInformation: "More information"
++	}
++};
+ const KumoLocaleContext = createContext(defaultTranslations);
+ /**
+ * Supplies translations for Kumo-owned UI copy. Explicit component props take
+ * precedence over these defaults.
+ */
+ function KumoLocaleProvider({ children, translations }) {
+-	const value = useMemo(() => ({ layerDialog: {
+-		...defaultTranslations.layerDialog,
+-		...translations?.layerDialog
+-	} }), [translations]);
++	const value = useMemo(() => ({
++		layerDialog: {
++			...defaultTranslations.layerDialog,
++			...translations?.layerDialog
++		},
++		label: {
++			...defaultTranslations.label,
++			...translations?.label
++		}
++	}), [translations]);
+ 	return /* @__PURE__ */ jsx(KumoLocaleContext.Provider, {
+ 		value,
+ 		children
 diff --git a/dist/chunks/menubar-fjhotkmndttb8mua.js b/dist/chunks/menubar-fjhotkmndttb8mua.js
 index d46aaa4..3627f7d 100644
 --- a/dist/chunks/menubar-fjhotkmndttb8mua.js
@@ -573,9 +685,45 @@ index 561640f..e96c87f 100644
  	});
  }
 diff --git a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
-index c2d058f..540cdbf 100644
+index c2d058f..977cc4a 100644
 --- a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
 +++ b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
+@@ -95,7 +95,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(1);
+ 						setEditingPage(1);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretDoubleLeftIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretDoubleLeftIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				/* @__PURE__ */ jsx(InputGroup.Button, {
+ 					variant: "secondary",
+@@ -106,7 +106,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(previousPage);
+ 						setEditingPage(previousPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				showFullControls && (pageSelector === "dropdown" ? /* @__PURE__ */ jsx(Select, {
+ 					"aria-label": labels.pageNumber,
+@@ -155,7 +155,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(nextPage);
+ 						setEditingPage(nextPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretRightIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretRightIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				showFullControls && /* @__PURE__ */ jsx(InputGroup.Button, {
+ 					variant: "secondary",
+@@ -165,7 +165,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(maxPage);
+ 						setEditingPage(maxPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretDoubleRightIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretDoubleRightIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				})
+ 			] })
+ 		})
 @@ -175,7 +175,7 @@ PaginationControls.displayName = "Pagination.Controls";
  function PaginationSeparator({ className }) {
  	return /* @__PURE__ */ jsx("div", {
@@ -632,7 +780,7 @@ index 7e3ffac..bfe2850 100644
  		})
  	] });
 diff --git a/dist/chunks/sidebar-in9zhvr473afsjpp.js b/dist/chunks/sidebar-in9zhvr473afsjpp.js
-index 984e056..3247d7b 100644
+index 984e056..9304dca 100644
 --- a/dist/chunks/sidebar-in9zhvr473afsjpp.js
 +++ b/dist/chunks/sidebar-in9zhvr473afsjpp.js
 @@ -401,7 +401,7 @@ const SidebarRoot = forwardRef(({ className, contentClassName, children, fullScr
@@ -724,7 +872,7 @@ index 984e056..3247d7b 100644
  		size: 12,
  		weight: "bold",
 -		className: cn("ml-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100", isCollapsible && isOpen && "rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
-+		className: cn("ms-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100", isCollapsible && isOpen && "rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
++		className: cn("ms-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100 rtl:-scale-x-100", isCollapsible && isOpen && "rotate-90 rtl:-rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
  	});
  }
  SidebarMenuChevron.displayName = "Sidebar.MenuChevron";
@@ -1173,3 +1321,22 @@ index ae38514..ae5356b 100644
  									})]
  								}),
  								" ",
+diff --git a/dist/locale-provider-BLGya10h.d.ts b/dist/locale-provider-BLGya10h.d.ts
+index 73e03ce..e3e5c41 100644
+--- a/dist/locale-provider-BLGya10h.d.ts
++++ b/dist/locale-provider-BLGya10h.d.ts
+@@ -9,6 +9,14 @@ interface KumoTranslations {
+     close: string;
+     cancel: string;
+   };
++  /**
++   * Cloudhal patch (patches/kumo/label-locale.patch): `Label`'s optional-field suffix and its
++   * tooltip button's accessible name, also used by `Field`, `Checkbox` and `Select`.
++   */
++  label: {
++    optional: string;
++    moreInformation: string;
++  };
+ }
+ type KumoTranslationsPartial = { [Key in keyof KumoTranslations]?: Partial<KumoTranslations[Key]>; };
+ interface KumoLocaleProviderProps {

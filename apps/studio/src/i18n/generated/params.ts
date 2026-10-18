@@ -415,6 +415,7 @@ export interface MessageParams {
   "menus.items.count": { count: string | number; limit: string | number };
   "menus.items.countHint": { limit: string | number };
   "menus.items.description": { max: string | number };
+  "menus.items.descriptionRtl": { max: string | number };
   "menus.items.title": { place: string | number };
   "menus.leave.title": { name: string | number };
   "menus.placeWithKey": { place: string | number; key: string | number };

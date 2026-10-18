@@ -1,0 +1,122 @@
+diff --git a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
+index 2b383c4..2c538b9 100644
+--- a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
++++ b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
+@@ -61,6 +61,7 @@ function Separator() {
+ 		className: "flex shrink-0 items-center text-kumo-inactive",
+ 		"aria-hidden": "true",
+ 		children: /* @__PURE__ */ jsx("svg", {
++			className: "rtl:-scale-x-100",
+ 			width: "24",
+ 			height: "24",
+ 			fill: "none",
+diff --git a/dist/chunks/command-palette-crtm3nd32yjhuax1.js b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
+index ceb2dbb..345f720 100644
+--- a/dist/chunks/command-palette-crtm3nd32yjhuax1.js
++++ b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
+@@ -264,7 +264,7 @@ function ResultItem({ title, breadcrumbs, titleHighlights, breadcrumbHighlights,
+ 								highlights: breadcrumbHighlights?.[index],
+ 								className: "text-base text-kumo-default"
+ 							}), /* @__PURE__ */ jsx(CaretRightIcon, {
+-								className: "h-3 w-3 flex-shrink-0 text-kumo-subtle",
++								className: "h-3 w-3 flex-shrink-0 text-kumo-subtle rtl:-scale-x-100",
+ 								weight: "bold"
+ 							})]
+ 						}, index)),
+@@ -284,7 +284,7 @@ function ResultItem({ title, breadcrumbs, titleHighlights, breadcrumbHighlights,
+ 					]
+ 				})
+ 			}),
+-			showArrow && !external && !nonInteractive && /* @__PURE__ */ jsx(ArrowRightIcon, { className: "h-4 w-4 flex-shrink-0 text-kumo-subtle opacity-0 transition-opacity group-data-[highlighted]:opacity-100" })
++			showArrow && !external && !nonInteractive && /* @__PURE__ */ jsx(ArrowRightIcon, { className: "h-4 w-4 flex-shrink-0 text-kumo-subtle rtl:-scale-x-100 opacity-0 transition-opacity group-data-[highlighted]:opacity-100" })
+ 		]
+ 	});
+ }
+diff --git a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
+index 8b0f021..151caa1 100644
+--- a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
++++ b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
+@@ -166,7 +166,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+ 						"aria-label": "Previous month",
+ 						className: "absolute top-0 left-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
+ 						onClick: () => adjustMonth(-1),
+-						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize })
++						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize, className: "rtl:-scale-x-100" })
+ 					}),
+ 					/* @__PURE__ */ jsx(DateRangeMonthHeader, {
+ 						month: getMonthName(viewingMonth),
+@@ -202,7 +202,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+ 						"aria-label": "Next month",
+ 						className: "absolute top-0 right-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
+ 						onClick: () => adjustMonth(1),
+-						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize })
++						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize, className: "rtl:-scale-x-100" })
+ 					}),
+ 					/* @__PURE__ */ jsx(DateRangeMonthHeader, {
+ 						month: getMonthName(viewingMonth, 1),
+diff --git a/dist/chunks/dropdown-m53ji1d66mws89wh.js b/dist/chunks/dropdown-m53ji1d66mws89wh.js
+index 4cb82af..dcd8ab6 100644
+--- a/dist/chunks/dropdown-m53ji1d66mws89wh.js
++++ b/dist/chunks/dropdown-m53ji1d66mws89wh.js
+@@ -34,7 +34,7 @@ const DropdownMenuSubTrigger = React$1.forwardRef(({ className, inset, children,
+ 	children: [
+ 		IconComponent && /* @__PURE__ */ jsx(IconComponent, { className: "mr-2 h-4 w-4" }),
+ 		children,
+-		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ml-auto h-4 w-4" })
++		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ml-auto h-4 w-4 rtl:-scale-x-100" })
+ 	]
+ }));
+ DropdownMenuSubTrigger.displayName = MenuSubmenuTrigger.displayName;
+diff --git a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
+index c2d058f..887df82 100644
+--- a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
++++ b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
+@@ -95,7 +95,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(1);
+ 						setEditingPage(1);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretDoubleLeftIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretDoubleLeftIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				/* @__PURE__ */ jsx(InputGroup.Button, {
+ 					variant: "secondary",
+@@ -106,7 +106,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(previousPage);
+ 						setEditingPage(previousPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				showFullControls && (pageSelector === "dropdown" ? /* @__PURE__ */ jsx(Select, {
+ 					"aria-label": labels.pageNumber,
+@@ -155,7 +155,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(nextPage);
+ 						setEditingPage(nextPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretRightIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretRightIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				}),
+ 				showFullControls && /* @__PURE__ */ jsx(InputGroup.Button, {
+ 					variant: "secondary",
+@@ -165,7 +165,7 @@ function PaginationControls({ controls = KUMO_PAGINATION_DEFAULT_VARIANTS.contro
+ 						setPage(maxPage);
+ 						setEditingPage(maxPage);
+ 					},
+-					children: /* @__PURE__ */ jsx(CaretDoubleRightIcon, { size: 16 })
++					children: /* @__PURE__ */ jsx(CaretDoubleRightIcon, { size: 16, className: "rtl:-scale-x-100" })
+ 				})
+ 			] })
+ 		})
+diff --git a/dist/chunks/sidebar-in9zhvr473afsjpp.js b/dist/chunks/sidebar-in9zhvr473afsjpp.js
+index 984e056..86939eb 100644
+--- a/dist/chunks/sidebar-in9zhvr473afsjpp.js
++++ b/dist/chunks/sidebar-in9zhvr473afsjpp.js
+@@ -1307,7 +1307,7 @@ function SidebarMenuChevron({ className }) {
+ 	return /* @__PURE__ */ jsx(CaretRightIcon, {
+ 		size: 12,
+ 		weight: "bold",
+-		className: cn("ml-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100", isCollapsible && isOpen && "rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
++		className: cn("ml-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100 rtl:-scale-x-100", isCollapsible && isOpen && "rotate-90 rtl:-rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
+ 	});
+ }
+ SidebarMenuChevron.displayName = "Sidebar.MenuChevron";

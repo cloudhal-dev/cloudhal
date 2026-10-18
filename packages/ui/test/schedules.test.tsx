@@ -17,6 +17,7 @@ import {
   type DateTimeFieldLabels,
   type DateTimeValue,
   DEFAULT_RECURRENCE,
+  DirectionProvider,
   firstDayOfWeek,
   formatTimeOfDay,
   monthGrid,
@@ -349,6 +350,29 @@ describe("CalendarMonth", () => {
     fireEvent.keyDown(document.activeElement as Element, { key: "PageUp", shiftKey: true });
     expect(onMonth).toHaveBeenLastCalledWith("2025-11");
     expect(document.activeElement).toBe(cell("2025-11-18"));
+  });
+
+  it("swaps Left and Right in right-to-left languages, where the week runs leftwards", () => {
+    const onMove = vi.fn();
+    render(
+      <DirectionProvider direction="rtl">
+        <Month onMove={onMove} />
+      </DirectionProvider>,
+    );
+    const start = cell(TODAY);
+    act(() => start.focus());
+    fireEvent.keyDown(start, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(cell("2026-10-13"));
+    fireEvent.keyDown(document.activeElement as Element, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(cell(TODAY));
+    // Alt+Left moves a chip to the next day.
+    const day = cell("2026-10-14");
+    act(() => day.focus());
+    fireEvent.keyDown(day, { key: "Enter" });
+    fireEvent.keyDown(document.activeElement as Element, { key: "ArrowLeft", altKey: true });
+    expect(onMove).toHaveBeenCalledWith(
+      expect.objectContaining({ fromDay: "2026-10-14", toDay: "2026-10-15", via: "keyboard" }),
+    );
   });
 
   it("goes into a day's chips with Enter and back with Escape", () => {

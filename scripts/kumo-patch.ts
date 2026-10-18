@@ -1,8 +1,10 @@
 /**
  * Generates `patches/@cloudflare__kumo@<version>.patch`, the one `pnpm patch` Kumo gets (pnpm takes
  * one patch per package version), from:
- * - the hand-written changes in `patches/kumo/*.patch` (today `tooltip-timestamp.patch`, DESIGN.md
- *   §2v "Kumo locale"), applied in name order;
+ * - the hand-written changes in `patches/kumo/*.patch`, applied in name order:
+ *   `tooltip-timestamp.patch` and `label-locale.patch` (DESIGN.md §2v "Kumo locale"), and
+ *   `rtl-icons.patch` (ADR-0033 C1: Kumo's ten directional icons and the breadcrumb separator get
+ *   `rtl:-scale-x-100`, so they mirror under `dir="rtl"`);
  * - ADR-0033 A1: every physical Tailwind utility in Kumo's compiled `dist/**\/*.js` rewritten to
  *   its logical twin (`ml-2` → `ms-2`, `left-0` → `start-0`, `text-right` → `text-end`, …) with
  *   the mapping Studio's own codemod and lint use (`logical` in
@@ -149,10 +151,19 @@ export function verifyInstalled(): string[] {
     const { tokens } = convertSource(readFileSync(file, "utf8"));
     for (const [t, n] of tokens) problems.push(`${path.relative(dir, file)}: ${n}× ${t}`);
   }
-  const chart = readdirSync(path.join(dir, "dist/chunks")).find((f) => f.startsWith("chart-"));
-  const text = chart ? readFileSync(path.join(dir, "dist/chunks", chart), "utf8") : "";
-  if (!text.includes("tooltipTimestampFormat"))
-    problems.push("tooltip-timestamp.patch is not applied");
+  const chunks = readdirSync(path.join(dir, "dist/chunks"));
+  const chunk = (prefix: string): string => {
+    const name = chunks.find((f) => f.startsWith(`${prefix}-`));
+    return name ? readFileSync(path.join(dir, "dist/chunks", name), "utf8") : "";
+  };
+  // Each hand-written patch: a chunk it changes and a string only the patched chunk has.
+  const marks: [patch: string, prefix: string, mark: string][] = [
+    ["tooltip-timestamp.patch", "chart", "tooltipTimestampFormat"],
+    ["label-locale.patch", "label", "words.optional"],
+    ["rtl-icons.patch", "pagination", "rtl:-scale-x-100"],
+  ];
+  for (const [patch, prefix, mark] of marks)
+    if (!chunk(prefix).includes(mark)) problems.push(`${patch} is not applied`);
   return problems;
 }
 

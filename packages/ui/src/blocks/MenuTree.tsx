@@ -1,4 +1,5 @@
 import { Button, cn, Text } from "@cloudflare/kumo";
+import { useDirection } from "@cloudflare/kumo/primitives/direction-provider";
 import { CaretDown, CaretRight, DotsSixVertical } from "@phosphor-icons/react";
 import {
   type DragEvent,
@@ -12,6 +13,7 @@ import {
   useState,
 } from "react";
 import { DirectionalIcon } from "./DirectionalIcon.tsx";
+import { readingKey } from "./reading-keys.ts";
 
 /** One row of the tree, with its children in display order. */
 export interface MenuTreeItem {
@@ -161,6 +163,17 @@ interface Drop {
 }
 
 /**
+ * Alt with an arrow moves the focused row. Keys are read in the reading order (`readingKey`):
+ * in right-to-left languages Alt+Left nests and plain Left opens a row.
+ */
+const ALT_MOVES: Record<string, "moveUp" | "moveDown" | "indent" | "outdent"> = {
+  ArrowUp: "moveUp",
+  ArrowDown: "moveDown",
+  ArrowRight: "indent",
+  ArrowLeft: "outdent",
+};
+
+/**
  * The navigation menu editor's tree (RFC-0003 §8, DESIGN.md §2t): Kumo rows in the WAI-ARIA tree
  * pattern. Keyboard first — arrows move focus (Right/Left expand, collapse and step in and out),
  * `Alt+↑/↓` reorder among siblings, `Alt+→/←` indent under the previous sibling and outdent,
@@ -183,6 +196,7 @@ export function MenuTree({
   readOnly = false,
   className,
 }: MenuTreeProps) {
+  const direction = useDirection();
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [active, setActive] = useState<string | undefined>(focusId);
   const [message, setMessage] = useState("");
@@ -342,28 +356,27 @@ export function MenuTree({
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>, row: Row, i: number) => {
     // Keys typed into a row's own controls (buttons, menus) are theirs.
     if (e.target !== e.currentTarget) return;
+    const key = readingKey(e.key, direction);
     const id = row.item.id;
     const ctx = contextFor(row);
     const expanded = row.hasChildren && !collapsed.has(id);
     let handled = true;
     if (e.altKey && !readOnly) {
-      if (e.key === "ArrowUp") ctx.moveUp();
-      else if (e.key === "ArrowDown") ctx.moveDown();
-      else if (e.key === "ArrowRight") ctx.indent();
-      else if (e.key === "ArrowLeft") ctx.outdent();
+      const move = ALT_MOVES[key];
+      if (move) ctx[move]();
       else handled = false;
-    } else if (e.key === "ArrowDown") focusRow(rows[i + 1]?.item.id);
-    else if (e.key === "ArrowUp") focusRow(rows[i - 1]?.item.id);
-    else if (e.key === "Home") focusRow(rows[0]?.item.id);
-    else if (e.key === "End") focusRow(rows.at(-1)?.item.id);
-    else if (e.key === "ArrowRight") {
+    } else if (key === "ArrowDown") focusRow(rows[i + 1]?.item.id);
+    else if (key === "ArrowUp") focusRow(rows[i - 1]?.item.id);
+    else if (key === "Home") focusRow(rows[0]?.item.id);
+    else if (key === "End") focusRow(rows.at(-1)?.item.id);
+    else if (key === "ArrowRight") {
       if (row.hasChildren && !expanded) toggle(id, true);
       else if (expanded) focusRow(rows[i + 1]?.item.id);
-    } else if (e.key === "ArrowLeft") {
+    } else if (key === "ArrowLeft") {
       if (expanded) toggle(id, false);
       else focusRow(row.parentId ?? undefined);
-    } else if ((e.key === "Enter" || e.key === "F2") && onEdit) onEdit(id);
-    else if ((e.key === "Delete" || e.key === "Backspace") && onRemove && !readOnly) onRemove(id);
+    } else if ((key === "Enter" || key === "F2") && onEdit) onEdit(id);
+    else if ((key === "Delete" || key === "Backspace") && onRemove && !readOnly) onRemove(id);
     else handled = false;
     if (handled) e.preventDefault();
   };

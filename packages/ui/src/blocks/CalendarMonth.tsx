@@ -1,4 +1,5 @@
 import { cn, Popover, Table, Text } from "@cloudflare/kumo";
+import { useDirection } from "@cloudflare/kumo/primitives/direction-provider";
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -10,6 +11,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { readingKey } from "./reading-keys.ts";
 import { ScheduleItem } from "./ScheduleItem.tsx";
 import {
   entryDay,
@@ -141,6 +143,14 @@ const DOT: Record<ScheduleLook, string> = {
   paused: "ring-1 ring-inset ring-kumo-line",
 };
 
+/** Days an arrow key moves, read in the reading order (`readingKey`). */
+const DAY_STEPS: Partial<Record<string, number>> = {
+  ArrowLeft: -1,
+  ArrowRight: 1,
+  ArrowUp: -7,
+  ArrowDown: 7,
+};
+
 /**
  * The Month view (RFC-0008 §15.2, §15.4, §15.7; DESIGN.md §2x): a WAI-ARIA APG data grid on a
  * fixed Kumo `Table` (seven columns starting on `weekStartsOn`) with **one tab stop** and a roving
@@ -180,6 +190,7 @@ export function CalendarMonth({
   hourCycle,
   className,
 }: CalendarMonthProps) {
+  const direction = useDirection();
   const phone = useMediaQuery(PHONE, density === "auto");
   const dots = density === "dots" || (density === "auto" && phone);
   const weeks = useMemo(() => monthGrid(month, weekStartsOn), [month, weekStartsOn]);
@@ -240,6 +251,8 @@ export function CalendarMonth({
 
   const onCellKeyDown = (e: KeyboardEvent<HTMLTableCellElement>, day: string) => {
     const cell = e.currentTarget;
+    // The week runs right to left in right-to-left languages: Left is the next day there.
+    const key = readingKey(e.key, direction);
     // Keys from the "+N more" popover reach here through the React tree, not the DOM: not ours.
     if (!cell.contains(e.target as Node)) return;
     // Inside the cell: its chips and "+N more".
@@ -249,21 +262,21 @@ export function CalendarMonth({
       const id = (e.target as HTMLElement).dataset.entryId;
       const entry = id ? byDay.get(day)?.find((x) => x.id === id) : undefined;
       if (e.altKey) {
-        const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+        const step = DAY_STEPS[key];
         if (step && entry && onMove && entry.movable) {
           e.preventDefault();
           onMove({ entry, fromDay: day, toDay: shiftDay(day, step), via: "keyboard" });
         }
         return;
       }
-      if (e.key === "Escape") {
+      if (key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
         cell.focus();
-      } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      } else if (key === "ArrowDown" || key === "ArrowRight") {
         e.preventDefault();
         items[Math.min(i + 1, items.length - 1)]?.focus();
-      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      } else if (key === "ArrowUp" || key === "ArrowLeft") {
         e.preventDefault();
         items[Math.max(i - 1, 0)]?.focus();
       }
@@ -271,18 +284,12 @@ export function CalendarMonth({
     }
     const col = weekdayOrder(weekStartsOn).indexOf(weekdayOf(day));
     let next: string | undefined;
-    switch (e.key) {
+    switch (key) {
       case "ArrowLeft":
-        next = shiftDay(day, -1);
-        break;
       case "ArrowRight":
-        next = shiftDay(day, 1);
-        break;
       case "ArrowUp":
-        next = shiftDay(day, -7);
-        break;
       case "ArrowDown":
-        next = shiftDay(day, 7);
+        next = shiftDay(day, DAY_STEPS[key] ?? 0);
         break;
       case "Home":
         next = shiftDay(day, -col);

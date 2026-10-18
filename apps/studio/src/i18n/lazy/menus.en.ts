@@ -43,6 +43,9 @@ export const messages = {
       countHint: "Items at every level. A menu holds at most {limit}.",
       description:
         "Drag the handle, or select an item and use Alt with the arrow keys: up and down reorder, right nests it under the item above, left moves it out. This menu goes {max} levels deep.",
+      /** `description` in right-to-left languages, where Alt with Left nests (ADR-0033). */
+      descriptionRtl:
+        "Drag the handle, or select an item and use Alt with the arrow keys: up and down reorder, left nests it under the item above, right moves it out. This menu goes {max} levels deep.",
       descriptionReadOnly: "The items as visitors get them after the next publish.",
       empty: "No items yet",
       emptyDescription: {
@@ -57,6 +60,9 @@ export const messages = {
       label: "{place} items",
       instructions:
         "Arrow keys move between items; Right and Left open and close an item. Alt with Up or Down moves the item, Alt with Right nests it under the item above, Alt with Left moves it out one level. Enter edits, Delete removes.",
+      /** `instructions` in right-to-left languages, where Left opens and Alt with Left nests. */
+      instructionsRtl:
+        "Arrow keys move between items; Left and Right open and close an item. Alt with Up or Down moves the item, Alt with Left nests it under the item above, Alt with Right moves it out one level. Enter edits, Delete removes.",
       expand: "Show items under {label}",
       collapse: "Hide items under {label}",
       topLevel: "top level",

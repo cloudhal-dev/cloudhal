@@ -6,7 +6,7 @@
     "apps/studio/src/lib/menus.ts": 831,
     "apps/studio/src/routes/AssetPage.tsx": 855,
     "apps/studio/src/routes/CommentThreadPage.tsx": 814,
-    "apps/studio/src/routes/NavigationPage.tsx": 1173,
+    "apps/studio/src/routes/NavigationPage.tsx": 1171,
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
     "packages/api/src/build-turn.ts": 885,
@@ -232,7 +232,7 @@
       "lines": 233
     },
     "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
-      "lines": 1045
+      "lines": 1042
     },
     "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
       "lines": 173
@@ -564,7 +564,7 @@
       "params": 5
     },
     "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth": {
-      "lines": 415
+      "lines": 412
     },
     "packages/ui/src/blocks/CalendarMonth.tsx::CalendarMonth>weeks.map(cb)": {
       "lines": 173
