@@ -10,6 +10,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GATES_ENFORCED } from "../src/availability.ts";
 import {
+  AI_SEARCH_MONTHLY_LIMIT,
   type AiSearchInstance,
   cloudflareAiSearchProvider,
   hybridProvider,
@@ -203,19 +204,35 @@ describe("Cloudflare AI Search provider", () => {
     const r = await broken.search({ siteId: site.id, query: "prices", locale: "en", now });
     expect(r.hits.map((h) => h.href)).toEqual(["/posts/market"]);
     expect(errors).toHaveLength(1);
-    // the budget: one semantic call a day, then FTS5 alone, without asking the instance
+    // the quota: one semantic call a month, then FTS5 alone, without asking the instance
     const spy = vi.fn(instance.search);
     const budgeted = hybridProvider(
       fts5Provider(sql),
       cloudflareAiSearchProvider({ instance: { search: spy }, bucket, sql }),
-      { allow: (q) => takeSearchCall(sql, q.siteId, { now: q.now, limit: 1 }) },
+      { allow: (q) => takeSearchCall(sql, { now: q.now, limit: 1 }) },
     );
     const ask = () => budgeted.search({ siteId: site.id, query: "prices", locale: "en", now });
     expect((await ask()).hits).toHaveLength(2);
     expect((await ask()).hits).toHaveLength(1);
     expect(spy).toHaveBeenCalledTimes(1);
-    now += 24 * HOUR; // a new UTC day
+    now += 24 * HOUR; // the next day: still this month's quota
+    expect((await ask()).hits).toHaveLength(1);
+    // the quota is the deployment's, not a site's: another site's call counts against it
+    expect(await takeSearchCall(sql, { now, limit: 1 })).toBe(false);
+    now = Date.UTC(2026, 10, 1, 0, 0, 1); // a new UTC month
     expect((await ask()).hits).toHaveLength(2);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a deployment inside Cloudflare's included 1,000 semantic queries a month by default", async () => {
+    const at = Date.UTC(2026, 11, 15);
+    for (let i = 0; i < 1000; i++)
+      await takeSearchCall(sql, { now: at, limit: AI_SEARCH_MONTHLY_LIMIT });
+    expect(AI_SEARCH_MONTHLY_LIMIT).toBe(1000);
+    expect(await takeSearchCall(sql, { now: at, limit: AI_SEARCH_MONTHLY_LIMIT })).toBe(false);
+    expect(
+      await takeSearchCall(sql, { now: Date.UTC(2027, 0, 1), limit: AI_SEARCH_MONTHLY_LIMIT }),
+    ).toBe(true);
   });
 
   it("is on only when the deployment says so and both bindings are there", () => {
