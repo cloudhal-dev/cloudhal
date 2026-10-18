@@ -23,6 +23,7 @@ import {
   MARK_CLOSE,
   MARK_OPEN,
   SEARCH_QUERY_MAX,
+  type SearchHit,
   type SearchKind,
   type SearchOptions,
   type SearchResults,
@@ -33,7 +34,7 @@ import {
 import { pageSearchRow, searchRowOf, termSearchRows } from "./search-rows.ts";
 
 export * from "./search-common.ts";
-export { searchRows } from "./search-memory.ts";
+export { markedSnippet, searchRows } from "./search-memory.ts";
 export {
   pageSearchRow,
   searchDocuments,
@@ -287,4 +288,62 @@ LIMIT ? OFFSET ?`,
     stale,
     provider: "fts5",
   };
+}
+
+/** A live row of the index, without a snippet: what another provider's hit is checked against. */
+export type LiveHit = Omit<SearchHit, "snippet">;
+
+/**
+ * Which of `nodeIds` readers can see now (RFC-0029 §1, invariant 1): rows of the index in the
+ * reader's locale and kinds, inside their time gates, archives only while an article carries them.
+ * Another provider's hits pass through this, so what it indexed late or kept too long never shows.
+ * A scan of the site's rows (no `MATCH`), bounded by the ids asked.
+ */
+export async function liveHits(
+  sql: SqlDriver,
+  siteId: string,
+  nodeIds: readonly string[],
+  options: Pick<SearchOptions, "locale" | "now" | "kinds">,
+): Promise<Map<string, LiveHit>> {
+  if (nodeIds.length === 0) return new Map();
+  const now = new Date(options.now).toISOString();
+  const rows = await sql.all<{
+    node_id: string;
+    kind: SearchKind | null;
+    title: string;
+    href: string;
+    context: string | null;
+    published_at: string | null;
+  }>(
+    `SELECT node_id, kind, title, href, context, published_at FROM search_index
+WHERE site_id = ? AND locale = ? AND node_id IN (SELECT value FROM json_each(?))
+AND kind IN (SELECT value FROM json_each(?))
+AND (gate_from IS NULL OR gate_from <= ?) AND (gate_until IS NULL OR gate_until > ?)
+AND ${LINKED}`,
+    [
+      siteId,
+      options.locale,
+      JSON.stringify(nodeIds),
+      JSON.stringify(searchKinds(options.kinds)),
+      now,
+      now,
+      siteId,
+      options.locale,
+      now,
+      now,
+    ],
+  );
+  return new Map(
+    rows.map((r) => [
+      r.node_id,
+      {
+        nodeId: r.node_id,
+        title: r.title,
+        href: r.href,
+        kind: r.kind ?? "article",
+        ...(r.context ? { context: r.context } : {}),
+        ...(r.published_at ? { publishedAt: r.published_at } : {}),
+      },
+    ]),
+  );
 }

@@ -100,3 +100,8 @@ function snippetOf(text: string, words: readonly string[]): string {
     .map((t) => (matches(t) ? `${MARK_OPEN}${t}${MARK_CLOSE}` : t));
   return `${from > 0 ? "…" : ""}${part.join(" ")}${from + 16 < tokens.length ? "…" : ""}`;
 }
+
+/** A snippet of `text` with the query's words marked: for providers whose text comes unmarked. */
+export function markedSnippet(text: string, query: string): string {
+  return snippetOf(text, queryWords(query).map(fold));
+}

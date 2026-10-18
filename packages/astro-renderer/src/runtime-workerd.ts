@@ -11,7 +11,7 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
-import { SiteGraphStore } from "@cloudhal/core-ts";
+import { type AiSearchEnv, SiteGraphStore, searchProviderFromEnv } from "@cloudhal/core-ts";
 import { edgeMaxAge } from "@cloudhal/core-ts/availability";
 import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -23,7 +23,8 @@ import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
 import type { GraphSource } from "./source.ts";
 
-export interface SiteWorkerEnv {
+/** RFC-0029 §3: `AI_SEARCH`, `SEARCH_BUCKET` and `CLOUDHAL_SEARCH_*` turn on semantic search. */
+export interface SiteWorkerEnv extends AiSearchEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   /** Overrides the site id baked into the build (one Worker can be re-pointed without a rebuild). */
@@ -42,10 +43,23 @@ export interface AstroLike {
 
 let resolver: SiteResolver | undefined;
 
+/** The site's store; with the deployment's search provider when it has one (RFC-0029 §3). */
+function siteStore(e: SiteWorkerEnv): SiteGraphStore {
+  const sql = new D1Driver(e.DB);
+  const search = searchProviderFromEnv(e, sql, {
+    onError: (err) => console.error("semantic search failed, FTS5 answered:", err),
+  });
+  return new SiteGraphStore({
+    sql,
+    blobs: new R2BlobStore(e.BLOBS),
+    ...(search ? { search } : {}),
+  });
+}
+
 function getResolver(siteId: string): SiteResolver {
   const e = env as unknown as SiteWorkerEnv;
   resolver ??= new SiteResolver({
-    store: new SiteGraphStore({ sql: new D1Driver(e.DB), blobs: new R2BlobStore(e.BLOBS) }),
+    store: siteStore(e),
     siteId,
     previewSecret: e.CLOUDHAL_PREVIEW_SECRET,
     // The edge cache absorbs repeat traffic; a cache miss must see the pointer as it is now,

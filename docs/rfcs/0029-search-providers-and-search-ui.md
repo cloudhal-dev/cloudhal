@@ -193,6 +193,22 @@ Algolia, Typesense, Meilisearch and similar services send content outside the de
     - by default the editing view, as Studio's palette;
     - with `published`, what readers find, through the store's provider.
     - The server instructions mention it.
+- **29e shipped (experimental).** Operator guide: [docs/guides/search.md](../guides/search.md).
+  - **Provider** (`@cloudhal/core-ts` `search-ai.ts`):
+    - **Sync.** `cloudflareAiSearchProvider` mirrors each `SearchPlan` into the R2 data source as `sites/<siteId>/<nodeId>/<locale>.md`, with the custom metadata `locale` and `kind`. A full plan clears the site's folder; a kind or node removal deletes its objects.
+    - **Search.** One instance call per search (`ai_search_options.retrieval.filters`: the folder range of §3, `locale`, `kind $in`, 50 chunks), keeping the best chunk per node.
+    - **Live check.** The nodes then pass `liveHits` against the FTS5 index (invariant 1); titles and links come from the index, and the snippet is the chunk with the query words marked.
+  - **Hybrid.** `hybridProvider` merges FTS5 and the semantic side by reciprocal rank (k = 60). FTS5 pages alone past 50 hits, when the semantic side fails, and past the budget.
+  - **Budget.** Migration `0023_search_usage`, a row per site and UTC day; `takeSearchCall` counts and checks atomically (`ON CONFLICT … RETURNING`). The limit is `CLOUDHAL_SEARCH_DAILY_LIMIT`, default 1000.
+  - **Wiring.** `searchProviderFromEnv` builds the provider when `CLOUDHAL_SEARCH_PROVIDER=cloudflare-ai-search` and both `AI_SEARCH` and `SEARCH_BUCKET` are bound. It is set on the store of the site Worker, the admin Worker and the scheduler's ticks.
+  - **Deploy.**
+    - `cloudhal.json` `search {provider, instance, bucket?, dailyLimit?}` binds both Workers (`ai_search`, a second R2 bucket, the vars).
+    - `cloudhal deploy` creates the bucket. The instance, with its data source and the two metadata fields, is made by hand (wrangler needs it to exist).
+- **Deviations (29e).**
+  - It is not checked against a live AI Search instance in this repository. The tests use a fake instance that applies the documented filters, and the wrangler config key comes from wrangler 4.148's schema.
+  - The budget is per site and day only, not part of the RFC-0008 automation budgets.
+  - The semantic side reads the FTS5 index with a scan of the site's rows (`liveHits` has no `MATCH`), fine for one site per deployment.
+  - A full sync writes one object per node in the publishing request. On Workers Free a large first rebuild can pass the subrequest limit (guide: rebuild on Paid, or let publishes fill it).
 - **Deviations.**
   - The command registry (`useRegisterCommands`, §7) is not built yet. No screen needs its own commands so far, and the site's commands are a table in one module now.
   - Menu items are found by their own labels; a page item without a label is found as its page.

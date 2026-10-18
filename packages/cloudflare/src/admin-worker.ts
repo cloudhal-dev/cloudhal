@@ -50,7 +50,7 @@ import { type AiBinding, AiStore, bindingTransport, createApi } from "@cloudhal/
 import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
-import { SiteGraphStore } from "@cloudhal/core-ts";
+import { type AiSearchEnv, SiteGraphStore, searchProviderFromEnv } from "@cloudhal/core-ts";
 import { type BlockType, createBlockRegistry, type PropsSchema } from "@cloudhal/core-ts/blocks";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
@@ -73,7 +73,7 @@ import {
   schedulerRuntime,
 } from "./scheduler.ts";
 
-export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRoomsEnv {
+export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRoomsEnv, AiSearchEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   /** Workers AI (RFC-0016), bound when cloudhal.json has an `ai` key. */
@@ -201,6 +201,21 @@ export interface AdminWorkerOptions {
   /** The theme's DESIGN.md (RFC-0021 §1), bundled at deploy time. */
   themeDesign?: string;
   log?: (line: string) => void;
+}
+
+/**
+ * The store's optional parts: the theme's settings and DESIGN.md, and the deployment's search
+ * provider, so publishes here mirror into the AI Search bucket when it has one (RFC-0029 §3).
+ */
+function storeExtras(options: AdminWorkerOptions, env: AdminEnv, sql: SqlDriver) {
+  const search = searchProviderFromEnv(env, sql, {
+    onError: (e) => console.error("semantic search failed, FTS5 answered:", e),
+  });
+  return {
+    ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
+    ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),
+    ...(search ? { search } : {}),
+  };
 }
 
 /**
@@ -338,8 +353,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         sql,
         blobs,
         blocks,
-        ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
-        ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),
+        ...storeExtras(options, env, sql),
         // S15: `availability` is refused until the site Worker says it enforces gates.
         gates: siteGateSupport({
           fetch: siteBinding

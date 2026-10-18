@@ -61,6 +61,7 @@ export type {
   ReleasePurge,
 } from "./release-apply.ts";
 export * from "./search.ts";
+export * from "./search-ai.ts";
 export * from "./search-provider.ts";
 export * from "./seed.ts";
 export * from "./site-search.ts";
