@@ -43,11 +43,7 @@
         "engine": "workers-ai/llama-4",
         "glossaryRev": 3,
         "score": 87.5,
-        "checks": [
-          "links",
-          "numbers",
-          "glossary"
-        ],
+        "checks": ["links", "numbers", "glossary"],
         "at": "2026-10-18T10:00:00Z"
       }
     }

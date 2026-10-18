@@ -17,10 +17,7 @@
     "category": "product",
     "featured": true
   },
-  "tags": [
-    "agents",
-    "launch"
-  ],
+  "tags": ["agents", "launch"],
   "author": {
     "kind": "agent",
     "id": "agent_01HZX8K3Q9YZ",

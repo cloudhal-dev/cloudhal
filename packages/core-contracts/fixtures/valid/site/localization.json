@@ -5,12 +5,7 @@
   "name": "Demo Newsroom",
   "slug": "demo-newsroom",
   "defaultLocale": "en",
-  "locales": [
-    "en",
-    "ar",
-    "es",
-    "tr"
-  ],
+  "locales": ["en", "ar", "es", "tr"],
   "domains": [
     {
       "hostname": "demo-newsroom.cloudhal.app",
@@ -21,10 +16,7 @@
       "primary": true
     }
   ],
-  "pageIds": [
-    "page_01HZX8K3Q9GH",
-    "page_01HZX8K3Q9IJ"
-  ],
+  "pageIds": ["page_01HZX8K3Q9GH", "page_01HZX8K3Q9IJ"],
   "homePageId": "page_01HZX8K3Q9GH",
   "theme": {
     "name": "blog",
@@ -44,10 +36,7 @@
     },
     "fallback": "default-with-notice",
     "review": {
-      "required": [
-        "posts",
-        "pages"
-      ]
+      "required": ["posts", "pages"]
     },
     "label": "unreviewed"
   }
