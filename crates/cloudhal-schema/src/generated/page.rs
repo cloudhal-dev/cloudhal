@@ -834,6 +834,8 @@ pub struct Page {
     pub site_id: Id,
     pub status: PublishStatus,
     pub title: PageTitle,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub translation: ::std::option::Option<Translation>,
     #[serde(rename = "updatedAt")]
     pub updated_at: Timestamp,
 }
@@ -2136,6 +2138,330 @@ impl ::std::convert::TryFrom<String> for Timestamp {
     type Error = <::chrono::DateTime<::chrono::offset::Utc> as ::std::str::FromStr>::Err;
     fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
         value.parse()
+    }
+}
+#[doc = "Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Translation {
+    #[doc = "The group's id: the original node's id, shared by every translation. May cross sites in one project."]
+    pub group: Id,
+    #[doc = "linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub layout: ::std::option::Option<TranslationLayout>,
+    pub method: TranslationMethod,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub provenance: ::std::option::Option<TranslationProvenance>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub review: ::std::option::Option<TranslationReview>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub source: ::std::option::Option<TranslationSource>,
+}
+#[doc = "linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum TranslationLayout {
+    #[serde(rename = "linked")]
+    Linked,
+    #[serde(rename = "independent")]
+    Independent,
+}
+impl ::std::fmt::Display for TranslationLayout {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Linked => f.write_str("linked"),
+            Self::Independent => f.write_str("independent"),
+        }
+    }
+}
+impl ::std::str::FromStr for TranslationLayout {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "linked" => Ok(Self::Linked),
+            "independent" => Ok(Self::Independent),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for TranslationLayout {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TranslationLayout {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum TranslationMethod {
+    #[serde(rename = "original")]
+    Original,
+    #[serde(rename = "human")]
+    Human,
+    #[serde(rename = "machine")]
+    Machine,
+    #[serde(rename = "machine-reviewed")]
+    MachineReviewed,
+}
+impl ::std::fmt::Display for TranslationMethod {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Original => f.write_str("original"),
+            Self::Human => f.write_str("human"),
+            Self::Machine => f.write_str("machine"),
+            Self::MachineReviewed => f.write_str("machine-reviewed"),
+        }
+    }
+}
+impl ::std::str::FromStr for TranslationMethod {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "original" => Ok(Self::Original),
+            "human" => Ok(Self::Human),
+            "machine" => Ok(Self::Machine),
+            "machine-reviewed" => Ok(Self::MachineReviewed),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for TranslationMethod {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TranslationMethod {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TranslationProvenance {
+    pub at: Timestamp,
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub checks: ::std::vec::Vec<TranslationProvenanceChecksItem>,
+    pub engine: TranslationProvenanceEngine,
+    #[serde(
+        rename = "glossaryRev",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub glossary_rev: ::std::option::Option<Revision>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub score: ::std::option::Option<f64>,
+}
+#[doc = "`TranslationProvenanceChecksItem`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct TranslationProvenanceChecksItem(::std::string::String);
+impl ::std::ops::Deref for TranslationProvenanceChecksItem {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<TranslationProvenanceChecksItem> for ::std::string::String {
+    fn from(value: TranslationProvenanceChecksItem) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for TranslationProvenanceChecksItem {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for TranslationProvenanceChecksItem {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TranslationProvenanceChecksItem {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TranslationProvenanceChecksItem {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`TranslationProvenanceEngine`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct TranslationProvenanceEngine(::std::string::String);
+impl ::std::ops::Deref for TranslationProvenanceEngine {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<TranslationProvenanceEngine> for ::std::string::String {
+    fn from(value: TranslationProvenanceEngine) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for TranslationProvenanceEngine {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 200usize {
+            return Err("longer than 200 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for TranslationProvenanceEngine {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TranslationProvenanceEngine {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TranslationProvenanceEngine {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "The person who reviewed this translation and when. Only humans set it."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TranslationReview {
+    pub at: Timestamp,
+    pub by: Actor,
+}
+#[doc = "The node and revision this translation was made from. Absent on the original."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TranslationSource {
+    #[doc = "Lower-case hex SHA-256 of the source node's canonical JSON at that revision."]
+    pub hash: TranslationSourceHash,
+    pub id: Id,
+    pub locale: Locale,
+    pub rev: Revision,
+    #[doc = "The source's site when it is another site of the same project (a language edition). Absent means this site."]
+    #[serde(
+        rename = "siteId",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub site_id: ::std::option::Option<Id>,
+}
+#[doc = "Lower-case hex SHA-256 of the source node's canonical JSON at that revision."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct TranslationSourceHash(::std::string::String);
+impl ::std::ops::Deref for TranslationSourceHash {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<TranslationSourceHash> for ::std::string::String {
+    fn from(value: TranslationSourceHash) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for TranslationSourceHash {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for TranslationSourceHash {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for TranslationSourceHash {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TranslationSourceHash {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
     }
 }
 #[doc = " Error types."]

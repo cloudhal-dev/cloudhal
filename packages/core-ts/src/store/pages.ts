@@ -9,6 +9,7 @@ import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { type Creatable, uniquenessKey } from "../nodes.ts";
 import type { StoreContext } from "./context.ts";
+import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkComponentSections, checkReservedPath } from "./validation.ts";
 
@@ -39,6 +40,8 @@ export class PageEngine {
     checkComponentSections(this.#ctx.graph.blocks, draft);
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
+    checkLocalizedNode("page", site, draft);
+    await checkTranslationLinks(this.#ctx, { kind: "page", site, node: draft });
     await this.#ctx.checkGates(site.id, undefined, draft.availability);
     const refs = await this.#ctx.assets.planRefs("page", site.id, draft, undefined);
     const page = refs.node;
@@ -92,6 +95,8 @@ export class PageEngine {
     await this.#ctx.tax.checkPagePath(next);
     const site = await this.#ctx.graph.getSite(next.siteId);
     if (!site) throw new NotFoundError("site", next.siteId);
+    checkLocalizedNode("page", site, next);
+    await checkTranslationLinks(this.#ctx, { kind: "page", site, node: next, stored });
     const sameLocale = stored.locale === next.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
       locale: next.locale,

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "page_01HZX8K3QES1",
+  "siteId": "site_01HZX8K3Q9EF",
+  "path": "/",
+  "title": "Inicio",
+  "locale": "es",
+  "status": "draft",
+  "sections": [
+    {
+      "id": "sec_01HZX8K3Q9OP",
+      "kind": "hero",
+      "heading": "El resumen matinal, escrito por un agente"
+    },
+    {
+      "id": "sec_01HZX8K3Q9ST",
+      "kind": "contentList",
+      "collection": "posts",
+      "limit": 5,
+      "sort": "newest"
+    }
+  ],
+  "seo": {
+    "title": "Demo Newsroom",
+    "description": "Agent-operated news site",
+    "noindex": false
+  },
+  "rev": 7,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z",
+  "translation": {
+    "group": "page_01HZX8K3Q9GH",
+    "method": "machine",
+    "layout": "linked",
+    "source": {
+      "id": "page_01HZX8K3Q9GH",
+      "locale": "en",
+      "rev": 7,
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "provenance": {
+      "engine": "workers-ai/llama-4",
+      "glossaryRev": 3,
+      "score": 87.5,
+      "checks": ["links", "numbers", "glossary"],
+      "at": "2026-10-18T10:00:00Z"
+    }
+  }
+}

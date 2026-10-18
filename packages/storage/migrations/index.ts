@@ -23,6 +23,7 @@ import { migration0021Search } from "./0021_search.ts";
 import { migration0022SearchKinds } from "./0022_search_kinds.ts";
 import { migration0023SearchUsage } from "./0023_search_usage.ts";
 import { migration0024SearchQuota } from "./0024_search_quota.ts";
+import { migration0025TranslationGroups } from "./0025_translation_groups.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -50,4 +51,5 @@ export const migrations: readonly Migration[] = [
   migration0022SearchKinds,
   migration0023SearchUsage,
   migration0024SearchQuota,
+  migration0025TranslationGroups,
 ];

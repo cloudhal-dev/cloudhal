@@ -2486,6 +2486,299 @@ impl<'de> ::serde::Deserialize<'de> for Locale {
             })
     }
 }
+#[doc = "How the site serves its locales (RFC-0033 §2). Absent fields mean: prefix-except-default routing, no fallback, no required review, the machine-translation notice until reviewed."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Localization {
+    #[doc = "Optional hostname per locale; that locale is then served at the host's root."]
+    #[serde(
+        default,
+        skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
+    )]
+    pub domains: ::std::collections::HashMap<Locale, LocalizationDomainsValue>,
+    #[doc = "none: a missing translation is not found. default-with-notice: the default locale's page is served with a notice and noindex."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub fallback: ::std::option::Option<LocalizationFallback>,
+    #[doc = "When readers see the machine-translation notice: unreviewed (until a person reviews) or always."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub label: ::std::option::Option<LocalizationLabel>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub review: ::std::option::Option<LocalizationReview>,
+    #[doc = "prefix-except-default: the default locale at the root, the others under /<locale>/. prefix-all: every locale prefixed, / is a language chooser (x-default)."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub routing: ::std::option::Option<LocalizationRouting>,
+}
+#[doc = "`LocalizationDomainsValue`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct LocalizationDomainsValue(::std::string::String);
+impl ::std::ops::Deref for LocalizationDomainsValue {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<LocalizationDomainsValue> for ::std::string::String {
+    fn from(value: LocalizationDomainsValue) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for LocalizationDomainsValue {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 253usize {
+            return Err("longer than 253 characters".into());
+        }
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
+                    .unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err ("doesn't match pattern \"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$\"" . into ()) ;
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for LocalizationDomainsValue {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LocalizationDomainsValue {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for LocalizationDomainsValue {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "none: a missing translation is not found. default-with-notice: the default locale's page is served with a notice and noindex."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum LocalizationFallback {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "default-with-notice")]
+    DefaultWithNotice,
+}
+impl ::std::fmt::Display for LocalizationFallback {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::None => f.write_str("none"),
+            Self::DefaultWithNotice => f.write_str("default-with-notice"),
+        }
+    }
+}
+impl ::std::str::FromStr for LocalizationFallback {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "none" => Ok(Self::None),
+            "default-with-notice" => Ok(Self::DefaultWithNotice),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for LocalizationFallback {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LocalizationFallback {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "When readers see the machine-translation notice: unreviewed (until a person reviews) or always."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum LocalizationLabel {
+    #[serde(rename = "unreviewed")]
+    Unreviewed,
+    #[serde(rename = "always")]
+    Always,
+}
+impl ::std::fmt::Display for LocalizationLabel {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Unreviewed => f.write_str("unreviewed"),
+            Self::Always => f.write_str("always"),
+        }
+    }
+}
+impl ::std::str::FromStr for LocalizationLabel {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "unreviewed" => Ok(Self::Unreviewed),
+            "always" => Ok(Self::Always),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for LocalizationLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LocalizationLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "Collections whose machine translations need a person's review before they publish ('pages' stands for pages)."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LocalizationReview {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub required: ::std::option::Option<::std::vec::Vec<LocalizationReviewRequiredItem>>,
+}
+#[doc = "`LocalizationReviewRequiredItem`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct LocalizationReviewRequiredItem(::std::string::String);
+impl ::std::ops::Deref for LocalizationReviewRequiredItem {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<LocalizationReviewRequiredItem> for ::std::string::String {
+    fn from(value: LocalizationReviewRequiredItem) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for LocalizationReviewRequiredItem {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for LocalizationReviewRequiredItem {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LocalizationReviewRequiredItem {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for LocalizationReviewRequiredItem {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "prefix-except-default: the default locale at the root, the others under /<locale>/. prefix-all: every locale prefixed, / is a language chooser (x-default)."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum LocalizationRouting {
+    #[serde(rename = "prefix-except-default")]
+    PrefixExceptDefault,
+    #[serde(rename = "prefix-all")]
+    PrefixAll,
+}
+impl ::std::fmt::Display for LocalizationRouting {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::PrefixExceptDefault => f.write_str("prefix-except-default"),
+            Self::PrefixAll => f.write_str("prefix-all"),
+        }
+    }
+}
+impl ::std::str::FromStr for LocalizationRouting {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "prefix-except-default" => Ok(Self::PrefixExceptDefault),
+            "prefix-all" => Ok(Self::PrefixAll),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for LocalizationRouting {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for LocalizationRouting {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
 #[doc = "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source)."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(transparent)]
@@ -3207,6 +3500,8 @@ pub struct Site {
     pub home_page_id: ::std::option::Option<Id>,
     pub id: Id,
     pub locales: ::std::vec::Vec<Locale>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub localization: ::std::option::Option<Localization>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub metadata: ::std::option::Option<Metadata>,
     pub name: SiteName,

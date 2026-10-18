@@ -171,6 +171,9 @@ export const SiteSchema = {
     "homePageId": {
       "$ref": "#/$defs/Id"
     },
+    "localization": {
+      "$ref": "#/$defs/Localization"
+    },
     "theme": {
       "$ref": "#/$defs/ThemeRef"
     },
@@ -720,6 +723,65 @@ export const SiteSchema = {
       "description": "BCP 47 language tag, e.g. en, tr, en-US.",
       "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
     },
+    "Localization": {
+      "type": "object",
+      "description": "How the site serves its locales (RFC-0033 §2). Absent fields mean: prefix-except-default routing, no fallback, no required review, the machine-translation notice until reviewed.",
+      "additionalProperties": false,
+      "properties": {
+        "routing": {
+          "type": "string",
+          "description": "prefix-except-default: the default locale at the root, the others under /<locale>/. prefix-all: every locale prefixed, / is a language chooser (x-default).",
+          "enum": [
+            "prefix-except-default",
+            "prefix-all"
+          ]
+        },
+        "domains": {
+          "type": "object",
+          "description": "Optional hostname per locale; that locale is then served at the host's root.",
+          "propertyNames": {
+            "$ref": "#/$defs/Locale"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+            "maxLength": 253
+          }
+        },
+        "fallback": {
+          "type": "string",
+          "description": "none: a missing translation is not found. default-with-notice: the default locale's page is served with a notice and noindex.",
+          "enum": [
+            "none",
+            "default-with-notice"
+          ]
+        },
+        "review": {
+          "type": "object",
+          "description": "Collections whose machine translations need a person's review before they publish ('pages' stands for pages).",
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "label": {
+          "type": "string",
+          "description": "When readers see the machine-translation notice: unreviewed (until a person reviews) or always.",
+          "enum": [
+            "unreviewed",
+            "always"
+          ]
+        }
+      }
+    },
     "Metadata": {
       "type": "object",
       "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
@@ -1186,6 +1248,9 @@ export const PageSchema = {
     },
     "updatedAt": {
       "$ref": "#/$defs/Timestamp"
+    },
+    "translation": {
+      "$ref": "#/$defs/Translation"
     },
     "metadata": {
       "$ref": "#/$defs/Metadata"
@@ -1704,6 +1769,126 @@ export const PageSchema = {
       "type": "string",
       "description": "RFC 3339 / ISO 8601 instant in UTC.",
       "format": "date-time"
+    },
+    "Translation": {
+      "type": "object",
+      "description": "Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash.",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "method"
+      ],
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/Id",
+          "description": "The group's id: the original node's id, shared by every translation. May cross sites in one project."
+        },
+        "method": {
+          "$ref": "#/$defs/TranslationMethod"
+        },
+        "layout": {
+          "type": "string",
+          "description": "linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked.",
+          "enum": [
+            "linked",
+            "independent"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "description": "The node and revision this translation was made from. Absent on the original.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "locale",
+            "rev",
+            "hash"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "siteId": {
+              "$ref": "#/$defs/Id",
+              "description": "The source's site when it is another site of the same project (a language edition). Absent means this site."
+            },
+            "locale": {
+              "$ref": "#/$defs/Locale"
+            },
+            "rev": {
+              "$ref": "#/$defs/Revision"
+            },
+            "hash": {
+              "type": "string",
+              "description": "Lower-case hex SHA-256 of the source node's canonical JSON at that revision.",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed.",
+          "additionalProperties": false,
+          "required": [
+            "engine",
+            "at"
+          ],
+          "properties": {
+            "engine": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "glossaryRev": {
+              "$ref": "#/$defs/Revision"
+            },
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "maxItems": 50
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "description": "The person who reviewed this translation and when. Only humans set it.",
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "at"
+          ],
+          "properties": {
+            "by": {
+              "$ref": "#/$defs/Actor"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        }
+      }
+    },
+    "TranslationMethod": {
+      "type": "string",
+      "description": "How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed.",
+      "enum": [
+        "original",
+        "human",
+        "machine",
+        "machine-reviewed"
+      ]
     }
   }
 } as const;
@@ -2249,6 +2434,9 @@ export const ContentEntrySchema = {
     "updatedAt": {
       "$ref": "#/$defs/Timestamp"
     },
+    "translation": {
+      "$ref": "#/$defs/Translation"
+    },
     "metadata": {
       "$ref": "#/$defs/Metadata"
     },
@@ -2531,6 +2719,126 @@ export const ContentEntrySchema = {
       "type": "string",
       "description": "RFC 3339 / ISO 8601 instant in UTC.",
       "format": "date-time"
+    },
+    "Translation": {
+      "type": "object",
+      "description": "Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash.",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "method"
+      ],
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/Id",
+          "description": "The group's id: the original node's id, shared by every translation. May cross sites in one project."
+        },
+        "method": {
+          "$ref": "#/$defs/TranslationMethod"
+        },
+        "layout": {
+          "type": "string",
+          "description": "linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked.",
+          "enum": [
+            "linked",
+            "independent"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "description": "The node and revision this translation was made from. Absent on the original.",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "locale",
+            "rev",
+            "hash"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "siteId": {
+              "$ref": "#/$defs/Id",
+              "description": "The source's site when it is another site of the same project (a language edition). Absent means this site."
+            },
+            "locale": {
+              "$ref": "#/$defs/Locale"
+            },
+            "rev": {
+              "$ref": "#/$defs/Revision"
+            },
+            "hash": {
+              "type": "string",
+              "description": "Lower-case hex SHA-256 of the source node's canonical JSON at that revision.",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed.",
+          "additionalProperties": false,
+          "required": [
+            "engine",
+            "at"
+          ],
+          "properties": {
+            "engine": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "glossaryRev": {
+              "$ref": "#/$defs/Revision"
+            },
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "maxItems": 50
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "description": "The person who reviewed this translation and when. Only humans set it.",
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "at"
+          ],
+          "properties": {
+            "by": {
+              "$ref": "#/$defs/Actor"
+            },
+            "at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          }
+        }
+      }
+    },
+    "TranslationMethod": {
+      "type": "string",
+      "description": "How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed.",
+      "enum": [
+        "original",
+        "human",
+        "machine",
+        "machine-reviewed"
+      ]
     }
   }
 } as const;

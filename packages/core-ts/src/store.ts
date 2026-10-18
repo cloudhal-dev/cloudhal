@@ -39,13 +39,7 @@ import { type BlockRegistry, createBlockRegistry, type PropsSchema } from "./blo
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { addedCorrections, type CorrectionInput } from "./corrections.ts";
-import {
-  ConflictError,
-  InvariantError,
-  isUniqueViolation,
-  NotFoundError,
-  UniqueConstraintError,
-} from "./errors.ts";
+import { ConflictError, InvariantError, NotFoundError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import {
   assertHoldsKept,
@@ -60,7 +54,7 @@ import { MEDIA_LIMITS } from "./media/types.ts";
 import type { TargetRef } from "./menu.ts";
 import { MenuEngine } from "./menu-store.ts";
 import type { Resolution } from "./names.ts";
-import type { Cond, Row } from "./node-sql.ts";
+import { type Cond, mapUniqueViolation, type Row } from "./node-sql.ts";
 import type { Creatable, NodeKind, SiteNode } from "./nodes.ts";
 import { BodyProposals } from "./proposals.ts";
 import type { RedirectMatch } from "./redirects.ts";
@@ -105,6 +99,7 @@ import { PageEngine } from "./store/pages.ts";
 import { SearchEngine } from "./store/search.ts";
 import { SiteEngine } from "./store/sites.ts";
 import { SnapshotEngine } from "./store/snapshots.ts";
+import { readTranslationGroup, type TranslationGroup } from "./store/translations.ts";
 import {
   firstPublication,
   type NodeWriteOptions,
@@ -115,6 +110,7 @@ import {
 } from "./store/types.ts";
 import { checkReservedPath, diffNodeRefs } from "./store/validation.ts";
 
+export type { TranslationGroup, TranslationMember } from "./store/translations.ts";
 export type {
   NodeWriteOptions,
   PublishChange,
@@ -340,6 +336,11 @@ export class SiteGraphStore {
 
   async getSite(id: string): Promise<Site | undefined> {
     return this.#getNode<Site>("site", id);
+  }
+
+  /** RFC-0033: every language version of `group` in the site's project, with staleness. */
+  translationGroup(site: Site, group: string): Promise<TranslationGroup> {
+    return readTranslationGroup(this, this.#sql, site, group);
   }
 
   /** All sites, optionally filtered by project. */
@@ -1223,8 +1224,7 @@ export class SiteGraphStore {
       const [first] = await this.#sql.batch([statement, ...extra]);
       return { changes: first?.changes ?? 0 };
     } catch (e) {
-      if (isUniqueViolation(e)) throw new UniqueConstraintError(kind, key);
-      throw e;
+      throw mapUniqueViolation(e, kind, key);
     }
   }
 }

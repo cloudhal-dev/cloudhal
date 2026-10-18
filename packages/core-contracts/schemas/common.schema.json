@@ -107,6 +107,76 @@
       "description": "Editorial lifecycle of a page or content entry.",
       "enum": ["draft", "review", "published", "archived"]
     },
+    "TranslationMethod": {
+      "type": "string",
+      "description": "How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed.",
+      "enum": ["original", "human", "machine", "machine-reviewed"]
+    },
+    "Translation": {
+      "type": "object",
+      "description": "Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash.",
+      "additionalProperties": false,
+      "required": ["group", "method"],
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/Id",
+          "description": "The group's id: the original node's id, shared by every translation. May cross sites in one project."
+        },
+        "method": { "$ref": "#/$defs/TranslationMethod" },
+        "layout": {
+          "type": "string",
+          "description": "linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked.",
+          "enum": ["linked", "independent"]
+        },
+        "source": {
+          "type": "object",
+          "description": "The node and revision this translation was made from. Absent on the original.",
+          "additionalProperties": false,
+          "required": ["id", "locale", "rev", "hash"],
+          "properties": {
+            "id": { "$ref": "#/$defs/Id" },
+            "siteId": {
+              "$ref": "#/$defs/Id",
+              "description": "The source's site when it is another site of the same project (a language edition). Absent means this site."
+            },
+            "locale": { "$ref": "#/$defs/Locale" },
+            "rev": { "$ref": "#/$defs/Revision" },
+            "hash": {
+              "type": "string",
+              "description": "Lower-case hex SHA-256 of the source node's canonical JSON at that revision.",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed.",
+          "additionalProperties": false,
+          "required": ["engine", "at"],
+          "properties": {
+            "engine": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "glossaryRev": { "$ref": "#/$defs/Revision" },
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "checks": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "maxItems": 50
+            },
+            "at": { "$ref": "#/$defs/Timestamp" }
+          }
+        },
+        "review": {
+          "type": "object",
+          "description": "The person who reviewed this translation and when. Only humans set it.",
+          "additionalProperties": false,
+          "required": ["by", "at"],
+          "properties": {
+            "by": { "$ref": "#/$defs/Actor" },
+            "at": { "$ref": "#/$defs/Timestamp" }
+          }
+        }
+      }
+    },
     "TimeZone": {
       "type": "string",
       "description": "IANA time zone name from the tz database (RFC-0008), e.g. Europe/Istanbul, America/Argentina/Buenos_Aires, Etc/GMT+3 or UTC. Wall-clock times a person enters are kept with their zone, so the instant is recomputed when governments change the rules. The pattern bounds the shape only; writers also check the name against the runtime's Intl zone list.",

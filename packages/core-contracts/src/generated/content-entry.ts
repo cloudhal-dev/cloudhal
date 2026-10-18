@@ -77,6 +77,13 @@ export type BodyBlocks = BodyBlock[];
  * via the `definition` "Revision".
  */
 export type Revision = number;
+/**
+ * How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "TranslationMethod".
+ */
+export type TranslationMethod = "original" | "human" | "machine" | "machine-reviewed";
 
 /**
  * A structured content item in a named collection (e.g. collection 'posts'). Core fields are typed; collection-specific fields live in `fields` and are validated by the collection's own schema in a later phase.
@@ -118,6 +125,7 @@ export interface ContentEntry {
   rev: Revision;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  translation?: Translation;
   metadata?: Metadata;
   /**
    * Corrections, clarifications and updates appended to the entry, oldest first (RFC-0019 §2). The store stamps `at`; an item that has been live can no longer be removed, and only a person may edit its note.
@@ -209,6 +217,59 @@ export interface ImageRef {
 export interface Availability {
   from?: Timestamp;
   until?: Timestamp;
+}
+/**
+ * Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash.
+ *
+ * This interface was referenced by `ContentEntry`'s JSON-Schema
+ * via the `definition` "Translation".
+ */
+export interface Translation {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  group: string;
+  method: TranslationMethod;
+  /**
+   * linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked.
+   */
+  layout?: "linked" | "independent";
+  /**
+   * The node and revision this translation was made from. Absent on the original.
+   */
+  source?: {
+    id: Id;
+    /**
+     * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+     */
+    siteId?: string;
+    locale: Locale;
+    rev: Revision;
+    /**
+     * Lower-case hex SHA-256 of the source node's canonical JSON at that revision.
+     */
+    hash: string;
+  };
+  /**
+   * The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed.
+   */
+  provenance?: {
+    engine: string;
+    glossaryRev?: Revision;
+    score?: number;
+    /**
+     * @maxItems 50
+     */
+    checks?: string[];
+    at: Timestamp;
+  };
+  /**
+   * The person who reviewed this translation and when. Only humans set it.
+   */
+  review?: {
+    by: Actor;
+    at: Timestamp;
+  };
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

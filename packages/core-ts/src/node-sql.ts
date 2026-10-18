@@ -5,7 +5,9 @@
 import type { SqlDriver, SqlStatement, SqlValue } from "@cloudhal/storage";
 import {
   ConflictError,
+  InvariantError,
   isOpGuardViolation,
+  isTranslationViolation,
   isUniqueViolation,
   UniqueConstraintError,
 } from "./errors.ts";
@@ -273,12 +275,23 @@ export async function runOpBatch(
       }
       throw new OperationConflictError(batch.opId, "a node it depends on changed");
     }
-    if (isUniqueViolation(e))
-      throw new UniqueConstraintError(options.uniqueKind ?? "node", options.uniqueKey ?? "");
-    throw e;
+    throw mapUniqueViolation(e, options.uniqueKind ?? "node", options.uniqueKey ?? "");
   }
 }
 
 export function parseRows<T>(rows: { body: string }[]): T[] {
   return rows.map((r) => JSON.parse(r.body) as T);
+}
+
+/**
+ * A unique-index failure as the store's error: RFC-0033's translation index (a concurrent write
+ * took the locale in the group) or a node key; anything else is returned unchanged.
+ */
+export function mapUniqueViolation(e: unknown, kind: string, key: string): unknown {
+  if (isTranslationViolation(e))
+    return new InvariantError(
+      "translation_exists",
+      "the group already has a version in this locale; reload it and update that one instead",
+    );
+  return isUniqueViolation(e) ? new UniqueConstraintError(kind, key) : e;
 }

@@ -128,6 +128,10 @@ export function searchSuite(
       await article("expiring", "Flash sale", "Ends soon.", {
         availability: { until: iso(T0 + HOUR) },
       });
+      site = await store.updateSite({
+        ...((await store.getSite(site.id)) as Site),
+        locales: ["en", "tr"],
+      });
       await article("turkce", "Seçim sonuçları", "Election results in Turkish.", { locale: "tr" });
       await publish();
       expect(await hrefs("election")).toEqual([]);

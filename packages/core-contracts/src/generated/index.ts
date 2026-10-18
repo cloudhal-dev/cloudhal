@@ -6,8 +6,8 @@
  */
 
 export type { SchemaVersion, Id, Slug, Revision, Timestamp, Project, Metadata } from "./project.ts";
-export type { Locale, Section, BodyProfile, ActorKind, BodyBlocks, SurfaceComponentId, Path, Section1, TimeZone, Site, Domain, ThemeRef, Design, Brand, ImageRef, SocialLink, Chrome, ChromeHeader, HeaderAction, ChromeFooter, FooterColumn, HeroSection, Link, RichTextSection, BodyBlock, Actor, ImageSection, ContentListSection, ComponentSection, SurfaceSection, SurfaceComponent, Announcement, Consent } from "./site.ts";
-export type { PublishStatus, MotionLevel, Page, Seo, Availability } from "./page.ts";
+export type { Locale, Section, BodyProfile, ActorKind, BodyBlocks, SurfaceComponentId, Path, Section1, TimeZone, Site, Domain, Localization, ThemeRef, Design, Brand, ImageRef, SocialLink, Chrome, ChromeHeader, HeaderAction, ChromeFooter, FooterColumn, HeroSection, Link, RichTextSection, BodyBlock, Actor, ImageSection, ContentListSection, ComponentSection, SurfaceSection, SurfaceComponent, Announcement, Consent } from "./site.ts";
+export type { PublishStatus, TranslationMethod, MotionLevel, Page, Seo, Availability, Translation } from "./page.ts";
 export type { ContentEntry, Body, TermAssignment, Correction } from "./content-entry.ts";
 export type { Snapshot, NodeRef, ChangeSummary } from "./snapshot.ts";
 export type { SkillManifest } from "./skill-manifest.ts";

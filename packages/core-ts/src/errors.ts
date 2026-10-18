@@ -39,6 +39,15 @@ export class UniqueConstraintError extends Error {
   }
 }
 
+/** The unique index behind "one node per locale in a translation group" (RFC-0033 invariant 2). */
+export function isTranslationViolation(error: unknown): boolean {
+  const msg =
+    error instanceof Error
+      ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+      : String(error);
+  return /nodes_translation_locale|json_extract\(body, '\$\.translation\.group'\)/i.test(msg);
+}
+
 export function isUniqueViolation(error: unknown): boolean {
   const msg =
     error instanceof Error
@@ -147,7 +156,16 @@ export type InvariantCode =
   | "invalid_surface"
   // ── RFC-0019 (corrections) ──
   /** §2: a correction that has been live was removed, or its kind or (by an agent) its note changed. */
-  | "correction_locked";
+  | "correction_locked"
+  // ── RFC-0033 (multilingual publishing) ──
+  /** Invariant 1: a page's or entry's locale is not one of the site's locales. */
+  | "locale_not_enabled"
+  /** Invariants 2–6: a translation link that does not hold (group, source, method, provenance, review). */
+  | "invalid_translation"
+  /** Invariant 2: the group already has a node in that locale. */
+  | "translation_exists"
+  /** Invariant 5: a machine translation in a review-required collection was published unreviewed. */
+  | "review_required";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

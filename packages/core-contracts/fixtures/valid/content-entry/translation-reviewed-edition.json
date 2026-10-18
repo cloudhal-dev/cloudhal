@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "entry_01HZX8K3QDE1",
+  "siteId": "site_01HZX8K3Q9EF",
+  "collection": "posts",
+  "slug": "first-agent-written-article",
+  "locale": "de",
+  "status": "review",
+  "title": "The first agent-written article",
+  "summary": "How the newsroom agent researched and drafted this piece.",
+  "body": {
+    "format": "markdown",
+    "value": "# Hello\n\nBody text."
+  },
+  "fields": {
+    "readingMinutes": 4,
+    "category": "product",
+    "featured": true
+  },
+  "tags": ["agents", "launch"],
+  "author": {
+    "kind": "agent",
+    "id": "agent_01HZX8K3Q9YZ",
+    "name": "Newsroom Agent"
+  },
+  "coverImage": {
+    "src": "/assets/cover.jpg",
+    "alt": "Cover"
+  },
+  "rev": 2,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T21:00:00Z",
+  "translation": {
+    "group": "entry_01HZX8K3Q9WX",
+    "method": "machine-reviewed",
+    "layout": "independent",
+    "source": {
+      "id": "entry_01HZX8K3Q9WX",
+      "siteId": "site_01HZX8K3QEN1",
+      "locale": "en",
+      "rev": 2,
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "provenance": {
+      "engine": "deepl",
+      "at": "2026-10-18T10:00:00Z"
+    },
+    "review": {
+      "by": {
+        "kind": "human",
+        "id": "usr_01HZX8K3QREV",
+        "name": "Redaktion"
+      },
+      "at": "2026-10-18T11:00:00Z"
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { gatesSuite } from "../src/testing-gates.ts";
 import { releasesSuite } from "../src/testing-releases.ts";
 import { searchSuite, searchTextCases } from "../src/testing-search.ts";
 import { searchKindsSuite, searchProviderCases } from "../src/testing-search-kinds.ts";
+import { translationsSuite } from "../src/testing-translations.ts";
 
 const sqlite = {
   create: async () => ({
@@ -17,6 +18,7 @@ const sqlite = {
 };
 describeSiteGraphStore("better-sqlite3 + memory blobs", sqlite);
 gatesSuite("better-sqlite3 + memory blobs", sqlite);
+translationsSuite("better-sqlite3 + memory blobs", sqlite);
 releasesSuite("better-sqlite3 + memory blobs", sqlite);
 correctionsSuite("better-sqlite3 + memory blobs", sqlite);
 searchSuite("better-sqlite3 + memory blobs", sqlite);
@@ -37,6 +39,7 @@ const miniflare = {
 };
 describeSiteGraphStore("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 gatesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
+translationsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 releasesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 correctionsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 searchSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
