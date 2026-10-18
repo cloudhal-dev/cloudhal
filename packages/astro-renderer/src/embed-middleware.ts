@@ -11,6 +11,7 @@ import { EMBED_SCRIPT } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
 import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { PREFS_SCRIPT } from "./prefs-client.ts";
+import { SEARCH_SCRIPT } from "./search-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Cloudhal's constant first-party modules `cloudhal dev` serves (builds write them as files). */
@@ -28,6 +29,8 @@ const SCRIPTS = new Map<string, string>([
   [CAROUSEL_SCRIPT.path, CAROUSEL_SCRIPT.code],
   ...CAROUSEL_SCRIPT_ALIASES.map((alias) => [alias, CAROUSEL_SCRIPT.code] as [string, string]),
   [PREFS_SCRIPT.path, PREFS_SCRIPT.code],
+  // RFC-0029 §6: the search modal, on pages of deployments that answer searches.
+  [SEARCH_SCRIPT.path, SEARCH_SCRIPT.code],
 ]);
 
 interface MiddlewareContext {

@@ -104,9 +104,10 @@ export function footerOf(html: string): string {
 }
 
 /**
- * The header's search form, rendered where the deployment answers searches (RFC-0019 §3). */
+ * The header's search form, rendered where the deployment answers searches (RFC-0019 §3); it opens
+ * the search modal once its module loads (RFC-0029 §6). */
 export const HEADER_SEARCH =
-  '<form class="ch-header-search" method="get" action="/search" role="search"><label for="ch-header-q" class="sr-only">Search this site</label><input id="ch-header-q" type="search" name="q" value maxlength="200" placeholder="Search the site…"><button type="submit" class="sr-only">Search</button></form>';
+  '<form class="ch-header-search" method="get" action="/search" role="search" data-ch-search-open><label for="ch-header-q" class="sr-only">Search this site</label><input id="ch-header-q" type="search" name="q" value maxlength="200" placeholder="Search the site…"><button type="submit" class="sr-only">Search</button></form>';
 
 /**
  * The derived header (no menu, no chrome: RFC-0025's defaults), byte for byte: the top-level pages,

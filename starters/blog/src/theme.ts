@@ -95,6 +95,20 @@ const STRINGS = {
       n === 1 ? `1 result for “${q}”` : `${n} results for “${q}”`,
     searchNone: (q: string) => `Nothing matches “${q}”. Try fewer or other words.`,
     searchUpdating: "Search is catching up with the latest changes.",
+    /** RFC-0029 §6: the search modal's words (`data-words`; `{q}` is the query, `#` the count). */
+    searchModal: {
+      kinds: { article: "Articles", page: "Pages", term: "Topics", author: "Authors" },
+      all: "See all results for “{q}”",
+      none: "Nothing matches “{q}”.",
+      recent: "Recent searches",
+      clear: "Clear recent searches",
+      limited: "Too many searches right now.",
+      error: "Search is unavailable right now.",
+      updating: "Search is catching up with the latest changes.",
+      count: { one: "# result", other: "# results" },
+      close: "Close",
+      keys: { move: "move", open: "open", close: "close" },
+    },
     previous: "← Previous",
     next: "Next →",
     /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
@@ -148,6 +162,19 @@ const STRINGS = {
     searchNone: (q: string) =>
       `“${q}” ile eşleşen bir şey yok. Daha az ya da başka sözcükler deneyin.`,
     searchUpdating: "Arama son değişiklikleri eklemeye devam ediyor.",
+    searchModal: {
+      kinds: { article: "Yazılar", page: "Sayfalar", term: "Konular", author: "Yazarlar" },
+      all: "“{q}” için tüm sonuçlar",
+      none: "“{q}” ile eşleşen bir şey yok.",
+      recent: "Son aramalar",
+      clear: "Son aramaları temizle",
+      limited: "Şu anda çok fazla arama yapıldı.",
+      error: "Arama şu anda kullanılamıyor.",
+      updating: "Arama son değişiklikleri eklemeye devam ediyor.",
+      count: { one: "# sonuç", other: "# sonuç" },
+      close: "Kapat",
+      keys: { move: "gez", open: "aç", close: "kapat" },
+    },
     previous: "← Önceki",
     next: "Sonraki →",
     embargoed: (when: string) =>

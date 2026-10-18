@@ -271,6 +271,7 @@ const searchForm = searchAvailable(config, source)
       label: t.searchLabel,
       placeholder: t.searchPlaceholder,
       button: t.search,
+      modal: t.searchModal,
       ...(route.kind === "search" ? { query: route.search.query } : {}),
     }
   : undefined;
