@@ -134,6 +134,7 @@ export async function searchJsonResponse(
   config: Pick<CloudhalRendererConfig, "target">,
   source: Pick<GraphSource, "mode" | "search"> | undefined,
   url: URL,
+  options: { locale?: string; localize?: ((path: string) => string) | undefined } = {},
 ): Promise<Response> {
   // No body: a static build, which prerenders the route once, then writes no file at all.
   if (!source?.search || !searchAvailable(config, source))
@@ -143,6 +144,12 @@ export async function searchJsonResponse(
     page,
     perPage: SEARCH_SUGGEST_SIZE,
     ...(kinds ? { kinds } : {}),
+    ...(options.locale ? { locale: options.locale } : {}),
   });
-  return new Response(JSON.stringify(searchJson(results)), { headers: JSON_HEADERS });
+  // RFC-0033: hits link to the locale's URLs (`linkLocalizer`).
+  const { localize } = options;
+  const shown = localize
+    ? { ...results, hits: results.hits.map((h) => ({ ...h, href: localize(h.href) })) }
+    : results;
+  return new Response(JSON.stringify(searchJson(shown)), { headers: JSON_HEADERS });
 }

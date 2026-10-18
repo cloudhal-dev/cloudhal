@@ -69,6 +69,14 @@ describe("locale URLs", () => {
     expect(localeUrl(domains, "es", "/", ORIGIN)).toBe("https://example.com/es");
   });
 
+  it("points the search dialog at the locale's endpoint and page", () => {
+    const html =
+      '<dialog id="ch-search" data-ch-search data-endpoint="/search.json" data-page="/search">';
+    expect(localizeLinks(html, (p) => `/es${p}`)).toBe(
+      '<dialog id="ch-search" data-ch-search data-endpoint="/es/search.json" data-page="/es/search">',
+    );
+  });
+
   it("knows which scripts run right to left", () => {
     expect(["ar", "fa-IR", "he", "ur"].map(textDirection)).toEqual(["rtl", "rtl", "rtl", "rtl"]);
     expect(["en", "tr", "ja", "ku-Latn"].map(textDirection)).toEqual(["ltr", "ltr", "ltr", "ltr"]);

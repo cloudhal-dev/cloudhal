@@ -4,6 +4,8 @@
  * summary or body, title matches rank first, time gates apply at `now`, and a term or author is
  * found only while a visible article in the reader's locale carries it. Worker-safe.
  */
+
+import { CJK_TABLE, searchTable } from "./search-cjk.ts";
 import {
   isArchiveKind,
   MARK_CLOSE,
@@ -50,7 +52,10 @@ export function searchRows(
   const { perPage, page } = searchPaging(options);
   const q = query.slice(0, SEARCH_QUERY_MAX).trim();
   const words = queryWords(q).map(fold);
-  const starts = (text: string, w: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${w}`, "u").test(text);
+  // RFC-0033 §5: languages without spaces between words match anywhere, others at a word's start.
+  const anywhere = searchTable(options.locale) === CJK_TABLE;
+  const starts = (text: string, w: string) =>
+    anywhere ? text.includes(w) : new RegExp(`(^|[^\\p{L}\\p{N}])${w}`, "u").test(text);
   const scored =
     words.length === 0
       ? []

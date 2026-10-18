@@ -143,6 +143,36 @@ export function searchSuite(
       expect(tr.hits.map((h) => h.href)).toEqual(["/posts/turkce"]);
     });
 
+    it("finds Japanese and Chinese without spaces: trigrams, and LIKE for short words (RFC-0033 §5)", async () => {
+      site = await store.updateSite({ ...(await fresh()), locales: ["en", "ja", "zh-Hans"] });
+      await article("tokyo", "東京都の地下鉄", "東京都は毎日たくさんの人が地下鉄に乗ります。", {
+        locale: "ja",
+      });
+      await article("kyoto", "京都の庭", "京都には古い庭がたくさんあります。", { locale: "ja" });
+      await article("beijing", "北京的胡同", "北京有很多胡同。", { locale: "zh-Hans" });
+      await article("subway", "The subway", "Tokyo has a large subway.");
+      await publish();
+      const jaFind = (q: string) => store.search(site.id, q, { locale: "ja", now });
+      // three characters or more: a trigram match, inside a word, with a snippet
+      const long = await jaFind("地下鉄");
+      expect(long.hits.map((h) => h.href)).toEqual(["/posts/tokyo"]);
+      expect(long.hits[0]?.snippet).toContain(`${MARK_OPEN}地下鉄${MARK_CLOSE}`);
+      // two characters: LIKE over the same rows ("京都" is also inside "東京都")
+      expect((await jaFind("京都")).hits.map((h) => h.href).sort()).toEqual([
+        "/posts/kyoto",
+        "/posts/tokyo",
+      ]);
+      expect((await jaFind("庭 京都")).hits.map((h) => h.href)).toEqual(["/posts/kyoto"]);
+      // each locale keeps to its own rows; English still uses words
+      expect((await store.search(site.id, "胡同", { locale: "zh-Hans", now })).total).toBe(1);
+      expect((await jaFind("胡同")).total).toBe(0);
+      expect(await hrefs("subway")).toEqual(["/posts/subway"]);
+      expect((await find("東京都")).total).toBe(0);
+      // punctuation never becomes a LIKE pattern: "%" alone finds nothing, "京_" is "京"
+      expect((await jaFind("%")).total).toBe(0);
+      expect((await jaFind("京_")).total).toBe(2);
+    });
+
     it("pages results and treats FTS5 syntax as words", async () => {
       for (let i = 0; i < 23; i++) await article(`p-${i}`, `Istanbul note ${i}`, "Street food.");
       await publish();
