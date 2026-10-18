@@ -1,6 +1,6 @@
 # RFC-0034: Multi-site installations: one Studio, many isolated sites
 
-- Status: Draft
+- Status: Accepted (2026-10-19, by Halil; ADR-0036). Open questions 1–5 decided as recommended. Phases A–F follow in order.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
   - RFC-0033 §7 and §9: "multi-site serving" is named there as the follow-up; phase F (the newsroom's English edition) depends on it.
