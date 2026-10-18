@@ -39,13 +39,19 @@ import {
 } from "./node-sql.ts";
 import type { Creatable, NodeKind, NodeTypes } from "./nodes.ts";
 import {
+  ancestorPaths,
   assertNoLoop,
+  collapseTarget,
+  localizeRedirect,
   matchRedirect,
   normalisePath,
   type RedirectMatch,
   RedirectPlan,
+  redirectKey,
+  redirectLocale,
   splitTarget,
 } from "./redirects.ts";
+import { checkLocaleSlugs } from "./term-locales.ts";
 
 /** What the engine needs from the store. */
 export interface StoreKernel {
@@ -571,6 +577,7 @@ export class TaxonomyEngine {
 
   /** Invariant 12: default-locale label; alternative names never equal another term's name, synonym or slug. */
   #checkLabels(term: Term, site: Site, taxonomyTerms: readonly Term[]): void {
+    checkLocaleSlugs(term, site, taxonomyTerms);
     if (!term.labels[site.defaultLocale])
       throw new InvariantError(
         "invalid_labels",
@@ -1316,33 +1323,37 @@ export class TaxonomyEngine {
     return this.#list(siteId, "redirect", undefined, "key, id");
   }
 
-  /** The redirect for a request path: exact `from` first, then the longest prefix redirect above it. */
-  async redirectFor(siteId: string, path: string): Promise<RedirectMatch | undefined> {
+  /** The redirect for a request path in a locale (RFC-0033): exact `from`, then the longest prefix. */
+  async redirectFor(
+    siteId: string,
+    path: string,
+    locale?: string,
+  ): Promise<RedirectMatch | undefined> {
     const p = normalisePath(path);
-    const ancestors: string[] = [];
-    for (let q = p; q.length > 1; ) {
-      q = q.slice(0, q.lastIndexOf("/")) || "/";
-      ancestors.push(q);
-    }
+    const loc = locale && redirectLocale(locale, (await this.site(siteId)).defaultLocale);
     const candidates = await this.#list(siteId, "redirect", {
       sql: "key IN (SELECT value FROM json_each(?))",
-      params: [json([p, ...ancestors])],
+      params: [json([p, ...ancestorPaths(p)].map((x) => redirectKey(x, loc)))],
     });
-    return matchRedirect(candidates, p);
+    return matchRedirect(candidates, p, loc);
   }
 
-  /** Paths the site serves right now that equal `path` (invariant 14). */
-  async #servedBy(site: Site, path: string): Promise<string | undefined> {
+  /** Paths the site serves right now in `locale` that equal `path` (invariant 14). */
+  async #servedBy(
+    site: Site,
+    path: string,
+    locale = site.defaultLocale,
+  ): Promise<string | undefined> {
     const page = await this.#sql.get<{ id: string }>(
-      "SELECT id FROM nodes WHERE site_id = ? AND kind = 'page' AND json_extract(body, '$.path') = ?",
-      [site.id, path],
+      "SELECT id FROM nodes WHERE site_id = ? AND kind = 'page' AND key = ?",
+      [site.id, `${locale}:${path}`],
     );
     if (page) return `page ${page.id}`;
     const segs = path.split("/").filter(Boolean);
     if (segs.length === 2) {
       const entry = await this.#sql.get<{ id: string }>(
         "SELECT id FROM nodes WHERE site_id = ? AND kind = 'contentEntry' AND key = ? AND json_extract(body, '$.status') = 'published'",
-        [site.id, `${segs[0]}:${site.defaultLocale}:${segs[1]}`],
+        [site.id, `${segs[0]}:${locale}:${segs[1]}`],
       );
       if (entry) return `entry ${entry.id}`;
     }
@@ -1356,7 +1367,7 @@ export class TaxonomyEngine {
   }
 
   async #checkManual(r: Redirect, site: Site): Promise<void> {
-    const served = await this.#servedBy(site, r.from);
+    const served = await this.#servedBy(site, r.from, r.locale);
     if (served)
       throw new InvariantError(
         "invalid_redirect",
@@ -1373,27 +1384,21 @@ export class TaxonomyEngine {
    */
   async createRedirect(input: Creatable<Redirect>): Promise<Redirect> {
     const ts = this.#k.stamp();
-    const draft: Redirect = {
-      ...input,
-      schemaVersion: 1,
-      id: input.id ?? this.#k.newId(ID_PREFIX.redirect),
-      rev: 0,
-      createdAt: ts,
-      updatedAt: ts,
-    };
-    assertValid("redirect", draft);
-    const site = await this.site(draft.siteId);
+    const site = await this.site(input.siteId);
+    const id = input.id ?? this.#k.newId(ID_PREFIX.redirect);
+    const draft = localizeRedirect(input, site, { id, ts });
     await this.#checkManual(draft, site);
     const existing = await this.listRedirects(site.id);
-    if (existing.some((x) => x.from === draft.from))
-      throw new UniqueConstraintError("redirect", draft.from);
-    const to = this.#collapse(existing, draft.to);
+    const key = redirectKey(draft.from, draft.locale);
+    if (existing.some((x) => redirectKey(x.from, x.locale) === key))
+      throw new UniqueConstraintError("redirect", key);
+    const to = collapseTarget(existing, draft.to, draft.locale);
     if (splitTarget(to)?.path === draft.from)
       throw new InvariantError(
         "invalid_redirect",
         `a redirect from ${draft.from} to ${draft.to} would loop`,
       );
-    const plan = new RedirectPlan(site.id, existing, ts, () => draft.id);
+    const plan = new RedirectPlan(site.id, existing, ts, () => draft.id).forLocale(draft.locale);
     plan.move(draft.from, to, {
       match: draft.match,
       reason: draft.reason,
@@ -1404,22 +1409,8 @@ export class TaxonomyEngine {
     });
     const batch = this.#batch(site.id, ts);
     const written = await plan.emit(batch);
-    await runOpBatch(this.#sql, batch, { uniqueKind: "redirect", uniqueKey: draft.from });
+    await runOpBatch(this.#sql, batch, { uniqueKind: "redirect", uniqueKey: key });
     return written.find((x) => x.id === draft.id) as Redirect;
-  }
-
-  /** Follows site-path targets through existing exact/prefix redirects (no chains, invariant 14). */
-  #collapse(redirects: readonly Redirect[], to: string): string {
-    let cur = to;
-    for (let hop = 0; hop < 25; hop++) {
-      const target = splitTarget(cur);
-      if (!target) return cur;
-      const m = matchRedirect(redirects, target.path);
-      if (!m) return cur;
-      const next = splitTarget(m.location);
-      cur = next ? `${next.path}${target.suffix || next.suffix}` : m.location;
-    }
-    throw new InvariantError("invalid_redirect", `target ${to} is part of a redirect loop`);
   }
 
   /**
@@ -1428,16 +1419,16 @@ export class TaxonomyEngine {
    */
   async updateRedirect(r: Redirect): Promise<Redirect> {
     const stored = await this.#fresh("redirect", r);
-    if (r.from !== stored.from || r.siteId !== stored.siteId)
+    if (r.from !== stored.from || r.locale !== stored.locale || r.siteId !== stored.siteId)
       throw new InvariantError(
         "immutable_field",
-        "a redirect's from is immutable; delete it and create another",
+        "a redirect's from and locale are immutable; delete it and create another",
       );
     const others = (await this.listRedirects(stored.siteId)).filter((x) => x.id !== stored.id);
     const ts = this.#k.stamp();
     const next: Redirect = {
       ...r,
-      to: this.#collapse(others, r.to),
+      to: collapseTarget(others, r.to, r.locale),
       createdAt: stored.createdAt,
       rev: stored.rev + 1,
       updatedAt: ts,
@@ -1450,7 +1441,7 @@ export class TaxonomyEngine {
         "invalid_redirect",
         `a redirect from ${next.from} cannot point to itself`,
       );
-    assertNoLoop([...others, next], next.from);
+    assertNoLoop([...others, next], next.from, next.locale);
     const res = await this.#sql.run(
       ...stmt(await casUpdateStatement("redirect", next, stored.rev)),
     );
@@ -1633,9 +1624,9 @@ export class TaxonomyEngine {
   }
 
   /**
-   * Redirect work for an entry or page write in the site's default locale: a published node that
-   * moved leaves `old → new` (exact 301) with chains collapsed; a published node frees its path from
-   * redirects (renaming back).
+   * Redirect work for an entry or page write, among its locale's redirects (RFC-0033): a published
+   * node that moved leaves `old → new` (exact 301) with chains collapsed; a published node frees
+   * its path from redirects (renaming back).
    */
   async planPathChange(
     site: Site,
@@ -1649,7 +1640,7 @@ export class TaxonomyEngine {
       readonly source: { kind: "page" | "contentEntry"; id: string };
     },
   ): Promise<RedirectPlan | undefined> {
-    if (change.locale !== site.defaultLocale) return undefined;
+    const locale = redirectLocale(change.locale, site.defaultLocale);
     const moved =
       change.wasPublished && change.oldPath !== undefined && change.oldPath !== change.newPath;
     if (!moved) {
@@ -1657,11 +1648,12 @@ export class TaxonomyEngine {
       // Cheap check first: most writes have no redirect at their path.
       const hit = await this.#sql.get<{ id: string }>(
         "SELECT id FROM nodes WHERE site_id = ? AND kind = 'redirect' AND key = ?",
-        [site.id, change.newPath],
+        [site.id, redirectKey(change.newPath, locale)],
       );
       if (!hit) return undefined;
     }
-    const plan = new RedirectPlan(site.id, await this.listRedirects(site.id), ts, this.#k.newId);
+    const all = await this.listRedirects(site.id);
+    const plan = new RedirectPlan(site.id, all, ts, this.#k.newId).forLocale(locale);
     plan.serve(change.newPath, false);
     if (moved)
       plan.move(change.oldPath as string, change.newPath, {

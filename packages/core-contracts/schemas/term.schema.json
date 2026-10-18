@@ -86,6 +86,10 @@
       "required": ["name"],
       "properties": {
         "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "slug": {
+          "$ref": "common.schema.json#/$defs/Slug",
+          "description": "This locale's archive slug (RFC-0033); absent uses the term's slug. Never set for the site's default locale, whose slug is the term's own; unique per taxonomy and locale."
+        },
         "altNames": {
           "type": "array",
           "description": "Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.",

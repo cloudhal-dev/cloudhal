@@ -975,7 +975,7 @@ export function taxonomySuite(ctx: SuiteContext): void {
         ["/posts/c", "/posts/a"],
       ]);
       expect((await store.redirectFor(w.site.id, "/posts/b/"))?.location).toBe("/posts/a");
-      // drafts and other locales leave no redirect
+      // drafts leave no redirect; another locale leaves one in that locale only (RFC-0033)
       let d = await entry(w, { slug: "draft-a" });
       d = await store.updateContentEntry({ ...d, slug: "draft-b" });
       let tr = await entry(w, {
@@ -985,11 +985,16 @@ export function taxonomySuite(ctx: SuiteContext): void {
         terms: cat(w.news.id),
       });
       tr = await store.updateContentEntry({ ...tr, slug: "tr-b" });
-      expect((await store.listRedirects(w.site.id)).length).toBe(2);
+      const trRedirects = (await store.listRedirects(w.site.id)).filter((r) => r.locale === "tr");
+      expect(trRedirects.map((r) => [r.from, r.to])).toEqual([["/posts/tr-a", "/posts/tr-b"]]);
+      expect((await store.listRedirects(w.site.id)).length).toBe(3);
+      expect(await store.redirectFor(w.site.id, "/posts/tr-a")).toBeUndefined();
       // a newly published entry at a redirected path takes the path back
       const back = await entry(w, { slug: "b", status: "published", terms: cat(w.news.id) });
       expect(back.slug).toBe("b");
-      expect((await store.listRedirects(w.site.id)).map((r) => r.from)).toEqual(["/posts/c"]);
+      expect(
+        (await store.listRedirects(w.site.id)).filter((r) => !r.locale).map((r) => r.from),
+      ).toEqual(["/posts/c"]);
       // pages
       const about = (await store.listPages(w.site.id)).find(
         (p) => p.path === "/about",

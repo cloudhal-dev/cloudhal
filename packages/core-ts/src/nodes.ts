@@ -15,6 +15,7 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import { ID_PREFIX } from "./ids.ts";
+import { redirectKey } from "./redirects.ts";
 
 export const NODE_KINDS = [
   "site",
@@ -87,7 +88,7 @@ export const NODE_SPEC: { readonly [K in NodeKind]: NodeSpec<K> } = {
   redirect: {
     schema: "redirect",
     prefix: ID_PREFIX.redirect,
-    key: (n) => n.from,
+    key: (n) => redirectKey(n.from, n.locale),
     siteId: (n) => n.siteId,
   },
   // RFC-0003: one node per menu key; the key is immutable.

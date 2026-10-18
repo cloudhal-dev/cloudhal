@@ -3,12 +3,13 @@
  * staleness (4), the review gate (5) and provenance (6). Part of the shared suite, so it runs on
  * SQLite and Miniflare D1.
  */
-import type { Actor, Page, Site, Translation } from "@cloudhal/core-contracts";
+import type { Actor, Page, Site, Term, Translation } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { seedStarterSite } from "./seed.ts";
 import { SiteGraphStore } from "./store.ts";
+import { termSlug } from "./term-locales.ts";
 
 const human: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
 const agent: Actor = { kind: "agent", id: "agent_01HZX8K3Q9AG" };
@@ -266,6 +267,85 @@ export function translationsSuite(
         [post.id, "contentEntry", false],
         [hola.id, "contentEntry", false],
       ]);
+    });
+
+    it("keeps each locale's redirects apart (A2)", async () => {
+      const es = await translate("es", { method: "human", provenance: undefined }, "published");
+      await store.updatePage({ ...((await store.getPage(es.id)) as Page), path: "/lanzamiento" });
+      const redirects = await store.listRedirects(site.id);
+      expect(redirects.map((r) => [r.locale, r.from, r.to])).toEqual([
+        ["es", "/launch", "/lanzamiento"],
+      ]);
+      expect((await store.redirectFor(site.id, "/launch", "es"))?.location).toBe("/lanzamiento");
+      // The English page still lives at /launch: no redirect there in the default locale.
+      expect(await store.redirectFor(site.id, "/launch")).toBeUndefined();
+      expect(await store.redirectFor(site.id, "/launch", "en")).toBeUndefined();
+      // Manual redirects: the default locale is stored untagged, the same `from` may exist per locale.
+      const en = await store.createRedirect({
+        siteId: site.id,
+        locale: "en",
+        from: "/old",
+        to: "/launch",
+        status: 301,
+        match: "exact",
+        reason: "manual",
+      });
+      expect(en.locale).toBeUndefined();
+      const de = await store.createRedirect({
+        siteId: site.id,
+        locale: "de",
+        from: "/old",
+        to: "/launch",
+        status: 301,
+        match: "exact",
+        reason: "manual",
+      });
+      expect(de.locale).toBe("de");
+      await expect(
+        store.createRedirect({ ...de, id: undefined as never, locale: "fr", from: "/alt" }),
+      ).rejects.toMatchObject({ code: "locale_not_enabled" });
+      // A redirect cannot shadow a page the locale serves.
+      await expect(
+        store.createRedirect({ ...de, id: undefined as never, locale: "es", from: "/lanzamiento" }),
+      ).rejects.toMatchObject({ code: "invalid_redirect" });
+    });
+
+    it("gives terms a slug per locale, unique in each locale (A2)", async () => {
+      const news = (await store.getTermBySlug(site.id, "category", "news")) as Term;
+      const named = await store.updateTerm({
+        ...news,
+        labels: { ...news.labels, es: { name: "Noticias", slug: "noticias" } },
+      });
+      expect(termSlug(named, "es", "en")).toBe("noticias");
+      expect(termSlug(named, "de", "en")).toBe("news");
+      await expect(
+        store.updateTerm({
+          ...named,
+          labels: { ...named.labels, en: { name: "News", slug: "x" } },
+        }),
+      ).rejects.toMatchObject({ code: "invalid_labels" });
+      const taxonomyId = named.taxonomyId;
+      await expect(
+        store.createTerm({
+          siteId: site.id,
+          taxonomyId,
+          slug: "sports",
+          status: "active",
+          visibility: "public",
+          labels: { en: { name: "Sports" }, es: { name: "Deportes", slug: "noticias" } },
+        }),
+      ).rejects.toMatchObject({ code: "slug_taken" });
+      // A term whose own slug equals another term's Spanish slug collides in Spanish.
+      await expect(
+        store.createTerm({
+          siteId: site.id,
+          taxonomyId,
+          slug: "noticias",
+          status: "active",
+          visibility: "public",
+          labels: { en: { name: "Noticias (en)" } },
+        }),
+      ).rejects.toMatchObject({ code: "slug_taken" });
     });
   });
 }

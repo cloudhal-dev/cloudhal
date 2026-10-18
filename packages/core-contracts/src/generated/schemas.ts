@@ -3564,6 +3564,10 @@ export const TermSchema = {
           "minLength": 1,
           "maxLength": 200
         },
+        "slug": {
+          "$ref": "#/$defs/Slug",
+          "description": "This locale's archive slug (RFC-0033); absent uses the term's slug. Never set for the site's default locale, whose slug is the term's own; unique per taxonomy and locale."
+        },
         "altNames": {
           "type": "array",
           "description": "Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.",
@@ -3632,9 +3636,13 @@ export const RedirectSchema = {
     },
     "from": {
       "type": "string",
-      "description": "Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.",
+      "description": "Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site and locale; never a path the site currently serves.",
       "pattern": "^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$",
       "maxLength": 1024
+    },
+    "locale": {
+      "$ref": "#/$defs/Locale",
+      "description": "The locale whose URLs `from` belongs to (RFC-0033); absent means the site's default locale. `from` is the path inside that locale, without its prefix or domain. Unique per site and locale."
     },
     "to": {
       "type": "string",
@@ -3694,6 +3702,11 @@ export const RedirectSchema = {
       "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
       "minLength": 8,
       "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
     },
     "Metadata": {
       "type": "object",

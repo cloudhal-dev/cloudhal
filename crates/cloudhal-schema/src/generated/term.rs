@@ -876,6 +876,9 @@ pub struct TermLabel {
     pub role: ::std::option::Option<TermLabelRole>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub seo: ::std::option::Option<Seo>,
+    #[doc = "This locale's archive slug (RFC-0033); absent uses the term's slug. Never set for the site's default locale, whose slug is the term's own; unique per taxonomy and locale."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub slug: ::std::option::Option<Slug>,
 }
 #[doc = "`TermLabelAltNamesItem`"]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

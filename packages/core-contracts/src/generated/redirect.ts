@@ -33,6 +33,13 @@ export type Revision = number;
  * via the `definition` "Timestamp".
  */
 export type Timestamp = string;
+/**
+ * BCP 47 language tag, e.g. en, tr, en-US.
+ *
+ * This interface was referenced by `Redirect`'s JSON-Schema
+ * via the `definition` "Locale".
+ */
+export type Locale = string;
 
 /**
  * An HTTP redirect from a path the site no longer serves. Created automatically when a published entry or a term changes slug, when terms are merged or retired, and by people. Snapshotted and published like every other node (RFC-0002).
@@ -42,9 +49,13 @@ export interface Redirect {
   id: Id;
   siteId: Id;
   /**
-   * Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.
+   * Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site and locale; never a path the site currently serves.
    */
   from: string;
+  /**
+   * The locale whose URLs `from` belongs to (RFC-0033); absent means the site's default locale. `from` is the path inside that locale, without its prefix or domain. Unique per site and locale.
+   */
+  locale?: string;
   /**
    * Target: a site path (may carry a query or fragment) or an absolute https URL. Protocol-relative ('//host') and backslash forms are rejected.
    */
