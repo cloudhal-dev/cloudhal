@@ -55,8 +55,22 @@ export const LOCALE_REGISTRY = {
   ru: { name: "Русский", dir: "ltr", fallback: ["en"], reviewed: false },
   // AI translation, awaiting review.
   uk: { name: "Українська", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  ja: { name: "日本語", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  ko: { name: "한국어", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  "zh-Hans": { name: "简体中文", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  hi: { name: "हिन्दी", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  id: { name: "Bahasa Indonesia", dir: "ltr", fallback: ["en"], reviewed: false },
   // AI translation, awaiting review. The first right-to-left language (ADR-0033).
   ar: { name: "العربية", dir: "rtl", fallback: ["en"], reviewed: false, intl: "ar-u-nu-latn" },
+  // AI translation, awaiting review.
+  fa: { name: "فارسی", dir: "rtl", fallback: ["en"], reviewed: false, intl: "fa-u-nu-latn" },
+  // AI translation, awaiting review.
+  he: { name: "עברית", dir: "rtl", fallback: ["en"], reviewed: false },
 } as const satisfies Record<string, LocaleInfo>;
 
 /** The `Intl` tags that differ from their key (`{ ar: "ar-u-nu-latn", … }`), for `setIntlTags`. */
