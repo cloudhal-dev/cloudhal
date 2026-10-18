@@ -465,4 +465,60 @@ describe("cloudhal init → dev → snapshot → build", () => {
     );
     expect(footerOf(page2)).toBe(DEFAULT_FOOTER);
   });
+
+  it("build writes every locale: prefixed pages, hreflang, the reader's notice, localized links, sitemap and llms.txt (RFC-0033)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const outDir = path.join(projectDir, "dist");
+    const read = (...p: string[]) => readFile(path.join(outDir, ...p), "utf8");
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    let site = await local.store.getSite(cfg.siteId);
+    if (!site) throw new Error("no site");
+    site = await local.store.updateSite({ ...site, locales: [site.defaultLocale, "es"] });
+    const about = (await local.store.listPages(cfg.siteId)).find((p) => p.path === "/about");
+    if (!about) throw new Error("no about page");
+    const original = await local.store.updatePage({
+      ...about,
+      translation: { group: about.id, method: "original" },
+    });
+    const group = await local.store.translationGroup(site, original.id);
+    const hash = group.members.find((m) => m.id === original.id)?.hash as string;
+    await local.store.createPage(site, {
+      siteId: site.id,
+      path: "/acerca",
+      title: "Acerca de",
+      locale: "es",
+      status: "published",
+      sections: [{ id: "sec_es0acerca01", kind: "hero", heading: "Quiénes somos" }],
+      translation: {
+        group: original.id,
+        method: "machine",
+        source: { id: original.id, locale: original.locale, rev: original.rev, hash },
+        provenance: { engine: "workers-ai", at: "2026-10-18T10:00:00Z" },
+      },
+    });
+    await local.close();
+    await snapshot({ projectDir, label: "spanish", publish: true });
+    await spawnBuild(projectDir);
+
+    const es = await read("es", "acerca", "index.html");
+    expect(es).toMatch(/<html lang="es" dir="ltr"/);
+    expect(es).toMatch(/<link rel="canonical" href="[^"]+\/es\/acerca">/);
+    expect(es).toMatch(/<link rel="alternate" hreflang="en" href="[^"]+\/about">/);
+    expect(es).toMatch(/<link rel="alternate" hreflang="x-default" href="[^"]+\/about">/);
+    expect(es).toContain("ch-translation-notice");
+    expect(es).toContain('"translationOfWork"');
+    // the header's link to About leads to the Spanish version
+    expect(es).toContain('href="/es/acerca"');
+    const en = await read("about", "index.html");
+    expect(en).toMatch(/<link rel="alternate" hreflang="es" href="[^"]+\/es\/acerca">/);
+    expect(en).not.toContain("ch-translation-notice");
+    expect(en).toContain("ch-footer__languages");
+    expect(en).toContain(">español</a>");
+    const sitemap = await read("sitemap.xml");
+    expect(sitemap).toMatch(
+      /<xhtml:link rel="alternate" hreflang="es" href="[^"]+\/es\/acerca"\/>/,
+    );
+    expect(await read("es", "llms.txt")).toContain("Language: es");
+    expect(await read("es", "rss.xml")).toContain("<language>es</language>");
+  });
 });
