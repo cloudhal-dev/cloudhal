@@ -76,6 +76,14 @@ export function checkLocalizedNode(kind: LocalizedKind, site: Site, node: Locali
     fail("a reviewed machine translation is machine-reviewed");
   if (t.review && t.review.by.kind !== "human")
     fail("only a person reviews a translation", { by: t.review.by.kind });
+  if (
+    node.status === "published" &&
+    t.method === "machine" &&
+    t.provenance?.checks?.some((c) => c.startsWith("!"))
+  )
+    fail("a machine translation with failing checks is fixed before it is published", {
+      checks: t.provenance.checks,
+    });
   const required = site.localization?.review?.required ?? [];
   if (
     node.status === "published" &&

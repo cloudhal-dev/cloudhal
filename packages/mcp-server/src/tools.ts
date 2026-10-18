@@ -47,6 +47,7 @@ import { hoistDefs, relaxImageRefs } from "./schema-transforms.ts";
 import { searchTools } from "./search-tools.ts";
 import { surfaceTools } from "./surface-tools.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
+import { translationTools } from "./translation-tools.ts";
 
 export {
   type ApprovalChanges,
@@ -72,6 +73,7 @@ export function defineTools(): ToolDefinition[] {
     ...surfaceTools(),
     ...pageRemovalTools(),
     ...entryTools(),
+    ...translationTools(),
     // RFC-0029 §8: find nodes by words (drafts included), or what readers find.
     ...searchTools(),
     ...bodyTools(),
