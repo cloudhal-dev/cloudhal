@@ -21,7 +21,7 @@
     "packages/core-ts/src/automations.ts": 1003,
     "packages/core-ts/src/menu.ts": 928,
     "packages/core-ts/src/releases.ts": 996,
-    "packages/core-ts/src/store.ts": 1230,
+    "packages/core-ts/src/store.ts": 1221,
     "packages/core-ts/src/surface-interop.ts": 1235,
     "packages/core-ts/src/taxonomy.ts": 1723,
     "packages/mcp-server/src/menu-tools.ts": 1058,

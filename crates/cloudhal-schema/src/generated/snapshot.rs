@@ -305,6 +305,8 @@ pub enum NodeRefKind {
     Menu,
     #[serde(rename = "asset")]
     Asset,
+    #[serde(rename = "glossary")]
+    Glossary,
 }
 impl ::std::fmt::Display for NodeRefKind {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -317,6 +319,7 @@ impl ::std::fmt::Display for NodeRefKind {
             Self::Redirect => f.write_str("redirect"),
             Self::Menu => f.write_str("menu"),
             Self::Asset => f.write_str("asset"),
+            Self::Glossary => f.write_str("glossary"),
         }
     }
 }
@@ -332,6 +335,7 @@ impl ::std::str::FromStr for NodeRefKind {
             "redirect" => Ok(Self::Redirect),
             "menu" => Ok(Self::Menu),
             "asset" => Ok(Self::Asset),
+            "glossary" => Ok(Self::Glossary),
             _ => Err("invalid value".into()),
         }
     }

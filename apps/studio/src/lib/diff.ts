@@ -23,6 +23,7 @@ const KIND_ORDER: Record<NodeRef["kind"], number> = {
   page: 5,
   contentEntry: 6,
   redirect: 7,
+  glossary: 8,
 };
 
 /** Flattens the API diff into rows grouped by change: site, menus, taxonomies, terms, media, pages, articles, redirects. */

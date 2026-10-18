@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "gloss_01HZX8K3Q9GL",
+  "siteId": "site_01HZX8K3Q9EF",
+  "entries": [
+    { "term": "Cloudhal", "doNotTranslate": true },
+    {
+      "term": "byline",
+      "note": "The author line under a headline.",
+      "translations": {
+        "es": { "text": "firma" },
+        "tr": { "text": "imza", "note": "Haber dilinde." }
+      }
+    },
+    { "term": "AI", "caseSensitive": true, "translations": { "de": { "text": "KI" } } }
+  ],
+  "rev": 3,
+  "createdAt": "2026-10-18T10:00:00Z",
+  "updatedAt": "2026-10-18T11:00:00Z"
+}

@@ -3002,7 +3002,8 @@ export const SnapshotSchema = {
             "term",
             "redirect",
             "menu",
-            "asset"
+            "asset",
+            "glossary"
           ]
         },
         "rev": {
@@ -7079,6 +7080,146 @@ export const ScheduleRunSchema = {
   }
 } as const;
 
+export const GlossarySchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/glossary.schema.json",
+  "title": "Glossary",
+  "description": "A site's translation glossary (RFC-0033 §2): terms with their approved translation per locale, and terms never to translate (brand and product names). Agents translating content read it as hard constraints; the checks flag drafts that break it. One per site, snapshotted like every node.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "siteId",
+    "entries",
+    "rev",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "id": {
+      "$ref": "#/$defs/Id"
+    },
+    "siteId": {
+      "$ref": "#/$defs/Id"
+    },
+    "entries": {
+      "type": "array",
+      "description": "Unique by term (case-insensitive); order is the editor's.",
+      "items": {
+        "$ref": "#/$defs/GlossaryEntry"
+      },
+      "maxItems": 2000
+    },
+    "rev": {
+      "$ref": "#/$defs/Revision"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    }
+  },
+  "$defs": {
+    "GlossaryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "term"
+      ],
+      "properties": {
+        "term": {
+          "type": "string",
+          "description": "The term as written in the site's default locale.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "note": {
+          "type": "string",
+          "description": "Context for translators and agents: meaning, part of speech, where it appears.",
+          "maxLength": 500
+        },
+        "doNotTranslate": {
+          "type": "boolean",
+          "description": "Keep the term as written in every locale (brand, product or proper names). Such an entry has no translations."
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "description": "Match the term only with this exact capitalisation."
+        },
+        "translations": {
+          "type": "object",
+          "description": "The approved translation per locale (never the default locale).",
+          "propertyNames": {
+            "$ref": "#/$defs/Locale"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 500
+              }
+            }
+          }
+        }
+      }
+    },
+    "Id": {
+      "type": "string",
+      "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
+      "pattern": "^[a-z]+_[A-Za-z0-9]{6,32}$",
+      "minLength": 8,
+      "maxLength": 48
+    },
+    "Locale": {
+      "type": "string",
+      "description": "BCP 47 language tag, e.g. en, tr, en-US.",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "Revision": {
+      "type": "integer",
+      "description": "Monotonic per-node revision used for optimistic locking (compare-and-swap on write).",
+      "minimum": 0
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -7099,4 +7240,5 @@ export const schemas = {
   "release": ReleaseSchema,
   "automation": AutomationSchema,
   "schedule-run": ScheduleRunSchema,
+  "glossary": GlossarySchema,
 } as const;

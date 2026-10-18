@@ -199,6 +199,7 @@ export function taxonomySuite(ctx: SuiteContext): void {
         "redirect",
         "menu",
         "asset",
+        "glossary",
       ]);
       expect(w.category.id).toMatch(/^tax_/);
       expect(w.news.id).toMatch(/^term_/);

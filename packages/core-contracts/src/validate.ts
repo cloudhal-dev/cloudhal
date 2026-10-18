@@ -8,6 +8,7 @@ import type {
   Comment,
   CommentSubmission,
   ContentEntry,
+  Glossary,
   Menu,
   Page,
   Project,
@@ -44,6 +45,7 @@ export interface ContractTypes {
   release: Release;
   automation: Automation;
   "schedule-run": ScheduleRun;
+  glossary: Glossary;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -66,6 +68,7 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   release: v.validateRelease,
   automation: v.validateAutomation,
   "schedule-run": v.validateScheduleRun,
+  glossary: v.validateGlossary,
 };
 
 export class ContractValidationError extends Error {

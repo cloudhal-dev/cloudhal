@@ -347,5 +347,48 @@ export function translationsSuite(
         }),
       ).rejects.toMatchObject({ code: "slug_taken" });
     });
+
+    it("keeps one glossary per site, checked and versioned (A3)", async () => {
+      expect(await store.glossary.get(site.id)).toBeUndefined();
+      const g = await store.glossary.save({
+        siteId: site.id,
+        entries: [
+          { term: "Cloudhal", doNotTranslate: true },
+          { term: "byline", translations: { es: { text: "firma" }, de: { text: "Autorenzeile" } } },
+        ],
+      });
+      expect(g.rev).toBe(0);
+      expect((await store.glossary.get(site.id))?.entries).toHaveLength(2);
+      // A second create is refused: one glossary per site.
+      await expect(store.glossary.save({ siteId: site.id, entries: [] })).rejects.toThrow();
+      const g1 = await store.glossary.save({
+        ...g,
+        entries: [...g.entries, { term: "AI", caseSensitive: true }],
+      });
+      expect(g1.rev).toBe(1);
+      await expect(store.glossary.save(g)).rejects.toMatchObject({ name: "ConflictError" });
+      const bad = (entries: typeof g.entries) => store.glossary.save({ ...g1, entries });
+      await expect(bad([{ term: "Byline" }, { term: "byline" }])).rejects.toMatchObject({
+        code: "invalid_labels",
+      });
+      await expect(
+        bad([{ term: "Cloudhal", doNotTranslate: true, translations: { es: { text: "x" } } }]),
+      ).rejects.toMatchObject({
+        code: "invalid_labels",
+      });
+      await expect(
+        bad([{ term: "byline", translations: { en: { text: "byline" } } }]),
+      ).rejects.toMatchObject({
+        code: "locale_not_enabled",
+      });
+      await expect(
+        bad([{ term: "byline", translations: { fr: { text: "signature" } } }]),
+      ).rejects.toMatchObject({
+        code: "locale_not_enabled",
+      });
+      // The glossary is part of the site's snapshots.
+      const snap = await store.createSnapshot(site.id, { actor: human, reason: "manual" });
+      expect(snap.nodes.some((n) => n.kind === "glossary" && n.id === g.id)).toBe(true);
+    });
   });
 }

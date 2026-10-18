@@ -95,10 +95,11 @@ export {
 
 import type { StoreContext } from "./store/context.ts";
 import { EntryEngine } from "./store/entries.ts";
+import { GlossaryEngine } from "./store/glossary.ts";
 import { PageEngine } from "./store/pages.ts";
 import { SearchEngine } from "./store/search.ts";
 import { SiteEngine } from "./store/sites.ts";
-import { SnapshotEngine } from "./store/snapshots.ts";
+import { isAncestor, SnapshotEngine } from "./store/snapshots.ts";
 import { readTranslationGroup, type TranslationGroup } from "./store/translations.ts";
 import {
   firstPublication,
@@ -127,6 +128,7 @@ export class SiteGraphStore {
   readonly #newId: (prefix: string) => string;
   /** Body proposals (RFC-0014 §5): operations agents filed for a person to accept or reject. */
   readonly proposals: BodyProposals;
+  readonly glossary: GlossaryEngine; // RFC-0033: the site's translation glossary
   readonly #tax: TaxonomyEngine;
   readonly #menus: MenuEngine;
   readonly #assets: AssetEngine;
@@ -190,6 +192,7 @@ export class SiteGraphStore {
     };
     this.#sites = new SiteEngine(ctx);
     this.#pages = new PageEngine(ctx);
+    this.glossary = new GlossaryEngine(ctx);
     this.#entries = new EntryEngine(ctx);
     this.#snapshots = new SnapshotEngine(ctx);
     this.#search = new SearchEngine({
@@ -687,9 +690,8 @@ export class SiteGraphStore {
   }
 
   /**
-   * "Create menu from current pages" (RFC-0003 §8): page items without labels for the pages
-   * today's derived header shows, plus top-level categories with a served archive on request.
-   * `dryRun` returns the unsaved menu.
+   * "Create menu from current pages" (RFC-0003 §8): unlabelled items for the pages the derived
+   * header shows, plus top-level categories with a served archive on request; `dryRun` unsaved.
    */
   async createMenuFromPages(
     site: Site,
@@ -1138,7 +1140,9 @@ export class SiteGraphStore {
   ): Promise<{ site: Site; snapshot: Snapshot }> {
     if (!site.publishedSnapshotId)
       throw new Error("site has no published snapshot to roll back from");
-    if (!(await this.#isAncestor(targetSnapshotId, site.publishedSnapshotId))) {
+    if (
+      !(await isAncestor((id) => this.getSnapshot(id), targetSnapshotId, site.publishedSnapshotId))
+    ) {
       throw new Error(
         `snapshot ${targetSnapshotId} is not an ancestor of the published snapshot ${site.publishedSnapshotId}`,
       );
@@ -1195,19 +1199,6 @@ export class SiteGraphStore {
   /** RFC-0029 §1: what readers find, through the site's search provider (FTS5 by default). */
   search(siteId: string, query: string, options: SearchOptions): Promise<SearchResults> {
     return this.#search.search(siteId, query, options);
-  }
-
-  async #isAncestor(ancestorId: string, descendantId: string): Promise<boolean> {
-    let cursor: string | undefined = descendantId;
-    const seen = new Set<string>();
-    while (cursor && !seen.has(cursor)) {
-      seen.add(cursor);
-      const snap = await this.getSnapshot(cursor);
-      if (!snap) return false;
-      if (snap.parentId === ancestorId) return true;
-      cursor = snap.parentId;
-    }
-    return false;
   }
 
   // ───────────────────────────── helpers ─────────────────────────────

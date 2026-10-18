@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/glossary.schema.json",
+  "title": "Glossary",
+  "description": "A site's translation glossary (RFC-0033 §2): terms with their approved translation per locale, and terms never to translate (brand and product names). Agents translating content read it as hard constraints; the checks flag drafts that break it. One per site, snapshotted like every node.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "siteId", "entries", "rev", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/Id" },
+    "siteId": { "$ref": "common.schema.json#/$defs/Id" },
+    "entries": {
+      "type": "array",
+      "description": "Unique by term (case-insensitive); order is the editor's.",
+      "items": { "$ref": "#/$defs/GlossaryEntry" },
+      "maxItems": 2000
+    },
+    "rev": { "$ref": "common.schema.json#/$defs/Revision" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
+  },
+  "$defs": {
+    "GlossaryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["term"],
+      "properties": {
+        "term": {
+          "type": "string",
+          "description": "The term as written in the site's default locale.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "note": {
+          "type": "string",
+          "description": "Context for translators and agents: meaning, part of speech, where it appears.",
+          "maxLength": 500
+        },
+        "doNotTranslate": {
+          "type": "boolean",
+          "description": "Keep the term as written in every locale (brand, product or proper names). Such an entry has no translations."
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "description": "Match the term only with this exact capitalisation."
+        },
+        "translations": {
+          "type": "object",
+          "description": "The approved translation per locale (never the default locale).",
+          "propertyNames": { "$ref": "common.schema.json#/$defs/Locale" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "note": { "type": "string", "maxLength": 500 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
