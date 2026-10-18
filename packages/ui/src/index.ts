@@ -273,6 +273,13 @@ export {
   type ResourceListPageProps,
 } from "./blocks/kumo/resource-list/resource-list.tsx";
 export {
+  type LanguageChipItem,
+  type LanguageChipState,
+  LanguageChips,
+  type LanguageChipsLabels,
+  type LanguageChipsProps,
+} from "./blocks/LanguageChips.tsx";
+export {
   MediaDropZone,
   type MediaDropZoneLabels,
   type MediaDropZoneProps,

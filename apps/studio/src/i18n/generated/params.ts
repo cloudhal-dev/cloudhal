@@ -733,5 +733,8 @@ export interface MessageParams {
   "termEditor.retired.merged": { name: string | number };
   "termEditor.seo.description": { locale: string | number };
   "theme.current": { name: string | number };
+  "translationList.state": { language: string | number; state: "published" | "draft" | "outdated" | "review" | "missing" };
+  "translationList.summary": { count: number; total: number };
+  "translationList.summaryLabel": { count: number; total: number };
   "translations.none": { language: string | number };
 }

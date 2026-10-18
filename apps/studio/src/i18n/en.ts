@@ -1751,6 +1751,17 @@ export const en = {
       "You confirm that a person read this machine translation against the original. Readers stop seeing the machine-translation notice, unless the site always shows it.",
     reviewSaveFirst: "Save your changes before you review.",
   },
+  // docs/reports/2026-10-multilingual-studio-ux.md §4a: Pages and Articles on a multilingual site.
+  translationList: {
+    column: "Languages",
+    filter: "Language",
+    grouped: "All languages (grouped)",
+    state:
+      "{language}: {state, select, published {published} draft {draft} outdated {out of date} review {needs review} missing {missing} other {missing}}",
+    summary: "{count, number}/{total, number}",
+    summaryLabel: "{count, number} of {total, plural, one {# language} other {# languages}}",
+    writeByHand: "Write by hand",
+  },
   diff: {
     title: "Changes in {name}",
     against: "Compare with",
