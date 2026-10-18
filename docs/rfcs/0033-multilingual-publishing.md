@@ -1,6 +1,6 @@
 # RFC-0033: Multilingual publishing, language editions and publications
 
-- Status: Draft
+- Status: Accepted (2026-10-18, by Halil; ADR-0035). Open questions 1–5 decided as recommended. Implementation phases A–F follow in order.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
   - [Research report](../reports/2026-10-multilingual-publishing-research.md): evidence and sources for every claim here.
