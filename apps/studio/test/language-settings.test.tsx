@@ -48,13 +48,22 @@ describe("Language settings", () => {
     expect(within(table).getByText("Default")).toBeInTheDocument();
     // The default language cannot be removed; Spanish can.
     expect(screen.queryByRole("button", { name: "Remove English" })).toBeNull();
-    const add = screen.getByRole("textbox", { name: "Add a language" });
-    fireEvent.change(add, { target: { value: "es" } });
-    expect(await screen.findByText("The site already has this language.")).toBeInTheDocument();
-    fireEvent.change(add, { target: { value: "Spanish" } });
-    expect(await screen.findByText("Use a BCP 47 tag such as es or pt-BR.")).toBeInTheDocument();
-    fireEvent.change(add, { target: { value: "ar" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    // Languages are picked from a searchable list: by name in the Studio language, in itself or by tag.
+    const add = screen.getByRole("combobox", { name: "Add a language" });
+    fireEvent.focus(add);
+    fireEvent.input(add, { target: { value: "Arab" } });
+    fireEvent.keyDown(add, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "Arabic · العربية · ar" }));
+    await waitFor(() => expect(within(table).getByText("Arabic")).toBeInTheDocument());
+    // Languages the site already has are not offered; a valid tag outside the list can be used.
+    fireEvent.input(add, { target: { value: "Spanish" } });
+    fireEvent.keyDown(add, { key: "ArrowDown" });
+    expect(screen.queryByRole("option", { name: /· es$/ })).toBeNull();
+    fireEvent.input(add, { target: { value: "gsw" } });
+    fireEvent.keyDown(add, { key: "ArrowDown" });
+    expect(await screen.findByRole("option", { name: "Use the tag gsw" })).toBeInTheDocument();
+    fireEvent.keyDown(add, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("option")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Remove Spanish" }));
     const pages = screen.getByRole("checkbox", { name: "Pages" });
     // A labelled Kumo checkbox: people click its label.
