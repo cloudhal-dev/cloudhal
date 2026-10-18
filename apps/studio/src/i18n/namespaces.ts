@@ -50,22 +50,50 @@ export type Namespace = keyof NamespaceCatalogs;
 export type NamespaceMessages<N extends Namespace> = { [K in N]: NamespaceCatalogs[K] };
 
 /**
- * Every namespace module, by path (`./lazy/<namespace>.<locale>.ts`): one dynamic import per
- * namespace and locale, so a page loads only the language it shows, and a new language's files
- * are found by name.
+ * English's namespace modules, by path (`./lazy/<namespace>.en.ts`): in the first load, since
+ * English is every key's fallback. Each other language's loaders are a small generated module of
+ * their own (`./loaders/<locale>.ts`, written by `pnpm i18n:import`), fetched only when Studio
+ * shows that language (`loadNamespaceIndex`, with its core catalog), so the first load does not
+ * grow with every language added; a new language's files are still found by name.
  */
-const MODULES = import.meta.glob<{ messages: Record<string, object> }>("./lazy/*.ts");
+export type Loader = () => Promise<{ messages: Record<string, object> }>;
+const ENGLISH_MODULES = import.meta.glob<{ messages: Record<string, object> }>("./lazy/*.en.ts");
+const INDEXES = import.meta.glob<{ loaders: Record<string, Loader> }>("./loaders/*.ts");
 const PREFIX = "./lazy/";
 const ENGLISH = ".en.ts";
 
 /** The namespaces, one per English module. */
-export const NAMESPACES = Object.keys(MODULES)
-  .filter((path) => path.endsWith(ENGLISH))
+export const NAMESPACES = Object.keys(ENGLISH_MODULES)
   .map((path) => path.slice(PREFIX.length, -ENGLISH.length))
   .sort() as Namespace[];
 
 export function isNamespace(name: string): name is Namespace {
-  return Object.hasOwn(MODULES, `${PREFIX}${name}${ENGLISH}`);
+  return Object.hasOwn(ENGLISH_MODULES, `${PREFIX}${name}${ENGLISH}`);
+}
+
+const indexes = new Map<Locale, Promise<Record<string, Loader>>>();
+
+/** `locale`'s namespace loaders (its `./loaders/<locale>.ts`), fetched once. */
+export function loadNamespaceIndex(locale: Locale): Promise<Record<string, Loader>> {
+  let index = indexes.get(locale);
+  if (!index) {
+    const load = INDEXES[`./loaders/${locale}.ts`];
+    if (!load) return Promise.resolve({});
+    index = load().then(
+      (module) => module.loaders,
+      (error: unknown) => {
+        indexes.delete(locale);
+        throw error;
+      },
+    );
+    indexes.set(locale, index);
+  }
+  return index;
+}
+
+async function loaderFor(ns: Namespace, locale: Locale): Promise<Loader | undefined> {
+  if (locale === "en") return ENGLISH_MODULES[`${PREFIX}${ns}${ENGLISH}`];
+  return (await loadNamespaceIndex(locale))[`../lazy/${ns}.${locale}.ts`];
 }
 
 const loaded = new Map<string, object>();
@@ -91,18 +119,21 @@ export function loadNamespace(ns: Namespace, locale: Locale): Promise<void> {
   if (loaded.has(key)) return Promise.resolve();
   let promise = pending.get(key);
   if (!promise) {
-    const load = MODULES[`${PREFIX}${ns}.${locale}.ts`];
-    if (!load) return Promise.reject(new Error(`no "${ns}" messages for locale "${locale}"`));
-    promise = load().then(
-      (module) => {
-        loaded.set(key, module.messages[ns] as object);
-        pending.delete(key);
-      },
-      (error: unknown) => {
-        pending.delete(key);
-        throw error;
-      },
-    );
+    promise = loaderFor(ns, locale)
+      .then((load) => {
+        if (!load) throw new Error(`no "${ns}" messages for locale "${locale}"`);
+        return load();
+      })
+      .then(
+        (module) => {
+          loaded.set(key, module.messages[ns] as object);
+          pending.delete(key);
+        },
+        (error: unknown) => {
+          pending.delete(key);
+          throw error;
+        },
+      );
     pending.set(key, promise);
   }
   return promise;
@@ -112,4 +143,5 @@ export function loadNamespace(ns: Namespace, locale: Locale): Promise<void> {
 export function resetNamespaces(): void {
   loaded.clear();
   pending.clear();
+  indexes.clear();
 }

@@ -122,17 +122,19 @@ describe("locales", () => {
       expect(fallbackChain(l).at(-1)).toBe("en");
       expect(["ltr", "rtl"]).toContain(info.dir);
     }
-    // A machine-translated language says so (the menus mark it); English and Turkish are reviewed.
+    // English and Turkish are reviewed; the AI translations wait for a speaker (a note in locales.ts).
     expect(LOCALE_REGISTRY.en.reviewed).toBe(true);
     expect(LOCALE_REGISTRY.tr.reviewed).toBe(true);
     expect(LOCALE_REGISTRY.de.reviewed).toBe(false);
+    expect(LOCALE_REGISTRY.ar).toMatchObject({ dir: "rtl", reviewed: false, intl: "ar-u-nu-latn" });
   });
 
   it("picks the browser's language: exact tag, then the same language, then English", () => {
     expect(matchLocale(["tr-TR", "en"])).toBe("tr");
     expect(matchLocale(["de-AT"])).toBe("de");
     expect(matchLocale(["fr-FR", "de"])).toBe("de");
-    expect(matchLocale(["ja", "x-invalid-tag-!!"])).toBe("en");
+    expect(matchLocale(["ar-EG"])).toBe("ar");
+    expect(matchLocale(["sv", "x-invalid-tag-!!"])).toBe("en");
   });
 
   it("keeps every language on English's keys and placeholders (core catalogs)", () => {

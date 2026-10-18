@@ -6,8 +6,11 @@ import {
   formatDate,
   formatList,
   formatMessage,
+  formatNumber,
   formatRelative,
+  intlTag,
   numberFormat,
+  setIntlTags,
 } from "../src/format.ts";
 import { pseudoLocalize, pseudoText } from "../src/pseudo.ts";
 import { compileCatalogSource } from "../src/transform.ts";
@@ -136,6 +139,17 @@ describe("the Intl layer", () => {
     expect(formatRelative("de", 3, "day")).toBe("in 3 Tagen");
     expect(displayNames(["en"], { type: "language" }).of("tr")).toBe("Turkish");
     expect(["b", "ç", "c"].sort(collator("tr").compare)).toEqual(["b", "c", "ç"]);
+  });
+
+  it("formats a language with the tag its registry gives (ADR-0033: Western digits)", () => {
+    expect(formatNumber("fa", 1234)).toBe("۱٬۲۳۴");
+    setIntlTags({ fa: "fa-u-nu-latn" });
+    expect(intlTag("fa")).toBe("fa-u-nu-latn");
+    expect(intlTag("de")).toBe("de");
+    expect(formatNumber("fa", 1234)).toBe("1,234");
+    expect(formatDate("fa", "2026-10-18T12:00:00Z", { year: "numeric", timeZone: "UTC" })).toMatch(
+      /^1405/,
+    );
   });
 });
 
