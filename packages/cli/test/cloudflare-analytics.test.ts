@@ -36,6 +36,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const STARTER_NODE_MODULES = path.resolve(here, "../../../starters/blog/node_modules");
 const PREVIEW_SECRET = "analytics-test-preview-secret-32-bytes!!";
 const PURGE_TOKEN = "analytics-test-purge-token";
+// The analytics tag and vitals script; the reader search modal also loads from /_cloudhal/.
+const ANALYTICS_ASSET = /\/_cloudhal\/[pv]\.[0-9a-f]{8}\.js/;
 const human = { kind: "human" as const, id: "user_cfanalytic1", name: "Halil" };
 const CHROME =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -255,10 +257,10 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
     const token = await mintPreviewToken(PREVIEW_SECRET, { site: siteId, target: "live" });
     const preview = await get(`/about?cloudhal-preview=${token}`);
     expect(preview.headers.get("x-cloudhal-mode")).toBe("preview");
-    expect(await preview.text()).not.toContain("/_cloudhal/");
+    expect(await preview.text()).not.toMatch(ANALYTICS_ASSET);
     const missing = await get("/does-not-exist");
     expect(missing.status).toBe(404);
-    expect(await missing.text()).not.toContain("/_cloudhal/");
+    expect(await missing.text()).not.toMatch(ANALYTICS_ASSET);
   });
 
   it("writes a beacon for a cached page view: the Worker never rendered the page", async () => {
@@ -398,7 +400,7 @@ describe("Site Worker analytics on workerd (RFC-0006)", () => {
     await clear();
     const html = await (await get("/about")).text();
     expect(html).toContain("<title>");
-    expect(html).not.toContain("/_cloudhal/");
+    expect(html).not.toMatch(ANALYTICS_ASSET);
     expect((await beacon(view("/about"))).status).toBe(204);
     await get("/does-not-exist");
     await new Promise((r) => setTimeout(r, 100));
