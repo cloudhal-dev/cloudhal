@@ -201,6 +201,19 @@ export const en = {
     goRedirects: "Go to redirects",
     goSchedules: "Go to schedules",
     newSchedule: "Schedule a publish…",
+    /** RFC-0029 §7: the palette searches the site's content too (drafts included). */
+    searchPlaceholder: "Search content or run a command…",
+    searchEmpty: "No commands or content match",
+    hintNewTab: "New tab",
+    groups: {
+      commands: "Commands",
+      entry: "Articles",
+      page: "Pages",
+      term: "Categories and tags",
+      asset: "Media",
+      menu: "Menu items",
+      redirect: "Redirects",
+    },
   },
   overview: {
     commentsWaiting: "{count, plural, one {# comment is waiting} other {# comments are waiting}}",

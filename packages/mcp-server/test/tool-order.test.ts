@@ -20,6 +20,7 @@ const ORDER = [
   "update_entry",
   "add_correction",
   "delete_entry",
+  "search_site",
   "get_theme_settings",
   "set_theme_settings",
   "list_block_types",

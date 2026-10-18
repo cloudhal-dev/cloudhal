@@ -20,14 +20,26 @@ import { useToast } from "./Toast.ts";
  * → snapshot + publish; the menu takes a snapshot without publishing (DESIGN.md §1, §2d). It follows
  * the person's role (§2s): an Author whose changes include others' work sends "Request publish"
  * (the server files a request an Editor approves, 202); a Contributor sees Publish disabled with
- * the reason, since an Editor publishes their work.
+ * the reason, since an Editor publishes their work. The palette's Publish command opens the same
+ * confirmation (RFC-0029 §7), never publishing on its own.
  */
-export function SitePublish({ siteId }: { siteId: string }) {
+export function SitePublish({
+  siteId,
+  open: openProp,
+  onOpenChange,
+}: {
+  siteId: string;
+  /** The confirmation's state, when the surface opens it too (the palette's Publish command). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = onOpenChange ?? setOwnOpen;
   const { mode, reason } = usePublishMode(siteId);
   const publish = usePublishSite(siteId, { onDone: () => setOpen(false) });
   const snapshot = useMutation({

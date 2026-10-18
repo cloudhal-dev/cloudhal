@@ -161,6 +161,7 @@ export type {
   SchedulesFeature,
 } from "./api/schedules-types.ts";
 export { SCHEDULE_NOTIFICATION_KINDS } from "./api/schedules-types.ts";
+export type { SiteSearchHit, SiteSearchKind, SiteSearchResult } from "./api/search.ts";
 export type {
   ArchiveReason,
   EntrySummary,
@@ -209,6 +210,7 @@ import { historyApi } from "./api/history.ts";
 import { mediaApi } from "./api/media.ts";
 import { menusApi } from "./api/menus.ts";
 import { notificationsApi } from "./api/notifications.ts";
+import { searchApi } from "./api/search.ts";
 import { taxonomyApi } from "./api/taxonomy.ts";
 import { teamApi } from "./api/team.ts";
 
@@ -244,4 +246,5 @@ export const api = {
   analytics: analyticsApi,
   comments: commentsApi,
   preview: contentApi.preview,
+  search: searchApi,
 };

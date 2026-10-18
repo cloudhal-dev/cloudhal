@@ -63,6 +63,7 @@ export type {
 export * from "./search.ts";
 export * from "./search-provider.ts";
 export * from "./seed.ts";
+export * from "./site-search.ts";
 export * from "./store.ts";
 export * from "./sync.ts";
 export {

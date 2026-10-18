@@ -180,6 +180,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${T}/parent`, "site:write"],
   ["POST", `${T}/visibility`, "site:write"],
   ["POST", `${T}/review`, "site:write"],
+  // RFC-0029 §7: Studio search (media, menus and redirects only with site:read, in the handler)
+  ["GET", `${S}/search`, "content:read"],
   ["GET", `${S}/redirects`, "site:read"],
   ["POST", `${S}/redirects`, "site:write"],
   ["GET", `${S}/redirects/:redirectId`, "site:read"],

@@ -54,6 +54,7 @@ describe("Cloudhal tools (SDK-independent)", () => {
       // RFC-0019 §2
       "add_correction",
       "delete_entry",
+      "search_site",
       // RFC-0017 §1, RFC-0015 §6, RFC-0014 §4
       "get_theme_settings",
       "set_theme_settings",

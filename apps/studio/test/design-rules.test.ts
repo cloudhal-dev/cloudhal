@@ -783,7 +783,9 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   ],
   "components/Seo.tsx#media": ["ImageRefField"],
   "routes/PageEditorPage.tsx#media": ["ImageRefField"],
-  "routes/SiteShell.tsx#media": ["Images", "nav.media", "goMedia"],
+  // "Go to media" lives with the site's palette commands (`useSitePalette.ts`, RFC-0029 §7;
+  // checked in command-menu.test.tsx)
+  "routes/SiteShell.tsx#media": ["Images", "nav.media"],
   "components/SnapshotDiffDialog.tsx#media": ["assetTitle"],
 };
 
