@@ -2733,6 +2733,24 @@ export const en = {
       restrictedTitle: "Team activity is for Editors and above",
     },
   },
+  /** RFC-0034 A2: which sites an Editor, Author or Contributor works on. */
+  siteAccess: {
+    legend: "Sites",
+    all: "Every site",
+    some: "Only some sites",
+    roleOn: "Role on {site}",
+    everySite: "Owners and Administrators work on every site of this installation.",
+    required: "Pick at least one site.",
+    menu: "Sites",
+    title: "Sites for {name}",
+    description:
+      "Choose which sites this person works on and their role on each. Changes apply at once.",
+    failed: "The sites could not be saved",
+    submit: "Save sites",
+    saved: "Sites saved",
+    savedDescription: "The sites of {name} were updated.",
+    count: "{count, plural, one {# site} other {# sites}}",
+  },
   invites: {
     create: {
       title: "Invite someone",

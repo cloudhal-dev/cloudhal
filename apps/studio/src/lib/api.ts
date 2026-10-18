@@ -198,6 +198,7 @@ export type {
   Role,
   RolesInfo,
   SignUpPolicy,
+  SiteRoles,
 } from "./api/team.ts";
 export type { TranslationRow } from "./api/translations.ts";
 
@@ -219,6 +220,7 @@ import { translationsApi } from "./api/translations.ts";
 /** Thin typed client over the Cloudhal API; every mutation sends the full document (CAS on `rev`). */
 export const api = {
   me: teamApi.me,
+  meOnSite: teamApi.meOnSite,
   instance: teamApi.instance,
   scheduler: teamApi.scheduler,
   members: teamApi.members,

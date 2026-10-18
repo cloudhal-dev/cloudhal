@@ -11,8 +11,28 @@ export const ME_KEY = ["me"] as const;
  * query (`["me"]`) shared by the shell, the account menu and every gated control; a role change
  * (Members, the `role-changed` notification) invalidates it.
  */
+/**
+ * The site the Studio URL is about (`/sites/<id>/…`), read from the location so the hook also works
+ * outside the router (dialogs in tests, the account surface).
+ */
+function currentSiteId(): string | undefined {
+  const match = /^\/sites\/([^/]+)/.exec(globalThis.location?.pathname ?? "");
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+}
+
 export function useMe() {
-  return useQuery({ queryKey: ME_KEY, queryFn: api.me, staleTime: 60_000 });
+  const base = useQuery({ queryKey: ME_KEY, queryFn: api.me, staleTime: 60_000 });
+  // RFC-0034 A2: inside a site, a person limited to sites is gated by their role on that site.
+  const siteId = currentSiteId();
+  const limited = base.data?.sites !== undefined;
+  const onSite = useQuery({
+    queryKey: [...ME_KEY, siteId],
+    queryFn: () => api.meOnSite(siteId as string),
+    enabled: limited && siteId !== undefined,
+    staleTime: 60_000,
+    retry: false,
+  });
+  return limited && siteId && onSite.data ? { ...base, data: onSite.data } : base;
 }
 
 /**

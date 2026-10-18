@@ -21,7 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { absoluteTime } from "../lib/activity.ts";
-import { api, type CreatedInvite, errorCode, type Role } from "../lib/api.ts";
+import { api, type CreatedInvite, errorCode, type Role, type SiteRoles } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { formatDuration } from "../lib/elevation.ts";
 import {
@@ -32,6 +32,7 @@ import {
   validEmail,
 } from "../lib/roles.ts";
 import { RoleBadge, RoleExplainer } from "./Roles.tsx";
+import { capSites, isSiteRole, SiteAccessField, siteAccessError } from "./SiteAccessField.tsx";
 import { useInviteRules, useMe } from "./useMe.ts";
 
 /** What re-inviting starts from: the pending invite it replaces. */
@@ -89,6 +90,7 @@ export function InviteDialog({
   const [delivery, setDelivery] = useState<"link" | "email">("link");
   const [submitted, setSubmitted] = useState(false);
   const [created, setCreated] = useState<CreatedInvite | undefined>();
+  const [sites, setSites] = useState<SiteRoles | undefined>();
 
   const create = useMutation({
     mutationFn: () =>
@@ -97,6 +99,7 @@ export function InviteDialog({
         role,
         expiresInHours: hours,
         ...(delivery === "email" ? { delivery } : {}),
+        ...(sites && isSiteRole(role) ? { sites: capSites(sites, role) } : {}),
       }),
     onSuccess: async (result) => {
       setCreated(result);
@@ -112,6 +115,7 @@ export function InviteDialog({
       setRole(start);
       setHours(inviteDefaultHours(rules, start));
       setDelivery("link");
+      setSites(undefined);
       setSubmitted(false);
       create.reset();
     } else {
@@ -135,12 +139,12 @@ export function InviteDialog({
   const submit = () => {
     setSubmitted(true);
     if (create.isPending || !validEmail(email) || !roles.includes(role)) return;
+    if (isSiteRole(role) && siteAccessError(sites)) return;
     create.mutate();
   };
   const apiError = inviteErrorOf(create.error);
   const roleName = t(`roles.names.${role}`);
   const emailOffered = rules.delivery.includes("email");
-  const expiresAt = created?.invite.expiresAt;
 
   return (
     <LayerDialog.Root open={open} onOpenChange={onOpenChange} dismissDisabled={create.isPending}>
@@ -164,66 +168,7 @@ export function InviteDialog({
         </LayerDialog.Description>
         <LayerDialog.Body>
           {created ? (
-            <div className="grid gap-5" data-testid="invite-reveal">
-              {created.url ? (
-                <>
-                  <Banner
-                    variant="alert"
-                    icon={<Warning weight="fill" />}
-                    title={t("invites.reveal.warningTitle")}
-                    description={t("invites.reveal.warning", {
-                      role: t(`roles.names.${created.invite.role}`),
-                    })}
-                  />
-                  <div className="grid min-w-0 gap-1.5">
-                    <Text size="sm" bold as="span">
-                      {t("invites.reveal.link")}
-                    </Text>
-                    <ClipboardText
-                      size="lg"
-                      text={created.url}
-                      tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
-                    />
-                  </div>
-                </>
-              ) : (
-                <Banner
-                  variant="default"
-                  icon={<CheckCircle weight="fill" />}
-                  title={t("invites.reveal.sent", { email: created.invite.email })}
-                  description={t("invites.reveal.sentDescription")}
-                />
-              )}
-              <InsetPanel label={t("invites.reveal.summary")}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <RoleBadge value={created.invite.role} />
-                  <Text as="span" truncate>
-                    {created.invite.email}
-                  </Text>
-                </div>
-                {expiresAt && (
-                  <div className="flex items-start gap-2">
-                    <span className="flex h-lh items-center text-kumo-subtle">
-                      <ClockCountdown size={16} />
-                    </span>
-                    <Text variant="secondary" size="sm">
-                      {t("invites.reveal.expires", {
-                        relative: expiresIn(expiresAt, locale),
-                        absolute: absoluteTime(expiresAt, locale),
-                      })}
-                    </Text>
-                  </div>
-                )}
-                <div className="flex items-start gap-2">
-                  <span className="flex h-lh items-center text-kumo-subtle">
-                    <ShieldWarning size={16} />
-                  </span>
-                  <Text variant="secondary" size="sm">
-                    {t("invites.reveal.private")}
-                  </Text>
-                </div>
-              </InsetPanel>
-            </div>
+            <InviteReveal created={created} />
           ) : (
             // No <form>: Kumo's Radio cards are buttons; Enter in the email field submits.
             <div className="grid gap-5" data-testid="invite-step-details">
@@ -291,6 +236,12 @@ export function InviteDialog({
                   />
                 </div>
               </div>
+              <SiteAccessField
+                role={role}
+                value={sites}
+                onChange={setSites}
+                error={submitted && siteAccessError(sites) ? t("siteAccess.required") : undefined}
+              />
               <div className="grid min-w-0 gap-2" data-testid="role-explainer">
                 <Text size="sm" bold as="span">
                   {t("invites.create.explainer")}
@@ -344,5 +295,73 @@ export function InviteDialog({
         </LayerDialog.Actions>
       </LayerDialog.Content>
     </LayerDialog.Root>
+  );
+}
+
+/** Step 2: the link, shown once (or "sent"), with what it grants and when it expires. */
+function InviteReveal({ created }: { created: CreatedInvite }) {
+  const { t, locale } = useI18n();
+  const expiresAt = created.invite.expiresAt;
+  return (
+    <div className="grid gap-5" data-testid="invite-reveal">
+      {created.url ? (
+        <>
+          <Banner
+            variant="alert"
+            icon={<Warning weight="fill" />}
+            title={t("invites.reveal.warningTitle")}
+            description={t("invites.reveal.warning", {
+              role: t(`roles.names.${created.invite.role}`),
+            })}
+          />
+          <div className="grid min-w-0 gap-1.5">
+            <Text size="sm" bold as="span">
+              {t("invites.reveal.link")}
+            </Text>
+            <ClipboardText
+              size="lg"
+              text={created.url}
+              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
+            />
+          </div>
+        </>
+      ) : (
+        <Banner
+          variant="default"
+          icon={<CheckCircle weight="fill" />}
+          title={t("invites.reveal.sent", { email: created.invite.email })}
+          description={t("invites.reveal.sentDescription")}
+        />
+      )}
+      <InsetPanel label={t("invites.reveal.summary")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <RoleBadge value={created.invite.role} />
+          <Text as="span" truncate>
+            {created.invite.email}
+          </Text>
+        </div>
+        {expiresAt && (
+          <div className="flex items-start gap-2">
+            <span className="flex h-lh items-center text-kumo-subtle">
+              <ClockCountdown size={16} />
+            </span>
+            <Text variant="secondary" size="sm">
+              {t("invites.reveal.expires", {
+                relative: expiresIn(expiresAt, locale),
+                absolute: absoluteTime(expiresAt, locale),
+              })}
+            </Text>
+          </div>
+        )}
+        <div className="flex items-start gap-2">
+          <span className="flex h-lh items-center text-kumo-subtle">
+            <ShieldWarning size={16} />
+          </span>
+          <Text variant="secondary" size="sm">
+            {t("invites.reveal.private")}
+          </Text>
+        </div>
+      </InsetPanel>
+    </div>
   );
 }
