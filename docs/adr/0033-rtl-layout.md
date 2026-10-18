@@ -75,6 +75,17 @@ A lint rule (design lint, like `i18n-format`) forbids physical utilities in `app
   - Kumo's compiled class names change between versions and the patch script drifts. Mitigation: a test that fails when the patch no longer applies, as for the current patch.
   - Charts (ECharts) need their own RTL settings (axis and legend placement), out of this ADR's scope; noted for the analytics screens.
 
+## Decisions (2026-10-18)
+The owner delegated the open questions; decided in the session that coordinates the i18n work:
+
+- **First right-to-left language: Arabic (`ar`), with Western digits.** The registry entry is keyed `ar`, and Studio formats with the tag **`ar-u-nu-latn`**. Studio shows ids, versions, revisions and code next to numbers, and Western digits keep them readable together. Arabic-Indic digits (`nu-arab`) may become a person's preference later.
+- **Order:**
+  - A1: the generated Kumo patch, with a test that fails when it no longer applies, and the upstream issue text ready for the owner to file;
+  - C1: `DirectionalIcon`, converting only icons that mean a direction;
+  - then the Arabic catalogs, verified with `SHOTS_LOCALE=ar pnpm design:shots` at 1440 and 390 px.
+- **ECharts:** its right-to-left settings (axis side, legend order) are a follow-up if the Arabic step does not cover them.
+
 ## Open questions
-- Does Cloudflare plan RTL in Kumo? Ask before writing the patch, through the upstream note.
-- Which RTL language first? The Arabic font stack and the numerals (Arabic-Indic or Western digits, `nu` in the locale tag) are product decisions.
+None left from this ADR; the questions below were answered above.
+- *(answered)* Does Cloudflare plan RTL in Kumo? The upstream issue (`kumo-upstream-notes.md` §7) asks; the patch does not wait for the answer.
+- *(answered)* Which RTL language first, which numerals? Arabic, Western digits (`ar-u-nu-latn`).
