@@ -57,7 +57,6 @@ export {
   redirectLocale,
   splitTarget,
 } from "./redirects.ts";
-export { termSlug } from "./term-locales.ts";
 export type {
   PublishReleaseInput,
   PublishReleaseResult,
@@ -88,3 +87,4 @@ export {
   type TermUsage,
 } from "./taxonomy.ts";
 export * from "./taxonomy-report.ts";
+export { termSlug } from "./term-locales.ts";
