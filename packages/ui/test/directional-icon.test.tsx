@@ -3,7 +3,8 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DirectionalIcon, DirectionProvider, directional } from "../src/index.ts";
 
-const transform = (container: HTMLElement) => container.querySelector("svg")?.getAttribute("transform");
+const transform = (container: HTMLElement) =>
+  container.querySelector("svg")?.getAttribute("transform");
 
 describe("DirectionalIcon (ADR-0033 C1)", () => {
   it("mirrors in right-to-left languages only", () => {

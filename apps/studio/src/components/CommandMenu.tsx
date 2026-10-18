@@ -1,4 +1,4 @@
-import { CommandPalette } from "@cloudhal/ui";
+import { CommandPalette, DirectionalIcon } from "@cloudhal/ui";
 import {
   ArrowBendUpRight,
   Article,
@@ -32,7 +32,8 @@ const KIND_ICONS: Record<SiteSearchKind, ReactNode> = {
   term: <Tag />,
   asset: <ImageSquare />,
   menu: <ListBullets />,
-  redirect: <ArrowBendUpRight />,
+  // a redirect points onward in reading order: mirrored right-to-left (ADR-0033 C1)
+  redirect: <DirectionalIcon icon={ArrowBendUpRight} />,
 };
 
 type Entry = PaletteEntry<PaletteCommand>;
