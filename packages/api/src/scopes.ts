@@ -182,6 +182,12 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${T}/review`, "site:write"],
   // RFC-0029 §7: Studio search (media, menus and redirects only with site:read, in the handler)
   ["GET", `${S}/search`, "content:read"],
+  // RFC-0033 §8: language versions and a person's review; the glossary is a site setting.
+  ["GET", `${S}/translations`, "content:read"],
+  ["GET", `${S}/translations/:nodeId`, "content:read"],
+  ["POST", `${S}/translations/:nodeId/review`, "content:write"],
+  ["GET", `${S}/glossary`, "content:read"],
+  ["PUT", `${S}/glossary`, "site:settings"],
   ["GET", `${S}/redirects`, "site:read"],
   ["POST", `${S}/redirects`, "site:write"],
   ["GET", `${S}/redirects/:redirectId`, "site:read"],

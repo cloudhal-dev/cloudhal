@@ -52,6 +52,7 @@ import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
 import { terms } from "./routes/terms.ts";
 import { themeSettings } from "./routes/theme-settings.ts";
+import { glossary, translations } from "./routes/translations.ts";
 import { routeGuard } from "./scopes.ts";
 import { randomUploadSecret, type UploadSecret } from "./uploads.ts";
 
@@ -83,6 +84,9 @@ const SITE_AREAS: readonly (readonly [string, Hono<Env>])[] = [
   ["taxonomies", taxonomies],
   ["terms", terms],
   ["redirects", redirects],
+  // RFC-0033 §8: language versions, reviews and the glossary.
+  ["translations", translations],
+  ["glossary", glossary],
   ["migrations", migrations],
   // RFC-0029 §7: the command palette's search over the site's own nodes, drafts included.
   ["search", siteSearch],

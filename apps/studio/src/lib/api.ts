@@ -199,6 +199,7 @@ export type {
   RolesInfo,
   SignUpPolicy,
 } from "./api/team.ts";
+export type { TranslationRow } from "./api/translations.ts";
 
 import { agentsApi } from "./api/agents.ts";
 import { aiApi } from "./api/ai.ts";
@@ -213,6 +214,7 @@ import { notificationsApi } from "./api/notifications.ts";
 import { searchApi } from "./api/search.ts";
 import { taxonomyApi } from "./api/taxonomy.ts";
 import { teamApi } from "./api/team.ts";
+import { translationsApi } from "./api/translations.ts";
 
 /** Thin typed client over the Cloudhal API; every mutation sends the full document (CAS on `rev`). */
 export const api = {
@@ -247,4 +249,5 @@ export const api = {
   comments: commentsApi,
   preview: contentApi.preview,
   search: searchApi,
+  translations: translationsApi,
 };
