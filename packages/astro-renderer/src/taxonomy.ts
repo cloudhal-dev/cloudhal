@@ -14,6 +14,8 @@ import type { GraphSource } from "./source.ts";
 /** Everything needed to show terms: the site's taxonomies and every term, by id. */
 export interface TaxonomyIndex {
   readonly locale: string;
+  /** The site's default locale, whose archive slugs are the terms' own (RFC-0033). */
+  readonly defaultLocale?: string;
   /** In display order: the section taxonomy (categories) first, then the others by key. */
   readonly taxonomies: readonly Taxonomy[];
   readonly byKey: ReadonlyMap<string, Taxonomy>;
@@ -37,6 +39,7 @@ export function taxonomyIndex(
   taxonomies: readonly Taxonomy[],
   terms: readonly Term[],
   locale: string,
+  defaultLocale?: string,
 ): TaxonomyIndex {
   const section = pickSection(taxonomies);
   const ordered = [...taxonomies].sort(
@@ -44,6 +47,7 @@ export function taxonomyIndex(
   );
   return {
     locale,
+    ...(defaultLocale ? { defaultLocale } : {}),
     taxonomies: ordered,
     byKey: new Map(ordered.map((t) => [t.key, t])),
     byId: new Map(ordered.map((t) => [t.id, t])),
@@ -51,14 +55,17 @@ export function taxonomyIndex(
   };
 }
 
-/** Loads the index from a source, in the site's default locale (the only routed locale today). */
-export async function loadTaxonomyIndex(source: GraphSource): Promise<TaxonomyIndex> {
+/** Loads the index from a source, in `locale` (default: the site's). */
+export async function loadTaxonomyIndex(
+  source: GraphSource,
+  locale?: string,
+): Promise<TaxonomyIndex> {
   const [site, taxonomies, terms] = await Promise.all([
     source.site(),
     source.taxonomies(),
     source.vocabulary(),
   ]);
-  return taxonomyIndex(taxonomies, terms, site.defaultLocale);
+  return taxonomyIndex(taxonomies, terms, locale ?? site.defaultLocale, site.defaultLocale);
 }
 
 export function sectionTaxonomy(index: TaxonomyIndex): Taxonomy | undefined {

@@ -48,6 +48,13 @@ export interface FeedOptions {
   taxonomy?: TaxonomyIndex;
   /** The site's assets: cover images get type, size and dimensions; `asset:` links resolve (RFC-0004 §7.7). */
   assets?: AssetIndex;
+  /** The feed's language (RFC-0033); default: the site's default locale. */
+  locale?: string;
+  /**
+   * Where the feed's links start (RFC-0033: `https://host/es` for a prefixed locale, a locale's
+   * own domain); default `origin`. Media URLs always use `origin`.
+   */
+  linkOrigin?: string;
 }
 
 /** Category names of an item: public terms (section first), else legacy tags. */
@@ -62,11 +69,12 @@ function itemCategories(entry: ContentEntry, index: TaxonomyIndex | undefined): 
 /** RSS 2.0 with full content (`content:encoded`), as feed readers and Ghost/WordPress readers expect. */
 export function rssXml(options: FeedOptions): string {
   const { site, origin } = options;
-  const self = `${origin}${options.feedPath ?? "/rss.xml"}`;
+  const base = options.linkOrigin ?? origin;
+  const self = `${base}${options.feedPath ?? "/rss.xml"}`;
   const items = published(options.entries)
     .slice(0, FEED_LIMIT)
     .map((e) => {
-      const url = `${origin}${entryPath(e)}`;
+      const url = `${base}${entryPath(e)}`;
       const date = new Date(e.publishedAt ?? e.createdAt).toUTCString();
       const cover = e.coverImage?.assetId ? options.assets?.get(e.coverImage.assetId) : undefined;
       const image = cover
@@ -101,9 +109,9 @@ export function rssXml(options: FeedOptions): string {
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">',
     "<channel>",
     `<title>${xml(options.title ?? site.name)}</title>`,
-    `<link>${xml(`${origin}${options.linkPath ?? "/"}`)}</link>`,
+    `<link>${xml(`${base}${options.linkPath ?? "/"}`)}</link>`,
     `<description>${xml(options.description ?? site.name)}</description>`,
-    `<language>${xml(site.defaultLocale)}</language>`,
+    `<language>${xml(options.locale ?? site.defaultLocale)}</language>`,
     `<atom:link href="${xml(self)}" rel="self" type="application/rss+xml"/>`,
     "<generator>Cloudhal</generator>",
     newest
@@ -143,6 +151,8 @@ export function archiveFeedXml(
 export interface SitemapUrl {
   loc: string;
   lastmod: string;
+  /** Every language version of the URL, itself and `x-default` included (RFC-0033). */
+  alternates?: ReadonlyArray<{ locale: string; href: string }>;
 }
 
 /**
@@ -213,10 +223,18 @@ export function redirectsFile(redirects: readonly Redirect[]): string {
 }
 
 export function sitemapXml(urls: SitemapUrl[]): string {
+  const localized = urls.some((u) => u.alternates?.length);
+  const link = (a: { locale: string; href: string }) =>
+    `<xhtml:link rel="alternate" hreflang="${xml(a.locale)}" href="${xml(a.href)}"/>`;
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urls.map((u) => `<url><loc>${xml(u.loc)}</loc><lastmod>${xml(u.lastmod)}</lastmod></url>`),
+    localized
+      ? '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+      : '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls.map(
+      (u) =>
+        `<url><loc>${xml(u.loc)}</loc><lastmod>${xml(u.lastmod)}</lastmod>${(u.alternates ?? []).map(link).join("")}</url>`,
+    ),
     "</urlset>",
   ].join("\n");
 }

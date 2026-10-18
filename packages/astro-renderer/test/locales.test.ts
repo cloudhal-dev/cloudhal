@@ -7,6 +7,8 @@ import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
+import { sitemapXml } from "../src/feeds.ts";
+import { llmsTxt, localeFeedXml, localizedSitemap } from "../src/locale-feeds.ts";
 import {
   alternatesFor,
   linkLocalizer,
@@ -140,7 +142,7 @@ describe("locales over a store", () => {
   it("lists every version with x-default, each self-canonical in its own locale", async () => {
     const alternates = await alternatesFor(source, acerca, ORIGIN);
     expect(alternates).toEqual([
-      { locale: "en", href: "https://example.com/team", current: false },
+      { locale: "en", href: "https://example.com/team", current: false, original: true },
       { locale: "es", href: "https://example.com/es/equipo", current: true },
       { locale: "x-default", href: "https://example.com/team", current: false },
     ]);
@@ -176,5 +178,77 @@ describe("locales over a store", () => {
     expect(es("/")).toBe("/"); // the home page has no Spanish version: it stays English
     expect(es("/search")).toBe("/es/search"); // not a node: the same locale
     expect(es("/category/news/page/2")).toBe("/es/category/noticias/page/2");
+  });
+
+  it("links versions in JSON-LD and names the translator", async () => {
+    const alternates = await alternatesFor(source, acerca, ORIGIN);
+    const es = localizeHead(pageHead(site, acerca, ORIGIN), site, {
+      locale: "es",
+      origin: ORIGIN,
+      alternates,
+      translation: {
+        group: about.id,
+        method: "machine-reviewed",
+        review: {
+          by: { kind: "human", id: "user_01HZX8K3QREV", name: "Ana" },
+          at: "2026-10-18T10:00:00Z",
+        },
+      },
+    });
+    expect(es.jsonLd[0]).toMatchObject({
+      translationOfWork: { "@id": "https://example.com/team", inLanguage: "en" },
+      translator: { "@type": "Person", name: "Ana" },
+    });
+    const en = localizeHead(pageHead(site, about, ORIGIN), site, {
+      locale: "en",
+      origin: ORIGIN,
+      alternates: await alternatesFor(source, about, ORIGIN),
+    });
+    expect(en.jsonLd[0]).toMatchObject({
+      workTranslation: [{ "@id": "https://example.com/es/equipo", inLanguage: "es" }],
+    });
+  });
+
+  it("writes one sitemap with every locale and its alternates, and a feed and llms.txt per locale", async () => {
+    const urls = await localizedSitemap(source, ORIGIN, "example.com");
+    const team = urls.find((u) => u.loc === "https://example.com/team");
+    expect(team?.alternates).toEqual([
+      { locale: "en", href: "https://example.com/team" },
+      { locale: "es", href: "https://example.com/es/equipo" },
+      { locale: "x-default", href: "https://example.com/team" },
+    ]);
+    expect(urls.some((u) => u.loc === "https://example.com/es/equipo")).toBe(true);
+    const xml = sitemapXml(urls);
+    expect(xml).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(xml).toContain(
+      '<xhtml:link rel="alternate" hreflang="es" href="https://example.com/es/equipo"/>',
+    );
+    await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "hola",
+      locale: "es",
+      status: "published",
+      title: "Hola",
+      body: { format: "markdown", value: "Hola." },
+      fields: {},
+      tags: [],
+      author: { kind: "human", id: "user_01HZX8K3QAUT", name: "Ana" },
+      terms: {
+        category: {
+          ids: [(await store.getTermBySlug(site.id, "category", "news"))?.id as string],
+          primary: (await store.getTermBySlug(site.id, "category", "news"))?.id as string,
+        },
+      },
+    });
+    const feed = await localeFeedXml(source, { origin: ORIGIN, locale: "es" });
+    expect(feed).toContain("<language>es</language>");
+    expect(feed).toContain("<link>https://example.com/es/posts/hola</link>");
+    expect(feed).toContain('<atom:link href="https://example.com/es/rss.xml"');
+    const llms = await llmsTxt(source, { origin: ORIGIN, locale: "es" });
+    expect(llms).toContain("Language: es");
+    expect(llms).toContain("- [Equipo](https://example.com/es/equipo)");
+    expect(llms).toContain("- [Hola](https://example.com/es/posts/hola)");
+    expect(llms).toContain("- [en](https://example.com/llms.txt)");
   });
 });
