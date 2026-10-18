@@ -131,6 +131,38 @@ describe("translation tools", () => {
     expect((again.result.node as Page).id).toBe(node.id);
   });
 
+  it("lists stale translations and rebuilds a linked one on the source's new layout", async () => {
+    const node = (await call("save_translation", spanish())).result.node as Page;
+    expect((await call("list_stale_translations", { siteId: site.id })).result.stale).toEqual([]);
+    // The source gains a section and drops one.
+    const source = (await store.getPage(page.id)) as Page;
+    await store.updatePage({
+      ...source,
+      sections: [
+        source.sections[0] as Page["sections"][number],
+        { id: "sec_launch0more", kind: "hero", heading: "Now in Spanish" },
+      ] as Page["sections"],
+    });
+    const stale = (await call("list_stale_translations", { siteId: site.id, locale: "es" })).result
+      .stale as Array<{ id: string; locale: string }>;
+    expect(stale.map((m) => [m.id, m.locale])).toEqual([[node.id, "es"]]);
+    const src = await call("get_translation_source", {
+      siteId: site.id,
+      nodeId: page.id,
+      locale: "es",
+    });
+    expect(src.result.stale).toBe(true);
+    const layout = src.result.layout as {
+      sections: Page["sections"];
+      untranslated: string[];
+      removed: string[];
+    };
+    expect(layout.untranslated).toEqual(["sec_launch0more"]);
+    expect(layout.removed).toEqual(["sec_launch0text"]);
+    // The kept section keeps its Spanish text.
+    expect(layout.sections[0]).toMatchObject({ heading: "Cloudhal para cada redacción" });
+  });
+
   it("records failing checks, and the store keeps such a draft from being published", async () => {
     const saved = await call(
       "save_translation",

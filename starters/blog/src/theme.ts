@@ -198,7 +198,24 @@ const STRINGS = {
 
 export type ThemeStrings = (typeof STRINGS)[keyof typeof STRINGS];
 
-export function strings(locale: string): ThemeStrings {
+/**
+ * The theme's words in `locale`, with the site's own wording over them (`strings` in the theme
+ * settings, RFC-0033 §4a: one item per language): plain-text words only, the keys the settings
+ * declare.
+ */
+export function strings(locale: string, overrides?: unknown): ThemeStrings {
   const lang = (locale.split("-")[0] ?? locale) as keyof typeof STRINGS;
-  return STRINGS[lang] ?? STRINGS.en;
+  const base = STRINGS[lang] ?? STRINGS.en;
+  if (!Array.isArray(overrides)) return base;
+  const words = base as Record<string, unknown>;
+  const item =
+    (overrides as Array<Record<string, unknown>>).find((o) => o?.locale === locale) ??
+    (overrides as Array<Record<string, unknown>>).find((o) => o?.locale === lang);
+  if (!item) return base;
+  const own = Object.fromEntries(
+    Object.entries(item).filter(
+      ([k, v]) => k !== "locale" && typeof v === "string" && v && typeof words[k] === "string",
+    ),
+  );
+  return Object.keys(own).length ? ({ ...base, ...own } as ThemeStrings) : base;
 }

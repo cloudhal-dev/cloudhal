@@ -473,7 +473,18 @@ describe("cloudhal init → dev → snapshot → build", () => {
     const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
     let site = await local.store.getSite(cfg.siteId);
     if (!site) throw new Error("no site");
-    site = await local.store.updateSite({ ...site, locales: [site.defaultLocale, "es"] });
+    site = await local.store.updateSite({
+      ...site,
+      locales: [site.defaultLocale, "es"],
+      // RFC-0033 §4a: the theme's notice in Spanish, from the site's own wording.
+      theme: {
+        ...site.theme,
+        config: {
+          ...site.theme.config,
+          strings: [{ locale: "es", machineTranslated: "Esta página se tradujo automáticamente." }],
+        },
+      },
+    });
     const about = (await local.store.listPages(cfg.siteId)).find((p) => p.path === "/about");
     if (!about) throw new Error("no about page");
     const original = await local.store.updatePage({
@@ -506,6 +517,7 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(es).toMatch(/<link rel="alternate" hreflang="en" href="[^"]+\/about">/);
     expect(es).toMatch(/<link rel="alternate" hreflang="x-default" href="[^"]+\/about">/);
     expect(es).toContain("ch-translation-notice");
+    expect(es).toContain("Esta página se tradujo automáticamente.");
     expect(es).toContain('"translationOfWork"');
     // the header's link to About leads to the Spanish version
     expect(es).toContain('href="/es/acerca"');
