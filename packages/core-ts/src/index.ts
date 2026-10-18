@@ -88,3 +88,4 @@ export {
 } from "./taxonomy.ts";
 export * from "./taxonomy-report.ts";
 export { termSlug } from "./term-locales.ts";
+export * from "./translation-checks.ts";
