@@ -8,7 +8,7 @@
     "apps/studio/src/routes/CommentThreadPage.tsx": 814,
     "apps/studio/src/routes/NavigationPage.tsx": 1171,
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
-    "apps/studio/src/routes/SiteSettingsPage.tsx": 915,
+    "apps/studio/src/routes/SiteSettingsPage.tsx": 881,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 853,
     "packages/api/src/routes/comments.ts": 874,
@@ -181,10 +181,10 @@
       "lines": 191
     },
     "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
-      "lines": 477
+      "lines": 475
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
-      "lines": 370
+      "lines": 214
     },
     "apps/studio/src/routes/AssetPage.tsx::AssetPage": {
       "lines": 739
@@ -234,9 +234,6 @@
     "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
       "lines": 1042
     },
-    "apps/studio/src/routes/PagesPage.tsx::PagesPage": {
-      "lines": 173
-    },
     "apps/studio/src/routes/RedirectsPage.tsx::RedirectsPage": {
       "lines": 296
     },
@@ -271,7 +268,7 @@
       "lines": 164
     },
     "apps/studio/src/routes/SiteShell.tsx::SiteShell": {
-      "lines": 255
+      "lines": 235
     },
     "apps/studio/src/routes/SkillsPage.tsx::SkillsPage": {
       "lines": 170

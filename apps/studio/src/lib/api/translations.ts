@@ -14,6 +14,8 @@ export interface TranslationRow {
   method?: TranslationMethod;
   layout?: "linked" | "independent";
   rev: number;
+  /** The node's current content hash: what a translation made from it records as its source. */
+  hash?: string;
   stale: boolean;
   sourceMissing: boolean;
   reviewed: boolean;

@@ -33,7 +33,12 @@ import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
-import { ListViewsCell, ListViewsHead, useListViews } from "../components/ListViews.tsx";
+import {
+  ListViewsCell,
+  type ListViewsColumn,
+  ListViewsHead,
+  useListViews,
+} from "../components/ListViews.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
@@ -42,6 +47,12 @@ import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { type TaxonomyData, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { treeOptions } from "../components/TermPickers.tsx";
+import {
+  LanguageFilter,
+  LanguagesCell,
+  type TranslationList,
+  useTranslationList,
+} from "../components/TranslationList.tsx";
 import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { listOf, useI18n, useT } from "../i18n/index.tsx";
@@ -77,7 +88,6 @@ function namesOf(entry: ContentEntry, tax: Taxonomy | undefined, data: TaxonomyD
  */
 export function ArticlesPage() {
   const t = useT();
-  const { locale } = useI18n();
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const facets = useSearch({ strict: false }) as { category?: string; tag?: string };
   const qc = useQueryClient();
@@ -113,7 +123,11 @@ export function ArticlesPage() {
     toDelete ? { kind: "contentEntry", id: toDelete.id } : undefined,
   );
   const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const paging = usePaging(sorted, (e, q, fold) => fold(e.title).includes(q) || e.slug.includes(q));
+  const list = useTranslationList(siteId, site.data, sorted);
+  const paging = usePaging(
+    list.items,
+    (e, q, fold) => fold(e.title).includes(q) || e.slug.includes(q),
+  );
   const setFacets = (next: { category?: string | undefined; tag?: string | undefined }) =>
     navigate({
       to: "/sites/$siteId/articles",
@@ -130,7 +144,7 @@ export function ArticlesPage() {
       api.entries.create(siteId, {
         collection: "posts",
         slug: `untitled-${Date.now().toString(36)}`,
-        locale: site.data?.defaultLocale ?? "en",
+        locale: list.newLocale,
         status: "draft",
         title: t("articles.untitled"),
         body: { format: "markdown", value: "" },
@@ -164,17 +178,8 @@ export function ArticlesPage() {
     </Button>
   );
   const migrated = (data.taxonomies.data?.length ?? 0) > 0;
-  const categoryOptions = catTax ? treeOptions(data.itemsOf(catTax), data.name) : [];
-  const tagOptions = tagTax
-    ? data
-        .itemsOf(tagTax)
-        .filter((i) => i.term.status !== "retired")
-        .sort(
-          (a, b) =>
-            b.usage.total - a.usage.total || data.name(a.term).localeCompare(data.name(b.term)),
-        )
-    : [];
-  const columns = 5 + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + 1;
+  const facetsShown = migrated && Boolean(catTax || tagTax);
+  const columns = 6 + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + (list.groupOf ? 1 : 0);
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.articles.title") }]} />}
@@ -192,58 +197,19 @@ export function ArticlesPage() {
         onSearch={paging.setSearch}
         placeholder={t("articles.search")}
         actions={
-          migrated && (catTax || tagTax) ? (
+          facetsShown || list.multilingual ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {filtered && (
                 <Button variant="ghost" onClick={() => setFacets({})} data-testid="clear-facets">
                   {t("articles.facets.clear")}
                 </Button>
               )}
-              <Toolbar aria-label={t("articles.facets.label")}>
-                {catTax && (
-                  <Select
-                    aria-label={t("articles.facets.category")}
-                    value={facets.category ?? ALL}
-                    onValueChange={(v) =>
-                      setFacets({ ...facets, category: v === ALL ? undefined : (v as string) })
-                    }
-                    items={Object.fromEntries([
-                      [
-                        ALL,
-                        t("articles.facets.allCategories", {
-                          label: data.label(catTax).toLocaleLowerCase(locale),
-                        }),
-                      ],
-                      ...categoryOptions.map((o) => [
-                        o.term.slug,
-                        `${" ".repeat(o.depth)}${data.name(o.term)}`,
-                      ]),
-                    ])}
-                    render={<Toolbar.Button />}
-                    data-testid="facet-category"
-                  />
-                )}
-                {tagTax && (
-                  <Select
-                    aria-label={t("articles.facets.tag")}
-                    value={facets.tag ?? ALL}
-                    onValueChange={(v) =>
-                      setFacets({ ...facets, tag: v === ALL ? undefined : (v as string) })
-                    }
-                    items={Object.fromEntries([
-                      [
-                        ALL,
-                        t("articles.facets.allTags", {
-                          label: data.label(tagTax).toLocaleLowerCase(locale),
-                        }),
-                      ],
-                      ...tagOptions.map((i) => [i.term.slug, data.name(i.term)]),
-                    ])}
-                    render={<Toolbar.Button />}
-                    data-testid="facet-tag"
-                  />
-                )}
-              </Toolbar>
+              {list.multilingual && (
+                <Toolbar aria-label={t("translationList.filter")}>
+                  <LanguageFilter list={list} site={site.data} />
+                </Toolbar>
+              )}
+              {facetsShown && <ArticleFacets data={data} facets={facets} setFacets={setFacets} />}
             </div>
           ) : undefined
         }
@@ -277,6 +243,7 @@ export function ArticlesPage() {
                 {catTax && <Table.Head>{data.label(catTax, "singular")}</Table.Head>}
                 <Table.Head>{tagTax ? data.label(tagTax) : t("editor.tags")}</Table.Head>
                 <Table.Head>{t("articles.columns.author")}</Table.Head>
+                {list.groupOf && <Table.Head>{t("translationList.column")}</Table.Head>}
                 <Table.Head>{t("articles.columns.status")}</Table.Head>
                 <Table.Head>{t("articles.columns.updated")}</Table.Head>
                 {viewsColumn && <ListViewsHead />}
@@ -289,135 +256,23 @@ export function ArticlesPage() {
               <TableSkeleton columns={columns} />
             ) : (
               <Table.Body>
-                {paging.pageItems.map((e) => {
-                  const AuthorIcon = AUTHOR_ICON[e.author.kind];
-                  const cats = namesOf(e, catTax, data);
-                  const tags = tagTax ? namesOf(e, tagTax, data).names : e.tags;
-                  const needsCategory =
-                    catTax?.required &&
-                    !e.terms?.[catTax.key]?.primary &&
-                    (e.status === "review" || e.status === "published");
-                  return (
-                    <Table.Row key={e.id} data-entry-id={e.id}>
-                      <Table.Cell>
-                        <div className="flex min-w-56 items-center gap-3">
-                          <ImagePreview
-                            size="thumb"
-                            src={
-                              e.coverImage
-                                ? imageRefPreviewUrl(siteId, e.coverImage, host)
-                                : undefined
-                            }
-                            alt=""
-                            labels={{
-                              empty: t("seo.noCover"),
-                              loading: t("seo.cover.loading"),
-                              error: t("seo.cover.broken"),
-                            }}
-                          />
-                          <div className="grid min-w-0 gap-1">
-                            <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
-                              <Text bold as="span">
-                                {e.title}
-                              </Text>
-                            </Link>
-                            <Text variant="mono-secondary" as="span" truncate>
-                              /{e.collection}/{e.slug}
-                            </Text>
-                          </div>
-                        </div>
-                      </Table.Cell>
-                      {catTax && (
-                        <Table.Cell className="whitespace-nowrap" data-testid="category-cell">
-                          {cats.names.length === 0 ? (
-                            needsCategory ? (
-                              <Badge variant="warning" icon={<Warning />}>
-                                {t("articles.noCategory")}
-                              </Badge>
-                            ) : (
-                              <Text variant="secondary" as="span">
-                                {t("articles.none")}
-                              </Text>
-                            )
-                          ) : (
-                            <span className="flex items-center gap-1.5">
-                              {cats.primary && (
-                                <Tooltip content={t("articles.primary")}>
-                                  <span className="flex items-center text-kumo-warning">
-                                    <Star
-                                      size={12}
-                                      weight="fill"
-                                      aria-label={t("articles.primary")}
-                                    />
-                                  </span>
-                                </Tooltip>
-                              )}
-                              <Text as="span">{cats.names[0]}</Text>
-                              {cats.names.length > 1 && (
-                                <Tooltip content={listOf(cats.names.slice(1))}>
-                                  <span className="inline-flex">
-                                    <Badge variant="secondary">+{cats.names.length - 1}</Badge>
-                                  </span>
-                                </Tooltip>
-                              )}
-                            </span>
-                          )}
-                        </Table.Cell>
-                      )}
-                      <Table.Cell data-testid="tags-cell">
-                        {tags.length === 0 ? (
-                          <Text variant="secondary" as="span">
-                            {t("articles.none")}
-                          </Text>
-                        ) : (
-                          <span className="flex min-w-36 flex-wrap items-center gap-1">
-                            {tags.slice(0, 2).map((name) => (
-                              <Badge key={name} variant="outline">
-                                {name}
-                              </Badge>
-                            ))}
-                            {tags.length > 2 && (
-                              <Tooltip content={listOf(tags.slice(2))}>
-                                <span className="inline-flex">
-                                  <Badge variant="secondary">+{tags.length - 2}</Badge>
-                                </span>
-                              </Tooltip>
-                            )}
-                          </span>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="flex items-center gap-2 whitespace-nowrap">
-                          <AuthorIcon size={16} className="shrink-0 text-kumo-subtle" aria-hidden />
-                          <Text as="span">{e.author.name ?? e.author.id}</Text>
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <Status status={e.status} />
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap">
-                        <RelativeTime iso={e.updatedAt} />
-                      </Table.Cell>
-                      {viewsColumn && <ListViewsCell views={viewsColumn.views} nodeId={e.id} />}
-                      <Table.Cell sticky="right" className="w-0 text-end">
-                        <RowMenu
-                          onOpen={() =>
-                            navigate({
-                              to: "/sites/$siteId/articles/$entryId",
-                              params: { siteId, entryId: e.id },
-                            })
-                          }
-                          onDelete={() => setToDelete(e)}
-                          deleteDisabledReason={
-                            entryAccess(e, { editAny, editOwnPublished }, self) === "edit"
-                              ? undefined
-                              : t("gating.entryDelete")
-                          }
-                        />
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
+                {paging.pageItems.map((e) => (
+                  <ArticleRow
+                    key={e.id}
+                    entry={e}
+                    siteId={siteId}
+                    host={host}
+                    data={data}
+                    list={list}
+                    views={viewsColumn}
+                    deleteDisabledReason={
+                      entryAccess(e, { editAny, editOwnPublished }, self) === "edit"
+                        ? undefined
+                        : t("gating.entryDelete")
+                    }
+                    onDelete={() => setToDelete(e)}
+                  />
+                ))}
               </Table.Body>
             )}
           </Table>
@@ -443,5 +298,225 @@ export function ArticlesPage() {
         }}
       />
     </PageLayout>
+  );
+}
+
+/** One article; on a multilingual site's grouped list, with its group's Languages cell. */
+function ArticleRow({
+  entry: e,
+  siteId,
+  host,
+  data,
+  list,
+  views,
+  deleteDisabledReason,
+  onDelete,
+}: {
+  entry: ContentEntry;
+  siteId: string;
+  host: string | undefined;
+  data: TaxonomyData;
+  list: TranslationList<ContentEntry>;
+  views: ListViewsColumn;
+  deleteDisabledReason: string | undefined;
+  onDelete: () => void;
+}) {
+  const t = useT();
+  const navigate = useNavigate();
+  const { category: catTax, tag: tagTax } = data.defaults;
+  const group = list.groupOf?.(e.id);
+  const AuthorIcon = AUTHOR_ICON[e.author.kind];
+  const cats = namesOf(e, catTax, data);
+  const tags = tagTax ? namesOf(e, tagTax, data).names : e.tags;
+  const needsCategory =
+    catTax?.required &&
+    !e.terms?.[catTax.key]?.primary &&
+    (e.status === "review" || e.status === "published");
+  return (
+    <Table.Row key={e.id} data-entry-id={e.id}>
+      <Table.Cell>
+        <div className="flex min-w-56 items-center gap-3">
+          <ImagePreview
+            size="thumb"
+            src={e.coverImage ? imageRefPreviewUrl(siteId, e.coverImage, host) : undefined}
+            alt=""
+            labels={{
+              empty: t("seo.noCover"),
+              loading: t("seo.cover.loading"),
+              error: t("seo.cover.broken"),
+            }}
+          />
+          <div className="grid min-w-0 gap-1">
+            <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
+              <Text bold as="span">
+                {e.title}
+              </Text>
+            </Link>
+            <Text variant="mono-secondary" as="span" truncate>
+              /{e.collection}/{e.slug}
+            </Text>
+          </div>
+        </div>
+      </Table.Cell>
+      {catTax && (
+        <Table.Cell className="whitespace-nowrap" data-testid="category-cell">
+          {cats.names.length === 0 ? (
+            needsCategory ? (
+              <Badge variant="warning" icon={<Warning />}>
+                {t("articles.noCategory")}
+              </Badge>
+            ) : (
+              <Text variant="secondary" as="span">
+                {t("articles.none")}
+              </Text>
+            )
+          ) : (
+            <span className="flex items-center gap-1.5">
+              {cats.primary && (
+                <Tooltip content={t("articles.primary")}>
+                  <span className="flex items-center text-kumo-warning">
+                    <Star size={12} weight="fill" aria-label={t("articles.primary")} />
+                  </span>
+                </Tooltip>
+              )}
+              <Text as="span">{cats.names[0]}</Text>
+              {cats.names.length > 1 && (
+                <Tooltip content={listOf(cats.names.slice(1))}>
+                  <span className="inline-flex">
+                    <Badge variant="secondary">+{cats.names.length - 1}</Badge>
+                  </span>
+                </Tooltip>
+              )}
+            </span>
+          )}
+        </Table.Cell>
+      )}
+      <Table.Cell data-testid="tags-cell">
+        {tags.length === 0 ? (
+          <Text variant="secondary" as="span">
+            {t("articles.none")}
+          </Text>
+        ) : (
+          <span className="flex min-w-36 flex-wrap items-center gap-1">
+            {tags.slice(0, 2).map((name) => (
+              <Badge key={name} variant="outline">
+                {name}
+              </Badge>
+            ))}
+            {tags.length > 2 && (
+              <Tooltip content={listOf(tags.slice(2))}>
+                <span className="inline-flex">
+                  <Badge variant="secondary">+{tags.length - 2}</Badge>
+                </span>
+              </Tooltip>
+            )}
+          </span>
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        <span className="flex items-center gap-2 whitespace-nowrap">
+          <AuthorIcon size={16} className="shrink-0 text-kumo-subtle" aria-hidden />
+          <Text as="span">{e.author.name ?? e.author.id}</Text>
+        </span>
+      </Table.Cell>
+      {list.groupOf && (
+        <Table.Cell data-testid="languages-cell">
+          {group && <LanguagesCell siteId={siteId} row={group} canWrite />}
+        </Table.Cell>
+      )}
+      <Table.Cell className="whitespace-nowrap">
+        <Status status={e.status} />
+      </Table.Cell>
+      <Table.Cell className="whitespace-nowrap">
+        <RelativeTime iso={e.updatedAt} />
+      </Table.Cell>
+      {views && <ListViewsCell views={views.views} nodeId={e.id} />}
+      <Table.Cell sticky="right" className="w-0 text-end">
+        <RowMenu
+          onOpen={() =>
+            navigate({
+              to: "/sites/$siteId/articles/$entryId",
+              params: { siteId, entryId: e.id },
+            })
+          }
+          onDelete={onDelete}
+          deleteDisabledReason={deleteDisabledReason}
+        />
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+type Facets = { category?: string | undefined; tag?: string | undefined };
+
+/** The category and tag filters, which query the API's filter language (DESIGN.md §2p). */
+function ArticleFacets({
+  data,
+  facets,
+  setFacets,
+}: {
+  data: TaxonomyData;
+  facets: Facets;
+  setFacets: (next: Facets) => void;
+}) {
+  const t = useT();
+  const { locale } = useI18n();
+  const { category: catTax, tag: tagTax } = data.defaults;
+  const categoryOptions = catTax ? treeOptions(data.itemsOf(catTax), data.name) : [];
+  const tagOptions = tagTax
+    ? data
+        .itemsOf(tagTax)
+        .filter((i) => i.term.status !== "retired")
+        .sort(
+          (a, b) =>
+            b.usage.total - a.usage.total || data.name(a.term).localeCompare(data.name(b.term)),
+        )
+    : [];
+  return (
+    <Toolbar aria-label={t("articles.facets.label")}>
+      {catTax && (
+        <Select
+          aria-label={t("articles.facets.category")}
+          value={facets.category ?? ALL}
+          onValueChange={(v) =>
+            setFacets({ ...facets, category: v === ALL ? undefined : (v as string) })
+          }
+          items={Object.fromEntries([
+            [
+              ALL,
+              t("articles.facets.allCategories", {
+                label: data.label(catTax).toLocaleLowerCase(locale),
+              }),
+            ],
+            ...categoryOptions.map((o) => [
+              o.term.slug,
+              `${" ".repeat(o.depth)}${data.name(o.term)}`,
+            ]),
+          ])}
+          render={<Toolbar.Button />}
+          data-testid="facet-category"
+        />
+      )}
+      {tagTax && (
+        <Select
+          aria-label={t("articles.facets.tag")}
+          value={facets.tag ?? ALL}
+          onValueChange={(v) =>
+            setFacets({ ...facets, tag: v === ALL ? undefined : (v as string) })
+          }
+          items={Object.fromEntries([
+            [
+              ALL,
+              t("articles.facets.allTags", {
+                label: data.label(tagTax).toLocaleLowerCase(locale),
+              }),
+            ],
+            ...tagOptions.map((i) => [i.term.slug, data.name(i.term)]),
+          ])}
+          render={<Toolbar.Button />}
+          data-testid="facet-tag"
+        />
+      )}
+    </Toolbar>
   );
 }
