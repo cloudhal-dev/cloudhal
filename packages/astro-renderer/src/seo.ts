@@ -442,10 +442,15 @@ const SEARCH_WORDS: Record<string, { search: string; results: (q: string) => str
 
 /**
  * `<head>` for the search page (RFC-0019 §3): always `noindex,follow`, canonical without the
- * query (results are not documents), no cards or structured data.
+ * query (results are not documents), no cards or structured data; its words in `locale`
+ * (English for languages without them).
  */
-export function searchHead(site: Site, query: string, origin: string): HeadMeta {
-  const locale = site.defaultLocale;
+export function searchHead(
+  site: Site,
+  query: string,
+  origin: string,
+  locale: string = site.defaultLocale,
+): HeadMeta {
   const words =
     SEARCH_WORDS[locale.split("-")[0] ?? locale] ??
     (SEARCH_WORDS.en as (typeof SEARCH_WORDS)["en"]);

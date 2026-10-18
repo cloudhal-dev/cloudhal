@@ -533,4 +533,131 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(await read("es", "llms.txt")).toContain("Language: es");
     expect(await read("es", "rss.xml")).toContain("<language>es</language>");
   });
+
+  it("dev answers a miss in the request's language: the theme's 404, then the site's own /404 and its translation; search and archives in tr (RFC-0033)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    let site = await local.store.getSite(cfg.siteId);
+    if (!site) throw new Error("no site");
+    site = await local.store.updateSite({
+      ...site,
+      locales: [site.defaultLocale, "es", "tr"],
+      // Spanish is no language the theme ships: English words, the site's own over them.
+      theme: {
+        ...site.theme,
+        config: {
+          ...site.theme.config,
+          strings: [{ locale: "es", notFoundTitle: "Página no encontrada" }],
+        },
+      },
+    });
+    const posts = await local.store.listContentEntries(cfg.siteId, "posts");
+    const hello = posts.find((e) => e.slug === "hello-world" && e.locale === "en");
+    if (!hello) throw new Error("no hello-world");
+    const { id: _id, rev: _rev, createdAt: _c, updatedAt: _u, schemaVersion: _v, ...rest } = hello;
+    await local.store.createContentEntry({
+      ...rest,
+      slug: "merhaba-dunya",
+      locale: "tr",
+      title: "Merhaba dünya",
+    });
+    await local.close();
+
+    const port = 40000 + Math.floor(Math.random() * 20000);
+    const server = await spawnDev(projectDir, port);
+    const get = async (p: string) => {
+      const res = await fetch(new URL(p, server.url));
+      return { status: res.status, html: await res.text() };
+    };
+    try {
+      let tr = await get("/tr/missing");
+      for (let i = 0; i < 40 && !tr.html.includes("<h1"); i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        tr = await get("/tr/missing");
+      }
+      expect(tr.status).toBe(404);
+      expect(tr.html).toMatch(/<html lang="tr" dir="ltr"/);
+      expect(tr.html).toContain("Sayfa bulunamadı");
+      expect(tr.html).toContain("<title>Sayfa bulunamadı · ");
+      expect(tr.html).toContain('<meta name="robots" content="noindex,follow">');
+      expect(tr.html).toContain('action="/tr/search"');
+      expect(tr.html).toContain("ch-footer__languages");
+      expect(tr.html).toContain('<link rel="alternate" type="application/rss+xml"');
+      expect(tr.html).toMatch(/type="application\/rss\+xml"[^>]*href="[^"]+\/tr\/rss\.xml"/);
+      const en = await get("/missing");
+      expect(en.status).toBe(404);
+      expect(en.html).toMatch(/<html lang="en" dir="ltr"/);
+      expect(en.html).toContain("Page not found");
+      const es = await get("/es/missing");
+      expect(es.status).toBe(404);
+      expect(es.html).toMatch(/<html lang="es" dir="ltr"/);
+      expect(es.html).toContain("Página no encontrada");
+      expect(es.html).toContain("The page you are looking for");
+
+      const search = await get("/tr/search?q=merhaba");
+      expect(search.status).toBe(200);
+      expect(search.html).toMatch(/<html lang="tr" dir="ltr"/);
+      expect(search.html).toContain("<title>Arama: merhaba · ");
+      expect(search.html).toMatch(/<link rel="canonical" href="[^"]+\/tr\/search">/);
+      const archive = await get("/tr/category/news");
+      expect(archive.status).toBe(200);
+      expect(archive.html).toMatch(/<html lang="tr" dir="ltr"/);
+      expect(archive.html).toContain("1 yazı");
+      expect(archive.html).toContain('href="/tr/posts/merhaba-dunya"');
+
+      // The site authors its 404, in English and (at a path of its own) in Turkish.
+      const local2 = await openLocalStore(path.join(projectDir, cfg.dataDir));
+      const site2 = await local2.store.getSite(cfg.siteId);
+      if (!site2) throw new Error("no site");
+      const { page: lost, site: site3 } = await local2.store.createPage(site2, {
+        id: "page_01HZX8K4N0FD",
+        siteId: cfg.siteId,
+        path: "/404",
+        title: "Lost?",
+        locale: "en",
+        status: "published",
+        sections: [{ id: "sec_lost00000001", kind: "hero", heading: "Nothing here" }],
+        translation: { group: "page_01HZX8K4N0FD", method: "original" },
+      });
+      const group = await local2.store.translationGroup(site3, lost.id);
+      await local2.store.createPage(site3, {
+        siteId: cfg.siteId,
+        path: "/bulunamadi",
+        title: "Kayboldunuz mu?",
+        locale: "tr",
+        status: "published",
+        sections: [{ id: "sec_kayip0000001", kind: "hero", heading: "Burada bir şey yok" }],
+        translation: {
+          group: lost.id,
+          method: "human",
+          source: {
+            id: lost.id,
+            locale: "en",
+            rev: lost.rev,
+            hash: group.members[0]?.hash as string,
+          },
+        },
+      });
+      await local2.close();
+      for (let i = 0; i < 40 && !tr.html.includes("Burada bir şey yok"); i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        tr = await get("/tr/missing");
+      }
+      expect(tr.status).toBe(404);
+      expect(tr.html).toMatch(/<html lang="tr" dir="ltr"/);
+      expect(tr.html).toContain("Burada bir şey yok");
+      expect(tr.html).not.toContain('<link rel="alternate" hreflang');
+      // the not-found page is no header link
+      expect(tr.html).not.toContain('href="/tr/bulunamadi"');
+      const enOwn = await get("/missing");
+      expect(enOwn.status).toBe(404);
+      expect(enOwn.html).toContain("Nothing here");
+      expect((await get("/404")).status).toBe(404);
+      // No Spanish version and no fallback: the theme's own page, in the site's Spanish words.
+      expect((await get("/es/missing")).html).toContain("Página no encontrada");
+    } finally {
+      server.child.kill("SIGTERM");
+      await new Promise((r) => server.child.once("exit", r));
+    }
+  });
 });

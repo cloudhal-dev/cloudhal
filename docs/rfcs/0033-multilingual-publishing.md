@@ -185,6 +185,7 @@ A new root type **`glossary.schema.json`** holds one per site. Its entries are `
   - It never redirects by `Accept-Language` or IP. A remembered choice (cookie) may show a "Read in …" banner only.
 - **Machine-translation notice.** A theme-kit component every theme gets. It shows the notice wording, links to the original, and offers "reviewed by …" when reviewed. The wording lives in the theme `STRINGS` for each locale.
 - **Fallback with notice** (opt-in). The default-language page is served at the requested locale's URL with a notice and `noindex`, and is not listed in `hreflang` or the sitemap (Starlight's model).
+- **Not found** (no contract change). A miss answers `404` in the request's locale: `/<locale>/…` in that locale, a bare path in the default one, with its `lang`/`dir`, strings, menus and switcher, `noindex`, no `hreflang`. A site may author a page at `/404`; its translation group members (at any path) are each locale's not-found page, the original stands in only under the fallback above, and otherwise the theme draws its own (`@cloudhal/astro-renderer/not-found`). These pages answer `404` at their own paths too and stay out of the sitemap and `llms.txt`.
 - **Caching.** The locale is in the URL or host, so each locale has its own cache key and there is no `Vary: Accept-Language`. Publish purges the cache tags of every group member whose `hreflang` set changed.
 
 ### 4a. Landing pages, themes and generated pages across languages
@@ -201,7 +202,7 @@ A landing page in three languages is **three page nodes in one group**: the orig
   - Text already translated or edited by a person is never touched (invariant: a person's edit wins).
   - Webflow's model is "inherit until overridden" for layout. This gets the same result with no field-level storage.
 - **Independent layout is for pages that diverge by market or edition:** a different hero, other sections, a local offer. Nothing propagates. The page stays in the group for `hreflang` and the switcher, and the staleness signal still tells editors the original changed.
-- **The theme's own words never live in pages.** "Read more", "Search", dates, "min read" and the machine-translation notice come from the theme's `STRINGS` per locale (`starters/blog/src/theme.ts`).
+- **The theme's own words never live in pages.** "Read more", "Search", dates, "min read" and the machine-translation notice come from the theme's `STRINGS` per locale (`starters/blog/src/strings.ts`; a language the theme lacks reads English, never a blank).
   - A theme ships at least English. It declares its locales in the manifest (RFC-0018).
   - For a site locale the theme lacks, the agent drafts the missing strings into a site-level override map (a `strings` map in `Site.theme.config`), reviewed like any translation.
   - `theme:check` fails a theme whose templates contain hard-coded words. This is the same rule Studio follows (AGENTS.md rule 10).

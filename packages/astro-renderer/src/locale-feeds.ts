@@ -8,6 +8,7 @@ import { archiveSummaries } from "./archive.ts";
 import { FEED_LIMIT, rssXml, type SitemapUrl, sitemapUrls } from "./feeds.ts";
 import { hostLocale, localeUrl } from "./locales.ts";
 import { loadAssetIndex } from "./media.ts";
+import { notFoundPageIds } from "./not-found.ts";
 import { entryPath } from "./routing.ts";
 import type { GraphSource } from "./source.ts";
 import { loadTaxonomyIndex } from "./taxonomy.ts";
@@ -120,7 +121,9 @@ export async function llmsTxt(
   const home = await source.pageByPath("/", locale);
   const visible = <T extends Localized>(n: T) =>
     n.status === "published" && n.locale === locale && !("seo" in n && n.seo?.noindex);
-  const pages = (await source.pages()).filter(visible);
+  const all = await source.pages();
+  const notFound = notFoundPageIds(all);
+  const pages = all.filter((p) => visible(p) && !notFound.has(p.id));
   const entries = (await source.allEntries(locale)).filter(visible).slice(0, FEED_LIMIT * 4);
   const line = (n: Localized) => {
     const summary = "summary" in n && n.summary ? `: ${n.summary.replace(/\s+/g, " ")}` : "";

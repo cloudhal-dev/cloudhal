@@ -33,6 +33,7 @@ import {
   markCurrent,
   navigationCacheTags,
 } from "@cloudhal/astro-renderer/navigation";
+import { notFoundPage, notFoundPageIds } from "@cloudhal/astro-renderer/not-found";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { searchAvailable } from "@cloudhal/astro-renderer/search";
@@ -59,7 +60,8 @@ import type { ContentEntry } from "@cloudhal/core-contracts";
  * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
  * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
  * `/search?q=` is the site search (RFC-0019 §3) where the deployment answers it: never cached,
- * never indexed, and its form sits in the header.
+ * never indexed, and its form sits in the header. A miss answers 404 with the site's page at
+ * `/404` in the request's locale, else the theme's own not-found page in that locale.
  */
 import { resolveChrome } from "@cloudhal/core-ts/chrome";
 import { blockTypes } from "../blocks.ts";
@@ -67,6 +69,7 @@ import Archive from "../components/Archive.astro";
 import Article from "../components/Article.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import MenuPanel from "../components/MenuPanel.astro";
+import NotFound from "../components/NotFound.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
 import Search from "../components/Search.astro";
@@ -152,8 +155,23 @@ if (route.kind === "gone") return new Response(null, { status: 410 });
 // RFC-0025 §2: `/menu` is the phone menu as a page (the menu link's target without JavaScript),
 // unless the site has a page there.
 const isMenu = route.kind === "not-found" && path === "/menu";
-if (!isMenu && (route.kind === "not-found" || route.kind === "feed"))
-  return new Response(null, { status: 404 });
+// Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
+// `?comments=<n>` past the last page is a miss.
+const comments =
+  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
+// A miss (RFC-0033 §4) answers 404 in the request's locale: the site's page at `/404` (its
+// translation, or the original under `default-with-notice`), else the theme's NotFound below.
+// The authored page answers 404 at its own path too.
+const notFound =
+  (!isMenu && (route.kind === "not-found" || route.kind === "feed")) ||
+  comments?.notFound === true ||
+  (route.kind === "page" && notFoundPageIds(await source.pages()).has(route.page.id));
+if (notFound) {
+  Astro.response.status = 404;
+  const authored = route.kind === "page" ? route.page : await notFoundPage(source, site, locale);
+  route = authored ? { kind: "page", page: authored } : { kind: "not-found" };
+  shownIn = authored?.locale ?? locale;
+}
 
 // Search results (RFC-0019 §3) are per query: never in the edge cache, never in search engines.
 if (route.kind === "search") {
@@ -165,11 +183,6 @@ const origin = siteOrigin(site, Astro.url);
 // Internal links of a localized page stay in its locale (`src/middleware.ts`).
 const links = await linkLocalizer(source, locale, origin);
 if (links) (Astro.locals as { cloudhalLinks?: (p: string) => string }).cloudhalLinks = links;
-// Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
-// `?comments=<n>` past the last page is a 404.
-const comments =
-  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
-if (comments?.notFound) return new Response(null, { status: 404 });
 // Media (RFC-0004): assets resolve `assetId` and `asset:<id>`; previews never use transformations.
 const media: MediaContext = {
   assets: await loadAssetIndex(source),
@@ -207,9 +220,13 @@ const ancestors = (id: string) => {
   const term = index.terms.get(id);
   return term ? termAncestors(index, term).map((a) => a.id) : [];
 };
+// The derived header lists top-level pages, never the not-found page.
+const allPages = await source.pages();
+const notFoundIds = notFoundPageIds(allPages);
+const navPages = allPages.filter((p) => !notFoundIds.has(p.id));
 const nav = primary
   ? markActive(primary, activeItem(primary, activeRoute, ancestors))
-  : markCurrent(derivedNavigation(site, await source.pages(), categories, locale), path);
+  : markCurrent(derivedNavigation(site, navPages, categories, locale), path);
 const footer = footerMenu
   ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
   : undefined;
@@ -316,22 +333,23 @@ const head =
       : route.kind === "archive"
         ? archiveHead(site, route.archive, origin, media)
         : route.kind === "search"
-          ? searchHead(site, route.search.query, origin)
+          ? searchHead(site, route.search.query, origin, locale)
           : {
-              ...searchHead(site, "", origin),
-              title: `${t.menu} · ${site.name}`,
-              canonical: `${origin}/menu`,
+              ...searchHead(site, "", origin, locale),
+              title: `${isMenu ? t.menu : t.notFoundTitle} · ${site.name}`,
+              canonical: `${origin}${isMenu ? "/menu" : path}`,
             };
 // RFC-0033 §4: self-canonical in the locale, `lang`/`dir`, and the `hreflang` set from the group.
 const fallback = shownIn !== locale;
-const alternates = gated && !fallback ? await alternatesFor(source, gated, origin) : [];
+const alternates =
+  gated && !fallback && !notFound ? await alternatesFor(source, gated, origin) : [];
 const localized = localizeHead(head, site, {
   locale: shownIn,
   origin,
   alternates,
   ...(gated?.translation ? { translation: gated.translation } : {}),
 });
-const meta = fallback ? { ...localized, robots: "noindex,follow" } : localized;
+const meta = fallback || notFound ? { ...localized, robots: "noindex,follow" } : localized;
 Astro.response.headers.set("content-language", shownIn);
 // The reader's notice (RFC-0033 §4): machine output until a person reviews it (or always, when
 // the site asks), a page shown in its original language, each with a link to the original.
@@ -420,4 +438,5 @@ const searchForm = searchAvailable(config, source)
   )}
   {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}
   {route.kind === "search" && <Search search={route.search} locale={locale} t={t} />}
+  {route.kind === "not-found" && !isMenu && <NotFound t={t} search={searchForm !== undefined} />}
 </Base>
