@@ -69,15 +69,7 @@ import {
   type PublishReleaseResult,
   publishRelease,
 } from "./release-apply.ts";
-import {
-  planSearch,
-  type SearchOptions,
-  type SearchPlan,
-  type SearchResults,
-  searchIndex,
-  searchState,
-  searchStatements,
-} from "./search.ts";
+import { type SearchOptions, type SearchResults, searchStatements } from "./search.ts";
 import {
   migrateTagsToTerms,
   revertTagsToTerms,
@@ -110,6 +102,7 @@ export {
 import type { StoreContext } from "./store/context.ts";
 import { EntryEngine } from "./store/entries.ts";
 import { PageEngine } from "./store/pages.ts";
+import { SearchEngine } from "./store/search.ts";
 import { SiteEngine } from "./store/sites.ts";
 import { SnapshotEngine } from "./store/snapshots.ts";
 import {
@@ -145,6 +138,7 @@ export class SiteGraphStore {
   readonly #pages: PageEngine;
   readonly #entries: EntryEngine;
   readonly #snapshots: SnapshotEngine;
+  readonly #search: SearchEngine;
 
   constructor(options: SiteGraphStoreOptions) {
     this.#sql = options.sql;
@@ -202,6 +196,13 @@ export class SiteGraphStore {
     this.#pages = new PageEngine(ctx);
     this.#entries = new EntryEngine(ctx);
     this.#snapshots = new SnapshotEngine(ctx);
+    this.#search = new SearchEngine({
+      sql: this.#sql,
+      graph: this,
+      stamp: () => this.#stamp(),
+      onError: (e) => this.#onHookError(e),
+      provider: options.search,
+    });
   }
 
   readonly #onPublished: SiteGraphStoreOptions["onPublished"];
@@ -1103,11 +1104,12 @@ export class SiteGraphStore {
 
   async #publishPointer(site: Site, snapshotId: string): Promise<Site> {
     // RFC-0019 §3: the search index follows the pointer in the same batch.
-    const plan = await this.#planSearch(site.id, snapshotId);
+    const plan = await this.#search.plan(site.id, snapshotId);
     const updated = await this.#sites.update(
       { ...site, publishedSnapshotId: snapshotId },
       plan ? (guard, at) => searchStatements(plan, guard, at) : undefined,
     );
+    await this.#search.synced(site.id, plan);
     await this.#runOnPublished(updated, {
       ...(site.publishedSnapshotId ? { from: site.publishedSnapshotId } : {}),
       to: snapshotId,
@@ -1177,54 +1179,21 @@ export class SiteGraphStore {
   }
 
   /**
-   * RFC-0019 §3: the plan that brings the search index to `snapshotId`, from the snapshot it
-   * reflects now (only changed articles) or from scratch. Undefined when it cannot be planned (the
-   * publish goes ahead; the index stays where it was and pages say it is updating).
-   */
-  async #planSearch(
-    siteId: string,
-    snapshotId: string,
-    options: { full?: boolean } = {},
-  ): Promise<SearchPlan | undefined> {
-    try {
-      const target = await this.getSnapshot(snapshotId);
-      if (!target) return undefined;
-      const state = options.full ? undefined : await searchState(this.#sql, siteId);
-      if (state?.snapshotId === snapshotId) return undefined;
-      const base = state ? await this.getSnapshot(state.snapshotId) : undefined;
-      return await planSearch({
-        target,
-        base,
-        read: (ref) => this.readSnapshotNode<ContentEntry>(ref),
-      });
-    } catch (e) {
-      this.#onHookError(e);
-      return undefined;
-    }
-  }
-
-  /**
    * RFC-0019 §3: brings the site's search index to its live snapshot (after a release or an
    * import, or `cloudhal search reindex` with `full`). Guarded on the site row as read here.
    */
-  async refreshSearch(siteId: string, options: { full?: boolean } = {}): Promise<void> {
-    const site = await this.getSite(siteId);
-    if (!site?.publishedSnapshotId) return;
-    const plan = await this.#planSearch(siteId, site.publishedSnapshotId, options);
-    if (!plan) return;
-    await this.#sql.batch(
-      searchStatements(plan, { siteId, hash: await nodeHash(site) }, this.#stamp()),
-    );
+  refreshSearch(siteId: string, options: { full?: boolean } = {}): Promise<void> {
+    return this.#search.refresh(siteId, options);
   }
 
-  /** RFC-0019 §3: the snapshot the site's search index reflects and how many articles it holds. */
+  /** RFC-0019 §3: the snapshot the site's search index reflects and how many rows it holds. */
   searchStatus(siteId: string): Promise<{ snapshotId: string; entries: number } | undefined> {
-    return searchState(this.#sql, siteId);
+    return this.#search.status(siteId);
   }
 
-  /** RFC-0019 §3: the site's published articles that match a reader's query. */
+  /** RFC-0029 §1: what readers find, through the site's search provider (FTS5 by default). */
   search(siteId: string, query: string, options: SearchOptions): Promise<SearchResults> {
-    return searchIndex(this.#sql, siteId, query, options);
+    return this.#search.search(siteId, query, options);
   }
 
   async #isAncestor(ancestorId: string, descendantId: string): Promise<boolean> {

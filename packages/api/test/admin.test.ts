@@ -76,12 +76,14 @@ describe("admin search reindex (RFC-0019 §3)", () => {
     await b.store.publish(site, snap.id);
     // a restored backup has no index rows: the reindex brings them back
     await b.sql.run("DELETE FROM search_index");
+    await b.sql.run("DELETE FROM search_links");
     await b.sql.run("DELETE FROM search_state");
     const res = await reindex();
     expect(res.status).toBe(200);
+    // the seeded article, its two pages and its two terms (RFC-0029 §2)
     expect(await res.json()).toEqual({
       published: snap.id,
-      index: { snapshotId: snap.id, entries: 1 },
+      index: { snapshotId: snap.id, entries: 5 },
     });
     expect((await b.store.search(site.id, "hello", { locale: "en", now: Date.now() })).total).toBe(
       1,

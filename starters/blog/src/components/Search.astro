@@ -1,7 +1,9 @@
 ---
 /**
- * The search page (RFC-0019 §3): an ordinary `<form method="get">` (no JavaScript), the results
- * with their snippets (escaped text, matches in `<mark>`), and real links between result pages.
+ * The search page (RFC-0019 §3, RFC-0029 §2): an ordinary `<form method="get">` (no JavaScript),
+ * the results with their snippets (escaped text, matches in `<mark>`), and real links between
+ * result pages.
+ * Pages, topics and authors are found too; a topic or author shows its taxonomy ("Category").
  * Rendered only by deployments that answer searches; the page is never cached and never indexed.
  */
 import { type SearchView, searchPageHref, snippetHtml } from "@cloudhal/astro-renderer/search";
@@ -32,7 +34,8 @@ const date = (iso: string) =>
   {search.hits.length > 0 && (
     <ol class="ch-search-results">
       {search.hits.map((hit) => (
-        <li data-entry-id={hit.nodeId}>
+        <li data-entry-id={hit.nodeId} data-kind={hit.kind ?? "article"}>
+          {hit.context && <p class="ch-search-context">{hit.context}</p>}
           <h2><a href={hit.href}>{hit.title}</a></h2>
           {hit.snippet && <p class="ch-search-snippet" set:html={snippetHtml(hit.snippet)} />}
           {hit.publishedAt && <time datetime={hit.publishedAt}>{date(hit.publishedAt)}</time>}

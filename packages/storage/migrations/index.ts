@@ -20,6 +20,7 @@ import { migration0018QueryIndexes } from "./0018_query_indexes.ts";
 import { migration0019BodyProposals } from "./0019_body_proposals.ts";
 import { migration0020Ai } from "./0020_ai.ts";
 import { migration0021Search } from "./0021_search.ts";
+import { migration0022SearchKinds } from "./0022_search_kinds.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -44,4 +45,5 @@ export const migrations: readonly Migration[] = [
   migration0019BodyProposals,
   migration0020Ai,
   migration0021Search,
+  migration0022SearchKinds,
 ];

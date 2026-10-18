@@ -10,8 +10,8 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import type { RedirectMatch, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import { matchRedirect, searchRowOf, searchRows, termName } from "@cloudhal/core-ts";
+import type { RedirectMatch, SearchKind, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
+import { matchRedirect, searchDocuments, searchRows, termName } from "@cloudhal/core-ts";
 import {
   gateInstants,
   hasGates,
@@ -113,6 +113,8 @@ export interface SourceSearchOptions {
   perPage?: number;
   /** Default: the site's default locale. */
   locale?: string;
+  /** RFC-0029: only these kinds (default: all). */
+  kinds?: readonly SearchKind[];
 }
 
 function byNewest(a: ContentEntry, b: ContentEntry): number {
@@ -235,12 +237,23 @@ export class LiveSource implements GraphSource {
   }
 
   async search(query: string, options: SourceSearchOptions = {}): Promise<SearchResults> {
-    const locale = options.locale ?? (await this.site()).defaultLocale;
-    // The entries this source shows decided visibility and gates already.
-    const rows = (await this.allEntries(locale)).flatMap((e) => {
-      const row = searchRowOf(e, { drafts: true });
-      return row ? [{ ...row, gateFrom: undefined, gateUntil: undefined }] : [];
-    });
+    const site = await this.site();
+    const locale = options.locale ?? site.defaultLocale;
+    // What this source shows decided visibility and gates already (drafts included).
+    const [entries, pages, taxonomies, terms] = await Promise.all([
+      this.allEntries(locale),
+      this.pages(),
+      this.taxonomies(),
+      this.vocabulary(),
+    ]);
+    const rows = searchDocuments({
+      locales: [locale],
+      entries,
+      pages: pages.filter((p) => p.locale === locale),
+      taxonomies,
+      terms,
+      drafts: true,
+    }).map((r) => ({ ...r, gateFrom: undefined, gateUntil: undefined }));
     return searchRows(rows, query, { ...options, locale, now: this.#now() });
   }
 

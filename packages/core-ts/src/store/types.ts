@@ -4,6 +4,7 @@ import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import type { GateSupport } from "../availability.ts";
 import type { BlockRegistry, PropsSchema } from "../blocks.ts";
 import type { BlockWriter } from "../body-index.ts";
+import type { SearchProvider } from "../search-provider.ts";
 
 export interface SiteGraphStoreOptions {
   readonly sql: SqlDriver;
@@ -18,6 +19,11 @@ export interface SiteGraphStoreOptions {
    */
   readonly onPublished?: (site: Site, change: PublishChange) => Promise<void>;
   readonly onHookError?: (error: unknown) => void;
+  /**
+   * RFC-0029 §1: the provider that answers readers' searches. FTS5 stays written on every publish
+   * and answers when this provider fails or is slow. Default: FTS5 alone.
+   */
+  readonly search?: SearchProvider;
   /** Media (RFC-0004): per-site quota of stored bytes (default 10 GB; 0 = unlimited). */
   readonly media?: { readonly quotaBytes?: number };
   /**
