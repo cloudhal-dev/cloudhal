@@ -10,6 +10,7 @@ import {
   type CommentThreadLabels,
   type CommentWords,
   DropdownMenu,
+  directional,
   InputArea,
   LayerDialog,
   Select,
@@ -580,7 +581,7 @@ export function CommentMenu({
           item("resolve", t("comments.actions.resolve"), Warning, moderate.reason)}
         <DropdownMenu.Separator />
         {comment.status === "approved" &&
-          item("reply", t("comments.actions.reply"), ArrowBendUpLeft, reply.reason)}
+          item("reply", t("comments.actions.reply"), directional(ArrowBendUpLeft), reply.reason)}
         {item("openThread", t("comments.actions.openThread"), ChatsCircle, undefined)}
         {item("commenter", t("comments.actions.commenter"), UserCircle, commenters.reason)}
       </DropdownMenu.Content>

@@ -11,6 +11,7 @@ import {
   Banner,
   Button,
   Columns,
+  directional,
   Empty,
   LinkButton,
   PageLayout,
@@ -64,6 +65,9 @@ import {
 } from "../lib/analytics.ts";
 import { api, isNotEnabled } from "../lib/api.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
+
+/** Opens elsewhere; mirrors in right-to-left languages (ADR-0033 C1). */
+const OpenOutside = directional(ArrowSquareOut);
 
 /** The node a `node:` filter names, from the lists the shell already caches. */
 function useNodeTitle(siteId: string, nodeId: string | undefined): string | undefined {
@@ -293,7 +297,7 @@ export function AnalyticsPage() {
         description={t("analytics.empty.noVisits.description")}
         contents={
           host ? (
-            <LinkButton href={`https://${host}`} external variant="secondary" icon={ArrowSquareOut}>
+            <LinkButton href={`https://${host}`} external variant="secondary" icon={OpenOutside}>
               {t("analytics.empty.noVisits.openSite")}
             </LinkButton>
           ) : undefined

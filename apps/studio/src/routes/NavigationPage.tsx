@@ -4,6 +4,7 @@ import {
   Banner,
   Button,
   DropdownMenu,
+  directional,
   InlineCopyText,
   Input,
   MenuTree,
@@ -96,6 +97,10 @@ import {
   summarizeTarget,
   type TargetData,
 } from "../lib/menus.ts";
+
+/** Indent and outdent point along the reading order (ADR-0033 C1). */
+const Indent = directional(TextIndent);
+const Outdent = directional(TextOutdent);
 
 /** Waits until `value` has been stable for `ms` (the preview is resolved on the server). */
 function useDebounced<T>(value: T, ms: number): T {
@@ -513,7 +518,7 @@ export function NavigationPage() {
               {t("menus.row.moveDown")}
             </DropdownMenu.Item>
             {ctx.canIndent ? (
-              <DropdownMenu.Item icon={TextIndent} onClick={ctx.indent}>
+              <DropdownMenu.Item icon={Indent} onClick={ctx.indent}>
                 {t("menus.row.indent")}
               </DropdownMenu.Item>
             ) : (
@@ -524,10 +529,10 @@ export function NavigationPage() {
                   : ctx.indentBlocked === "size"
                     ? t("menus.row.indentFull", { max: limits.perLevel })
                     : t("menus.row.indentNoPrevious"),
-                TextIndent,
+                Indent,
               )
             )}
-            <DropdownMenu.Item icon={TextOutdent} disabled={!ctx.canOutdent} onClick={ctx.outdent}>
+            <DropdownMenu.Item icon={Outdent} disabled={!ctx.canOutdent} onClick={ctx.outdent}>
               {t("menus.row.outdent")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />

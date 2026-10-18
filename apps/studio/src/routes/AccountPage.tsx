@@ -5,6 +5,7 @@ import {
   Banner,
   Button,
   Checkbox,
+  DirectionalIcon,
   InlineCopyText,
   Input,
   PageLayout,
@@ -434,7 +435,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
           )}
           <Button
             variant="secondary"
-            icon={<SignOut />}
+            icon={<DirectionalIcon icon={SignOut} />}
             disabled={others === 0}
             onClick={() => setOthersOpen(true)}
           >
@@ -453,7 +454,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
             action={
               <Banner.Action
                 variant="secondary"
-                icon={<SignIn />}
+                icon={<DirectionalIcon icon={SignIn} />}
                 onClick={async () => {
                   await authClient.signOut();
                   await navigate({ to: "/login" });
@@ -537,7 +538,7 @@ function SessionsSection({ currentToken }: { currentToken: string | undefined })
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={<SignOut />}
+                          icon={<DirectionalIcon icon={SignOut} />}
                           aria-label={t("account.sessions.revokeLabel", { device: label })}
                           onClick={() => setToRevoke(s)}
                         >

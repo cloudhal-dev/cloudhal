@@ -12,6 +12,7 @@ import {
 } from "./CommentParts.tsx";
 import { CommentText } from "./CommentText.tsx";
 import { commentAnchorId, isInstructionLike } from "./comment-model.ts";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 
 /**
  * A comment as Studio receives it: the `Comment` contract plus the REST response's Studio-only
@@ -164,7 +165,7 @@ export function CommentRow({
             )}
             {inReplyTo && (
               <span className="inline-flex min-w-0 items-center gap-1 text-kumo-subtle">
-                <ArrowBendUpLeft size={16} aria-hidden />
+                <DirectionalIcon icon={ArrowBendUpLeft} size={16} aria-hidden />
                 <Text as="span" variant="secondary" size="sm">
                   <Link
                     // A native anchor: an in-page fragment must not go through the app router.

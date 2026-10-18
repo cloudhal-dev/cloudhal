@@ -1,4 +1,4 @@
-import { Banner, LinkButton } from "@cloudhal/ui";
+import { Banner, directional, LinkButton } from "@cloudhal/ui";
 import { ArrowRight, WarningCircle } from "@phosphor-icons/react";
 import { useI18n } from "../i18n/index.tsx";
 import type { SchedulerStatus } from "../lib/api.ts";
@@ -39,7 +39,7 @@ export function SchedulerStalledBanner({
             href={`/sites/${siteId}/settings#schedules`}
             variant="secondary"
             size="sm"
-            icon={ArrowRight}
+            icon={directional(ArrowRight)}
           >
             {t(`${s}.action`)}
           </LinkButton>

@@ -1,4 +1,13 @@
-import { Badge, Banner, Link, SectionCard, SectionEmpty, Text, Tooltip } from "@cloudhal/ui";
+import {
+  Badge,
+  Banner,
+  directional,
+  Link,
+  SectionCard,
+  SectionEmpty,
+  Text,
+  Tooltip,
+} from "@cloudhal/ui";
 import {
   ArrowSquareOut,
   Article,
@@ -46,7 +55,7 @@ const CHIP_ICON = {
   contentEntry: Article,
   term: Tag,
   collection: Cards,
-  url: ArrowSquareOut,
+  url: directional(ArrowSquareOut),
   group: FolderSimple,
 } as const;
 

@@ -12,6 +12,7 @@ import {
   BuildActivity,
   type BuildActivityItem,
   Button,
+  directional,
   InlineCopyText,
   LinkButton,
   PageLayout,
@@ -138,7 +139,7 @@ export function BuildPage() {
           >
             {t(`build.connection.${build.status}`)}
           </Badge>
-          <LinkButton href={editorHref} variant="secondary" icon={ArrowLeft}>
+          <LinkButton href={editorHref} variant="secondary" icon={directional(ArrowLeft)}>
             {t("build.backToEditor")}
           </LinkButton>
         </>

@@ -11,6 +11,7 @@ import {
   type BreakdownLabels,
   type CountryNameLabels,
   createAnalyticsFormatter,
+  directional,
   type StatDelta,
 } from "@cloudhal/ui";
 import {
@@ -93,8 +94,8 @@ export function isRetryable(error: unknown): boolean {
 }
 
 const CHANNEL_ICONS: Record<AnalyticsChannel, Icon> = {
-  direct: ArrowSquareIn,
-  internal: ArrowsLeftRight,
+  direct: directional(ArrowSquareIn),
+  internal: directional(ArrowsLeftRight),
   search: MagnifyingGlass,
   social: ShareNetwork,
   ai: Sparkle,

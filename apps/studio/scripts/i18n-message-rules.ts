@@ -11,6 +11,9 @@
  * - `rtl-logical`: a physical Tailwind utility (`ml-2`, `pr-4`, `left-0`, `text-right`,
  *   `border-l`, `rounded-r`) where a logical one mirrors in right-to-left languages (`ms-2`, `pe-4`,
  *   `start-0`, `text-end`, `border-s`, `rounded-e`) — ADR-0033 D.
+ * - `rtl-icon`: an icon that means a direction in reading order (`ArrowRight`, `CaretLeft`,
+ *   `ArrowSquareOut`, `SignOut`, …) used directly instead of through `DirectionalIcon`, which
+ *   mirrors it in right-to-left languages — ADR-0033 C1.
  * Exceptions carry `i18n-ignore: <reason>` on the line or the line above, as for the words rule.
  */
 
@@ -19,7 +22,7 @@ const isNode = (v: unknown): v is Node =>
   typeof v === "object" && v !== null && typeof (v as Node).type === "string";
 
 export interface RuleHit {
-  rule: "i18n-plural" | "i18n-concat" | "i18n-format" | "rtl-logical";
+  rule: "i18n-plural" | "i18n-concat" | "i18n-format" | "rtl-logical" | "rtl-icon";
   node: Node;
   message: string;
 }
@@ -177,9 +180,47 @@ function jsxStitches(node: Node, hits: RuleHit[]) {
   }
 }
 
-/** Every hit of the two rules in a parsed program. */
+/**
+ * Phosphor icons that mean a direction in reading order (ADR-0033 C1): carets and arrows that point
+ * sideways, opening elsewhere, indent and outdent, signing in and out, sending. Not clocks, refresh
+ * or undo circles, up and down.
+ */
+export const DIRECTIONAL_ICON =
+  /^(?:(?:Caret|Arrows?)\w*(?:Left|Right)|ArrowSquare(?:Out|In)|Text(?:Indent|Outdent)|Sign(?:In|Out)|PaperPlane(?:Right|Tilt))(?:Icon)?$/;
+const ICON =
+  "a directional icon used directly — wrap it so it mirrors in right-to-left languages: <DirectionalIcon icon={…} /> (as an element on Kumo's icon props), ADR-0033 C1; an icon whose direction is physical carries i18n-ignore";
+
+/**
+ * References to a directional icon outside `DirectionalIcon`'s `icon` prop and `directional(…)`:
+ * as a JSX element, a prop value, an argument or a table entry. Imports and object keys
+ * (`{ ArrowLeft: -1 }`, key names) are not uses.
+ */
+function iconHits(node: Node, hits: RuleHit[]) {
+  if (node.type === "ImportDeclaration") return;
+  if (node.type === "JSXOpeningElement" && nameOfJsx(node.name) === "DirectionalIcon") return;
+  if (node.type === "CallExpression" && (node.callee as Node).name === "directional") return;
+  const named = node.type === "Identifier" || node.type === "JSXIdentifier";
+  if (named && DIRECTIONAL_ICON.test(node.name as string)) {
+    hits.push({ rule: "rtl-icon", node, message: ICON });
+    return;
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "type" || key === "start" || key === "end") continue;
+    if ((node.type === "Property" || node.type === "MemberExpression") && !node.computed)
+      if (key === "key" || key === "property") continue;
+    if (node.type === "JSXAttribute" && key === "name") continue;
+    if (Array.isArray(value)) {
+      for (const v of value) if (isNode(v)) iconHits(v, hits);
+    } else if (isNode(value)) iconHits(value, hits);
+  }
+}
+
+const nameOfJsx = (n: unknown) => (isNode(n) && n.type === "JSXIdentifier" ? n.name : undefined);
+
+/** Every hit of the rules in a parsed program. */
 export function messageRuleHits(program: Node): RuleHit[] {
   const hits: RuleHit[] = [];
+  iconHits(program, hits);
   const visit = (node: Node) => {
     check(node, hits);
     for (const [key, value] of Object.entries(node)) {

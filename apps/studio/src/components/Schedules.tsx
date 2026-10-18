@@ -15,7 +15,9 @@ import {
   ButtonGroup,
   type DateTimeFieldLabels,
   type DateTimeValue,
+  DirectionalIcon,
   DropdownMenu,
+  directional,
   firstDayOfWeek,
   hourCycleOf,
   LinkButton,
@@ -652,7 +654,11 @@ export function SchedulesBanners({
           description={t("schedules.attention.description")}
           action={
             onReviewAttention ? (
-              <Banner.Action variant="secondary" icon={<ArrowRight />} onClick={onReviewAttention}>
+              <Banner.Action
+                variant="secondary"
+                icon={<DirectionalIcon icon={ArrowRight} />}
+                onClick={onReviewAttention}
+              >
                 {t("schedules.attention.review")}
               </Banner.Action>
             ) : undefined
@@ -673,7 +679,7 @@ export function SchedulesBanners({
               href={`/sites/${siteId}/settings#schedules`}
               variant="secondary"
               size="sm"
-              icon={ArrowRight}
+              icon={directional(ArrowRight)}
             >
               {t("schedules.paused.settings")}
             </LinkButton>

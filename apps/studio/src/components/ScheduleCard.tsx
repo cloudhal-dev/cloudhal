@@ -13,6 +13,7 @@ import {
   Button,
   DateTimeField,
   type DateTimeValue,
+  directional,
   LinkButton,
   SectionCard,
   SectionEmpty,
@@ -280,7 +281,7 @@ export function ScheduleCard({
                     href={`/sites/${siteId}/schedules/releases/${r.id}`}
                     variant="ghost"
                     size="sm"
-                    icon={ArrowRight}
+                    icon={directional(ArrowRight)}
                   >
                     {t(`${c}.releases.open`)}
                   </LinkButton>
@@ -437,7 +438,7 @@ export function LockedBanner({
               href={`/sites/${siteId}/schedules/releases/${hold.id}`}
               variant="ghost"
               size="sm"
-              icon={ArrowRight}
+              icon={directional(ArrowRight)}
             >
               {t(`${l}.open`)}
             </LinkButton>

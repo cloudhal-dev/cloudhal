@@ -9,15 +9,9 @@ import {
   LayerDialog,
   SkeletonLine,
   Text,
+  TransitionArrow,
 } from "@cloudhal/ui";
-import {
-  ArrowRight,
-  Camera,
-  Globe,
-  Prohibit,
-  WarningCircle,
-  WarningOctagon,
-} from "@phosphor-icons/react";
+import { Camera, Globe, Prohibit, WarningCircle, WarningOctagon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { listOf, type MessageKey, useT } from "../i18n/index.tsx";
@@ -482,7 +476,7 @@ function PreviewSection({
                 <Text variant="mono" as="span">
                   {r.from}
                 </Text>
-                <ArrowRight size={14} className="shrink-0 text-kumo-subtle" aria-hidden />
+                <TransitionArrow size={14} />
                 <Text variant="mono" as="span">
                   {r.to}
                 </Text>

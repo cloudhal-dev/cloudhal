@@ -4,6 +4,7 @@ import {
   Banner,
   Button,
   DeleteResource,
+  directional,
   FocalPointPicker,
   InlineCopyText,
   Input,
@@ -298,7 +299,7 @@ export function AssetPage() {
               href={contentUrl}
               external
               variant="secondary"
-              icon={ArrowSquareOut}
+              icon={directional(ArrowSquareOut)}
               data-testid="asset-open"
             >
               {t("media.detail.openFile")}

@@ -1,5 +1,5 @@
 import type { Taxonomy, Term } from "@cloudhal/core-contracts";
-import { Badge, Link, Text, Tooltip } from "@cloudhal/ui";
+import { Badge, DirectionalIcon, Link, Text, Tooltip } from "@cloudhal/ui";
 import {
   ArrowElbowDownRight,
   CheckCircle,
@@ -179,7 +179,7 @@ export function TermNameCell({
     >
       {depth > 0 && (
         <span className="flex h-lh items-center text-kumo-inactive" aria-hidden>
-          <ArrowElbowDownRight size={16} />
+          <DirectionalIcon icon={ArrowElbowDownRight} size={16} />
         </span>
       )}
       <div className="grid min-w-0 gap-1">

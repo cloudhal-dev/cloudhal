@@ -3,12 +3,14 @@ import {
   Button,
   ButtonGroup,
   DropdownMenu,
+  directional,
   LinkButton,
   NotificationBell,
   NotificationItem,
   SectionEmpty,
   SkeletonLine,
   Text,
+  TransitionArrow,
 } from "@cloudhal/ui";
 import {
   ArrowRight,
@@ -177,7 +179,7 @@ function EndingItem({
             href={notificationHref(item)}
             variant="ghost"
             size="sm"
-            icon={ArrowRight}
+            icon={directional(ArrowRight)}
             onClick={onNavigate}
           >
             {t("notifications.openAgents")}
@@ -219,7 +221,7 @@ function RequestItem({
           href={notificationHref(item)}
           variant="secondary"
           size="sm"
-          icon={ArrowRight}
+          icon={directional(ArrowRight)}
           onClick={onNavigate}
         >
           {t("notifications.request.review")}
@@ -253,7 +255,7 @@ function MemberJoinedItem({
           href={notificationHref(item)}
           variant="ghost"
           size="sm"
-          icon={ArrowRight}
+          icon={directional(ArrowRight)}
           onClick={onNavigate}
         >
           {t("notifications.openTeam")}
@@ -290,7 +292,7 @@ function RoleChangedItem({
           href={notificationHref(item)}
           variant="ghost"
           size="sm"
-          icon={ArrowRight}
+          icon={directional(ArrowRight)}
           onClick={onNavigate}
         >
           {t("notifications.openTeam")}
@@ -300,7 +302,7 @@ function RoleChangedItem({
       <div className="grid gap-1.5" data-notification={item.id}>
         <span className="flex flex-wrap items-center gap-1.5">
           <RoleBadge value={item.from} tooltip={false} />
-          <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+          <TransitionArrow size={12} />
           <RoleBadge value={item.to} />
         </span>
         <Text variant="secondary" size="sm">
@@ -381,7 +383,7 @@ function CommentItem({
             href={notificationHref(item)}
             variant={item.kind === "comments-purge-waiting" ? "ghost" : "secondary"}
             size="sm"
-            icon={ArrowRight}
+            icon={directional(ArrowRight)}
             onClick={onNavigate}
           >
             {action}
@@ -444,7 +446,7 @@ function ScheduleNoticeItem({
           href={href}
           variant="secondary"
           size="sm"
-          icon={ArrowRight}
+          icon={directional(ArrowRight)}
           onClick={onNavigate}
         >
           {notice.action}

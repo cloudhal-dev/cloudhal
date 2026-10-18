@@ -1,4 +1,4 @@
-import { Banner } from "@cloudhal/ui";
+import { Banner, DirectionalIcon } from "@cloudhal/ui";
 import { ArrowRight, ChatsCircle } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useT } from "../i18n/index.tsx";
@@ -26,7 +26,7 @@ export function CommentsWaitingBanner({ siteId }: { siteId: string }) {
         action={
           <Banner.Action
             variant="secondary"
-            icon={<ArrowRight />}
+            icon={<DirectionalIcon icon={ArrowRight} />}
             onClick={() => navigate({ to: "/sites/$siteId/comments", params: { siteId } })}
           >
             {t("notifications.comments.review")}

@@ -1,6 +1,7 @@
 import { Button, cn, SkeletonLine, Text } from "@cloudflare/kumo";
 import { CalendarDots, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { Fragment, type ReactNode, useId, useMemo, useState } from "react";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 import { ScheduleItem } from "./ScheduleItem.tsx";
 import { SectionEmpty } from "./SectionEmpty.tsx";
 import {
@@ -209,7 +210,7 @@ export function AgendaList({
                   <Button
                     variant="ghost"
                     size="sm"
-                    icon={showDone ? <CaretDown size={16} /> : <CaretRight size={16} />}
+                    icon={<DirectionalIcon icon={showDone ? CaretDown : CaretRight} size={16} />}
                     aria-expanded={showDone}
                     onClick={() => setShowDone((v) => !v)}
                     data-fold="done"
@@ -230,7 +231,7 @@ export function AgendaList({
                   <Button
                     variant="ghost"
                     size="sm"
-                    icon={foldRuns ? <CaretRight size={16} /> : <CaretDown size={16} />}
+                    icon={<DirectionalIcon icon={foldRuns ? CaretRight : CaretDown} size={16} />}
                     aria-expanded={!foldRuns}
                     onClick={() =>
                       setOpenRuns((prev) => {

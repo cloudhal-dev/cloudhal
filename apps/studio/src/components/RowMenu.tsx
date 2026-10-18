@@ -1,4 +1,4 @@
-import { Button, DropdownMenu, Tooltip } from "@cloudhal/ui";
+import { Button, DropdownMenu, directional, Tooltip } from "@cloudhal/ui";
 import { ArrowSquareOut, DotsThree, Trash } from "@phosphor-icons/react";
 import { useT } from "../i18n/index.tsx";
 
@@ -35,7 +35,7 @@ export function RowMenu({
         }
       />
       <DropdownMenu.Content align="end">
-        <DropdownMenu.Item icon={ArrowSquareOut} onClick={onOpen}>
+        <DropdownMenu.Item icon={directional(ArrowSquareOut)} onClick={onOpen}>
           {t("sites.open")}
         </DropdownMenu.Item>
         {onDelete &&

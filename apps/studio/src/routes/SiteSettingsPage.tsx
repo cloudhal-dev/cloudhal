@@ -5,6 +5,7 @@ import {
   Button,
   ClipboardText,
   DropdownMenu,
+  directional,
   InlineCopyText,
   Input,
   InputGroup,
@@ -370,7 +371,7 @@ function DomainMenu({
       />
       <DropdownMenu.Content align="end">
         <DropdownMenu.Item
-          icon={ArrowSquareOut}
+          icon={directional(ArrowSquareOut)}
           onClick={() => window.open(`https://${domain.hostname}`, "_blank", "noopener")}
         >
           {t("siteSettings.domains.visit")}

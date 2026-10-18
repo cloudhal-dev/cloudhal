@@ -158,7 +158,7 @@ The block (`kumo add DeleteResource`) hard-codes "Delete {name}", "This action c
 
 ## 7. Right-to-left: Kumo's styles are physical
 
-**Status in Cloudhal:** Studio and the `@cloudhal/ui` blocks use logical utilities only (lint `rtl-logical`, ADR-0033 D); Base UI's `DirectionProvider` (re-exported by Kumo) wraps Studio, fed by the locale registry's `dir` (ADR-0033 B). Kumo's own components are patched (ADR-0033 A1, decided 2026-10-18 with Arabic as the first RTL language): `scripts/kumo-patch.ts` rewrites the 217 physical utilities of Kumo 2.14's `dist` to logical ones into the generated `patches/@cloudflare__kumo@2.14.0.patch`; offsets that are centred (`left-1/2`) or measured by a physical `translate-x` (the tabs' indicator, centred dialogs) stay physical. The issue below is ready to paste; **the owner files it**, not an agent.
+**Status in Cloudhal:** Studio and the `@cloudhal/ui` blocks use logical utilities only (lint `rtl-logical`, ADR-0033 D); Base UI's `DirectionProvider` (re-exported by Kumo) wraps Studio, fed by the locale registry's `dir` (ADR-0033 B). Kumo's own components are patched (ADR-0033 A1, decided 2026-10-18 with Arabic as the first RTL language): `scripts/kumo-patch.ts` rewrites the 217 physical utilities of Kumo 2.14's `dist` to logical ones into the generated `patches/@cloudflare__kumo@2.14.0.patch`; offsets that are centred (`left-1/2`) or measured by a physical `translate-x` (the tabs' indicator, centred dialogs) stay physical. Studio's and the blocks' directional icons mirror through `DirectionalIcon` (ADR-0033 C1); Kumo's own ten (`DropdownMenu`'s submenu caret, the sidebar's caret, `Pagination`, `DateRangePicker`, `CommandPalette`'s arrow and caret) do not yet. The issue below is ready to paste; **the owner files it**, not an agent.
 
 ### Title
 
@@ -172,7 +172,7 @@ Kumo 2.14's compiled CSS has about 239 physical utilities (`ml-*`, `mr-*`, `pl-*
 
 - Use Tailwind 4's logical utilities in every component (`ms`/`me`, `ps`/`pe`, `start`/`end`, `text-start`/`text-end`, `border-s`/`border-e`, `rounded-s`/`rounded-e`/`rounded-ss`…). In left-to-right pages they render exactly as today, so the change is invisible to existing users.
 - Read the direction from Base UI's context for placement that is computed (popover side `inline-start`/`inline-end`, sidebar side, the order of icon and label where it matters).
-- Document which icons mirror (back, forward, carets in breadcrumbs and menus) and offer a `mirrored`-aware icon slot.
+- Document which icons mirror (back, forward, carets in breadcrumbs and menus) and offer a `mirrored`-aware icon slot. Kumo's own directional icons today — `DropdownMenu`'s submenu caret, the sidebar's caret, `Pagination`'s first/previous/next/last, `DateRangePicker`'s month arrows, `CommandPalette`'s arrow and caret — should set Phosphor's `mirrored` from the direction context.
 - A lint in Kumo's own CI against new physical utilities keeps it that way.
 
 Cloudhal's interim plan, if an RTL language comes before this: a generated `pnpm patch` that rewrites the compiled classes (the same mapping as our codemod, `scripts/i18n-codemod/logical-utilities.ts`), re-generated on each Kumo upgrade.

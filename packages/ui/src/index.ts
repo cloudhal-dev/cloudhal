@@ -245,6 +245,13 @@ export {
   useTimeOfDayDraft,
 } from "./blocks/DateTimeField.tsx";
 export {
+  DirectionalIcon,
+  type DirectionalIconProps,
+  directional,
+  TransitionArrow,
+  type TransitionArrowProps,
+} from "./blocks/DirectionalIcon.tsx";
+export {
   type FocalPoint,
   FocalPointPicker,
   type FocalPointPickerLabels,

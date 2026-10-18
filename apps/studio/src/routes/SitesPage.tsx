@@ -1,6 +1,7 @@
 import {
   Badge,
   Code,
+  DirectionalIcon,
   Empty,
   LayerCard,
   Link,
@@ -103,7 +104,12 @@ export function SitesPage() {
                       )}
                     </Table.Cell>
                     <Table.Cell sticky="right" className="w-12 text-end">
-                      <CaretRight size={16} className="text-kumo-subtle" aria-hidden />
+                      <DirectionalIcon
+                        icon={CaretRight}
+                        size={16}
+                        className="text-kumo-subtle"
+                        aria-hidden
+                      />
                     </Table.Cell>
                   </Table.Row>
                 ))}
