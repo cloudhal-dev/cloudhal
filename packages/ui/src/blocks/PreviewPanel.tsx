@@ -9,6 +9,7 @@ import {
 } from "@cloudflare/kumo";
 import { ArrowSquareOut, DeviceMobile, DeviceTablet, Monitor } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { directional } from "./DirectionalIcon.tsx";
 
 export type PreviewDevice = "desktop" | "tablet" | "mobile";
 
@@ -335,7 +336,7 @@ export function PreviewPanel({
             variant="ghost"
             size="sm"
             shape="square"
-            icon={ArrowSquareOut}
+            icon={directional(ArrowSquareOut)}
             aria-label={labels.openInNewTab}
             title={labels.openInNewTab}
           />

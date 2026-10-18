@@ -2,6 +2,7 @@ import type { Redirect } from "@cloudhal/core-contracts";
 import {
   Badge,
   Button,
+  DirectionalIcon,
   DropdownMenu,
   Empty,
   LayerCard,
@@ -13,10 +14,10 @@ import {
   Text,
   Toolbar,
   Tooltip,
+  TransitionArrow,
 } from "@cloudhal/ui";
 import {
   Archive,
-  ArrowRight,
   ArrowSquareOut,
   ArrowsMerge,
   DotsThree,
@@ -223,18 +224,17 @@ export function RedirectsPage() {
                         </Table.Cell>
                         <Table.Cell>
                           <span className="flex min-w-48 flex-wrap items-center gap-x-2 gap-y-1">
-                            <ArrowRight
-                              size={14}
-                              className="shrink-0 text-kumo-subtle"
-                              aria-hidden
-                            />
+                            <TransitionArrow size={14} />
                             <Text variant="mono" as="span">
                               {r.to}
                             </Text>
                             {ext && (
                               <Tooltip content={t("redirects.externalHint", { host: ext })}>
                                 <span className="inline-flex">
-                                  <Badge variant="outline" icon={<ArrowSquareOut />}>
+                                  <Badge
+                                    variant="outline"
+                                    icon={<DirectionalIcon icon={ArrowSquareOut} />}
+                                  >
                                     {t("redirects.external.badge")}
                                   </Badge>
                                 </span>

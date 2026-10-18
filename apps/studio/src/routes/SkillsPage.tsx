@@ -3,6 +3,7 @@ import {
   Button,
   Code,
   Collapsible,
+  DirectionalIcon,
   Empty,
   InlineCopyText,
   LayerCard,
@@ -235,7 +236,7 @@ export function SkillsPage() {
                         variant="ghost"
                         size="xs"
                         shape="square"
-                        icon={<CaretRight />}
+                        icon={<DirectionalIcon icon={CaretRight} />}
                         aria-label={`${t("skills.view")}: ${s.name}`}
                         onClick={(e) => {
                           e.stopPropagation();

@@ -4,7 +4,7 @@
  * again" — instead of the server's sentence; and for `lift_embargo`, the embargo time and the
  * agent's reason quoted as plain text. Approving carries the request out on the server.
  */
-import { Badge, InsetPanel, LinkButton, SkeletonLine, Text } from "@cloudhal/ui";
+import { Badge, directional, InsetPanel, LinkButton, SkeletonLine, Text } from "@cloudhal/ui";
 import { ArrowRight, Package, ShieldCheck } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { Approval } from "../lib/api.ts";
@@ -88,7 +88,7 @@ export function ReleaseRequestDetails({ siteId, request }: { siteId: string; req
               href={`/sites/${siteId}/schedules/releases/${r.id}`}
               variant="ghost"
               size="sm"
-              icon={ArrowRight}
+              icon={directional(ArrowRight)}
             >
               {t(`${a}.open`)}
             </LinkButton>

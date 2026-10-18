@@ -1,4 +1,13 @@
-import { AuthLayout, Banner, Button, Input, InsetPanel, LinkButton, Text } from "@cloudhal/ui";
+import {
+  AuthLayout,
+  Banner,
+  Button,
+  directional,
+  Input,
+  InsetPanel,
+  LinkButton,
+  Text,
+} from "@cloudhal/ui";
 import { CheckCircle, ClockCountdown, SignIn, SquaresFour } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -95,7 +104,7 @@ export function ResetPasswordPage() {
           <LinkButton
             href="/login"
             variant="primary"
-            icon={SignIn}
+            icon={directional(SignIn)}
             className="w-full justify-center"
           >
             {t("auth.signIn")}

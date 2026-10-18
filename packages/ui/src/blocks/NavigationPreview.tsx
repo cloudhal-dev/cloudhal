@@ -1,6 +1,7 @@
 import { Button, cn, Text } from "@cloudflare/kumo";
 import { ArrowUpRight, CaretDown, CaretUp, List } from "@phosphor-icons/react";
 import { useState } from "react";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 
 /** A shown menu item as the site renders it (`ActiveNavItem` of `@cloudhal/astro-renderer`). */
 export interface NavigationPreviewItem {
@@ -72,7 +73,9 @@ function ItemText({
       )}
     >
       <span className="break-words">{item.label}</span>
-      {item.external && <ArrowUpRight size={12} aria-hidden className="shrink-0" />}
+      {item.external && (
+        <DirectionalIcon icon={ArrowUpRight} size={12} aria-hidden className="shrink-0" />
+      )}
       {item.newTab && <span className="sr-only">{labels.newTab}</span>}
     </span>
   );

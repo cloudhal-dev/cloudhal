@@ -1,7 +1,8 @@
 import { Banner, LayerDialog, Text } from "@cloudflare/kumo";
-import { ArrowRight, CheckCircle, HandPalm, Warning } from "@phosphor-icons/react";
+import { CheckCircle, HandPalm, Warning } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { DateTimeField, type DateTimeFieldLabels, type DateTimeValue } from "./DateTimeField.tsx";
+import { TransitionArrow } from "./DirectionalIcon.tsx";
 import { InsetPanel } from "./InsetPanel.tsx";
 
 /**
@@ -108,7 +109,7 @@ export function RescheduleDialog({
                   <span data-reschedule-current="">{current}</span>
                 </Text>
               </span>
-              <ArrowRight size={16} aria-hidden className="shrink-0 text-kumo-subtle" />
+              <TransitionArrow size={16} />
               <span className="grid min-w-0 gap-0.5">
                 <Text as="span" variant="secondary" size="sm">
                   {labels.next}

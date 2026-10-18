@@ -2,6 +2,7 @@ import {
   AuthLayout,
   Banner,
   Button,
+  DirectionalIcon,
   Input,
   InsetPanel,
   LinkButton,
@@ -245,7 +246,7 @@ export function InvitePage() {
               action={
                 <Banner.Action
                   variant="secondary"
-                  icon={<SignOut />}
+                  icon={<DirectionalIcon icon={SignOut} />}
                   loading={signOut.isPending}
                   onClick={() => signOut.mutate()}
                 >
@@ -271,7 +272,7 @@ export function InvitePage() {
               action={
                 <Banner.Action
                   variant="secondary"
-                  icon={<ArrowRight />}
+                  icon={<DirectionalIcon icon={ArrowRight} />}
                   onClick={() => navigate({ to: "/login" })}
                 >
                   {t("inviteAccept.toSignIn")}

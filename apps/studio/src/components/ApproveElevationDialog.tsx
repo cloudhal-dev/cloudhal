@@ -1,5 +1,14 @@
-import { Banner, Input, InsetPanel, LayerDialog, Select, Tabs, Text } from "@cloudhal/ui";
-import { ArrowRight, ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
+import {
+  Banner,
+  Input,
+  InsetPanel,
+  LayerDialog,
+  Select,
+  Tabs,
+  Text,
+  TransitionArrow,
+} from "@cloudhal/ui";
+import { ClockCountdown, Info, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
@@ -295,7 +304,7 @@ export function ApproveElevationDialog({
                           </Text>
                           <ModeBadge mode={ownMode} />
                         </span>
-                        <ArrowRight size={16} className="text-kumo-subtle" aria-hidden />
+                        <TransitionArrow size={16} />
                       </>
                     )}
                     <span className="flex items-center gap-2">

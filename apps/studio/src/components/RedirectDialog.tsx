@@ -1,6 +1,8 @@
 import type { Redirect } from "@cloudhal/core-contracts";
 import {
   Banner,
+  DirectionalIcon,
+  directional,
   Field,
   Input,
   InputGroup,
@@ -25,6 +27,9 @@ import {
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { taxonomyKeys } from "./Taxonomy.tsx";
 import { useToast } from "./Toast.ts";
+
+/** Opens elsewhere; mirrors in right-to-left languages (ADR-0033 C1). */
+const OpenOutside = directional(ArrowSquareOut);
 
 const FROM_ERROR: Record<FromError, MessageKey> = {
   required: "redirects.errors.fromRequired",
@@ -162,7 +167,7 @@ export function RedirectDialog({
             <div className="grid gap-4" data-testid="redirect-external">
               <Banner
                 variant="alert"
-                icon={<SignOut weight="fill" />}
+                icon={<DirectionalIcon icon={SignOut} weight="fill" />}
                 title={t("redirects.external.leave", { host: external ?? "" })}
                 description={t("redirects.external.warning")}
               />
@@ -172,7 +177,7 @@ export function RedirectDialog({
                     {t("redirects.external.host")}
                   </Text>
                   <span className="flex items-center gap-2">
-                    <ArrowSquareOut size={16} className="shrink-0 text-kumo-subtle" />
+                    <OpenOutside size={16} className="shrink-0 text-kumo-subtle" />
                     <Text bold as="span" data-testid="external-host">
                       {external}
                     </Text>

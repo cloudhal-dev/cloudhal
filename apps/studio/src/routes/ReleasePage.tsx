@@ -5,6 +5,7 @@ import {
   Button,
   DateTimeField,
   type DateTimeValue,
+  directional,
   InlineCopyText,
   Input,
   LayerCard,
@@ -252,7 +253,7 @@ export function ReleasePage() {
               href={`/sites/${siteId}/snapshots?diff=${outcome.snapshotId}`}
               variant="secondary"
               size="sm"
-              icon={ArrowRight}
+              icon={directional(ArrowRight)}
             >
               {t(`${rel}.outcome.snapshot`)}
             </LinkButton>
@@ -405,7 +406,7 @@ export function ReleasePage() {
                       href={`/sites/${siteId}/approvals`}
                       variant="secondary"
                       size="sm"
-                      icon={ArrowRight}
+                      icon={directional(ArrowRight)}
                     >
                       {t(`${rel}.approval.review`)}
                     </LinkButton>

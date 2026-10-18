@@ -3,13 +3,14 @@ import {
   Badge,
   Banner,
   ClipboardText,
+  DirectionalIcon,
   InsetPanel,
   LayerDialog,
   Select,
   Text,
+  TransitionArrow,
 } from "@cloudhal/ui";
 import {
-  ArrowRight,
   ClockCountdown,
   Crown,
   Info,
@@ -108,7 +109,7 @@ function KeyNarrowingRow({ change }: { change: KeyNarrowing }) {
             {t("members.role.narrowedMode")}
           </Text>
           <ModeBadge mode={change.mode.from} subtle />
-          <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+          <TransitionArrow size={12} />
           <ModeBadge mode={change.mode.to} />
         </span>
       )}
@@ -245,7 +246,7 @@ export function ChangeRoleDialog({
                       {t("members.role.now")}
                     </Text>
                     <RoleBadge value={from} tooltip={false} />
-                    <ArrowRight size={14} className="text-kumo-subtle" aria-hidden />
+                    <TransitionArrow size={14} />
                     <RoleBadge value={role} tooltip={false} />
                   </span>
                   <Text variant="secondary" size="sm" as="span">
@@ -361,7 +362,9 @@ export function RemoveMemberDialog({
               </InsetPanel>
             )}
             <div className="grid gap-2">
-              <Consequence icon={<SignOut size={16} />}>{t("members.remove.signOut")}</Consequence>
+              <Consequence icon={<DirectionalIcon icon={SignOut} size={16} />}>
+                {t("members.remove.signOut")}
+              </Consequence>
               <Consequence icon={<Key size={16} />}>
                 {keyCount === undefined
                   ? t("members.remove.keys")
@@ -487,7 +490,7 @@ export function ResetLinkDialog({
                 <Consequence icon={<ClockCountdown size={16} />}>
                   {t("members.reset.once")}
                 </Consequence>
-                <Consequence icon={<SignOut size={16} />}>
+                <Consequence icon={<DirectionalIcon icon={SignOut} size={16} />}>
                   {t("members.reset.signsOut")}
                 </Consequence>
                 <Consequence icon={<ShieldWarning size={16} />}>
@@ -609,7 +612,7 @@ export function TransferOwnershipDialog({
                 <MemberIdentity member={member} size="sm" />
                 <span className="flex items-center gap-1.5">
                   <RoleBadge value={member.role} tooltip={false} />
-                  <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+                  <TransitionArrow size={12} />
                   <RoleBadge value="owner" tooltip={false} />
                 </span>
               </InsetPanel>

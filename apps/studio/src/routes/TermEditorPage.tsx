@@ -17,9 +17,9 @@ import {
   TagInput,
   Text,
   Tooltip,
+  TransitionArrow,
 } from "@cloudhal/ui";
 import {
-  ArrowRight,
   ArrowsMerge,
   Check,
   ClockCounterClockwise,
@@ -593,11 +593,7 @@ export function TermEditorPage() {
                               </Text>
                               {r ? (
                                 <>
-                                  <ArrowRight
-                                    size={14}
-                                    className="shrink-0 text-kumo-subtle"
-                                    aria-hidden
-                                  />
+                                  <TransitionArrow size={14} />
                                   <Text variant="mono-secondary" as="span">
                                     {r.to}
                                   </Text>

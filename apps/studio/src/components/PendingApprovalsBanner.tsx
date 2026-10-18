@@ -1,4 +1,4 @@
-import { Banner } from "@cloudhal/ui";
+import { Banner, DirectionalIcon } from "@cloudhal/ui";
 import { ArrowRight, HandPalm } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useT } from "../i18n/index.tsx";
@@ -21,7 +21,7 @@ export function PendingApprovalsBanner({ siteId }: { siteId: string }) {
         action={
           <Banner.Action
             variant="primary"
-            icon={<ArrowRight />}
+            icon={<DirectionalIcon icon={ArrowRight} />}
             onClick={() => navigate({ to: "/sites/$siteId/approvals", params: { siteId } })}
           >
             {t("approvals.banner.action")}
