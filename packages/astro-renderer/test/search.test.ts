@@ -5,8 +5,21 @@ import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resolveRoute } from "../src/routing.ts";
-import { searchAvailable, searchPageHref, searchRequest, snippetHtml } from "../src/search.ts";
-import { isSearchPath, SEARCH_RATE_LIMIT, SearchLimiter } from "../src/search-limit.ts";
+import {
+  searchAvailable,
+  searchJsonRequest,
+  searchJsonResponse,
+  searchPageHref,
+  searchRequest,
+  snippetHtml,
+} from "../src/search.ts";
+import {
+  isSearchPath,
+  SEARCH_COST,
+  SEARCH_RATE_LIMIT,
+  SearchLimiter,
+  searchCost,
+} from "../src/search-limit.ts";
 import { searchHead } from "../src/seo.ts";
 import { type GraphSource, LiveSource, SnapshotSource } from "../src/source.ts";
 
@@ -115,6 +128,43 @@ describe("search route", () => {
     expect(searchAvailable({ target: "node" }, new LiveSource(store, site.id))).toBe(true);
   });
 
+  it("answers the modal's /search.json with escaped snippets, never cached (RFC-0029 §5)", async () => {
+    const live = new LiveSource(store, site.id);
+    const res = await searchJsonResponse(
+      { target: "node" },
+      live,
+      new URL("http://x/search.json?q=bakl&kinds=article,nope"),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("x-robots-tag")).toBe("noindex");
+    const json = (await res.json()) as { total: number; hits: Record<string, unknown>[] };
+    expect(json.total).toBe(2);
+    expect(json.hits[0]).toMatchObject({
+      kind: "article",
+      href: expect.stringMatching(/^\/posts\//),
+    });
+    expect(json.hits[0]?.snippetHtml).toContain("<mark>");
+    expect(json.hits[0]?.snippetHtml).not.toContain("<b>");
+    expect(json.hits[0]).not.toHaveProperty("nodeId");
+    // a static build: no search, an empty 404 so no file is written
+    const snap = new SnapshotSource(store, await publish());
+    const none = await searchJsonResponse(
+      { target: "node" },
+      snap,
+      new URL("http://x/search.json?q=a"),
+    );
+    expect(none.status).toBe(404);
+    expect(await none.text()).toBe("");
+    expect(searchJsonRequest("?q=a&kinds=page,term,zz&page=2")).toEqual({
+      query: "a",
+      page: 2,
+      kinds: ["page", "term"],
+    });
+    expect(searchJsonRequest("?q=a").kinds).toBeUndefined();
+  });
+
   it("parses requests, builds page links and escapes snippets before marking them", () => {
     expect(searchRequest("?q=%C3%A7ay&page=3")).toEqual({ query: "çay", page: 3 });
     expect(searchRequest("?page=-1")).toEqual({ query: "", page: 1 });
@@ -134,17 +184,26 @@ describe("search route", () => {
 });
 
 describe("SearchLimiter", () => {
-  it("allows SEARCH_RATE_LIMIT searches per client and minute", () => {
-    let now = 60_000 * 1000 + 15_000;
+  it("holds a token bucket per client: 30 result pages or 60 modal requests in a burst", () => {
+    let now = 1_000_000;
     const limiter = new SearchLimiter({ now: () => now });
     for (let i = 0; i < SEARCH_RATE_LIMIT; i++) expect(limiter.take("203.0.113.7")).toBe(0);
-    expect(limiter.take("203.0.113.7")).toBe(45);
-    expect(limiter.take("198.51.100.1")).toBe(0);
+    expect(SEARCH_RATE_LIMIT).toBe(30);
+    expect(limiter.take("203.0.113.7")).toBe(2); // a page costs 2 tokens, refilled at 1 a second
+    expect(limiter.take("203.0.113.7", SEARCH_COST.json)).toBe(1);
+    expect(limiter.take("198.51.100.1")).toBe(0); // another client is not affected
     expect(limiter.take(undefined)).toBe(0);
-    now += 45_000;
-    expect(limiter.take("203.0.113.7")).toBe(0);
-    expect(isSearchPath("/search")).toBe(true);
-    expect(isSearchPath("/search/")).toBe(true);
+    now += 1_000;
+    expect(limiter.take("203.0.113.7", SEARCH_COST.json)).toBe(0);
+    expect(limiter.take("203.0.113.7", SEARCH_COST.json)).toBe(1);
+    now += 60_000; // a full bucket, never more
+    for (let i = 0; i < 60; i++) expect(limiter.take("203.0.113.7", SEARCH_COST.json)).toBe(0);
+    expect(limiter.take("203.0.113.7", SEARCH_COST.json)).toBe(1);
+    expect(searchCost("/search")).toBe(SEARCH_COST.page);
+    expect(searchCost("/search/")).toBe(SEARCH_COST.page);
+    expect(searchCost("/search.json")).toBe(SEARCH_COST.json);
+    expect(searchCost("/searching")).toBeUndefined();
+    expect(isSearchPath("/search.json")).toBe(true);
     expect(isSearchPath("/searching")).toBe(false);
   });
 });

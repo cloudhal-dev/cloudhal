@@ -157,7 +157,29 @@ Algolia, Typesense, Meilisearch and similar services send content outside the de
     - `LiveSource.search` uses `searchDocuments`, so `cloudhal dev` finds pages and terms too.
     - `SourceSearchOptions.kinds` narrows the results.
     - The results page shows a hit's `context`.
+- **29c shipped.**
+  - **Endpoint.** `GET /search.json?q=&kinds=&page=` (`searchJsonResponse` in `@cloudhal/astro-renderer/search`; the starter's `src/pages/search.json.ts`):
+    - 8 hits per request, as `SearchJson`, with snippets escaped and marked on the server and no node ids.
+    - Headers: `no-store` and `noindex`.
+    - A static build gets an empty `404`, so no file is written.
+  - **Limit.** `SearchLimiter` is a token bucket per client and isolate:
+    - 60 tokens, refilled at 1 a second; `/search` costs 2, `/search.json` costs 1.
+    - That allows a burst of 30 result pages, as before, or 60 modal requests.
+    - The endpoint's `429` is JSON.
+  - **Module.** `/_cloudhal/search.1.js` (`@cloudhal/astro-renderer/search-client`, under 3 KB gzipped). It is served by `cloudhal dev` and written by Site Worker builds. It wires markup the theme renders:
+    - The header field (`[data-ch-search-open]`), ⌘K / Ctrl+K and `/` open the dialog.
+    - Queries are debounced (200 ms) and the request a newer query replaces is cancelled.
+    - Hits are grouped by kind in a WAI-ARIA combobox and listbox, with an "all results" option.
+    - The last five searches stay in `localStorage`, with a button that clears them.
+    - It says when the reader must wait (`429`) and when search is unavailable.
+    - Escape closes the dialog even inside a search field, and focus returns to the header field without opening the dialog again.
+  - **Starter.**
+    - `SearchDialog.astro` renders the dialog's markup and words (en/tr, `searchModal` in `theme.ts`).
+    - `features/search-dialog.css`: centered on wide screens, a full-height sheet on phones, entrance at the site's motion level.
+    - `Base.astro` renders the dialog and loads the module where the deployment answers searches.
 - **Deviations.**
+  - The header action's `style` (§6) is not added: it is a contract change, and the existing field opens the modal. The phone menu keeps its plain form.
+  - The modal searches the site's default locale, like `/search` (open question 1).
   - Article hits carry no `context` yet: a category name would go stale when the term is renamed and the article is not.
   - `image` is not indexed yet.
   - Pages with `seo.noindex` are left out of search.

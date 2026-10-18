@@ -10,6 +10,7 @@ import { EMBED_SCRIPT, withEmbedFrames } from "./embed-client.ts";
 import { MOTION_SCRIPT, MOTION_SCRIPT_ALIASES } from "./motion-client.ts";
 import { OVERLAY_SCRIPT } from "./overlay-client.ts";
 import { PREFS_SCRIPT } from "./prefs-client.ts";
+import { SEARCH_SCRIPT } from "./search-client.ts";
 import { SURFACE_SCRIPT, SURFACE_SCRIPT_ALIASES } from "./surface-client.ts";
 
 /** Where the Site Worker build writes its hashed scripts (analytics, comments). */
@@ -94,6 +95,8 @@ export async function writeSurfaceClient(dir: URL | string): Promise<void> {
     // RFC-0027 27b: the carousel module, loaded by surfaces with a carousel.
     [CAROUSEL_SCRIPT.path, CAROUSEL_SCRIPT.code],
     ...CAROUSEL_SCRIPT_ALIASES.map((alias) => [alias, CAROUSEL_SCRIPT.code] as [string, string]),
+    // RFC-0029 §6: the search modal (static builds have no search, so they never load it).
+    [SEARCH_SCRIPT.path, SEARCH_SCRIPT.code],
   ];
   for (const [name, code] of files) {
     const file = path.join(rootOf(dir), ...name.split("/").filter(Boolean));

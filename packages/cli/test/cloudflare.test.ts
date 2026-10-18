@@ -302,7 +302,7 @@ describe("Site Worker on workerd", () => {
     );
   });
 
-  it("answers /search from the D1 index, never cached, 30 per minute per client (RFC-0019 §3)", async () => {
+  it("answers /search and /search.json from the D1 index, never cached, rate-limited per client (RFC-0019 §3, RFC-0029 §5)", async () => {
     const snap = await remote.createSnapshot(siteId, {
       actor: human,
       reason: "publish",
@@ -319,10 +319,33 @@ describe("Site Worker on workerd", () => {
     expect(html).toContain('<a href="/posts/hello-world">');
     expect(html).toContain("<mark>");
     expect(html).toContain('<meta name="robots" content="noindex,follow"');
-    for (let i = 1; i < 30; i++) await (await get("/search?q=hello", client)).arrayBuffer();
-    const limited = await get("/search?q=hello", client);
-    expect(limited.status).toBe(429);
-    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    // RFC-0029 §5: the modal's JSON, from the same index, never cached
+    const json = await get("/search.json?q=hello", client);
+    expect(json.status).toBe(200);
+    expect(json.headers.get("content-type")).toContain("application/json");
+    expect(json.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    const body = (await json.json()) as { hits: unknown[] };
+    expect(body.hits).toContainEqual(
+      expect.objectContaining({ href: "/posts/hello-world", kind: "article" }),
+    );
+    // a token bucket: a burst of about 30 pages, then 429 (the bucket refills at a token a second,
+    // so a slow run gets a few more before it empties)
+    let limited: Awaited<ReturnType<typeof get>> | undefined;
+    for (let i = 0; i < 45 && !limited; i++) {
+      const r = await get("/search?q=hello", client);
+      if (r.status === 429) limited = r;
+      else await r.arrayBuffer();
+    }
+    expect(limited?.status).toBe(429);
+    expect(Number(limited?.headers.get("retry-after"))).toBeGreaterThan(0);
+    // the endpoint's own 429 is JSON (it costs one token, so it may get one more answer first)
+    let limitedJson: Awaited<ReturnType<typeof get>> | undefined;
+    for (let i = 0; i < 5 && !limitedJson; i++) {
+      const r = await get("/search.json?q=hello", client);
+      if (r.status === 429) limitedJson = r;
+      else await r.arrayBuffer();
+    }
+    expect(await limitedJson?.json()).toEqual({ error: "rate_limited" });
     // another client is not affected
     expect(
       (await get("/search?q=hello", { headers: { "cf-connecting-ip": "198.51.100.4" } })).status,

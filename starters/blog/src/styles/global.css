@@ -21,6 +21,7 @@
 @import "./features/motion-effects.css";
 @import "./features/ambient.css";
 @import "./features/search.css";
+@import "./features/search-dialog.css";
 @import "./features/chrome.css";
 @import "./features/chrome-menus.css";
 @import "./features/overlays.css";

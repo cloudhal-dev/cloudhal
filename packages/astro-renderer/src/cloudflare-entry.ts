@@ -56,7 +56,7 @@ import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
-import { isSearchPath, SearchLimiter } from "./search-limit.ts";
+import { SearchLimiter, searchCost } from "./search-limit.ts";
 
 interface Env {
   CLOUDHAL_SITE_ID?: string;
@@ -416,18 +416,29 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
           clientAddress: request.headers.get("cf-connecting-ip") ?? undefined,
         })) as Response;
       }
-      // Site search (RFC-0019 §3): per-client limit before anything renders.
-      if (isSearchPath(url.pathname)) {
-        const wait = searchLimiter.take(request.headers.get("cf-connecting-ip") ?? undefined);
-        if (wait > 0)
-          return new Response("Too many searches; try again in a minute.", {
-            status: 429,
-            headers: {
-              "retry-after": String(wait),
-              "cache-control": "no-store",
-              "content-type": "text/plain; charset=utf-8",
+      // Site search (RFC-0019 §3, RFC-0029 §5): per-client limit before anything renders; the
+      // modal's endpoint answers in JSON.
+      const cost = searchCost(url.pathname);
+      if (cost !== undefined) {
+        const wait = searchLimiter.take(request.headers.get("cf-connecting-ip") ?? undefined, cost);
+        if (wait > 0) {
+          const json = url.pathname.endsWith(".json");
+          return new Response(
+            json
+              ? JSON.stringify({ error: "rate_limited" })
+              : "Too many searches; try again in a minute.",
+            {
+              status: 429,
+              headers: {
+                "retry-after": String(wait),
+                "cache-control": "no-store",
+                "content-type": json
+                  ? "application/json; charset=utf-8"
+                  : "text/plain; charset=utf-8",
+              },
             },
-          });
+          );
+        }
       }
       const started = Date.now();
       const media = siteId ? await serveMedia(request, { siteId }) : undefined;

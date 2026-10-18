@@ -12,6 +12,7 @@ cloudhal build    # static HTML from the published (or latest) snapshot
 - `[...path].astro` — pages at their path, posts at `/<collection>/<slug>`, category and tag archives at `/category/<slug>` and `/tag/<slug>` (`/page/<n>` for older posts). Anything else follows the site's redirects (301), answers 410 for a retired term, or 404.
 - `[...path]/rss.xml.ts` — a feed per category and tag (`/category/<slug>/rss.xml`).
 - `rss.xml.ts`, `sitemap.xml.ts`, `robots.txt.ts` — the site feed, the sitemap (pages, posts and indexable archives) and robots rules.
+- `search.json.ts` — the search modal's answers (RFC-0029), where the deployment answers searches (`cloudhal dev`, the Cloudflare Site Worker). `components/SearchDialog.astro` is the modal's markup and words; Cloudhal's `/_cloudhal/search.1.js` wires it, and without it the header form opens `/search`.
 
 ## Styles (`src/styles`)
 `global.css` (imported by `layouts/Base.astro`) loads Tailwind, `fonts.css` and one file per feature from `styles/features/` (`tokens.css` with `@theme`, `prose.css`, `surfaces.css`, `motion.css`, `chrome.css`, `carousel.css` …) in cascade order. The rules are unlayered and later files override earlier ones, so keep the order; add a feature as a new file and import it from `global.css`. `source("..")` on the Tailwind import is relative to `global.css`, so that import stays there.

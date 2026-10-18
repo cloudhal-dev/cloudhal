@@ -3,6 +3,7 @@ import { CHROME_SCRIPT } from "@cloudhal/astro-renderer/chrome";
 import { SeoHead } from "@cloudhal/astro-renderer/components";
 import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
 import { PREFS_SCRIPT } from "@cloudhal/astro-renderer/prefs";
+import { SEARCH_SCRIPT } from "@cloudhal/astro-renderer/search-client";
 import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
 import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { Site } from "@cloudhal/core-contracts";
@@ -11,9 +12,11 @@ import { renderIcon } from "@cloudhal/core-ts/icons";
 import MenuPanel from "../components/MenuPanel.astro";
 import NavLink from "../components/NavLink.astro";
 import NavMenu from "../components/NavMenu.astro";
+import SearchDialog from "../components/SearchDialog.astro";
 import { PAIRING_PRELOADS } from "../fonts.ts";
 import { iconSet } from "../icons.ts";
 import { themeSettings } from "../settings.ts";
+import type { ThemeStrings } from "../theme.ts";
 import "../styles/global.css";
 
 interface Props {
@@ -26,7 +29,16 @@ interface Props {
   /** A preview of an embargoed or expired page or entry says so above it (RFC-0008 §7.3). */
   notice?: { state: string; at: string; text: string } | undefined;
   /** RFC-0019 §3: the header's search form, where the deployment answers searches. */
-  search?: { label: string; placeholder: string; button: string; query?: string } | undefined;
+  search?:
+    | {
+        label: string;
+        placeholder: string;
+        button: string;
+        query?: string;
+        /** RFC-0029 §6: the search modal's words; the header field opens it. */
+        modal?: ThemeStrings["searchModal"];
+      }
+    | undefined;
   /** RFC-0024 §1: the page's own motion level, over the site's. */
   motion?: string | undefined;
   /** RFC-0025: the page's header and footer (`resolveChrome`), and the menus they name by key. */
@@ -236,7 +248,7 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
                 a.kind === "button" && a.label && a.href ? (
                   <a class={`ch-button ch-button--${a.variant ?? "primary"}`} href={safe(a.href)}>{a.label}</a>
                 ) : a.kind === "search" && search ? (
-                  <form class="ch-header-search" method="get" action="/search" role="search">
+                  <form class="ch-header-search" method="get" action="/search" role="search" data-ch-search-open={search.modal ? "" : undefined}>
                     <label for="ch-header-q" class="sr-only">{search.label}</label>
                     <input id="ch-header-q" type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
                     <button type="submit" class="sr-only">{search.button}</button>
@@ -364,5 +376,8 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
     {/* RFC-0025 25d: toasts land here (a live region already in the page, so they are announced). */}
     <div class="ch-toasts" data-ch-toasts role="status" aria-live="polite" data-copied={bw.copied} data-link-copied={bw.linkCopied}></div>
     {needsScript && <script type="module" src={CHROME_SCRIPT.path}></script>}
+    {/* RFC-0029 §6: the search modal, where the deployment answers searches. */}
+    {search?.modal && <SearchDialog label={search.label} placeholder={search.placeholder} words={search.modal} />}
+    {search?.modal && <script type="module" src={SEARCH_SCRIPT.path}></script>}
   </body>
 </html>
