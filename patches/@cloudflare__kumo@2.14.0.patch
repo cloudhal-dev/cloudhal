@@ -1,7 +1,62 @@
+diff --git a/dist/chunks/badge-dq8bx752b9dp7dst.js b/dist/chunks/badge-dq8bx752b9dp7dst.js
+index c39a326..1d54435 100644
+--- a/dist/chunks/badge-dq8bx752b9dp7dst.js
++++ b/dist/chunks/badge-dq8bx752b9dp7dst.js
+@@ -147,7 +147,7 @@ function Badge({ variant = KUMO_BADGE_DEFAULT_VARIANTS.variant, appearance = KUM
+ 		className: cn(badgeVariants({
+ 			variant,
+ 			appearance
+-		}), icon && "pl-1.5", className),
++		}), icon && "ps-1.5", className),
+ 		children: [
+ 			dotColor ? /* @__PURE__ */ jsx("span", {
+ 				"aria-hidden": "true",
+diff --git a/dist/chunks/banner-msnmqm7of2lck01x.js b/dist/chunks/banner-msnmqm7of2lck01x.js
+index f6abf6d..bb73d96 100644
+--- a/dist/chunks/banner-msnmqm7of2lck01x.js
++++ b/dist/chunks/banner-msnmqm7of2lck01x.js
+@@ -199,13 +199,13 @@ const BannerRoot = forwardRef(function BannerRoot({ icon, title, description, ac
+ 					children: [title && /* @__PURE__ */ jsxs("span", {
+ 						className: "leading-snug font-medium",
+ 						children: [title, !description && hasInlineLinkAction && /* @__PURE__ */ jsx("span", {
+-							className: "ml-1.5 [&_[data-kumo-component=Link]]:inline",
++							className: "ms-1.5 [&_[data-kumo-component=Link]]:inline",
+ 							children: action
+ 						})]
+ 					}), description && /* @__PURE__ */ jsxs("span", {
+ 						className: cn(sizeParts.description, "leading-snug"),
+ 						children: [description, hasInlineLinkAction && /* @__PURE__ */ jsx("span", {
+-							className: "ml-1.5 [&_[data-kumo-component=Link]]:inline",
++							className: "ms-1.5 [&_[data-kumo-component=Link]]:inline",
+ 							children: action
+ 						})]
+ 					})]
+diff --git a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
+index 2b383c4..0e75e8f 100644
+--- a/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
++++ b/dist/chunks/breadcrumbs-lhi1qrdh74mb4zsx.js
+@@ -21,7 +21,7 @@ const KUMO_BREADCRUMBS_VARIANTS = { size: {
+ } };
+ const KUMO_BREADCRUMBS_DEFAULT_VARIANTS = { size: "base" };
+ function breadcrumbsVariants({ size = KUMO_BREADCRUMBS_DEFAULT_VARIANTS.size } = {}) {
+-	return cn("group mr-4 flex min-w-0 grow items-center overflow-hidden whitespace-nowrap", resolveVariant(KUMO_BREADCRUMBS_VARIANTS.size, size, KUMO_BREADCRUMBS_DEFAULT_VARIANTS.size).classes);
++	return cn("group me-4 flex min-w-0 grow items-center overflow-hidden whitespace-nowrap", resolveVariant(KUMO_BREADCRUMBS_VARIANTS.size, size, KUMO_BREADCRUMBS_DEFAULT_VARIANTS.size).classes);
+ }
+ const Link = ({ href, icon, children }) => {
+ 	const LinkComponent = useLinkComponent();
 diff --git a/dist/chunks/chart-kd1xd6crso2i956o.js b/dist/chunks/chart-kd1xd6crso2i956o.js
-index e3f77e571783acc063b0780ec1cba6f1c6dfc71b..98b549913906a9db150626d45778c640d1e22bc5 100644
+index e3f77e5..0caf455 100644
 --- a/dist/chunks/chart-kd1xd6crso2i956o.js
 +++ b/dist/chunks/chart-kd1xd6crso2i956o.js
+@@ -407,7 +407,7 @@ function MarkerTooltipContent({ state, formatValue, formatTimestamp }) {
+ 					})
+ 				]
+ 			}), marker.description && /* @__PURE__ */ jsx("div", {
+-				className: "mt-0.5 ml-5 text-xs text-kumo-default",
++				className: "mt-0.5 ms-5 text-xs text-kumo-default",
+ 				children: marker.description
+ 			})] }, `${marker.timestamp}-${marker.label}-${index}`))
+ 		}),
 @@ -534,7 +534,7 @@ const DEFAULT_X_AXIS_TICK_COUNT = 5;
  * />
  * ```
@@ -20,8 +75,1072 @@ index e3f77e571783acc063b0780ec1cba6f1c6dfc71b..98b549913906a9db150626d45778c640
  					footer: tooltipFooter
  				})
  			})
+diff --git a/dist/chunks/clipboard-text-gd6s3n1bqse9zgt8.js b/dist/chunks/clipboard-text-gd6s3n1bqse9zgt8.js
+index 99e7eea..dcdd781 100644
+--- a/dist/chunks/clipboard-text-gd6s3n1bqse9zgt8.js
++++ b/dist/chunks/clipboard-text-gd6s3n1bqse9zgt8.js
+@@ -152,7 +152,7 @@ const ClipboardText = forwardRef(({ text, textToCopy, className, size = KUMO_CLI
+ 		ref: buttonRef,
+ 		size: sizeConfig.buttonSize,
+ 		variant: "ghost",
+-		className: cn("relative isolate overflow-hidden rounded-l-none rounded-r-[inherit] border-l! border-kumo-line! px-3 transition-all duration-200", "focus:ring-kumo-focus/50 focus:ring-inset", "focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset"),
++		className: cn("relative isolate overflow-hidden rounded-s-none rounded-e-[inherit] border-l! border-kumo-line! px-3 transition-all duration-200", "focus:ring-kumo-focus/50 focus:ring-inset", "focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset"),
+ 		onClick: copyToClipboard,
+ 		"aria-label": copyAction,
+ 		children: [/* @__PURE__ */ jsx("span", {
+diff --git a/dist/chunks/cloudflare-logo-boafurcbm5ttoo4o.js b/dist/chunks/cloudflare-logo-boafurcbm5ttoo4o.js
+index 8c73dad..e35407d 100644
+--- a/dist/chunks/cloudflare-logo-boafurcbm5ttoo4o.js
++++ b/dist/chunks/cloudflare-logo-boafurcbm5ttoo4o.js
+@@ -136,7 +136,7 @@ const PoweredByCloudflare = forwardRef(({ color = "color", href = "https://www.c
+ 		href,
+ 		target: "_blank",
+ 		rel: "noopener noreferrer",
+-		className: cn("inline-flex items-center gap-2 rounded-lg py-2 pr-3 pl-2.5 text-sm font-medium", "ring-1 transition-all ring-inset hover:shadow-sm", color === "color" && "bg-kumo-base text-kumo-default ring-kumo-hairline", color === "black" && "bg-white text-black ring-black/20", color === "white" && "bg-black text-white ring-white/20", className),
++		className: cn("inline-flex items-center gap-2 rounded-lg py-2 pe-3 ps-2.5 text-sm font-medium", "ring-1 transition-all ring-inset hover:shadow-sm", color === "color" && "bg-kumo-base text-kumo-default ring-kumo-hairline", color === "black" && "bg-white text-black ring-black/20", color === "white" && "bg-black text-white ring-white/20", className),
+ 		...props,
+ 		children: [/* @__PURE__ */ jsx(CloudflareLogo, {
+ 			variant: "glyph",
+diff --git a/dist/chunks/collapsible-l8g94on4w7qfosmn.js b/dist/chunks/collapsible-l8g94on4w7qfosmn.js
+index 92741bb..89e13f4 100644
+--- a/dist/chunks/collapsible-l8g94on4w7qfosmn.js
++++ b/dist/chunks/collapsible-l8g94on4w7qfosmn.js
+@@ -118,7 +118,7 @@ const CollapsibleDefaultPanel = forwardRef(({ children, className, ...props }, r
+ 		className: cn("h-[var(--collapsible-panel-height)] overflow-hidden transition-[height,opacity] duration-100 ease-out data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 [&[hidden]:not([hidden='until-found'])]:hidden", className),
+ 		...props,
+ 		children: /* @__PURE__ */ jsx("div", {
+-			className: "my-2 space-y-4 border-l-2 border-kumo-fill py-1 pr-1 pl-4",
++			className: "my-2 space-y-4 border-s-2 border-kumo-fill py-1 pe-1 ps-4",
+ 			children
+ 		})
+ 	});
+diff --git a/dist/chunks/combobox-hdxtsm2gqcxxgfju.js b/dist/chunks/combobox-hdxtsm2gqcxxgfju.js
+index 87feff9..0e760b6 100644
+--- a/dist/chunks/combobox-hdxtsm2gqcxxgfju.js
++++ b/dist/chunks/combobox-hdxtsm2gqcxxgfju.js
+@@ -66,24 +66,24 @@ function Content({ children, className, align = "start", sideOffset = 4, alignOf
+ }
+ const triggerValueIconStyles = {
+ 	xs: {
+-		padding: "pr-5",
++		padding: "pe-5",
+ 		iconSize: 12,
+-		iconRight: "right-1"
++		iconRight: "end-1"
+ 	},
+ 	sm: {
+-		padding: "pr-6",
++		padding: "pe-6",
+ 		iconSize: 14,
+-		iconRight: "right-1.5"
++		iconRight: "end-1.5"
+ 	},
+ 	base: {
+-		padding: "pr-8",
++		padding: "pe-8",
+ 		iconSize: 16,
+-		iconRight: "right-2"
++		iconRight: "end-2"
+ 	},
+ 	lg: {
+-		padding: "pr-10",
++		padding: "pe-10",
+ 		iconSize: 18,
+-		iconRight: "right-3"
++		iconRight: "end-3"
+ 	}
+ };
+ function TriggerValue({ className, render, ...props }) {
+@@ -108,28 +108,28 @@ function TriggerValue({ className, render, ...props }) {
+ }
+ const triggerInputIconStyles = {
+ 	xs: {
+-		padding: "pr-7",
++		padding: "pe-7",
+ 		iconSize: 12,
+-		clearRight: "right-5",
+-		caretRight: "right-1"
++		clearRight: "end-5",
++		caretRight: "end-1"
+ 	},
+ 	sm: {
+-		padding: "pr-9",
++		padding: "pe-9",
+ 		iconSize: 14,
+-		clearRight: "right-6",
+-		caretRight: "right-1.5"
++		clearRight: "end-6",
++		caretRight: "end-1.5"
+ 	},
+ 	base: {
+-		padding: "pr-12",
++		padding: "pe-12",
+ 		iconSize: 16,
+-		clearRight: "right-8",
+-		caretRight: "right-2"
++		clearRight: "end-8",
++		caretRight: "end-2"
+ 	},
+ 	lg: {
+-		padding: "pr-14",
++		padding: "pe-14",
+ 		iconSize: 18,
+-		clearRight: "right-9",
+-		caretRight: "right-3"
++		clearRight: "end-9",
++		caretRight: "end-3"
+ 	}
+ };
+ function TriggerInput({ clearLabel = "Clear selection", showOptionsLabel = "Show options", ...props }) {
+@@ -217,7 +217,7 @@ function Group(props) {
+ function Chip({ removeLabel = "Remove", ...props }) {
+ 	return /* @__PURE__ */ jsxs(ComboboxChip, {
+ 		...props,
+-		className: cn("flex items-center gap-2.5", "h-6 pr-[3px] pl-2", "rounded-sm ring-1 ring-kumo-hairline", "bg-kumo-overlay", "text-sm"),
++		className: cn("flex items-center gap-2.5", "h-6 pe-[3px] ps-2", "rounded-sm ring-1 ring-kumo-hairline", "bg-kumo-overlay", "text-sm"),
+ 		children: [props.children, /* @__PURE__ */ jsx(ComboboxChipRemove, {
+ 			"data-kumo-component": "Combobox",
+ 			"data-kumo-part": "chip-remove",
+diff --git a/dist/chunks/command-palette-crtm3nd32yjhuax1.js b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
+index ceb2dbb..0d73cfc 100644
+--- a/dist/chunks/command-palette-crtm3nd32yjhuax1.js
++++ b/dist/chunks/command-palette-crtm3nd32yjhuax1.js
+@@ -162,7 +162,7 @@ function Item({ value, disabled, children, className, onClick }) {
+ 		value,
+ 		disabled,
+ 		onClick,
+-		className: cn("group flex w-full items-center gap-3 px-2 py-1.5 text-left text-base transition-colors", "cursor-pointer data-[highlighted]:bg-kumo-overlay", "rounded-lg", disabled && "cursor-default opacity-50", className),
++		className: cn("group flex w-full items-center gap-3 px-2 py-1.5 text-start text-base transition-colors", "cursor-pointer data-[highlighted]:bg-kumo-overlay", "rounded-lg", disabled && "cursor-default opacity-50", className),
+ 		children
+ 	});
+ }
+@@ -246,7 +246,7 @@ function ResultItem({ title, breadcrumbs, titleHighlights, breadcrumbHighlights,
+ 	return /* @__PURE__ */ jsxs(AutocompleteItem, {
+ 		value,
+ 		onClick: nonInteractive ? void 0 : (e) => onClick(e),
+-		className: cn("group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors", nonInteractive ? "cursor-default" : "cursor-pointer data-[highlighted]:bg-kumo-overlay"),
++		className: cn("group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-start transition-colors", nonInteractive ? "cursor-default" : "cursor-pointer data-[highlighted]:bg-kumo-overlay"),
+ 		children: [
+ 			icon && /* @__PURE__ */ jsx("div", {
+ 				className: "flex flex-shrink-0 items-center text-kumo-subtle",
+diff --git a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
+index 8b0f021..676c6f3 100644
+--- a/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
++++ b/dist/chunks/date-range-picker-i6d8y1yemm7x5ins.js
+@@ -164,7 +164,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+ 					/* @__PURE__ */ jsx("button", {
+ 						type: "button",
+ 						"aria-label": "Previous month",
+-						className: "absolute top-0 left-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
++						className: "absolute top-0 start-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
+ 						onClick: () => adjustMonth(-1),
+ 						children: /* @__PURE__ */ jsx(CaretLeftIcon, { size: sizeConfig.iconSize })
+ 					}),
+@@ -200,7 +200,7 @@ function DateRangePicker({ onStartDateChange, onEndDateChange, size = KUMO_DATE_
+ 					/* @__PURE__ */ jsx("button", {
+ 						type: "button",
+ 						"aria-label": "Next month",
+-						className: "absolute top-0 right-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
++						className: "absolute top-0 end-0 cursor-pointer rounded bg-kumo-interact/85 p-1.5 hover:bg-kumo-interact",
+ 						onClick: () => adjustMonth(1),
+ 						children: /* @__PURE__ */ jsx(CaretRightIcon, { size: sizeConfig.iconSize })
+ 					}),
+@@ -252,8 +252,8 @@ function DateRangeDayCell({ date, mode, size = KUMO_DATE_RANGE_PICKER_DEFAULT_VA
+ 		switch (mode) {
+ 			case 0: return "bg-transparent";
+ 			case 1: return "bg-transparent";
+-			case 2: return "!bg-kumo-contrast rounded-tl-[5px] rounded-bl-[5px]";
+-			case 3: return "!bg-kumo-contrast rounded-tr-[5px] rounded-br-[5px]";
++			case 2: return "!bg-kumo-contrast rounded-ss-[5px] rounded-es-[5px]";
++			case 3: return "!bg-kumo-contrast rounded-se-[5px] rounded-ee-[5px]";
+ 			case 4: return "bg-kumo-interact";
+ 			case 5: return "bg-kumo-fill";
+ 		}
+diff --git a/dist/chunks/dropdown-m53ji1d66mws89wh.js b/dist/chunks/dropdown-m53ji1d66mws89wh.js
+index 4cb82af..7f3f464 100644
+--- a/dist/chunks/dropdown-m53ji1d66mws89wh.js
++++ b/dist/chunks/dropdown-m53ji1d66mws89wh.js
+@@ -29,12 +29,12 @@ const DropdownMenuSubTrigger = React$1.forwardRef(({ className, inset, children,
+ 	ref,
+ 	"data-kumo-component": "DropdownMenu",
+ 	"data-kumo-part": "submenu-trigger",
+-	className: cn("flex cursor-default items-center rounded-sm text-base outline-hidden select-none", "px-2 py-1.5", "focus:bg-kumo-tint focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand", "data-[state=open]:bg-kumo-tint", inset && "pl-8", className),
++	className: cn("flex cursor-default items-center rounded-sm text-base outline-hidden select-none", "px-2 py-1.5", "focus:bg-kumo-tint focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand", "data-[state=open]:bg-kumo-tint", inset && "ps-8", className),
+ 	...props,
+ 	children: [
+-		IconComponent && /* @__PURE__ */ jsx(IconComponent, { className: "mr-2 h-4 w-4" }),
++		IconComponent && /* @__PURE__ */ jsx(IconComponent, { className: "me-2 h-4 w-4" }),
+ 		children,
+-		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ml-auto h-4 w-4" })
++		/* @__PURE__ */ jsx(CaretRightIcon, { className: "ms-auto h-4 w-4" })
+ 	]
+ }));
+ DropdownMenuSubTrigger.displayName = MenuSubmenuTrigger.displayName;
+@@ -56,7 +56,7 @@ const DropdownMenuContent = React$1.forwardRef(({ className, sideOffset = 8, chi
+ const renderIconNode = (IconComponent) => {
+ 	if (!IconComponent) return null;
+ 	if (React$1.isValidElement(IconComponent)) return IconComponent;
+-	return /* @__PURE__ */ jsx(IconComponent, { className: "mr-2 h-4 w-4" });
++	return /* @__PURE__ */ jsx(IconComponent, { className: "me-2 h-4 w-4" });
+ };
+ /**
+ * DropdownMenuItem — a single actionable item within a dropdown menu.
+@@ -114,7 +114,7 @@ const DropdownMenuItem = React$1.forwardRef(({ className, inset, icon: IconCompo
+ 		ref,
+ 		"data-kumo-component": "DropdownMenu",
+ 		"data-kumo-part": "item",
+-		className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-overlay", inset && "pl-8", dropdownVariants({ variant }), className),
++		className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-overlay", inset && "ps-8", dropdownVariants({ variant }), className),
+ 		render: href ? linkContent : render,
+ 		...props,
+ 		children: useRenderProp ? void 0 : innerContent
+@@ -150,7 +150,7 @@ const DropdownMenuLinkItem = React$1.forwardRef(({ className, inset, icon: IconC
+ 		ref,
+ 		"data-kumo-component": "DropdownMenu",
+ 		"data-kumo-part": "link-item",
+-		className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none", "focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-overlay", "text-inherit no-underline", inset && "pl-8", dropdownVariants({ variant }), className),
++		className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none", "focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-overlay", "text-inherit no-underline", inset && "ps-8", dropdownVariants({ variant }), className),
+ 		...props,
+ 		children: [IconComponent && renderIconNode(IconComponent), children]
+ 	});
+@@ -160,11 +160,11 @@ const DropdownMenuCheckboxItem = React$1.forwardRef(({ className, children, chec
+ 	ref,
+ 	"data-kumo-component": "DropdownMenu",
+ 	"data-kumo-part": "checkbox-item",
+-	className: cn("relative flex cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-base outline-hidden transition-colors select-none focus:bg-kumo-tint focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50", className),
++	className: cn("relative flex cursor-default items-center rounded-sm py-1.5 pe-2 ps-8 text-base outline-hidden transition-colors select-none focus:bg-kumo-tint focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:ring-2 focus-visible:ring-kumo-brand data-disabled:pointer-events-none data-disabled:opacity-50", className),
+ 	checked,
+ 	...props,
+ 	children: [/* @__PURE__ */ jsx(MenuCheckboxItemIndicator, {
+-		className: "absolute left-2 flex h-3.5 w-3.5 items-center justify-center text-inherit",
++		className: "absolute start-2 flex h-3.5 w-3.5 items-center justify-center text-inherit",
+ 		children: /* @__PURE__ */ jsx(CheckIcon, {
+ 			weight: "bold",
+ 			size: 12
+@@ -174,7 +174,7 @@ const DropdownMenuCheckboxItem = React$1.forwardRef(({ className, children, chec
+ DropdownMenuCheckboxItem.displayName = MenuCheckboxItem.displayName;
+ const DropdownMenuLabel = React$1.forwardRef(({ className, inset, ...props }, ref) => /* @__PURE__ */ jsx(MenuGroupLabel, {
+ 	ref,
+-	className: cn("px-2 py-1.5 text-base font-semibold", inset && "pl-8", className),
++	className: cn("px-2 py-1.5 text-base font-semibold", inset && "ps-8", className),
+ 	...props
+ }));
+ DropdownMenuLabel.displayName = MenuGroupLabel.displayName;
+@@ -186,7 +186,7 @@ const DropdownMenuSeparator = React$1.forwardRef(({ className, ...props }, ref)
+ DropdownMenuSeparator.displayName = Separator.displayName;
+ const DropdownMenuShortcut = ({ className, ...props }) => {
+ 	return /* @__PURE__ */ jsx("span", {
+-		className: cn("ml-auto text-xs tracking-widest opacity-60", className),
++		className: cn("ms-auto text-xs tracking-widest opacity-60", className),
+ 		...props
+ 	});
+ };
+@@ -195,14 +195,14 @@ const DropdownMenuRadioItem = React$1.forwardRef(({ className, children, inset,
+ 	ref,
+ 	"data-kumo-component": "DropdownMenu",
+ 	"data-kumo-part": "radio-item",
+-	className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none", "data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-tint", inset && "pl-8", className),
++	className: cn("relative flex cursor-default items-center rounded-md px-2 py-1.5 text-base outline-hidden select-none", "data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-kumo-tint", inset && "ps-8", className),
+ 	...props,
+ 	children: [IconComponent && renderIconNode(IconComponent), children]
+ }));
+ DropdownMenuRadioItem.displayName = "DropdownMenuRadioItem";
+ const DropdownMenuRadioItemIndicator = React$1.forwardRef(({ className, children, ...props }, ref) => /* @__PURE__ */ jsx(MenuRadioItemIndicator, {
+ 	ref,
+-	className: cn("ml-auto", className),
++	className: cn("ms-auto", className),
+ 	...props,
+ 	children: children ?? /* @__PURE__ */ jsx(CheckIcon, { className: "h-4 w-4" })
+ }));
+diff --git a/dist/chunks/empty-hkvg3is3uc6dj1at.js b/dist/chunks/empty-hkvg3is3uc6dj1at.js
+index 357b2e0..c4c33c7 100644
+--- a/dist/chunks/empty-hkvg3is3uc6dj1at.js
++++ b/dist/chunks/empty-hkvg3is3uc6dj1at.js
+@@ -60,7 +60,7 @@ function Empty({ icon, title, description, commandLine, contents, size = "base",
+ 				})]
+ 			}),
+ 			commandLine && /* @__PURE__ */ jsxs("div", {
+-				className: cn("relative inline-flex h-10 max-w-8/10 transform-gpu items-center gap-2 rounded-lg border border-white bg-kumo-overlay pr-2 pl-3 font-mono shadow-xs ring ring-kumo-line"),
++				className: cn("relative inline-flex h-10 max-w-8/10 transform-gpu items-center gap-2 rounded-lg border border-white bg-kumo-overlay pe-2 ps-3 font-mono shadow-xs ring ring-kumo-line"),
+ 				children: [/* @__PURE__ */ jsxs("span", {
+ 					className: "inline-flex min-w-0 items-baseline gap-2",
+ 					children: [/* @__PURE__ */ jsx("span", {
+diff --git a/dist/chunks/flow-iz8sn24h5q6q4b10.js b/dist/chunks/flow-iz8sn24h5q6q4b10.js
+index 559514d..5218bdf 100644
+--- a/dist/chunks/flow-iz8sn24h5q6q4b10.js
++++ b/dist/chunks/flow-iz8sn24h5q6q4b10.js
+@@ -9971,7 +9971,7 @@ function FlowDiagram({ orientation = "horizontal", canvas = true, align = "start
+ 					})]
+ 				}),
+ 				canScrollY && /* @__PURE__ */ jsx("div", {
+-					className: "absolute top-1 right-1 bottom-1 w-1.5 rounded-full bg-kumo-hairline/50 opacity-0 group-hover:opacity-100",
++					className: "absolute top-1 end-1 bottom-1 w-1.5 rounded-full bg-kumo-hairline/50 opacity-0 group-hover:opacity-100",
+ 					children: /* @__PURE__ */ jsx(motion.div, {
+ 						className: "absolute w-full rounded-full bg-kumo-fill",
+ 						style: {
+@@ -9981,7 +9981,7 @@ function FlowDiagram({ orientation = "horizontal", canvas = true, align = "start
+ 					})
+ 				}),
+ 				canScrollX && /* @__PURE__ */ jsx("div", {
+-					className: "absolute right-1 bottom-1 left-1 h-1.5 rounded-full bg-kumo-hairline/50 opacity-0 group-hover:opacity-100",
++					className: "absolute end-1 bottom-1 start-1 h-1.5 rounded-full bg-kumo-hairline/50 opacity-0 group-hover:opacity-100",
+ 					children: /* @__PURE__ */ jsx(motion.div, {
+ 						className: "absolute h-full rounded-full bg-kumo-fill",
+ 						style: {
+@@ -10084,7 +10084,7 @@ function FlowNodeList({ children }) {
+ 	return /* @__PURE__ */ jsx(DescendantsProvider, {
+ 		value: descendants,
+ 		children: /* @__PURE__ */ jsx("ul", {
+-			className: cn("ml-0 list-none", orientation === "vertical" && "flex flex-col"),
++			className: cn("ms-0 list-none", orientation === "vertical" && "flex flex-col"),
+ 			children
+ 		})
+ 	});
+diff --git a/dist/chunks/input-group-fjr4r5ax0x78ppax.js b/dist/chunks/input-group-fjr4r5ax0x78ppax.js
+index c4cea93..ca73e34 100644
+--- a/dist/chunks/input-group-fjr4r5ax0x78ppax.js
++++ b/dist/chunks/input-group-fjr4r5ax0x78ppax.js
+@@ -10,41 +10,41 @@ import { Fragment as Fragment$1, jsx, jsxs } from "react/jsx-runtime";
+ const INPUT_GROUP_SIZE = {
+ 	xs: {
+ 		inputOuter: "px-1.5",
+-		addonOuterStart: "pl-1.5",
+-		addonOuterEnd: "pr-1.5",
+-		addonButtonOuterStart: "pl-1",
+-		addonButtonOuterEnd: "pr-1",
+-		suffixPad: "pr-1.5",
++		addonOuterStart: "ps-1.5",
++		addonOuterEnd: "pe-1.5",
++		addonButtonOuterStart: "ps-1",
++		addonButtonOuterEnd: "pe-1",
++		suffixPad: "pe-1.5",
+ 		fontSize: "text-xs",
+ 		iconSize: 10
+ 	},
+ 	sm: {
+ 		inputOuter: "px-2",
+-		addonOuterStart: "pl-1.5",
+-		addonOuterEnd: "pr-1.5",
+-		addonButtonOuterStart: "pl-1",
+-		addonButtonOuterEnd: "pr-1",
+-		suffixPad: "pr-2",
++		addonOuterStart: "ps-1.5",
++		addonOuterEnd: "pe-1.5",
++		addonButtonOuterStart: "ps-1",
++		addonButtonOuterEnd: "pe-1",
++		suffixPad: "pe-2",
+ 		fontSize: "text-xs",
+ 		iconSize: 13
+ 	},
+ 	base: {
+ 		inputOuter: "px-3",
+-		addonOuterStart: "pl-2",
+-		addonOuterEnd: "pr-2",
+-		addonButtonOuterStart: "pl-1",
+-		addonButtonOuterEnd: "pr-1",
+-		suffixPad: "pr-3",
++		addonOuterStart: "ps-2",
++		addonOuterEnd: "pe-2",
++		addonButtonOuterStart: "ps-1",
++		addonButtonOuterEnd: "pe-1",
++		suffixPad: "pe-3",
+ 		fontSize: "text-base",
+ 		iconSize: 18
+ 	},
+ 	lg: {
+ 		inputOuter: "px-4",
+-		addonOuterStart: "pl-2.5",
+-		addonOuterEnd: "pr-2.5",
+-		addonButtonOuterStart: "pl-1.5",
+-		addonButtonOuterEnd: "pr-0.5",
+-		suffixPad: "pr-4",
++		addonOuterStart: "ps-2.5",
++		addonOuterEnd: "pe-2.5",
++		addonButtonOuterStart: "ps-1.5",
++		addonButtonOuterEnd: "pe-0.5",
++		suffixPad: "pe-4",
+ 		fontSize: "text-base",
+ 		iconSize: 20
+ 	}
+@@ -159,8 +159,8 @@ const Input = forwardRef((props, ref) => {
+ 		id: inputId,
+ 		className: cn("flex h-full min-w-0 grow items-center rounded-none border-0 bg-transparent font-sans", tokens.inputOuter, "text-ellipsis", isIndividual ? [
+ 			"relative ring-0 focus:ring-0 border border-kumo-line",
+-			"first:rounded-l-[inherit] last:rounded-r-[inherit]",
+-			"not-first:-ml-px",
++			"first:rounded-s-[inherit] last:rounded-e-[inherit]",
++			"not-first:-ms-px",
+ 			"hover:z-1 hover:border-kumo-line",
+ 			"focus:z-2 focus:border-kumo-focus/50"
+ 		].join(" ") : "relative z-1 shadow-none ring-0! outline-none focus:ring-0! focus:outline-none", props.className)
+@@ -211,8 +211,8 @@ const Button = forwardRef(({ children, className, variant, size, disabled, toolt
+ 		size: size ?? (isIndividual ? context?.size ?? "sm" : COMPACT_BUTTON_SIZE[context?.size ?? "base"] ?? "sm"),
+ 		className: cn("pointer-events-auto", "shadow-none", "focus:ring-0", !isIndividual && "focus-visible:ring-[1.5px] focus-visible:ring-kumo-focus/50", isIndividual && [
+ 			"relative h-full! rounded-none border border-kumo-line ring-0 focus-visible:ring-0",
+-			"first:rounded-l-[inherit] last:rounded-r-[inherit]",
+-			"not-first:-ml-px",
++			"first:rounded-s-[inherit] last:rounded-e-[inherit]",
++			"not-first:-ms-px",
+ 			"hover:z-1",
+ 			"focus:z-2",
+ 			"focus-visible:border-kumo-focus/50",
+@@ -251,7 +251,7 @@ const Addon = forwardRef(({ align = "start", className, children }, ref) => {
+ 	return /* @__PURE__ */ jsx("div", {
+ 		ref,
+ 		"data-slot": align === "start" ? "input-group-addon-start" : "input-group-addon-end",
+-		className: cn("pointer-events-none relative z-[1] flex shrink-0 items-center gap-1.5", "text-kumo-subtle", tokens.fontSize, "*:pointer-events-auto", align === "start" ? cn("-order-1", containsButton ? tokens.addonButtonOuterStart : tokens.addonOuterStart, "pr-0") : cn("order-1", "pl-0", containsButton ? tokens.addonButtonOuterEnd : tokens.addonOuterEnd), className),
++		className: cn("pointer-events-none relative z-[1] flex shrink-0 items-center gap-1.5", "text-kumo-subtle", tokens.fontSize, "*:pointer-events-auto", align === "start" ? cn("-order-1", containsButton ? tokens.addonButtonOuterStart : tokens.addonOuterStart, "pe-0") : cn("order-1", "ps-0", containsButton ? tokens.addonButtonOuterEnd : tokens.addonOuterEnd), className),
+ 		children: /* @__PURE__ */ jsx(InputGroupAddonContext.Provider, {
+ 			value: true,
+ 			children: sizedChildren
+@@ -362,7 +362,7 @@ const Root = forwardRef(({ size = "base", children, className, disabled = false,
+ 			value: containerZoneContext,
+ 			children: /* @__PURE__ */ jsxs("div", {
+ 				"data-slot": "input-group-container-zone",
+-				className: cn(inputVariants({ size }), "overflow-hidden", "has-[input[aria-invalid=true]]:ring-kumo-danger", "px-0", "flex min-w-0 flex-1 items-center gap-0", "shadow-none ring-0", "border border-kumo-line", "focus-within:border-kumo-focus/50", "focus-within:z-2", "not-first:-ml-px", "rounded-none first:rounded-l-[inherit] last:rounded-r-[inherit]", INPUT_GROUP_HAS_CLASSES[size], "has-data-[slot=input-group-suffix]:[&_input]:field-sizing-content", "has-data-[slot=input-group-suffix]:[&_input]:max-w-full", "has-data-[slot=input-group-suffix]:[&_input]:grow-0", "has-data-[slot=input-group-suffix]:[&_input]:pr-0"),
++				className: cn(inputVariants({ size }), "overflow-hidden", "has-[input[aria-invalid=true]]:ring-kumo-danger", "px-0", "flex min-w-0 flex-1 items-center gap-0", "shadow-none ring-0", "border border-kumo-line", "focus-within:border-kumo-focus/50", "focus-within:z-2", "not-first:-ms-px", "rounded-none first:rounded-s-[inherit] last:rounded-e-[inherit]", INPUT_GROUP_HAS_CLASSES[size], "has-data-[slot=input-group-suffix]:[&_input]:field-sizing-content", "has-data-[slot=input-group-suffix]:[&_input]:max-w-full", "has-data-[slot=input-group-suffix]:[&_input]:grow-0", "has-data-[slot=input-group-suffix]:[&_input]:pr-0"),
+ 				children: [label && /* @__PURE__ */ jsx("label", {
+ 					htmlFor: inputId,
+ 					className: "absolute inset-0 z-0 mb-0! cursor-text",
+diff --git a/dist/chunks/layer-card-idh3863vdgprgqai.js b/dist/chunks/layer-card-idh3863vdgprgqai.js
+index 8d2a8d4..b7abc64 100644
+--- a/dist/chunks/layer-card-idh3863vdgprgqai.js
++++ b/dist/chunks/layer-card-idh3863vdgprgqai.js
+@@ -8,7 +8,7 @@ import { jsx } from "react/jsx-runtime";
+ const LAYER_CARD_SURFACE_CLASSES = "overflow-hidden rounded-lg bg-kumo-base shadow-xs ring ring-kumo-line";
+ const LAYER_CARD_LAYERED_ROOT_CLASSES = "flex w-full flex-col overflow-hidden rounded-lg bg-kumo-elevated text-base ring ring-kumo-hairline";
+ const LAYER_CARD_SECONDARY_CLASSES = "-my-2 flex items-center gap-2 bg-kumo-elevated p-4 text-base font-medium text-kumo-subtle";
+-const LAYER_CARD_PRIMARY_CLASSES = "relative flex flex-col gap-2 overflow-hidden rounded-lg bg-kumo-base p-4 pr-3 text-inherit no-underline ring ring-kumo-fill";
++const LAYER_CARD_PRIMARY_CLASSES = "relative flex flex-col gap-2 overflow-hidden rounded-lg bg-kumo-base p-4 pe-3 text-inherit no-underline ring ring-kumo-fill";
+ function layerCardVariants(_props = {}) {
+ 	return cn(LAYER_CARD_SURFACE_CLASSES);
+ }
+diff --git a/dist/chunks/layer-dialog-j5ywmzs46ccg6oqy.js b/dist/chunks/layer-dialog-j5ywmzs46ccg6oqy.js
+index 028c18c..2d4424f 100644
+--- a/dist/chunks/layer-dialog-j5ywmzs46ccg6oqy.js
++++ b/dist/chunks/layer-dialog-j5ywmzs46ccg6oqy.js
+@@ -304,7 +304,7 @@ function LayerDialogBody({ children }) {
+ 				}), /* @__PURE__ */ jsx(ScrollAreaScrollbar, {
+ 					keepMounted: true,
+ 					orientation: "vertical",
+-					className: "my-1.5 mr-0.5 hidden w-2 p-px opacity-0 transition-opacity data-[has-overflow-y]:block data-[hovering]:opacity-100 data-[scrolling]:opacity-100",
++					className: "my-1.5 me-0.5 hidden w-2 p-px opacity-0 transition-opacity data-[has-overflow-y]:block data-[hovering]:opacity-100 data-[scrolling]:opacity-100",
+ 					children: /* @__PURE__ */ jsx(ScrollAreaThumb, { className: "w-full rounded-full bg-kumo-contrast opacity-10 transition-opacity hover:opacity-20 active:opacity-30" })
+ 				})]
+ 			}),
+@@ -320,7 +320,7 @@ function LayerDialogIconClose({ disabled, label }) {
+ 	const close = (closeProps) => /* @__PURE__ */ jsx(Button, {
+ 		...closeProps,
+ 		"aria-label": label,
+-		className: "-mt-1.5 -mr-1.5 rounded-lg",
++		className: "-mt-1.5 -me-1.5 rounded-lg",
+ 		disabled,
+ 		icon: /* @__PURE__ */ jsx(X, { size: 15 }),
+ 		shape: "square",
+diff --git a/dist/chunks/menubar-fjhotkmndttb8mua.js b/dist/chunks/menubar-fjhotkmndttb8mua.js
+index d46aaa4..3627f7d 100644
+--- a/dist/chunks/menubar-fjhotkmndttb8mua.js
++++ b/dist/chunks/menubar-fjhotkmndttb8mua.js
+@@ -55,7 +55,7 @@ const MenuOption = ({ icon, id, isActive, onClick, tooltip }) => {
+ 		"data-kumo-component": "MenuBar",
+ 		"data-kumo-part": "option",
+ 		"aria-label": tooltip,
+-		className: cn("relative -ml-px flex h-full w-11 cursor-pointer items-center justify-center rounded-md border-none bg-kumo-recessed transition-colors first:rounded-l-lg last:rounded-r-lg focus:z-3 focus:ring-kumo-focus/50 focus:outline-none focus-visible:z-3 focus-visible:ring-2 focus-visible:ring-kumo-brand", { "z-2 bg-kumo-base shadow-xs transition-colors": isActive === id }),
++		className: cn("relative -ms-px flex h-full w-11 cursor-pointer items-center justify-center rounded-md border-none bg-kumo-recessed transition-colors first:rounded-s-lg last:rounded-e-lg focus:z-3 focus:ring-kumo-focus/50 focus:outline-none focus-visible:z-3 focus-visible:ring-2 focus-visible:ring-kumo-brand", { "z-2 bg-kumo-base shadow-xs transition-colors": isActive === id }),
+ 		onClick,
+ 		children: /* @__PURE__ */ jsx(IconContext.Provider, {
+ 			value: { size: 18 },
+@@ -93,7 +93,7 @@ const MenuBar = ({ className, isActive, options, optionIds = false }) => {
+ 		direction: "horizontal"
+ 	});
+ 	return /* @__PURE__ */ jsx("nav", {
+-		className: cn("isolate flex rounded-lg bg-kumo-recessed pl-px shadow-xs ring ring-kumo-line transition-colors", className),
++		className: cn("isolate flex rounded-lg bg-kumo-recessed ps-px shadow-xs ring ring-kumo-line transition-colors", className),
+ 		ref: menuRef,
+ 		children: options.map((option, index) => /* @__PURE__ */ jsx(MenuOption, {
+ 			...option,
+diff --git a/dist/chunks/meter-majprsslwmpbmkzg.js b/dist/chunks/meter-majprsslwmpbmkzg.js
+index 561640f..e96c87f 100644
+--- a/dist/chunks/meter-majprsslwmpbmkzg.js
++++ b/dist/chunks/meter-majprsslwmpbmkzg.js
+@@ -27,7 +27,7 @@ function Meter({ value, customValue, label, showValue = true, className, trackCl
+ 			}) : /* @__PURE__ */ jsx(Fragment, { children: showValue && /* @__PURE__ */ jsx(MeterValue, { className: "text-sm font-medium text-kumo-default tabular-nums" }) })]
+ 		}), /* @__PURE__ */ jsx(MeterTrack, {
+ 			className: cn("relative h-2 w-full overflow-hidden rounded-full bg-kumo-fill", trackClassName),
+-			children: /* @__PURE__ */ jsx(MeterIndicator, { className: cn("absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-kumo-brand via-kumo-brand to-kumo-brand transition-[width] duration-300 ease-out", indicatorClassName) })
++			children: /* @__PURE__ */ jsx(MeterIndicator, { className: cn("absolute inset-y-0 start-0 rounded-full bg-linear-to-r from-kumo-brand via-kumo-brand to-kumo-brand transition-[width] duration-300 ease-out", indicatorClassName) })
+ 		})]
+ 	});
+ }
+diff --git a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
+index c2d058f..540cdbf 100644
+--- a/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
++++ b/dist/chunks/pagination-oaenm9t7ou3lmcgw.js
+@@ -175,7 +175,7 @@ PaginationControls.displayName = "Pagination.Controls";
+ function PaginationSeparator({ className }) {
+ 	return /* @__PURE__ */ jsx("div", {
+ 		"data-slot": "pagination-separator",
+-		className: cn("mx-2 h-6 border-l border-kumo-hairline", className)
++		className: cn("mx-2 h-6 border-s border-kumo-hairline", className)
+ 	});
+ }
+ PaginationSeparator.displayName = "Pagination.Separator";
+diff --git a/dist/chunks/sensitive-input-cw33yncetxk3fbrl.js b/dist/chunks/sensitive-input-cw33yncetxk3fbrl.js
+index 7e3ffac..bfe2850 100644
+--- a/dist/chunks/sensitive-input-cw33yncetxk3fbrl.js
++++ b/dist/chunks/sensitive-input-cw33yncetxk3fbrl.js
+@@ -167,12 +167,12 @@ const SensitiveInput = forwardRef(({ value: controlledValue, defaultValue = "",
+ 			readOnly: readOnly || isMaskedWithValue,
+ 			autoComplete,
+ 			tabIndex: isMaskedWithValue ? -1 : 0,
+-			className: cn("kumo-input-placeholder w-full border-0 bg-transparent p-0 text-kumo-default ring-0 outline-none disabled:cursor-not-allowed disabled:text-kumo-subtle", size === "xs" && "pr-5", size === "sm" && "pr-6", size === "base" && "pr-8", size === "lg" && "pr-10", isMaskedWithValue && "pointer-events-none text-transparent"),
++			className: cn("kumo-input-placeholder w-full border-0 bg-transparent p-0 text-kumo-default ring-0 outline-none disabled:cursor-not-allowed disabled:text-kumo-subtle", size === "xs" && "pe-5", size === "sm" && "pe-6", size === "base" && "pe-8", size === "lg" && "pe-10", isMaskedWithValue && "pointer-events-none text-transparent"),
+ 			"aria-hidden": isMaskedWithValue,
+ 			...inputProps
+ 		}),
+ 		/* @__PURE__ */ jsx("span", {
+-			className: cn("pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden select-none", size === "xs" && "right-5", size === "sm" && "right-6", size === "base" && "right-8", size === "lg" && "right-10", size === "xs" && "px-1.5", size === "sm" && "px-2", size === "base" && "px-3", size === "lg" && "px-4", !isMaskedWithValue && "invisible", isMaskedWithValue && "pointer-events-auto", "text-kumo-default", "group/mask"),
++			className: cn("pointer-events-none absolute inset-y-0 start-0 flex items-center overflow-hidden select-none", size === "xs" && "end-5", size === "sm" && "end-6", size === "base" && "end-8", size === "lg" && "end-10", size === "xs" && "px-1.5", size === "sm" && "px-2", size === "base" && "px-3", size === "lg" && "px-4", !isMaskedWithValue && "invisible", isMaskedWithValue && "pointer-events-auto", "text-kumo-default", "group/mask"),
+ 			"aria-hidden": "true",
+ 			children: /* @__PURE__ */ jsxs("span", {
+ 				className: "relative",
+@@ -180,7 +180,7 @@ const SensitiveInput = forwardRef(({ value: controlledValue, defaultValue = "",
+ 					className: cn(isMaskedWithValue && !disabled && "group-focus-within/container:invisible group-hover/mask:invisible"),
+ 					children: "••••••••"
+ 				}), isMaskedWithValue && !disabled && /* @__PURE__ */ jsx("span", {
+-					className: "invisible absolute top-0 left-0 whitespace-nowrap text-kumo-subtle group-focus-within/container:visible group-hover/mask:visible",
++					className: "invisible absolute top-0 start-0 whitespace-nowrap text-kumo-subtle group-focus-within/container:visible group-hover/mask:visible",
+ 					children: "Click to reveal"
+ 				})]
+ 			})
+@@ -193,7 +193,7 @@ const SensitiveInput = forwardRef(({ value: controlledValue, defaultValue = "",
+ 			onKeyDown: (e) => e.stopPropagation(),
+ 			"aria-label": mode === "revealed" ? "Hide value" : "Reveal value",
+ 			tabIndex: showEyeButton ? 0 : -1,
+-			className: cn("absolute top-1/2 right-0 -translate-y-1/2 cursor-pointer text-kumo-subtle hover:text-kumo-default focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-kumo-brand", "m-0 inline-flex h-auto min-h-0 items-center justify-center border-none bg-transparent p-0 shadow-none", size === "xs" && "right-1.5", size === "sm" && "right-2", size === "base" && "right-3", size === "lg" && "right-4", iconSize, !showEyeButton && "pointer-events-none opacity-0"),
++			className: cn("absolute top-1/2 end-0 -translate-y-1/2 cursor-pointer text-kumo-subtle hover:text-kumo-default focus:text-kumo-default focus:ring-kumo-focus/50 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-kumo-brand", "m-0 inline-flex h-auto min-h-0 items-center justify-center border-none bg-transparent p-0 shadow-none", size === "xs" && "end-1.5", size === "sm" && "end-2", size === "base" && "end-3", size === "lg" && "end-4", iconSize, !showEyeButton && "pointer-events-none opacity-0"),
+ 			children: mode === "revealed" ? /* @__PURE__ */ jsx(EyeSlash, { className: "size-full" }) : /* @__PURE__ */ jsx(Eye, { className: "size-full" })
+ 		}),
+ 		hasValue && !disabled && /* @__PURE__ */ jsx("button", {
+@@ -203,7 +203,7 @@ const SensitiveInput = forwardRef(({ value: controlledValue, defaultValue = "",
+ 			onClick: copyToClipboard,
+ 			onKeyDown: (e) => e.stopPropagation(),
+ 			"aria-label": copied ? "Copied" : "Copy to clipboard",
+-			className: cn("absolute -top-px right-2 -translate-y-full cursor-pointer rounded-t-md bg-kumo-brand px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-focus-within/container:opacity-100 group-hover/container:opacity-100 hover:brightness-120 focus:ring-kumo-focus/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand", "m-0 h-auto min-h-0 border-none shadow-none"),
++			className: cn("absolute -top-px end-2 -translate-y-full cursor-pointer rounded-t-md bg-kumo-brand px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-focus-within/container:opacity-100 group-hover/container:opacity-100 hover:brightness-120 focus:ring-kumo-focus/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand", "m-0 h-auto min-h-0 border-none shadow-none"),
+ 			children: copied ? "Copied" : "Copy"
+ 		})
+ 	] });
+diff --git a/dist/chunks/sidebar-in9zhvr473afsjpp.js b/dist/chunks/sidebar-in9zhvr473afsjpp.js
+index 984e056..3247d7b 100644
+--- a/dist/chunks/sidebar-in9zhvr473afsjpp.js
++++ b/dist/chunks/sidebar-in9zhvr473afsjpp.js
+@@ -401,7 +401,7 @@ const SidebarRoot = forwardRef(({ className, contentClassName, children, fullScr
+ 			minWidth: "var(--sidebar-width)",
+ 			maxWidth: "var(--sidebar-width)"
+ 		},
+-		className: cn("relative flex h-full shrink-0 grow-0 flex-col overflow-hidden bg-(--sidebar-bg) text-kumo-default", variant === "sidebar" && (side === "left" ? "border-r border-kumo-line" : "border-l border-kumo-line"), variant === "floating" && "m-2 rounded-lg border border-kumo-line shadow-lg", className),
++		className: cn("relative flex h-full shrink-0 grow-0 flex-col overflow-hidden bg-(--sidebar-bg) text-kumo-default", variant === "sidebar" && (side === "left" ? "border-e border-kumo-line" : "border-s border-kumo-line"), variant === "floating" && "m-2 rounded-lg border border-kumo-line shadow-lg", className),
+ 		...props,
+ 		children
+ 	});
+@@ -427,7 +427,7 @@ const SidebarRoot = forwardRef(({ className, contentClassName, children, fullScr
+ 		"data-collapsible": collapsible,
+ 		"data-sidebar": "sidebar",
+ 		"data-mobile": "true",
+-		className: cn("group/sidebar inset-y-0 z-50 flex flex-col overflow-hidden", contained ? "absolute" : "fixed", fullScreenOnMobile ? "w-full" : "w-(--sidebar-width)", "bg-(--sidebar-bg) text-kumo-default", !fullScreenOnMobile && "border-r border-kumo-line", "transition-transform duration-(--sidebar-animation-duration) ease-(--sidebar-easing)", "motion-reduce:transition-none", side === "left" && "left-0", side === "right" && "right-0", side === "left" && (openMobile ? "translate-x-0" : "-translate-x-full"), side === "right" && (openMobile ? "translate-x-0" : "translate-x-full"), className),
++		className: cn("group/sidebar inset-y-0 z-50 flex flex-col overflow-hidden", contained ? "absolute" : "fixed", fullScreenOnMobile ? "w-full" : "w-(--sidebar-width)", "bg-(--sidebar-bg) text-kumo-default", !fullScreenOnMobile && "border-e border-kumo-line", "transition-transform duration-(--sidebar-animation-duration) ease-(--sidebar-easing)", "motion-reduce:transition-none", side === "left" && "left-0", side === "right" && "right-0", side === "left" && (openMobile ? "translate-x-0" : "-translate-x-full"), side === "right" && (openMobile ? "translate-x-0" : "translate-x-full"), className),
+ 		...props,
+ 		children
+ 	})] });
+@@ -435,7 +435,7 @@ const SidebarRoot = forwardRef(({ className, contentClassName, children, fullScr
+ 	const expandedWidth = resizable ? `${width}px` : "var(--sidebar-width)";
+ 	const railWidth = open ? expandedWidth : collapsedWidth;
+ 	const contentWidth = open || isPeeking ? expandedWidth : collapsedWidth;
+-	const borderClasses = variant === "sidebar" ? side === "left" ? "border-r border-kumo-line" : "border-l border-kumo-line" : variant === "floating" ? "border border-kumo-line" : "";
++	const borderClasses = variant === "sidebar" ? side === "left" ? "border-e border-kumo-line" : "border-s border-kumo-line" : variant === "floating" ? "border border-kumo-line" : "";
+ 	return /* @__PURE__ */ jsx("aside", {
+ 		ref,
+ 		"data-state": state,
+@@ -453,7 +453,7 @@ const SidebarRoot = forwardRef(({ className, contentClassName, children, fullScr
+ 			return /* @__PURE__ */ jsxs("div", {
+ 				"data-sidebar": "content-container",
+ 				style: { width: contentWidth },
+-				className: cn("flex h-full flex-col", "min-w-0 overflow-hidden whitespace-nowrap", "bg-(--sidebar-bg) text-kumo-default", borderClasses, "transition-[width] duration-(--sidebar-animation-duration) ease-(--sidebar-easing)", "motion-reduce:transition-none", isResizing && "transition-none!", !open && cn(contained ? "absolute" : "fixed", "inset-y-0 z-40", side === "left" && "left-0", side === "right" && "right-0"), open && "relative", contentClassName),
++				className: cn("flex h-full flex-col", "min-w-0 overflow-hidden whitespace-nowrap", "bg-(--sidebar-bg) text-kumo-default", borderClasses, "transition-[width] duration-(--sidebar-animation-duration) ease-(--sidebar-easing)", "motion-reduce:transition-none", isResizing && "transition-none!", !open && cn(contained ? "absolute" : "fixed", "inset-y-0 z-40", side === "left" && "start-0", side === "right" && "end-0"), open && "relative", contentClassName),
+ 				children: [/* @__PURE__ */ jsx("div", {
+ 					"data-sidebar": "peek-zone",
+ 					className: "flex min-h-0 flex-1 flex-col",
+@@ -573,7 +573,7 @@ const SidebarLoading = forwardRef(({ className, label = "Loading", ...props }, r
+ 	...props,
+ 	children: SIDEBAR_LOADING_GROUPS.map((widths, groupIndex) => /* @__PURE__ */ jsxs("div", {
+ 		className: "flex flex-col gap-0.5",
+-		children: [/* @__PURE__ */ jsx(SkeletonLine, { className: "mb-1 ml-2 h-2 w-16 rounded-full group-data-[state=collapsed]/sidebar:hidden" }), widths.map((width, itemIndex) => /* @__PURE__ */ jsxs("div", {
++		children: [/* @__PURE__ */ jsx(SkeletonLine, { className: "mb-1 ms-2 h-2 w-16 rounded-full group-data-[state=collapsed]/sidebar:hidden" }), widths.map((width, itemIndex) => /* @__PURE__ */ jsxs("div", {
+ 			className: "flex min-h-8.5 items-center gap-3 rounded-lg px-3 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0",
+ 			children: [/* @__PURE__ */ jsx(SkeletonLine, { className: "size-4.5 shrink-0 rounded-md" }), /* @__PURE__ */ jsx(SkeletonLine, { className: cn("h-2.5 rounded-full group-data-[state=collapsed]/sidebar:hidden", width) })]
+ 		}, itemIndex))]
+@@ -740,7 +740,7 @@ const SidebarMenuButton = forwardRef(({ className, icon: IconProp, active = fals
+ 	const content = /* @__PURE__ */ jsxs("div", {
+ 		className: cn("flex min-w-0 flex-1 items-center gap-3", "translate-x-[-3px] group-not-data-[state=collapsed]/sidebar:translate-x-0", "transition-transform duration-(--sidebar-animation-duration)"),
+ 		children: [iconNode, /* @__PURE__ */ jsx("span", {
+-			className: cn("flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"),
++			className: cn("flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-start"),
+ 			children: React.Children.map(children, (child) => typeof child === "string" || typeof child === "number" ? /* @__PURE__ */ jsx("span", {
+ 				className: "truncate",
+ 				children: child
+@@ -831,9 +831,9 @@ SidebarMenuBadge.displayName = "Sidebar.MenuBadge";
+ const SidebarMenuSub = forwardRef(({ className, children, ...props }, ref) => /* @__PURE__ */ jsxs("ul", {
+ 	ref,
+ 	"data-sidebar": "menu-sub",
+-	className: cn("relative m-0 flex min-w-0 list-none flex-col gap-y-px overflow-hidden p-0 pr-0 pl-7", className),
++	className: cn("relative m-0 flex min-w-0 list-none flex-col gap-y-px overflow-hidden p-0 pe-0 ps-7", className),
+ 	...props,
+-	children: [/* @__PURE__ */ jsx("div", { className: "absolute inset-y-px left-[19px] z-10 w-px bg-kumo-line" }), children]
++	children: [/* @__PURE__ */ jsx("div", { className: "absolute inset-y-px start-[19px] z-10 w-px bg-kumo-line" }), children]
+ }));
+ SidebarMenuSub.displayName = "Sidebar.MenuSub";
+ /**
+@@ -872,7 +872,7 @@ const SidebarMenuSubButton = forwardRef(({ className, active = false, href, targ
+ 	const isInsideMenuSubItem = useContext(MenuSubItemContext);
+ 	const buttonClasses = cn("group/menu-button relative flex min-h-8.5 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-0 text-sm font-medium outline-none", "before:absolute before:inset-x-0 before:-inset-y-px", "text-kumo-default transition-[color] duration-150", !active && "hover:bg-(--sidebar-active-bg)", active && "bg-(--sidebar-active-bg)", "focus:outline-none focus-visible:bg-(--sidebar-active-bg) focus-visible:text-kumo-strong", className);
+ 	const content = /* @__PURE__ */ jsx("span", {
+-		className: "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left",
++		className: "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-start",
+ 		children: React.Children.map(children, (child) => typeof child === "string" || typeof child === "number" ? /* @__PURE__ */ jsx("span", {
+ 			className: "truncate",
+ 			children: child
+@@ -1112,7 +1112,7 @@ const SidebarResizeHandle = forwardRef(({ className, ...props }, ref) => {
+ 		"aria-label": "Resize sidebar",
+ 		tabIndex: 0,
+ 		"data-sidebar": "resize-handle",
+-		className: cn("absolute inset-y-0 z-2 hidden w-3 cursor-col-resize sm:block", "after:absolute after:inset-y-0 after:w-0.5", "after:bg-transparent after:transition-colors", "hover:after:bg-kumo-hairline focus-visible:after:bg-kumo-hairline active:after:bg-kumo-hairline", "focus:outline-none", side === "left" && "right-0 after:right-0", side === "right" && "left-0 after:left-0", className),
++		className: cn("absolute inset-y-0 z-2 hidden w-3 cursor-col-resize sm:block", "after:absolute after:inset-y-0 after:w-0.5", "after:bg-transparent after:transition-colors", "hover:after:bg-kumo-hairline focus-visible:after:bg-kumo-hairline active:after:bg-kumo-hairline", "focus:outline-none", side === "left" && "end-0 after:end-0", side === "right" && "start-0 after:start-0", className),
+ 		onPointerDown: handlePointerDown,
+ 		onKeyDown: handleKeyDown,
+ 		...props
+@@ -1307,7 +1307,7 @@ function SidebarMenuChevron({ className }) {
+ 	return /* @__PURE__ */ jsx(CaretRightIcon, {
+ 		size: 12,
+ 		weight: "bold",
+-		className: cn("ml-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100", isCollapsible && isOpen && "rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
++		className: cn("ms-auto shrink-0 opacity-40 transition-[transform,rotate,opacity] duration-200 group-hover/menu-button:opacity-100", isCollapsible && isOpen && "rotate-90", "group-data-[state=collapsed]/sidebar:hidden", className)
+ 	});
+ }
+ SidebarMenuChevron.displayName = "Sidebar.MenuChevron";
+diff --git a/dist/chunks/switch-cqsvolm7h69z7vgg.js b/dist/chunks/switch-cqsvolm7h69z7vgg.js
+index 9b0e720..14618da 100644
+--- a/dist/chunks/switch-cqsvolm7h69z7vgg.js
++++ b/dist/chunks/switch-cqsvolm7h69z7vgg.js
+@@ -55,23 +55,23 @@ const SwitchBase = forwardRef(({ className, checked, disabled, size = "base", va
+ 				sm: {
+ 					track: "h-4 w-8",
+ 					thumb: "w-4",
+-					slide: "left-4"
++					slide: "start-4"
+ 				},
+ 				base: {
+ 					track: "h-4.5 w-9",
+ 					thumb: "w-4.5",
+-					slide: "left-4.5"
++					slide: "start-4.5"
+ 				},
+ 				lg: {
+ 					track: "h-5 w-10",
+ 					thumb: "w-5",
+-					slide: "left-5"
++					slide: "start-5"
+ 				}
+ 			}[size];
+ 			const trackColors = isNeutral ? state.checked ? "bg-neutral-500 dark:bg-kumo-base ring-neutral-600 dark:ring-neutral-700" : "bg-neutral-150 dark:bg-kumo-base ring-kumo-hairline" : state.checked ? "bg-blue-500 dark:bg-blue-600 ring-blue-600 dark:ring-blue-500" : "bg-neutral-200 dark:bg-neutral-700 ring-neutral-300 dark:ring-neutral-600";
+ 			const thumbColors = isNeutral ? state.checked ? "bg-kumo-base dark:bg-neutral-400" : "bg-kumo-base dark:bg-neutral-850" : state.checked ? "bg-kumo-base dark:bg-blue-300" : "bg-kumo-base dark:bg-neutral-850";
+ 			const trackClassName = cn("relative inline-flex cursor-pointer items-center border-none p-0 ring", "focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand", "transition-colors duration-150 ease-out motion-reduce:transition-none", "disabled:cursor-not-allowed disabled:opacity-50", s.track, squircleRadius, trackColors, className, baseClassName);
+-			const thumbClassName = cn("absolute top-0 bottom-0 shadow-[0_0_1px_0.5px_var(--color-kumo-shadow-edge),0_1px_2px_var(--color-kumo-shadow-drop)]", s.thumb, squircleRadius, thumbColors, "transition-all duration-150 ease-out motion-reduce:transition-none", state.checked ? s.slide : "left-0");
++			const thumbClassName = cn("absolute top-0 bottom-0 shadow-[0_0_1px_0.5px_var(--color-kumo-shadow-edge),0_1px_2px_var(--color-kumo-shadow-drop)]", s.thumb, squircleRadius, thumbColors, "transition-all duration-150 ease-out motion-reduce:transition-none", state.checked ? s.slide : "start-0");
+ 			const role = props.role ?? baseRole ?? "switch";
+ 			const checkedA11yProps = role === "switch" ? { "aria-checked": state.checked } : { "aria-pressed": state.checked };
+ 			return /* @__PURE__ */ jsx("button", {
+@@ -119,23 +119,23 @@ const SwitchItem = forwardRef(({ className, checked, disabled, size = "base", va
+ 					sm: {
+ 						track: "h-4 w-8",
+ 						thumb: "w-4",
+-						slide: "left-4"
++						slide: "start-4"
+ 					},
+ 					base: {
+ 						track: "h-4.5 w-9",
+ 						thumb: "w-4.5",
+-						slide: "left-4.5"
++						slide: "start-4.5"
+ 					},
+ 					lg: {
+ 						track: "h-5 w-10",
+ 						thumb: "w-5",
+-						slide: "left-5"
++						slide: "start-5"
+ 					}
+ 				}[size];
+ 				const trackColors = isNeutral ? state.checked ? "bg-neutral-500 dark:bg-kumo-base ring-neutral-600 dark:ring-neutral-700" : "bg-neutral-150 dark:bg-kumo-base ring-kumo-hairline" : state.checked ? "bg-blue-500 dark:bg-blue-600 ring-blue-600 dark:ring-blue-500" : "bg-neutral-200 dark:bg-neutral-700 ring-neutral-300 dark:ring-neutral-600";
+ 				const thumbColors = isNeutral ? state.checked ? "bg-kumo-base dark:bg-neutral-400" : "bg-kumo-base dark:bg-neutral-850" : state.checked ? "bg-kumo-base dark:bg-blue-300" : "bg-kumo-base dark:bg-neutral-850";
+ 				const trackClassName = cn("relative inline-flex cursor-pointer items-center border-none p-0 ring", "focus:ring-kumo-focus/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand", "transition-colors duration-150 ease-out motion-reduce:transition-none", "disabled:cursor-not-allowed disabled:opacity-50", s.track, squircleRadius, trackColors, baseClassName);
+-				const thumbClassName = cn("absolute top-0 bottom-0 shadow-[0_0_1px_0.5px_var(--color-kumo-shadow-edge),0_1px_2px_var(--color-kumo-shadow-drop)]", s.thumb, squircleRadius, thumbColors, "transition-all duration-150 ease-out motion-reduce:transition-none", state.checked ? s.slide : "left-0");
++				const thumbClassName = cn("absolute top-0 bottom-0 shadow-[0_0_1px_0.5px_var(--color-kumo-shadow-edge),0_1px_2px_var(--color-kumo-shadow-drop)]", s.thumb, squircleRadius, thumbColors, "transition-all duration-150 ease-out motion-reduce:transition-none", state.checked ? s.slide : "start-0");
+ 				const role = baseRole ?? "switch";
+ 				const checkedA11yProps = role === "switch" ? { "aria-checked": state.checked } : { "aria-pressed": state.checked };
+ 				return /* @__PURE__ */ jsx("button", {
+diff --git a/dist/chunks/table-of-contents-cvduqgssxdcbpagh.js b/dist/chunks/table-of-contents-cvduqgssxdcbpagh.js
+index 230b242..91a7d83 100644
+--- a/dist/chunks/table-of-contents-cvduqgssxdcbpagh.js
++++ b/dist/chunks/table-of-contents-cvduqgssxdcbpagh.js
+@@ -15,7 +15,7 @@ const KUMO_TABLE_OF_CONTENTS_VARIANTS = { state: {
+ 	}
+ } };
+ const KUMO_TABLE_OF_CONTENTS_DEFAULT_VARIANTS = { state: "default" };
+-const ITEM_BASE = "block w-full truncate border-l-2 border-transparent py-0.5 pl-4 text-sm text-left no-underline";
++const ITEM_BASE = "block w-full truncate border-s-2 border-transparent py-0.5 ps-4 text-sm text-start no-underline";
+ const TableOfContentsRoot = forwardRef(({ className, "aria-label": ariaLabel = "Table of contents", ...props }, ref) => /* @__PURE__ */ jsx("nav", {
+ 	ref,
+ 	"aria-label": ariaLabel,
+@@ -29,7 +29,7 @@ const TableOfContentsTitle = forwardRef(({ className, ...props }, ref) => /* @__
+ }));
+ const TableOfContentsList = forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ jsx("ul", {
+ 	ref,
+-	className: cn("flex flex-col gap-2 border-l-2 border-kumo-hairline", className),
++	className: cn("flex flex-col gap-2 border-s-2 border-kumo-hairline", className),
+ 	...props
+ }));
+ const TableOfContentsItem = forwardRef(({ active = false, className, children, render, ...props }, ref) => {
+@@ -48,21 +48,21 @@ const TableOfContentsItem = forwardRef(({ active = false, className, children, r
+ 		...props
+ 	};
+ 	if (render && isValidElement(render)) return /* @__PURE__ */ jsx("li", {
+-		className: "-ml-0.5",
++		className: "-ms-0.5",
+ 		children: cloneElement(render, sharedProps)
+ 	});
+ 	return /* @__PURE__ */ jsx("li", {
+-		className: "-ml-0.5",
++		className: "-ms-0.5",
+ 		children: /* @__PURE__ */ jsx("a", { ...sharedProps })
+ 	});
+ });
+-const NESTED_UL_CLASSES = "flex flex-col gap-2 border-l-2 border-kumo-hairline [&>li>a]:pl-7 [&>li>button]:pl-7";
++const NESTED_UL_CLASSES = "flex flex-col gap-2 border-s-2 border-kumo-hairline [&>li>a]:pl-7 [&>li>button]:pl-7";
+ const TableOfContentsGroup = forwardRef(({ label, href, active = false, className, children, onClick, ...props }, ref) => {
+ 	if (href) {
+ 		const stateClasses = active ? KUMO_TABLE_OF_CONTENTS_VARIANTS.state.active.classes : KUMO_TABLE_OF_CONTENTS_VARIANTS.state.default.classes;
+ 		return /* @__PURE__ */ jsxs("li", {
+ 			ref,
+-			className: cn("-ml-0.5 flex flex-col gap-2", className),
++			className: cn("-ms-0.5 flex flex-col gap-2", className),
+ 			...props,
+ 			children: [/* @__PURE__ */ jsx("a", {
+ 				href,
+@@ -83,10 +83,10 @@ const TableOfContentsGroup = forwardRef(({ label, href, active = false, classNam
+ 	}
+ 	return /* @__PURE__ */ jsxs("li", {
+ 		ref,
+-		className: cn("-ml-0.5 flex flex-col gap-2", className),
++		className: cn("-ms-0.5 flex flex-col gap-2", className),
+ 		...props,
+ 		children: [/* @__PURE__ */ jsx("p", {
+-			className: "py-0.5 pl-4 text-sm leading-5 font-medium text-kumo-subtle",
++			className: "py-0.5 ps-4 text-sm leading-5 font-medium text-kumo-subtle",
+ 			children: label
+ 		}), /* @__PURE__ */ jsx("ul", {
+ 			className: cn(NESTED_UL_CLASSES),
+diff --git a/dist/chunks/table-yf8ul2e5nbemioi1.js b/dist/chunks/table-yf8ul2e5nbemioi1.js
+index 610d480..906bf77 100644
+--- a/dist/chunks/table-yf8ul2e5nbemioi1.js
++++ b/dist/chunks/table-yf8ul2e5nbemioi1.js
+@@ -29,11 +29,11 @@ const KUMO_TABLE_VARIANTS = {
+ 	},
+ 	sticky: {
+ 		left: {
+-			classes: "sticky left-0",
++			classes: "sticky start-0",
+ 			description: "Pin column to the left edge of the scroll container"
+ 		},
+ 		right: {
+-			classes: "sticky right-0",
++			classes: "sticky end-0",
+ 			description: "Pin column to the right edge of the scroll container"
+ 		}
+ 	}
+@@ -54,7 +54,7 @@ const KUMO_TABLE_VARIANTS = {
+ const stickyColumnClasses = (side, element) => {
+ 	const base = resolveVariant(KUMO_TABLE_VARIANTS.sticky, side, "left").classes;
+ 	const z = element === "head" ? "z-2" : "z-1";
+-	const fadePosition = side === "right" ? "before:-left-6" : "before:-right-6";
++	const fadePosition = side === "right" ? "before:-start-6" : "before:-end-6";
+ 	const fadeBase = "before:pointer-events-none before:absolute before:inset-y-0 before:w-6";
+ 	if (element === "cell") return cn(base, z, "bg-(--kumo-table-row-bg)", fadeBase, fadePosition, side === "right" ? "before:bg-gradient-to-r before:from-transparent before:to-(--kumo-table-row-bg)" : "before:bg-gradient-to-l before:from-transparent before:to-(--kumo-table-row-bg)");
+ 	return cn(base, z, "bg-kumo-base group-data-[compact]/header:bg-kumo-elevated", fadeBase, fadePosition, side === "right" ? "before:bg-gradient-to-r before:from-transparent before:to-kumo-base group-data-[compact]/header:before:to-kumo-elevated" : "before:bg-gradient-to-l before:from-transparent before:to-kumo-base group-data-[compact]/header:before:to-kumo-elevated");
+@@ -85,7 +85,7 @@ const KUMO_TABLE_DEFAULT_VARIANTS = {
+ * ```
+ */
+ const TableRoot = forwardRef(({ layout = "auto", ...props }, ref) => {
+-	const className = cn("isolate w-full", resolveVariant(KUMO_TABLE_VARIANTS.layout, layout, KUMO_TABLE_DEFAULT_VARIANTS.layout).classes, "[&_td]:p-3", "[&_th]:border-b [&_th]:border-kumo-fill [&_th]:p-3 [&_th]:text-base [&_th]:font-semibold", "[&_th]:bg-kumo-base", "text-left text-base text-kumo-default", props.className);
++	const className = cn("isolate w-full", resolveVariant(KUMO_TABLE_VARIANTS.layout, layout, KUMO_TABLE_DEFAULT_VARIANTS.layout).classes, "[&_td]:p-3", "[&_th]:border-b [&_th]:border-kumo-fill [&_th]:p-3 [&_th]:text-base [&_th]:font-semibold", "[&_th]:bg-kumo-base", "text-start text-base text-kumo-default", props.className);
+ 	return /* @__PURE__ */ jsx("table", {
+ 		ref,
+ 		...props,
+@@ -144,7 +144,7 @@ const TableResizeHandle = forwardRef((props, ref) => {
+ 		...props,
+ 		type: "button",
+ 		"aria-label": "Resize column",
+-		className: cn("invisible h-full group-hover:visible", "w-[10px]", "flex items-center justify-center", "cursor-col-resize touch-none select-none", "absolute top-0 right-0", "m-0 bg-kumo-base p-0", "focus-visible:ring-2 focus-visible:ring-kumo-brand"),
++		className: cn("invisible h-full group-hover:visible", "w-[10px]", "flex items-center justify-center", "cursor-col-resize touch-none select-none", "absolute top-0 end-0", "m-0 bg-kumo-base p-0", "focus-visible:ring-2 focus-visible:ring-kumo-brand"),
+ 		children: /* @__PURE__ */ jsx("span", { className: "h-5 w-[2px] rounded bg-kumo-hairline" })
+ 	});
+ });
+diff --git a/dist/chunks/tabs-gf57qqf1wcclaejq.js b/dist/chunks/tabs-gf57qqf1wcclaejq.js
+index 4cc9b6f..fb8c442 100644
+--- a/dist/chunks/tabs-gf57qqf1wcclaejq.js
++++ b/dist/chunks/tabs-gf57qqf1wcclaejq.js
+@@ -110,9 +110,9 @@ function TabsOverflowControl({ side, visible, variant, size, label, onClick }) {
+ 		"aria-hidden": !visible,
+ 		tabIndex: visible ? 0 : -1,
+ 		onClick,
+-		className: cn("absolute inset-y-0 z-3 flex items-center border-0 bg-transparent p-0 transition-opacity duration-150 focus:outline-none focus-visible:[&>span]:ring-2 focus-visible:[&>span]:ring-kumo-brand", isStart ? "left-0 justify-start bg-linear-to-r" : "right-0 justify-end bg-linear-to-l", visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0", isSegmented ? "from-kumo-recessed via-kumo-recessed/95 to-transparent" : "from-kumo-base via-kumo-base/95 to-transparent", isSegmented && (size === "sm" ? "w-8 rounded-md" : "w-10 rounded-lg"), !isSegmented && "w-8"),
++		className: cn("absolute inset-y-0 z-3 flex items-center border-0 bg-transparent p-0 transition-opacity duration-150 focus:outline-none focus-visible:[&>span]:ring-2 focus-visible:[&>span]:ring-kumo-brand", isStart ? "start-0 justify-start bg-linear-to-r" : "end-0 justify-end bg-linear-to-l", visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0", isSegmented ? "from-kumo-recessed via-kumo-recessed/95 to-transparent" : "from-kumo-base via-kumo-base/95 to-transparent", isSegmented && (size === "sm" ? "w-8 rounded-md" : "w-10 rounded-lg"), !isSegmented && "w-8"),
+ 		children: /* @__PURE__ */ jsx("span", {
+-			className: cn("flex items-center justify-center text-kumo-subtle transition-colors hover:text-kumo-default", size === "sm" ? "size-5" : "size-6", isSegmented ? size === "sm" ? "rounded-sm" : "rounded-md" : "rounded", isStart ? "ml-1" : "mr-1"),
++			className: cn("flex items-center justify-center text-kumo-subtle transition-colors hover:text-kumo-default", size === "sm" ? "size-5" : "size-6", isSegmented ? size === "sm" ? "rounded-sm" : "rounded-md" : "rounded", isStart ? "ms-1" : "me-1"),
+ 			children: /* @__PURE__ */ jsx("svg", {
+ 				viewBox: "0 0 16 16",
+ 				fill: "none",
+diff --git a/dist/chunks/tag-input-ohfybx5dbxy3houy.js b/dist/chunks/tag-input-ohfybx5dbxy3houy.js
+index 59bde61..4b07b03 100644
+--- a/dist/chunks/tag-input-ohfybx5dbxy3houy.js
++++ b/dist/chunks/tag-input-ohfybx5dbxy3houy.js
+@@ -77,7 +77,7 @@ const TagInput = forwardRef(({ value, defaultValue = [], onValueChange, validate
+ 	};
+ 	const fieldError = normalizeFieldError(error) ?? normalizeFieldError(message);
+ 	const inputVariant = variant ?? (fieldError ? "error" : "default");
+-	const chipClassName = cn("flex w-fit max-w-full shrink-0 items-center gap-2.5 rounded-sm bg-kumo-overlay ring-1 ring-kumo-hairline", "h-6 py-0 pr-[3px] pl-2 text-sm");
++	const chipClassName = cn("flex w-fit max-w-full shrink-0 items-center gap-2.5 rounded-sm bg-kumo-overlay ring-1 ring-kumo-hairline", "h-6 py-0 pe-[3px] ps-2 text-sm");
+ 	const input = (controlProps) => /* @__PURE__ */ jsx("input", {
+ 		...controlProps,
+ 		...inputProps,
+diff --git a/dist/chunks/toast-bzaothy2yrezh787.js b/dist/chunks/toast-bzaothy2yrezh787.js
+index 1bda60b..1c84d2e 100644
+--- a/dist/chunks/toast-bzaothy2yrezh787.js
++++ b/dist/chunks/toast-bzaothy2yrezh787.js
+@@ -147,7 +147,7 @@ const KUMO_TOAST_VARIANTS = {
+ 		description: "Toast description with muted text color"
+ 	},
+ 	close: {
+-		classes: "absolute top-2 right-2 size-5 rounded text-kumo-subtle hover:bg-current/15",
++		classes: "absolute top-2 end-2 size-5 rounded text-kumo-subtle hover:bg-current/15",
+ 		description: "Button-based close control with variant-aware hover tint"
+ 	},
+ 	variant: {
+@@ -248,7 +248,7 @@ function Toasty({ children, container: containerProp, toastManager }) {
+ 		children: [children, /* @__PURE__ */ jsx(ToastPortal, {
+ 			container: containerProp ?? contextContainer ?? void 0,
+ 			children: /* @__PURE__ */ jsx(ToastViewport, {
+-				className: "fixed top-auto right-4 bottom-4 z-1 mx-auto flex w-[calc(100%-2rem)] sm:right-8 sm:bottom-8 sm:w-[340px]",
++				className: "fixed top-auto end-4 bottom-4 z-1 mx-auto flex w-[calc(100%-2rem)] sm:end-8 sm:bottom-8 sm:w-[340px]",
+ 				children: /* @__PURE__ */ jsx(ToastList, {})
+ 			})
+ 		})]
+@@ -260,7 +260,7 @@ function ToastList() {
+ 	const { toasts } = useKumoToastManager();
+ 	return toasts.map((toast) => /* @__PURE__ */ jsxs(ToastRoot, {
+ 		toast,
+-		className: cn("absolute right-0 bottom-0 left-auto z-[calc(1000-var(--toast-index))] mr-0 h-[var(--height)] w-full origin-bottom select-none", toastVariants({ variant: toast.variant }), "[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]", "[transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_0.5s_cubic-bezier(0.22,1,0.36,1),opacity_0.5s,height_0.15s]", "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']", "data-[ending-style]:opacity-0 data-[expanded]:h-[var(--toast-height)] data-[expanded]:[transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--offset-y)))] data-[limited]:opacity-0 data-[starting-style]:[transform:translateY(150%)]", "data-[ending-style]:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))] data-[expanded]:data-[ending-style]:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]", "data-[ending-style]:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-[expanded]:data-[ending-style]:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]", "data-[ending-style]:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-[expanded]:data-[ending-style]:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]", "data-[ending-style]:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))] data-[expanded]:data-[ending-style]:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]", "[&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(150%)]", toast.bump && "animate-toast-bump"),
++		className: cn("absolute end-0 bottom-0 start-auto z-[calc(1000-var(--toast-index))] me-0 h-[var(--height)] w-full origin-bottom select-none", toastVariants({ variant: toast.variant }), "[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]", "[transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_0.5s_cubic-bezier(0.22,1,0.36,1),opacity_0.5s,height_0.15s]", "after:absolute after:top-full after:start-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']", "data-[ending-style]:opacity-0 data-[expanded]:h-[var(--toast-height)] data-[expanded]:[transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--offset-y)))] data-[limited]:opacity-0 data-[starting-style]:[transform:translateY(150%)]", "data-[ending-style]:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))] data-[expanded]:data-[ending-style]:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]", "data-[ending-style]:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-[expanded]:data-[ending-style]:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]", "data-[ending-style]:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-[expanded]:data-[ending-style]:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]", "data-[ending-style]:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))] data-[expanded]:data-[ending-style]:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]", "[&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(150%)]", toast.bump && "animate-toast-bump"),
+ 		children: [/* @__PURE__ */ jsx(ToastBackground, { variant: toast.variant }), /* @__PURE__ */ jsxs(ToastContent, {
+ 			className: "isolate flex flex-col gap-1 transition-opacity [transition-duration:250ms] data-[behind]:pointer-events-none data-[behind]:opacity-0 data-[expanded]:pointer-events-auto data-[expanded]:opacity-100",
+ 			children: [toast.content ?? /* @__PURE__ */ jsx(Fragment$1, { children: /* @__PURE__ */ jsxs("div", {
+@@ -287,7 +287,7 @@ function ToastList() {
+ 					size: "sm",
+ 					shape: "square",
+ 					"aria-label": "Close",
+-					className: cn("absolute top-2 right-2 size-5 rounded text-kumo-subtle hover:bg-current/15", toast.variant && TOAST_CLOSE_CLASSES[toast.variant]),
++					className: cn("absolute top-2 end-2 size-5 rounded text-kumo-subtle hover:bg-current/15", toast.variant && TOAST_CLOSE_CLASSES[toast.variant]),
+ 					icon: /* @__PURE__ */ jsx(e, { className: "h-3 w-3" })
+ 				})
+ 			})]
+diff --git a/dist/chunks/vendor-styling-da1xibnxfkjmtglr.js b/dist/chunks/vendor-styling-da1xibnxfkjmtglr.js
+index bfbfb8a..afb39fb 100644
+--- a/dist/chunks/vendor-styling-da1xibnxfkjmtglr.js
++++ b/dist/chunks/vendor-styling-da1xibnxfkjmtglr.js
+@@ -598,13 +598,13 @@ const getDefaultConfig = () => {
+ 		"left",
+ 		"right",
+ 		"top-left",
+-		"left-top",
++		"start-top",
+ 		"top-right",
+-		"right-top",
++		"end-top",
+ 		"bottom-right",
+-		"right-bottom",
++		"end-bottom",
+ 		"bottom-left",
+-		"left-bottom"
++		"start-bottom"
+ 	];
+ 	const scalePositionWithArbitrary = () => [
+ 		...scalePosition(),
+@@ -2050,7 +2050,7 @@ const getDefaultConfig = () => {
+ 			* Border Radius Right
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-r": [{ "rounded-r": scaleRadius() }],
++			"rounded-e": [{ "rounded-e": scaleRadius() }],
+ 			/**
+ 			* Border Radius Bottom
+ 			* @see https://tailwindcss.com/docs/border-radius
+@@ -2060,7 +2060,7 @@ const getDefaultConfig = () => {
+ 			* Border Radius Left
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-l": [{ "rounded-l": scaleRadius() }],
++			"rounded-s": [{ "rounded-s": scaleRadius() }],
+ 			/**
+ 			* Border Radius Start Start
+ 			* @see https://tailwindcss.com/docs/border-radius
+@@ -2085,22 +2085,22 @@ const getDefaultConfig = () => {
+ 			* Border Radius Top Left
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-tl": [{ "rounded-tl": scaleRadius() }],
++			"rounded-ss": [{ "rounded-ss": scaleRadius() }],
+ 			/**
+ 			* Border Radius Top Right
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-tr": [{ "rounded-tr": scaleRadius() }],
++			"rounded-se": [{ "rounded-se": scaleRadius() }],
+ 			/**
+ 			* Border Radius Bottom Right
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-br": [{ "rounded-br": scaleRadius() }],
++			"rounded-ee": [{ "rounded-ee": scaleRadius() }],
+ 			/**
+ 			* Border Radius Bottom Left
+ 			* @see https://tailwindcss.com/docs/border-radius
+ 			*/
+-			"rounded-bl": [{ "rounded-bl": scaleRadius() }],
++			"rounded-es": [{ "rounded-es": scaleRadius() }],
+ 			/**
+ 			* Border Width
+ 			* @see https://tailwindcss.com/docs/border-width
+@@ -2145,7 +2145,7 @@ const getDefaultConfig = () => {
+ 			* Border Width Right
+ 			* @see https://tailwindcss.com/docs/border-width
+ 			*/
+-			"border-w-r": [{ "border-r": scaleBorderWidth() }],
++			"border-w-r": [{ "border-e": scaleBorderWidth() }],
+ 			/**
+ 			* Border Width Bottom
+ 			* @see https://tailwindcss.com/docs/border-width
+@@ -2155,7 +2155,7 @@ const getDefaultConfig = () => {
+ 			* Border Width Left
+ 			* @see https://tailwindcss.com/docs/border-width
+ 			*/
+-			"border-w-l": [{ "border-l": scaleBorderWidth() }],
++			"border-w-l": [{ "border-s": scaleBorderWidth() }],
+ 			/**
+ 			* Divide Width X
+ 			* @see https://tailwindcss.com/docs/border-width#between-children
+@@ -2238,7 +2238,7 @@ const getDefaultConfig = () => {
+ 			* Border Color Right
+ 			* @see https://tailwindcss.com/docs/border-color
+ 			*/
+-			"border-color-r": [{ "border-r": scaleColor() }],
++			"border-color-r": [{ "border-e": scaleColor() }],
+ 			/**
+ 			* Border Color Bottom
+ 			* @see https://tailwindcss.com/docs/border-color
+@@ -2248,7 +2248,7 @@ const getDefaultConfig = () => {
+ 			* Border Color Left
+ 			* @see https://tailwindcss.com/docs/border-color
+ 			*/
+-			"border-color-l": [{ "border-l": scaleColor() }],
++			"border-color-l": [{ "border-s": scaleColor() }],
+ 			/**
+ 			* Divide Color
+ 			* @see https://tailwindcss.com/docs/divide-color
+@@ -3345,24 +3345,24 @@ const getDefaultConfig = () => {
+ 				"rounded-s",
+ 				"rounded-e",
+ 				"rounded-t",
+-				"rounded-r",
++				"rounded-e",
+ 				"rounded-b",
+-				"rounded-l",
++				"rounded-s",
+ 				"rounded-ss",
+ 				"rounded-se",
+ 				"rounded-ee",
+ 				"rounded-es",
+-				"rounded-tl",
+-				"rounded-tr",
+-				"rounded-br",
+-				"rounded-bl"
++				"rounded-ss",
++				"rounded-se",
++				"rounded-ee",
++				"rounded-es"
+ 			],
+ 			"rounded-s": ["rounded-ss", "rounded-es"],
+ 			"rounded-e": ["rounded-se", "rounded-ee"],
+-			"rounded-t": ["rounded-tl", "rounded-tr"],
+-			"rounded-r": ["rounded-tr", "rounded-br"],
+-			"rounded-b": ["rounded-br", "rounded-bl"],
+-			"rounded-l": ["rounded-tl", "rounded-bl"],
++			"rounded-t": ["rounded-ss", "rounded-se"],
++			"rounded-e": ["rounded-se", "rounded-ee"],
++			"rounded-b": ["rounded-ee", "rounded-es"],
++			"rounded-s": ["rounded-ss", "rounded-es"],
+ 			"border-spacing": ["border-spacing-x", "border-spacing-y"],
+ 			"border-w": [
+ 				"border-w-x",
+diff --git a/dist/code.js b/dist/code.js
+index d8badc9..bb87d05 100644
+--- a/dist/code.js
++++ b/dist/code.js
+@@ -293,7 +293,7 @@ function CodeHighlighted({ code, lang, variant = "default", showLineNumbers = fa
+ 	const fallbackCodeClasses = cn("!m-0 min-w-0 flex-1 overflow-x-auto", "font-mono text-sm leading-relaxed text-kumo-subtle", variant === "plain" ? "!p-0" : "!p-4");
+ 	const highlightedCodeClasses = cn("kumo-shiki", "[&_code]:!m-0 [&_code]:!border-0 [&_code]:!bg-transparent [&_code]:!p-0", "[&>pre]:!m-0 [&>pre]:!rounded-none [&>pre]:!border-0 [&>pre]:!bg-transparent", "[&>pre]:font-mono [&>pre]:text-sm [&>pre]:leading-relaxed", variant === "plain" ? "[&>pre]:!p-0" : "[&>pre]:!p-4", variant === "plain" && "[&_.line-highlighted]:!m-0 [&_.line-highlighted]:!w-full [&_.line-highlighted]:!px-0");
+ 	const copyButton = showCopyButton ? /* @__PURE__ */ jsx("div", {
+-		className: cn(isSingleLine ? "shrink-0 px-2" : variant === "plain" ? "absolute top-0 right-0" : "absolute top-2 right-2", !copied && "opacity-0 transition-opacity group-hover:opacity-100"),
++		className: cn(isSingleLine ? "shrink-0 px-2" : variant === "plain" ? "absolute top-0 end-0" : "absolute top-2 end-2", !copied && "opacity-0 transition-opacity group-hover:opacity-100"),
+ 		children: /* @__PURE__ */ jsx(Button, {
+ 			variant: "secondary",
+ 			size: "sm",
+@@ -303,7 +303,7 @@ function CodeHighlighted({ code, lang, variant = "default", showLineNumbers = fa
+ 		})
+ 	}) : null;
+ 	const lineNumbers = showLineNumbers && !isSingleLine ? /* @__PURE__ */ jsx("div", {
+-		className: cn("kumo-line-numbers shrink-0 pr-4 text-right font-mono text-sm opacity-40 select-none", variant === "plain" ? "py-0" : "py-4"),
++		className: cn("kumo-line-numbers shrink-0 pe-4 text-end font-mono text-sm opacity-40 select-none", variant === "plain" ? "py-0" : "py-4"),
+ 		"aria-hidden": "true",
+ 		children: Array.from({ length: lineCount }, (_, i) => /* @__PURE__ */ jsx("div", {
+ 			className: "leading-relaxed",
+diff --git a/dist/command-line/cli.js b/dist/command-line/cli.js
+index b167063..da9a75e 100644
+--- a/dist/command-line/cli.js
++++ b/dist/command-line/cli.js
+@@ -636,9 +636,9 @@ var COLOR_PREFIXES = [
+   "bg",
+   "border",
+   "border-t",
+-  "border-r",
++  "border-e",
+   "border-b",
+-  "border-l",
++  "border-s",
+   "border-x",
+   "border-y",
+   "ring",
 diff --git a/dist/index-CtTNoYA2.d.ts b/dist/index-CtTNoYA2.d.ts
-index 9a91d01b583e81478c5e68a020c4de03e2c2b433..f54598308d6a1f7b2bf7aa403b1c0bff42a1328a 100644
+index 9a91d01..f545983 100644
 --- a/dist/index-CtTNoYA2.d.ts
 +++ b/dist/index-CtTNoYA2.d.ts
 @@ -88,6 +88,11 @@ interface TimeseriesChartProps {
@@ -36,3 +1155,21 @@ index 9a91d01b583e81478c5e68a020c4de03e2c2b433..f54598308d6a1f7b2bf7aa403b1c0bff
    /**
     * Footer text rendered below the series rows in the tooltip.
     * Intended for brief context such as data freshness or aggregation details.
+diff --git a/dist/index.js b/dist/index.js
+index ae38514..ae5356b 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -154,11 +154,11 @@ function DeleteResource({ open, onOpenChange, resourceType, resourceName, onDele
+ 									children: [resourceName, copied ? /* @__PURE__ */ jsx(CheckIcon, {
+ 										size: 12,
+ 										weight: "bold",
+-										className: "ml-1.5 inline"
++										className: "ms-1.5 inline"
+ 									}) : /* @__PURE__ */ jsx(CopyIcon, {
+ 										size: 12,
+ 										weight: "bold",
+-										className: "ml-1.5 inline text-kumo-subtle group-hover:text-kumo-default"
++										className: "ms-1.5 inline text-kumo-subtle group-hover:text-kumo-default"
+ 									})]
+ 								}),
+ 								" ",
