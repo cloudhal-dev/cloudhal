@@ -1677,6 +1677,7 @@ export const en = {
       redirect: "Redirect",
       menu: "Menu",
       asset: "Media",
+      glossary: "Glossary",
     },
     gone: "No longer exists",
     revs: "rev {from} → {to}",

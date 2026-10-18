@@ -225,10 +225,10 @@ export function pinItems(input: PinInput): ReleaseItem[] {
     once(id);
     const target = working.get(id);
     if (!target) throw new ScheduleError("node_not_found", `${id} does not exist`);
-    if (target.kind === "site")
+    if (target.kind === "site" || target.kind === "glossary")
       throw new ScheduleError(
         "site_node_in_release",
-        "site settings are published the ordinary way",
+        "site settings and the glossary are published the ordinary way",
       );
     const base = live.get(id);
     if (base && base.rev === target.rev && base.hash === target.hash)
@@ -246,10 +246,10 @@ export function pinItems(input: PinInput): ReleaseItem[] {
     const base = live.get(id);
     const known = base ?? working.get(id);
     if (!known) throw new ScheduleError("node_not_found", `${id} does not exist`);
-    if (known.kind === "site")
+    if (known.kind === "site" || known.kind === "glossary")
       throw new ScheduleError(
         "site_node_in_release",
-        "site settings are published the ordinary way",
+        "site settings and the glossary are published the ordinary way",
       );
     if (!REMOVABLE_NODE_KINDS.includes(known.kind))
       throw new ScheduleError(
@@ -338,7 +338,7 @@ export async function dependencyClosure(input: ClosureInput): Promise<ClosureRes
     for (const dep of deps) {
       if (byNode.has(dep) || live.has(dep)) continue;
       const w = working.get(dep);
-      if (!w || w.kind === "site") {
+      if (!w || w.kind === "site" || w.kind === "glossary") {
         missing.add(dep);
         continue;
       }

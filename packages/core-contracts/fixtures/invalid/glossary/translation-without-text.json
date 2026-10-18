@@ -1,0 +1,12 @@
+{
+  "reason": "a translation needs its text",
+  "data": {
+    "schemaVersion": 1,
+    "id": "gloss_01HZX8K3Q9GL",
+    "siteId": "site_01HZX8K3Q9EF",
+    "entries": [{ "term": "byline", "translations": { "es": { "note": "firma" } } }],
+    "rev": 0,
+    "createdAt": "2026-10-18T10:00:00Z",
+    "updatedAt": "2026-10-18T10:00:00Z"
+  }
+}

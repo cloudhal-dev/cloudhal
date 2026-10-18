@@ -109,3 +109,21 @@ export class SnapshotEngine {
     return snapshot;
   }
 }
+
+/** Whether `ancestorId` is on `descendantId`'s parent chain (rollback targets an ancestor). */
+export async function isAncestor(
+  getSnapshot: (id: string) => Promise<Snapshot | undefined>,
+  ancestorId: string,
+  descendantId: string,
+): Promise<boolean> {
+  let cursor: string | undefined = descendantId;
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
+    const snap = await getSnapshot(cursor);
+    if (!snap) return false;
+    if (snap.parentId === ancestorId) return true;
+    cursor = snap.parentId;
+  }
+  return false;
+}

@@ -7,6 +7,7 @@ pub mod automation;
 pub mod comment;
 pub mod comment_submission;
 pub mod content_entry;
+pub mod glossary;
 pub mod menu;
 pub mod page;
 pub mod project;

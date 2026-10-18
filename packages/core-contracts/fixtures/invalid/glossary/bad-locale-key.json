@@ -1,0 +1,12 @@
+{
+  "reason": "translations are keyed by BCP 47 locales",
+  "data": {
+    "schemaVersion": 1,
+    "id": "gloss_01HZX8K3Q9GL",
+    "siteId": "site_01HZX8K3Q9EF",
+    "entries": [{ "term": "byline", "translations": { "Spanish": { "text": "firma" } } }],
+    "rev": 0,
+    "createdAt": "2026-10-18T10:00:00Z",
+    "updatedAt": "2026-10-18T10:00:00Z"
+  }
+}

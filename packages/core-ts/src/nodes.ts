@@ -5,6 +5,7 @@
 import type {
   Asset,
   ContentEntry,
+  Glossary,
   Menu,
   NodeRef,
   Page,
@@ -26,6 +27,7 @@ export const NODE_KINDS = [
   "redirect",
   "menu",
   "asset",
+  "glossary",
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -39,6 +41,7 @@ export interface NodeTypes {
   redirect: Redirect;
   menu: Menu;
   asset: Asset;
+  glossary: Glossary;
 }
 export type SiteNode = NodeTypes[NodeKind];
 
@@ -93,6 +96,13 @@ export const NODE_SPEC: { readonly [K in NodeKind]: NodeSpec<K> } = {
   },
   // RFC-0003: one node per menu key; the key is immutable.
   menu: { schema: "menu", prefix: ID_PREFIX.menu, key: (n) => n.key, siteId: (n) => n.siteId },
+  // RFC-0033: one glossary per site.
+  glossary: {
+    schema: "glossary",
+    prefix: ID_PREFIX.glossary,
+    key: () => "glossary",
+    siteId: (n) => n.siteId,
+  },
   // RFC-0004: one asset per content per site (invariant 2).
   asset: {
     schema: "asset",

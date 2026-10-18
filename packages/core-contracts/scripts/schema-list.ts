@@ -22,6 +22,7 @@ export const ROOT_SCHEMAS = [
   "release",
   "automation",
   "schedule-run",
+  "glossary",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];
