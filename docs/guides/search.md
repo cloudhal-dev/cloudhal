@@ -37,12 +37,12 @@ The instance must exist before the deploy that binds it. Wrangler refuses an `ai
 Add to `cloudhal.json`:
 
 ```json
-"search": { "provider": "cloudflare-ai-search", "instance": "newsroom-search", "dailyLimit": 1000 }
+"search": { "provider": "cloudflare-ai-search", "instance": "newsroom-search" }
 ```
 
 - `instance`: the AI Search instance's name.
 - `bucket`: optional, default `<name>-search`.
-- `dailyLimit`: optional, default 1000. Semantic searches per site and UTC day; after that, FTS5 alone until the next day.
+- `monthlyLimit`: optional, default **1000**. Semantic searches per UTC month for the whole deployment; after that, FTS5 alone until the month ends (see Costs).
 
 ### 3. Deploy and fill the bucket
 `cloudhal deploy` creates the bucket and binds both Workers: `AI_SEARCH`, `SEARCH_BUCKET` and the `CLOUDHAL_SEARCH_*` vars.
@@ -54,9 +54,22 @@ From then on every publish, rollback, release and import mirrors what changed in
 To fill the bucket for content published earlier, run `cloudhal search reindex --remote` once.
 
 ### Costs and limits
-- **What you pay for.** AI Search bills per query and for indexing; R2 stores one small file per node and language. The daily limit caps reader queries per site.
-- **Large first rebuild.** A full rebuild writes one file per node, so on Workers Free a site with many hundreds of pages can run past a request's subrequest limit. Rebuild with `cloudhal search reindex --remote` on Workers Paid, or let publishes fill the bucket over time.
-- **No generated answers.** Readers never see text the model wrote: Cloudhal uses AI Search for retrieval only.
+Cloudflare bills AI Search from **2026-11-01**. Every account gets a monthly allowance; Cloudhal's defaults keep a deployment inside it, so a site on **Workers Free** or the **$5 Workers Paid** plan pays nothing for search.
+
+| Included per account and month | Beyond it | What Cloudhal does |
+|---|---|---|
+| 1,000 semantic (hybrid) queries | $0.75 per 1,000 | Counts its own calls: `monthlyLimit` defaults to 1,000; past it, FTS5 answers until the month ends |
+| 5 million ingestion tokens | $0.75 per million | Mirrors only what a publish changed; a full rebuild of a site with a few hundred articles stays well under a million tokens (an estimate, not a measurement) |
+| 10 GB-month of storage | $2.00 per GB-month | One small Markdown file per node and language |
+
+Source: [AI Search limits and pricing](https://developers.cloudflare.com/ai-search/platform/limits-pricing/) (checked 2026-10-18). The page lists the same overage prices for every plan and does not say that Workers Free stops at the allowance, so Cloudhal sets the limit itself rather than relying on the plan.
+
+- **The quota is per Cloudflare account.** Several deployments on one account share the 1,000; give each a part (`"monthlyLimit": 300`).
+- **Large sites.** Raise `monthlyLimit` to what you are willing to pay for: 10,000 a month is about $6.75 over the allowance. FTS5 has no such limit; it runs in your own D1 database.
+- **Readers never see the limit.** Past it, results simply come from FTS5 alone, without the semantic matches.
+- **R2.** The bucket is billed as R2 (with R2's own free allowance; a site this size stays within it).
+- **Large first rebuild.** A full rebuild writes one file per node in one request. On Workers Free a site with many hundreds of pages can run past a request's subrequest limit: rebuild with `cloudhal search reindex --remote` on Workers Paid, or let publishes fill the bucket over time.
+- **No generated answers.** Readers never see text the model wrote: Cloudhal uses AI Search for retrieval only, so generation is never billed.
 
 ### Turning it off
 Remove the `search` block and deploy again. The bindings go, and FTS5 answers alone. The bucket and the instance stay until you delete them in the dashboard.

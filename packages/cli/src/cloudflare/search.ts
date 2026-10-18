@@ -8,12 +8,13 @@ import type { SearchConfig } from "../config-search.ts";
 export interface SearchDeployment {
   readonly instance: string;
   readonly bucket: string;
-  readonly dailyLimit: number;
+  readonly monthlyLimit: number;
 }
 
 export const AI_SEARCH_BINDING = "AI_SEARCH";
 export const SEARCH_BUCKET_BINDING = "SEARCH_BUCKET";
-const DEFAULT_DAILY_LIMIT = 1000;
+/** Cloudflare AI Search's included semantic queries per account and month (`config-search.ts`). */
+const DEFAULT_MONTHLY_LIMIT = 1000;
 
 /** The deployment's search resources, or undefined for FTS5 alone. */
 export function searchDeploymentOf(
@@ -24,7 +25,7 @@ export function searchDeploymentOf(
   return {
     instance: search.instance,
     bucket: search.bucket ?? `${name}-search`,
-    dailyLimit: search.dailyLimit ?? DEFAULT_DAILY_LIMIT,
+    monthlyLimit: search.monthlyLimit ?? DEFAULT_MONTHLY_LIMIT,
   };
 }
 
@@ -41,6 +42,6 @@ export const searchVars = (s: SearchDeployment | undefined) =>
   s
     ? {
         CLOUDHAL_SEARCH_PROVIDER: "cloudflare-ai-search",
-        CLOUDHAL_SEARCH_DAILY_LIMIT: String(s.dailyLimit),
+        CLOUDHAL_SEARCH_MONTHLY_LIMIT: String(s.monthlyLimit),
       }
     : {};

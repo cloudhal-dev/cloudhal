@@ -91,7 +91,7 @@ export async function loadDeploy(options: DeployOptions): Promise<DeployContext>
   const base: DeploymentNames = { name, ...(search ? { search } : {}) };
   if (search)
     log(
-      `search: Cloudflare AI Search instance ${search.instance} over R2 bucket ${search.bucket} (the instance must exist, read that bucket and declare the text metadata fields locale and kind); ${search.dailyLimit} semantic searches per site a day, then FTS5 alone`,
+      `search: Cloudflare AI Search instance ${search.instance} over R2 bucket ${search.bucket} (the instance must exist, read that bucket and declare the text metadata fields locale and kind); ${search.monthlyLimit} semantic searches a month for the deployment (Cloudflare includes 1,000 per account), then FTS5 alone until the month ends`,
     );
   const names = workerNames(base);
   // 0. analytics: decided before anything is generated; the wrangler version gates the configs

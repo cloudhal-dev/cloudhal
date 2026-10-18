@@ -199,14 +199,14 @@ Algolia, Typesense, Meilisearch and similar services send content outside the de
     - **Search.** One instance call per search (`ai_search_options.retrieval.filters`: the folder range of §3, `locale`, `kind $in`, 50 chunks), keeping the best chunk per node.
     - **Live check.** The nodes then pass `liveHits` against the FTS5 index (invariant 1); titles and links come from the index, and the snippet is the chunk with the query words marked.
   - **Hybrid.** `hybridProvider` merges FTS5 and the semantic side by reciprocal rank (k = 60). FTS5 pages alone past 50 hits, when the semantic side fails, and past the budget.
-  - **Budget.** Migration `0023_search_usage`, a row per site and UTC day; `takeSearchCall` counts and checks atomically (`ON CONFLICT … RETURNING`). The limit is `CLOUDHAL_SEARCH_DAILY_LIMIT`, default 1000.
+  - **Quota.** Migration `0024_search_quota` (replacing `0023_search_usage`) keeps one row per UTC month for the deployment; `takeSearchCall` counts and checks atomically (`ON CONFLICT … RETURNING`). The limit is `CLOUDHAL_SEARCH_MONTHLY_LIMIT`, default 1,000: the semantic queries Cloudflare includes per account and month, so Workers Free and the $5 Workers Paid plan pay nothing (billing starts 2026-11-01). Large sites raise `monthlyLimit`.
   - **Wiring.** `searchProviderFromEnv` builds the provider when `CLOUDHAL_SEARCH_PROVIDER=cloudflare-ai-search` and both `AI_SEARCH` and `SEARCH_BUCKET` are bound. It is set on the store of the site Worker, the admin Worker and the scheduler's ticks.
   - **Deploy.**
-    - `cloudhal.json` `search {provider, instance, bucket?, dailyLimit?}` binds both Workers (`ai_search`, a second R2 bucket, the vars).
+    - `cloudhal.json` `search {provider, instance, bucket?, monthlyLimit?}` binds both Workers (`ai_search`, a second R2 bucket, the vars).
     - `cloudhal deploy` creates the bucket. The instance, with its data source and the two metadata fields, is made by hand (wrangler needs it to exist).
 - **Deviations (29e).**
   - It is not checked against a live AI Search instance in this repository. The tests use a fake instance that applies the documented filters, and the wrangler config key comes from wrangler 4.148's schema.
-  - The budget is per site and day only, not part of the RFC-0008 automation budgets.
+  - The quota is per deployment and month, not part of the RFC-0008 automation budgets. Deployments sharing a Cloudflare account must split the allowance by hand.
   - The semantic side reads the FTS5 index with a scan of the site's rows (`liveHits` has no `MATCH`), fine for one site per deployment.
   - A full sync writes one object per node in the publishing request. On Workers Free a large first rebuild can pass the subrequest limit (guide: rebuild on Paid, or let publishes fill it).
 - **Deviations.**

@@ -2,20 +2,23 @@
  * `cloudhal.json` `search` (RFC-0029 §3): the deployment's search provider. Absent, FTS5 alone.
  *
  * ```json
- * "search": { "provider": "cloudflare-ai-search", "instance": "newsroom-search", "dailyLimit": 1000 }
+ * "search": { "provider": "cloudflare-ai-search", "instance": "newsroom-search", "monthlyLimit": 1000 }
  * ```
  *
  * - `instance`: the AI Search instance (it must exist before the deploy, its data source the R2
  *   bucket below, with the text custom metadata fields `locale` and `kind`).
  * - `bucket`: the R2 bucket the deployment mirrors published content into (default
  *   `<name>-search`; `cloudhal deploy` creates it).
- * - `dailyLimit`: semantic calls per site and UTC day, then FTS5 alone (default 1000).
+ * - `monthlyLimit`: semantic calls per UTC month for the whole deployment, then FTS5 alone until
+ *   the month ends. Default 1000: the semantic queries Cloudflare includes per account and month,
+ *   so Workers Free and the $5 Workers Paid plan pay nothing for search. Large sites raise it;
+ *   deployments sharing one Cloudflare account share the 1,000 and should split it.
  */
 export interface SearchConfig {
   readonly provider: "cloudflare-ai-search";
   readonly instance: string;
   readonly bucket?: string;
-  readonly dailyLimit?: number;
+  readonly monthlyLimit?: number;
 }
 
 /** AI Search instance and R2 bucket names: lower-case letters, digits and hyphens. */
@@ -31,8 +34,8 @@ export function parseSearchConfig(input: unknown): SearchConfig | undefined {
     provider: "cloudflare-ai-search",
     instance: o.instance,
     ...(typeof o.bucket === "string" && RESOURCE_NAME.test(o.bucket) ? { bucket: o.bucket } : {}),
-    ...(Number.isInteger(o.dailyLimit) && (o.dailyLimit as number) >= 0
-      ? { dailyLimit: o.dailyLimit as number }
+    ...(Number.isInteger(o.monthlyLimit) && (o.monthlyLimit as number) >= 0
+      ? { monthlyLimit: o.monthlyLimit as number }
       : {}),
   };
 }

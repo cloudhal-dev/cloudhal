@@ -14,9 +14,9 @@ describe("search provider deployment", () => {
       parseSearchConfig({
         provider: "cloudflare-ai-search",
         instance: "news-search",
-        dailyLimit: 50,
+        monthlyLimit: 50,
       }),
-    ).toEqual({ provider: "cloudflare-ai-search", instance: "news-search", dailyLimit: 50 });
+    ).toEqual({ provider: "cloudflare-ai-search", instance: "news-search", monthlyLimit: 50 });
     expect(parseSearchConfig({ provider: "algolia", instance: "x-y" })).toBeUndefined();
     expect(
       parseSearchConfig({ provider: "cloudflare-ai-search", instance: "Bad Name" }),
@@ -26,13 +26,13 @@ describe("search provider deployment", () => {
         provider: "cloudflare-ai-search",
         instance: "news-search",
         bucket: "UPPER",
-        dailyLimit: -1,
+        monthlyLimit: -1,
       }),
     ).toEqual({ provider: "cloudflare-ai-search", instance: "news-search" });
     expect(searchDeploymentOf(undefined, "news")).toBeUndefined();
     expect(
       searchDeploymentOf({ provider: "cloudflare-ai-search", instance: "news-search" }, "news"),
-    ).toEqual({ instance: "news-search", bucket: "news-search", dailyLimit: 1000 });
+    ).toEqual({ instance: "news-search", bucket: "news-search", monthlyLimit: 1000 });
   });
 
   it("without it, neither Worker binds AI Search or a second bucket", () => {
@@ -45,7 +45,7 @@ describe("search provider deployment", () => {
   });
 
   it("with it, both Workers bind the instance and the bucket and read the same vars", () => {
-    const search = { instance: "news-ai", bucket: "news-search", dailyLimit: 200 };
+    const search = { instance: "news-ai", bucket: "news-search", monthlyLimit: 200 };
     for (const cfg of [
       siteWorkerConfig({ ...site, search }),
       adminWorkerConfig({ ...admin, search }),
@@ -57,7 +57,7 @@ describe("search provider deployment", () => {
       ]);
       expect(cfg.vars).toMatchObject({
         CLOUDHAL_SEARCH_PROVIDER: "cloudflare-ai-search",
-        CLOUDHAL_SEARCH_DAILY_LIMIT: "200",
+        CLOUDHAL_SEARCH_MONTHLY_LIMIT: "200",
       });
     }
     // `cloudhal deploy` creates the bucket with the others

@@ -13,7 +13,9 @@
  *   titles and links come from the index.
  * - **Hybrid.** `hybridProvider` merges it with FTS5 by reciprocal rank, so exact title matches stay
  *   on top and semantic matches fill in; when it fails, FTS5 answers alone.
- * - **Budget.** `dailyLimit` calls per site and UTC day (`search_usage`); past it, FTS5 alone.
+ * - **Quota.** `monthlyLimit` calls per UTC month for the deployment (`search_quota`), by default
+ *   the 1,000 semantic queries Cloudflare includes per account; past it, FTS5 alone until the
+ *   month ends.
  *
  * The binding types are structural (no `@cloudflare/workers-types` here). Worker-safe.
  */
@@ -260,19 +262,20 @@ export function hybridProvider(
 }
 
 /**
- * Counts one semantic call for a site and UTC day; false once the day's calls pass `limit`
- * (the call is counted either way, so the count says how often readers asked).
+ * Counts one semantic call for the deployment in the UTC month of `now`; false once the month's
+ * calls pass `limit`. Cloudflare's quota is per account and month (1,000 semantic queries
+ * included), so the count is too, across every site of the deployment. A call is counted either
+ * way, so the count says how often readers asked.
  */
 export async function takeSearchCall(
   sql: SqlDriver,
-  siteId: string,
   options: { now: number; limit: number },
 ): Promise<boolean> {
-  const day = new Date(options.now).toISOString().slice(0, 10);
+  const period = new Date(options.now).toISOString().slice(0, 7);
   const row = await sql.get<{ calls: number }>(
-    `INSERT INTO search_usage (site_id, day, calls) VALUES (?, ?, 1)
-ON CONFLICT (site_id, day) DO UPDATE SET calls = calls + 1 RETURNING calls`,
-    [siteId, day],
+    `INSERT INTO search_quota (period, calls) VALUES (?, 1)
+ON CONFLICT (period) DO UPDATE SET calls = calls + 1 RETURNING calls`,
+    [period],
   );
   return (row?.calls ?? 1) <= options.limit;
 }
@@ -281,13 +284,19 @@ ON CONFLICT (site_id, day) DO UPDATE SET calls = calls + 1 RETURNING calls`,
 export interface AiSearchEnv {
   /** `cloudflare-ai-search` turns it on; anything else (or nothing) keeps FTS5 alone. */
   CLOUDHAL_SEARCH_PROVIDER?: string;
-  /** Semantic calls per site and UTC day (default `AI_SEARCH_DAILY_LIMIT`). */
-  CLOUDHAL_SEARCH_DAILY_LIMIT?: string;
+  /** Semantic calls per UTC month for the deployment (default `AI_SEARCH_MONTHLY_LIMIT`). */
+  CLOUDHAL_SEARCH_MONTHLY_LIMIT?: string;
   AI_SEARCH?: AiSearchInstance;
   SEARCH_BUCKET?: SearchBucket;
 }
 
-export const AI_SEARCH_DAILY_LIMIT = 1000;
+/**
+ * The semantic queries Cloudflare AI Search includes per account and month (checked 2026-10-18,
+ * billing from 2026-11-01): the default keeps a deployment inside the free allowance, so neither
+ * Workers Free nor the $5 Workers Paid plan pays for search. Large sites raise it in
+ * `cloudhal.json` (`search.monthlyLimit`).
+ */
+export const AI_SEARCH_MONTHLY_LIMIT = 1000;
 
 /**
  * The store's provider from a Worker's environment: FTS5 merged with AI Search when the deployment
@@ -300,16 +309,13 @@ export function searchProviderFromEnv(
 ): SearchProvider | undefined {
   if (env.CLOUDHAL_SEARCH_PROVIDER !== AI_SEARCH_PROVIDER || !env.AI_SEARCH || !env.SEARCH_BUCKET)
     return undefined;
-  const limit = Number(env.CLOUDHAL_SEARCH_DAILY_LIMIT ?? AI_SEARCH_DAILY_LIMIT);
+  const set = Number(env.CLOUDHAL_SEARCH_MONTHLY_LIMIT ?? AI_SEARCH_MONTHLY_LIMIT);
+  const limit = Number.isInteger(set) && set >= 0 ? set : AI_SEARCH_MONTHLY_LIMIT;
   return hybridProvider(
     fts5Provider(sql),
     cloudflareAiSearchProvider({ instance: env.AI_SEARCH, bucket: env.SEARCH_BUCKET, sql }),
     {
-      allow: (r) =>
-        takeSearchCall(sql, r.siteId, {
-          now: r.now,
-          limit: Number.isFinite(limit) && limit >= 0 ? limit : AI_SEARCH_DAILY_LIMIT,
-        }),
+      allow: (r) => takeSearchCall(sql, { now: r.now, limit }),
       ...(options.onError ? { onError: options.onError } : {}),
     },
   );
