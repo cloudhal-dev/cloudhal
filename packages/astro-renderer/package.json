@@ -50,7 +50,8 @@
     "./search-client": "./src/search-client.ts",
     "./locales": "./src/locales.ts",
     "./locale-middleware": "./src/locale-middleware.ts",
-    "./locale-feeds": "./src/locale-feeds.ts"
+    "./locale-feeds": "./src/locale-feeds.ts",
+    "./not-found": "./src/not-found.ts"
   },
   "files": [
     "dist",
@@ -251,6 +252,10 @@
       "./locale-feeds": {
         "types": "./dist/src/locale-feeds.d.ts",
         "default": "./dist/src/locale-feeds.js"
+      },
+      "./not-found": {
+        "types": "./dist/src/not-found.d.ts",
+        "default": "./dist/src/not-found.js"
       }
     }
   }

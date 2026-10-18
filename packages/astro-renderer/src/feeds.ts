@@ -7,6 +7,7 @@ import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contract
 import type { ArchiveSummary, ArchiveView } from "./archive.ts";
 import { markdownText, renderBody } from "./markdown.ts";
 import type { AssetIndex } from "./media.ts";
+import { notFoundPageIds } from "./not-found.ts";
 import { entryPath } from "./routing.ts";
 import { absoluteUrl } from "./seo.ts";
 import { entryTaxonomy, type TaxonomyIndex } from "./taxonomy.ts";
@@ -170,8 +171,9 @@ export function sitemapUrls(
 ): SitemapUrl[] {
   const urls: SitemapUrl[] = [];
   const seen = new Set<string>();
+  const notFound = notFoundPageIds(pages);
   for (const page of published(pages)) {
-    if (page.locale !== site.defaultLocale || page.seo?.noindex) continue;
+    if (page.locale !== site.defaultLocale || page.seo?.noindex || notFound.has(page.id)) continue;
     const own = `${origin}${page.path === "/" ? "/" : page.path}`;
     const canonical = absoluteUrl(origin, page.seo?.canonical);
     if (canonical && canonical !== own) continue;

@@ -236,9 +236,9 @@ export function localizeLinks(html: string, localize: (path: string) => string):
 }
 
 /**
- * The head of a page rendered in `locale`: its canonical and `og:url` on the locale's URL (each
- * version is self-canonical, never pointing at another language), `lang`/`dir`, the `hreflang`
- * set and `og:locale:alternate`.
+ * The head of a page rendered in `locale`: its canonical, `og:url` and feed links on the locale's
+ * URLs (each version is self-canonical, never pointing at another language), `lang`/`dir`, the
+ * `hreflang` set and `og:locale:alternate`.
  */
 export function localizeHead(
   meta: HeadMeta,
@@ -251,17 +251,16 @@ export function localizeHead(
   },
 ): HeadMeta {
   const { locale, origin, alternates } = input;
-  const graphPath = meta.canonical.startsWith(origin)
-    ? meta.canonical.slice(origin.length) || "/"
-    : undefined;
-  const canonical =
-    graphPath === undefined ? meta.canonical : localeUrl(site, locale, graphPath, origin);
+  const here = (url: string) =>
+    url.startsWith(origin) ? localeUrl(site, locale, url.slice(origin.length) || "/", origin) : url;
+  const canonical = here(meta.canonical);
   const others = alternates.filter((a) => !a.current && a.locale !== "x-default");
   return {
     ...meta,
     canonical,
     lang: locale,
     dir: textDirection(locale),
+    feeds: meta.feeds.map((f) => ({ ...f, href: here(f.href) })),
     openGraph: [
       ...meta.openGraph.map(([k, v]): [string, string] => [k, k === "og:url" ? canonical : v]),
       ...others.map((a): [string, string] => ["og:locale:alternate", a.locale.replace("-", "_")]),

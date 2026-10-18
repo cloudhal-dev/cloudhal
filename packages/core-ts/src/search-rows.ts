@@ -177,7 +177,9 @@ export function pageSearchRow(
   page: Page,
   options: { drafts?: boolean } = {},
 ): SearchRow | undefined {
-  if (!shown(page.status, options.drafts) || page.seo?.noindex) return undefined;
+  // The site's not-found page (`/404`, RFC-0033 §4) is no search result.
+  if (!shown(page.status, options.drafts) || page.seo?.noindex || page.path === "/404")
+    return undefined;
   return {
     nodeId: page.id,
     locale: page.locale,

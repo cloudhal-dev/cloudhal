@@ -41,3 +41,19 @@
 .ch-search-results time {
   @apply mt-1 block text-sm text-zinc-500;
 }
+/* The built-in not-found page: the search page's form, a sentence and a link home. */
+.ch-not-found-text {
+  @apply mt-3 text-zinc-700;
+}
+.ch-not-found .ch-search-form {
+  @apply flex-wrap items-center;
+}
+.ch-not-found-prompt {
+  @apply w-full text-sm text-zinc-600;
+}
+.ch-not-found-home {
+  @apply mt-6;
+}
+.ch-not-found-home a {
+  @apply font-medium underline underline-offset-4;
+}

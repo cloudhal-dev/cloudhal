@@ -279,6 +279,26 @@ export const themeSettings: PropsSchema = {
             maxLength: 300,
             title: { en: "Skip to content", tr: "İçeriğe geç" },
           },
+          notFoundTitle: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Not found: title", tr: "Bulunamadı: başlık" },
+          },
+          notFoundText: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Not found: text", tr: "Bulunamadı: metin" },
+          },
+          notFoundHome: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Not found: home link", tr: "Bulunamadı: ana sayfa bağlantısı" },
+          },
+          notFoundSearch: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Not found: search prompt", tr: "Bulunamadı: arama çağrısı" },
+          },
         },
       },
     },
