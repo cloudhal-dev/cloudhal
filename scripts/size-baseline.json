@@ -103,7 +103,7 @@
       "lines": 167
     },
     "apps/studio/src/components/InviteDialog.tsx::InviteDialog": {
-      "lines": 279
+      "lines": 229
     },
     "apps/studio/src/components/MediaPicker.tsx::AssetPickerDialog": {
       "lines": 164
@@ -229,7 +229,7 @@
       "lines": 159
     },
     "apps/studio/src/routes/MembersPage.tsx::MembersPage": {
-      "lines": 233
+      "lines": 218
     },
     "apps/studio/src/routes/NavigationPage.tsx::NavigationPage": {
       "lines": 1042

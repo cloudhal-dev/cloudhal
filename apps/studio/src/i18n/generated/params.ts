@@ -641,6 +641,10 @@ export interface MessageParams {
   "seo.cover.size": { width: string | number; height: string | number };
   "seo.page.canonicalHintHost": { host: string | number };
   "site.description": { slug: string | number; locale: string | number };
+  "siteAccess.count": { count: number };
+  "siteAccess.roleOn": { site: string | number };
+  "siteAccess.savedDescription": { name: string | number };
+  "siteAccess.title": { name: string | number };
   "siteSettings.appearance.description": { theme: string | number };
   "siteSettings.appearance.none": { theme: string | number };
   "siteSettings.design.count": { count: string | number; max: string | number };

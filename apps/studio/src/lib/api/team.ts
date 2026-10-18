@@ -119,7 +119,12 @@ export interface Me {
   invitableRoles?: Role[];
   /** Better Auth user id (members are keyed by it). */
   userId?: string;
+  /** RFC-0034 A2: the sites this person is limited to, with their role on each. */
+  sites?: SiteRoles;
 }
+
+/** `{siteId: role}`: the sites an Editor, Author or Contributor works on (RFC-0034 A2). */
+export type SiteRoles = Partial<Record<string, Role>>;
 
 export interface Member {
   userId: string;
@@ -130,6 +135,8 @@ export interface Member {
   joinedAt: string;
   /** Only for callers with `members:manage` (Administrators and the Owner). */
   email?: string;
+  /** Limited to these sites (absent: every site). */
+  sites?: SiteRoles;
 }
 
 /** How one of a demoted person's agent keys was narrowed (RFC-0005 §5.3). */
@@ -163,6 +170,8 @@ export interface Invite {
   /** The account it created or re-admitted; `null` while pending (or accepted without an account). */
   acceptedUserId: string | null;
   acceptedAt: string | null;
+  /** The sites the new member will be limited to. */
+  sites?: SiteRoles;
 }
 
 export interface NewInvite {
@@ -170,6 +179,7 @@ export interface NewInvite {
   role: Role;
   expiresInHours?: number;
   delivery?: "link" | "email";
+  sites?: SiteRoles;
 }
 
 /** `POST /api/invites`: the link (`<studio>/invite#chinv_…`) comes back once, never again. */
@@ -207,6 +217,8 @@ export type InstanceFeature = Exclude<
 
 export const teamApi = {
   me: () => request<Me>("/api/me"),
+  /** The person's role and abilities on one site (RFC-0034 A2); 404 for a site they are not on. */
+  meOnSite: (siteId: string) => request<Me>(`/api/me?siteId=${encodeURIComponent(siteId)}`),
   instance: () => request<InstanceInfo>("/api/instance"),
   /**
    * Is scheduled work running (RFC-0008 §8.7, §13)? 404 on servers without schedules. The rest of
@@ -222,6 +234,12 @@ export const teamApi = {
         `/api/members/${encodeURIComponent(userId)}`,
         { method: "PATCH", ...json({ role }) },
       ),
+    /** Limits an Editor, Author or Contributor to sites (`{}` lifts it); 400 `invalid_sites`. */
+    setSites: (userId: string, sites: SiteRoles) =>
+      request<{ member: Member }>(`/api/members/${encodeURIComponent(userId)}/sites`, {
+        method: "PUT",
+        ...json({ sites }),
+      }),
     /** Deletes the membership, signs them out, disables their keys, cancels invites and requests. */
     remove: (userId: string) =>
       request<MemberRemoval>(`/api/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),

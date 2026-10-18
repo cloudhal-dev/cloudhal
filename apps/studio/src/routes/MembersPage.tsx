@@ -18,6 +18,7 @@ import {
   Crown,
   DotsThree,
   EnvelopeSimple,
+  Globe,
   Info,
   Key,
   LinkSimple,
@@ -45,8 +46,10 @@ import {
   ResetLinkDialog,
   TransferOwnershipDialog,
 } from "../components/MemberDialogs.tsx";
+import { MemberSitesDialog } from "../components/MemberSitesDialog.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RoleBadge, RoleList } from "../components/Roles.tsx";
+import { isSiteRole, useSites } from "../components/SiteAccessField.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
 import {
@@ -113,6 +116,7 @@ function MemberMenu({
   problem,
   isOwner,
   onRole,
+  onSites,
   onReset,
   onTransfer,
   onRemove,
@@ -122,6 +126,8 @@ function MemberMenu({
   /** The signed-in person is the Owner (may transfer ownership). */
   isOwner: boolean;
   onRole: () => void;
+  /** RFC-0034 A2: which sites they work on (multi-site installations, site roles only). */
+  onSites?: (() => void) | undefined;
   onReset: () => void;
   onTransfer: () => void;
   onRemove: () => void;
@@ -162,6 +168,11 @@ function MemberMenu({
         <GatedItem icon={UserCircleGear} reason={reason} onClick={onRole}>
           {t("members.changeRole")}
         </GatedItem>
+        {onSites && (
+          <GatedItem icon={Globe} reason={reason} onClick={onSites}>
+            {t("siteAccess.menu")}
+          </GatedItem>
+        )}
         <GatedItem icon={Password} reason={reason} onClick={onReset}>
           {t("members.resetLink")}
         </GatedItem>
@@ -445,6 +456,67 @@ function HowInvitesWork() {
  * an Activity sub-view with the deployment's own events (`audit:read`). Every control follows the
  * server's rank rule and is disabled with the reason when it does not apply; the server decides.
  */
+type MemberSetters = Record<
+  "setToRole" | "setToSites" | "setToReset" | "setToTransfer" | "setToRemove",
+  (m: Member) => void
+>;
+
+/** One member: identity, role (and their sites when limited), joined, and the actions menu. */
+function MemberTableRow({
+  member: m,
+  you,
+  problem,
+  isOwner,
+  multiSite,
+  on,
+}: {
+  member: Member;
+  you: boolean;
+  problem: RankProblem | undefined;
+  isOwner: boolean;
+  multiSite: boolean;
+  on: MemberSetters;
+}) {
+  const t = useT();
+  const count = m.sites ? Object.keys(m.sites).length : 0;
+  const role = (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <RoleBadge value={m.role} />
+      {count > 0 && (
+        <span data-site-limited>
+          <Badge variant="secondary">{t("siteAccess.count", { count })}</Badge>
+        </span>
+      )}
+    </span>
+  );
+  return (
+    <Table.Row data-member-id={m.userId} data-role={m.role}>
+      <Table.Cell>
+        <div className="grid min-w-0 gap-1.5 sm:min-w-56">
+          <MemberIdentity member={m} you={you} />
+          <span className="ps-11 sm:hidden">{role}</span>
+        </div>
+      </Table.Cell>
+      <Table.Cell className="hidden whitespace-nowrap sm:table-cell">{role}</Table.Cell>
+      <Table.Cell className="hidden whitespace-nowrap sm:table-cell">
+        <RelativeTime iso={m.joinedAt} />
+      </Table.Cell>
+      <Table.Cell sticky="right" className="w-12 text-end">
+        <MemberMenu
+          member={m}
+          problem={problem}
+          isOwner={isOwner}
+          onRole={() => on.setToRole(m)}
+          onSites={multiSite && isSiteRole(m.role) ? () => on.setToSites(m) : undefined}
+          onReset={() => on.setToReset(m)}
+          onTransfer={() => on.setToTransfer(m)}
+          onRemove={() => on.setToRemove(m)}
+        />
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
 export function MembersPage() {
   const t = useT();
   const navigate = useNavigate();
@@ -468,6 +540,8 @@ export function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [draft, setDraft] = useState<InviteDraft | undefined>();
   const [toRole, setToRole] = useState<Member | undefined>();
+  const [toSites, setToSites] = useState<Member | undefined>();
+  const multiSite = (useSites().data?.length ?? 0) > 1;
   const [toRemove, setToRemove] = useState<Member | undefined>();
   const [toReset, setToReset] = useState<Member | undefined>();
   const [toTransfer, setToTransfer] = useState<Member | undefined>();
@@ -597,33 +671,15 @@ export function MembersPage() {
                 ) : (
                   <Table.Body>
                     {paging.pageItems.map((m) => (
-                      <Table.Row key={m.userId} data-member-id={m.userId} data-role={m.role}>
-                        <Table.Cell>
-                          <div className="grid min-w-0 gap-1.5 sm:min-w-56">
-                            <MemberIdentity member={m} you={m.userId === me?.userId} />
-                            <span className="ps-11 sm:hidden">
-                              <RoleBadge value={m.role} />
-                            </span>
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="hidden whitespace-nowrap sm:table-cell">
-                          <RoleBadge value={m.role} />
-                        </Table.Cell>
-                        <Table.Cell className="hidden whitespace-nowrap sm:table-cell">
-                          <RelativeTime iso={m.joinedAt} />
-                        </Table.Cell>
-                        <Table.Cell sticky="right" className="w-12 text-end">
-                          <MemberMenu
-                            member={m}
-                            problem={roleChangeProblem(manager, m)}
-                            isOwner={isOwner}
-                            onRole={() => setToRole(m)}
-                            onReset={() => setToReset(m)}
-                            onTransfer={() => setToTransfer(m)}
-                            onRemove={() => setToRemove(m)}
-                          />
-                        </Table.Cell>
-                      </Table.Row>
+                      <MemberTableRow
+                        key={m.userId}
+                        member={m}
+                        you={m.userId === me?.userId}
+                        problem={roleChangeProblem(manager, m)}
+                        isOwner={isOwner}
+                        multiSite={multiSite}
+                        on={{ setToRole, setToSites, setToReset, setToTransfer, setToRemove }}
+                      />
                     ))}
                   </Table.Body>
                 )}
@@ -654,6 +710,7 @@ export function MembersPage() {
         draft={draft}
       />
       <ChangeRoleDialog member={toRole} onOpenChange={(o) => !o && setToRole(undefined)} />
+      <MemberSitesDialog member={toSites} onOpenChange={(o) => !o && setToSites(undefined)} />
       <RemoveMemberDialog
         member={toRemove}
         keyCount={
