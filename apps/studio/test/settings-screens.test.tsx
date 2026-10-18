@@ -1,6 +1,6 @@
 import { Toasty } from "@cloudhal/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeProvider } from "../src/components/CodeProvider.tsx";
@@ -230,7 +230,9 @@ describe("SiteSettingsPage", () => {
     render(wrap(<SiteSettingsPage />));
     const name = await screen.findByDisplayValue("Blog");
     fireEvent.change(name, { target: { value: "Blog weekly" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    // Every settings section has its own save button: this one is the General section's.
+    const general = document.getElementById("general") as HTMLElement;
+    fireEvent.click(within(general).getByRole("button", { name: "Save changes" }));
     expect(await screen.findByText("This site changed somewhere else")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /load latest/i })).toBeInTheDocument();
   });

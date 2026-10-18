@@ -1650,6 +1650,61 @@ export const en = {
     },
     aBlock: "a block",
   },
+  // RFC-0033 §8: Site › Settings › Languages and Glossary.
+  languages: {
+    title: "Languages",
+    description:
+      "The languages this site publishes in and how readers reach them. A page or article in another language is a translation of the original.",
+    language: "Language",
+    tag: "Tag",
+    default: "Default",
+    remove: "Remove {language}",
+    add: "Add a language",
+    addHint: "A BCP 47 tag such as es, pt-BR or zh-Hans.",
+    addPlaceholder: "es",
+    addButton: "Add",
+    invalid: "Use a BCP 47 tag such as es or pt-BR.",
+    exists: "The site already has this language.",
+    routing: "Addresses",
+    routingHint: "Where each language lives. Other languages always have a prefix.",
+    routingOptions: {
+      prefixExceptDefault: "The default language at the root, others under their prefix",
+      prefixAll: "Every language under its prefix",
+    },
+    fallback: "Missing translations",
+    fallbackHint: "What readers get at an address the language has no version for.",
+    fallbackOptions: {
+      none: "Not found",
+      defaultWithNotice: "The original, with a notice, kept out of search engines",
+    },
+    review: "Review before publishing",
+    reviewHint: "Machine translations of these go live only after a person reviews them.",
+    reviewOptions: { pages: "Pages", posts: "Articles" },
+    label: "Machine-translation notice",
+    labelHint: "When readers see that a page was translated automatically.",
+    labelOptions: {
+      unreviewed: "Until a person reviews the translation",
+      always: "Always, also after a review",
+    },
+    saved: "Languages saved",
+    failed: "Couldn't save the languages",
+  },
+  glossary: {
+    title: "Glossary",
+    description:
+      "Terms agents keep when they translate: names that are never translated, and the approved word in each language.",
+    empty: "No terms yet",
+    emptyDescription: "Add brand and product names, and words with a fixed translation.",
+    oneLanguage:
+      "Add a second language first: the glossary holds words for the site's other languages.",
+    term: "Term",
+    neverTranslate: "Never translate",
+    translationIn: "In {language}",
+    add: "Add term",
+    remove: "Remove {term}",
+    saved: "Glossary saved",
+    failed: "Couldn't save the glossary",
+  },
   // RFC-0033 §8: a page's or article's language versions and a person's review.
   translations: {
     title: "Translations",

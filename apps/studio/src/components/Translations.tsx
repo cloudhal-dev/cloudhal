@@ -5,13 +5,13 @@
  * through MCP (`save_translation`); only people review, here.
  */
 import type { ContentEntry, Page } from "@cloudhal/core-contracts";
-import { displayNames } from "@cloudhal/messages/format";
 import { Badge, Button, Link, SectionCard, SectionEmpty, Text } from "@cloudhal/ui";
 import { Translate } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { api, type TranslationRow } from "../lib/api.ts";
+import { languageName } from "../lib/languages.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Status } from "./Status.tsx";
 
@@ -54,7 +54,7 @@ export function TranslationsCard({
       await qc.invalidateQueries({ queryKey: ["translations", siteId] });
     },
   });
-  const name = (l: string) => displayNames([locale], { type: "language" }).of(l) ?? l;
+  const name = (l: string) => languageName(locale, l);
   const rows = group.data?.items ?? [];
   const canReview = node.translation?.method === "machine" && !node.translation.review;
   return (
