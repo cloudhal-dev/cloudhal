@@ -132,7 +132,8 @@ describe("locales", () => {
   it("picks the browser's language: exact tag, then the same language, then English", () => {
     expect(matchLocale(["tr-TR", "en"])).toBe("tr");
     expect(matchLocale(["de-AT"])).toBe("de");
-    expect(matchLocale(["fr-FR", "de"])).toBe("de");
+    expect(matchLocale(["fr-FR", "de"])).toBe("fr");
+    expect(matchLocale(["pt-PT"])).toBe("pt-BR");
     expect(matchLocale(["ar-EG"])).toBe("ar");
     expect(matchLocale(["sv", "x-invalid-tag-!!"])).toBe("en");
   });

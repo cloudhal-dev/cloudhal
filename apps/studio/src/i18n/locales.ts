@@ -39,6 +39,22 @@ export const LOCALE_REGISTRY = {
   tr: { name: "Türkçe", dir: "ltr", fallback: ["en"], reviewed: true },
   // AI translation, awaiting review.
   de: { name: "Deutsch", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  es: { name: "Español", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  fr: { name: "Français", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  it: { name: "Italiano", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  "pt-BR": { name: "Português (Brasil)", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  nl: { name: "Nederlands", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  pl: { name: "Polski", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  ru: { name: "Русский", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review.
+  uk: { name: "Українська", dir: "ltr", fallback: ["en"], reviewed: false },
   // AI translation, awaiting review. The first right-to-left language (ADR-0033).
   ar: { name: "العربية", dir: "rtl", fallback: ["en"], reviewed: false, intl: "ar-u-nu-latn" },
 } as const satisfies Record<string, LocaleInfo>;
