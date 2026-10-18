@@ -76,6 +76,7 @@ All new fields are optional (AGENTS.md rule 3). `schemaVersion` stays `[1]`.
   "properties": {
     "group": { "$ref": "#/$defs/Id", "description": "The group's id: the original node's id. Shared by every translation; may cross sites in one project." },
     "method": { "$ref": "#/$defs/TranslationMethod" },
+    "layout": { "type": "string", "description": "linked: the original's structural changes propagate as drafts (§4a); independent: nothing propagates. Absent means linked.", "enum": ["linked", "independent"] },
     "source": {
       "type": "object",
       "description": "The node and revision this translation was made from. Absent on the original.",
@@ -186,6 +187,28 @@ A new root type **`glossary.schema.json`** holds one per site. Its entries are `
 - **Fallback with notice** (opt-in). The default-language page is served at the requested locale's URL with a notice and `noindex`, and is not listed in `hreflang` or the sitemap (Starlight's model).
 - **Caching.** The locale is in the URL or host, so each locale has its own cache key and there is no `Vary: Accept-Language`. Publish purges the cache tags of every group member whose `hreflang` set changed.
 
+### 4a. Landing pages, themes and generated pages across languages
+
+A landing page in three languages is **three page nodes in one group**: the original and two translations. Each has its own path, status and review. People and agents do not build it three times.
+
+- **The layout is linked by default.** Sections keep the same `id` in every translation, because `translate` copies the original's sections and surface tree and changes only text.
+  - Translated: text props, `alt`, SEO, link labels.
+  - Shared: images, icons, bindings, styles, motion.
+  - A translation stores `translation.layout`, which is `"linked"` (default) or `"independent"`. *(Add to `Translation` in §2 as an optional enum.)*
+- **Linked layout propagates structure, never text.** When the original changes structurally, the store computes the JSON Patch between `source.rev` and now with RFC-0020's `patchPage`. Structural changes are an added, removed or reordered section, a changed image, style or binding, or a new surface node.
+  - The patch is applied to each linked translation as a **draft**.
+  - New text arrives in the source language, marked `untranslated` in the check list, and `translate` fills only those strings.
+  - Text already translated or edited by a person is never touched (invariant: a person's edit wins).
+  - Webflow's model is "inherit until overridden" for layout. This gets the same result with no field-level storage.
+- **Independent layout is for pages that diverge by market or edition:** a different hero, other sections, a local offer. Nothing propagates. The page stays in the group for `hreflang` and the switcher, and the staleness signal still tells editors the original changed.
+- **The theme's own words never live in pages.** "Read more", "Search", dates, "min read" and the machine-translation notice come from the theme's `STRINGS` per locale (`starters/blog/src/theme.ts`).
+  - A theme ships at least English. It declares its locales in the manifest (RFC-0018).
+  - For a site locale the theme lacks, the agent drafts the missing strings into a site-level override map (a `strings` map in `Site.theme.config`), reviewed like any translation.
+  - `theme:check` fails a theme whose templates contain hard-coded words. This is the same rule Studio follows (AGENTS.md rule 10).
+- **Data blocks follow the page's locale automatically.** A "latest articles" list, archives, tags and menus read with the page's locale, so a Spanish landing page lists Spanish articles. Missing items fall back only if the site's `fallback` allows it.
+- **Theme presets and the generator (RFC-0017/0018/0020)** write pages in the site's default locale. Then, for every other locale, `translate` creates linked translations in the same build turn. A build in four languages is therefore one plan, one set of sections and four reviewable drafts. Asking the Build chat to build "the Spanish version" edits the Spanish node only: its layout becomes `independent` after the user confirms.
+- **Direction and type are per locale, not per page.** `dir`, logical CSS (ADR-0033) and per-script font stacks in the theme's tokens make one layout serve LTR and RTL. A theme that cannot render RTL declares it, and Studio warns before an RTL locale is added.
+
 ### 5. Search
 
 - Search rows already carry `locale`; queries keep filtering by it, and hrefs gain the prefix.
@@ -275,7 +298,7 @@ Each phase is its own PR or PRs, run sequentially. Tests run one package at a ti
 | Phase | Scope | Done when |
 |---|---|---|
 | A. Contracts and store | `Translation`, `Site.localization`, term slug per locale, redirect locale, glossary root; `pnpm gen`; store checks (invariants 1–6); group queries; stale computation; fixtures | the conformance suites pass on sqlite and D1 |
-| B. Renderer and SEO | routing, switcher, `lang`/`dir`, `hreflang`, canonical, JSON-LD, per-locale sitemap/RSS/`llms.txt`/markdown, notice component, fallback | `design:shots` passes in two locales, one RTL; an `hreflang` validator test passes |
+| B. Renderer and SEO | routing, switcher, linked-layout propagation (§4a), theme `STRINGS` overrides, `lang`/`dir`, `hreflang`, canonical, JSON-LD, per-locale sitemap/RSS/`llms.txt`/markdown, notice component, fallback | `design:shots` passes in two locales, one RTL; an `hreflang` validator test passes |
 | C. Search | locale hrefs, trigram table for CJK and Thai, provider locale | search tests pass for `ja` and `ar` |
 | D. Agent pipeline | MCP tools, checks, score, policy scope, locale-limited keys, approvals, staleness inbox | the build eval runs an "add Spanish" turn; news cannot auto-publish |
 | E. Studio | Translations card, Languages screen, coverage view, review | the e2e flow passes: translate → review → publish → edit source → stale |
@@ -292,6 +315,7 @@ Each phase is its own PR or PRs, run sequentially. Tests run one package at a ti
 | Proxy or overlay translation at the edge (Weglot) | instant | shallow, no editorial control, no provenance, SEO fragile | contradicts reviewable, snapshotted changes |
 | Auto-publish machine translations | fast | Google scaled-content risk, AI Act disclosure, scholarly norms | allowed only for collections outside `review.required`, always labelled |
 | Locale by cookie or `Accept-Language` | clean URLs | invisible to crawlers, cache fragmentation, Google advises against | path or host only |
+| One page, text per locale inside each section (overlay; Webflow, Framer) | layout edited once | one status for all languages; markets cannot diverge; large rows; agents patch one big node | linked layout (§4a) gives the same "edit once" with per-locale nodes |
 | Theme per locale | per-market look | doubles theme work; direction and words already come from the locale | per-site themes cover editions that need a different look |
 
 ## Compatibility & migration
