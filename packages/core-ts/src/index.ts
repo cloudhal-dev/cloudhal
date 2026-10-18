@@ -53,8 +53,11 @@ export {
   matchRedirect,
   normalisePath,
   type RedirectMatch,
+  redirectKey,
+  redirectLocale,
   splitTarget,
 } from "./redirects.ts";
+export { termSlug } from "./term-locales.ts";
 export type {
   PublishReleaseInput,
   PublishReleaseResult,

@@ -180,7 +180,7 @@ const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
 const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
 ---
 <!doctype html>
-<html lang={meta.lang} {...look.attributes} data-ch-announcement={announce?.dismissible ? announce.id : undefined}>
+<html lang={meta.lang} dir={meta.dir ?? "ltr"} {...look.attributes} data-ch-announcement={announce?.dismissible ? announce.id : undefined}>
   <head>
     {/* is:inline keeps it a classic script where it is: it must run before the body paints. */}
     {needsPrefs && <script is:inline src={PREFS_SCRIPT.path}></script>}

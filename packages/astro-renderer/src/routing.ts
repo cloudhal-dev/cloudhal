@@ -37,26 +37,27 @@ export function entryPath(entry: Pick<ContentEntry, "collection" | "slug">): str
 
 export type Resolved = { kind: "page"; page: Page } | { kind: "entry"; entry: ContentEntry };
 
-/** The page or entry at `path` (leading slash, no trailing slash except "/"), if any. */
+/** The page or entry at `path` (leading slash, no trailing slash except "/") in `locale`, if any. */
 export async function resolvePath(
   source: GraphSource,
   path: string,
+  locale?: string,
 ): Promise<Resolved | undefined> {
-  const page = await source.pageByPath(path);
+  const page = await source.pageByPath(path, locale);
   if (page) return { kind: "page", page };
   const m = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
   if (!m) return undefined;
-  const entry = await source.entryBySlug(m[1] as string, m[2] as string);
+  const entry = await source.entryBySlug(m[1] as string, m[2] as string, locale);
   return entry ? { kind: "entry", entry } : undefined;
 }
 
-/** Every page and entry path of the default locale (archives and redirects: `staticPaths`). */
-export async function routablePaths(source: GraphSource): Promise<string[]> {
+/** Every page and entry path of a locale (default: the site's), as graph paths without prefix. */
+export async function routablePaths(source: GraphSource, locale?: string): Promise<string[]> {
   const pages = await source.pages();
-  const site = await source.site();
-  const pagePaths = pages.filter((p) => p.locale === site.defaultLocale).map((p) => p.path);
+  const loc = locale ?? (await source.site()).defaultLocale;
+  const pagePaths = pages.filter((p) => p.locale === loc).map((p) => p.path);
   const taken = new Set(pagePaths);
-  const entryPaths = (await source.allEntries()).map(entryPath).filter((p) => !taken.has(p));
+  const entryPaths = (await source.allEntries(loc)).map(entryPath).filter((p) => !taken.has(p));
   return [...pagePaths, ...entryPaths];
 }
 
@@ -114,6 +115,8 @@ export interface RouteOptions {
   readonly perPage?: number;
   /** The request's query string (`?a=b`), kept on redirects. */
   readonly search?: string;
+  /** The locale the request is for (RFC-0033; `localeRequest`). Default: the site's. */
+  readonly locale?: string;
 }
 
 /**
@@ -143,11 +146,13 @@ export async function resolveRoute(
   options: RouteOptions = {},
 ): Promise<RouteResult> {
   const path = normalisePath(requestPath);
-  const resolved = await resolvePath(source, path);
+  const site = await source.site();
+  const locale = options.locale ?? site.defaultLocale;
+  const resolved = await resolvePath(source, path, locale);
   if (resolved) return resolved;
   if (path === SEARCH_PATH && source.search) {
     const { query, page } = searchRequest(options.search ?? "");
-    const search = await source.search(query, { page });
+    const search = await source.search(query, { page, locale });
     if (page > 1 && page > search.pages) return { kind: "not-found" };
     return { kind: "search", search };
   }
@@ -155,11 +160,11 @@ export async function resolveRoute(
   const taxonomies = await source.taxonomies();
   const request = parseArchivePath(taxonomies, path);
   if (request) {
-    const locale = (await source.site()).defaultLocale;
     const vocabulary = await source.vocabulary();
     const term = termForSlug(
       vocabulary.filter((t) => t.taxonomyId === request.taxonomy.id),
       request.slug,
+      { locale, defaultLocale: site.defaultLocale },
     );
     const listed =
       term && isPublicTerm(term)
@@ -206,7 +211,7 @@ export async function resolveRoute(
       }
     }
   }
-  const redirect = await source.redirectFor(path);
+  const redirect = await source.redirectFor(path, locale);
   if (redirect)
     return {
       kind: "redirect",
@@ -249,14 +254,17 @@ export interface StaticPaths {
  */
 export async function staticPaths(
   source: GraphSource,
-  options: { perPage?: number } = {},
+  options: { perPage?: number; locale?: string } = {},
 ): Promise<StaticPaths> {
   const perPage = options.perPage ?? DEFAULT_ARCHIVE_PAGE_SIZE;
+  const site = await source.site();
+  const locale = options.locale ?? site.defaultLocale;
+  const tagged = locale === site.defaultLocale ? undefined : locale;
   const [base, index, entries, redirects] = await Promise.all([
-    routablePaths(source),
+    routablePaths(source, locale),
     loadTaxonomyIndex(source),
-    source.allEntries(),
-    source.redirects(),
+    source.allEntries(locale),
+    source.redirects().then((all) => all.filter((r) => r.locale === tagged)),
   ]);
   // The entries the source shows (a live dev source includes drafts), as `resolveRoute` counts them.
   const archives = archiveSummaries(index, entries);

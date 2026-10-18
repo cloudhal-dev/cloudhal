@@ -28,6 +28,10 @@ export interface HeadMeta {
   jsonLd: object[];
   /** `<link rel="alternate">` feeds. */
   feeds: Array<{ title: string; href: string }>;
+  /** `<html dir>` (RFC-0033); absent means `ltr`. */
+  dir?: "ltr" | "rtl";
+  /** `<link rel="alternate" hreflang>`: every language version, itself and `x-default` included. */
+  alternates?: Array<{ locale: string; href: string }>;
 }
 
 /** The public origin: the site's primary domain when it has one, else where the request came in. */

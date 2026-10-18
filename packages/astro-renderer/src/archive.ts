@@ -14,6 +14,7 @@
  * | `…/page/n` past the last page                                 | 404                            |
  */
 import type { ContentEntry, Taxonomy, Term } from "@cloudhal/core-contracts";
+import { termSlug } from "@cloudhal/core-ts";
 import {
   archiveFeedPath,
   archiveMembers,
@@ -77,10 +78,19 @@ export function parseArchivePath(
  * recently retired one. Old slugs (`slugHistory`) are not matched here: they answer through their
  * redirects.
  */
-export function termForSlug(terms: readonly Term[], slug: string): Term | undefined {
+/**
+ * The term an archive slug names; with `locale` (RFC-0033), the slug that locale shows
+ * (`labels[locale].slug`, else the term's own).
+ */
+export function termForSlug(
+  terms: readonly Term[],
+  slug: string,
+  locale?: { readonly locale: string; readonly defaultLocale: string },
+): Term | undefined {
+  const of = (t: Term) => (locale ? termSlug(t, locale.locale, locale.defaultLocale) : t.slug);
   return (
-    terms.find((t) => t.slug === slug && t.status !== "retired") ??
-    terms.filter((t) => t.slug === slug).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    terms.find((t) => of(t) === slug && t.status !== "retired") ??
+    terms.filter((t) => of(t) === slug).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
   );
 }
 

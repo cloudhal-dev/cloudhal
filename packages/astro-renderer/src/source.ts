@@ -11,7 +11,13 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SearchKind, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import { matchRedirect, searchDocuments, searchRows, termName } from "@cloudhal/core-ts";
+import {
+  matchRedirect,
+  redirectLocale,
+  searchDocuments,
+  searchRows,
+  termName,
+} from "@cloudhal/core-ts";
 import {
   gateInstants,
   hasGates,
@@ -69,8 +75,8 @@ export interface GraphSource {
     slug: string,
     options?: { locale?: string; limit?: number; descendants?: boolean },
   ): Promise<ContentEntry[]>;
-  /** The redirect for a request path: exact first, then the longest prefix redirect. */
-  redirectFor(path: string): Promise<RedirectMatch | undefined>;
+  /** The redirect for a request path in a locale (default: the site's): exact, then longest prefix. */
+  redirectFor(path: string, locale?: string): Promise<RedirectMatch | undefined>;
   /** Every redirect of the site (static builds write them out; see `redirectsFile`). */
   redirects(): Promise<Redirect[]>;
   /** The menu stored under `key`, if the site has one (raw node, RFC-0003). */
@@ -308,8 +314,8 @@ export class LiveSource implements GraphSource {
     return this.entriesByFilter(termFilter(key, slug, options.descendants === true), options);
   }
 
-  redirectFor(path: string): Promise<RedirectMatch | undefined> {
-    return this.#store.redirectFor(this.#siteId, path);
+  redirectFor(path: string, locale?: string): Promise<RedirectMatch | undefined> {
+    return this.#store.redirectFor(this.#siteId, path, locale);
   }
 
   redirects(): Promise<Redirect[]> {
@@ -734,8 +740,9 @@ export class SnapshotSource implements GraphSource {
     return this.entriesByFilter(termFilter(key, slug, options.descendants === true), options);
   }
 
-  async redirectFor(path: string): Promise<RedirectMatch | undefined> {
-    return matchRedirect((await this.#current()).redirects, path);
+  async redirectFor(path: string, locale?: string): Promise<RedirectMatch | undefined> {
+    const { site, redirects } = await this.#current();
+    return matchRedirect(redirects, path, locale && redirectLocale(locale, site.defaultLocale));
   }
 
   async redirects(): Promise<Redirect[]> {
