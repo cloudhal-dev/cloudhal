@@ -5,32 +5,20 @@
  * notice. Saved on the Site (PUT, CAS on `rev`); the site follows after a publish.
  */
 import type { Site } from "@cloudhal/core-contracts";
-import {
-  Badge,
-  Banner,
-  Button,
-  Checkbox,
-  Input,
-  Select,
-  SkeletonLine,
-  Table,
-  Text,
-} from "@cloudhal/ui";
-import { Plus, WarningCircle, X } from "@phosphor-icons/react";
+import { Badge, Banner, Button, Checkbox, Select, SkeletonLine, Table, Text } from "@cloudhal/ui";
+import { WarningCircle, X } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { languageName } from "../lib/languages.ts";
+import { LanguagePicker } from "./LanguagePicker.tsx";
 import { SettingRow, SettingsSection } from "./Settings.tsx";
 import { useToast } from "./Toast.ts";
 import { useGate } from "./useMe.ts";
 
 export const LANGUAGE_SETTINGS_SECTION = "languages";
-
-/** The contract's locale pattern (`common.schema.json#/$defs/Locale`). */
-const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
 
 type Localization = NonNullable<Site["localization"]>;
 interface Form {
@@ -157,15 +145,6 @@ function LocalesEditor({
   disabled,
 }: EditorProps & { def: string; name: (locale: string) => string }) {
   const { t } = useI18n();
-  const [adding, setAdding] = useState("");
-  const tag = adding.trim();
-  const addError = !tag
-    ? undefined
-    : !LOCALE.test(tag)
-      ? t("languages.invalid")
-      : form.locales.includes(tag)
-        ? t("languages.exists")
-        : undefined;
   return (
     <>
       <Table>
@@ -206,29 +185,11 @@ function LocalesEditor({
           ))}
         </Table.Body>
       </Table>
-      <div className="flex flex-wrap items-start gap-2">
-        <Input
-          label={t("languages.add")}
-          description={t("languages.addHint")}
-          placeholder={t("languages.addPlaceholder")}
-          value={adding}
-          onValueChange={setAdding}
-          error={addError}
-          disabled={disabled}
-          className="font-mono"
-        />
-        <Button
-          icon={<Plus />}
-          className="mt-6"
-          disabled={!tag || addError !== undefined || disabled}
-          onClick={() => {
-            set({ locales: [...form.locales, tag] });
-            setAdding("");
-          }}
-        >
-          {t("languages.addButton")}
-        </Button>
-      </div>
+      <LanguagePicker
+        taken={form.locales}
+        disabled={disabled}
+        onPick={(tag) => set({ locales: [...form.locales, tag] })}
+      />
     </>
   );
 }

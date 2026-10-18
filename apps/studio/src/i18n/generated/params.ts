@@ -325,6 +325,7 @@ export interface MessageParams {
   "invites.reveal.sent": { email: string | number };
   "invites.reveal.warning": { role: string | number };
   "languages.remove": { language: string | number };
+  "languages.useTag": { tag: string | number };
   "media.badges.agentHint": { name: string | number };
   "media.danger.inUse": { count: string | number };
   "media.detail.altHintLocale": { locale: string | number };
