@@ -165,7 +165,9 @@ export type InvariantCode =
   /** Invariant 2: the group already has a node in that locale. */
   | "translation_exists"
   /** Invariant 5: a machine translation in a review-required collection was published unreviewed. */
-  | "review_required";
+  | "review_required"
+  /** RFC-0034 invariant 1: the hostname already serves another site of the installation. */
+  | "host_taken";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

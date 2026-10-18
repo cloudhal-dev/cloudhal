@@ -38,6 +38,8 @@
  * - `GET  /api/admin/sites/:siteId/media-placeholders?all=1` → images without a placeholder, and
  *   `PUT …/media-placeholders/:assetId` ← {rev, lqip?, color?}: `cloudhal media placeholders
  *   --remote` draws them in a local Chrome (RFC-0028 §5)
+ * - `GET|POST /api/admin/sites`, `DELETE /api/admin/sites/:siteId` ← {confirm}: the installation's
+ *   sites (RFC-0034 §2–3, `cloudhal site list|create|delete`), see `admin/sites.ts`
  * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
  *   pins would point into a replaced graph) unless `?cancelSchedules=1` cancels them first
  *   (`cloudhal push --cancel-schedules`).
@@ -55,6 +57,7 @@ import { ownerAdminRoutes } from "./admin/owner.ts";
 import { schedulesAdminRoutes } from "./admin/schedules.ts";
 import { timingSafeEqual } from "./admin/shared.ts";
 import { siteOpsAdminRoutes } from "./admin/site-ops.ts";
+import { sitesAdminRoutes } from "./admin/sites.ts";
 import { syncAdminRoutes } from "./admin/sync.ts";
 
 export { ROLLUP_MAX_SITE_DAYS_PER_CALL } from "./admin/analytics.ts";
@@ -82,6 +85,7 @@ export function adminRoutes(
       .route("/", commentsAdminRoutes())
       .route("/", schedulesAdminRoutes(deps))
       .route("/", aiAdminRoutes(deps))
+      .route("/", sitesAdminRoutes(deps))
       .route("/", siteOpsAdminRoutes())
       .route("/", syncAdminRoutes(deps))
   );

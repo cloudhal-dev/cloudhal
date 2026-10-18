@@ -33,6 +33,7 @@ export * from "./errors.ts";
 export * from "./filter.ts";
 export * from "./hash.ts";
 export type { NodeHold } from "./holds.ts";
+export * from "./hosts.ts";
 export * from "./ids.ts";
 export {
   importMediaUrls,
@@ -66,6 +67,7 @@ export * from "./search.ts";
 export * from "./search-ai.ts";
 export * from "./search-provider.ts";
 export * from "./seed.ts";
+export * from "./site-delete.ts";
 export * from "./site-search.ts";
 export * from "./store.ts";
 export * from "./sync.ts";

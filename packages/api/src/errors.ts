@@ -55,6 +55,7 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   invalid_translation: 400,
   translation_exists: 409,
   review_required: 422,
+  host_taken: 409,
   // RFC-0008 (time gates)
   invalid_availability: 400,
   gates_unsupported: 409,

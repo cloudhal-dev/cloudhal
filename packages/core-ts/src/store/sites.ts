@@ -4,6 +4,7 @@ import type { SqlStatement } from "@cloudhal/storage";
 import { checkTimeZone, isTimeZone } from "../availability.ts";
 import { ConflictError, InvariantError } from "../errors.ts";
 import { nodeHash } from "../hash.ts";
+import { checkHosts, hostStatements, hostsOf } from "../hosts.ts";
 import { ID_PREFIX } from "../ids.ts";
 import { fillMissingSrc } from "../media/refs.ts";
 import { casUpdateStatement, insertNodeStatement } from "../node-sql.ts";
@@ -33,10 +34,14 @@ export class SiteEngine {
     assertValid("site", site);
     checkTimeZone(site.timeZone);
     checkThemeConfig(this.#ctx.graph.themeSettings, site.theme.config, undefined);
+    // RFC-0034 §4: a hostname belongs to one site of the installation.
+    const hosts = hostsOf(site);
+    await checkHosts(this.#ctx.sql, hosts);
     await this.#ctx.runUnique(
       await insertNodeStatement("site", site, ts),
       "site",
       uniquenessKey("site", site),
+      hostStatements(hosts, { siteId: site.id, hash: await nodeHash(site) }),
     );
     return site;
   }
@@ -78,11 +83,16 @@ export class SiteEngine {
       checkTimeZone(next.timeZone, (await this.#ctx.graph.getSite(site.id))?.timeZone);
     // RFC-0025: the brand's logos are uses of their assets (checked, made canonical, indexed).
     const stored = await this.#ctx.graph.getSite(site.id);
+    // RFC-0034 §4: rewritten only when the hostnames change.
+    const hosts = hostsOf(next);
+    const hostsChanged = !stored || JSON.stringify(hostsOf(stored)) !== JSON.stringify(hosts);
+    if (hostsChanged) await checkHosts(this.#ctx.sql, hosts);
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
     const s = await casUpdateStatement("site", written, site.rev, refs.guard);
     const hash = await nodeHash(written);
     const more = [
+      ...(hostsChanged ? hostStatements(hosts, { siteId: site.id, hash }) : []),
       ...(extra?.({ siteId: site.id, hash }, written.updatedAt) ?? []),
       ...refs.statements(hash),
     ];
