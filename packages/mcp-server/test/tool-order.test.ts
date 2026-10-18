@@ -21,6 +21,7 @@ const ORDER = [
   "add_correction",
   "delete_entry",
   "list_translations",
+  "list_stale_translations",
   "get_translation_source",
   "save_translation",
   "search_site",

@@ -220,6 +220,68 @@ export const themeSettings: PropsSchema = {
         tr: "İnce, ferah ve editoryal sitelere uyar; kalın ve dolu, küçük boyutta ve kalabalık sayfalarda daha iyi okunur.",
       },
     },
+    // RFC-0033 §4a: the theme's own words in a language it does not ship, or worded otherwise.
+    strings: {
+      type: "array",
+      maxItems: 50,
+      title: { en: "Theme words", tr: "Tema metinleri" },
+      description: {
+        en: "The theme's own words (notices, buttons, labels) in a language, over the theme's: one item per language. Agents can draft them; people review.",
+        tr: "Temanın kendi metinleri (bildirimler, düğmeler, etiketler), bir dilde, temanınkilerin yerine: her dil için bir öğe. Agent'lar taslak hazırlayabilir; kişiler gözden geçirir.",
+      },
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["locale"],
+        properties: {
+          locale: { type: "string", maxLength: 35, title: { en: "Language", tr: "Dil" } },
+          machineTranslated: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Machine translation notice", tr: "Makine çevirisi notu" },
+          },
+          machineReviewed: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Reviewed translation notice", tr: "İncelenmiş çeviri notu" },
+          },
+          readOriginal: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Read the original", tr: "Orijinalini oku" },
+          },
+          notTranslated: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Not translated notice", tr: "Çevrilmemiş sayfa notu" },
+          },
+          languages: { type: "string", maxLength: 300, title: { en: "Languages", tr: "Diller" } },
+          home: { type: "string", maxLength: 300, title: { en: "Home", tr: "Ana sayfa" } },
+          menu: { type: "string", maxLength: 300, title: { en: "Menu", tr: "Menü" } },
+          search: { type: "string", maxLength: 300, title: { en: "Search", tr: "Ara" } },
+          searchLabel: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Search label", tr: "Arama etiketi" },
+          },
+          searchPlaceholder: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Search placeholder", tr: "Arama ipucu" },
+          },
+          related: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Related posts", tr: "İlgili yazılar" },
+          },
+          skipToContent: {
+            type: "string",
+            maxLength: 300,
+            title: { en: "Skip to content", tr: "İçeriğe geç" },
+          },
+        },
+      },
+    },
   },
   // WCAG 2.2 AA: body text 4.5:1, links 4.5:1, buttons and other UI parts 3:1 against the page.
   "x-contrast": [

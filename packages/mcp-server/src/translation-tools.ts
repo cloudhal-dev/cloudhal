@@ -7,7 +7,12 @@
  * wrote or reviewed is never overwritten here.
  */
 import type { ContentEntry, Glossary, Page, Section, Translation } from "@cloudhal/core-contracts";
-import { checkNames, checkTranslation, type TranslationGroup } from "@cloudhal/core-ts";
+import {
+  checkNames,
+  checkTranslation,
+  linkedLayout,
+  type TranslationGroup,
+} from "@cloudhal/core-ts";
 import {
   autoSnapshot,
   id,
@@ -86,7 +91,7 @@ const getSourceTool: ToolDefinition = {
   name: "get_translation_source",
   title: "Get translation source",
   description:
-    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since). Then call save_translation.",
+    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
   inputSchema: obj({ siteId: id, nodeId: id, locale: str("Target BCP 47 locale") }, [
     "siteId",
     "nodeId",
@@ -98,6 +103,11 @@ const getSourceTool: ToolDefinition = {
       glossary: { type: "array", items: { type: "object" } },
       existing: { type: "object" },
       stale: { type: "boolean" },
+      layout: {
+        type: "object",
+        description:
+          "A linked page translation rebuilt on the source's current layout: translate the sections named in `untranslated` and save these sections",
+      },
     },
     ["source", "glossary"],
   ),
@@ -113,6 +123,14 @@ const getSourceTool: ToolDefinition = {
     const member = group.members.find((m) => m.locale === locale && m.siteId === site.id);
     const existing = member ? await nodeOf(ctx, site.id, member.id) : undefined;
     const text = JSON.stringify("sections" in source ? source.sections : source.body.value);
+    // RFC-0033 §4a: a linked page translation follows the source's layout; nothing is written.
+    const layout =
+      existing &&
+      "sections" in existing &&
+      "sections" in source &&
+      existing.translation?.layout !== "independent"
+        ? linkedLayout(source, existing)
+        : undefined;
     return {
       source,
       glossary: glossaryFor(
@@ -121,6 +139,7 @@ const getSourceTool: ToolDefinition = {
         locale,
       ),
       ...(existing ? { existing, stale: member?.stale === true } : {}),
+      ...(layout?.changed ? { layout } : {}),
     };
   },
 };
@@ -293,7 +312,36 @@ async function writeTranslation(
   );
 }
 
-/** list_translations, get_translation_source, save_translation. */
+const listStaleTool: ToolDefinition = {
+  name: "list_stale_translations",
+  title: "List stale translations",
+  description:
+    "Translations whose source changed since they were made (or whose source is gone), optionally in one locale: the work queue for keeping languages in step. Re-translate each with get_translation_source and save_translation.",
+  inputSchema: obj({ siteId: id, locale: str("Only this locale") }, ["siteId"]),
+  outputSchema: obj({ stale: { type: "array", items: { type: "object" } } }, ["stale"]),
+  annotations: READ,
+  scopes: ["content:read"],
+  handler: async (a, ctx) => {
+    const site = await requireSite(ctx, a.siteId as string);
+    const nodes: Localized[] = [
+      ...(await ctx.store.listPages(site.id)),
+      ...(await ctx.store.listContentEntries(site.id)),
+    ];
+    const groups = [...new Set(nodes.flatMap((n) => (n.translation ? [n.translation.group] : [])))];
+    const stale = [];
+    for (const g of groups)
+      for (const m of (await ctx.store.translationGroup(site, g)).members)
+        if (
+          (m.stale || m.sourceMissing) &&
+          m.siteId === site.id &&
+          (!a.locale || m.locale === a.locale)
+        )
+          stale.push({ ...m, group: g });
+    return { stale };
+  },
+};
+
+/** list_translations, list_stale_translations, get_translation_source, save_translation. */
 export function translationTools(): ToolDefinition[] {
-  return [listTranslationsTool, getSourceTool, saveTranslationTool];
+  return [listTranslationsTool, listStaleTool, getSourceTool, saveTranslationTool];
 }

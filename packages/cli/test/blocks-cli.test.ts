@@ -63,6 +63,7 @@ describe("theme block types", () => {
       "motion",
       "pageTransition",
       "iconWeight",
+      "strings",
     ]);
     const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-settings-"));
     try {
