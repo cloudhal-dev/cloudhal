@@ -51,7 +51,6 @@ import {
   LOCALE_LIST,
   LOCALE_REGISTRY,
   type Locale,
-  matchLocale,
 } from "./locales.ts";
 import {
   isNamespace,
@@ -130,13 +129,16 @@ export function localeLoaded(locale: Locale): boolean {
 }
 const STORAGE_KEY = "cloudhal.studio.locale";
 
+/**
+ * The person's own choice (the language menu), else English: Studio's global default is always
+ * English, whatever the browser prefers.
+ */
 function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && isLocale(stored)) return stored;
   } catch {}
-  if (typeof navigator === "undefined") return "en";
-  return matchLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
+  return "en";
 }
 
 /**

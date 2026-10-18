@@ -228,6 +228,37 @@ describe("i18n", () => {
     );
     expect(screen.getByText("Kaydet")).toBeInTheDocument();
   });
+  it("opens in English whatever the browser prefers, and keeps a person's own choice", () => {
+    const languages = Object.getOwnPropertyDescriptor(window.navigator, "languages");
+    Object.defineProperty(window.navigator, "languages", {
+      value: ["tr-TR", "tr"],
+      configurable: true,
+    });
+    try {
+      localStorage.removeItem("cloudhal.studio.locale");
+      function Probe() {
+        return <span>{useT()("common.save")}</span>;
+      }
+      render(
+        <I18nProvider>
+          <Probe />
+        </I18nProvider>,
+      );
+      expect(screen.getByText("Save")).toBeInTheDocument();
+      cleanup();
+      localStorage.setItem("cloudhal.studio.locale", "tr");
+      render(
+        <I18nProvider>
+          <Probe />
+        </I18nProvider>,
+      );
+      expect(screen.getByText("Kaydet")).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem("cloudhal.studio.locale");
+      if (languages) Object.defineProperty(window.navigator, "languages", languages);
+      else delete (window.navigator as { languages?: unknown }).languages;
+    }
+  });
   it("sets the page's language and direction from the registry", () => {
     render(
       <I18nProvider initialLocale="de">
