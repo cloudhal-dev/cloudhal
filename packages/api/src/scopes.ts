@@ -47,6 +47,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/media/:sha256", "deploy-token"],
   ["POST", "/api/admin/owner", "deploy-token"],
+  // RFC-0034 §2–3: `cloudhal site list|create|delete`
+  ["GET", "/api/admin/sites", "deploy-token"],
+  ["POST", "/api/admin/sites", "deploy-token"],
+  ["DELETE", "/api/admin/sites/:siteId", "deploy-token"],
   // RFC-0008 §13: `cloudhal schedules status|list|run-due --remote` and the deploy's downgrade guard.
   ["GET", "/api/admin/schedules/status", "deploy-token"],
   ["POST", "/api/admin/schedules/run-due", "deploy-token"],

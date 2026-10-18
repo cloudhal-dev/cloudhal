@@ -38,6 +38,12 @@ Every Cloudhal site is a whole installation today: a site Worker, an admin Worke
    - hosted-Cloud custom hostnames;
    - project-level roles.
 
+## Addendum (2026-10-19)
+Roles are deployment-wide today (RFC-0005). Per-site roles (decision 1) arrive in phase A2, before Studio can create sites:
+- a `site_members` table;
+- owners and administrators stay installation-wide;
+- other roles with site rows are limited to those sites.
+
 ## Alternatives considered
 - One installation per site (status quo).
 - One D1 per site under one Studio.

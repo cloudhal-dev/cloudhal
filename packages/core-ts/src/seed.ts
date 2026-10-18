@@ -6,10 +6,14 @@ export interface SeedOptions {
   readonly slug: string;
   readonly locale?: string;
   readonly owner?: Actor;
+  /** RFC-0034 §3: add the site to this project of the installation instead of a new project. */
+  readonly projectId?: string;
+  /** The theme the site is designed for (default `blog`). */
+  readonly theme?: string;
 }
 
 /**
- * Creates a project, a site, a home page with a hero + content list, an about page, the default
+ * Creates a project (or joins `projectId`), a site, a home page with a hero + content list, an about page, the default
  * taxonomies (`category` required, `tag`; RFC-0002 §1) with a "News" category and a "Cloudhal" tag,
  * an empty `author` taxonomy (RFC-0019 §1),
  * and a first post filed under both. Returns the site (after the page append).
@@ -17,12 +21,16 @@ export interface SeedOptions {
 export async function seedStarterSite(store: SiteGraphStore, options: SeedOptions): Promise<Site> {
   const locale = options.locale ?? "en";
   const owner = options.owner ?? { kind: "system" as const, id: "sys_cloudhalinit" };
-  const project = await store.createProject({
-    name: options.name,
-    slug: options.slug,
-    ownerId: owner.id,
-    siteIds: [],
-  });
+  const existing = options.projectId ? await store.getProject(options.projectId) : undefined;
+  if (options.projectId && !existing) throw new Error(`unknown project ${options.projectId}`);
+  const project =
+    existing ??
+    (await store.createProject({
+      name: options.name,
+      slug: options.slug,
+      ownerId: owner.id,
+      siteIds: [],
+    }));
   let site = await store.createSite({
     projectId: project.id,
     name: options.name,
@@ -31,9 +39,9 @@ export async function seedStarterSite(store: SiteGraphStore, options: SeedOption
     locales: [locale],
     domains: [],
     pageIds: [],
-    theme: { name: "blog" },
+    theme: { name: options.theme ?? "blog" },
   });
-  await store.updateProject({ ...project, siteIds: [site.id] });
+  await store.updateProject({ ...project, siteIds: [...project.siteIds, site.id] });
   ({ site } = await store.createPage(site, {
     siteId: site.id,
     path: "/",

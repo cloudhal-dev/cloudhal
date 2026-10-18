@@ -9,12 +9,13 @@
  * `mode: "replace"` is given. Snapshots are immutable and only ever added.
  */
 
-import { type Asset, assertValid } from "@cloudhal/core-contracts";
+import { type Asset, assertValid, type Site } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { mediaBlobKey, refsRebuild } from "./assets.ts";
 import { checkAvailability, checkTimeZone, type GateSupport, isTimeZone } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
+import { checkHosts, hostStatements, hostsOf } from "./hosts.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
 
@@ -370,6 +371,10 @@ export async function importSite(
   await assertGates(siteId, bundle, options.gates);
   await assertTimeZone(to, siteId, bundle);
   await assertMedia(to, bundle);
+  // RFC-0034 §4: the site's hostnames must be free in the target installation.
+  const siteRow = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId) as NodeRow;
+  const hosts = hostsOf(JSON.parse(siteRow.body) as Site);
+  await checkHosts(to.sql, hosts);
 
   // 1. Blobs: verify content addressing so a bundle cannot plant mismatched bodies.
   let blobs = 0;
@@ -448,6 +453,7 @@ export async function importSite(
   await runBatches(to.sql, snapInserts);
   // The derived reference index follows the node set in the same batch (RFC-0004 §4.4).
   statements.push(...refsRebuild(siteId, bundle.nodes));
+  statements.push(...hostStatements(hosts, { siteId, hash: siteRow.hash }));
   if (statements.length > 0) {
     if (statements.length > 1000)
       throw new Error(

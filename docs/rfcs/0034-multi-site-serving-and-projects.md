@@ -9,6 +9,8 @@
   - RFC-0005: per-site roles and the deployment Owner; RFC-0006 / RFC-0007: same-origin host checks.
   - ADR-0012: site Worker entry and workerd prelude.
 
+> **Correction (2026-10-19, phase A).** Roles are deployment-wide today (RFC-0005 kept them so; its open question 10 recommends a `site_members (site_id, user_id, role)` table). The per-site role isolation in §2 does not exist yet. It becomes phase **A2**: per-site roles before Studio's "New site" (phase D). Until then, a member's role applies to every site of the installation, and phase A's site management is operator-only (deployment token, `cloudhal site`).
+
 ## Summary
 One self-hosted Cloudhal installation (one Studio, one D1, one R2 in one Cloudflare account) manages any number of sites. Each site is isolated: its own content, settings, members, keys, analytics and comments, exportable and deletable on its own. Sites are created from Studio or the CLI, starting empty or copied from another site as a language edition. They are served by one or more site Workers that pick the site from the hostname, so `en.example.com` and `tr.example.com` can be two independent sites run by the same team from one login. A site Worker carries one theme, so sites with different themes get different site Workers in the same installation. One-site installations keep working unchanged.
 
@@ -157,6 +159,7 @@ What one installation can hold, from Cloudflare's published limits (Workers and 
 - **CLI:** `sites` and `installation` are additive. An existing `cloudhal.json` with `siteId` produces exactly today's config, and tests pin it.
 - **Rollout, in order, one PR each:**
   - A: the tables, plus site create, export and delete in the API and CLI;
+  - A2: per-site roles (`site_members`; owner and administrator stay installation-wide; an editor, author or contributor with site rows is limited to those sites), enforced in `routeGuard` and the MCP policy, with a two-site isolation test in the shared API suite;
   - B: Worker resolution and per-site caches, tested on workerd with two sites and two hosts;
   - C: CLI `sites`, `installation`, routes, `domains sync`, and the `site_workers` purge;
   - D: Studio "New site", grouped switcher, project overview;
