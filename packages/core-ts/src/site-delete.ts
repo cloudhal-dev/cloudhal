@@ -15,6 +15,7 @@ import { canonicalJson } from "./hash.ts";
 /** Tables keyed by `site_id`, in deletion order. `nodes` comes last on purpose. */
 export const SITE_TABLES = [
   "site_hosts",
+  "site_members",
   "search_links",
   "search_index",
   "search_index_cjk",

@@ -258,6 +258,8 @@ export interface Principal {
    * principals are not role-bound.
    */
   person?: PersonRef | undefined;
+  /** Agents only: the key's own scopes before narrowing, so `forSite` can narrow them per site. */
+  keyScopes?: readonly string[] | undefined;
 }
 
 /** A staff member as the policy layer sees them. */
@@ -268,6 +270,11 @@ export interface PersonRef {
   userId: string;
   role: Role;
   name?: string | undefined;
+  /**
+   * RFC-0034 A2: the sites an Editor, Author or Contributor is limited to, each with its role.
+   * Absent: the role applies to every site. `forSite` applies it.
+   */
+  sites?: Readonly<Record<string, Role>> | undefined;
 }
 
 /** The mode that actually applies: `bypass` only counts locally, remote keys fall back to `edits`. */

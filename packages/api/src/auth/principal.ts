@@ -57,7 +57,8 @@ export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
         id: agentIdForKey(verified.key.id),
         name: verified.key.name ?? "API key",
       };
-      const scopes = narrow(storedScopes(verified.key), roleScopes(creator.role));
+      const keyScopes = storedScopes(verified.key);
+      const scopes = narrow(keyScopes, roleScopes(creator.role));
       // The mode is worked out on every call, so an elevation ends on time by itself (ADR-0016),
       // and never above the creator's cap (I6).
       const cap = modeCap(creator.role);
@@ -70,6 +71,8 @@ export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
         mode: elevation?.mode ?? base,
         ...(elevation ? { elevation: { from: base, until: elevation.until } } : {}),
         keyId: verified.key.id,
+        // RFC-0034 A2: narrowed again per site when the creator is limited to sites.
+        keyScopes,
         ...(automationOf(verified.key) ? { automationId: automationOf(verified.key) } : {}),
         person: personRef(creator),
       };

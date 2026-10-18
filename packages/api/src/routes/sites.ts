@@ -1,3 +1,4 @@
+import { visibleSites } from "@cloudhal/agent-runtime";
 import type { Site } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -5,7 +6,15 @@ import { badRequest, notFound } from "../errors.ts";
 import { param } from "../params.ts";
 
 export const sites: Hono<Env> = new Hono<Env>()
-  .get("/", async (c) => c.json(await c.get("store").listSites()))
+  // RFC-0034 A2: a person limited to sites sees only theirs.
+  .get("/", async (c) => {
+    const all = await c.get("store").listSites();
+    const ids = visibleSites(
+      c.get("principal"),
+      all.map((s) => s.id),
+    );
+    return c.json(all.filter((s) => ids.includes(s.id)));
+  })
   .get("/:siteId", async (c) => {
     const site = await c.get("store").getSite(param(c, "siteId"));
     if (!site) throw notFound("site not found");

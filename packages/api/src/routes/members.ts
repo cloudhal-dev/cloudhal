@@ -35,6 +35,7 @@ import { apiError, badRequest, notFound, unauthorized } from "../errors.ts";
 import { param } from "../params.ts";
 import type { MemberRow } from "../staff.ts";
 import { hashToken, newToken, RESET_TOKEN_PREFIX, studioOrigin } from "../tokens.ts";
+import { memberSiteRoutes, visibleMembers } from "./member-sites.ts";
 
 export interface MemberView {
   userId: string;
@@ -45,6 +46,8 @@ export interface MemberView {
   joinedAt: string;
   /** Administrators and the Owner only (`members:manage`). */
   email?: string;
+  /** RFC-0034 A2: the sites this member is limited to (absent: every site). */
+  sites?: MemberRow["sites"];
 }
 
 /** Who decides when the server does (removal denies pending requests). */
@@ -65,6 +68,7 @@ export function memberView(m: MemberRow, withEmail: boolean): MemberView {
     role: m.role,
     joinedAt: m.joinedAt,
     ...(withEmail ? { email: m.email } : {}),
+    ...(m.sites ? { sites: m.sites } : {}),
   };
 }
 
@@ -120,10 +124,13 @@ export function memberRoutes(options: {
   trustedOrigins: ReadonlySet<string>;
 }): Hono<Env> {
   return new Hono<Env>()
+    .route("/", memberSiteRoutes())
     .get("/", async (c) => {
-      const { staff } = me(c);
+      const { person, staff } = me(c);
       const withEmail = holds(c.get("principal")?.scopes ?? [], "members:manage");
-      const items = (await staff.store.list()).map((m) => memberView(m, withEmail));
+      const items = visibleMembers(person, await staff.store.list()).map((m) =>
+        memberView(m, withEmail),
+      );
       return c.json({ items });
     })
     .post("/transfer-ownership", async (c) => {

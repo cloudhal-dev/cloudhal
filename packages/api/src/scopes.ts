@@ -13,7 +13,7 @@
  *
  * Agents (API keys) are refused everywhere except `public`/`signed-in`: they work through MCP.
  */
-import { holds, type Scope } from "@cloudhal/agent-runtime";
+import { forInstallation, forSite, holds, type Scope } from "@cloudhal/agent-runtime";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "./context.ts";
 import { apiError, missingScope, unauthorized } from "./errors.ts";
@@ -23,6 +23,8 @@ export type RouteRequirement = "public" | "deploy-token" | "signed-in" | "member
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
 
 const S = "/api/sites/:siteId";
+/** The site a `/api/sites/<id>/…` path is about. */
+const SITE_PATH = /^\/api\/sites\/([^/]+)/;
 const T = `${S}/terms/:termId`;
 const M = `${S}/menus`;
 const A = `${S}/assets`;
@@ -95,6 +97,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", "/api/members/:userId", "members:manage"],
   ["POST", "/api/members/transfer-ownership", "owner"],
   ["POST", "/api/members/:userId/password-reset", "members:manage"],
+  // RFC-0034 A2: per-site roles
+  ["PUT", "/api/members/:userId/sites", "members:manage"],
   ["GET", "/api/invites", "members:invite"],
   ["POST", "/api/invites", "members:invite"],
   ["DELETE", "/api/invites/:id", "members:invite"],
@@ -366,19 +370,25 @@ export function routeGuard(options: { requireAuth: boolean; membership: boolean 
         403,
       );
     if (!options.membership) return next();
-    const person = principal.person;
-    if (!person)
+    if (!principal.person)
       throw apiError(
         403,
         "not_a_member",
         "Your access was removed. Ask an administrator for a new invite.",
       );
+    // RFC-0034 A2: a person limited to sites acts with that site's role under /api/sites/:siteId,
+    // and without the installation-wide scopes everywhere else. A site they are not on is unknown.
+    const siteId = SITE_PATH.exec(path)?.[1];
+    const scoped = siteId ? forSite(principal, siteId) : forInstallation(principal);
+    if (!scoped) throw apiError(404, "not_found", "not found: site");
+    if (scoped !== principal) c.set("principal", scoped);
+    const person = scoped.person as NonNullable<typeof scoped.person>;
     if (req === "member") return next();
     if (req === "owner") {
       if (person.role !== "owner") throw apiError(403, "owner_only", "only the Owner can do this");
       return next();
     }
-    if (!holds(principal.scopes, req)) throw missingScope(req);
+    if (!holds(scoped.scopes, req)) throw missingScope(req);
     return next();
   });
 }

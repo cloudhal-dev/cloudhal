@@ -1,7 +1,5 @@
 import {
-  abilities,
   defaultScopes,
-  invitableRoles,
   type OwnershipResolver,
   PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
@@ -36,6 +34,7 @@ import {
   schedulesFeature,
 } from "./routes/instance.ts";
 import { inviteRoutes } from "./routes/invites.ts";
+import { meHandler } from "./routes/me.ts";
 import { memberRoutes } from "./routes/members.ts";
 import { menus } from "./routes/menus.ts";
 import { migrations } from "./routes/migrations.ts";
@@ -223,37 +222,7 @@ export function createApi(deps: ApiDeps) {
     );
   }
 
-  /**
-   * Who is calling and what they may do (RFC-0005 §10.1): `role` (null without a membership),
-   * `scopes`, the `can` ability map for UI gating (cosmetic, I16) and the roles they may invite.
-   * Agents see their actor and their effective scopes.
-   */
-  app.get("/api/me", (c) => {
-    const principal = c.get("principal");
-    if (!principal) throw unauthorized();
-    const membership = Boolean(deps.staff);
-    const role = principal.person?.role ?? null;
-    const person = principal.actor.kind !== "agent";
-    return c.json({
-      actor: principal.actor,
-      role,
-      member: !membership || role !== null,
-      scopes: principal.scopes,
-      ...(person
-        ? {
-            can: abilities(membership ? (role ?? "contributor") : undefined, principal.scopes),
-            invitableRoles: membership
-              ? role
-                ? invitableRoles(role)
-                : []
-              : invitableRoles("owner"),
-            ...(principal.person ? { userId: principal.person.userId } : {}),
-          }
-        : principal.person
-          ? { person: { id: principal.person.id, role: principal.person.role } }
-          : {}),
-    });
-  });
+  app.get("/api/me", meHandler(Boolean(deps.staff)));
 
   if (deps.mcp) {
     const mcp = createCloudhalMcpHandler({

@@ -7,7 +7,13 @@
  * Approvals are bound to the tool, the canonical arguments and the state of what the call acts on
  * (`Binding`); a state that cannot be computed is `null` and fails closed.
  */
-import type { LoadedSkill, PolicyEngine, Principal } from "@cloudhal/agent-runtime";
+import {
+  forInstallation,
+  forSite,
+  type LoadedSkill,
+  type PolicyEngine,
+  type Principal,
+} from "@cloudhal/agent-runtime";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { canonicalJson, sha256Hex } from "@cloudhal/core-ts";
 import type {
@@ -219,7 +225,11 @@ export async function handleToolCall(
   const declared = declaredPrincipal(rt, ctx);
   if ("content" in declared) return declared;
   const siteId = typeof args.siteId === "string" ? args.siteId : undefined;
-  const scope = await runScope(rt, def, declared, siteId);
+  // RFC-0034 A2: a person limited to sites (and their keys) acts with that site's role; another
+  // site does not exist for them.
+  const sited = siteId ? forSite(declared, siteId) : forInstallation(declared);
+  if (!sited) return errorResult(`not_found: site ${siteId}`);
+  const scope = await runScope(rt, def, sited, siteId);
   if ("content" in scope) return scope;
   const { principal, run } = scope;
   const argsHash = await sha256Hex(canonicalJson(args));
