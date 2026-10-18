@@ -20,7 +20,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { listOf, type MessageKey, useT } from "../i18n/index.tsx";
+import { directionOf, listOf, type MessageKey, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import {
   isWellKnown,
@@ -48,6 +48,23 @@ export function useMenuTitle() {
   const name = useMenuName();
   return (key: string) =>
     isWellKnown(key) ? t("menus.placeWithKey", { place: name(key), key }) : key;
+}
+
+/**
+ * The menu tree's keyboard help. `MenuTree` swaps Left and Right in right-to-left languages
+ * (ADR-0033), so the help names the keys as they work there.
+ */
+export function useMenuKeyHelp() {
+  const { t, locale } = useI18n("menus");
+  const rtl = directionOf(locale) === "rtl";
+  return {
+    /** The items card's description: how to move items, or what a read-only list is. */
+    description: (editable: boolean, max: number) =>
+      editable
+        ? t(rtl ? "menus.items.descriptionRtl" : "menus.items.description", { max })
+        : t("menus.items.descriptionReadOnly"),
+    instructions: t(rtl ? "menus.tree.instructionsRtl" : "menus.tree.instructions"),
+  };
 }
 
 const CHIP_ICON = {

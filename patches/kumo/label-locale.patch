@@ -1,0 +1,99 @@
+diff --git a/dist/chunks/label-gzyfw17u08irhdo8.js b/dist/chunks/label-gzyfw17u08irhdo8.js
+index 69fc0cf..f1cbcc7 100644
+--- a/dist/chunks/label-gzyfw17u08irhdo8.js
++++ b/dist/chunks/label-gzyfw17u08irhdo8.js
+@@ -4,6 +4,7 @@ import { t as Tooltip } from "./tooltip-o4natsv01lpq8oq2.js";
+ import { t as Button } from "./button-pa1bq9b85hawg41a.js";
+ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+ import { Info } from "@phosphor-icons/react";
++import { n as useKumoLocale } from "./locale-provider-kjlnws7jln3ak0dr.js";
+ //#region src/components/label/label.tsx
+ /** Label variant definitions (currently empty, reserved for future additions). */
+ const KUMO_LABEL_VARIANTS = {};
+@@ -40,11 +41,12 @@ function labelContentVariants() {
+ * </Label>
+ */
+ function Label({ children, showOptional = false, tooltip, className, htmlFor, asContent = false }) {
++	const { label: words } = useKumoLocale();
+ 	const content = /* @__PURE__ */ jsxs(Fragment, { children: [
+ 		children,
+ 		showOptional && /* @__PURE__ */ jsx("span", {
+ 			className: "font-normal text-kumo-subtle",
+-			children: "(optional)"
++			children: words.optional
+ 		}),
+ 		tooltip && /* @__PURE__ */ jsx(Tooltip, {
+ 			content: tooltip,
+@@ -52,7 +54,7 @@ function Label({ children, showOptional = false, tooltip, className, htmlFor, as
+ 				variant: "ghost",
+ 				size: "xs",
+ 				shape: "square",
+-				"aria-label": "More information",
++				"aria-label": words.moreInformation,
+ 				children: /* @__PURE__ */ jsx(Info, { className: "size-4" })
+ 			})
+ 		})
+diff --git a/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js b/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
+index 797f8b4..45a9223 100644
+--- a/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
++++ b/dist/chunks/locale-provider-kjlnws7jln3ak0dr.js
+@@ -2,20 +2,32 @@
+ import { createContext, useContext, useMemo } from "react";
+ import { jsx } from "react/jsx-runtime";
+ //#region src/utils/locale-provider.tsx
+-const defaultTranslations = { layerDialog: {
+-	close: "Close",
+-	cancel: "Cancel"
+-} };
++const defaultTranslations = {
++	layerDialog: {
++		close: "Close",
++		cancel: "Cancel"
++	},
++	label: {
++		optional: "(optional)",
++		moreInformation: "More information"
++	}
++};
+ const KumoLocaleContext = createContext(defaultTranslations);
+ /**
+ * Supplies translations for Kumo-owned UI copy. Explicit component props take
+ * precedence over these defaults.
+ */
+ function KumoLocaleProvider({ children, translations }) {
+-	const value = useMemo(() => ({ layerDialog: {
+-		...defaultTranslations.layerDialog,
+-		...translations?.layerDialog
+-	} }), [translations]);
++	const value = useMemo(() => ({
++		layerDialog: {
++			...defaultTranslations.layerDialog,
++			...translations?.layerDialog
++		},
++		label: {
++			...defaultTranslations.label,
++			...translations?.label
++		}
++	}), [translations]);
+ 	return /* @__PURE__ */ jsx(KumoLocaleContext.Provider, {
+ 		value,
+ 		children
+diff --git a/dist/locale-provider-BLGya10h.d.ts b/dist/locale-provider-BLGya10h.d.ts
+index 73e03ce..e3e5c41 100644
+--- a/dist/locale-provider-BLGya10h.d.ts
++++ b/dist/locale-provider-BLGya10h.d.ts
+@@ -9,6 +9,14 @@ interface KumoTranslations {
+     close: string;
+     cancel: string;
+   };
++  /**
++   * Cloudhal patch (patches/kumo/label-locale.patch): `Label`'s optional-field suffix and its
++   * tooltip button's accessible name, also used by `Field`, `Checkbox` and `Select`.
++   */
++  label: {
++    optional: string;
++    moreInformation: string;
++  };
+ }
+ type KumoTranslationsPartial = { [Key in keyof KumoTranslations]?: Partial<KumoTranslations[Key]>; };
+ interface KumoLocaleProviderProps {

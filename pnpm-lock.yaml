@@ -355,7 +355,7 @@ catalogs:
       version: 4.6.5
 
 patchedDependencies:
-  '@cloudflare/kumo@2.14.0': c96023d01d0032739622ce6af70c0ea7e58b4237c8f7bf8111f99cb50035d4b3
+  '@cloudflare/kumo@2.14.0': 198f9be784beeb608a5d59b175d6085d7b4f0291567d57b089a85da1fef5f9d7
 
 importers:
 
@@ -1014,7 +1014,7 @@ importers:
     dependencies:
       '@cloudflare/kumo':
         specifier: 'catalog:'
-        version: 2.14.0(patch_hash=c96023d01d0032739622ce6af70c0ea7e58b4237c8f7bf8111f99cb50035d4b3)(@date-fns/tz@1.5.0)(@phosphor-icons/react@2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(echarts@6.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
+        version: 2.14.0(patch_hash=198f9be784beeb608a5d59b175d6085d7b4f0291567d57b089a85da1fef5f9d7)(@date-fns/tz@1.5.0)(@phosphor-icons/react@2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(echarts@6.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
       '@cloudhal/core-contracts':
         specifier: workspace:*
         version: link:../core-contracts
@@ -5260,7 +5260,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@cloudflare/kumo@2.14.0(patch_hash=c96023d01d0032739622ce6af70c0ea7e58b4237c8f7bf8111f99cb50035d4b3)(@date-fns/tz@1.5.0)(@phosphor-icons/react@2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(echarts@6.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)':
+  '@cloudflare/kumo@2.14.0(patch_hash=198f9be784beeb608a5d59b175d6085d7b4f0291567d57b089a85da1fef5f9d7)(@date-fns/tz@1.5.0)(@phosphor-icons/react@2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(echarts@6.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)':
     dependencies:
       '@base-ui/react': 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@phosphor-icons/react': 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
