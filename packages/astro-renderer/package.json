@@ -47,7 +47,9 @@
     "./chrome": "./src/chrome-client.ts",
     "./prefs": "./src/prefs-client.ts",
     "./carousel": "./src/carousel-client.ts",
-    "./search-client": "./src/search-client.ts"
+    "./search-client": "./src/search-client.ts",
+    "./locales": "./src/locales.ts",
+    "./locale-middleware": "./src/locale-middleware.ts"
   },
   "files": [
     "dist",
@@ -236,6 +238,14 @@
       "./search-client": {
         "types": "./dist/src/search-client.d.ts",
         "default": "./dist/src/search-client.js"
+      },
+      "./locales": {
+        "types": "./dist/src/locales.d.ts",
+        "default": "./dist/src/locales.js"
+      },
+      "./locale-middleware": {
+        "types": "./dist/src/locale-middleware.d.ts",
+        "default": "./dist/src/locale-middleware.js"
       }
     }
   }

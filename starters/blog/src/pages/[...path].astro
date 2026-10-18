@@ -12,6 +12,13 @@ import { Comments, Sections } from "@cloudhal/astro-renderer/components";
 import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import {
+  alternatesFor,
+  linkLocalizer,
+  localeRequest,
+  localizedPath,
+  localizeHead,
+} from "@cloudhal/astro-renderer/locales";
+import {
   loadAssetIndex,
   type MediaContext,
   placeholderBudget,
@@ -76,10 +83,21 @@ import {
 
 export async function getStaticPaths() {
   const source = await getSource(config);
+  const site = await source.site();
   const { pages } = await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE });
   // RFC-0025 §2: the phone menu's page, unless the site has a page there.
   if (!pages.includes("/menu")) pages.push("/menu");
-  return pages.map((path) => ({
+  // RFC-0033: every other locale on this host under its prefix (archives follow in a later step).
+  const domains = site.localization?.domains ?? {};
+  const urls = pages.map((p) => localizedPath(site, site.defaultLocale, p));
+  for (const locale of site.locales)
+    if (locale !== site.defaultLocale && domains[locale] === undefined)
+      for (const p of [
+        ...(await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE, locale })).pages,
+        "/menu",
+      ])
+        urls.push(localizedPath(site, locale, p));
+  return [...new Set(urls)].map((path) => ({
     params: { path: path === "/" ? undefined : path.slice(1) },
   }));
 }
@@ -87,13 +105,30 @@ export async function getStaticPaths() {
 const source = await getSource(config, Astro);
 if (!source) return new Response("This site has not been published yet.", { status: 503 });
 const site = await source.site();
-const path = Astro.params.path ? `/${Astro.params.path}` : "/";
+const requested = Astro.params.path ? `/${Astro.params.path}` : "/";
+// RFC-0033 §4: the locale is in the path prefix or the host; a non-canonical locale URL moves.
+const lr = localeRequest(site, Astro.url.host, requested);
+if (lr.redirect !== undefined)
+  return new Response(null, {
+    status: 301,
+    headers: { location: `${lr.redirect}${Astro.url.search}` },
+  });
+const locale = lr.locale;
+const path = lr.path;
 const route = await resolveRoute(source, path, {
   perPage: ARCHIVE_PAGE_SIZE,
   search: Astro.url.search,
+  locale,
 });
 if (route.kind === "redirect")
-  return new Response(null, { status: route.status, headers: { location: route.location } });
+  return new Response(null, {
+    status: route.status,
+    headers: {
+      location: route.location.startsWith("/")
+        ? localizedPath(site, locale, route.location)
+        : route.location,
+    },
+  });
 if (route.kind === "gone") return new Response(null, { status: 410 });
 // RFC-0025 §2: `/menu` is the phone menu as a page (the menu link's target without JavaScript),
 // unless the site has a page there.
@@ -108,7 +143,9 @@ if (route.kind === "search") {
   Astro.response.headers.set("x-robots-tag", "noindex");
 }
 const origin = siteOrigin(site, Astro.url);
-const locale = site.defaultLocale;
+// Internal links of a localized page stay in its locale (`src/middleware.ts`).
+const links = await linkLocalizer(source, locale, origin);
+if (links) (Astro.locals as { cloudhalLinks?: (p: string) => string }).cloudhalLinks = links;
 // Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
 // `?comments=<n>` past the last page is a 404.
 const comments =
@@ -134,7 +171,7 @@ const primary = await source.navigation("primary", locale, { collectionIndex });
 const footerMenu = await source.navigation("footer", locale, { collectionIndex });
 const derivedCategories = !primary && NAV_CATEGORIES;
 const needsEntries = derivedCategories || (route.kind === "entry" && RELATED_POSTS > 0);
-const all = needsEntries ? await source.allEntries() : [];
+const all = needsEntries ? await source.allEntries(locale) : [];
 const categories = derivedCategories
   ? archiveSummaries(
       index,
@@ -193,13 +230,13 @@ if (route.kind === "page") {
     ),
   ];
   entries = Object.fromEntries(
-    await Promise.all(collections.map(async (c) => [c, await source.entries(c)])),
+    await Promise.all(collections.map(async (c) => [c, await source.entries(c, locale)])),
   );
   // A section with a `filter` (RFC-0002 §5) lists its own entries, keyed by section id.
   for (const s of route.page.sections)
     if (s.kind === "contentList" && s.filter)
       entries[s.id] = await source
-        .entriesByFilter(`collection:${s.collection}+${s.filter}`)
+        .entriesByFilter(`collection:${s.collection}+${s.filter}`, { locale })
         .catch((err: unknown) => {
           console.warn(`cloudhal: section ${s.id} has an invalid filter: ${String(err)}`);
           return [];
@@ -252,7 +289,7 @@ const gated = route.kind === "page" ? route.page : route.kind === "entry" ? rout
 const gate = gated ? gateNotice(gated, site, locale, Date.now()) : undefined;
 const notice = gate && { state: gate.state, at: gate.at, text: t[gate.state](gate.when) };
 
-const meta =
+const head =
   route.kind === "page"
     ? pageHead(site, route.page, origin, media)
     : route.kind === "entry"
@@ -266,6 +303,12 @@ const meta =
               title: `${t.menu} · ${site.name}`,
               canonical: `${origin}/menu`,
             };
+// RFC-0033 §4: self-canonical in the locale, `lang`/`dir`, and the `hreflang` set from the group.
+const meta = localizeHead(head, site, {
+  locale,
+  origin,
+  alternates: gated ? await alternatesFor(source, gated, origin) : [],
+});
 const searchForm = searchAvailable(config, source)
   ? {
       label: t.searchLabel,

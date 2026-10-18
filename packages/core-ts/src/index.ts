@@ -53,6 +53,8 @@ export {
   matchRedirect,
   normalisePath,
   type RedirectMatch,
+  redirectKey,
+  redirectLocale,
   splitTarget,
 } from "./redirects.ts";
 export type {
@@ -85,3 +87,4 @@ export {
   type TermUsage,
 } from "./taxonomy.ts";
 export * from "./taxonomy-report.ts";
+export { termSlug } from "./term-locales.ts";
