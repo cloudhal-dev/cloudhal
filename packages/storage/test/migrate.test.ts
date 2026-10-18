@@ -40,6 +40,7 @@ describe("migrate", () => {
       "0020_ai",
       "0021_search",
       "0022_search_kinds",
+      "0023_search_usage",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -65,6 +66,7 @@ describe("migrate", () => {
       "0020_ai",
       "0021_search",
       "0022_search_kinds",
+      "0023_search_usage",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -121,6 +123,7 @@ describe("migrate", () => {
       "search_index_idx",
       "search_links",
       "search_state",
+      "search_usage",
       "session",
       "snapshot_blobs",
       "snapshots",
@@ -157,6 +160,7 @@ describe("migrate", () => {
       "0020_ai",
       "0021_search",
       "0022_search_kinds",
+      "0023_search_usage",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -181,6 +185,7 @@ describe("migrate", () => {
       "0020_ai",
       "0021_search",
       "0022_search_kinds",
+      "0023_search_usage",
     ]);
     await h.dispose();
   });
@@ -212,6 +217,7 @@ describe("migrate", () => {
       "0020_ai",
       "0021_search",
       "0022_search_kinds",
+      "0023_search_usage",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

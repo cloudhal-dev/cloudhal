@@ -28,6 +28,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { type SearchDeployment, searchBinding, searchBuckets, searchVars } from "./search.ts";
+
 export const COMPATIBILITY_DATE = "2026-10-01";
 
 /**
@@ -124,6 +126,8 @@ export interface DeploymentNames {
   readonly databaseName?: string;
   readonly databaseId?: string;
   readonly bucketName?: string;
+  /** RFC-0029 §3: the AI Search instance and bucket both Workers bind; absent = FTS5 alone. */
+  readonly search?: SearchDeployment;
 }
 
 export function workerNames(n: DeploymentNames) {
@@ -132,6 +136,7 @@ export function workerNames(n: DeploymentNames) {
     admin: `${n.name}-admin`,
     database: n.databaseName ?? `${n.name}-db`,
     bucket: n.bucketName ?? `${n.name}-blobs`,
+    ...(n.search ? { searchBucket: n.search.bucket } : {}),
   };
 }
 
@@ -145,7 +150,7 @@ const storageBindings = (n: DeploymentNames) => {
         ...(n.databaseId ? { database_id: n.databaseId } : {}),
       },
     ],
-    r2_buckets: [{ binding: "BLOBS", bucket_name: names.bucket }],
+    r2_buckets: [{ binding: "BLOBS", bucket_name: names.bucket }, ...searchBuckets(n.search)],
   };
 };
 
@@ -202,8 +207,10 @@ export function siteWorkerConfig(
     // Analytics (RFC-0006 §4): one write binding; the dataset is created on its first write.
     ...(a ? { analytics_engine_datasets: [{ binding: "ANALYTICS", dataset: a.dataset }] } : {}),
     ...(ratelimits.length > 0 ? { ratelimits } : {}),
+    ...searchBinding(n.search),
     vars: {
       CLOUDHAL_SITE_ID: n.siteId,
+      ...searchVars(n.search),
       ...(a
         ? {
             CLOUDHAL_ANALYTICS: "on",
@@ -309,6 +316,8 @@ export function adminWorkerConfig(
     // §8.2: the statements and releases one tick may spend; §11.6: the deployment's kill switch.
     CLOUDHAL_TICK_BUDGET: s.plan,
     CLOUDHAL_AUTOMATIONS: s.automations ? "on" : "off",
+    // RFC-0029 §3: publishes mirror into the search bucket here.
+    ...searchVars(n.search),
     ...(n.mail
       ? {
           CLOUDHAL_MAIL_FROM: n.mail.from,
@@ -337,6 +346,7 @@ export function adminWorkerConfig(
     ...(n.ai ? { ai: { binding: "AI" } } : {}),
     // RFC-0021 §4: render_page opens previews in Browser Rendering (agents only, rate-limited).
     ...(n.browser ? { browser: { binding: "BROWSER" } } : {}),
+    ...searchBinding(n.search),
     vars,
     // The SQLite-backed clock is always declared (Workers Free allows SQLite classes only), so
     // switching between the cron trigger and the alarm never needs a migration (§8.3).

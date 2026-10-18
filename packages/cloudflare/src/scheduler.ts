@@ -27,7 +27,13 @@
 import { releaseApprovalCheck } from "@cloudhal/api";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
-import { type CachePurgePlan, SiteGraphStore, siteCacheTag } from "@cloudhal/core-ts";
+import {
+  type AiSearchEnv,
+  type CachePurgePlan,
+  SiteGraphStore,
+  searchProviderFromEnv,
+  siteCacheTag,
+} from "@cloudhal/core-ts";
 import {
   type BuiltinInputs,
   type NotFoundAnalytics,
@@ -60,7 +66,7 @@ import { flushCommentPurges, runCommentsHourly } from "./comments.ts";
 import { PURGE_MAX_REQUESTS, PURGE_TAGS_PER_REQUEST } from "./purge.ts";
 
 /** What the scheduler reads from the admin Worker's environment. */
-export interface SchedulerEnv {
+export interface SchedulerEnv extends AiSearchEnv {
   DB: D1Database;
   BLOBS: R2Bucket;
   SITE?: Fetcher;
@@ -399,6 +405,8 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
     builtinInputs: ({ counted }) => adminBuiltinInputs(env, o.analytics(counted, o.now)),
     // RFC-0008 §10.6: the approver may still approve it, an auto release's key still holds.
     checkApproval: releaseApprovalCheck({ sql, graph: new SiteGraphStore({ sql, blobs }) }),
+    // RFC-0029 §3: releases mirror into the AI Search bucket too.
+    graph: searchGraph(env, sql, o.log),
   });
 }
 
@@ -532,4 +540,12 @@ export function schedulerClockClass(
       }
     }
   };
+}
+
+/** The tick's store options: the deployment's search provider, when it has one (RFC-0029 §3). */
+function searchGraph(env: SchedulerEnv, sql: SqlDriver, log: (line: string) => void) {
+  const search = searchProviderFromEnv(env, sql, {
+    onError: (e) => log(`semantic search failed: ${e instanceof Error ? e.message : String(e)}`),
+  });
+  return search ? { search } : {};
 }

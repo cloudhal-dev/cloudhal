@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseSearchConfig, type SearchConfig } from "./config-search.ts";
 
 /**
  * `cloudhal.json` → `analytics` (RFC-0006 §8): deployment defaults for site analytics. Absent means
@@ -129,6 +130,8 @@ export interface ProjectConfig {
    * visitor (it makes several database round trips per request). Absent = default placement.
    */
   readonly placement?: "smart";
+  /** The search provider (RFC-0029 §3, `config-search.ts`); absent = FTS5 alone. */
+  readonly search?: SearchConfig;
 }
 
 export const CONFIG_FILE = "cloudhal.json";
@@ -145,6 +148,7 @@ const OWN_KEYS = new Set([
   "ai",
   "observability",
   "placement",
+  "search",
 ]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
@@ -276,6 +280,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   // RFC-0016: `{}` or `true` binds Workers AI; anything else leaves it off.
   const ai = cfg.ai === (true as unknown) || (cfg.ai && typeof cfg.ai === "object");
   const observability = parseObservabilityConfig(cfg.observability);
+  const search = parseSearchConfig(cfg.search);
   return {
     siteId: cfg.siteId,
     dataDir: cfg.dataDir ?? ".cloudhal",
@@ -295,6 +300,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
     ...(cfg.render === false ? { render: false as const } : {}),
     ...(observability ? { observability } : {}),
     ...(cfg.placement === "smart" ? { placement: "smart" as const } : {}),
+    ...(search ? { search } : {}),
   };
 }
 

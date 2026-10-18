@@ -373,10 +373,10 @@
       "params": 5
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
-      "lines": 273
+      "lines": 272
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker>fetch": {
-      "lines": 210
+      "lines": 209
     },
     "packages/comments/src/client/comments.browser.js::enhance": {
       "lines": 205

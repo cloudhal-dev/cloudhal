@@ -55,6 +55,14 @@ export async function ensureResources(
   if (bucket.code !== 0 && !/already exists|already own/i.test(bucket.stderr + bucket.stdout))
     throw new Error(`could not create R2 bucket ${names.bucket}:\n${bucket.stderr.slice(-2000)}`);
   await ensureBundleLifecycle(run, cwd, names.bucket, log);
+  // RFC-0029 §3: the bucket the AI Search instance reads (the instance itself is made by hand).
+  if (names.searchBucket) {
+    const search = await run(["r2", "bucket", "create", names.searchBucket], { cwd });
+    if (search.code !== 0 && !/already exists|already own/i.test(search.stderr + search.stdout))
+      throw new Error(
+        `could not create R2 bucket ${names.searchBucket}:\n${search.stderr.slice(-2000)}`,
+      );
+  }
   return { databaseId, ...(made ? { created: made } : {}) };
 }
 

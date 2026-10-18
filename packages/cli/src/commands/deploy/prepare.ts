@@ -2,6 +2,7 @@
  * The phases of `cloudhal deploy` before anything is uploaded: the project and its site, analytics
  * and comments, the Studio build, Cloudflare resources, the scheduler and plan, the site Worker.
  */
+
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { datasetName } from "@cloudhal/analytics/wae";
@@ -31,6 +32,7 @@ import {
   workerNames,
   writeWranglerConfig,
 } from "../../cloudflare/config.ts";
+import { searchDeploymentOf } from "../../cloudflare/search.ts";
 import {
   installedWranglerVersion,
   versionAtLeast,
@@ -83,7 +85,14 @@ export async function loadDeploy(options: DeployOptions): Promise<DeployContext>
   await local.close();
   if (!site) throw new Error(`site ${cfg.siteId} not found in the local store`);
   const previous = await readDeployState(options.projectDir, cfg.dataDir);
-  const base: DeploymentNames = { name: options.name ?? previous?.name ?? site.slug };
+  const name = options.name ?? previous?.name ?? site.slug;
+  // RFC-0029 §3: the search provider's instance and bucket, bound by both Workers.
+  const search = searchDeploymentOf(cfg.search, name);
+  const base: DeploymentNames = { name, ...(search ? { search } : {}) };
+  if (search)
+    log(
+      `search: Cloudflare AI Search instance ${search.instance} over R2 bucket ${search.bucket} (the instance must exist, read that bucket and declare the text metadata fields locale and kind); ${search.dailyLimit} semantic searches per site a day, then FTS5 alone`,
+    );
   const names = workerNames(base);
   // 0. analytics: decided before anything is generated; the wrangler version gates the configs
   const decided = await decideAnalytics(options, cfg, site.name, log);
