@@ -130,7 +130,9 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
       ).rejects.toThrow(UniqueConstraintError);
       // the failed batch must not have bumped the site
       expect((await store.getSite(site.id))?.rev).toBe(site.rev);
-      const { site: s2 } = await store.createPage(site, {
+      // RFC-0033 invariant 1: the locale is one of the site's.
+      const bilingual = await store.updateSite({ ...site, locales: ["en", "tr"] });
+      const { site: s2 } = await store.createPage(bilingual, {
         siteId: site.id,
         path: "/",
         title: "TR Home",

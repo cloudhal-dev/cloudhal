@@ -408,6 +408,12 @@ function invariantHint(e: InvariantError): string | undefined {
       return "paths under /media/<16 hex digits>/ belong to media files";
     case "retry":
       return "call the tool again in a few seconds";
+    case "locale_not_enabled":
+      return "use one of the site's locales (get_site), or ask a person to add the language";
+    case "translation_exists":
+      return "that language already has a version in the group; update it instead";
+    case "review_required":
+      return "save it as a draft; a person reviews machine translations of this collection before they publish";
     case "invalid_surface":
       return "fix the parts named by the JSON Pointers in details.issues; get_catalog lists every component, its props and the binding rules";
     default:

@@ -44,6 +44,7 @@
       "uniqueItems": true
     },
     "homePageId": { "$ref": "common.schema.json#/$defs/Id" },
+    "localization": { "$ref": "#/$defs/Localization" },
     "theme": { "$ref": "#/$defs/ThemeRef" },
     "design": { "$ref": "#/$defs/Design" },
     "brand": { "$ref": "#/$defs/Brand" },
@@ -356,6 +357,50 @@
           "maxLength": 253
         },
         "primary": { "type": "boolean" }
+      }
+    },
+    "Localization": {
+      "type": "object",
+      "description": "How the site serves its locales (RFC-0033 §2). Absent fields mean: prefix-except-default routing, no fallback, no required review, the machine-translation notice until reviewed.",
+      "additionalProperties": false,
+      "properties": {
+        "routing": {
+          "type": "string",
+          "description": "prefix-except-default: the default locale at the root, the others under /<locale>/. prefix-all: every locale prefixed, / is a language chooser (x-default).",
+          "enum": ["prefix-except-default", "prefix-all"]
+        },
+        "domains": {
+          "type": "object",
+          "description": "Optional hostname per locale; that locale is then served at the host's root.",
+          "propertyNames": { "$ref": "common.schema.json#/$defs/Locale" },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+            "maxLength": 253
+          }
+        },
+        "fallback": {
+          "type": "string",
+          "description": "none: a missing translation is not found. default-with-notice: the default locale's page is served with a notice and noindex.",
+          "enum": ["none", "default-with-notice"]
+        },
+        "review": {
+          "type": "object",
+          "description": "Collections whose machine translations need a person's review before they publish ('pages' stands for pages).",
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "uniqueItems": true
+            }
+          }
+        },
+        "label": {
+          "type": "string",
+          "description": "When readers see the machine-translation notice: unreviewed (until a person reviews) or always.",
+          "enum": ["unreviewed", "always"]
+        }
       }
     },
     "Design": {

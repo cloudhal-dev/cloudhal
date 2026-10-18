@@ -11,6 +11,7 @@ import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } fro
 import { uniquenessKey } from "../nodes.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import type { StoreContext } from "./context.ts";
+import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkBodyDirectives } from "./validation.ts";
 
@@ -54,6 +55,8 @@ export class EntryEngine {
       draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
     }
     assertValid("content-entry", canonicalTerms(draft));
+    checkLocalizedNode("contentEntry", site, draft);
+    await checkTranslationLinks(this.#ctx, { kind: "contentEntry", site, node: draft, stored });
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {

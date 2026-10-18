@@ -50,6 +50,11 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   invalid_surface: 422,
   // RFC-0019 (corrections)
   correction_locked: 422,
+  // RFC-0033 (multilingual publishing)
+  locale_not_enabled: 422,
+  invalid_translation: 400,
+  translation_exists: 409,
+  review_required: 422,
   // RFC-0008 (time gates)
   invalid_availability: 400,
   gates_unsupported: 409,

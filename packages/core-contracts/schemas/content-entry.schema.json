@@ -61,6 +61,7 @@
     "rev": { "$ref": "common.schema.json#/$defs/Revision" },
     "createdAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
     "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+    "translation": { "$ref": "common.schema.json#/$defs/Translation" },
     "metadata": { "$ref": "common.schema.json#/$defs/Metadata" },
     "corrections": {
       "type": "array",

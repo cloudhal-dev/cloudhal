@@ -98,6 +98,13 @@ export type SurfaceComponentId = string;
  */
 export type Revision = number;
 /**
+ * How a page's or entry's text came to be (RFC-0033). 'original' marks the source of a translation group; 'machine-reviewed' is machine output a person has reviewed.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "TranslationMethod".
+ */
+export type TranslationMethod = "original" | "human" | "machine" | "machine-reviewed";
+/**
  * How much a page may move (RFC-0024 §1); the reader's reduced-motion preference and pause control can only lower it.
  *
  * This interface was referenced by `Page`'s JSON-Schema
@@ -136,6 +143,7 @@ export interface Page {
   rev: Revision;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  translation?: Translation;
   metadata?: Metadata;
 }
 export interface HeroSection {
@@ -320,6 +328,59 @@ export interface Seo {
 export interface Availability {
   from?: Timestamp;
   until?: Timestamp;
+}
+/**
+ * Links a page or entry to the other language versions of the same work (RFC-0033 §2). Staleness is computed: the source's current hash differs from source.hash.
+ *
+ * This interface was referenced by `Page`'s JSON-Schema
+ * via the `definition` "Translation".
+ */
+export interface Translation {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  group: string;
+  method: TranslationMethod;
+  /**
+   * linked: the original's structural changes propagate to this translation as drafts (RFC-0033 §4a); independent: nothing propagates. Absent means linked.
+   */
+  layout?: "linked" | "independent";
+  /**
+   * The node and revision this translation was made from. Absent on the original.
+   */
+  source?: {
+    id: Id;
+    /**
+     * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+     */
+    siteId?: string;
+    locale: Locale;
+    rev: Revision;
+    /**
+     * Lower-case hex SHA-256 of the source node's canonical JSON at that revision.
+     */
+    hash: string;
+  };
+  /**
+   * The machine-translation record: engine, glossary revision, checks run, quality score. Required when method is machine or machine-reviewed.
+   */
+  provenance?: {
+    engine: string;
+    glossaryRev?: Revision;
+    score?: number;
+    /**
+     * @maxItems 50
+     */
+    checks?: string[];
+    at: Timestamp;
+  };
+  /**
+   * The person who reviewed this translation and when. Only humans set it.
+   */
+  review?: {
+    by: Actor;
+    at: Timestamp;
+  };
 }
 /**
  * Free-form string-to-string map for extensions. Keys should be namespaced (e.g. cloudhal.source).

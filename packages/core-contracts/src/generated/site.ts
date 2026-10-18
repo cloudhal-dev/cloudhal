@@ -135,6 +135,7 @@ export interface Site {
   domains: Domain[];
   pageIds: Id[];
   homePageId?: Id;
+  localization?: Localization;
   theme: ThemeRef;
   design?: Design;
   brand?: Brand;
@@ -159,6 +160,38 @@ export interface Site {
 export interface Domain {
   hostname: string;
   primary: boolean;
+}
+/**
+ * How the site serves its locales (RFC-0033 §2). Absent fields mean: prefix-except-default routing, no fallback, no required review, the machine-translation notice until reviewed.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "Localization".
+ */
+export interface Localization {
+  /**
+   * prefix-except-default: the default locale at the root, the others under /<locale>/. prefix-all: every locale prefixed, / is a language chooser (x-default).
+   */
+  routing?: "prefix-except-default" | "prefix-all";
+  /**
+   * Optional hostname per locale; that locale is then served at the host's root.
+   */
+  domains?: {
+    [k: string]: string | undefined;
+  };
+  /**
+   * none: a missing translation is not found. default-with-notice: the default locale's page is served with a notice and noindex.
+   */
+  fallback?: "none" | "default-with-notice";
+  /**
+   * Collections whose machine translations need a person's review before they publish ('pages' stands for pages).
+   */
+  review?: {
+    required?: string[];
+  };
+  /**
+   * When readers see the machine-translation notice: unreviewed (until a person reviews) or always.
+   */
+  label?: "unreviewed" | "always";
 }
 /**
  * Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.
