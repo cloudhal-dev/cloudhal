@@ -10,23 +10,45 @@
 export interface LocaleInfo {
   /** The language's name in itself, for the language menus. */
   name: string;
-  /** Writing direction, set on `<html dir>` with `lang`. RTL needs the review's Phase 3 first. */
+  /** Writing direction, set on `<html dir>` with `lang` (ADR-0033). */
   dir: "ltr" | "rtl";
   /** Where a missing word is looked up next, in order; English (the source) ends every chain. */
   fallback: readonly string[];
   /**
-   * Whether a person who speaks the language has reviewed its catalogs. `false` means machine
-   * translation (AI) awaiting review; the language menus say so.
+   * Whether a person who speaks the language has reviewed its catalogs. `false` is an AI draft
+   * (the `translate` skill and a second consistency pass, ADR-0034) awaiting that review; the
+   * language menus show only the name, so this stays a note for maintainers. Only a reviewer sets
+   * it to `true`.
    */
   reviewed: boolean;
+  /**
+   * The tag `Intl` formats with, when it differs from the key (`@cloudhal/messages` `setIntlTags`):
+   * Arabic and Persian use Western digits (ADR-0033, decided 2026-10-18; their own digits may
+   * become a preference later).
+   */
+  intl?: string;
 }
 
+/*
+ * English is the source; Turkish is maintained by the owner. Every other language is an AI
+ * translation (machine translation) awaiting review by a person who speaks it: German since
+ * 2026-10 (pilot), the others since 2026-10-18. They stay `reviewed: false` until that review.
+ */
 export const LOCALE_REGISTRY = {
   en: { name: "English", dir: "ltr", fallback: [], reviewed: true },
   tr: { name: "Türkçe", dir: "ltr", fallback: ["en"], reviewed: true },
-  // Pilot (2026-10): AI-translated from English, awaiting a German speaker's review.
+  // AI translation, awaiting review.
   de: { name: "Deutsch", dir: "ltr", fallback: ["en"], reviewed: false },
+  // AI translation, awaiting review. The first right-to-left language (ADR-0033).
+  ar: { name: "العربية", dir: "rtl", fallback: ["en"], reviewed: false, intl: "ar-u-nu-latn" },
 } as const satisfies Record<string, LocaleInfo>;
+
+/** The `Intl` tags that differ from their key (`{ ar: "ar-u-nu-latn", … }`), for `setIntlTags`. */
+export const INTL_TAGS: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(LOCALE_REGISTRY as Record<string, LocaleInfo>).flatMap(([l, info]) =>
+    info.intl ? [[l, info.intl]] : [],
+  ),
+);
 
 export type Locale = keyof typeof LOCALE_REGISTRY;
 export const LOCALE_LIST = Object.keys(LOCALE_REGISTRY) as Locale[];
@@ -45,7 +67,8 @@ export function fallbackChain(locale: Locale): Locale[] {
 
 /**
  * The best registered locale for the browser's preferred languages (`navigator.languages`): an
- * exact tag, else the same language (`de-AT` → `de`), else English.
+ * exact tag, else the same language (`de-AT` → `de`, `pt-PT` → `pt-BR`, `zh-CN` → `zh-Hans`), else
+ * English.
  */
 export function matchLocale(preferred: readonly string[]): Locale {
   for (const tag of preferred) {
@@ -57,6 +80,8 @@ export function matchLocale(preferred: readonly string[]): Locale {
       continue;
     }
     if (isLocale(language)) return language;
+    const same = LOCALE_LIST.find((l) => l.split("-")[0] === language);
+    if (same) return same;
   }
   return "en";
 }

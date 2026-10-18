@@ -11,8 +11,6 @@ export const en = {
     signOut: "Sign out",
     live: "Live",
     language: "Language",
-    /** A language in the menus whose catalogs are machine-translated, awaiting review (`locales.ts`). */
-    unreviewedLanguage: "{name} (machine translation)",
     more: "More",
     rev: "rev {rev}",
     close: "Close",

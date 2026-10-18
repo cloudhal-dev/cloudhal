@@ -11,10 +11,25 @@
 
 type Locales = string | readonly string[];
 
+const TAGS = new Map<string, string>();
+
+/**
+ * The `Intl` tag of languages whose formatting differs from their plain tag (ADR-0033: Arabic
+ * `ar` formats with Western digits, `ar-u-nu-latn`). Studio registers them once from its locale
+ * registry; every factory below then formats `ar` as `ar-u-nu-latn`, so call sites pass the
+ * language as it is.
+ */
+export function setIntlTags(tags: Readonly<Record<string, string>>): void {
+  for (const [locale, tag] of Object.entries(tags)) TAGS.set(locale, tag);
+}
+
+/** The tag `Intl` gets for `locale`. */
+export const intlTag = (locale: string): string => TAGS.get(locale) ?? locale;
+
 function cache<O, F>(make: (locales: string[], options?: O) => F) {
   const made = new Map<string, F>();
   return (locales: Locales, options?: O): F => {
-    const list = typeof locales === "string" ? [locales] : [...locales];
+    const list = (typeof locales === "string" ? [locales] : [...locales]).map(intlTag);
     const id = `${list.join(",")}|${options === undefined ? "" : JSON.stringify(options)}`;
     let f = made.get(id);
     if (!f) {

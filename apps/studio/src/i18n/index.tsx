@@ -1,4 +1,10 @@
-import { type Compiled, formatList, formatMessage, isMessage } from "@cloudhal/messages/format";
+import {
+  type Compiled,
+  formatList,
+  formatMessage,
+  isMessage,
+  setIntlTags,
+} from "@cloudhal/messages/format";
 import { pseudoLocalize } from "@cloudhal/messages/pseudo";
 
 /** Studio's `Intl` layer (the i18n review's Phase 2): cached, always with an explicit locale. */
@@ -40,6 +46,7 @@ import { en, type Messages } from "./en.ts";
 import type { MessageParams } from "./generated/params.ts";
 import {
   fallbackChain,
+  INTL_TAGS,
   isLocale,
   LOCALE_LIST,
   LOCALE_REGISTRY,
@@ -51,6 +58,7 @@ import {
   loadedCatalog,
   loadedNamespaces,
   loadNamespace,
+  loadNamespaceIndex,
   type Namespace,
   type NamespaceCatalogs,
 } from "./namespaces.ts";
@@ -65,6 +73,10 @@ export {
   type LocaleInfo,
   matchLocale,
 } from "./locales.ts";
+
+// Arabic and Persian format with Western digits wherever Studio formats (ADR-0033).
+setIntlTags(INTL_TAGS);
+
 export {
   loadNamespace,
   NAMESPACES,
@@ -95,6 +107,8 @@ export function loadLocale(locale: Locale): Promise<void> {
   if (!promise) {
     const load = CORE_MODULES[`./${locale}.ts`];
     if (!load) return Promise.reject(new Error(`no core catalog for locale "${locale}"`));
+    // The language's namespace loaders come with it, so its first lazy namespace waits no longer.
+    void loadNamespaceIndex(locale).catch(() => {});
     promise = load().then(
       ({ messages }) => {
         catalogs[locale] = messages;

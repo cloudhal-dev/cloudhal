@@ -1,11 +1,10 @@
 import { Avatar, Button, DropdownMenu, directional, Text, Tooltip } from "@cloudhal/ui";
 import { SignOut, SquaresFour, Translate, UserGear, UsersThree } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
-import { LOCALE_LIST, type Locale, useI18n } from "../i18n/index.tsx";
+import { LOCALE_LIST, LOCALES, type Locale, useI18n } from "../i18n/index.tsx";
 import { authClient } from "../lib/auth.ts";
 import { initials } from "../lib/initials.ts";
 import { useThemePreference } from "../lib/theme.ts";
-import { languageNames } from "./LanguageSwitch.tsx";
 import { RoleBadge } from "./Roles.tsx";
 import { ThemeRadioItems, themeIcon } from "./ThemeSwitch.tsx";
 import { useMe } from "./useMe.ts";
@@ -18,7 +17,6 @@ import { useMe } from "./useMe.ts";
  */
 export function UserMenu() {
   const { t, locale, setLocale } = useI18n();
-  const names = languageNames(t);
   const navigate = useNavigate();
   const [theme] = useThemePreference();
   const me = useMe();
@@ -80,7 +78,7 @@ export function UserMenu() {
             <DropdownMenu.RadioGroup value={locale} onValueChange={(v: Locale) => setLocale(v)}>
               {LOCALE_LIST.map((l) => (
                 <DropdownMenu.RadioItem key={l} value={l}>
-                  {names[l]}
+                  {LOCALES[l]}
                   <DropdownMenu.RadioItemIndicator />
                 </DropdownMenu.RadioItem>
               ))}

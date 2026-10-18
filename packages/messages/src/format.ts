@@ -3,7 +3,7 @@
  * dependency-free; `Intl.PluralRules` and `Intl.NumberFormat` are made once per locale and options.
  */
 
-import { numberFormat } from "./intl.ts";
+import { intlTag, numberFormat } from "./intl.ts";
 import {
   type Compiled,
   type Message,
@@ -24,7 +24,7 @@ function rules(locale: string, ordinal: boolean): Intl.PluralRules {
   const id = `${locale}|${ordinal ? "o" : "c"}`;
   let r = pluralRules.get(id);
   if (!r) {
-    r = new Intl.PluralRules(locale, { type: ordinal ? "ordinal" : "cardinal" });
+    r = new Intl.PluralRules(intlTag(locale), { type: ordinal ? "ordinal" : "cardinal" });
     pluralRules.set(id, r);
   }
   return r;
@@ -57,7 +57,7 @@ export function formatList(
   const id = `${locale}|${type}`;
   let f = listFormats.get(id);
   if (!f) {
-    f = new Intl.ListFormat(locale, { type, style: "long" });
+    f = new Intl.ListFormat(intlTag(locale), { type, style: "long" });
     listFormats.set(id, f);
   }
   return f.format(items);
@@ -131,10 +131,12 @@ export {
   displayNames,
   formatDate,
   formatRelative,
+  intlTag,
   NUMERIC_DATE,
   NUMERIC_DATE_TIME,
   numberFormat,
   relativeTimeFormat,
+  setIntlTags,
 } from "./intl.ts";
 export type { Compiled, Message } from "./model.ts";
 export { isMessage } from "./model.ts";
