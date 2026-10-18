@@ -114,6 +114,13 @@ const STRINGS = {
     /** Previews of an embargoed or expired page or entry (RFC-0008 §7.3); readers never see these. */
     embargoed: (when: string) => `Embargoed until ${when}. Only previews show it until then.`,
     expired: (when: string) => `Expired on ${when}. Only previews show it now.`,
+    // RFC-0033: the reader's notice on machine translations, the fallback notice, the switcher.
+    machineTranslated: "This page was translated automatically and has not been reviewed yet.",
+    machineReviewed: "This page was translated automatically and reviewed by a person.",
+    readOriginal: "Read the original",
+    notTranslated:
+      "This page isn't available in your language yet, so it is shown in its original language.",
+    languages: "Languages",
   },
   tr: {
     home: "Ana sayfa",
@@ -181,6 +188,11 @@ const STRINGS = {
       `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
     expired: (when: string) =>
       `${when} tarihinde yayından kalktı. Artık yalnızca önizlemede görünür.`,
+    machineTranslated: "Bu sayfa otomatik olarak çevrildi ve henüz gözden geçirilmedi.",
+    machineReviewed: "Bu sayfa otomatik olarak çevrildi ve bir kişi tarafından gözden geçirildi.",
+    readOriginal: "Orijinalini oku",
+    notTranslated: "Bu sayfa henüz dilinizde yok; bu yüzden orijinal dilinde gösteriliyor.",
+    languages: "Diller",
   },
 } as const;
 

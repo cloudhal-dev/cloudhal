@@ -15,6 +15,7 @@ import {
   alternatesFor,
   linkLocalizer,
   localeRequest,
+  localeUrl,
   localizedPath,
   localizeHead,
 } from "@cloudhal/astro-renderer/locales";
@@ -115,11 +116,29 @@ if (lr.redirect !== undefined)
   });
 const locale = lr.locale;
 const path = lr.path;
-const route = await resolveRoute(source, path, {
+let route = await resolveRoute(source, path, {
   perPage: ARCHIVE_PAGE_SIZE,
   search: Astro.url.search,
   locale,
 });
+// RFC-0033 §4: a site may show a missing translation in its original language, with a notice,
+// never indexed and never in `hreflang` (`localization.fallback`).
+let shownIn = locale;
+if (
+  route.kind === "not-found" &&
+  locale !== site.defaultLocale &&
+  site.localization?.fallback === "default-with-notice"
+) {
+  const original = await resolveRoute(source, path, {
+    perPage: ARCHIVE_PAGE_SIZE,
+    search: Astro.url.search,
+    locale: site.defaultLocale,
+  });
+  if (original.kind === "page" || original.kind === "entry") {
+    route = original;
+    shownIn = site.defaultLocale;
+  }
+}
 if (route.kind === "redirect")
   return new Response(null, {
     status: route.status,
@@ -304,13 +323,53 @@ const head =
               canonical: `${origin}/menu`,
             };
 // RFC-0033 §4: self-canonical in the locale, `lang`/`dir`, and the `hreflang` set from the group.
-const meta = localizeHead(head, site, {
-  locale,
+const fallback = shownIn !== locale;
+const alternates = gated && !fallback ? await alternatesFor(source, gated, origin) : [];
+const localized = localizeHead(head, site, {
+  locale: shownIn,
   origin,
-  alternates: gated ? await alternatesFor(source, gated, origin) : [],
+  alternates,
   ...(gated?.translation ? { translation: gated.translation } : {}),
 });
-Astro.response.headers.set("content-language", locale);
+const meta = fallback ? { ...localized, robots: "noindex,follow" } : localized;
+Astro.response.headers.set("content-language", shownIn);
+// The reader's notice (RFC-0033 §4): machine output until a person reviews it (or always, when
+// the site asks), a page shown in its original language, each with a link to the original.
+const original = alternates.find((a) => a.original && !a.current);
+const tr = gated?.translation;
+const machine =
+  tr?.method === "machine" ||
+  (tr?.method === "machine-reviewed" && site.localization?.label === "always");
+const translationNotice = fallback
+  ? { text: t.notTranslated }
+  : machine
+    ? {
+        text: tr?.review ? t.machineReviewed : t.machineTranslated,
+        ...(original
+          ? { original: { href: original.href, text: t.readOriginal, lang: original.locale } }
+          : {}),
+      }
+    : undefined;
+// The language switcher: this page's versions, else each language's home page.
+const nativeName = (l: string) => {
+  try {
+    return new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l;
+  } catch {
+    return l;
+  }
+};
+const languages =
+  site.locales.length > 1
+    ? {
+        label: t.languages,
+        items: site.locales.map((l) => ({
+          locale: l,
+          name: nativeName(l),
+          href: alternates.find((a) => a.locale === l)?.href ?? localeUrl(site, l, "/", origin),
+          current: l === locale,
+        })),
+      }
+    : undefined;
 const searchForm = searchAvailable(config, source)
   ? {
       label: t.searchLabel,
@@ -321,7 +380,7 @@ const searchForm = searchAvailable(config, source)
     }
   : undefined;
 ---
-<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }} barWords={{ announcement: t.announcement, dismiss: t.dismiss, privacy: t.privacy, consentNotice: t.consentNotice, consentChoices: t.consentChoices, consentOk: t.consentOk, consentAll: t.consentAll, consentEssential: t.consentEssential, privacyPolicy: t.privacyPolicy, copied: t.copied, linkCopied: t.linkCopied }}>
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} translation={translationNotice} languages={languages} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }} barWords={{ announcement: t.announcement, dismiss: t.dismiss, privacy: t.privacy, consentNotice: t.consentNotice, consentChoices: t.consentChoices, consentOk: t.consentOk, consentAll: t.consentAll, consentEssential: t.consentEssential, privacyPolicy: t.privacyPolicy, copied: t.copied, linkCopied: t.linkCopied }}>
   {chrome.footer.region && (
     <Fragment slot="footer-region">
       <Sections sections={[chrome.footer.region]} entries={{}} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={regionSources} />

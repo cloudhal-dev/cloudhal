@@ -60,6 +60,20 @@ interface Props {
     | undefined;
   /** RFC-0025 25d: the bars' and toasts' words, in the page's language. */
   barWords?: Record<(typeof BAR_WORDS)[number], string> | undefined;
+  /**
+   * RFC-0033 §4: the reader's notice on a machine translation or a page shown in its original
+   * language, with a link to the original.
+   */
+  translation?:
+    | { text: string; original?: { href: string; text: string; lang: string } }
+    | undefined;
+  /** RFC-0033 §4: the language switcher: each language's name in itself and its URL here. */
+  languages?:
+    | {
+        label: string;
+        items: Array<{ locale: string; name: string; href: string; current: boolean }>;
+      }
+    | undefined;
 }
 const BAR_WORDS = [
   "announcement",
@@ -85,6 +99,8 @@ const {
   menus = {},
   words,
   barWords,
+  translation,
+  languages,
 } = Astro.props;
 const chrome = Astro.props.chrome ?? resolveChrome(site);
 const h = chrome.header;
@@ -123,8 +139,15 @@ const social = f.social ? (brand?.social ?? []) : [];
 const safe = (href: string) => (/^(https?:|mailto:|\/(?!\/)|#)/i.test(href) ? href : "#");
 // The actions this page can show (search only where the deployment answers searches).
 const actions = h.actions.filter((a) =>
-  a.kind === "button" ? a.label && a.href : a.kind === "search" && search,
+  a.kind === "button"
+    ? a.label && a.href
+    : a.kind === "locale"
+      ? languages
+      : a.kind === "search" && search,
 );
+// Without a header switcher, a multilingual site lists its languages in the footer (RFC-0033).
+const footerLanguages =
+  languages && !actions.some((a) => a.kind === "locale") ? languages : undefined;
 // The bar collapses into the phone menu below `collapseAt` (always for the minimal layout).
 const collapse = h.layout === "minimal" ? "always" : h.collapseAt;
 const dialog =
@@ -247,6 +270,13 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
               {actions.map((a) =>
                 a.kind === "button" && a.label && a.href ? (
                   <a class={`ch-button ch-button--${a.variant ?? "primary"}`} href={safe(a.href)}>{a.label}</a>
+                ) : a.kind === "locale" && languages ? (
+                  <details class="ch-languages">
+                    <summary>{languages.label}</summary>
+                    <ul>
+                      {languages.items.map((l) => <li><a href={l.href} lang={l.locale} hreflang={l.locale} aria-current={l.current ? "true" : undefined}>{l.name}</a></li>)}
+                    </ul>
+                  </details>
                 ) : a.kind === "search" && search ? (
                   <form class="ch-header-search" method="get" action="/search" role="search" data-ch-search-open={search.modal ? "" : undefined}>
                     <label for="ch-header-q" class="sr-only">{search.label}</label>
@@ -296,6 +326,12 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
           data-gate-at={notice.at}
         >{notice.text}</p>
       )}
+      {translation && (
+        <p class="ch-translation-notice mb-6 rounded-md border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="note">
+          {translation.text}
+          {translation.original && <> <a href={translation.original.href} lang={translation.original.lang} hreflang={translation.original.lang}>{translation.original.text}</a></>}
+        </p>
+      )}
       <slot />
     </main>
     {!f.hidden && (
@@ -332,6 +368,13 @@ const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
                 </nav>
               ))}
             </div>
+          )}
+          {footerLanguages && (
+            <nav class="ch-footer__languages" aria-label={footerLanguages.label}>
+              <ul>
+                {footerLanguages.items.map((l) => <li><a href={l.href} lang={l.locale} hreflang={l.locale} aria-current={l.current ? "true" : undefined}>{l.name}</a></li>)}
+              </ul>
+            </nav>
           )}
           <div class="ch-footer__legal">
             {copyright && <span>{copyright}</span>}
