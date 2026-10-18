@@ -34,6 +34,7 @@ import {
   type ApprovalStatus,
   checkEntryLimit,
   elevationProblem,
+  forSite,
   holds,
   isAgentMode,
   isMoreAutonomous,
@@ -241,10 +242,13 @@ export async function canDecide(
   request: Approval,
   decision: "approve" | "deny",
 ): Promise<DecideCheck> {
-  const principal = c.get("principal");
-  if (!principal) return NO("unauthorized", "sign in");
+  const signedIn = c.get("principal");
+  if (!signedIn) return NO("unauthorized", "sign in");
   // Without a membership source every person may decide (auth-less servers, tests).
-  if (!c.get("staff") || !principal.person) return { ok: true };
+  if (!c.get("staff") || !signedIn.person) return { ok: true };
+  // RFC-0034 A2: decided with the person's role on the request's site.
+  const principal = request.siteId ? forSite(signedIn, request.siteId) : signedIn;
+  if (!principal?.person) return NO("not_found", "not found: site");
   const person = principal.person;
   const ownRequest = request.actor.kind === "human" && request.actor.id === principal.actor.id;
   const byMyAgent =

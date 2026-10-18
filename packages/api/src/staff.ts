@@ -9,6 +9,14 @@
  */
 import { isRole, type Role } from "@cloudhal/agent-runtime";
 import type { SqlDriver } from "@cloudhal/storage";
+import {
+  allSiteRoles,
+  inviteSiteRoles,
+  parseSiteRoles,
+  replaceSiteRoles,
+  type SiteRoles,
+  siteRolesOf,
+} from "./site-members.ts";
 
 /** The one organization of a deployment (Cloud: one per tenant). */
 export const DEPLOYMENT_ORG = "deployment";
@@ -20,6 +28,8 @@ export interface MemberRow {
   email: string;
   role: Role;
   joinedAt: string;
+  /** RFC-0034 A2: the sites an Editor, Author or Contributor is limited to (absent: every site). */
+  sites?: SiteRoles;
 }
 
 export type InviteStatus = "pending" | "accepted" | "canceled" | "expired";
@@ -38,6 +48,8 @@ export interface InviteRow {
   acceptedAt: string | null;
   canceledBy: string | null;
   canceledAt: string | null;
+  /** RFC-0034 A2: the sites the new member will be limited to. */
+  sites?: SiteRoles;
 }
 
 export interface PasswordResetRow {
@@ -92,7 +104,10 @@ export class StaffStore {
       `SELECT m."userId", m."role", m."createdAt", u."name", u."email" FROM "member" m JOIN "user" u ON u."id" = m."userId" WHERE m."organizationId" = ? AND m."userId" = ?`,
       [DEPLOYMENT_ORG, userId],
     );
-    return row ? toMember(row) : undefined;
+    const member = row ? toMember(row) : undefined;
+    if (!member) return undefined;
+    const sites = await siteRolesOf(this.#sql, userId);
+    return sites ? { ...member, sites } : member;
   }
 
   /** Members by rank, then join date. */
@@ -102,9 +117,11 @@ export class StaffStore {
       [DEPLOYMENT_ORG],
     );
     const order: Role[] = ["owner", "administrator", "editor", "author", "contributor"];
+    const sites = await allSiteRoles(this.#sql);
     return rows
       .map(toMember)
       .filter((m): m is MemberRow => m !== undefined)
+      .map((m) => (sites.has(m.userId) ? { ...m, sites: sites.get(m.userId) as SiteRoles } : m))
       .sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role));
   }
 
@@ -162,20 +179,37 @@ export class StaffStore {
   /** Changes a role, guarded on the role the caller saw (a concurrent change voids it). */
   async setRole(userId: string, from: Role, to: Role): Promise<boolean> {
     if (from === "owner" || to === "owner") return false;
-    const r = await this.#sql.run(
-      `UPDATE "member" SET "role" = ? WHERE "organizationId" = ? AND "userId" = ? AND "role" = ?`,
-      [to, DEPLOYMENT_ORG, userId, from],
-    );
-    return r.changes === 1;
+    const [r] = await this.#sql.batch([
+      {
+        sql: `UPDATE "member" SET "role" = ? WHERE "organizationId" = ? AND "userId" = ? AND "role" = ?`,
+        params: [to, DEPLOYMENT_ORG, userId, from],
+      },
+      // An Administrator works on every site: their site rows go with the promotion.
+      ...(to === "administrator"
+        ? [{ sql: "DELETE FROM site_members WHERE user_id = ?", params: [userId] }]
+        : []),
+    ]);
+    return r?.changes === 1;
+  }
+
+  /** RFC-0034 A2: replaces the member's site assignments (empty: every site). */
+  async setSites(userId: string, sites: SiteRoles): Promise<void> {
+    await this.#sql.batch(replaceSiteRoles(userId, sites, this.#stamp()));
   }
 
   /** Deletes a membership (never the Owner's). */
   async remove(userId: string): Promise<boolean> {
-    const r = await this.#sql.run(
-      `DELETE FROM "member" WHERE "organizationId" = ? AND "userId" = ? AND "role" <> 'owner'`,
-      [DEPLOYMENT_ORG, userId],
-    );
-    return r.changes === 1;
+    const [r] = await this.#sql.batch([
+      {
+        sql: `DELETE FROM "member" WHERE "organizationId" = ? AND "userId" = ? AND "role" <> 'owner'`,
+        params: [DEPLOYMENT_ORG, userId],
+      },
+      {
+        sql: `DELETE FROM site_members WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM "member" WHERE "organizationId" = ? AND "userId" = ?)`,
+        params: [userId, DEPLOYMENT_ORG, userId],
+      },
+    ]);
+    return r?.changes === 1;
   }
 
   /**
@@ -287,6 +321,7 @@ export class StaffStore {
     expiresAt: string;
     delivery: "link" | "email";
     tokenHash: string;
+    sites?: SiteRoles | undefined;
   }): Promise<InviteRow> {
     const id = newRowId();
     const now = this.#stamp();
@@ -296,7 +331,7 @@ export class StaffStore {
         params: [input.inviterId, now, DEPLOYMENT_ORG, input.email],
       },
       {
-        sql: `INSERT INTO "invitation" ("id", "organizationId", "email", "role", "status", "expiresAt", "createdAt", "inviterId", "tokenHash", "delivery") VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO "invitation" ("id", "organizationId", "email", "role", "status", "expiresAt", "createdAt", "inviterId", "tokenHash", "delivery", "sites") VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
         params: [
           id,
           DEPLOYMENT_ORG,
@@ -307,6 +342,7 @@ export class StaffStore {
           input.inviterId,
           input.tokenHash,
           input.delivery,
+          input.sites && Object.keys(input.sites).length > 0 ? JSON.stringify(input.sites) : null,
         ],
       },
     ]);
@@ -402,6 +438,7 @@ export class StaffStore {
             invite.role,
           ],
         },
+        ...inviteSiteRoles(invite.id, userId, invite.sites ?? {}, this.#stamp()),
       ]);
       return bind?.changes === 1 && insert?.changes === 1;
     } catch {
@@ -537,6 +574,7 @@ export class StaffStore {
       acceptedAt: r.acceptedAt ? iso(r.acceptedAt) : null,
       canceledBy: (r.canceledBy as string | null) ?? null,
       canceledAt: r.canceledAt ? iso(r.canceledAt) : null,
+      ...(parseSiteRoles(r.sites) ? { sites: parseSiteRoles(r.sites) as SiteRoles } : {}),
     };
   }
 }

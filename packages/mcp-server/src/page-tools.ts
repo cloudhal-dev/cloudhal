@@ -1,3 +1,4 @@
+import { visibleSites } from "@cloudhal/agent-runtime";
 /** Site and page tools: list, read, create, update and delete pages. */
 
 import type { Page, Section } from "@cloudhal/core-contracts";
@@ -39,7 +40,15 @@ const listSitesTool: ToolDefinition = {
     openWorldHint: false,
   },
   scopes: ["site:read"],
-  handler: async (_a, ctx) => ({ sites: await ctx.store.listSites() }),
+  // RFC-0034 A2: only the sites the principal's person may open.
+  handler: async (_a, ctx) => {
+    const all = await ctx.store.listSites();
+    const ids = visibleSites(
+      ctx.principal,
+      all.map((s) => s.id),
+    );
+    return { sites: all.filter((s) => ids.includes(s.id)) };
+  },
 };
 
 const getSiteTool: ToolDefinition = {

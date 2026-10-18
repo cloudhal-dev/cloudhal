@@ -8,5 +8,6 @@ export * from "./modes.ts";
 export * from "./ownership.ts";
 export * from "./policy.ts";
 export * from "./roles.ts";
+export * from "./site-access.ts";
 export * from "./skills.ts";
 export * from "./taxonomy.ts";

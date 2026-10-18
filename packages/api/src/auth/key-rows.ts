@@ -176,6 +176,7 @@ export function personRef(member: MemberRow): PersonRef {
     userId: member.userId,
     role: member.role,
     name: member.name,
+    ...(member.sites ? { sites: member.sites } : {}),
   };
 }
 

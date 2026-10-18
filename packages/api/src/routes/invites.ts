@@ -23,8 +23,6 @@ import {
   canInvite,
   inviteDefaultHours,
   inviteExpiryProblem,
-  inviteProblem,
-  isRole,
   type Role,
 } from "@cloudhal/agent-runtime";
 import type { Actor } from "@cloudhal/core-contracts";
@@ -45,6 +43,7 @@ import {
   newToken,
   studioOrigin,
 } from "../tokens.ts";
+import { inviteTarget } from "./member-sites.ts";
 import { auditEvent, me, rankError } from "./members.ts";
 
 /** At most this many pending invites per deployment, and creations per inviter per hour. */
@@ -63,6 +62,8 @@ export interface InviteView {
   /** Set when accepted: the account it created or re-admitted (null: accepted, no account yet). */
   acceptedUserId: string | null;
   acceptedAt: string | null;
+  /** RFC-0034 A2: the sites the new member will be limited to. */
+  sites?: InviteRow["sites"];
 }
 
 export function inviteView(i: InviteRow): InviteView {
@@ -77,6 +78,7 @@ export function inviteView(i: InviteRow): InviteView {
     expiresAt: i.expiresAt,
     acceptedUserId: i.acceptedUserId,
     acceptedAt: i.acceptedAt,
+    ...(i.sites ? { sites: i.sites } : {}),
   };
 }
 
@@ -209,11 +211,7 @@ export function inviteRoutes(options: {
       const body = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
       const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
       if (!EMAIL.test(email) || email.length > 254) throw badRequest("a valid email is required");
-      if (!isRole(body.role))
-        throw badRequest("role must be administrator, editor, author or contributor");
-      const role = body.role;
-      const problem = inviteProblem(person.role, role);
-      if (problem) throw rankError(problem);
+      const { role, sites } = await inviteTarget(c, person, body);
       const hours =
         body.expiresInHours === undefined ? inviteDefaultHours(role) : body.expiresInHours;
       const expiry = inviteExpiryProblem(role, hours as number);
@@ -251,6 +249,7 @@ export function inviteRoutes(options: {
         expiresAt,
         delivery,
         tokenHash: await hashToken(token),
+        sites,
       });
       const url = `${studioOrigin(c, options.studioOrigin, options.trustedOrigins)}/invite#${token}`;
       if (delivery === "email" && mail) {

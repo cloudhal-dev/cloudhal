@@ -30,6 +30,7 @@ import {
   ownsEntry,
   type Role,
   type Scope,
+  visibleSites,
 } from "@cloudhal/agent-runtime";
 import { PURGE_LIMITS, utcDay, utcDayStart } from "@cloudhal/comments";
 import type { Actor, Site } from "@cloudhal/core-contracts";
@@ -202,7 +203,18 @@ const sitesByRequest = new WeakMap<Context<Env>, Promise<Site[]>>();
 function requestSites(c: Context<Env>): Promise<Site[]> {
   let sites = sitesByRequest.get(c);
   if (!sites) {
-    sites = c.get("store").listSites();
+    // RFC-0034 A2: only the sites the person may open.
+    const principal = c.get("principal");
+    sites = c
+      .get("store")
+      .listSites()
+      .then((all) => {
+        const ids = visibleSites(
+          principal,
+          all.map((s) => s.id),
+        );
+        return all.filter((s) => ids.includes(s.id));
+      });
     sitesByRequest.set(c, sites);
   }
   return sites;
@@ -294,6 +306,7 @@ async function commentNotifications(c: Context<Env>, now: Date): Promise<Notific
   if (approvals && (moderateOwn || can("comments:reply:own"))) {
     for (const a of await approvals.list({ status: "pending", limit: 100 })) {
       if (a.status !== "pending" || !a.siteId || !COMMENT_REQUEST_TOOLS.has(a.tool)) continue;
+      if (visibleSites(principal, [a.siteId]).length === 0) continue;
       if (!(await canDecide(c, a, "approve")).ok) continue;
       out.push({
         id: `comments-approval:${a.id}`,
@@ -528,6 +541,7 @@ export function notificationRoutes(clock: () => Date): Hono<Env> {
       const pending = await approvals.list({ tool: "request_elevation", status: "pending" });
       for (const a of pending) {
         if (a.status !== "pending" || !a.siteId) continue;
+        if (visibleSites(c.get("principal"), [a.siteId]).length === 0) continue;
         const input = (a.input ?? {}) as {
           mode?: AgentMode;
           minutes?: number;

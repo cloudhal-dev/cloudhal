@@ -51,6 +51,7 @@ export const INVITATION_FIELDS = {
   acceptedAt: { type: "date", required: false, input: false },
   canceledBy: { type: "string", required: false, input: false },
   canceledAt: { type: "date", required: false, input: false },
+  sites: { type: "string", required: false, input: false },
 } as const;
 
 /**
