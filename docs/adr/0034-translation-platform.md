@@ -73,7 +73,19 @@ It writes ICU strings for every category the language needs, then runs `pnpm i18
   - two-way edits (a developer changes `de.ts` while a translator changes the platform). Mitigation: catalogs other than English are generated, and only English is edited by hand. This is a lint rule once the import exists.
   - MF2: none of the four platforms documents MessageFormat 2 import/export yet (RFC-0032, open question 1). The ICU MF1 exchange stays until they do.
 
+## Decisions (2026-10-18)
+The owner delegated the open questions; decided in the session that coordinates the i18n work:
+
+- **Platform: Hosted Weblate, Libre plan.** No self-hosting.
+  - The plan is for public projects, and is set up from https://hosted.weblate.org/hosting/.
+  - Its limit is 160,000 hosted strings, counted as source strings × (languages + 1). Studio has about 4,550 keys, so en plus tr, de and ar is about 18,200.
+  - **The owner creates the account and applies; agents never create accounts.** The steps are in `docs/guides/translations-weblate.md`.
+- **Reviewers:** German and Arabic stay `reviewed: false` until community reviewers approve them in Weblate. Turkish stays reviewed (the owner).
+- **Until then:** an AI second-pass consistency review (glossary, register, terms) may correct the drafts through the `translate` skill and `pnpm i18n:import`. It never sets `reviewed: true`.
+- **Visitor-facing strings** (themes, notices) stay out of scope for now. The catalogs remain Studio-only.
+
 ## Open questions
-- Self-host on Cloudflare (Containers) or elsewhere, or use the hosted service?
-- Who reviews German, and later each new language, and how are reviewers credited?
-- Should the platform also hold visitor-facing strings (themes, notices)? Today the catalogs are Studio-only.
+None left from this ADR; the questions below were answered above.
+- *(answered)* Hosting: Hosted Weblate, Libre plan.
+- *(answered)* Reviewers: community reviewers in Weblate for German and Arabic; the owner for Turkish.
+- *(answered)* Visitor-facing strings: not now.
