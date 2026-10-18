@@ -131,6 +131,10 @@ export interface Term {
 export interface TermLabel {
   name: string;
   /**
+   * This locale's archive slug (RFC-0033); absent uses the term's slug. Never set for the site's default locale, whose slug is the term's own; unique per taxonomy and locale.
+   */
+  slug?: string;
+  /**
    * Synonyms (SKOS altLabel). Matched when an agent or editor assigns by name; never shown as separate terms.
    *
    * @minItems 1

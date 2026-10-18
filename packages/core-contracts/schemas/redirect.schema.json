@@ -24,9 +24,13 @@
     "siteId": { "$ref": "common.schema.json#/$defs/Id" },
     "from": {
       "type": "string",
-      "description": "Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site; never a path the site currently serves.",
+      "description": "Request path to redirect: starts with '/', no query, fragment, backslash or trailing slash (root excepted). Unique per site and locale; never a path the site currently serves.",
       "pattern": "^/(?:[^\\s?#/\\\\]+(?:/[^\\s?#/\\\\]+)*)?$",
       "maxLength": 1024
+    },
+    "locale": {
+      "$ref": "common.schema.json#/$defs/Locale",
+      "description": "The locale whose URLs `from` belongs to (RFC-0033); absent means the site's default locale. `from` is the path inside that locale, without its prefix or domain. Unique per site and locale."
     },
     "to": {
       "type": "string",

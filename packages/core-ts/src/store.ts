@@ -641,8 +641,8 @@ export class SiteGraphStore {
   }
 
   /** Exact `from` first, then the longest prefix redirect above `path` (rest appended to `to`). */
-  redirectFor(siteId: string, path: string): Promise<RedirectMatch | undefined> {
-    return this.#tax.redirectFor(siteId, path);
+  redirectFor(siteId: string, path: string, locale?: string): Promise<RedirectMatch | undefined> {
+    return this.#tax.redirectFor(siteId, path, locale);
   }
 
   // ───────────────────────────── menus (RFC-0003) ─────────────────────────────
