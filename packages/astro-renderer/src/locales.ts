@@ -218,20 +218,21 @@ function archiveLocalizer(
 const PLATFORM = /^\/(?:_|media\/)/;
 
 /**
- * Rewrites root-relative `href`s of `<a>` and `action`s of `<form>` in rendered HTML through
- * `localize` (query and fragment kept). Platform paths are left alone.
+ * Rewrites root-relative `href`s of `<a>`, `action`s of `<form>` and the search dialog's
+ * `data-endpoint`/`data-page` in rendered HTML through `localize` (query and fragment kept).
+ * Platform paths are left alone.
  */
 export function localizeLinks(html: string, localize: (path: string) => string): string {
-  return html.replace(
-    /(<(?:a|form)\b[^>]*?\s(?:href|action)=")(\/[^"]*)(")/gi,
-    (all, head: string, url: string, tail: string) => {
-      if (url.startsWith("//") || PLATFORM.test(url)) return all;
-      const cut = url.search(/[?#]/);
-      const path = cut < 0 ? url : url.slice(0, cut);
-      const suffix = cut < 0 ? "" : url.slice(cut);
-      return `${head}${localize(path.length > 1 ? path.replace(/\/+$/, "") : path)}${suffix}${tail}`;
-    },
-  );
+  const swap = (all: string, head: string, url: string, tail: string) => {
+    if (url.startsWith("//") || PLATFORM.test(url)) return all;
+    const cut = url.search(/[?#]/);
+    const path = cut < 0 ? url : url.slice(0, cut);
+    const suffix = cut < 0 ? "" : url.slice(cut);
+    return `${head}${localize(path.length > 1 ? path.replace(/\/+$/, "") : path)}${suffix}${tail}`;
+  };
+  return html
+    .replace(/(<(?:a|form)\b[^>]*?\s(?:href|action)=")(\/[^"]*)(")/gi, swap)
+    .replace(/(\sdata-(?:endpoint|page)=")(\/[^"]*)(")/gi, swap);
 }
 
 /**

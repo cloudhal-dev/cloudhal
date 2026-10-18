@@ -6,6 +6,7 @@
 import type { ContentEntry, Page, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { termName } from "./names.ts";
 import { MARK_CLOSE, MARK_OPEN, SEARCH_TEXT_MAX, type SearchRow } from "./search-common.ts";
+import { termSlug } from "./term-locales.ts";
 
 const iso = (value: string | undefined) => {
   if (!value) return undefined;
@@ -200,6 +201,7 @@ export function termSearchRows(
   taxonomy: Taxonomy,
   term: Term,
   locales: readonly string[],
+  defaultLocale = locales[0] ?? "",
 ): SearchRow[] {
   if (!taxonomy.archive.enabled || term.status !== "active" || term.visibility !== "public")
     return [];
@@ -217,7 +219,8 @@ export function termSearchRows(
       title: termName(term, locale),
       summary: searchText({ format: "markdown", value: words.join(" ") }),
       body: "",
-      href: `${taxonomy.archive.basePath}/${term.slug}`,
+      // RFC-0033: the archive under the locale's slug for the term.
+      href: `${taxonomy.archive.basePath}/${termSlug(term, locale, defaultLocale)}`,
       context: (taxonomy.labels[locale] ?? fallbackTax)?.singular,
     };
   });
@@ -234,6 +237,8 @@ export function searchDocuments(input: {
   taxonomies: readonly Taxonomy[];
   terms: readonly Term[];
   drafts?: boolean;
+  /** The site's default locale, whose archive slugs are the terms' own (default: `locales[0]`). */
+  defaultLocale?: string;
 }): SearchRow[] {
   const options = { drafts: input.drafts ?? false };
   const byId = new Map(input.taxonomies.map((t) => [t.id, t]));
@@ -243,7 +248,7 @@ export function searchDocuments(input: {
   ];
   for (const term of input.terms) {
     const taxonomy = byId.get(term.taxonomyId);
-    if (taxonomy) rows.push(...termSearchRows(taxonomy, term, input.locales));
+    if (taxonomy) rows.push(...termSearchRows(taxonomy, term, input.locales, input.defaultLocale));
   }
   return rows.filter((r): r is SearchRow => r !== undefined);
 }

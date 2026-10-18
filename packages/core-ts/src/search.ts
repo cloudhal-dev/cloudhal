@@ -1,7 +1,8 @@
 /**
  * Site search (RFC-0019 §3, RFC-0029 §2): an FTS5 index of what readers see (`search_index`,
- * migrations `0021_search` and `0022_search_kinds`): published articles and pages, and public term
- * and author archives.
+ * migrations `0021_search` and `0022_search_kinds`; `search_index_cjk` for languages without
+ * spaces between words, RFC-0033 §5): published articles and pages, and public term and author
+ * archives.
  *
  * - **Built on publish.** The rows come from the snapshot a publish or rollback makes live and are
  *   written in the same `batch()` as the pointer flip, guarded on the site's new hash (hard rule
@@ -18,6 +19,7 @@
  */
 import type { ContentEntry, NodeRef, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
+import { CJK_TABLE, SEARCH_TABLES, searchTable, trigramQuery } from "./search-cjk.ts";
 import {
   ftsQuery,
   MARK_CLOSE,
@@ -97,41 +99,52 @@ export function searchStatements(plan: SearchPlan, guard: SiteGuard, at: string)
       params: [site, ...params, ...g],
     });
   if (plan.full) {
-    del("search_index", "", []);
+    for (const table of SEARCH_TABLES) del(table, "", []);
     del("search_links", "", []);
   } else {
     if (plan.removeKinds && plan.removeKinds.length > 0)
-      del("search_index", "AND kind IN (SELECT value FROM json_each(?)) ", [
-        JSON.stringify(plan.removeKinds),
-      ]);
+      for (const table of SEARCH_TABLES)
+        del(table, "AND kind IN (SELECT value FROM json_each(?)) ", [
+          JSON.stringify(plan.removeKinds),
+        ]);
     if (plan.remove.length > 0) {
       const ids = JSON.stringify(plan.remove);
-      del("search_index", "AND node_id IN (SELECT value FROM json_each(?)) ", [ids]);
+      for (const table of SEARCH_TABLES)
+        del(table, "AND node_id IN (SELECT value FROM json_each(?)) ", [ids]);
       del("search_links", "AND node_id IN (SELECT value FROM json_each(?)) ", [ids]);
     }
   }
-  for (const json of payloads(plan.rows)) {
-    out.push({
-      sql: `INSERT INTO search_index (site_id, node_id, locale, kind, title, summary, body, href, context, published_at, gate_from, gate_until)
-SELECT ?, j.value ->> '$.nodeId', j.value ->> '$.locale', j.value ->> '$.kind', j.value ->> '$.title', j.value ->> '$.summary', j.value ->> '$.body', j.value ->> '$.href', j.value ->> '$.context', j.value ->> '$.publishedAt', j.value ->> '$.gateFrom', j.value ->> '$.gateUntil'
-FROM json_each(?) j WHERE ${GUARD}`,
-      params: [site, json, ...g],
-    });
-    if (plan.rows.some((r) => r.terms && r.terms.length > 0))
-      out.push({
-        sql: `INSERT INTO search_links (site_id, node_id, term_id, locale, gate_from, gate_until)
-SELECT ?, j.value ->> '$.nodeId', t.value, j.value ->> '$.locale', j.value ->> '$.gateFrom', j.value ->> '$.gateUntil'
-FROM json_each(?) j, json_each(j.value, '$.terms') t WHERE ${GUARD}`,
-        params: [site, json, ...g],
-      });
-  }
+  // RFC-0033 §5: each row goes to its locale's table (`search-cjk.ts`).
+  for (const table of SEARCH_TABLES)
+    for (const json of payloads(plan.rows.filter((r) => searchTable(r.locale) === table)))
+      insertRows(out, { table, json, site, guard: g });
   out.push({
     sql: `INSERT INTO search_state (site_id, snapshot_id, entries, updated_at)
-SELECT ?, ?, (SELECT count(*) FROM search_index WHERE site_id = ?), ? WHERE ${GUARD}
+SELECT ?, ?, (SELECT count(*) FROM search_index WHERE site_id = ?) + (SELECT count(*) FROM ${CJK_TABLE} WHERE site_id = ?), ? WHERE ${GUARD}
 ON CONFLICT (site_id) DO UPDATE SET snapshot_id = excluded.snapshot_id, entries = excluded.entries, updated_at = excluded.updated_at`,
-    params: [site, plan.snapshotId, site, at, ...g],
+    params: [site, plan.snapshotId, site, site, at, ...g],
   });
   return out;
+}
+
+/** The inserts of one payload: its rows into `table`, and the terms they carry into `search_links`. */
+function insertRows(
+  out: SqlStatement[],
+  { table, json, site, guard: g }: { table: string; json: string; site: string; guard: string[] },
+): void {
+  out.push({
+    sql: `INSERT INTO ${table} (site_id, node_id, locale, kind, title, summary, body, href, context, published_at, gate_from, gate_until)
+SELECT ?, j.value ->> '$.nodeId', j.value ->> '$.locale', j.value ->> '$.kind', j.value ->> '$.title', j.value ->> '$.summary', j.value ->> '$.body', j.value ->> '$.href', j.value ->> '$.context', j.value ->> '$.publishedAt', j.value ->> '$.gateFrom', j.value ->> '$.gateUntil'
+FROM json_each(?) j WHERE ${GUARD}`,
+    params: [site, json, ...g],
+  });
+  if (json.includes('"terms":['))
+    out.push({
+      sql: `INSERT INTO search_links (site_id, node_id, term_id, locale, gate_from, gate_until)
+SELECT ?, j.value ->> '$.nodeId', t.value, j.value ->> '$.locale', j.value ->> '$.gateFrom', j.value ->> '$.gateUntil'
+FROM json_each(?) j, json_each(j.value, '$.terms') t WHERE ${GUARD}`,
+      params: [site, json, ...g],
+    });
 }
 
 /** The snapshot the index reflects for a site, if any, and how many rows it holds. */
@@ -222,9 +235,35 @@ async function archiveContext(
 }
 
 /** A visible archive: its term is linked by an indexed article the reader can see. */
-const LINKED = `(kind NOT IN ('term', 'author') OR EXISTS (SELECT 1 FROM search_links l
-WHERE l.site_id = ? AND l.term_id = search_index.node_id AND l.locale = ?
+const linked = (
+  table: string,
+) => `(kind NOT IN ('term', 'author') OR EXISTS (SELECT 1 FROM search_links l
+WHERE l.site_id = ? AND l.term_id = ${table}.node_id AND l.locale = ?
 AND (l.gate_from IS NULL OR l.gate_from <= ?) AND (l.gate_until IS NULL OR l.gate_until > ?)))`;
+
+/**
+ * The text condition of a query in a table: `MATCH` (words for `search_index`, substrings of three
+ * characters or more for the trigram table), or `LIKE` for shorter words in the trigram table.
+ */
+function textCondition(
+  table: string,
+  query: string,
+): { sql: string; params: string[]; ranked: boolean } | undefined {
+  if (table !== CJK_TABLE) {
+    const match = ftsQuery(query);
+    return match ? { sql: `${table} MATCH ?`, params: [match], ranked: true } : undefined;
+  }
+  const t = trigramQuery(query);
+  if (!t) return undefined;
+  if ("match" in t) return { sql: `${table} MATCH ?`, params: [t.match], ranked: true };
+  const like =
+    "(title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')";
+  return {
+    sql: t.like.map(() => like).join(" AND "),
+    params: t.like.flatMap((p) => [p, p, p]),
+    ranked: false,
+  };
+}
 
 /** Searches the index for a site's readers. A query with nothing searchable finds nothing. */
 export async function searchIndex(
@@ -237,18 +276,30 @@ export async function searchIndex(
   const q = query.slice(0, SEARCH_QUERY_MAX).trim();
   const state = await searchState(sql, siteId);
   const stale = options.snapshotId !== undefined && state?.snapshotId !== options.snapshotId;
-  const match = ftsQuery(q);
+  const table = searchTable(options.locale);
+  const text = textCondition(table, q);
   const empty = { query: q, hits: [], total: 0, page, pages: 0, perPage, stale, provider: "fts5" };
-  if (!match || !state) return empty;
+  if (!text || !state) return empty;
   const now = new Date(options.now).toISOString();
-  const where = `search_index MATCH ? AND site_id = ? AND locale = ?
+  const where = `${text.sql} AND site_id = ? AND locale = ?
 AND kind IN (SELECT value FROM json_each(?))
 AND (gate_from IS NULL OR gate_from <= ?) AND (gate_until IS NULL OR gate_until > ?)
-AND ${LINKED}`;
+AND ${linked(table)}`;
   const kinds = JSON.stringify(searchKinds(options.kinds));
-  const params = [match, siteId, options.locale, kinds, now, now, siteId, options.locale, now, now];
+  const params = [
+    ...text.params,
+    siteId,
+    options.locale,
+    kinds,
+    now,
+    now,
+    siteId,
+    options.locale,
+    now,
+    now,
+  ];
   const count = await sql.get<{ n: number }>(
-    `SELECT count(*) AS n FROM search_index WHERE ${where}`,
+    `SELECT count(*) AS n FROM ${table} WHERE ${where}`,
     params,
   );
   const total = count?.n ?? 0;
@@ -264,9 +315,9 @@ AND ${LINKED}`;
     published_at: string | null;
   }>(
     `SELECT node_id, kind, title, href, context, published_at,
-snippet(search_index, -1, '${MARK_OPEN}', '${MARK_CLOSE}', '…', 16) AS snippet
-FROM search_index WHERE ${where}
-ORDER BY bm25(search_index, 0, 0, 0, 0, 10, 4, 1, 0, 0, 0, 0, 0), published_at DESC
+${text.ranked ? `snippet(${table}, -1, '${MARK_OPEN}', '${MARK_CLOSE}', '…', 16)` : "substr(coalesce(summary, body), 1, 160)"} AS snippet
+FROM ${table} WHERE ${where}
+ORDER BY ${text.ranked ? `bm25(${table}, 0, 0, 0, 0, 10, 4, 1, 0, 0, 0, 0, 0), ` : ""}published_at DESC
 LIMIT ? OFFSET ?`,
     [...params, perPage, (page - 1) * perPage],
   );
@@ -315,11 +366,11 @@ export async function liveHits(
     context: string | null;
     published_at: string | null;
   }>(
-    `SELECT node_id, kind, title, href, context, published_at FROM search_index
+    `SELECT node_id, kind, title, href, context, published_at FROM ${searchTable(options.locale)}
 WHERE site_id = ? AND locale = ? AND node_id IN (SELECT value FROM json_each(?))
 AND kind IN (SELECT value FROM json_each(?))
 AND (gate_from IS NULL OR gate_from <= ?) AND (gate_until IS NULL OR gate_until > ?)
-AND ${LINKED}`,
+AND ${linked(searchTable(options.locale))}`,
     [
       siteId,
       options.locale,

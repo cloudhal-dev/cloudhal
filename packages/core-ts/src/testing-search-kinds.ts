@@ -341,6 +341,15 @@ export function searchProviderCases(): void {
         expect.objectContaining({ locale: "tr", title: "Ayşe", context: "Yazar" }),
       ]);
       expect(termSearchRows(taxonomy, { ...ayse, status: "proposed" } as Term, ["en"])).toEqual([]);
+      // RFC-0033: each locale's row links to the archive under that locale's slug
+      const named = {
+        ...ayse,
+        labels: { ...ayse.labels, tr: { name: "Ayşe", slug: "ayse-hanim" } },
+      };
+      expect(termSearchRows(taxonomy, named as Term, ["en", "tr"]).map((r) => r.href)).toEqual([
+        "/author/ayse",
+        "/author/ayse-hanim",
+      ]);
     });
 
     it("searches rows in memory by the index's rules", () => {
