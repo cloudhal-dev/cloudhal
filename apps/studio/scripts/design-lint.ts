@@ -64,6 +64,8 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/TaxonomyPage.tsx": "list",
   "routes/TermEditorPage.tsx": "editor",
   "routes/RedirectsPage.tsx": "list",
+  // RFC-0033 §8: every page and article by language.
+  "routes/TranslationsPage.tsx": "list",
   "routes/NavigationPage.tsx": "editor",
   "routes/MediaPage.tsx": "list",
   "routes/CommentsPage.tsx": "moderation",

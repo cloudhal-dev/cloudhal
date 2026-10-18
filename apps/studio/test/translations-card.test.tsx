@@ -17,6 +17,7 @@ afterEach(() => {
 
 const row = (over: Partial<TranslationRow>): TranslationRow => ({
   id: "page_1",
+  group: "page_1",
   kind: "page",
   siteId: "site_1",
   locale: "en",

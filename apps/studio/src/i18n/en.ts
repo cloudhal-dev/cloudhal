@@ -132,6 +132,11 @@ export const en = {
       description:
         "The menus visitors find their way with: the header, the footer and any your theme places. Items point at pages and categories, so renames never break them.",
     },
+    translations: {
+      title: "Translations",
+      description:
+        "Every page and article by language: what is missing, out of date or waiting for a person's review.",
+    },
     redirects: {
       title: "Redirects",
       description:
@@ -172,6 +177,7 @@ export const en = {
     taxonomy: "Categories & tags",
     navigation: "Navigation",
     redirects: "Redirects",
+    translations: "Translations",
     team: "Team",
     analytics: "Analytics",
   },
@@ -1649,6 +1655,24 @@ export const en = {
       delete: "Remove “{before}”",
     },
     aBlock: "a block",
+  },
+  // RFC-0033 §8: Site › Translations, the coverage view.
+  coverage: {
+    search: "Search by title",
+    filter: "Show",
+    needsWork: "Needs work",
+    all: "Everything",
+    item: "Page or article",
+    page: "Page",
+    article: "Article",
+    missing: "Missing",
+    toReview: "To review",
+    oneLanguage: "This site has one language",
+    oneLanguageDescription: "Add languages in the site's settings; translations show here.",
+    openSettings: "Open language settings",
+    allDone: "Nothing needs work",
+    empty: "Nothing here yet",
+    emptyDescription: "Every language has an up-to-date, reviewed version.",
   },
   // RFC-0033 §8: Site › Settings › Languages and Glossary.
   languages: {
