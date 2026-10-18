@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   dateToDay,
   dayToDate,
+  directional,
   Empty,
   formatDay,
   formatMonth,
@@ -220,7 +221,7 @@ function CalendarAside({
                       size="sm"
                       variant="ghost"
                       href={`/sites/${siteId}/schedules/releases/${r.request.releaseId}`}
-                      icon={ArrowRight}
+                      icon={directional(ArrowRight)}
                     >
                       {t(`${a}.waiting.open`)}
                     </LinkButton>
@@ -297,7 +298,7 @@ function CalendarAside({
             href={`/sites/${siteId}/settings#schedules`}
             variant="ghost"
             size="sm"
-            icon={ArrowRight}
+            icon={directional(ArrowRight)}
           >
             {t(`${a}.scheduler.settings`)}
           </LinkButton>

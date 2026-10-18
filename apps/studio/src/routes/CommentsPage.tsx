@@ -10,6 +10,7 @@ import {
   CommentRow,
   commentFilterSince,
   DEFAULT_COMMENT_FILTERS,
+  directional,
   Empty,
   LayerCard,
   LinkButton,
@@ -514,7 +515,7 @@ export function CommentsPage() {
                   href={`/sites/${siteId}/approvals`}
                   variant="secondary"
                   size="sm"
-                  icon={ArrowRight}
+                  icon={directional(ArrowRight)}
                 >
                   {t("comments.agentRequests.review")}
                 </LinkButton>

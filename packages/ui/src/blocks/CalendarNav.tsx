@@ -1,6 +1,7 @@
 import { Button, cn, Tabs, Text } from "@cloudflare/kumo";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 
 export type CalendarView = "agenda" | "month";
 export const CALENDAR_VIEWS: readonly CalendarView[] = ["agenda", "month"];
@@ -72,7 +73,7 @@ export function CalendarNav({
           variant="secondary"
           shape="square"
           aria-label={labels.previous}
-          icon={<CaretLeft size={16} />}
+          icon={<DirectionalIcon icon={CaretLeft} size={16} />}
           onClick={onPrevious}
           data-nav="previous"
         />
@@ -83,7 +84,7 @@ export function CalendarNav({
           variant="secondary"
           shape="square"
           aria-label={labels.next}
-          icon={<CaretRight size={16} />}
+          icon={<DirectionalIcon icon={CaretRight} size={16} />}
           onClick={onNext}
           data-nav="next"
         />

@@ -1,5 +1,5 @@
 import type { PublishStatus } from "@cloudhal/core-contracts";
-import { Button, DropdownMenu, Tooltip } from "@cloudhal/ui";
+import { Button, DirectionalIcon, DropdownMenu, directional, Tooltip } from "@cloudhal/ui";
 import {
   Archive,
   ArrowCounterClockwise,
@@ -54,7 +54,7 @@ export function StatusActions({
     status === "draft" && may("review") ? (
       <Button
         variant="secondary"
-        icon={<PaperPlaneTilt />}
+        icon={<DirectionalIcon icon={PaperPlaneTilt} />}
         onClick={() => onChange("review")}
         disabled={busy || locked}
         title={readOnlyReason}
@@ -99,7 +99,11 @@ export function StatusActions({
         ? t("editor.archive")
         : t("editor.sendToReview");
   const icon = (s: PublishStatus) =>
-    s === "archived" ? Archive : s === "review" ? PaperPlaneTilt : ArrowCounterClockwise;
+    s === "archived"
+      ? Archive
+      : s === "review"
+        ? directional(PaperPlaneTilt)
+        : ArrowCounterClockwise;
   const moreLabel = t("editor.moreActions");
   return (
     <>

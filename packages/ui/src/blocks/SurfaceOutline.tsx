@@ -7,6 +7,7 @@
 import { Badge, Button, cn, Input, InputArea, Text } from "@cloudflare/kumo";
 import { CaretDown, CaretRight, PencilSimple } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 
 /** A text a person may change in place (a literal string prop). */
 export interface SurfaceOutlineField {
@@ -112,7 +113,7 @@ export function SurfaceOutline({
                     size="xs"
                     shape="square"
                     aria-label={open ? labels.collapse(node.title) : labels.expand(node.title)}
-                    icon={open ? <CaretDown size={12} /> : <CaretRight size={12} />}
+                    icon={<DirectionalIcon icon={open ? CaretDown : CaretRight} size={12} />}
                     onClick={() => toggle(node.id)}
                   />
                 )}

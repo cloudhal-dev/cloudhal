@@ -1,5 +1,5 @@
-import { Badge, Banner, InsetPanel, Link, Text, Tooltip } from "@cloudhal/ui";
-import { ArrowRight, ClockCountdown, Info } from "@phosphor-icons/react";
+import { Badge, Banner, InsetPanel, Link, Text, Tooltip, TransitionArrow } from "@cloudhal/ui";
+import { ClockCountdown, Info } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useI18n, useT } from "../i18n/index.tsx";
 import type { Approval, KeyMode } from "../lib/api.ts";
@@ -84,7 +84,7 @@ export function ModeTransition({ from, to }: { from: KeyMode | undefined; to: Ke
       {from && (
         <>
           <ModeBadge mode={from} />
-          <ArrowRight size={14} className="text-kumo-subtle" aria-hidden />
+          <TransitionArrow size={14} />
         </>
       )}
       <ModeBadge mode={to} />

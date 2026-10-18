@@ -1,4 +1,4 @@
-import { ApprovalDialog, Button, ButtonGroup, DropdownMenu } from "@cloudhal/ui";
+import { ApprovalDialog, Button, ButtonGroup, DirectionalIcon, DropdownMenu } from "@cloudhal/ui";
 import {
   CalendarDots,
   Camera,
@@ -57,7 +57,7 @@ export function SitePublish({
         <Button
           variant="primary"
           size="sm"
-          icon={request ? <PaperPlaneTilt /> : <RocketLaunch />}
+          icon={request ? <DirectionalIcon icon={PaperPlaneTilt} /> : <RocketLaunch />}
           onClick={() => setOpen(true)}
           loading={publish.isPending || snapshot.isPending}
           disabled={mode === "none"}

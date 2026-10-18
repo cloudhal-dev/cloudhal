@@ -11,16 +11,9 @@ import {
   Radio,
   Switch,
   Text,
+  TransitionArrow,
 } from "@cloudhal/ui";
-import {
-  ArrowRight,
-  Camera,
-  Info,
-  ShieldCheck,
-  Star,
-  Warning,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { Camera, Info, ShieldCheck, Star, Warning, WarningCircle } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
@@ -577,7 +570,7 @@ function ArchiveChangePreview({ change }: { change: ReturnType<typeof archiveCha
             <Text variant="mono" as="span">
               {change.redirect.from}
             </Text>
-            <ArrowRight size={14} className="shrink-0 text-kumo-subtle" aria-hidden />
+            <TransitionArrow size={14} />
             <Text variant="mono" as="span">
               {change.redirect.to}
             </Text>

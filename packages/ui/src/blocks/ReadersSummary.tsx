@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AnalyticsTimeseries, type AnalyticsTimeseriesLabels } from "./AnalyticsTimeseries.tsx";
 import type { StatDelta } from "./analytics-format.ts";
 import { BreakdownMeters, type BreakdownRow } from "./Breakdown.tsx";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 import { StatTile, StatTileGroup } from "./StatTile.tsx";
 
 /** A figure and, when comparing, the previous period's figure. */
@@ -117,7 +118,7 @@ export function ReadersSummary({
       {redirects && !loading && (
         <div className="flex min-w-0 items-start gap-2">
           <span className="flex h-lh shrink-0 items-center text-kumo-subtle" aria-hidden>
-            <ArrowBendDownRight size={16} />
+            <DirectionalIcon icon={ArrowBendDownRight} size={16} />
           </span>
           <Text variant="secondary" size="sm">
             {redirects}

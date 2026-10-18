@@ -1,6 +1,7 @@
 import {
   Banner,
   Button,
+  DirectionalIcon,
   Empty,
   LayerCard,
   Link,
@@ -292,7 +293,7 @@ export function ActivityList({ source }: { source: ActivitySource }) {
                         variant="ghost"
                         size="xs"
                         shape="square"
-                        icon={<CaretRight />}
+                        icon={<DirectionalIcon icon={CaretRight} />}
                         aria-label={`${t("activity.viewEvent")}: ${label(r.tool)}`}
                         onClick={(e) => {
                           e.stopPropagation();

@@ -9,6 +9,8 @@ import {
   type CommentRowData,
   CommentText,
   CommentThread,
+  DirectionalIcon,
+  directional,
   InputArea,
   InsetPanel,
   LayerDialog,
@@ -185,7 +187,7 @@ function ReplyForm({
           <Button
             type="submit"
             variant="primary"
-            icon={<PaperPlaneRight />}
+            icon={<DirectionalIcon icon={PaperPlaneRight} />}
             loading={publish.isPending}
             data-testid="reply-publish"
           >
@@ -712,7 +714,7 @@ export function CommentThreadPage() {
           <LinkButton
             href={`/sites/${siteId}/articles/${nodeId}`}
             variant="secondary"
-            icon={ArrowSquareOut}
+            icon={directional(ArrowSquareOut)}
           >
             {t("comments.thread.openArticle")}
           </LinkButton>

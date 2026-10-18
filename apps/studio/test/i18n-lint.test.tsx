@@ -21,7 +21,7 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
       .map((f) =>
         format(
           f,
-          lintFile(f).filter((v) => v.rule.startsWith("i18n") || v.rule === "rtl-logical"),
+          lintFile(f).filter((v) => v.rule.startsWith("i18n") || v.rule.startsWith("rtl-")),
         ),
       )
       .filter(Boolean);
@@ -149,6 +149,30 @@ describe("no hard-coded words (AGENTS.md hard rule 10)", () => {
     expect(hits('const a = t("x"); // right-to-left and left-to-right')).toEqual([]);
     expect(
       hits('// i18n-ignore: Floating UI sets physical left/top\nconst a = "fixed left-0";'),
+    ).toEqual([]);
+  });
+
+  it("finds directional icons used without DirectionalIcon (rtl-icon, ADR-0033 C1)", () => {
+    const hits = (source: string) =>
+      lintText("apps/studio/src/routes/X.tsx", source).map((v) => v.rule);
+    expect(hits("const a = <ArrowRight size={12} aria-hidden />;")).toEqual(["rtl-icon"]);
+    expect(hits("const a = <Button icon={CaretLeft} />;")).toEqual(["rtl-icon"]);
+    expect(hits("const a = <Button icon={<SignOut />} />;")).toEqual(["rtl-icon"]);
+    expect(hits("const icons = { url: ArrowSquareOut };")).toEqual(["rtl-icon"]);
+    expect(hits('item("reply", label, ArrowBendUpLeft);')).toEqual(["rtl-icon"]);
+    // Through the block, as a component through `directional`; imports and key names are not uses.
+    expect(hits("const a = <DirectionalIcon icon={ArrowRight} size={12} />;")).toEqual([]);
+    expect(hits("const a = <Button icon={directional(CaretLeft)} />;")).toEqual([]);
+    expect(hits('import { ArrowRight, CaretLeft } from "@phosphor-icons/react";')).toEqual([]);
+    expect(hits('const step = { ArrowLeft: -1, ArrowRight: 1 }; e.key === "ArrowLeft";')).toEqual(
+      [],
+    );
+    // Physical or temporal directions stay as they are.
+    expect(hits("const a = <><ArrowUp /><CaretDown /><ArrowClockwise /></>;")).toEqual([]);
+    expect(
+      hits(
+        "// i18n-ignore: a chart axis points right in every language\nconst a = <ArrowRight />;",
+      ),
     ).toEqual([]);
   });
 

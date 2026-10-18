@@ -1,4 +1,4 @@
-import { Avatar, Button, DropdownMenu, Text, Tooltip } from "@cloudhal/ui";
+import { Avatar, Button, DropdownMenu, directional, Text, Tooltip } from "@cloudhal/ui";
 import { SignOut, SquaresFour, Translate, UserGear, UsersThree } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { LOCALE_LIST, type Locale, useI18n } from "../i18n/index.tsx";
@@ -88,7 +88,7 @@ export function UserMenu() {
           </DropdownMenu.SubContent>
         </DropdownMenu.Sub>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item icon={SignOut} onClick={signOut}>
+        <DropdownMenu.Item icon={directional(SignOut)} onClick={signOut}>
           {t("common.signOut")}
         </DropdownMenu.Item>
       </DropdownMenu.Content>

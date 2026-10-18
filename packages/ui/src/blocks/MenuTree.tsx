@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { DirectionalIcon } from "./DirectionalIcon.tsx";
 
 /** One row of the tree, with its children in display order. */
 export interface MenuTreeItem {
@@ -545,7 +546,7 @@ export function MenuTree({
                     shape="square"
                     tabIndex={-1}
                     aria-label={expanded ? labels.collapse(item.label) : labels.expand(item.label)}
-                    icon={expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
+                    icon={<DirectionalIcon icon={expanded ? CaretDown : CaretRight} size={12} />}
                     onClick={() => toggle(item.id)}
                   />
                 )}

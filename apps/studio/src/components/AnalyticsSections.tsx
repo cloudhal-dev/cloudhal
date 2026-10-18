@@ -12,6 +12,7 @@ import {
   type BreakdownRow,
   BreakdownTable,
   Button,
+  DirectionalIcon,
   InsetPanel,
   LayerDialog,
   Link,
@@ -494,7 +495,7 @@ export function SourcesCard({
     <SectionCard
       id="sources"
       title={t("analytics.sources.title")}
-      icon={<ArrowRight size={16} />}
+      icon={<DirectionalIcon icon={ArrowRight} size={16} />}
       actions={
         <Tabs
           variant="segmented"
@@ -538,7 +539,7 @@ export function SourcesCard({
           loading={top.isPending}
           empty={
             <SectionEmpty
-              icon={<ArrowRight size={32} className="text-kumo-inactive" />}
+              icon={<DirectionalIcon icon={ArrowRight} size={32} className="text-kumo-inactive" />}
               title={t(`analytics.sources.empty.${tab}`)}
               {...(tab === "campaigns"
                 ? { description: t("analytics.sources.campaignsHint") }

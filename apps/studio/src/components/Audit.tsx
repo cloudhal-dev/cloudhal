@@ -1,6 +1,14 @@
 import type { Actor } from "@cloudhal/core-contracts";
-import { ActorBadge, Badge, DecisionBadge, OutcomeBadge, Text, Tooltip } from "@cloudhal/ui";
-import { ArrowRight, Robot } from "@phosphor-icons/react";
+import {
+  ActorBadge,
+  Badge,
+  DecisionBadge,
+  OutcomeBadge,
+  Text,
+  Tooltip,
+  TransitionArrow,
+} from "@cloudhal/ui";
+import { Robot } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
 import {
@@ -135,7 +143,7 @@ export function ElevationGrant({
     >
       <span className="flex items-center gap-1.5 whitespace-nowrap">
         <ModeBadge mode={row.elevation.from} subtle />
-        <ArrowRight size={12} className="text-kumo-subtle" aria-hidden />
+        <TransitionArrow size={12} />
         <ModeBadge mode={row.mode} subtle elevation={row.elevation} />
       </span>
       {requested && (

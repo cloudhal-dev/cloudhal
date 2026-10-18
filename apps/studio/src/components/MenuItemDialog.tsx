@@ -4,6 +4,8 @@ import {
   Banner,
   Checkbox,
   Combobox,
+  DirectionalIcon,
+  directional,
   Input,
   InsetPanel,
   LayerDialog,
@@ -33,6 +35,9 @@ import {
   validateItemForm,
 } from "../lib/menus.ts";
 import { foldName } from "../lib/taxonomy.ts";
+
+/** Opens elsewhere; mirrors in right-to-left languages (ADR-0033 C1). */
+const OpenOutside = directional(ArrowSquareOut);
 
 interface Group {
   value: string;
@@ -210,7 +215,7 @@ export function MenuItemDialog({
                                 data-option={o.value}
                               >
                                 {o.value === "url" ? (
-                                  <ArrowSquareOut size={16} className="shrink-0 text-kumo-subtle" />
+                                  <OpenOutside size={16} className="shrink-0 text-kumo-subtle" />
                                 ) : o.value === "group" ? (
                                   <FolderSimple size={16} className="shrink-0 text-kumo-subtle" />
                                 ) : null}
