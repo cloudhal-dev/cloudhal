@@ -7,6 +7,7 @@ import { correctionsSuite } from "../src/testing-corrections.ts";
 import { gatesSuite } from "../src/testing-gates.ts";
 import { releasesSuite } from "../src/testing-releases.ts";
 import { searchSuite, searchTextCases } from "../src/testing-search.ts";
+import { searchKindsSuite, searchProviderCases } from "../src/testing-search-kinds.ts";
 
 const sqlite = {
   create: async () => ({
@@ -19,7 +20,9 @@ gatesSuite("better-sqlite3 + memory blobs", sqlite);
 releasesSuite("better-sqlite3 + memory blobs", sqlite);
 correctionsSuite("better-sqlite3 + memory blobs", sqlite);
 searchSuite("better-sqlite3 + memory blobs", sqlite);
+searchKindsSuite("better-sqlite3 + memory blobs", sqlite);
 searchTextCases();
+searchProviderCases();
 
 let d1: Awaited<ReturnType<typeof createMiniflareD1>> | undefined;
 const miniflare = {
@@ -37,3 +40,4 @@ gatesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 releasesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 correctionsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 searchSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
+searchKindsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);

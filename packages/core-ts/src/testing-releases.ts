@@ -138,9 +138,10 @@ export function releasesSuite(
       const report = await tick(T + 41_000);
       RELEASE_STATEMENTS["release published by a tick (publishRelease)"] = report.statements ?? -1;
       // overview 1, due releases 1, claim 2, purge plan 1, site + live + parent 3, the batch 7 (no
-      // asset blobs to root), the search index brought to the new snapshot 6 (RFC-0019 §3: its
-      // reads and one guarded batch), then the overview after work 1 and the heartbeat 1 (S17).
-      expect(report.statements).toBe(23);
+      // asset blobs to root), the search index brought to the new snapshot 7 (RFC-0019 §3: its
+      // reads and one guarded batch, which also clears the article's term links, RFC-0029 §2),
+      // then the overview after work 1 and the heartbeat 1 (S17).
+      expect(report.statements).toBe(24);
       expect(report).toMatchObject({ ran: 1, failed: 0, more: false });
       expect(report.statements).toBeLessThanOrEqual(TICK_BUDGETS.free.maxQueries);
       const S = await live();

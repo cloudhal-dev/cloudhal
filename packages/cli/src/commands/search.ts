@@ -49,5 +49,5 @@ export async function searchReindex(options: SearchCliOptions): Promise<ReindexR
 
 export function describeReindex(r: ReindexReport): string {
   if (!r.published) return `${r.where}: the site has not been published yet; nothing to index`;
-  return `${r.where}: indexed ${r.index?.entries ?? 0} article(s) from ${r.published}`;
+  return `${r.where}: indexed ${r.index?.entries ?? 0} item(s) from ${r.published}`;
 }

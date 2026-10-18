@@ -79,6 +79,23 @@ describe("search route", () => {
     expect(route.search.hits[0]?.snippet).toContain(MARK_OPEN);
   });
 
+  it("finds pages and topics too, in cloudhal dev and on the published site (RFC-0029)", async () => {
+    const kinds = (r: Awaited<ReturnType<typeof resolveRoute>>) =>
+      r.kind === "search" ? r.search.hits.map((h) => `${h.kind}:${h.href}:${h.context ?? ""}`) : [];
+    const live = new LiveSource(store, site.id);
+    expect(kinds(await resolveRoute(live, "/search", { search: "?q=about" }))).toContain(
+      "page:/about:",
+    );
+    expect(kinds(await resolveRoute(live, "/search", { search: "?q=news" }))).toEqual([
+      "term:/category/news:Category",
+    ]);
+    const snap = new SnapshotSource(store, await publish());
+    expect(kinds(await resolveRoute(snap, "/search", { search: "?q=news" }))).toEqual([
+      "term:/category/news:Category",
+    ]);
+    expect(await snap.search?.("news", { kinds: ["page"] })).toMatchObject({ total: 0 });
+  });
+
   it("is a 404 for sources that cannot search, and only static builds lack it", async () => {
     const snap = await publish();
     const source = new SnapshotSource(store, snap);

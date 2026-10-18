@@ -90,7 +90,7 @@ const STRINGS = {
     builtWith: "Built with Cloudhal",
     search: "Search",
     searchLabel: "Search this site",
-    searchPlaceholder: "Search articles…",
+    searchPlaceholder: "Search the site…",
     searchResults: (n: number, q: string) =>
       n === 1 ? `1 result for “${q}”` : `${n} results for “${q}”`,
     searchNone: (q: string) => `Nothing matches “${q}”. Try fewer or other words.`,
@@ -143,7 +143,7 @@ const STRINGS = {
     builtWith: "Cloudhal ile yapıldı",
     search: "Ara",
     searchLabel: "Sitede ara",
-    searchPlaceholder: "Yazılarda ara…",
+    searchPlaceholder: "Sitede ara…",
     searchResults: (n: number, q: string) => `“${q}” için ${n} sonuç`,
     searchNone: (q: string) =>
       `“${q}” ile eşleşen bir şey yok. Daha az ya da başka sözcükler deneyin.`,

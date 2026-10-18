@@ -23,6 +23,9 @@
 .ch-search-results {
   @apply mt-6 space-y-6;
 }
+.ch-search-context {
+  @apply text-xs font-medium text-zinc-500;
+}
 .ch-search-results h2 {
   @apply text-lg font-semibold;
 }

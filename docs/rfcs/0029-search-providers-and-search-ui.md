@@ -144,6 +144,24 @@ Algolia, Typesense, Meilisearch and similar services send content outside the de
 | 29d | Studio search endpoint, grouped palette, command registry, publish through `ApprovalDialog`, `search_site` MCP tool |
 | 29e | Cloudflare AI Search provider (experimental): R2 sync, filtered retrieval, hybrid ranking, budgets |
 
+### Status
+- **29a shipped.** The palette runs commands on click, Enter and ↑↓ + Enter. Matching is Turkish-aware (`foldName`), the query clears on close, a footer shows the key hints, and the shortcut hint follows the platform.
+- **29b shipped.**
+  - **Storage.** Migration `0022_search_kinds` rebuilds `search_index` with `kind` and `context`, adds `search_links` (each indexed article's terms with its locale and gates), and clears `search_state`. FTS5 tables cannot gain columns, so existing indexes are written again on the next publish, release, import or `cloudhal search reindex`. This is the one place the "existing rows read as `article`" plan of §2 could not be kept.
+  - **Core** (`search-common.ts`, `search-rows.ts`, `search-memory.ts`, `search-provider.ts`, `store/search.ts`):
+    - `SearchProvider`, `fts5Provider`, `memoryProvider` and `withFallback` (1.5 s).
+    - `SiteGraphStoreOptions.search` sets the store's provider, which is wrapped in a fallback to FTS5 and told about every index update through `sync`.
+    - `planSearch` rewrites changed articles, pages and terms, and every archive row when a taxonomy or the site changed.
+    - Term and author hits need a `search_links` row in the reader's locale with open gates.
+  - **Renderer and starter.**
+    - `LiveSource.search` uses `searchDocuments`, so `cloudhal dev` finds pages and terms too.
+    - `SourceSearchOptions.kinds` narrows the results.
+    - The results page shows a hit's `context`.
+- **Deviations.**
+  - Article hits carry no `context` yet: a category name would go stale when the term is renamed and the article is not.
+  - `image` is not indexed yet.
+  - Pages with `seo.noindex` are left out of search.
+
 ## Open questions
 1. **Locales in the modal.** Only the page's locale, like `/search`, or the other locales in their own group? Default: the page's locale only.
 2. **Studio search at scale.** At what size does the in-memory scan need the `admin_search` FTS5 table? Default: measure in 29d on a 5,000-entry fixture; add the table only if p95 exceeds 150 ms.
