@@ -1650,6 +1650,27 @@ export const en = {
     },
     aBlock: "a block",
   },
+  // RFC-0033 §8: a page's or article's language versions and a person's review.
+  translations: {
+    title: "Translations",
+    none: "Only in {language}",
+    noneDescription:
+      "Agents translate pages and articles into the site's other languages; every version shows here.",
+    current: "This version",
+    method: {
+      original: "Original",
+      human: "Translated by a person",
+      machine: "Machine translation",
+      machineReviewed: "Machine translation, reviewed",
+    },
+    stale: "Out of date",
+    sourceMissing: "Original removed",
+    review: "Mark as reviewed",
+    reviewTitle: "Mark this translation as reviewed?",
+    reviewDescription:
+      "You confirm that a person read this machine translation against the original. Readers stop seeing the machine-translation notice, unless the site always shows it.",
+    reviewSaveFirst: "Save your changes before you review.",
+  },
   diff: {
     title: "Changes in {name}",
     against: "Compare with",

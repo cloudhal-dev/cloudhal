@@ -729,4 +729,5 @@ export interface MessageParams {
   "termEditor.retired.merged": { name: string | number };
   "termEditor.seo.description": { locale: string | number };
   "theme.current": { name: string | number };
+  "translations.none": { language: string | number };
 }

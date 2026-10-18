@@ -8,6 +8,7 @@ import { ScheduleAside } from "../EditorSchedule.tsx";
 import { UsedInMenusCard } from "../Menus.tsx";
 import { ReadersCard } from "../Readers.tsx";
 import { RelativeTime } from "../RelativeTime.tsx";
+import { TranslationsCard } from "../Translations.tsx";
 import type { PageEditorState } from "./usePageEditor.ts";
 
 export function PageEditorAside({
@@ -34,6 +35,7 @@ export function PageEditorAside({
       />
       <ReadersCard siteId={siteId} node={ed.query.data ?? draft} kind="page" />
       <UsedInMenusCard siteId={siteId} kind="page" id={draft.id} />
+      <TranslationsCard siteId={siteId} node={ed.query.data ?? draft} dirty={ed.dirty} />
       <DetailsCard
         rows={[
           {

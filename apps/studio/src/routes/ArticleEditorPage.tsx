@@ -21,9 +21,9 @@ import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArticleCommentsCard } from "../components/ArticleCommentsCard.tsx";
 import { ArticleCorrectionsCard } from "../components/ArticleCorrections.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
+import { ArticleReachCards } from "../components/article-editor/ArticleAside.tsx";
 import { BodyEditor } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
@@ -45,8 +45,7 @@ import {
 } from "../components/EditorSchedule.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
-import { MenuDeleteNotice, UsedInMenusCard, useMenuReferences } from "../components/Menus.tsx";
-import { ReadersCard } from "../components/Readers.tsx";
+import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { Status } from "../components/Status.tsx";
@@ -526,9 +525,7 @@ export function ArticleEditorPage() {
               host={host}
               coverStatus={coverStatus}
             />
-            <ReadersCard siteId={siteId} node={query.data ?? draft} kind="article" />
-            <ArticleCommentsCard siteId={siteId} entry={query.data ?? draft} />
-            <UsedInMenusCard siteId={siteId} kind="contentEntry" id={draft.id} />
+            <ArticleReachCards siteId={siteId} entry={query.data ?? draft} dirty={dirty} />
             <DetailsCard rows={details} />
             <DangerZoneCard
               title={t("editor.deleteArticleTitle")}
