@@ -109,6 +109,8 @@ export interface Alternate {
   readonly href: string;
   /** This is the version being rendered. */
   readonly current: boolean;
+  /** This is the group's original (the source of the translations). */
+  readonly original?: boolean;
 }
 
 type Localized = Page | ContentEntry;
@@ -147,10 +149,11 @@ export async function alternatesFor(
       locale: m.locale,
       href: localeUrl(site, m.locale, pathOf(m), origin),
       current: m.id === node.id,
+      ...(m.id === node.translation?.group ? { original: true } : {}),
     }))
     .sort((a, b) => site.locales.indexOf(a.locale) - site.locales.indexOf(b.locale));
   const fallback = out.find((a) => a.locale === site.defaultLocale);
-  return fallback ? [...out, { ...fallback, locale: "x-default", current: false }] : out;
+  return fallback ? [...out, { locale: "x-default", href: fallback.href, current: false }] : out;
 }
 
 /**
@@ -239,7 +242,12 @@ export function localizeLinks(html: string, localize: (path: string) => string):
 export function localizeHead(
   meta: HeadMeta,
   site: Site,
-  input: { locale: string; origin: string; alternates: readonly Alternate[] },
+  input: {
+    locale: string;
+    origin: string;
+    alternates: readonly Alternate[];
+    translation?: Localized["translation"];
+  },
 ): HeadMeta {
   const { locale, origin, alternates } = input;
   const graphPath = meta.canonical.startsWith(origin)
@@ -257,8 +265,39 @@ export function localizeHead(
       ...meta.openGraph.map(([k, v]): [string, string] => [k, k === "og:url" ? canonical : v]),
       ...others.map((a): [string, string] => ["og:locale:alternate", a.locale.replace("-", "_")]),
     ],
+    jsonLd: meta.jsonLd.map((doc, i) =>
+      i === 0 ? translationLd(doc, alternates, input.translation) : doc,
+    ),
     ...(alternates.length
       ? { alternates: alternates.map(({ locale: l, href }) => ({ locale: l, href })) }
       : {}),
   };
+}
+
+/**
+ * schema.org links between versions (RFC-0033 §4): the original lists its `workTranslation`s, a
+ * translation names its `translationOfWork`; `translator` is the reviewer, or the engine
+ * (a `SoftwareApplication`) for machine output nobody has reviewed yet.
+ */
+function translationLd(
+  doc: object,
+  alternates: readonly Alternate[],
+  translation: Localized["translation"],
+): object {
+  const self = alternates.find((a) => a.current);
+  const original = alternates.find((a) => a.original);
+  const others = alternates.filter((a) => !a.current && a.locale !== "x-default");
+  const links =
+    !self || !original
+      ? {}
+      : self.original
+        ? { workTranslation: others.map((a) => ({ "@id": a.href, inLanguage: a.locale })) }
+        : { translationOfWork: { "@id": original.href, inLanguage: original.locale } };
+  const by = translation?.review?.by;
+  const translator = by
+    ? { translator: { "@type": "Person", name: by.name ?? by.id } }
+    : translation?.method === "machine" && translation.provenance
+      ? { translator: { "@type": "SoftwareApplication", name: translation.provenance.engine } }
+      : {};
+  return { ...doc, ...links, ...translator };
 }

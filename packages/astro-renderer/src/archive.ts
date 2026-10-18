@@ -188,7 +188,10 @@ export function archiveSummaries(
         (max, e) => (e.updatedAt > max ? e.updatedAt : max),
         term.updatedAt,
       );
-      const path = archivePath(taxonomy, term.slug);
+      const path = archivePath(
+        taxonomy,
+        termSlug(term, index.locale, index.defaultLocale ?? index.locale),
+      );
       out.push({
         taxonomy,
         term,

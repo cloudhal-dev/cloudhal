@@ -184,7 +184,7 @@ export async function resolveRoute(
         };
       const perPage = options.perPage ?? DEFAULT_ARCHIVE_PAGE_SIZE;
       const pages = pageCount(listed.length, perPage);
-      const index = taxonomyIndex(taxonomies, vocabulary, locale);
+      const index = taxonomyIndex(taxonomies, vocabulary, locale, site.defaultLocale);
       const shown = shownTerm(index, term);
       const servesFeed = request.kind === "feed" && request.taxonomy.feed;
       if (shown && request.page <= pages && (request.kind === "page" || servesFeed)) {
@@ -262,7 +262,7 @@ export async function staticPaths(
   const tagged = locale === site.defaultLocale ? undefined : locale;
   const [base, index, entries, redirects] = await Promise.all([
     routablePaths(source, locale),
-    loadTaxonomyIndex(source),
+    loadTaxonomyIndex(source, locale),
     source.allEntries(locale),
     source.redirects().then((all) => all.filter((r) => r.locale === tagged)),
   ]);

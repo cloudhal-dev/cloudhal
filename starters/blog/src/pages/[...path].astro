@@ -166,7 +166,7 @@ const media: MediaContext = {
   budget: placeholderBudget(),
 };
 const t = strings(locale);
-const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source);
+const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source, locale);
 const primary = await source.navigation("primary", locale, { collectionIndex });
 const footerMenu = await source.navigation("footer", locale, { collectionIndex });
 const derivedCategories = !primary && NAV_CATEGORIES;
@@ -308,7 +308,9 @@ const meta = localizeHead(head, site, {
   locale,
   origin,
   alternates: gated ? await alternatesFor(source, gated, origin) : [],
+  ...(gated?.translation ? { translation: gated.translation } : {}),
 });
+Astro.response.headers.set("content-language", locale);
 const searchForm = searchAvailable(config, source)
   ? {
       label: t.searchLabel,

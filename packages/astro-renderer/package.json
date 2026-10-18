@@ -49,7 +49,8 @@
     "./carousel": "./src/carousel-client.ts",
     "./search-client": "./src/search-client.ts",
     "./locales": "./src/locales.ts",
-    "./locale-middleware": "./src/locale-middleware.ts"
+    "./locale-middleware": "./src/locale-middleware.ts",
+    "./locale-feeds": "./src/locale-feeds.ts"
   },
   "files": [
     "dist",
@@ -246,6 +247,10 @@
       "./locale-middleware": {
         "types": "./dist/src/locale-middleware.d.ts",
         "default": "./dist/src/locale-middleware.js"
+      },
+      "./locale-feeds": {
+        "types": "./dist/src/locale-feeds.d.ts",
+        "default": "./dist/src/locale-feeds.js"
       }
     }
   }
