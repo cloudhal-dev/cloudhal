@@ -280,6 +280,8 @@ export interface MessageParams {
   "gating.abilities.schedules.writeAny": { roles: string | number; role: string | number };
   "gating.abilities.settings.write": { roles: string | number; role: string | number };
   "gating.abilities.structure.write": { roles: string | number; role: string | number };
+  "glossary.remove": { term: string | number };
+  "glossary.translationIn": { language: string | number };
   "governance.appears.description": { path: string | number };
   "governance.blocked.title": { count: string | number };
   "governance.done.detail": { entries: string | number; redirects: string | number };
@@ -322,6 +324,7 @@ export interface MessageParams {
   "invites.reveal.expires": { relative: string | number; absolute: string | number };
   "invites.reveal.sent": { email: string | number };
   "invites.reveal.warning": { role: string | number };
+  "languages.remove": { language: string | number };
   "media.badges.agentHint": { name: string | number };
   "media.danger.inUse": { count: string | number };
   "media.detail.altHintLocale": { locale: string | number };

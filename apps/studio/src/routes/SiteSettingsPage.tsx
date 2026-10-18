@@ -36,34 +36,21 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AI_SETTINGS_SECTION, AiSettingsSection } from "../components/AiSettings.tsx";
-import {
-  ANALYTICS_SETTINGS_SECTION,
-  AnalyticsSettingsSection,
-} from "../components/AnalyticsSettings.tsx";
-import {
-  APPEARANCE_SETTINGS_SECTION,
-  AppearanceSettingsSection,
-} from "../components/AppearanceSettings.tsx";
-import { CHROME_SETTINGS_SECTION, ChromeSettingsSection } from "../components/ChromeSettings.tsx";
-import {
-  COMMENT_SETTINGS_SECTION,
-  CommentSettingsSection,
-} from "../components/CommentSettings.tsx";
+import { AiSettingsSection } from "../components/AiSettings.tsx";
+import { AnalyticsSettingsSection } from "../components/AnalyticsSettings.tsx";
+import { AppearanceSettingsSection } from "../components/AppearanceSettings.tsx";
+import { ChromeSettingsSection } from "../components/ChromeSettings.tsx";
+import { CommentSettingsSection } from "../components/CommentSettings.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
-import {
-  DESIGN_RULES_SECTION,
-  DesignRulesSettingsSection,
-} from "../components/DesignRulesSettings.tsx";
+import { DesignRulesSettingsSection } from "../components/DesignRulesSettings.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
-import {
-  SCHEDULE_SETTINGS_SECTION,
-  ScheduleSettingsSection,
-  TimeZoneField,
-} from "../components/ScheduleSettings.tsx";
+import { GlossarySettingsSection } from "../components/GlossarySettings.tsx";
+import { LanguageSettingsSection } from "../components/LanguageSettings.tsx";
+import { ScheduleSettingsSection, TimeZoneField } from "../components/ScheduleSettings.tsx";
 import { SettingRow, SettingsLayout, SettingsSection } from "../components/Settings.tsx";
+import { SETTINGS_SECTIONS, sectionTitleKey } from "../components/settings-sections.ts";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { formatDate, useI18n, useT } from "../i18n/index.tsx";
@@ -92,19 +79,6 @@ import {
   ttlSeconds,
   validateHostname,
 } from "../lib/site-settings.ts";
-
-const SECTIONS = [
-  "general",
-  "domains",
-  APPEARANCE_SETTINGS_SECTION,
-  CHROME_SETTINGS_SECTION,
-  DESIGN_RULES_SECTION,
-  ANALYTICS_SETTINGS_SECTION,
-  COMMENT_SETTINGS_SECTION,
-  SCHEDULE_SETTINGS_SECTION,
-  AI_SETTINGS_SECTION,
-  "previews",
-] as const;
 
 /** Saves a whole Site document (PUT, CAS on `rev`) and keeps every cached copy in step. */
 function useSaveSite(siteId: string) {
@@ -874,20 +848,9 @@ export function SiteSettingsPage() {
       <ViewOnlyBanner reason={settings.reason} />
       <SettingsLayout
         title={t("common.onThisPage")}
-        sections={SECTIONS.map((id) => ({
+        sections={SETTINGS_SECTIONS.map((id) => ({
           id,
-          label:
-            id === ANALYTICS_SETTINGS_SECTION
-              ? t("analyticsSettings.title")
-              : id === COMMENT_SETTINGS_SECTION
-                ? t("commentsSettings.title")
-                : id === SCHEDULE_SETTINGS_SECTION
-                  ? t("scheduleSettings.title")
-                  : id === AI_SETTINGS_SECTION
-                    ? t("aiSettings.title")
-                    : id === CHROME_SETTINGS_SECTION
-                      ? t("appearance.chrome.title")
-                      : t(`siteSettings.sections.${id}`),
+          label: t(sectionTitleKey(id)),
         }))}
       >
         <ReadOnly reason={settings.reason} className="grid min-w-0 content-start gap-6">
@@ -908,6 +871,9 @@ export function SiteSettingsPage() {
         <ScheduleSettingsSection siteId={siteId} />
         {/* In-editor AI (RFC-0016): content readers see it; site:settings changes it. */}
         <AiSettingsSection siteId={siteId} />
+        {/* RFC-0033: the site's languages and its translation glossary (settings.write changes them). */}
+        <LanguageSettingsSection siteId={siteId} />
+        <GlossarySettingsSection siteId={siteId} />
         <PreviewLinksSection site={site.data} enabled={instance.data?.features.previewLinks} />
       </SettingsLayout>
     </PageLayout>
