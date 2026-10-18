@@ -17,6 +17,8 @@ async function nodeOf(c: Context<Env>, siteId: string, nodeId: string): Promise<
 
 /** A group member with what Studio shows next to it: the title and, for pages, the path. */
 export interface TranslationRow extends TranslationMember {
+  /** The group's id: the original's. */
+  group: string;
   title: string;
   path?: string;
   collection?: string;
@@ -44,7 +46,7 @@ export const translations: Hono<Env> = new Hono<Env>()
       for (const m of (await store.translationGroup(site, g)).members)
         if (m.siteId === site.id && (!locale || m.locale === locale)) {
           const n = byId.get(m.id);
-          if (n) rows.push(row(m, n));
+          if (n) rows.push(row(m, n, g));
         }
     return c.json({ items: rows });
   })
@@ -57,7 +59,7 @@ export const translations: Hono<Env> = new Hono<Env>()
     for (const m of group.members) {
       const n =
         m.siteId === site.id ? await nodeOf(c, site.id, m.id).catch(() => undefined) : undefined;
-      items.push(n ? row(m, n) : { ...m, title: m.id });
+      items.push(n ? row(m, n, group.group) : { ...m, group: group.group, title: m.id });
     }
     return c.json({ group: group.group, items });
   })
@@ -86,9 +88,10 @@ export const translations: Hono<Env> = new Hono<Env>()
     return c.json(saved);
   });
 
-function row(m: TranslationMember, n: Localized): TranslationRow {
+function row(m: TranslationMember, n: Localized, group: string): TranslationRow {
   return {
     ...m,
+    group,
     title: n.title,
     ...("path" in n ? { path: n.path } : { collection: n.collection, slug: n.slug }),
   };

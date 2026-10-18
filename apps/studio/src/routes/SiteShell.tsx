@@ -16,6 +16,7 @@ import {
   Signpost,
   SquaresFour,
   Tag,
+  Translate,
   TreeStructure,
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -161,6 +162,14 @@ export function SiteShell() {
                 {proposedTerms > 0 && <Sidebar.MenuBadge>{proposedTerms}</Sidebar.MenuBadge>}
               </Sidebar.MenuButton>
               <Sidebar.MenuButton
+                icon={Translate}
+                href={`${base}/translations`}
+                active={is(`${base}/translations`)}
+                tooltip={t("nav.translations")}
+              >
+                {t("nav.translations")}
+              </Sidebar.MenuButton>
+              <Sidebar.MenuButton
                 icon={Images}
                 href={`${base}/media`}
                 active={is(`${base}/media`)}
@@ -250,40 +259,48 @@ export function SiteShell() {
               </Sidebar.MenuButton>
             </Sidebar.Menu>
           </Sidebar.Group>
-          <Sidebar.Group>
-            <Sidebar.GroupLabel>{t("nav.settings")}</Sidebar.GroupLabel>
-            <Sidebar.Menu>
-              <Sidebar.MenuButton
-                icon={GearSix}
-                href={`${base}/settings`}
-                active={is(`${base}/settings`)}
-                tooltip={t("nav.siteSettings")}
-              >
-                {t("nav.siteSettings")}
-              </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={TreeStructure}
-                href={`${base}/navigation`}
-                active={is(`${base}/navigation`)}
-                tooltip={t("nav.navigation")}
-              >
-                {t("nav.navigation")}
-              </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={Signpost}
-                href={`${base}/redirects`}
-                active={is(`${base}/redirects`)}
-                tooltip={t("nav.redirects")}
-              >
-                {t("nav.redirects")}
-              </Sidebar.MenuButton>
-            </Sidebar.Menu>
-          </Sidebar.Group>
+          <SettingsGroup base={base} is={is} />
         </>
       }
       commands={palette.commands}
     >
       <Outlet />
     </AppFrame>
+  );
+}
+
+/** The sidebar's Settings group: the site's settings, navigation and redirects. */
+function SettingsGroup({ base, is }: { base: string; is: (path: string) => boolean }) {
+  const t = useT();
+  return (
+    <Sidebar.Group>
+      <Sidebar.GroupLabel>{t("nav.settings")}</Sidebar.GroupLabel>
+      <Sidebar.Menu>
+        <Sidebar.MenuButton
+          icon={GearSix}
+          href={`${base}/settings`}
+          active={is(`${base}/settings`)}
+          tooltip={t("nav.siteSettings")}
+        >
+          {t("nav.siteSettings")}
+        </Sidebar.MenuButton>
+        <Sidebar.MenuButton
+          icon={TreeStructure}
+          href={`${base}/navigation`}
+          active={is(`${base}/navigation`)}
+          tooltip={t("nav.navigation")}
+        >
+          {t("nav.navigation")}
+        </Sidebar.MenuButton>
+        <Sidebar.MenuButton
+          icon={Signpost}
+          href={`${base}/redirects`}
+          active={is(`${base}/redirects`)}
+          tooltip={t("nav.redirects")}
+        >
+          {t("nav.redirects")}
+        </Sidebar.MenuButton>
+      </Sidebar.Menu>
+    </Sidebar.Group>
   );
 }

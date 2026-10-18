@@ -5,6 +5,8 @@ import { json, query, request } from "./http.ts";
 /** One language version of a page or entry, as the translations card lists it. */
 export interface TranslationRow {
   id: string;
+  /** The group's id: the original's. */
+  group: string;
   kind: "page" | "contentEntry";
   siteId: string;
   locale: string;

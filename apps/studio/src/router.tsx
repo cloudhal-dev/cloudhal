@@ -133,6 +133,10 @@ const AssetPage = lazyRouteComponent(
   () => withMessages(import("./routes/AssetPage.tsx"), ["media"]),
   "AssetPage",
 );
+const TranslationsPage = lazyRouteComponent(
+  () => import("./routes/TranslationsPage.tsx"),
+  "TranslationsPage",
+);
 const RedirectsPage = lazyRouteComponent(
   () => import("./routes/RedirectsPage.tsx"),
   "RedirectsPage",
@@ -335,6 +339,12 @@ const commenterRoute = createRoute({
   path: "/commenters/$commenterId",
   component: CommenterPage,
 });
+/** Site › Translations (RFC-0033 §8): the coverage view. */
+const translationsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/translations",
+  component: TranslationsPage,
+});
 /** Site › Settings › Redirects. */
 const redirectsRoute = createRoute({
   getParentRoute: () => siteRoute,
@@ -444,6 +454,7 @@ const routeTree = rootRoute.addChildren([
     taxonomyRoute,
     termEditorRoute,
     redirectsRoute,
+    translationsRoute,
     navigationRoute,
     mediaRoute,
     assetRoute,
