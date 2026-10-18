@@ -44,6 +44,7 @@ import { renderTools } from "./render-tools.ts";
 import { scheduleTools } from "./schedule-tools.ts";
 import { RUN_COUNTS, type RunContext } from "./schedules.ts";
 import { hoistDefs, relaxImageRefs } from "./schema-transforms.ts";
+import { searchTools } from "./search-tools.ts";
 import { surfaceTools } from "./surface-tools.ts";
 import { taxonomyTools } from "./taxonomy-tools.ts";
 
@@ -71,6 +72,8 @@ export function defineTools(): ToolDefinition[] {
     ...surfaceTools(),
     ...pageRemovalTools(),
     ...entryTools(),
+    // RFC-0029 §8: find nodes by words (drafts included), or what readers find.
+    ...searchTools(),
     ...bodyTools(),
     // RFC-0021 §2: DESIGN.md
     ...designTools(),

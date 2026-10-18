@@ -18,19 +18,17 @@ import {
   Tag,
   TreeStructure,
 } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
-import { AppFrame, type PaletteCommand } from "../components/AppFrame.tsx";
-import { usePublishMode, usePublishSite } from "../components/Publish.tsx";
+import { AppFrame } from "../components/AppFrame.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
-import { useToast } from "../components/Toast.ts";
 import { useCan } from "../components/useMe.ts";
 import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
+import { useSitePalette } from "../components/useSitePalette.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { apiErrorText } from "../lib/api-errors.ts";
 import { pendingCommentsCount } from "../lib/comments-shell.ts";
 
 /** Site surface: sidebar scoped to one site, with the site switcher in the header. */
@@ -39,8 +37,6 @@ export function SiteShell() {
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const qc = useQueryClient();
-  const toast = useToast();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites.list });
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
@@ -80,151 +76,23 @@ export function SiteShell() {
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
 
-  const createArticle = useMutation({
-    mutationFn: () =>
-      api.entries.create(siteId, {
-        collection: "posts",
-        slug: `untitled-${Date.now().toString(36)}`,
-        locale: site.data?.defaultLocale ?? "en",
-        status: "draft",
-        title: t("articles.untitled"),
-        body: { format: "markdown", value: "" },
-        fields: {},
-        tags: [],
-      }),
-    onSuccess: async (entry) => {
-      await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      await navigate({
-        to: "/sites/$siteId/articles/$entryId",
-        params: { siteId, entryId: entry.id },
-      });
-    },
+  // The palette: the site's commands and content search; Publish opens the top bar's confirmation.
+  const palette = useSitePalette({
+    siteId,
+    defaultLocale: site.data?.defaultLocale,
+    comments,
   });
-  const snapshot = useMutation({
-    mutationFn: () => api.snapshots.create(siteId, { label: t("snapshots.fromStudio") }),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["snapshots", siteId] });
-      toast.success(t("snapshots.created"));
-    },
-    onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
-  });
-  // Publishing follows the role: live, a request an Editor approves (202), or not at all (§2s).
-  const publish = usePublishSite(siteId);
-  const publishing = usePublishMode(siteId);
-
-  const commands: PaletteCommand[] = [
-    {
-      id: "overview",
-      label: t("commands.goOverview"),
-      run: () => navigate({ to: "/sites/$siteId", params: { siteId } }),
-    },
-    {
-      id: "analytics",
-      label: t("commands.goAnalytics"),
-      run: () => navigate({ to: "/sites/$siteId/analytics", params: { siteId } }),
-    },
-    {
-      id: "pages",
-      label: t("nav.pages"),
-      run: () => navigate({ to: "/sites/$siteId/pages", params: { siteId } }),
-    },
-    {
-      id: "articles",
-      label: t("commands.goArticles"),
-      run: () => navigate({ to: "/sites/$siteId/articles", params: { siteId } }),
-    },
-    {
-      id: "taxonomy",
-      label: t("commands.goTaxonomy"),
-      run: () => navigate({ to: "/sites/$siteId/taxonomy", params: { siteId } }),
-    },
-    {
-      id: "media",
-      label: t("commands.goMedia"),
-      run: () => navigate({ to: "/sites/$siteId/media", params: { siteId } }),
-    },
-    ...(comments
-      ? [
-          {
-            id: "comments",
-            label: t("commands.goComments"),
-            run: () => navigate({ to: "/sites/$siteId/comments", params: { siteId } }),
-          },
-        ]
-      : []),
-    {
-      id: "schedules",
-      label: t("commands.goSchedules"),
-      run: () => navigate({ to: "/sites/$siteId/schedules", params: { siteId } }),
-    },
-    {
-      id: "new-schedule",
-      label: t("commands.newSchedule"),
-      run: () =>
-        navigate({
-          to: "/sites/$siteId/schedules",
-          params: { siteId },
-          search: { new: "publish" },
-        }),
-    },
-    {
-      id: "navigation",
-      label: t("commands.goNavigation"),
-      run: () => navigate({ to: "/sites/$siteId/navigation", params: { siteId } }),
-    },
-    {
-      id: "redirects",
-      label: t("commands.goRedirects"),
-      run: () => navigate({ to: "/sites/$siteId/redirects", params: { siteId } }),
-    },
-    {
-      id: "snapshots",
-      label: t("commands.goSnapshots"),
-      run: () => navigate({ to: "/sites/$siteId/snapshots", params: { siteId } }),
-    },
-    {
-      id: "activity",
-      label: t("commands.goActivity"),
-      run: () => navigate({ to: "/sites/$siteId/activity", params: { siteId } }),
-    },
-    {
-      id: "approvals",
-      label: t("commands.goApprovals"),
-      run: () => navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
-    },
-    {
-      id: "settings",
-      label: t("commands.goSiteSettings"),
-      run: () => navigate({ to: "/sites/$siteId/settings", params: { siteId } }),
-    },
-    { id: "agents", label: t("commands.goAgents"), run: () => navigate({ to: "/agents" }) },
-    {
-      id: "skills",
-      label: t("commands.goSkills"),
-      run: () => navigate({ to: "/agents/skills" }),
-    },
-    { id: "team", label: t("commands.goTeam"), run: () => navigate({ to: "/team" }) },
-    { id: "account", label: t("commands.goAccount"), run: () => navigate({ to: "/account" }) },
-    { id: "new-article", label: t("commands.newArticle"), run: () => createArticle.mutate() },
-    { id: "snapshot", label: t("commands.createSnapshot"), run: () => snapshot.mutate() },
-    ...(publishing.mode === "none"
-      ? []
-      : [
-          {
-            id: "publish",
-            label:
-              publishing.mode === "request"
-                ? t("publishing.requestCommand")
-                : t("commands.publishSite"),
-            run: () => publish.mutate({ label: t("snapshots.publishedFromStudio") }),
-          },
-        ]),
-    { id: "all-sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
-  ];
 
   return (
     <AppFrame
-      actions={<SitePublish siteId={siteId} />}
+      actions={
+        <SitePublish
+          siteId={siteId}
+          open={palette.publishOpen}
+          onOpenChange={palette.setPublishOpen}
+        />
+      }
+      search={palette.search}
       loading={site.isPending}
       switcher={
         <SidebarSwitcher
@@ -413,7 +281,7 @@ export function SiteShell() {
           </Sidebar.Group>
         </>
       }
-      commands={commands}
+      commands={palette.commands}
     >
       <Outlet />
     </AppFrame>

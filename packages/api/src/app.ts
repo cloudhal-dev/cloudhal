@@ -46,6 +46,7 @@ import { previewLinks } from "./routes/preview-links.ts";
 import { proposals } from "./routes/proposals.ts";
 import { redirects } from "./routes/redirects.ts";
 import { scheduleRoutes, schedulerRoute } from "./routes/schedules.ts";
+import { siteSearch } from "./routes/search.ts";
 import { sites } from "./routes/sites.ts";
 import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
@@ -59,6 +60,38 @@ import { randomUploadSecret, type UploadSecret } from "./uploads.ts";
  * audited routes (RFC-0005 I3), and agent keys through `/api/agent-keys` (role caps, I5/I6).
  */
 const FENCED_AUTH_PATHS = /^\/api\/auth\/(organization|admin|api-key)(\/|$)/;
+
+/**
+ * The site's REST areas for people (agents use the MCP tools), each under
+ * `/api/sites/:siteId/<area>`; their requirements are in `ROUTE_SCOPES`.
+ */
+const SITE_AREAS: readonly (readonly [string, Hono<Env>])[] = [
+  ["pages", pages],
+  ["entries", entries],
+  ["proposals", proposals],
+  // RFC-0015: the block registry (built-ins and the theme's types).
+  ["block-types", blockTypes],
+  ["theme-settings", themeSettings],
+  ["chrome", chrome],
+  // RFC-0021: the site's design rules (DESIGN.md).
+  ["design", design],
+  ["snapshots", snapshots],
+  ["activity", activity],
+  ["preview-links", previewLinks],
+  ["approvals", approvals],
+  // RFC-0002 §6.1: taxonomy, terms, redirects and the tags migration.
+  ["taxonomies", taxonomies],
+  ["terms", terms],
+  ["redirects", redirects],
+  ["migrations", migrations],
+  // RFC-0029 §7: the command palette's search over the site's own nodes, drafts included.
+  ["search", siteSearch],
+  // RFC-0003 §5: navigation menus.
+  ["menus", menus],
+  // RFC-0004 §6.1: the media library.
+  ["assets", assets],
+  ["media", siteMedia],
+];
 
 /**
  * Builds the Cloudhal API as a Hono app (a `fetch` handler). The same app runs on Node
@@ -296,35 +329,13 @@ export function createApi(deps: ApiDeps) {
   app.route("/api/activity", deploymentActivity);
   app.route("/api/notifications", notificationRoutes(clock));
   app.route("/api/sites", sites);
-  app.route("/api/sites/:siteId/pages", pages);
-  app.route("/api/sites/:siteId/entries", entries);
-  app.route("/api/sites/:siteId/proposals", proposals);
-  // RFC-0015: the block registry (built-ins and the theme's types).
-  app.route("/api/sites/:siteId/block-types", blockTypes);
-  app.route("/api/sites/:siteId/theme-settings", themeSettings);
-  app.route("/api/sites/:siteId/chrome", chrome);
-  // RFC-0021: the site's design rules (DESIGN.md).
-  app.route("/api/sites/:siteId/design", design);
+  for (const [area, routes] of SITE_AREAS) app.route(`/api/sites/:siteId/${area}`, routes);
   // RFC-0016: in-editor AI settings, the model picker and commands.
   // RFC-0021 21c: Build chat renders with the same browser as `render_page`.
   app.route(
     "/api/sites/:siteId/ai",
     aiRoutes(deps.ai && deps.mcp?.render ? { ...deps.ai, render: deps.mcp.render } : deps.ai),
   );
-  app.route("/api/sites/:siteId/snapshots", snapshots);
-  app.route("/api/sites/:siteId/activity", activity);
-  app.route("/api/sites/:siteId/preview-links", previewLinks);
-  app.route("/api/sites/:siteId/approvals", approvals);
-  // RFC-0002 §6.1: taxonomy, terms, redirects and the tags migration (people; agents use MCP).
-  app.route("/api/sites/:siteId/taxonomies", taxonomies);
-  app.route("/api/sites/:siteId/terms", terms);
-  app.route("/api/sites/:siteId/redirects", redirects);
-  app.route("/api/sites/:siteId/migrations", migrations);
-  // RFC-0003 §5: navigation menus (people; agents use the MCP menu tools).
-  app.route("/api/sites/:siteId/menus", menus);
-  // RFC-0004 §6.1: the media library (people; agents use the MCP asset tools).
-  app.route("/api/sites/:siteId/assets", assets);
-  app.route("/api/sites/:siteId/media", siteMedia);
   // RFC-0006 §9.2: site analytics (people; agents use the MCP analytics tools).
   if (deps.analytics) app.route("/api/sites/:siteId/analytics", analytics);
   // RFC-0007 §12: reader comments (people; agents use the MCP comment tools).

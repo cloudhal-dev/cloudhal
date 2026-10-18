@@ -177,7 +177,25 @@ Algolia, Typesense, Meilisearch and similar services send content outside the de
     - `SearchDialog.astro` renders the dialog's markup and words (en/tr, `searchModal` in `theme.ts`).
     - `features/search-dialog.css`: centered on wide screens, a full-height sheet on phones, entrance at the site's motion level.
     - `Base.astro` renders the dialog and loads the module where the deployment answers searches.
+- **29d shipped.**
+  - **Core.** `searchSiteNodes` (`site-search.ts`) searches articles, pages, terms, media, menu items and redirects, drafts included.
+    - It matches words with `foldName` (every word a prefix of a word, title first).
+    - A dispatch table holds one reader per kind; media goes through the library's own query.
+    - It returns up to 5 hits per kind (at most 10).
+  - **API.** `GET /api/sites/:siteId/search?q=&kinds=&limit=` needs `content:read`. Media, menus and redirects appear only for people who hold `site:read`.
+    - `createApi` mounts the site areas from a table (`SITE_AREAS`).
+  - **Studio.**
+    - The palette groups commands and content (DESIGN.md §1 "Top bar") and opens a hit's editor, ⌘/Ctrl in a new tab.
+    - `useSitePalette` holds the site's commands; they left `SiteShell`, whose function went from 385 to 255 lines.
+    - Publish opens the top bar's `ApprovalDialog` (`SitePublish` takes `open`/`onOpenChange`).
+    - The new words are in English; Turkish and German are AI drafts through `pnpm i18n:import`.
+  - **MCP.** `search_site {siteId, query, kinds?, published?, limit?}` (`content:read`, read-only):
+    - by default the editing view, as Studio's palette;
+    - with `published`, what readers find, through the store's provider.
+    - The server instructions mention it.
 - **Deviations.**
+  - The command registry (`useRegisterCommands`, §7) is not built yet. No screen needs its own commands so far, and the site's commands are a table in one module now.
+  - Menu items are found by their own labels; a page item without a label is found as its page.
   - The header action's `style` (§6) is not added: it is a contract change, and the existing field opens the modal. The phone menu keeps its plain form.
   - The modal searches the site's default locale, like `/search` (open question 1).
   - Article hits carry no `context` yet: a category name would go stale when the term is renamed and the article is not.

@@ -12,6 +12,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { isApplePlatform } from "../lib/platform.ts";
 import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../lib/theme.ts";
+import type { PaletteSearch } from "./CommandMenu.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { NotificationsBell } from "./NotificationsBell.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
@@ -49,6 +50,8 @@ interface AppFrameProps {
   nav: ReactNode;
   loading?: boolean;
   commands: PaletteCommand[];
+  /** RFC-0029 §7: the palette also searches this site's content (the site surface). */
+  search?: PaletteSearch | undefined;
   children: ReactNode;
 }
 
@@ -58,6 +61,7 @@ function AppFrameShell({
   nav,
   loading = false,
   commands,
+  search,
   children,
 }: AppFrameProps) {
   const { t } = useI18n();
@@ -176,7 +180,12 @@ function AppFrameShell({
       {/* Kumo `CommandPalette` (`CommandMenu.tsx`), loaded on the first ⌘K, `/` or hover. */}
       {wanted ? (
         <Suspense fallback={null}>
-          <CommandMenu open={open} onOpenChange={setOpenState} commands={allCommands} />
+          <CommandMenu
+            open={open}
+            onOpenChange={setOpenState}
+            commands={allCommands}
+            search={search}
+          />
         </Suspense>
       ) : null}
     </Sidebar.Provider>

@@ -69,6 +69,7 @@ import { RelativeTime } from "../components/RelativeTime.tsx";
 import { SettingRow } from "../components/Settings.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useDebounced } from "../components/useDebounced.ts";
 import { useGate } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
@@ -101,16 +102,6 @@ import {
 /** Indent and outdent point along the reading order (ADR-0033 C1). */
 const Indent = directional(TextIndent);
 const Outdent = directional(TextOutdent);
-
-/** Waits until `value` has been stable for `ms` (the preview is resolved on the server). */
-function useDebounced<T>(value: T, ms: number): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setSettled(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return settled;
-}
 
 type Device = "desktop" | "mobile";
 
