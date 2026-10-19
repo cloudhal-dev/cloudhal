@@ -14,7 +14,7 @@
  * without them only public routes (/login) render. `route@<js>` runs JS after load (open a dialog) and tags the file `_action`.
  */
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -122,12 +122,13 @@ async function launch(width: number): Promise<{ chrome: ChildProcess; cdp: Cdp }
   const exe = CHROME_CANDIDATES.find((p) => existsSync(p));
   if (!exe) throw new Error("Chrome not found; set CHROME_PATH");
   const port = 9300 + Math.floor(Math.random() * 600);
+  const profile = mkdtempSync(path.join(tmpdir(), "cloudhal-shots-"));
   const chrome = spawn(
     exe,
     [
       "--headless=new",
       `--remote-debugging-port=${port}`,
-      `--user-data-dir=${path.join(tmpdir(), `cloudhal-shots-${port}`)}`,
+      `--user-data-dir=${profile}`,
       "--no-first-run",
       "--hide-scrollbars",
       `--window-size=${width},900`,
@@ -135,6 +136,15 @@ async function launch(width: number): Promise<{ chrome: ChildProcess; cdp: Cdp }
     ],
     { stdio: "ignore" },
   );
+  // The profile goes with Chrome; Chrome goes with this script, however it ends.
+  chrome.once("exit", () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // the OS cleans its temporary directory
+    }
+  });
+  process.once("exit", () => chrome.kill());
   for (let i = 0; i < 50; i++) {
     try {
       const targets = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()) as Array<{
@@ -237,7 +247,11 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
     }
   } finally {
     cdp.close();
-    chrome.kill();
+    const exited = new Promise((resolve) => chrome.once("exit", resolve));
+    if (chrome.exitCode === null && chrome.signalCode === null) {
+      chrome.kill();
+      await exited; // its profile is removed on exit
+    }
   }
   return problems;
 }

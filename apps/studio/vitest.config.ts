@@ -5,6 +5,8 @@ import { catalogs } from "./catalogs.ts";
 export default defineConfig({
   plugins: [catalogs(), react()],
   test: {
+    // One temp directory per run, removed at the end (scripts/vitest-tmpdir.ts).
+    globalSetup: ["../../scripts/vitest-tmpdir.ts"],
     environment: "happy-dom",
     include: ["test/**/*.test.{ts,tsx}"],
     setupFiles: ["./test/setup.ts"],

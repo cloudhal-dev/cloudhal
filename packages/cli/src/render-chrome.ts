@@ -57,6 +57,10 @@ export function chromeRenderer(
     const { process: child, dir } = chrome;
     chrome = undefined;
     child.kill();
+    // A Chrome still starting up can ignore SIGTERM and outlive this process: force it.
+    const force = setTimeout(() => child.kill("SIGKILL"), 2000);
+    force.unref?.();
+    child.once("exit", () => clearTimeout(force));
     // Chrome's helpers can still be writing into the profile as the main process exits: retry,
     // and never let a leftover temporary directory become an uncaught exception.
     child.once("exit", () => {

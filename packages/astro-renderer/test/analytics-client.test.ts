@@ -205,25 +205,31 @@ describe("analytics client build", () => {
 
 describe("_headers for the hashed /_cloudhal/ scripts", () => {
   it("adds one immutable rule next to the adapter's, idempotently", async () => {
-    const { mkdtemp, readFile, writeFile } = await import("node:fs/promises");
+    const { mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
     const { writeCloudhalAssetHeaders } = await import("../src/static-headers.ts");
     const dir = await mkdtemp(join(tmpdir(), "cloudhal-headers-"));
-    await writeFile(
-      join(dir, "_headers"),
-      "/_astro/*\n  Cache-Control: public, max-age=31536000, immutable\n",
-    );
-    await writeCloudhalAssetHeaders(dir);
-    await writeCloudhalAssetHeaders(dir);
-    const text = await readFile(join(dir, "_headers"), "utf8");
-    expect(text).toBe(
-      "/_astro/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/_cloudhal/*\n  Cache-Control: public, max-age=31536000, immutable\n",
-    );
-    const fresh = await mkdtemp(join(tmpdir(), "cloudhal-headers-"));
-    await writeCloudhalAssetHeaders(fresh);
-    expect(await readFile(join(fresh, "_headers"), "utf8")).toBe(
-      "/_cloudhal/*\n  Cache-Control: public, max-age=31536000, immutable\n",
-    );
+    let fresh: string | undefined;
+    try {
+      await writeFile(
+        join(dir, "_headers"),
+        "/_astro/*\n  Cache-Control: public, max-age=31536000, immutable\n",
+      );
+      await writeCloudhalAssetHeaders(dir);
+      await writeCloudhalAssetHeaders(dir);
+      const text = await readFile(join(dir, "_headers"), "utf8");
+      expect(text).toBe(
+        "/_astro/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/_cloudhal/*\n  Cache-Control: public, max-age=31536000, immutable\n",
+      );
+      fresh = await mkdtemp(join(tmpdir(), "cloudhal-headers-"));
+      await writeCloudhalAssetHeaders(fresh);
+      expect(await readFile(join(fresh, "_headers"), "utf8")).toBe(
+        "/_cloudhal/*\n  Cache-Control: public, max-age=31536000, immutable\n",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      if (fresh) await rm(fresh, { recursive: true, force: true });
+    }
   });
 });
