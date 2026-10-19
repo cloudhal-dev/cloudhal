@@ -379,11 +379,15 @@ const nativeName = (l: string) => {
     return l;
   }
 };
+// RFC-0034 §6: languages a language edition publishes (another site) follow the site's own.
+const editionLocales = alternates
+  .map((a) => a.locale)
+  .filter((l) => l !== "x-default" && !site.locales.includes(l));
 const languages =
-  site.locales.length > 1
+  site.locales.length + editionLocales.length > 1
     ? {
         label: t.languages,
-        items: site.locales.map((l) => ({
+        items: [...site.locales, ...editionLocales].map((l) => ({
           locale: l,
           name: nativeName(l),
           href: alternates.find((a) => a.locale === l)?.href ?? localeUrl(site, l, "/", origin),

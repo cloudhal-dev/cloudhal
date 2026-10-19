@@ -194,6 +194,12 @@ describe("locales over a store", () => {
       { locale: "ja", href: "https://ja.example.com/team", current: false },
       { locale: "x-default", href: "https://example.com/team", current: false },
     ]);
+    // From the edition: the same set, and the same x-default (the original).
+    const ownJa = new LiveSource(store, edition.site.id);
+    const back = { source, origin: ORIGIN };
+    const fromJa = await alternatesFor(ownJa, team, "https://ja.example.com", [back]);
+    expect(fromJa.find((a) => a.locale === "x-default")?.href).toBe("https://example.com/team");
+    expect(fromJa.map((a) => a.locale)).toEqual(["ja", "en", "es", "x-default"]);
     // A page that is not yet in a group joins one through its edition.
     const home = (await source.pageByPath("/")) as Page;
     const peerHome = (await store.listPages(edition.site.id)).find((p) => p.path === "/");
