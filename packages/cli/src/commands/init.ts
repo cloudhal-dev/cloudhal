@@ -5,6 +5,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { assetDir, materializeDependencies, monorepoRoot, monorepoVersions } from "../assets.ts";
 import { loadThemeSettings } from "../blocks.ts";
 import { writeProjectConfig } from "../config.ts";
+import { starterFilter } from "../starter-files.ts";
 
 export interface InitOptions {
   readonly dir: string;
@@ -12,8 +13,6 @@ export interface InitOptions {
   readonly starter?: string;
   readonly log?: (line: string) => void;
 }
-
-const SKIP = new Set(["node_modules", "dist", ".astro", ".cloudhal", "cloudhal.json"]);
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -59,10 +58,7 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
   }
   await mkdir(projectDir, { recursive: true });
 
-  await cp(starterDir, projectDir, {
-    recursive: true,
-    filter: (src) => !SKIP.has(path.basename(src)),
-  });
+  await cp(starterDir, projectDir, { recursive: true, filter: await starterFilter(starterDir) });
   // Published starters carry `_gitignore` (npm strips .gitignore from tarballs).
   if (await exists(path.join(projectDir, "_gitignore")))
     await rename(path.join(projectDir, "_gitignore"), path.join(projectDir, ".gitignore"));
