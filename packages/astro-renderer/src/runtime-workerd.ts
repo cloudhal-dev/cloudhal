@@ -23,6 +23,7 @@ import { usableCommentsKey } from "./comments.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
+import type { PeerEdition } from "./locales.ts";
 import type { GraphSource } from "./source.ts";
 
 /** RFC-0029 §3: `AI_SEARCH`, `SEARCH_BUCKET` and `CLOUDHAL_SEARCH_*` turn on semantic search. */
@@ -132,6 +133,43 @@ export function analyticsBackend(
 }
 
 export { CACHE_TAG_PREFIX } from "./cache-tags.ts";
+
+/**
+ * RFC-0034 §6: the other sites of the project that publish a version of `node`'s work (language
+ * editions), for `hreflang` and the language switcher. Only what those sites have published
+ * counts: their published snapshot is read, never their drafts. A site without a hostname is
+ * left out (there is no address to point to).
+ */
+export async function peerEditions(
+  config: CloudhalRendererConfig,
+  node: { id: string; translation?: { group: string } | undefined; path?: string },
+): Promise<PeerEdition[]> {
+  const siteId = siteOf(config.siteId);
+  if (!siteId) return [];
+  const store = getResolver(siteId).store;
+  const site = await store.getSite(siteId);
+  if (!site) return [];
+  const siblings = (await store.listSites(site.projectId)).filter(
+    (s) => s.id !== siteId && s.publishedSnapshotId && s.domains.length > 0,
+  );
+  if (siblings.length === 0) return [];
+  const group = node.translation?.group ?? node.id;
+  const rows = await store.sql.all<{ site_id: string }>(
+    `SELECT DISTINCT site_id FROM nodes WHERE kind = ? AND site_id IN (${siblings.map(() => "?").join(", ")})
+       AND (id = ? OR json_extract(body, '$.translation.group') = ?)`,
+    ["path" in node ? "page" : "contentEntry", ...siblings.map((s) => s.id), group, group],
+  );
+  const now = Date.now();
+  const out: PeerEdition[] = [];
+  for (const { site_id } of rows) {
+    const peer = siblings.find((s) => s.id === site_id);
+    const host = peer?.domains.find((d) => d.primary)?.hostname ?? peer?.domains[0]?.hostname;
+    if (!peer?.publishedSnapshotId || !host) continue;
+    const source = (await getResolver(peer.id).snapshot(peer.publishedSnapshotId)).at(now);
+    out.push({ source, origin: `https://${host}` });
+  }
+  return out;
+}
 
 let commentStore: SqlCommentStore | undefined;
 

@@ -2,6 +2,7 @@ import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { SqlDriver } from "@cloudhal/storage";
+import type { PeerEdition } from "./locales.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { SiteResolver } from "./resolver.ts";
@@ -54,6 +55,17 @@ export function resetSource(_siteId?: string): void {
  */
 export function withRequestSite<T>(_siteId: string, fn: () => T): T {
   return fn();
+}
+
+/**
+ * RFC-0034 §6: other sites' published versions of a work. `cloudhal dev` renders the project's one
+ * site from its local store, so there are none.
+ */
+export async function peerEditions(
+  _config: Partial<CloudhalRendererConfig>,
+  _node: unknown,
+): Promise<PeerEdition[]> {
+  return [];
 }
 
 /**

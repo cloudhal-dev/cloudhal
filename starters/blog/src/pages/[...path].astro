@@ -35,7 +35,7 @@ import {
 } from "@cloudhal/astro-renderer/navigation";
 import { notFoundPage, notFoundPageIds } from "@cloudhal/astro-renderer/not-found";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
-import { getSource } from "@cloudhal/astro-renderer/runtime";
+import { getSource, peerEditions } from "@cloudhal/astro-renderer/runtime";
 import { searchAvailable } from "@cloudhal/astro-renderer/search";
 import {
   archiveHead,
@@ -342,7 +342,10 @@ const head =
 // RFC-0033 §4: self-canonical in the locale, `lang`/`dir`, and the `hreflang` set from the group.
 const fallback = shownIn !== locale;
 const alternates =
-  gated && !fallback && !notFound ? await alternatesFor(source, gated, origin) : [];
+  gated && !fallback && !notFound
+    ? // RFC-0034 §6: language editions published by other sites of the project, on their hosts.
+      await alternatesFor(source, gated, origin, await peerEditions(config, gated))
+    : [];
 const localized = localizeHead(head, site, {
   locale: shownIn,
   origin,
