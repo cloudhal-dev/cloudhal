@@ -8,7 +8,15 @@
  *   the last site of the installation
  */
 
-import { deleteSiteData, listHosts, seedStarterSite } from "@cloudhal/core-ts";
+import type { Site } from "@cloudhal/core-contracts";
+import {
+  createEdition,
+  deleteSiteData,
+  type EditionReport,
+  listHosts,
+  type SiteGraphStore,
+  seedStarterSite,
+} from "@cloudhal/core-ts";
 import { Hono } from "hono";
 import type { Env } from "../../context.ts";
 import { badRequest } from "../../errors.ts";
@@ -24,6 +32,8 @@ export interface CreateInput {
   locale: string;
   projectId?: string;
   theme?: string;
+  /** RFC-0034 §6: start as a language edition of this site (its project, theme and structure). */
+  from?: string;
 }
 
 /** The `POST /sites` body, checked (400 on anything off). Shared with Studio's `POST /api/sites`. */
@@ -41,13 +51,39 @@ export function parseCreate(body: unknown): CreateInput {
     throw badRequest("projectId must be a string");
   if (b.theme !== undefined && (typeof b.theme !== "string" || !b.theme))
     throw badRequest("theme must be a theme name");
+  if (b.from !== undefined && (typeof b.from !== "string" || !b.from))
+    throw badRequest("from must be a site id");
   return {
     name,
     slug,
     locale,
     ...(b.projectId ? { projectId: b.projectId as string } : {}),
     ...(b.theme ? { theme: b.theme as string } : {}),
+    ...(b.from ? { from: b.from as string } : {}),
   };
+}
+
+/**
+ * A blank site seeded like `cloudhal init`, or a language edition of `input.from` (RFC-0034 §6).
+ * 404 for an unknown source.
+ */
+export async function makeSite(
+  store: SiteGraphStore,
+  input: CreateInput,
+): Promise<{ site: Site; edition?: Omit<EditionReport, "site"> } | Response> {
+  if (!input.from) return { site: await seedStarterSite(store, input) };
+  if (!(await store.getSite(input.from)))
+    return Response.json(
+      { error: "not_found", message: "not found: source site" },
+      { status: 404 },
+    );
+  const { site, ...edition } = await createEdition(store, {
+    fromSiteId: input.from,
+    name: input.name,
+    slug: input.slug,
+    locale: input.locale,
+  });
+  return { site, edition };
 }
 
 /** List, create and delete sites. */
@@ -95,18 +131,29 @@ export function sitesAdminRoutes(deps: AdminDeps): Hono<Env> {
           409,
           NO_STORE,
         );
-      const site = await seedStarterSite(store, input);
+      const made = await makeSite(store, input);
+      if (made instanceof Response) return made;
+      const site = made.site;
       await c.get("audit")?.record({
         at: new Date().toISOString(),
         actor: OPERATOR_ACTOR,
         tool: "site.create",
         decision: "allow",
         outcome: "ok",
-        input: { siteId: site.id, slug: input.slug, locale: input.locale, via: "deploy-token" },
+        input: {
+          siteId: site.id,
+          slug: input.slug,
+          locale: input.locale,
+          from: input.from ?? null,
+          via: "deploy-token",
+        },
         reason: `operator created the site ${input.name}`,
       });
       return c.json(
-        { site: { id: site.id, name: input.name, slug: input.slug, projectId: site.projectId } },
+        {
+          site: { id: site.id, name: input.name, slug: input.slug, projectId: site.projectId },
+          ...(made.edition ? { edition: made.edition } : {}),
+        },
         201,
         NO_STORE,
       );

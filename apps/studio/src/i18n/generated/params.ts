@@ -463,7 +463,9 @@ export interface MessageParams {
   "migration.dialog.termsValue": { created: string | number; reused: string | number };
   "migration.done.toastDetail": { tags: string | number; entries: string | number };
   "migration.revert.toastDetail": { count: string | number };
+  "newSite.copyOf": { name: string | number };
   "newSite.createdDescription": { name: string | number };
+  "newSite.editionCreated": { name: string | number; count: number };
   "notifications.bellCount": { count: string | number };
   "notifications.comments.approval.title": { agent: string | number };
   "notifications.comments.paused.body": { cap: string | number };

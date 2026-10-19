@@ -3,7 +3,7 @@ import { createSite, deleteSite, listSites } from "../commands/site.ts";
 import { type CliCommand, remoteFlags, subcommands } from "./types.ts";
 
 const USAGE =
-  "usage: cloudhal site list | create --name <name> --slug <slug> [--locale <tag>] [--project <id>] [--theme <name>] | delete <siteId> --confirm <slug>  [--remote] [--admin-url <url>]";
+  "usage: cloudhal site list | create --name <name> --slug <slug> [--locale <tag>] [--project <id>] [--theme <name>] [--from <siteId>] | delete <siteId> --confirm <slug>  [--remote] [--admin-url <url>]";
 
 const list: CliCommand = async (_rest, values, { projectDir }) => {
   const sites = await listSites({ projectDir, ...remoteFlags(values) });
@@ -26,9 +26,16 @@ const create: CliCommand = async (_rest, values, { projectDir }) => {
       ...(values.locale ? { locale: values.locale } : {}),
       ...(values.project ? { projectId: values.project } : {}),
       ...(values.theme ? { theme: values.theme } : {}),
+      ...(values.from ? { from: values.from } : {}),
     },
   );
   console.log(`created ${site.id} in project ${site.projectId} (nothing is published)`);
+  if (site.edition) {
+    console.log(
+      `  edition: ${site.edition.pages} page(s) and ${site.edition.menus} menu(s) copied as drafts`,
+    );
+    for (const s of site.edition.skipped) console.log(`  left out ${s.what}: ${s.reason}`);
+  }
   return 0;
 };
 

@@ -101,6 +101,10 @@ A site created with `from` (§3):
 - **Never copies:** articles, comments, analytics, members (the requester becomes the owner) or API keys.
 - **Assets** are copied as rows and server-side R2 copies (`media_blobs` is keyed by `(site_id, sha256)`), with no re-upload.
 - **Translation groups:** copied pages join cross-site groups with `source.siteId`, starting `linked` (RFC-0033 §4a), so structural changes arrive as drafts. Editors can switch a page to `independent`. With `structure+translate`, agent translations are queued as drafts through the existing pipeline (`save_translation`, glossary, review). Nothing auto-publishes.
+- *Phase E note:*
+  - **Implemented:** `structure` mode only (`createEdition`). Pages are copied as drafts in the source's words, with `method: "human"` and `layout: "linked"`.
+  - **Not copied:** terms and media. Pages that refer to them are left out and reported.
+  - **Deferred:** `structure+translate` (queueing agent translations). Studio has no agent-translation request path yet; agents translate over MCP (`save_translation`).
 - **Write discipline:** a series of guarded `batch()` calls. The new site's id is chosen up front and returned at once; a retry resumes rather than duplicates. Progress shows in Studio.
 
 ### 7. Studio

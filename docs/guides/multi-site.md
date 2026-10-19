@@ -13,6 +13,23 @@ cloudhal site list --remote
 
 The new site starts with a home page and system pages. Nothing is published. Give it its domains in Studio, under the site's settings.
 
+## Start a language edition
+
+A language edition is a separate site for another language or market. It is a new site in the same project, and it starts from the source site's structure instead of a blank starter.
+
+```bash
+cloudhal site create --remote --name "Newsroom English" --slug newsroom-en --locale en --from <sourceSiteId>
+```
+
+In Studio, choose **New site › Start from › A copy of …**.
+
+**Copied from the source:**
+- the theme and its settings, the design, the header and footer, and the time zone;
+- the pages in the source's default language, as drafts in the new language. They are still in the source's words; a person or an agent translates them. Each copy joins the source page's translation group, so `hreflang` spans both sites and the Translations card shows when the source changes;
+- the menus, with their page items pointing at the copies.
+
+**Not copied:** articles, categories and tags (the edition gets empty default taxonomies), media, comments, analytics, members and keys. A page that refers to the source's media or categories is left out and reported. Nothing is published.
+
 ## Serve it from the same site Worker
 
 1. List the sites in `cloudhal.json`. The project's own `siteId` always comes first:

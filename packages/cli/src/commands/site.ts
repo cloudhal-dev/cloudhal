@@ -5,7 +5,7 @@
  * serves it.
  */
 import path from "node:path";
-import { deleteSiteData, listHosts, seedStarterSite } from "@cloudhal/core-ts";
+import { createEdition, deleteSiteData, listHosts, seedStarterSite } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
 import { brief, deployment, type SyncOptions } from "./sync.ts";
@@ -26,12 +26,21 @@ export interface SiteRow {
   readonly conflicts: readonly string[];
 }
 
+/** What an edition copied and what it left out. */
+export interface EditionSummary {
+  readonly pages: number;
+  readonly menus: number;
+  readonly skipped: readonly { readonly what: string; readonly reason: string }[];
+}
+
 export interface CreateSiteInput {
   readonly name: string;
   readonly slug: string;
   readonly locale?: string;
   readonly projectId?: string;
   readonly theme?: string;
+  /** RFC-0034 §6: start as a language edition of this site. */
+  readonly from?: string;
 }
 
 async function remote<T>(options: SiteCliOptions, p: string, init: RequestInit = {}): Promise<T> {
@@ -90,17 +99,27 @@ export async function listSites(options: SiteCliOptions): Promise<SiteRow[]> {
 export async function createSite(
   options: SiteCliOptions,
   input: CreateSiteInput,
-): Promise<{ id: string; projectId: string }> {
-  if (options.remote)
-    return (
-      await remote<{ site: { id: string; projectId: string } }>(options, "/api/admin/sites", {
-        method: "POST",
-        body: JSON.stringify(input),
-      })
-    ).site;
+): Promise<{ id: string; projectId: string; edition?: EditionSummary }> {
+  if (options.remote) {
+    const r = await remote<{ site: { id: string; projectId: string }; edition?: EditionSummary }>(
+      options,
+      "/api/admin/sites",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+    return { ...r.site, ...(r.edition ? { edition: r.edition } : {}) };
+  }
   return withLocal(options.projectDir, async (l) => {
     if ((await l.store.listSites()).some((s) => s.slug === input.slug))
       throw new Error(`a site with the slug ${input.slug} exists`);
+    if (input.from) {
+      const r = await createEdition(l.store, {
+        fromSiteId: input.from,
+        name: input.name,
+        slug: input.slug,
+        locale: input.locale ?? "en",
+      });
+      return { id: r.site.id, projectId: r.site.projectId, edition: r };
+    }
     const site = await seedStarterSite(l.store, input);
     return { id: site.id, projectId: site.projectId };
   });

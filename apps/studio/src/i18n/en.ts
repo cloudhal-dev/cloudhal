@@ -2761,6 +2761,14 @@ export const en = {
     failed: "The site could not be created",
     created: "Site created",
     createdDescription: "{name} is ready to edit; nothing is published yet.",
+    from: "Start from",
+    fromHint: "A blank site starts with a home page and an About page.",
+    blank: "A blank site",
+    copyOf: "A copy of {name} (language edition)",
+    editionHint:
+      "Copies that site's pages as drafts in the new language, its menus and design, linked as translations; articles and media stay. The new site joins that site's project.",
+    editionCreated:
+      "{name} starts with {count, plural, one {# page} other {# pages}} to translate; nothing is published yet.",
   },
   /** RFC-0034 §7: a project's sites side by side. */
   projects: {

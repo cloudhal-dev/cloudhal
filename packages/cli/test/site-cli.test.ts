@@ -47,4 +47,15 @@ describe("cloudhal site (local)", () => {
     expect(r.rows).toBeGreaterThan(0);
     expect((await listSites({ projectDir })).map((s) => s.slug)).toEqual(["english"]);
   });
+
+  it("creates a language edition of the project's site", async () => {
+    const { projectDir, site } = await project();
+    const ed = await createSite(
+      { projectDir },
+      { name: "Deutsch", slug: "deutsch", locale: "de", from: site.id },
+    );
+    expect(ed.projectId).toBe(site.projectId);
+    expect(ed.edition?.pages).toBe(2);
+    expect(ed.edition?.skipped).toEqual([]);
+  });
 });

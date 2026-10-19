@@ -8,9 +8,11 @@ import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { COMMON_LOCALES, languageOption } from "../lib/languages.ts";
 import { slugify } from "../lib/workflow.ts";
+import { useSites } from "./SiteAccessField.tsx";
 import { useToast } from "./Toast.ts";
 
 const NEW_PROJECT = "__new";
+const BLANK = "__blank";
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
@@ -22,10 +24,13 @@ export function NewSiteDialog({
   open,
   onOpenChange,
   projectId,
+  from: fromSite,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId?: string | undefined;
+  /** RFC-0034 §6: preset "start from this site" (a language edition). */
+  from?: string | undefined;
 }) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
@@ -37,6 +42,7 @@ export function NewSiteDialog({
   const [slugEdited, setSlugEdited] = useState(false);
   const [language, setLanguage] = useState("en");
   const [project, setProject] = useState<string>(NEW_PROJECT);
+  const [from, setFrom] = useState<string>(BLANK);
   const [submitted, setSubmitted] = useState(false);
   const create = useMutation({
     mutationFn: () =>
@@ -44,15 +50,20 @@ export function NewSiteDialog({
         name: name.trim(),
         slug,
         locale: language,
-        ...(project !== NEW_PROJECT ? { projectId: project } : {}),
+        ...(from !== BLANK ? { from } : project !== NEW_PROJECT ? { projectId: project } : {}),
       }),
-    onSuccess: async ({ site }) => {
+    onSuccess: async ({ site, edition }) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["sites"] }),
         qc.invalidateQueries({ queryKey: ["projects"] }),
       ]);
       onOpenChange(false);
-      toast.success(t("newSite.created"), t("newSite.createdDescription", { name: site.name }));
+      toast.success(
+        t("newSite.created"),
+        edition
+          ? t("newSite.editionCreated", { name: site.name, count: edition.pages })
+          : t("newSite.createdDescription", { name: site.name }),
+      );
       await navigate({ to: "/sites/$siteId", params: { siteId: site.id } });
     },
   });
@@ -64,17 +75,15 @@ export function NewSiteDialog({
     setSlugEdited(false);
     setLanguage("en");
     setProject(projectId ?? NEW_PROJECT);
+    setFrom(fromSite ?? BLANK);
     setSubmitted(false);
     create.reset();
-  }, [open, projectId]);
+  }, [open, projectId, fromSite]);
+
   const languages = useMemo(
     () => Object.fromEntries(COMMON_LOCALES.map((l) => [l, languageOption(locale, l)])),
     [locale],
   );
-  const projectItems = {
-    [NEW_PROJECT]: t("newSite.newProject"),
-    ...Object.fromEntries((projects.data ?? []).map((p) => [p.id, p.name])),
-  };
   const nameError = submitted && !name.trim() ? t("newSite.nameRequired") : undefined;
   const slugError = submitted && !SLUG.test(slug) ? t("newSite.slugInvalid") : undefined;
   const submit = () => {
@@ -132,13 +141,12 @@ export function NewSiteDialog({
               onValueChange={(v) => setLanguage(v as string)}
               items={languages}
             />
-            <Select
-              className="w-full"
-              label={t("newSite.project")}
-              description={t("newSite.projectHint")}
-              value={project}
-              onValueChange={(v) => setProject(v as string)}
-              items={projectItems}
+            <OriginFields
+              from={from}
+              onFrom={setFrom}
+              project={project}
+              onProject={setProject}
+              projects={projects.data ?? []}
             />
           </div>
         </LayerDialog.Body>
@@ -149,5 +157,47 @@ export function NewSiteDialog({
         </LayerDialog.Actions>
       </LayerDialog.Content>
     </LayerDialog.Root>
+  );
+}
+
+/** Where the site starts: blank (in a project of your choice) or as an edition of another site. */
+function OriginFields(p: {
+  from: string;
+  onFrom: (v: string) => void;
+  project: string;
+  onProject: (v: string) => void;
+  projects: readonly { id: string; name: string }[];
+}) {
+  const { t } = useI18n();
+  const sites = useSites().data ?? [];
+  const fromItems = {
+    [BLANK]: t("newSite.blank"),
+    ...Object.fromEntries(sites.map((s) => [s.id, t("newSite.copyOf", { name: s.name })])),
+  };
+  const projectItems = {
+    [NEW_PROJECT]: t("newSite.newProject"),
+    ...Object.fromEntries(p.projects.map((x) => [x.id, x.name])),
+  };
+  return (
+    <>
+      <Select
+        className="w-full"
+        label={t("newSite.from")}
+        description={p.from === BLANK ? t("newSite.fromHint") : t("newSite.editionHint")}
+        value={p.from}
+        onValueChange={(v) => p.onFrom(v as string)}
+        items={fromItems}
+      />
+      {p.from === BLANK && (
+        <Select
+          className="w-full"
+          label={t("newSite.project")}
+          description={t("newSite.projectHint")}
+          value={p.project}
+          onValueChange={(v) => p.onProject(v as string)}
+          items={projectItems}
+        />
+      )}
+    </>
   );
 }
