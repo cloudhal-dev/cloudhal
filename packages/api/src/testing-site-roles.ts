@@ -199,6 +199,36 @@ export function describeSiteRolesApi(label: string, backend: RolesBackend): void
       expect(project?.sites.map((s) => s.id)).toContain(site.id);
     });
 
+    it("creates a language edition of a site, in its project", async () => {
+      const { english, owner, call } = await setup();
+      const res = await call("POST", "/api/sites", owner, {
+        name: "English (DE)",
+        slug: "english-de",
+        locale: "de",
+        from: english,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(201);
+      const { site, edition } = res.body as {
+        site: { id: string; projectId: string; defaultLocale: string };
+        edition: { pages: number; skipped: unknown[] };
+      };
+      const source = (await call("GET", `/api/sites/${english}`, owner)).body as {
+        projectId: string;
+      };
+      expect(site.projectId).toBe(source.projectId);
+      expect(site.defaultLocale).toBe("de");
+      expect(edition.pages).toBeGreaterThan(0);
+      expect(
+        (
+          await call("POST", "/api/sites", owner, {
+            name: "X",
+            slug: "x",
+            from: "site_missing0001",
+          })
+        ).status,
+      ).toBe(404);
+    });
+
     it("keeps the person's agent key inside their site over MCP", async () => {
       const { english, turkish, call, join, connect } = await setup();
       const tr = await join("tr-agent@example.com", "editor", { [turkish]: "editor" });

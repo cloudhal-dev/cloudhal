@@ -4,16 +4,17 @@
  * - `GET  /api/projects` → the projects holding a site the person may open, each with those sites:
  *   language, primary host, publish state and pending approvals (the project overview and the
  *   grouped Sites list). A site-limited person sees only their sites.
- * - `POST /api/sites` ← {name, slug, locale?, projectId?} → the new site (scope `site:create`:
- *   Owner and Administrators), seeded like `cloudhal init`; nothing is published.
+ * - `POST /api/sites` ← {name, slug, locale?, projectId?, from?} → the new site (scope
+ *   `site:create`: Owner and Administrators), seeded like `cloudhal init`, or with `from` a
+ *   language edition of that site (`createEdition`, with what it left out); nothing is published.
  */
-import { visibleSites } from "@cloudhal/agent-runtime";
+import { forSite, visibleSites } from "@cloudhal/agent-runtime";
 import type { Site } from "@cloudhal/core-contracts";
 import { listHosts, seedStarterSite } from "@cloudhal/core-ts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { notFound } from "../errors.ts";
-import { parseCreate } from "./admin/sites.ts";
+import { makeSite, parseCreate } from "./admin/sites.ts";
 
 export interface ProjectSiteView {
   id: string;
@@ -84,18 +85,32 @@ export const createSiteRoute = new Hono<Env>().post("/", async (c) => {
   if ((await store.listSites()).some((s) => s.slug === input.slug))
     return c.json({ error: "conflict", message: `a site with the slug ${input.slug} exists` }, 409);
   const principal = c.get("principal");
-  const site = await seedStarterSite(store, {
-    ...input,
-    ...(principal ? { owner: principal.actor } : {}),
-  });
+  // RFC-0034 §6: an edition copies a site, so the person must be able to open that site.
+  if (input.from && principal && !forSite(principal, input.from)) throw notFound("site not found");
+  const made = input.from
+    ? await makeSite(store, input)
+    : {
+        site: await seedStarterSite(store, {
+          ...input,
+          ...(principal ? { owner: principal.actor } : {}),
+        }),
+      };
+  if (made instanceof Response) return made;
+  const site = made.site;
   await c.get("audit")?.record({
     at: new Date().toISOString(),
     actor: principal?.actor ?? { kind: "system", id: "sys_studio0001" },
     tool: "site.create",
     decision: "allow",
     outcome: "ok",
-    input: { siteId: site.id, slug: input.slug, locale: input.locale },
+    input: { siteId: site.id, slug: input.slug, locale: input.locale, from: input.from ?? null },
     reason: `created the site ${input.name}`,
   });
-  return c.json({ site: await store.getSite(site.id) }, 201);
+  return c.json(
+    {
+      site: await store.getSite(site.id),
+      ...("edition" in made && made.edition ? { edition: made.edition } : {}),
+    },
+    201,
+  );
 });

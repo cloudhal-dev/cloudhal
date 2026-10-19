@@ -30,7 +30,7 @@ Usage:
   cloudhal owner transfer --to <email> [--admin-url <url>]
                                                           make a member the deployment's Owner
                                                           (lockout recovery; uses the deployment token)
-  cloudhal site list | create --name <name> --slug <slug> [--locale <tag>] [--project <id>] [--theme <name>]
+  cloudhal site list | create --name <name> --slug <slug> [--locale <tag>] [--project <id>] [--theme <name>] [--from <siteId>]
                      | delete <siteId> --confirm <slug>  [--remote] [--admin-url <url>]
                                                           the installation's sites (RFC-0034): one Studio,
                                                           many isolated sites; nothing is published
