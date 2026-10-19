@@ -43,9 +43,17 @@ function open(config: CloudhalRendererConfig, selector: string): Promise<GraphSo
   })();
 }
 
-/** Test hook. */
-export function resetSource(): void {
+/** Test hook. `cloudhal dev` serves one site, so `_siteId` changes nothing. */
+export function resetSource(_siteId?: string): void {
   cached = undefined;
+}
+
+/**
+ * RFC-0034 §4: on a multi-site Worker the entry runs each request for its site; `cloudhal dev`
+ * serves the project's one site, so this only runs `fn`.
+ */
+export function withRequestSite<T>(_siteId: string, fn: () => T): T {
+  return fn();
 }
 
 /**

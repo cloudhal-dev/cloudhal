@@ -42,9 +42,11 @@ import {
   CACHE_TAG_PREFIX,
   resetSource,
   serveMedia,
+  withRequestSite,
 } from "@cloudhal/astro-renderer/runtime";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { GATES_FEATURE_VERSION } from "@cloudhal/core-ts/availability";
+import { D1Driver } from "@cloudhal/storage/d1";
 import {
   ANALYTICS_BEACON_PATH,
   deploymentDefaults,
@@ -57,9 +59,16 @@ import { SITE_CSP } from "./csp.ts";
 import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { SearchLimiter, searchCost } from "./search-limit.ts";
+import { SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
 
 interface Env {
   CLOUDHAL_SITE_ID?: string;
+  /**
+   * RFC-0034 §4: the sites a multi-site Worker serves (comma-separated); the hostname picks one
+   * through `site_hosts`. Ignored when `CLOUDHAL_SITE_ID` is set.
+   */
+  CLOUDHAL_SITE_IDS?: string;
+  DB?: D1Database;
   CLOUDHAL_PURGE_TOKEN?: string;
   /**
    * Site analytics (RFC-0006 §11): the Workers Analytics Engine dataset (`<deployment>_events`).
@@ -126,15 +135,33 @@ class PendingWrites {
 }
 
 const pendingWrites = new PendingWrites();
-let analytics: SiteAnalytics | undefined;
-let comments: SiteComments | undefined;
+/** Per site the isolate has served (one on a single-site Worker). */
+const analyticsBySite = new Map<string, SiteAnalytics>();
+const commentsBySite = new Map<string, SiteComments>();
+let dispatch: SiteDispatch | undefined;
 
-/** One per isolate: keys, limits, today's count, replay cache, settings and pointer. */
-function siteComments(env: Env, siteId: string): SiteComments {
-  if (comments) return comments;
+/** One per isolate: which site a request is for (RFC-0034 §4). */
+function siteDispatch(env: Env, siteIdFromBuild: string | undefined): SiteDispatch {
+  dispatch ??= new SiteDispatch({
+    siteId: env.CLOUDHAL_SITE_ID ?? (env.CLOUDHAL_SITE_IDS ? undefined : siteIdFromBuild),
+    siteIds: env.CLOUDHAL_SITE_IDS,
+    sql: () => new D1Driver(env.DB as D1Database),
+  });
+  return dispatch;
+}
+
+/** The hosts a site answers on: `CLOUDHAL_SITE_HOSTS`, plus its `site_hosts` rows when multi-site. */
+async function siteHosts(env: Env, siteId: string): Promise<string[]> {
+  return [...parseHosts(env.CLOUDHAL_SITE_HOSTS), ...((await dispatch?.hosts(siteId)) ?? [])];
+}
+
+/** One per site and isolate: keys, limits, today's count, replay cache, settings and pointer. */
+async function siteComments(env: Env, siteId: string): Promise<SiteComments> {
+  const known = commentsBySite.get(siteId);
+  if (known) return known;
   const { sql, site, snapshot } = analyticsBackend(siteId);
   let store: SqlCommentStore | undefined;
-  comments = new SiteComments({
+  const comments = new SiteComments({
     siteId,
     secret: env.CLOUDHAL_COMMENTS_KEY,
     // the integration built the module only when `comments.available` is not false
@@ -145,19 +172,21 @@ function siteComments(env: Env, siteId: string): SiteComments {
     },
     site,
     snapshot,
-    hosts: parseHosts(env.CLOUDHAL_SITE_HOSTS),
+    hosts: await siteHosts(env, siteId),
     acceptRequestHost: (host) => host.endsWith(".workers.dev"),
     rateLimit: env.COMMENTS_RL,
     onError: (m, e) => console.error(m, e),
   });
+  commentsBySite.set(siteId, comments);
   return comments;
 }
 
-/** One per isolate: settings, pointer, rate limits and the render sampler live as long as it does. */
-function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
-  if (analytics) return analytics;
+/** One per site and isolate: settings, pointer, rate limits and the render sampler. */
+async function siteAnalytics(env: Env, siteId: string): Promise<SiteAnalytics> {
+  const known = analyticsBySite.get(siteId);
+  if (known) return known;
   const { sql, site, snapshot } = analyticsBackend(siteId);
-  analytics = new SiteAnalytics({
+  const analytics = new SiteAnalytics({
     siteId,
     defaults: deploymentDefaults(env.CLOUDHAL_ANALYTICS, env.CLOUDHAL_ANALYTICS_DEFAULTS),
     writer: env.ANALYTICS
@@ -169,7 +198,7 @@ function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
     site,
     snapshot,
     script: config.analyticsScript,
-    hosts: parseHosts(env.CLOUDHAL_SITE_HOSTS),
+    hosts: await siteHosts(env, siteId),
     acceptRequestHost: (host) => host.endsWith(".workers.dev"),
     rateLimit:
       env.ANALYTICS_RL && env.CLOUDHAL_PURGE_TOKEN
@@ -177,6 +206,7 @@ function siteAnalytics(env: Env, siteId: string): SiteAnalytics {
         : undefined,
     onError: (m, e) => console.error(m, e),
   });
+  analyticsBySite.set(siteId, analytics);
   return analytics;
 }
 
@@ -231,6 +261,43 @@ function features(request: Request, env: Env): Response {
   return Response.json({ gates: GATES_FEATURE_VERSION }, { headers });
 }
 
+/**
+ * The purge's optional JSON body: `tags` (1–100 Cloudhal cache tags) and, on a multi-site Worker,
+ * the `siteId` whose publish it is (RFC-0034 §4). A 400 for anything else.
+ */
+async function purgeBody(
+  request: Request,
+  served: readonly string[],
+): Promise<{ tags?: string[]; siteId?: string } | Response> {
+  if (!(request.headers.get("content-type") ?? "").includes("application/json")) return {};
+  const body = (await request.json().catch(() => undefined)) as
+    | { tags?: unknown; siteId?: unknown }
+    | undefined;
+  const out: { tags?: string[]; siteId?: string } = {};
+  if (body?.siteId !== undefined) {
+    if (typeof body.siteId !== "string" || !served.includes(body.siteId))
+      return Response.json({ error: "siteId is not served by this Worker" }, { status: 400 });
+    out.siteId = body.siteId;
+  }
+  if (body?.tags !== undefined) {
+    if (
+      !Array.isArray(body.tags) ||
+      body.tags.length === 0 ||
+      body.tags.length > 100 ||
+      !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
+    )
+      return Response.json(
+        {
+          error:
+            "tags must be 1–100 cloudhal-site-/node-/term-/list-/media-/asset-/comments- cache tags",
+        },
+        { status: 400 },
+      );
+    out.tags = body.tags as string[];
+  }
+  return out;
+}
+
 async function purge(
   request: Request,
   env: Env,
@@ -241,12 +308,8 @@ async function purge(
   const given = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   if (!expected || !timingSafeEqual(given, expected))
     return Response.json({ error: "unauthorized" }, { status: 401 });
-  resetSource();
-  // A settings change purges the cache (RFC-0006 §9.2, RFC-0007 §8.3): re-read settings on the
-  // next request.
-  analytics?.reset();
-  comments?.reset();
-  const siteId = env.CLOUDHAL_SITE_ID ?? siteIdFromBuild;
+  const d = siteDispatch(env, siteIdFromBuild);
+  const siteId = d.siteIds[0];
   const tag = `${CACHE_TAG_PREFIX}${siteId}`;
   // `cache.purge` exists on Cloudflare; local workerd has no edge cache to purge.
   const purger = (
@@ -261,26 +324,20 @@ async function purge(
   // (https://developers.cloudflare.com/cache/how-to/purge-cache/#hostname-tag-prefix-url-and-purge-everything-limits,
   // https://developers.cloudflare.com/workers/cache/purge/); the admin Worker batches to it.
   // Without a body everything is purged (first publish, or when the diff is unavailable).
-  let tags: string[] | undefined;
-  if ((request.headers.get("content-type") ?? "").includes("application/json")) {
-    const body = (await request.json().catch(() => undefined)) as { tags?: unknown } | undefined;
-    if (body?.tags !== undefined) {
-      if (
-        !Array.isArray(body.tags) ||
-        body.tags.length === 0 ||
-        body.tags.length > 100 ||
-        !body.tags.every((t) => typeof t === "string" && isCloudhalCacheTag(t))
-      )
-        return Response.json(
-          {
-            error:
-              "tags must be 1–100 cloudhal-site-/node-/term-/list-/media-/asset-/comments- cache tags",
-          },
-          { status: 400 },
-        );
-      tags = body.tags as string[];
-    }
+  const body = await purgeBody(request, d.siteIds);
+  if (body instanceof Response) return body;
+  const only = body.siteId;
+  let tags = body.tags;
+  // Re-read what the purged sites' publish or settings change touched (RFC-0006 §9.2, RFC-0007
+  // §8.3): pointers, settings, and on a multi-site Worker the hostnames.
+  d.reset();
+  for (const id of only ? [only] : d.siteIds) {
+    resetSource(id);
+    analyticsBySite.get(id)?.reset();
+    commentsBySite.get(id)?.reset();
   }
+  if (!tags && d.multi)
+    tags = (only ? [only] : [...d.siteIds]).map((id) => `${CACHE_TAG_PREFIX}${id}`).slice(0, 100);
   if (!purger)
     return Response.json({
       purged: false,
@@ -288,9 +345,9 @@ async function purge(
       ...(tags ? { tags } : {}),
       reason: "no edge cache in this runtime",
     });
-  // This Worker serves one site, so everything it cached belongs to that site. Purging all of it
-  // (not just the tag) also drops entries Cloudflare cached on its own, e.g. a 404 for a page that
-  // was published since.
+  // A single-site Worker cached only its site, so purging everything also drops entries Cloudflare
+  // cached on its own (a 404 for a page published since). A multi-site Worker purges tags only:
+  // one site's publish never empties another's cache (RFC-0034 invariant 4).
   const result = await purger.call(cache, tags ? { tags } : { purgeEverything: true });
   return Response.json(
     { purged: result.success, tag, ...(tags ? { tags } : {}), errors: result.errors ?? [] },
@@ -381,6 +438,94 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
+/** Everything after the operator endpoints, for one site (or none: a Worker not yet pointed at one). */
+async function serveSite(
+  call: { request: Request; env: Env; ctx: ExecutionContext },
+  siteId: string | undefined,
+  searchLimiter: SearchLimiter,
+): Promise<Response> {
+  const { request, env, ctx } = call;
+  const url = new URL(request.url);
+  const a = siteId ? await siteAnalytics(env, siteId) : undefined;
+  // Analytics beacons (RFC-0006 §5.2): 204 for every outcome, never cached (POST).
+  if (url.pathname === ANALYTICS_BEACON_PATH) {
+    if (!a)
+      return new Response(null, {
+        status: request.method === "POST" ? 204 : 405,
+        headers: { "cache-control": "no-store" },
+      });
+    // On Cloudflare the edge sets CF-Connecting-IP (a client's own value is overwritten), so
+    // it is the trusted address here; the beacon handler never reads headers for it.
+    const clientIp = request.headers.get("cf-connecting-ip")?.trim();
+    const answer = await a.beacon(request, clientIp ? { clientIp } : {});
+    pendingWrites.flush(ctx);
+    return answer;
+  }
+  // Reader comments (RFC-0007 §6.1): before Astro, never cached; `404` while comments are off.
+  if (isCommentsPath(url.pathname)) {
+    if (!siteId)
+      return Response.json(
+        { error: "not_found" },
+        { status: 404, headers: { "cache-control": "no-store" } },
+      );
+    // CF-Connecting-IP is set by Cloudflare's edge (a client's own value is overwritten).
+    return (await (
+      await siteComments(env, siteId)
+    ).handle(request, {
+      clientAddress: request.headers.get("cf-connecting-ip") ?? undefined,
+    })) as Response;
+  }
+  // Site search (RFC-0019 §3, RFC-0029 §5): per-client limit before anything renders; the
+  // modal's endpoint answers in JSON.
+  const cost = searchCost(url.pathname);
+  if (cost !== undefined) {
+    const wait = searchLimiter.take(request.headers.get("cf-connecting-ip") ?? undefined, cost);
+    if (wait > 0) {
+      const json = url.pathname.endsWith(".json");
+      return new Response(
+        json
+          ? JSON.stringify({ error: "rate_limited" })
+          : "Too many searches; try again in a minute.",
+        {
+          status: 429,
+          headers: {
+            "retry-after": String(wait),
+            "cache-control": "no-store",
+            "content-type": json ? "application/json; charset=utf-8" : "text/plain; charset=utf-8",
+          },
+        },
+      );
+    }
+  }
+  const started = Date.now();
+  const media = siteId ? await serveMedia(request, { siteId }) : undefined;
+  const rendered =
+    media ??
+    withSecurityHeaders(
+      cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
+    );
+  // Server-side render events (§5.4), off the response path: published HTML 200s (cache
+  // misses), redirects, 404, 410, 451 and 5xx; never previews or HEAD.
+  if (a?.available) {
+    const renderMs = Date.now() - started;
+    ctx.waitUntil(a.render(request, rendered, renderMs).then(() => pendingWrites.settled()));
+  }
+  if (media) return media;
+  const response = a?.available ? await withAnalyticsTag(rendered, a) : rendered;
+  const token = response.headers.get("x-cloudhal-preview-token");
+  if (response.headers.get("x-cloudhal-mode") !== "preview" || !token) return response;
+  const headers = new Headers(response.headers);
+  headers.delete("x-cloudhal-preview-token");
+  const stripped = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  return (headers.get("content-type") ?? "").includes("text/html")
+    ? keepPreviewInLinks(stripped, token)
+    : stripped;
+}
+
 export function createSiteWorker(options: { siteId?: string } = {}) {
   const searchLimiter = new SearchLimiter();
   return {
@@ -388,85 +533,14 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
       if (url.pathname === "/__cloudhal/features") return features(request, env);
-      const siteId = env.CLOUDHAL_SITE_ID ?? options.siteId;
-      const a = siteId ? siteAnalytics(env, siteId) : undefined;
-      // Analytics beacons (RFC-0006 §5.2): 204 for every outcome, never cached (POST).
-      if (url.pathname === ANALYTICS_BEACON_PATH) {
-        if (!a)
-          return new Response(null, {
-            status: request.method === "POST" ? 204 : 405,
-            headers: { "cache-control": "no-store" },
-          });
-        // On Cloudflare the edge sets CF-Connecting-IP (a client's own value is overwritten), so
-        // it is the trusted address here; the beacon handler never reads headers for it.
-        const clientIp = request.headers.get("cf-connecting-ip")?.trim();
-        const answer = await a.beacon(request, clientIp ? { clientIp } : {});
-        pendingWrites.flush(ctx);
-        return answer;
-      }
-      // Reader comments (RFC-0007 §6.1): before Astro, never cached; `404` while comments are off.
-      if (isCommentsPath(url.pathname)) {
-        if (!siteId)
-          return Response.json(
-            { error: "not_found" },
-            { status: 404, headers: { "cache-control": "no-store" } },
-          );
-        // CF-Connecting-IP is set by Cloudflare's edge (a client's own value is overwritten).
-        return (await siteComments(env, siteId).handle(request, {
-          clientAddress: request.headers.get("cf-connecting-ip") ?? undefined,
-        })) as Response;
-      }
-      // Site search (RFC-0019 §3, RFC-0029 §5): per-client limit before anything renders; the
-      // modal's endpoint answers in JSON.
-      const cost = searchCost(url.pathname);
-      if (cost !== undefined) {
-        const wait = searchLimiter.take(request.headers.get("cf-connecting-ip") ?? undefined, cost);
-        if (wait > 0) {
-          const json = url.pathname.endsWith(".json");
-          return new Response(
-            json
-              ? JSON.stringify({ error: "rate_limited" })
-              : "Too many searches; try again in a minute.",
-            {
-              status: 429,
-              headers: {
-                "retry-after": String(wait),
-                "cache-control": "no-store",
-                "content-type": json
-                  ? "application/json; charset=utf-8"
-                  : "text/plain; charset=utf-8",
-              },
-            },
-          );
-        }
-      }
-      const started = Date.now();
-      const media = siteId ? await serveMedia(request, { siteId }) : undefined;
-      const rendered =
-        media ??
-        withSecurityHeaders(
-          cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
-        );
-      // Server-side render events (§5.4), off the response path: published HTML 200s (cache
-      // misses), redirects, 404, 410, 451 and 5xx; never previews or HEAD.
-      if (a?.available) {
-        const renderMs = Date.now() - started;
-        ctx.waitUntil(a.render(request, rendered, renderMs).then(() => pendingWrites.settled()));
-      }
-      if (media) return media;
-      const response = a?.available ? await withAnalyticsTag(rendered, a) : rendered;
-      const token = response.headers.get("x-cloudhal-preview-token");
-      if (response.headers.get("x-cloudhal-mode") !== "preview" || !token) return response;
-      const headers = new Headers(response.headers);
-      headers.delete("x-cloudhal-preview-token");
-      const stripped = new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-      return (headers.get("content-type") ?? "").includes("text/html")
-        ? keepPreviewInLinks(stripped, token)
-        : stripped;
+      // RFC-0034 §4: the hostname picks the site on a multi-site Worker; everything the request
+      // runs (Astro's render included) then sees that site.
+      const choice = await siteDispatch(env, options.siteId).choose(request);
+      if (choice.kind === "unknown") return unknownHost();
+      const siteId = choice.siteId;
+      const run = () => serveSite({ request, env, ctx }, siteId, searchLimiter);
+      const response = siteId ? await withRequestSite(siteId, run) : await run();
+      return choice.noindex ? withNoindex(response) : response;
     },
   };
 }

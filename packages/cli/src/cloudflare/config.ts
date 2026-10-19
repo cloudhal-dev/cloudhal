@@ -163,6 +163,11 @@ function customDomain(hostname: string | undefined) {
 export function siteWorkerConfig(
   n: DeploymentNames & {
     siteId: string;
+    /**
+     * RFC-0034 §4: the sites a multi-site Worker serves, chosen by hostname
+     * (`CLOUDHAL_SITE_IDS`); without it the Worker serves `siteId` on every host.
+     */
+    siteIds?: readonly string[];
     domain?: string;
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
@@ -209,7 +214,9 @@ export function siteWorkerConfig(
     ...(ratelimits.length > 0 ? { ratelimits } : {}),
     ...searchBinding(n.search),
     vars: {
-      CLOUDHAL_SITE_ID: n.siteId,
+      ...(n.siteIds && n.siteIds.length > 0
+        ? { CLOUDHAL_SITE_IDS: n.siteIds.join(",") }
+        : { CLOUDHAL_SITE_ID: n.siteId }),
       ...searchVars(n.search),
       ...(a
         ? {
