@@ -16,7 +16,8 @@ import path from "node:path";
 import { readExistingIds, SITE_CONFIG_FILE, workerNames } from "../../cloudflare/config.ts";
 import { deployedUrls, must } from "../../cloudflare/wrangler.ts";
 import { readProjectConfig } from "../../config.ts";
-import { pushSite } from "../sync.ts";
+import { listSites } from "../site.ts";
+import { pushSite, setPrimaryDomain } from "../sync.ts";
 import type { DeployContext } from "./context.ts";
 import type { DeployOptions, DeployResult } from "./options.ts";
 import { analyticsAndComments, buildSite, deploySettings, loadDeploy } from "./prepare.ts";
@@ -137,6 +138,23 @@ export async function deployAttached(options: DeployOptions): Promise<DeployResu
     token: secrets.CLOUDHAL_DEPLOY_TOKEN,
     siteUrl,
   });
+  // A site without a hostname gets the Worker's workers.dev address as its primary one, as a
+  // first deploy does: previews, hreflang across editions and same-origin checks need one.
+  if (siteUrl) {
+    const sites = await listSites({
+      projectDir: options.projectDir,
+      remote: true,
+      adminUrl: inst.state.adminUrl,
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    });
+    if (sites.find((x) => x.id === cfg.siteId)?.hosts.length === 0)
+      await setPrimaryDomain({
+        projectDir: options.projectDir,
+        adminUrl: inst.state.adminUrl,
+        hostname: new URL(siteUrl).host,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      });
+  }
   log(
     `run \`cloudhal deploy\` in ${inst.dir} once, so the installation's Studio sends these sites' cache purges to ${names.site}`,
   );
