@@ -3,7 +3,7 @@
  * a real store (SQLite + memory blobs) and its live source.
  */
 import type { Page, Site, Term } from "@cloudhal/core-contracts";
-import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { createEdition, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -172,6 +172,37 @@ describe("locales over a store", () => {
       alternates: [],
     });
     expect([ar.lang, ar.dir, ar.alternates]).toEqual(["ar", "rtl", undefined]);
+  });
+
+  it("adds the versions a language edition publishes, on its own host (RFC-0034 §6)", async () => {
+    const edition = await createEdition(store, {
+      fromSiteId: site.id,
+      name: "Locales 日本語",
+      slug: "locales-ja",
+      locale: "ja",
+    });
+    const team = (await store.listPages(edition.site.id)).find((p) => p.path === "/team") as Page;
+    expect(team).toBeDefined();
+    const peer = {
+      source: new LiveSource(store, edition.site.id),
+      origin: "https://ja.example.com",
+    };
+    // From the original: its own versions, then the edition's, x-default last.
+    expect(await alternatesFor(source, about, ORIGIN, [peer])).toEqual([
+      { locale: "en", href: "https://example.com/team", current: true, original: true },
+      { locale: "es", href: "https://example.com/es/equipo", current: false },
+      { locale: "ja", href: "https://ja.example.com/team", current: false },
+      { locale: "x-default", href: "https://example.com/team", current: false },
+    ]);
+    // A page that is not yet in a group joins one through its edition.
+    const home = (await source.pageByPath("/")) as Page;
+    const peerHome = (await store.listPages(edition.site.id)).find((p) => p.path === "/");
+    expect(peerHome?.translation?.group).toBe(home.id);
+    expect((await alternatesFor(source, home, ORIGIN, [peer])).map((a) => a.locale)).toEqual([
+      "en",
+      "ja",
+      "x-default",
+    ]);
   });
 
   it("sends a localized page's links to the same locale, or back to the default locale", async () => {

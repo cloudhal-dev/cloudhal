@@ -116,42 +116,70 @@ export interface Alternate {
 type Localized = Page | ContentEntry;
 const pathOf = (n: Localized) => ("path" in n ? n.path : `/${n.collection}/${n.slug}`);
 
-/** The visible members of `node`'s translation group in this source (pages or entries). */
+/** The visible members of `group` in this source (pages, or entries in the site's locales). */
 async function groupMembers(
   source: GraphSource,
   site: Site,
-  node: Localized,
+  group: string,
+  pages: boolean,
 ): Promise<Localized[]> {
-  const group = node.translation?.group;
-  if (!group) return [];
   const inGroup = (n: Localized) => n.id === group || n.translation?.group === group;
-  if ("path" in node) return (await source.pages()).filter(inGroup);
+  if (pages) return (await source.pages()).filter(inGroup);
   const all = await Promise.all(site.locales.map((l) => source.allEntries(l)));
   return all.flat().filter(inGroup);
 }
 
 /**
+ * RFC-0034 §6: another site of the project holding versions of the same work (a language
+ * edition): its published source and the origin it is served on.
+ */
+export interface PeerEdition {
+  readonly source: GraphSource;
+  readonly origin: string;
+}
+
+/**
  * RFC-0033 invariant 7: every visible version of the node (itself included), plus `x-default`
  * (the default locale's version). Empty when the node has no other version — `hreflang` needs two.
+ * `peers` adds the versions published by other sites of the project (RFC-0034 §6), each on its
+ * own host; a locale this site serves itself is not taken from a peer.
  */
 export async function alternatesFor(
   source: GraphSource,
   node: Localized,
   origin: string,
+  peers: readonly PeerEdition[] = [],
 ): Promise<Alternate[]> {
   const site = await source.site();
-  const members = (await groupMembers(source, site, node)).filter((m) =>
+  const group = node.translation?.group ?? (peers.length > 0 ? node.id : undefined);
+  if (!group) return [];
+  const pages = "path" in node;
+  const own = (await groupMembers(source, site, group, pages)).filter((m) =>
     site.locales.includes(m.locale),
   );
-  if (members.length < 2) return [];
-  const out = members
-    .map((m) => ({
-      locale: m.locale,
-      href: localeUrl(site, m.locale, pathOf(m), origin),
-      current: m.id === node.id,
-      ...(m.id === node.translation?.group ? { original: true } : {}),
-    }))
-    .sort((a, b) => site.locales.indexOf(a.locale) - site.locales.indexOf(b.locale));
+  const out: Alternate[] = own.map((m) => ({
+    locale: m.locale,
+    href: localeUrl(site, m.locale, pathOf(m), origin),
+    current: m.id === node.id,
+    ...(m.id === group ? { original: true } : {}),
+  }));
+  for (const peer of peers) {
+    const peerSite = await peer.source.site();
+    for (const m of await groupMembers(peer.source, peerSite, group, pages))
+      if (peerSite.locales.includes(m.locale) && !out.some((a) => a.locale === m.locale))
+        out.push({
+          locale: m.locale,
+          href: localeUrl(peerSite, m.locale, pathOf(m), peer.origin),
+          current: false,
+          ...(m.id === group ? { original: true } : {}),
+        });
+  }
+  if (out.length < 2) return [];
+  const rank = (l: string) => {
+    const i = site.locales.indexOf(l);
+    return i === -1 ? site.locales.length : i;
+  };
+  out.sort((a, b) => rank(a.locale) - rank(b.locale) || a.locale.localeCompare(b.locale));
   const fallback = out.find((a) => a.locale === site.defaultLocale);
   return fallback ? [...out, { locale: "x-default", href: fallback.href, current: false }] : out;
 }
