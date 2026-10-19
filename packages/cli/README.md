@@ -46,6 +46,7 @@ Every admin request is also a backstop: when the heartbeat is more than two minu
 **Guards.**
 - `deploy` refuses to deploy code with a lower schedules level (`cloudhal.schedulesLevel` of `@cloudhal/core-ts`) over a deployment that has open releases or gated pages and entries: older code ignores holds and gates. `--force-downgrade` overrides it.
 - `push` refuses while the deployment has open releases (their pinned versions point into the graph a push replaces); `--cancel-schedules` cancels them first.
+- `push` carries content, not publishing: once the deployment has published, `push --replace` keeps its published snapshot (an approved publish or rollback in Studio), so it can never move production back to an older version. Publish the pushed content in Studio. A deployment that has never published takes your local one, as the first deploy does.
 
 **Tick budget and the automations switch.** Every deploy writes `CLOUDHAL_TICK_BUDGET` and `CLOUDHAL_AUTOMATIONS` on the admin Worker:
 - `CLOUDHAL_TICK_BUDGET=free` (default: 40 statements and one release per tick) or `paid` (900 statements and up to 50 releases): `cloudhal deploy --plan paid` or `cloudhal.json` `"schedules": { "plan": "paid" }`. The plan is remembered in `.cloudhal/deploy/state.json`; `--plan free` goes back. Wrangler's login cannot read the account's plan, so the deploy says which budget it used.

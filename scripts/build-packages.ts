@@ -42,6 +42,8 @@ export const PACKAGES = [
 /** Directories inside a package that hold code or runtime assets (mirrored into dist/). */
 const SOURCE_DIRS = ["src", "scripts", "bin", "migrations"];
 const SKIP_FILE = /(\.test\.tsx?|[\\/]testing\.ts)$/;
+/** Development-only generators: they run in the monorepo (on dev dependencies) and never ship. */
+const DEV_ONLY = new Set(["core-ts/scripts/gen-icons.ts"]);
 
 type Json = Record<string, unknown>;
 interface LexedImport {
@@ -160,8 +162,8 @@ async function buildPackage(name: string, typesRoot: string): Promise<void> {
   await rm(dist, { recursive: true, force: true });
   for (const sub of SOURCE_DIRS) {
     for (const file of await walk(path.join(dir, sub))) {
-      if (SKIP_FILE.test(file)) continue;
       const rel = path.relative(dir, file);
+      if (SKIP_FILE.test(file) || DEV_ONLY.has(`${name}/${rel}`)) continue;
       const target = path.join(dist, rel);
       await mkdir(path.dirname(target), { recursive: true });
       if (/\.tsx?$/.test(file) && !file.endsWith(".d.ts")) {

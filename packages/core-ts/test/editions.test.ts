@@ -4,8 +4,8 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
 import { createEdition } from "../src/editions.ts";
 import { seedStarterSite } from "../src/seed.ts";
-import { SiteGraphStore } from "../src/store.ts";
 import { readTranslationGroup } from "../src/store/translations.ts";
+import { SiteGraphStore } from "../src/store.ts";
 
 async function installation() {
   const sql = await BetterSqlite3Driver.open(":memory:");
@@ -17,7 +17,11 @@ async function installation() {
 describe("createEdition (RFC-0034 §6)", () => {
   it("starts a site in the same project from the source's pages, menus and settings", async () => {
     const { sql, store } = await installation();
-    const source = await seedStarterSite(store, { name: "Newsroom", slug: "newsroom", locale: "tr" });
+    const source = await seedStarterSite(store, {
+      name: "Newsroom",
+      slug: "newsroom",
+      locale: "tr",
+    });
     await store.createMenuFromPages((await store.getSite(source.id)) as Site, "header");
     const r = await createEdition(store, {
       fromSiteId: source.id,
@@ -45,7 +49,9 @@ describe("createEdition (RFC-0034 §6)", () => {
       source: { id: srcHome?.id, siteId: source.id, locale: "tr" },
     });
     const group = await readTranslationGroup(store, sql, r.site, srcHome?.id as string);
-    expect(group.members.map((m) => [m.siteId === source.id ? "tr" : "en", m.stale]).sort()).toEqual([
+    expect(
+      group.members.map((m) => [m.siteId === source.id ? "tr" : "en", m.stale]).sort(),
+    ).toEqual([
       ["en", false],
       ["tr", false],
     ]);
