@@ -37,14 +37,28 @@ function single(n: Localized): TranslationRow {
   };
 }
 
+/** A coverage column: one language, of one site when the view spans a project (RFC-0034 §7). */
+export interface CoverageColumn {
+  /** The cell key: the locale, or `<siteId>:<locale>` across sites. */
+  key: string;
+  locale: string;
+  siteId?: string;
+  /** The site's name, for the column header across sites. */
+  site?: string;
+}
+
 export function coverageRows(input: {
   /** The Studio language: rows sort by title in its order. */
   uiLocale: string;
   locales: readonly string[];
+  /** Across the sites of a project; default: one column per locale of the site. */
+  columns?: readonly CoverageColumn[];
   nodes: readonly Localized[];
   translations: readonly TranslationRow[];
 }): CoverageRow[] {
-  const { locales, nodes, translations } = input;
+  const { nodes, translations } = input;
+  const columns: readonly CoverageColumn[] =
+    input.columns ?? input.locales.map((l) => ({ key: l, locale: l }));
   const groups = new Map<string, TranslationRow[]>();
   for (const m of translations) groups.set(m.group, [...(groups.get(m.group) ?? []), m]);
   for (const n of nodes) if (!n.translation) groups.set(n.id, [single(n)]);
@@ -52,9 +66,14 @@ export function coverageRows(input: {
   for (const [group, members] of groups) {
     const original = members.find((m) => m.id === group) ?? members[0];
     if (!original) continue;
-    const cells = Object.fromEntries(locales.map((l) => [l, members.find((m) => m.locale === l)]));
-    const needsWork = locales.some((l) => {
-      const m = cells[l];
+    const cells = Object.fromEntries(
+      columns.map((c) => [
+        c.key,
+        members.find((m) => m.locale === c.locale && (!c.siteId || m.siteId === c.siteId)),
+      ]),
+    );
+    const needsWork = columns.some((c) => {
+      const m = cells[c.key];
       return !m || m.stale || m.sourceMissing || m.method === "machine";
     });
     rows.push({ group, kind: original.kind, title: original.title, cells, needsWork });

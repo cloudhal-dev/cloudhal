@@ -1,5 +1,6 @@
+import { visibleSites } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Glossary, Page, Translation } from "@cloudhal/core-contracts";
-import type { TranslationMember } from "@cloudhal/core-ts";
+import { nodeHash, type TranslationMember } from "@cloudhal/core-ts";
 import { type Context, Hono } from "hono";
 import type { Env } from "../context.ts";
 import { apiError, badRequest, notFound } from "../errors.ts";
@@ -35,20 +36,41 @@ export const translations: Hono<Env> = new Hono<Env>()
     const store = c.get("store");
     const site = await requireSite(c);
     const locale = c.req.query("locale");
-    const nodes: Localized[] = [
-      ...(await store.listPages(site.id)),
-      ...(await store.listContentEntries(site.id)),
-    ];
+    // RFC-0034 §7: `scope=project` — every site of the project the person may open, untranslated
+    // pages and articles included (as groups of one), with each site's languages.
+    const project = c.req.query("scope") === "project";
+    const all = project ? await store.listSites(site.projectId) : [site];
+    const ids = project
+      ? visibleSites(
+          c.get("principal"),
+          all.map((s) => s.id),
+        )
+      : [site.id];
+    const sites = all.filter((s) => ids.includes(s.id));
+    const nodes: Localized[] = [];
+    for (const s of sites)
+      nodes.push(...(await store.listPages(s.id)), ...(await store.listContentEntries(s.id)));
     const groups = [...new Set(nodes.flatMap((n) => (n.translation ? [n.translation.group] : [])))];
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const rows: TranslationRow[] = [];
     for (const g of groups)
       for (const m of (await store.translationGroup(site, g)).members)
-        if (m.siteId === site.id && (!locale || m.locale === locale)) {
+        if (ids.includes(m.siteId) && (!locale || m.locale === locale)) {
           const n = byId.get(m.id);
           if (n) rows.push(row(m, n, g));
         }
-    return c.json({ items: rows });
+    if (project) {
+      const grouped = new Set(groups);
+      for (const n of nodes)
+        if (!n.translation && !grouped.has(n.id) && (!locale || n.locale === locale))
+          rows.push(await single(n));
+    }
+    return c.json({
+      items: rows,
+      ...(project
+        ? { sites: sites.map((s) => ({ id: s.id, name: s.name, locales: s.locales })) }
+        : {}),
+    });
   })
   .get("/:nodeId", async (c) => {
     const store = c.get("store");
@@ -87,6 +109,25 @@ export const translations: Hono<Env> = new Hono<Env>()
     await snapshotAfter(c, site.id, "review_translation");
     return c.json(saved);
   });
+
+/** An untranslated original as a group of one (the project-wide coverage view). */
+async function single(n: Localized): Promise<TranslationRow> {
+  return {
+    id: n.id,
+    group: n.id,
+    kind: "sections" in n ? "page" : "contentEntry",
+    siteId: n.siteId,
+    locale: n.locale,
+    status: n.status,
+    hash: await nodeHash(n),
+    rev: n.rev,
+    stale: false,
+    sourceMissing: false,
+    reviewed: false,
+    title: n.title,
+    ...("path" in n ? { path: n.path } : { collection: n.collection, slug: n.slug }),
+  };
+}
 
 function row(m: TranslationMember, n: Localized, group: string): TranslationRow {
   return {

@@ -1664,6 +1664,10 @@ export const en = {
   },
   // RFC-0033 §8: Site › Translations, the coverage view.
   coverage: {
+    scope: "Which sites",
+    thisSite: "This site",
+    allSites: "All sites in the project",
+    siteLanguage: "{site} · {language}",
     search: "Search by title",
     filter: "Show",
     needsWork: "Needs work",
@@ -2739,6 +2743,16 @@ export const en = {
       emptyDescription: "Invites, role changes, removals and ownership transfers appear here.",
       restrictedTitle: "Team activity is for Editors and above",
     },
+  },
+  /** RFC-0034 §7: another language here, or a separate site. */
+  editionGuide: {
+    title: "Another language: here or as its own site?",
+    hereTitle: "Add it to this site",
+    here: "Same pages and menus in every language, one team, one publish. Best when the languages mirror each other.",
+    editionTitle: "Start a language edition",
+    edition:
+      "A separate site in this project that starts from this one: its own pages, menus, team roles and releases, still linked as translations. Best when a market needs its own structure or team.",
+    create: "Create a language edition…",
   },
   /** RFC-0034 §3: creating a site in Studio. */
   newSite: {

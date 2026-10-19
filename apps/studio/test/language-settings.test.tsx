@@ -81,6 +81,29 @@ describe("Language settings", () => {
 });
 
 describe("Glossary settings", () => {
+  it("explains a language here versus an edition, and starts an edition of this site", async () => {
+    const [me] = asRole("owner");
+    vi.stubGlobal(
+      "fetch",
+      serve(
+        me as Route,
+        on("GET", "/api/sites/site_1", { status: 200, body: SITE }),
+        on("GET", "/api/sites", { status: 200, body: [SITE] }),
+        on("GET", "/api/projects", { status: 200, body: { items: [] } }),
+      ),
+    );
+    render(wrap(<LanguageSettingsSection siteId="site_1" />));
+    const guide = await screen.findByTestId("edition-guide");
+    expect(within(guide).getByText("Start a language edition")).toBeInTheDocument();
+    fireEvent.click(within(guide).getByRole("button", { name: "Create a language edition…" }));
+    const dialog = await screen.findByTestId("new-site");
+    await waitFor(() =>
+      expect(within(dialog).getByRole("combobox", { name: "Start from" })).toHaveTextContent(
+        "A copy of Site (language edition)",
+      ),
+    );
+  });
+
   it("adds a term never translated and an approved word, and saves with the glossary's rev", async () => {
     const [me] = asRole("owner");
     const PATH = "/api/sites/site_1/glossary";
