@@ -129,6 +129,8 @@ export function syncAdminRoutes(deps: AdminDeps): Hono<Env> {
         const before = (await store.getSite(bundle.siteId))?.publishedSnapshotId;
         const result = await importSite(storage, bundle, {
           mode,
+          // Publishing is Studio's (an approved publish or rollback); a push never moves it back.
+          published: "target",
           gates: { enforced: (siteId) => store.gatesEnforced(siteId) },
         });
         const after = await store.getSite(bundle.siteId);

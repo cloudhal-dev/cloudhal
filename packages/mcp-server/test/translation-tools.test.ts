@@ -237,7 +237,7 @@ describe("translation tools", () => {
   it("saves an article on a language edition with its image and the edition's terms (RFC-0034 §6)", async () => {
     const { asset } = await store.ingestAsset({
       siteId: site.id,
-      bytes: makePng(8, 8),
+      bytes: makePng({ width: 8, height: 8 }),
       declaredType: "image/png",
       filename: "cover.png",
       uploadedBy: person,

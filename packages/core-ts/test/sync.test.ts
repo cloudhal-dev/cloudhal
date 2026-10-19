@@ -279,3 +279,65 @@ describe("copySite", () => {
     expect(rows.map((r) => r.sha256)).toEqual([asset.sha256]);
   });
 });
+
+describe("copySite publish pointer", () => {
+  /** A site published once on `src`, copied to `dst`, then published again on `dst` (Studio). */
+  async function publishedOnTarget() {
+    const src = await pair();
+    const dst = await pair();
+    const site = await seedStarterSite(src.store, { name: "Pointer", slug: "pointer" });
+    const v1 = await src.store.createSnapshot(site.id, { actor, reason: "publish" });
+    await src.store.publish((await src.store.getSite(site.id)) as typeof site, v1.id);
+    await copySite(src, dst, site.id);
+    const about = (await dst.store.listPages(site.id)).find((p) => p.path === "/about");
+    await dst.store.updatePage({ ...(about as NonNullable<typeof about>), title: "Studio edit" });
+    const v2 = await dst.store.createSnapshot(site.id, { actor, reason: "publish" });
+    await dst.store.publish((await dst.store.getSite(site.id)) as typeof site, v2.id);
+    return { src, dst, site, v1, v2, aboutId: about?.id as string };
+  }
+
+  it("a push replaces content but keeps the deployment's newer publish", async () => {
+    const { src, dst, site, v1, v2, aboutId } = await publishedOnTarget();
+    await src.store.updatePage({
+      ...((await src.store.getPage(aboutId)) as NonNullable<
+        Awaited<ReturnType<typeof src.store.getPage>>
+      >),
+      title: "Local edit",
+    });
+    // a site setting changed locally too: the written site node moves past both revs
+    const local = (await src.store.getSite(site.id)) as typeof site;
+    await src.store.updateSite({ ...local, name: "Pointer renamed" });
+    const before = (await dst.store.getSite(site.id))?.rev as number;
+    await copySite(src, dst, site.id, { mode: "replace", published: "target" });
+    const after = await dst.store.getSite(site.id);
+    expect(after?.publishedSnapshotId).toBe(v2.id);
+    expect(after?.publishedSnapshotId).not.toBe(v1.id);
+    expect((await dst.store.getPage(aboutId))?.title).toBe("Local edit");
+    // a Studio edit holding the old rev now fails its compare-and-swap
+    expect(after?.name).toBe("Pointer renamed");
+    expect(after?.rev).toBeGreaterThan(before);
+  });
+
+  it("does not report a change when only the pointer differs", async () => {
+    const { src, dst, site, v2 } = await publishedOnTarget();
+    // the target's content equals the source again except for the published pointer
+    await copySite(src, dst, site.id, { mode: "replace", published: "target" });
+    const again = await copySite(src, dst, site.id, { published: "target" });
+    expect(again.nodes.unchanged).toBe(true);
+    expect((await dst.store.getSite(site.id))?.publishedSnapshotId).toBe(v2.id);
+  });
+
+  it("a pull mirrors the deployment's pointer; a never-published target takes the source's", async () => {
+    const { src, dst, site, v2 } = await publishedOnTarget();
+    await copySite(dst, src, site.id, { mode: "replace" });
+    expect((await src.store.getSite(site.id))?.publishedSnapshotId).toBe(v2.id);
+
+    const local = await pair();
+    const fresh = await pair();
+    const other = await seedStarterSite(local.store, { name: "Fresh", slug: "fresh" });
+    const v = await local.store.createSnapshot(other.id, { actor, reason: "publish" });
+    await local.store.publish((await local.store.getSite(other.id)) as typeof other, v.id);
+    await copySite(local, fresh, other.id, { published: "target" });
+    expect((await fresh.store.getSite(other.id))?.publishedSnapshotId).toBe(v.id);
+  });
+});

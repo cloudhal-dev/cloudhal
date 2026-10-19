@@ -18,6 +18,7 @@ import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "./hosts.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
+import { keepTargetPublished } from "./sync-published.ts";
 
 /** Gates in a bundle follow the write rules (§4.1) and the writer guard (S15). */
 async function assertGates(
@@ -146,6 +147,14 @@ export interface CopySiteOptions {
    * store's check; local targets have the renderer in the same process.
    */
   gates?: GateSupport;
+  /**
+   * Whose `publishedSnapshotId` a written site node carries. `source` (default, `pull`): the
+   * bundle's, so a local copy mirrors the deployment. `target` (`push`): once the target has
+   * published, its pointer is kept, so a push carries content but never moves production back to
+   * an older snapshot (publishing stays a person's action in Studio); a target that never
+   * published takes the bundle's, as a first deploy does.
+   */
+  published?: "source" | "target";
 }
 
 export interface CopySiteResult {
@@ -425,8 +434,13 @@ export async function importSite(
   const dstNodes = await to.sql.all<NodeRow>("SELECT * FROM nodes WHERE site_id = ? ORDER BY id", [
     siteId,
   ]);
+  // A push keeps the deployment's publish pointer once it has one (`published: "target"`).
+  const rows =
+    options.published === "target"
+      ? await keepTargetPublished(bundle.nodes, dstNodes, siteId)
+      : bundle.nodes;
   const sig = (n: NodeRow) => `${n.id}@${n.rev}:${n.hash}`;
-  const srcSig = new Set(bundle.nodes.map(sig));
+  const srcSig = new Set(rows.map(sig));
   const dstSig = new Set(dstNodes.map(sig));
   const unchanged = srcSig.size === dstSig.size && [...srcSig].every((x) => dstSig.has(x));
   let inserted = 0;
@@ -434,14 +448,14 @@ export async function importSite(
   if (!unchanged) {
     if (dstNodes.length > 0 && mode !== "replace") {
       const differing = [
-        ...bundle.nodes.filter((n) => !dstSig.has(sig(n))).map((n) => n.id),
+        ...rows.filter((n) => !dstSig.has(sig(n))).map((n) => n.id),
         ...dstNodes.filter((n) => !srcSig.has(sig(n))).map((n) => n.id),
       ];
       throw new SyncConflictError(siteId, [...new Set(differing)]);
     }
     statements.push({ sql: "DELETE FROM nodes WHERE site_id = ?", params: [siteId] });
     deleted = dstNodes.length;
-    for (const n of bundle.nodes) {
+    for (const n of rows) {
       statements.push({
         sql: "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params: [n.id, n.site_id, n.kind, n.key, n.rev, n.hash, n.body, n.created_at, n.updated_at],
@@ -452,8 +466,9 @@ export async function importSite(
 
   await runBatches(to.sql, snapInserts);
   // The derived reference index follows the node set in the same batch (RFC-0004 §4.4).
-  statements.push(...refsRebuild(siteId, bundle.nodes));
-  statements.push(...hostStatements(hosts, { siteId, hash: siteRow.hash }));
+  statements.push(...refsRebuild(siteId, rows));
+  const written = rows.find((n) => n.kind === "site" && n.id === siteId) ?? siteRow;
+  statements.push(...hostStatements(hosts, { siteId, hash: written.hash }));
   if (statements.length > 0) {
     if (statements.length > 1000)
       throw new Error(
