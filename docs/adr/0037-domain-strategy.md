@@ -16,7 +16,6 @@ Planned: a hosted control plane in the style of Laravel Forge ("Cloud") and a pu
 |---|---|
 | `cloudhal.com` | Marketing, pricing, blog |
 | `try.cloudhal.com` | Public playground and the Deploy-to-Cloudflare / OAuth flow. Its own Worker, `__Host-` cookies, no `Domain=` |
-| `app.cloudhal.com` | Future Cloud control-plane panel |
 | `api.cloudhal.com` | The control plane's API and OAuth redirect host |
 | `status.cloudhal.com` | Status page |
 | `*@cloudhal.com` | All mail: `security@`, `legal@`, `conduct@`, `abuse@`, `support@` |
@@ -25,6 +24,7 @@ Planned: a hosted control plane in the style of Laravel Forge ("Cloud") and a pu
 | `cloudhal.dev/schemas/v1/*` | Permanent JSON Schema `$id` URLs. Never moved or deleted; a new version adds `/v2` |
 | `cloudhal.dev/fetch` | Bot User-Agent page |
 | `registry.cloudhal.dev` | Index of plugins, capabilities, themes and skills. Read-only metadata; packages stay on npm. Publisher sign-in through GitHub, host-only cookies |
+
 
 **Customer sites never run on Cloudhal's domains.** Cloud deploys into the customer's own Cloudflare account, and sites use the customer's domains or their own `*.workers.dev`. No Public Suffix List entry and no third domain is needed.
 
