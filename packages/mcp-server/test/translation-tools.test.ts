@@ -1,7 +1,8 @@
 /** RFC-0033 §6: agents translate with their own model; the server links, checks and guards. */
 import { AuditLog, defaultScopes, PolicyEngine } from "@cloudhal/agent-runtime";
 import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
-import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { createEdition, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -231,5 +232,71 @@ describe("translation tools", () => {
     await expect(
       call("get_translation_source", { siteId: site.id, nodeId: post.id, locale: "fr" }),
     ).rejects.toMatchObject({ code: "locale_not_enabled" });
+  });
+
+  it("saves an article on a language edition with its image and the edition's terms (RFC-0034 §6)", async () => {
+    const { asset } = await store.ingestAsset({
+      siteId: site.id,
+      bytes: makePng(8, 8),
+      declaredType: "image/png",
+      filename: "cover.png",
+      uploadedBy: person,
+      source: { kind: "upload" },
+      fields: { alt: { en: "A cover" } },
+    });
+    const post = (await store.listContentEntries(site.id, "posts"))[0] as ContentEntry;
+    const withCover = await store.updateContentEntry({
+      ...post,
+      coverImage: { assetId: asset.id, src: "/x.png", alt: "A cover" },
+    });
+    const edition = (
+      await createEdition(store, { fromSiteId: site.id, name: "日本語", slug: "ja", locale: "ja" })
+    ).site;
+    const args = {
+      siteId: site.id,
+      nodeId: withCover.id,
+      locale: "ja",
+      targetSiteId: edition.id,
+      title: "こんにちは、世界",
+      slug: "hello-world",
+      body: "# こんにちは、世界\n\nこの投稿は `cloudhal init` で作成されました。次の投稿はエージェントに頼みましょう。",
+      summary: "この Cloudhal サイトの最初の投稿。",
+      engine: "claude-opus-5-5",
+    };
+    // The edition lacks the article's category and tag: named, so they can be created there.
+    await expect(call("save_translation", args)).rejects.toMatchObject({ code: "required_term" });
+    const [category, tag] = await Promise.all(
+      ["category", "tag"].map((k) => store.getTaxonomyByKey(edition.id, k)),
+    );
+    await store.createTerm({
+      siteId: edition.id,
+      taxonomyId: category?.id as string,
+      slug: "news",
+      status: "active",
+      visibility: "public",
+      labels: { ja: { name: "ニュース" } },
+    });
+    await store.createTerm({
+      siteId: edition.id,
+      taxonomyId: tag?.id as string,
+      slug: "cloudhal",
+      status: "active",
+      visibility: "public",
+      labels: { ja: { name: "Cloudhal" } },
+    });
+    const saved = (await call("save_translation", args)).result.node as ContentEntry;
+    expect(saved).toMatchObject({ siteId: edition.id, locale: "ja", status: "draft" });
+    expect(saved.translation?.source).toMatchObject({ id: withCover.id, siteId: site.id });
+    // The cover is the edition's own copy of the image; the terms are the edition's.
+    const cover = await store.getAsset(saved.coverImage?.assetId as string);
+    expect(cover?.siteId).toBe(edition.id);
+    expect(cover?.sha256).toBe(asset.sha256);
+    const news = await store.getTermBySlug(edition.id, "category", "news");
+    expect(saved.terms?.category?.ids).toEqual([news?.id]);
+    // A site outside the project is not a target.
+    const other = await seedStarterSite(store, { name: "Other", slug: "other" });
+    await expect(
+      call("save_translation", { ...args, targetSiteId: other.id }),
+    ).rejects.toMatchObject({ code: "not_found" });
   });
 });

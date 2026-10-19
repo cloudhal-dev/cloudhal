@@ -6,10 +6,19 @@
  * (`checkTranslation`). Agents never review: only a person does, in Studio. A translation a person
  * wrote or reviewed is never overwritten here.
  */
-import type { ContentEntry, Glossary, Page, Section, Translation } from "@cloudhal/core-contracts";
+import { forSite, holds } from "@cloudhal/agent-runtime";
+import type {
+  ContentEntry,
+  Glossary,
+  Page,
+  Section,
+  Site,
+  Translation,
+} from "@cloudhal/core-contracts";
 import {
   checkNames,
   checkTranslation,
+  forEdition,
   linkedLayout,
   type TranslationGroup,
 } from "@cloudhal/core-ts";
@@ -92,11 +101,19 @@ const getSourceTool: ToolDefinition = {
   title: "Get translation source",
   description:
     "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
-  inputSchema: obj({ siteId: id, nodeId: id, locale: str("Target BCP 47 locale") }, [
-    "siteId",
-    "nodeId",
-    "locale",
-  ]),
+  inputSchema: obj(
+    {
+      siteId: id,
+      nodeId: id,
+      locale: str("Target BCP 47 locale"),
+      targetSiteId: {
+        ...id,
+        description:
+          "A language edition: another site of the project the translation lives on (RFC-0034 §6); default siteId",
+      },
+    },
+    ["siteId", "nodeId", "locale"],
+  ),
   outputSchema: obj(
     {
       source: { type: "object" },
@@ -115,13 +132,14 @@ const getSourceTool: ToolDefinition = {
   scopes: ["content:read"],
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
+    const target = await targetOf(ctx, site, a.targetSiteId);
     const locale = a.locale as string;
-    if (!site.locales.includes(locale))
+    if (!target.locales.includes(locale))
       throw new ToolError("locale_not_enabled", `${locale} is not one of the site's locales`);
     const source = await nodeOf(ctx, site.id, a.nodeId as string);
     const group = await ctx.store.translationGroup(site, source.translation?.group ?? source.id);
-    const member = group.members.find((m) => m.locale === locale && m.siteId === site.id);
-    const existing = member ? await nodeOf(ctx, site.id, member.id) : undefined;
+    const member = group.members.find((m) => m.locale === locale && m.siteId === target.id);
+    const existing = member ? await nodeOf(ctx, target.id, member.id) : undefined;
     const text = JSON.stringify("sections" in source ? source.sections : source.body.value);
     // RFC-0033 §4a: a linked page translation follows the source's layout; nothing is written.
     const layout =
@@ -162,6 +180,11 @@ const saveTranslationTool: ToolDefinition = {
       summary: str("Entries: the translated summary"),
       seo: { type: "object", description: "Pages: the translated SEO title and description" },
       engine: str("The model that translated, e.g. claude-opus-5-5"),
+      targetSiteId: {
+        ...id,
+        description:
+          "A language edition: another site of the project to save the translation on (RFC-0034 §6). Its images are copied there and its categories and tags become the edition's terms with the same slugs (create missing ones there first). Default siteId",
+      },
     },
     ["siteId", "nodeId", "locale", "title"],
   ),
@@ -182,7 +205,11 @@ const saveTranslationTool: ToolDefinition = {
   scopes: ["content:write"],
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
+    const target = await targetOf(ctx, site, a.targetSiteId);
+    const cross = target.id !== site.id;
     const locale = a.locale as string;
+    if (cross && !target.locales.includes(locale))
+      throw new ToolError("locale_not_enabled", `${locale} is not one of the edition's locales`);
     let source = await nodeOf(ctx, site.id, a.nodeId as string);
     if (source.locale === locale)
       throw new ToolError("invalid", "the translation's locale differs from its source's");
@@ -190,8 +217,8 @@ const saveTranslationTool: ToolDefinition = {
     if (!source.translation) source = await markOriginal(ctx, source);
     const group = await ctx.store.translationGroup(site, source.translation?.group ?? source.id);
     const self = group.members.find((m) => m.id === source.id);
-    const member = group.members.find((m) => m.locale === locale && m.siteId === site.id);
-    const existing = member ? await nodeOf(ctx, site.id, member.id) : undefined;
+    const member = group.members.find((m) => m.locale === locale && m.siteId === target.id);
+    const existing = member ? await nodeOf(ctx, target.id, member.id) : undefined;
     const t = existing?.translation;
     if (t && (t.method === "human" || t.method === "original" || t.review))
       throw new ToolError(
@@ -202,7 +229,13 @@ const saveTranslationTool: ToolDefinition = {
       group: source.translation?.group ?? source.id,
       method: "machine",
       layout: t?.layout ?? "linked",
-      source: { id: source.id, locale: source.locale, rev: source.rev, hash: self?.hash ?? "" },
+      source: {
+        id: source.id,
+        ...(cross ? { siteId: site.id } : {}),
+        locale: source.locale,
+        rev: source.rev,
+        hash: self?.hash ?? "",
+      },
       provenance: {
         engine:
           (a.engine as string | undefined) ?? ctx.principal.actor.name ?? ctx.principal.actor.id,
@@ -210,33 +243,53 @@ const saveTranslationTool: ToolDefinition = {
       },
     };
     try {
-      const draft = translatedNode({ a, site: site.id, locale, source, existing, translation });
-      const checks = checkTranslation({
-        source,
-        draft,
-        locale,
-        glossary: await ctx.store.glossary.get(site.id),
-      });
+      const made = translatedNode({ a, site: target.id, locale, source, existing, translation });
+      // RFC-0034 §6: on an edition, the images come along and the terms are the edition's.
+      const draft = cross
+        ? await forEdition(ctx.store, made, {
+            fromSiteId: site.id,
+            toSiteId: target.id,
+            actor: ctx.principal.actor,
+          })
+        : made;
+      const glossary = await ctx.store.glossary.get(target.id);
+      const checks = checkTranslation({ source, draft, locale, glossary });
       const withChecks: Translation = {
         ...translation,
         provenance: {
           ...(translation.provenance as NonNullable<Translation["provenance"]>),
           checks: checkNames(checks),
+          ...(glossary ? { glossaryRev: glossary.rev } : {}),
         },
       };
       const node = await writeTranslation(
         ctx,
-        site.id,
+        target.id,
         { ...draft, translation: withChecks } as Localized,
         existing,
       );
-      const snapshot = await autoSnapshot(ctx, site.id, "save_translation");
+      const snapshot = await autoSnapshot(ctx, target.id, "save_translation");
       return { node, checks, snapshot };
     } catch (e) {
       mapError(e);
     }
   },
 };
+
+/**
+ * The site a translation lives on: `siteId`'s own, or with `targetSiteId` another site of the same
+ * project (a language edition, RFC-0034 §6) the caller may write to.
+ */
+async function targetOf(ctx: ToolContext, site: Site, targetSiteId: unknown): Promise<Site> {
+  if (typeof targetSiteId !== "string" || targetSiteId === site.id) return site;
+  const target = await ctx.store.getSite(targetSiteId);
+  const scoped = target ? forSite(ctx.principal, target.id) : undefined;
+  if (!target || target.projectId !== site.projectId || !scoped)
+    throw new ToolError("not_found", `no site ${targetSiteId} in this site's project`);
+  if (!holds(scoped.scopes, "content:write"))
+    throw new ToolError("denied", "missing scope content:write on the edition");
+  return target;
+}
 
 /** The source gains `translation: { group: its id, method: "original" }`. */
 async function markOriginal(ctx: ToolContext, source: Localized): Promise<Localized> {

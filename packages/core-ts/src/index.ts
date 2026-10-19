@@ -67,6 +67,7 @@ export * from "./search.ts";
 export * from "./search-ai.ts";
 export * from "./search-provider.ts";
 export * from "./seed.ts";
+export * from "./cross-site.ts";
 export * from "./editions.ts";
 export * from "./site-delete.ts";
 export * from "./site-search.ts";
