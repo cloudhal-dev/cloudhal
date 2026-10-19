@@ -180,7 +180,12 @@ export async function alternatesFor(
     return i === -1 ? site.locales.length : i;
   };
   out.sort((a, b) => rank(a.locale) - rank(b.locale) || a.locale.localeCompare(b.locale));
-  const fallback = out.find((a) => a.locale === site.defaultLocale);
+  // One x-default for the whole set: across editions, the group's original (every site agrees);
+  // within one site, its default locale's version.
+  const spans = out.some((a) => !site.locales.includes(a.locale));
+  const fallback = spans
+    ? (out.find((a) => a.original) ?? out.find((a) => a.locale === site.defaultLocale))
+    : out.find((a) => a.locale === site.defaultLocale);
   return fallback ? [...out, { locale: "x-default", href: fallback.href, current: false }] : out;
 }
 

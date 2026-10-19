@@ -21,9 +21,9 @@ import { R2BlobStore } from "@cloudhal/storage/r2";
 import { siteCacheTag } from "./cache-tags.ts";
 import { usableCommentsKey } from "./comments.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
+import type { PeerEdition } from "./locales.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
-import type { PeerEdition } from "./locales.ts";
 import type { GraphSource } from "./source.ts";
 
 /** RFC-0029 §3: `AI_SEARCH`, `SEARCH_BUCKET` and `CLOUDHAL_SEARCH_*` turn on semantic search. */
