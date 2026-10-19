@@ -13,6 +13,7 @@ import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { languageName } from "../lib/languages.ts";
+import { EditionGuide } from "./EditionGuide.tsx";
 import { LanguagePicker } from "./LanguagePicker.tsx";
 import { SettingRow, SettingsSection } from "./Settings.tsx";
 import { useToast } from "./Toast.ts";
@@ -125,6 +126,7 @@ export function LanguageSettingsSection({ siteId }: { siteId: string }) {
         />
       )}
       <LocalesEditor form={form} set={set} def={def} name={name} disabled={disabled} />
+      <EditionGuide siteId={siteId} />
       <LocalizationRows form={form} set={set} disabled={disabled} />
     </SettingsSection>
   );

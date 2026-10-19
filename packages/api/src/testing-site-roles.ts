@@ -229,6 +229,36 @@ export function describeSiteRolesApi(label: string, backend: RolesBackend): void
       ).toBe(404);
     });
 
+    it("shows translation coverage across the sites of a project", async () => {
+      const { english, owner, call } = await setup();
+      const made = await call("POST", "/api/sites", owner, {
+        name: "English (FR)",
+        slug: "english-fr",
+        locale: "fr",
+        from: english,
+      });
+      const edition = (made.body as { site: { id: string } }).site.id;
+      const res = await call("GET", `/api/sites/${edition}/translations?scope=project`, owner);
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        items: { group: string; siteId: string; locale: string }[];
+        sites: { id: string; locales: string[] }[];
+      };
+      expect(body.sites.map((s) => s.id).sort()).toEqual([english, edition].sort());
+      // every copied page sits in a group with its English original
+      const fr = body.items.filter((i) => i.siteId === edition);
+      expect(fr.length).toBeGreaterThan(0);
+      for (const m of fr)
+        expect(body.items.some((o) => o.group === m.group && o.siteId === english)).toBe(true);
+      // the site view stays the site's own
+      const own = (await call("GET", `/api/sites/${edition}/translations`, owner)).body as {
+        items: { siteId: string }[];
+        sites?: unknown;
+      };
+      expect(own.items.every((i) => i.siteId === edition)).toBe(true);
+      expect(own.sites).toBeUndefined();
+    });
+
     it("keeps the person's agent key inside their site over MCP", async () => {
       const { english, turkish, call, join, connect } = await setup();
       const tr = await join("tr-agent@example.com", "editor", { [turkish]: "editor" });

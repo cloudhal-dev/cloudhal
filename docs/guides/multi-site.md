@@ -30,6 +30,12 @@ In Studio, choose **New site › Start from › A copy of …**.
 
 **Not copied:** articles, categories and tags (the edition gets empty default taxonomies), media, comments, analytics, members and keys. A page that refers to the source's media or categories is left out and reported. Nothing is published.
 
+### Track translations across the editions
+
+Open **Translations** and choose **All sites in the project**. Each site and language gets its own column, and each cell opens that site's editor. The list shows what is missing, out of date, or waiting for a person's review in every edition.
+
+Under **Settings › Languages**, each site compares two options: adding a language to the site, or starting an edition. **Create a language edition…** opens the New site dialog with this site as the starting point.
+
 ## Serve it from the same site Worker
 
 1. List the sites in `cloudhal.json`. The project's own `siteId` always comes first:

@@ -126,4 +126,69 @@ describe("TranslationsPage", () => {
       "/sites/site_1/settings#languages",
     );
   });
+
+  it("shows every site of the project, a column per site and language", async () => {
+    const [me] = asRole("owner");
+    vi.stubGlobal(
+      "fetch",
+      serve(
+        me as Route,
+        on("GET", "/api/projects", {
+          status: 200,
+          body: {
+            items: [{ id: "proj_1", name: "News", sites: [{ id: "site_1" }, { id: "site_2" }] }],
+          },
+        }),
+        on("GET", "/api/sites/site_1/translations?scope=project", {
+          status: 200,
+          body: {
+            items: [
+              member({}),
+              member({
+                id: "page_9",
+                siteId: "site_2",
+                locale: "es",
+                method: "human",
+                title: "Acerca",
+                stale: true,
+              }),
+            ],
+            sites: [
+              { id: "site_1", name: "Newsroom", locales: ["en"] },
+              { id: "site_2", name: "Edición", locales: ["es"] },
+            ],
+          },
+        }),
+        on("GET", "/api/sites/site_1", {
+          status: 200,
+          body: {
+            id: "site_1",
+            defaultLocale: "en",
+            locales: ["en"],
+            domains: [],
+            theme: { name: "blog" },
+          },
+        }),
+        on("GET", "/api/sites/site_1/pages", { status: 200, body: PAGES.slice(0, 1) }),
+        on("GET", "/api/sites/site_1/entries", { status: 200, body: [] }),
+        on("GET", "/api/sites/site_1/translations", { status: 200, body: { items: [member({})] } }),
+      ),
+    );
+    render(wrap(<TranslationsPage />));
+    const scope = await screen.findByRole("combobox", { name: "Which sites" }, { timeout: 15_000 });
+    fireEvent.click(scope);
+    const option = await screen.findByRole("option", { name: "All sites in the project" });
+    fireEvent.pointerDown(option, { pointerType: "mouse" });
+    fireEvent.click(option);
+    expect(
+      await screen.findByRole("columnheader", { name: "Edición · Spanish" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Newsroom · English" })).toBeInTheDocument();
+    const about = (screen.getByText("About").closest("tr") as HTMLElement).querySelector(
+      '[data-locale="site_2:es"]',
+    ) as HTMLElement;
+    expect(within(about).getByRole("link", { name: "Acerca" }).getAttribute("href")).toBe(
+      "/sites/site_2/pages/page_9",
+    );
+  });
 });

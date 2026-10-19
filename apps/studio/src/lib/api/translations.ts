@@ -34,6 +34,12 @@ export const translationsApi = {
   /** Every language version on the site, optionally in one locale. */
   list: (siteId: string, locale?: string) =>
     request<{ items: TranslationRow[] }>(`/api/sites/${siteId}/translations${query({ locale })}`),
+  /** RFC-0034 §7: across the project's sites the person may open, untranslated works included. */
+  listProject: (siteId: string) =>
+    request<{
+      items: TranslationRow[];
+      sites: { id: string; name: string; locales: string[] }[];
+    }>(`/api/sites/${siteId}/translations${query({ scope: "project" })}`),
   /** A person's review: machine output becomes machine-reviewed; CAS on `rev`; one snapshot. */
   review: (siteId: string, nodeId: string, rev: number) =>
     request<Page | ContentEntry>(

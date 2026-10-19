@@ -219,6 +219,7 @@ export interface MessageParams {
   "common.deleteResource.typeToConfirm": { name: string | number };
   "common.deleteResource.warning": { name: string | number; type: string | number };
   "common.rev": { rev: string | number };
+  "coverage.siteLanguage": { site: string | number; language: string | number };
   "diff.assignments.added": { taxonomy: string | number; name: string | number };
   "diff.assignments.primary": { taxonomy: string | number; name: string | number };
   "diff.assignments.removed": { taxonomy: string | number; name: string | number };
