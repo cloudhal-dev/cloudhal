@@ -48,6 +48,8 @@ import path from "node:path";
 import { prepareAdminWorker } from "../cloudflare/admin.ts";
 import type { SchedulerTicker } from "../cloudflare/config.ts";
 import { must } from "../cloudflare/wrangler.ts";
+import { readProjectConfig } from "../config.ts";
+import { deployAttached } from "./deploy/attach.ts";
 import type { DeployOptions, DeployResult } from "./deploy/options.ts";
 import {
   analyticsAndComments,
@@ -59,6 +61,7 @@ import {
   studioDirFor,
 } from "./deploy/prepare.ts";
 import { downgradeGuard } from "./deploy/schedules-guard.ts";
+import { attachedWorkers } from "./deploy/served-sites.ts";
 import { commentsResult } from "./deploy/settings.ts";
 import { afterDeploy, purgeIfSwitched, shipWorkers } from "./deploy/ship.ts";
 import { loadOrCreateSecrets, writeDeployState } from "./deploy/state.ts";
@@ -89,6 +92,8 @@ export {
 
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   checkOptions(options);
+  // RFC-0034 §4: a site Worker that joins another installation deploys only itself.
+  if ((await readProjectConfig(options.projectDir)).installation) return deployAttached(options);
   const ctx = await loadDeploy(options);
   const { cfg, log, previous, base, names } = ctx;
   const { analytics, comments } = await analyticsAndComments(ctx);
@@ -102,8 +107,9 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const { plan, schedules, observability } = settings;
   const site = await buildSite(ctx, { withIds, analytics, comments, observability });
 
-  // 4. admin Worker
+  // 4. admin Worker, bound to every site Worker attached to this installation (RFC-0034 §4)
   const skillsDir = await resolveSkillsDir(options.projectDir);
+  const siteWorkers = await attachedWorkers(ctx);
   const prepareAdmin = (ticker: SchedulerTicker) =>
     prepareAdminWorker({
       projectDir: options.projectDir,
@@ -111,6 +117,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       names: withIds,
       siteId: cfg.siteId,
       ...(cfg.sites ? { siteIds: cfg.sites } : {}),
+      siteWorkers,
       studioDir,
       skillsDir,
       blockTypes: site.blockTypes,

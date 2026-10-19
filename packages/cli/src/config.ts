@@ -107,6 +107,12 @@ export interface ProjectConfig {
    * always comes first. Absent: the Worker serves `siteId` alone, on every host.
    */
   readonly sites?: readonly string[];
+  /**
+   * RFC-0034 §4: the folder of the installation this project's site Worker joins (relative to
+   * this project): `cloudhal deploy` then deploys only a site Worker, on that installation's
+   * database, bucket and secrets, and registers it there. Used for a theme of its own.
+   */
+  readonly installation?: string;
   /** Relative to the project root. */
   readonly dataDir: string;
   /**
@@ -146,6 +152,7 @@ export const CONFIG_FILE = "cloudhal.json";
 const OWN_KEYS = new Set([
   "siteId",
   "sites",
+  "installation",
   "dataDir",
   "domains",
   "analytics",
@@ -303,6 +310,9 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   return {
     siteId: cfg.siteId,
     ...(sites ? { sites } : {}),
+    ...(typeof cfg.installation === "string" && cfg.installation
+      ? { installation: cfg.installation }
+      : {}),
     dataDir: cfg.dataDir ?? ".cloudhal",
     ...(domains && (domains.site || domains.studio)
       ? {

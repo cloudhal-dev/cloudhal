@@ -40,6 +40,8 @@
  *   --remote` draws them in a local Chrome (RFC-0028 §5)
  * - `GET|POST /api/admin/sites`, `DELETE /api/admin/sites/:siteId` ← {confirm}: the installation's
  *   sites (RFC-0034 §2–3, `cloudhal site list|create|delete`), see `admin/sites.ts`
+ * - `GET /api/admin/site-workers`, `PUT|DELETE /api/admin/site-workers/:name`: site Workers
+ *   attached to this installation (RFC-0034 §4), see `admin/site-workers.ts`
  * - The bundle import refuses while the site has open releases (409 `schedules_pending`, their
  *   pins would point into a replaced graph) unless `?cancelSchedules=1` cancels them first
  *   (`cloudhal push --cancel-schedules`).
@@ -57,6 +59,7 @@ import { ownerAdminRoutes } from "./admin/owner.ts";
 import { schedulesAdminRoutes } from "./admin/schedules.ts";
 import { timingSafeEqual } from "./admin/shared.ts";
 import { siteOpsAdminRoutes } from "./admin/site-ops.ts";
+import { siteWorkersAdminRoutes } from "./admin/site-workers.ts";
 import { sitesAdminRoutes } from "./admin/sites.ts";
 import { syncAdminRoutes } from "./admin/sync.ts";
 
@@ -86,6 +89,7 @@ export function adminRoutes(
       .route("/", schedulesAdminRoutes(deps))
       .route("/", aiAdminRoutes(deps))
       .route("/", sitesAdminRoutes(deps))
+      .route("/", siteWorkersAdminRoutes(deps))
       .route("/", siteOpsAdminRoutes())
       .route("/", syncAdminRoutes(deps))
   );

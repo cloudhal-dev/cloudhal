@@ -91,7 +91,8 @@ A site in a multi-site installation is as independent as a site in its own insta
 
 ### 5. Domains
 - `cloudhal deploy` writes one route (`custom_domain: true`) for every host of the sites a site Worker serves, read from the API.
-- `cloudhal domains sync` updates only the routes, so a domain added in Studio is live without a rebuild. Studio tells the user to run it, and shows each host's state (pending, live, error).
+- `cloudhal domains sync` updates only the routes, so a domain added in Studio is live without a rebuild. Studio tells the user to run it, and shows each host's state (pending, live, error). *(Phase C note: deferred. A route change needs a Worker deploy, so `cloudhal deploy` covers it for now.)*
+- *Phase C2 note:* attached site Workers reach the admin Worker only through service bindings, because Workers cannot fetch each other's public URLs. The installation's deploy binds every registered Worker as `SITE_<n>` and writes `CLOUDHAL_SITE_ROUTES`. The admin Worker routes each purge by the `siteId` in its body.
 - Cloudflare's own limits apply per zone: 100 custom domains and 1,000 routes. Subdomains of one zone (`en.example.com`, `tr.example.com`, `client3.example.com`) count against the same zone.
 
 ### 6. Language editions

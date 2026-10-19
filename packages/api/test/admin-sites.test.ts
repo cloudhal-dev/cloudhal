@@ -75,3 +75,37 @@ describe("admin sites endpoints", () => {
     ).toBe(409);
   });
 });
+
+describe("admin site-workers endpoints (RFC-0034 §4)", () => {
+  it("registers, lists and removes an attached site Worker", async () => {
+    const { first, call } = await setup();
+    const path = "/api/admin/site-workers/news-site-docs";
+    expect(
+      (await call("PUT", path, { url: "http://x", theme: "docs", siteIds: [first.id] })).status,
+    ).toBe(400);
+    expect(
+      (
+        await call("PUT", path, {
+          url: "https://x.workers.dev",
+          theme: "docs",
+          siteIds: ["site_missing001"],
+        })
+      ).status,
+    ).toBe(400);
+    const put = await call("PUT", path, {
+      url: "https://news-site-docs.example.workers.dev",
+      theme: "docs",
+      siteIds: [first.id],
+    });
+    expect(put.status).toBe(200);
+    const listed = (await (await call("GET", "/api/admin/site-workers")).json()) as {
+      workers: { name: string; siteIds: string[] }[];
+    };
+    expect(listed.workers.map((w) => [w.name, w.siteIds])).toEqual([
+      ["news-site-docs", [first.id]],
+    ]);
+    expect(((await (await call("DELETE", path)).json()) as { deleted: boolean }).deleted).toBe(
+      true,
+    );
+  });
+});

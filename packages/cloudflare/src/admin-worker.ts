@@ -72,6 +72,7 @@ import {
   schedulerClockClass,
   schedulerRuntime,
 } from "./scheduler.ts";
+import { routedSite } from "./site-routes.ts";
 
 export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRoomsEnv, AiSearchEnv {
   DB: D1Database;
@@ -80,6 +81,8 @@ export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRooms
   AI?: AiBinding;
   ASSETS?: Fetcher;
   SITE?: Fetcher;
+  /** RFC-0034 §4: `{siteId: binding}` for sites served by attached site Workers. */
+  CLOUDHAL_SITE_ROUTES?: string;
   BETTER_AUTH_SECRET: string;
   MCP_STATE_KEY: string;
   CLOUDHAL_PREVIEW_SECRET?: string;
@@ -153,7 +156,7 @@ export function adminAnalytics(
   const log = options.log ?? ((line: string) => console.log(line));
   const onError = (message: string, error?: unknown) =>
     log(`${message}: ${error instanceof Error ? error.message : String(error ?? "")}`);
-  const site = env.SITE;
+  const site = routedSite(env);
   const token = env.CLOUDHAL_PURGE_TOKEN;
   return new AnalyticsService({
     sql,
@@ -304,8 +307,9 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
 
       // A takedown (RFC-0004 §4.6) purges the asset's media URLs at once, not at the next publish.
       const purgeTags = async (tags: string[], what: string, siteId: string) => {
-        if (!env.SITE || !env.CLOUDHAL_PURGE_TOKEN) return;
-        const res = await env.SITE.fetch("https://site.internal/__cloudhal/purge", {
+        const target = routedSite(env);
+        if (!target || !env.CLOUDHAL_PURGE_TOKEN) return;
+        const res = await target.fetch("https://site.internal/__cloudhal/purge", {
           method: "POST",
           headers: {
             authorization: `Bearer ${env.CLOUDHAL_PURGE_TOKEN}`,
@@ -317,7 +321,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         log(`purge after ${what}: ${res.status} ${await res.text()}`);
       };
       // RFC-0007 §8.4: comment purges go through the queue; the flusher shares the budget.
-      const siteBinding = env.SITE;
+      const siteBinding = routedSite(env); // RFC-0034 §4: to the Worker serving the purge's site
       const purgeToken = env.CLOUDHAL_PURGE_TOKEN;
       const flush = (siteId?: string) =>
         siteBinding && purgeToken
@@ -373,7 +377,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           log,
         }),
         onPublished: async (site, change) => {
-          const binding = env.SITE;
+          const binding = routedSite(env);
           if (!binding || !env.CLOUDHAL_PURGE_TOKEN) return;
           // Only what changed between the snapshot that was live and the new one (RFC-0002 §7).
           const result = await purgeSiteCache({

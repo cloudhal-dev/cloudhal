@@ -71,6 +71,8 @@ export async function prepareAdminWorker(options: {
   siteId?: string | undefined;
   /** RFC-0034 §4: the sites a multi-site site Worker serves. */
   siteIds?: readonly string[] | undefined;
+  /** RFC-0034 §4: site Workers attached to this installation (`/api/admin/site-workers`). */
+  siteWorkers?: readonly { name: string; siteIds: readonly string[] }[] | undefined;
   /** Built Studio (`apps/studio/dist`). */
   studioDir: string;
   skillsDir?: string | undefined;
@@ -134,6 +136,7 @@ export async function prepareAdminWorker(options: {
       ...options.names,
       ...(options.siteId ? { siteId: options.siteId } : {}),
       ...(options.siteIds ? { siteIds: options.siteIds } : {}),
+      ...(options.siteWorkers?.length ? { siteWorkers: options.siteWorkers } : {}),
       main: "./worker.ts",
       studioDir: path.relative(dir, options.studioDir) || ".",
       ...(options.domain ? { domain: options.domain } : {}),
