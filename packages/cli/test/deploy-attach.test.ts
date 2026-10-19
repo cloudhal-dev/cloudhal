@@ -132,6 +132,10 @@ describe("an attached site Worker (RFC-0034 §4)", { timeout: 600_000 }, () => {
       expect.objectContaining({ name: "newsroom-site-docs", siteIds: [docsId], theme: "blog" }),
     ]);
     expect(lines.join("\n")).toMatch(/run `cloudhal deploy` in .*newsroom once/);
+    // The site's address is the Worker's own (no custom domain yet).
+    expect((await remote.getSite(docsId))?.domains).toEqual([
+      { hostname: "newsroom-site-docs.acme.workers.dev", primary: true },
+    ]);
 
     // The installation's next deploy binds it.
     const admin = adminWorkerConfig({
