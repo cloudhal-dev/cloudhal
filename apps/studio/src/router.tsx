@@ -111,6 +111,7 @@ const SiteSettingsPage = lazyRouteComponent(
   "SiteSettingsPage",
 );
 const SitesPage = lazyRouteComponent(() => import("./routes/SitesPage.tsx"), "SitesPage");
+const ProjectPage = lazyRouteComponent(() => import("./routes/ProjectPage.tsx"), "ProjectPage");
 const SkillsPage = lazyRouteComponent(() => import("./routes/SkillsPage.tsx"), "SkillsPage");
 const SnapshotsPage = lazyRouteComponent(
   () => withMessages(import("./routes/SnapshotsPage.tsx"), ["menus"]),
@@ -202,6 +203,11 @@ const sitesRoute = createRoute({
   getParentRoute: () => accountRoute,
   path: "/sites",
   component: SitesPage,
+});
+const projectRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/projects/$projectId",
+  component: ProjectPage,
 });
 const agentsRoute = createRoute({
   getParentRoute: () => accountRoute,
@@ -438,7 +444,14 @@ const routeTree = rootRoute.addChildren([
   resetPasswordRoute,
   forgotPasswordRoute,
   indexRoute,
-  accountRoute.addChildren([sitesRoute, agentsRoute, skillsRoute, accountSettingsRoute, teamRoute]),
+  accountRoute.addChildren([
+    sitesRoute,
+    projectRoute,
+    agentsRoute,
+    skillsRoute,
+    accountSettingsRoute,
+    teamRoute,
+  ]),
   siteRoute.addChildren([
     siteIndexRoute,
     analyticsRoute,

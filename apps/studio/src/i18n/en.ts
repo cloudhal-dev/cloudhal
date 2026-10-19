@@ -64,7 +64,13 @@ export const en = {
     title: "Sites",
     description:
       "Every site is a graph of pages and content that agents operate under your approval.",
-    columns: { name: "Name", slug: "Slug", pages: "Pages", status: "Status" },
+    columns: {
+      project: "Project",
+      name: "Name",
+      slug: "Slug",
+      pages: "Pages",
+      status: "Status",
+    },
     notPublished: "Not published",
     empty: "No sites yet",
     emptyDescription: "Create one from the terminal and it appears here.",
@@ -2544,6 +2550,7 @@ export const en = {
         manage: "Only {roles} and above can change roles or remove people.",
       },
       agents: { manage: "Only {roles} and above can manage others' agent keys." },
+      sites: { create: "Only {roles} and above can create sites." },
       schedules: {
         read: "Only {roles} and above see the schedule.",
         write: "Only {roles} and above schedule their work.",
@@ -2731,6 +2738,55 @@ export const en = {
       empty: "No team events yet",
       emptyDescription: "Invites, role changes, removals and ownership transfers appear here.",
       restrictedTitle: "Team activity is for Editors and above",
+    },
+  },
+  /** RFC-0034 §3: creating a site in Studio. */
+  newSite: {
+    open: "New site",
+    title: "New site",
+    description:
+      "A site of its own in this installation: its own pages, settings, team roles and analytics. It starts with a home page; nothing is published.",
+    name: "Name",
+    nameRequired: "Give the site a name.",
+    slug: "Short name",
+    slugHint:
+      "Lower-case letters, digits and hyphens; it identifies the site in Studio and the CLI.",
+    slugInvalid: "Use lower-case letters, digits and hyphens.",
+    language: "Language",
+    languageHint: "The site's default language; add more later in its language settings.",
+    project: "Project",
+    projectHint: "Projects group related sites, such as the language editions of one publication.",
+    newProject: "A new project",
+    submit: "Create site",
+    failed: "The site could not be created",
+    created: "Site created",
+    createdDescription: "{name} is ready to edit; nothing is published yet.",
+  },
+  /** RFC-0034 §7: a project's sites side by side. */
+  projects: {
+    title: "Project",
+    description:
+      "The sites of this project side by side: languages, address, publish state and approvals waiting.",
+    newSite: "New site in this project",
+    sites: "Sites",
+    notFound: "No such project",
+    notFoundDescription: "It was removed, or none of its sites are yours to open.",
+    columns: {
+      site: "Site",
+      languages: "Languages",
+      address: "Address",
+      status: "Status",
+      approvals: "Approvals",
+    },
+    noAddress: "No domain yet",
+    none: "None",
+    waiting: "{count, plural, one {# waiting} other {# waiting}}",
+    summary: {
+      title: "At a glance",
+      sites: "Sites",
+      languages: "Languages",
+      live: "Live",
+      waiting: "Approvals waiting",
     },
   },
   /** RFC-0034 A2: which sites an Editor, Author or Contributor works on. */

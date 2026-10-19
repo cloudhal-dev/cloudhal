@@ -279,6 +279,7 @@ export interface MessageParams {
   "gating.abilities.schedules.write": { roles: string | number; role: string | number };
   "gating.abilities.schedules.writeAny": { roles: string | number; role: string | number };
   "gating.abilities.settings.write": { roles: string | number; role: string | number };
+  "gating.abilities.sites.create": { roles: string | number; role: string | number };
   "gating.abilities.structure.write": { roles: string | number; role: string | number };
   "glossary.remove": { term: string | number };
   "glossary.translationIn": { language: string | number };
@@ -462,6 +463,7 @@ export interface MessageParams {
   "migration.dialog.termsValue": { created: string | number; reused: string | number };
   "migration.done.toastDetail": { tags: string | number; entries: string | number };
   "migration.revert.toastDetail": { count: string | number };
+  "newSite.createdDescription": { name: string | number };
   "notifications.bellCount": { count: string | number };
   "notifications.comments.approval.title": { agent: string | number };
   "notifications.comments.paused.body": { cap: string | number };
@@ -496,6 +498,7 @@ export interface MessageParams {
   "pickers.under": { path: string | number };
   "pickers.viaSynonym": { value: string | number };
   "preview.frameTitle": { name: string | number };
+  "projects.waiting": { count: number };
   "proposals.acceptSome": { count: string | number; total: string | number };
   "proposals.count": { count: string | number };
   "proposals.from": { name: string | number };

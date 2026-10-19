@@ -113,6 +113,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
 
   // sites
   ["GET", "/api/sites", "site:read"],
+  // RFC-0034 §3, §7: Studio's "New site" and the project overview
+  ["POST", "/api/sites", "site:create"],
+  ["GET", "/api/projects", "site:read"],
   ["GET", S, "site:read"],
   ["PUT", S, "site:settings"],
   ["GET", `${S}/pages`, "content:read"],

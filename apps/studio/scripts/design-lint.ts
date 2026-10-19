@@ -46,6 +46,7 @@ export function scopeOf(absPath: string): Scope {
  */
 export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/SitesPage.tsx": "list",
+  "routes/ProjectPage.tsx": "dashboard",
   "routes/PagesPage.tsx": "list",
   "routes/ArticlesPage.tsx": "list",
   "routes/SnapshotsPage.tsx": "list",

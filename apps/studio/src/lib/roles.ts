@@ -172,7 +172,7 @@ export const FALLBACK_ROLE_SCOPES: Record<Role, AnyScope[]> = {
     "schedules:write:own",
   ],
   editor: EDITOR,
-  administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
+  administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage", "site:create"],
   owner: ["*"],
 };
 
@@ -193,6 +193,7 @@ export const FALLBACK_ABILITIES: Record<Ability, AnyScope | "owner"> = {
   "members.invite": "members:invite",
   "members.manage": "members:manage",
   "agents.manage": "agents:manage",
+  "sites.create": "site:create",
   "analytics.read": "analytics:read",
   "analytics.settings": "site:settings",
   "comments.read": "comments:read",

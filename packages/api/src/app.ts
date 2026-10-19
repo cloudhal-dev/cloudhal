@@ -42,6 +42,7 @@ import { notificationRoutes } from "./routes/notifications.ts";
 import { pages } from "./routes/pages.ts";
 import { passwordResetRoutes } from "./routes/password-reset.ts";
 import { previewLinks } from "./routes/preview-links.ts";
+import { projects } from "./routes/projects.ts";
 import { proposals } from "./routes/proposals.ts";
 import { redirects } from "./routes/redirects.ts";
 import { scheduleRoutes, schedulerRoute } from "./routes/schedules.ts";
@@ -301,7 +302,7 @@ export function createApi(deps: ApiDeps) {
   }
   app.route("/api/activity", deploymentActivity);
   app.route("/api/notifications", notificationRoutes(clock));
-  app.route("/api/sites", sites);
+  app.route("/api/sites", sites).route("/api/projects", projects);
   for (const [area, routes] of SITE_AREAS) app.route(`/api/sites/:siteId/${area}`, routes);
   // RFC-0016: in-editor AI settings, the model picker and commands.
   // RFC-0021 21c: Build chat renders with the same browser as `render_page`.

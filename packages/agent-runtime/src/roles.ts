@@ -76,7 +76,7 @@ export const ROLE_SCOPES: Readonly<Record<Role, readonly Scope[]>> = {
     "schedules:write:own",
   ],
   editor: EDITOR,
-  administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage"],
+  administrator: [...EDITOR, "site:settings", "members:manage", "agents:manage", "site:create"],
   owner: ["*"],
 };
 
@@ -223,6 +223,8 @@ export const ABILITIES = {
   "members.invite": "members:invite",
   "members.manage": "members:manage",
   "agents.manage": "agents:manage",
+  // RFC-0034 §3: creating sites in Studio.
+  "sites.create": "site:create",
   // RFC-0006 §9.1: reading analytics; changing the site's analytics settings (Administrator).
   "analytics.read": "analytics:read",
   "analytics.settings": "site:settings",
