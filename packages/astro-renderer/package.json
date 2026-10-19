@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "description": "Render a Cloudhal Site Graph with Astro: data sources (live/snapshot), section components and the cloudhal() integration",
   "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
     "directory": "packages/astro-renderer"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
   },
   "type": "module",
   "exports": {

@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "description": "Cloudhal storage interfaces (SQL driver, blob store) with Cloudflare D1/R2 and local SQLite/filesystem adapters",
   "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
     "directory": "packages/storage"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
   },
   "type": "module",
   "exports": {

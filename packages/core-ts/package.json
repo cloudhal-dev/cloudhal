@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "description": "Cloudhal Site Graph core (TypeScript): load/save nodes with optimistic locking, snapshots, diff, publish and rollback; taxonomies, terms, redirects and menus",
   "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
     "directory": "packages/core-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
   },
   "type": "module",
   "exports": {
