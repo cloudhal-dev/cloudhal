@@ -64,6 +64,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { flushCommentPurges, runCommentsHourly } from "./comments.ts";
 import { PURGE_MAX_REQUESTS, PURGE_TAGS_PER_REQUEST } from "./purge.ts";
+import { attachedSite, bindingFor, routedSite } from "./site-routes.ts";
 
 /** What the scheduler reads from the admin Worker's environment. */
 export interface SchedulerEnv extends AiSearchEnv {
@@ -81,6 +82,8 @@ export interface SchedulerEnv extends AiSearchEnv {
   CLOUDHAL_SITE_ID?: string;
   /** RFC-0034 §4: the sites a multi-site site Worker serves, by hostname. */
   CLOUDHAL_SITE_IDS?: string;
+  /** RFC-0034 §4: `{siteId: binding}` for sites served by attached site Workers (`site-routes.ts`). */
+  CLOUDHAL_SITE_ROUTES?: string;
   /** `off`: automations stop; releases and gates are unaffected (§11.6). */
   CLOUDHAL_AUTOMATIONS?: string;
   /** Legacy (before RFC-0008): `off` meant "no cron slot", read as `alarm`. */
@@ -157,7 +160,7 @@ export function releasePurger(
 ): ReleasePurger {
   const log = o.log ?? (() => {});
   return async (siteId: string, plan: CachePurgePlan): Promise<ReleasePurge> => {
-    const site = env.SITE;
+    const site = routedSite(env);
     const token = env.CLOUDHAL_PURGE_TOKEN;
     if (!site || !token) return "none";
     const queue = new SqlCommentStore(sql).purgeQueue;
@@ -279,7 +282,7 @@ export function adminSystemJobs(
         log(
           `comments hourly: ${c.sites} site(s), ${c.retained} row(s) past retention${c.more ? " (more next run)" : ""}, ${c.deletedEntries} of deleted entries, ${c.closed} thread(s) closed, ${c.salts} salt(s) deleted`,
         );
-        const site = env.SITE;
+        const site = routedSite(env);
         if (site && env.CLOUDHAL_PURGE_TOKEN) {
           const f = await flushCommentPurges({
             store: comments,
@@ -308,6 +311,7 @@ const SITE_ORIGIN = "https://site.internal";
  */
 async function siteOrigin(env: SchedulerEnv, siteId: string): Promise<string | undefined> {
   const served = (env.CLOUDHAL_SITE_IDS ?? "").split(/[\s,]+/).filter(Boolean);
+  if (attachedSite(env, siteId)) served.push(siteId);
   if (served.length === 0)
     return !env.CLOUDHAL_SITE_ID || env.CLOUDHAL_SITE_ID === siteId ? SITE_ORIGIN : undefined;
   if (!served.includes(siteId)) return undefined;
@@ -326,11 +330,11 @@ async function siteOrigin(env: SchedulerEnv, siteId: string): Promise<string | u
 export function siteDocumentFetcher(
   env: SchedulerEnv,
 ): NonNullable<BuiltinInputs["fetchDocument"]> | undefined {
-  const site = env.SITE;
-  if (!site) return undefined;
+  if (!env.SITE && !env.CLOUDHAL_SITE_ROUTES) return undefined;
   return async ({ siteId, path }) => {
     const origin = await siteOrigin(env, siteId);
-    if (!origin) return undefined;
+    const site = bindingFor(env, siteId);
+    if (!origin || !site) return undefined;
     const res = await site.fetch(`${origin}${path}`, {
       headers: { accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.1" },
     });
@@ -382,7 +386,7 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
   const sql = new D1Driver(env.DB);
   const mode = schedulerMode(env);
   const flush = (siteId: string) => {
-    const site = env.SITE;
+    const site = routedSite(env);
     const token = env.CLOUDHAL_PURGE_TOKEN;
     if (!o.waitUntil || !site || !token) return;
     o.waitUntil(

@@ -53,6 +53,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/admin/sites", "deploy-token"],
   ["POST", "/api/admin/sites", "deploy-token"],
   ["DELETE", "/api/admin/sites/:siteId", "deploy-token"],
+  ["GET", "/api/admin/site-workers", "deploy-token"],
+  ["PUT", "/api/admin/site-workers/:name", "deploy-token"],
+  ["DELETE", "/api/admin/site-workers/:name", "deploy-token"],
   // RFC-0008 §13: `cloudhal schedules status|list|run-due --remote` and the deploy's downgrade guard.
   ["GET", "/api/admin/schedules/status", "deploy-token"],
   ["POST", "/api/admin/schedules/run-due", "deploy-token"],

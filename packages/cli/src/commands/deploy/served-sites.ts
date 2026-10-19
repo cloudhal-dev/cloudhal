@@ -7,6 +7,7 @@
  */
 
 import { listSites } from "../site.ts";
+import { deployment } from "../sync.ts";
 import type { DeployContext } from "./context.ts";
 
 export interface ServedSites {
@@ -47,4 +48,39 @@ export async function servedSites(ctx: DeployContext): Promise<ServedSites> {
     .flatMap((s) => s.hosts)
     .filter((h) => !h.endsWith(".workers.dev") && h !== cfg.domains?.site);
   return { siteIds: cfg.sites, hosts: [...new Set(hosts)] };
+}
+
+/** A site Worker another project attached to this installation (`/api/admin/site-workers`). */
+export interface AttachedWorker {
+  readonly name: string;
+  readonly url: string;
+  readonly theme: string;
+  readonly siteIds: readonly string[];
+}
+
+/**
+ * The site Workers attached to this installation, so the admin Worker gets a service binding to
+ * each and routes their sites' purges there (RFC-0034 §4). None before the first deploy, or when
+ * the deployment predates the registry.
+ */
+export async function attachedWorkers(ctx: DeployContext): Promise<AttachedWorker[]> {
+  const { previous, options, log } = ctx;
+  if (!previous?.adminUrl) return [];
+  try {
+    const { token, fetch: f } = await deployment({
+      projectDir: options.projectDir,
+      adminUrl: previous.adminUrl,
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    });
+    const res = await f(new URL("/api/admin/site-workers", previous.adminUrl), {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const workers = ((await res.json()) as { workers: AttachedWorker[] }).workers;
+    for (const w of workers)
+      log(`site Worker ${w.name} (${w.theme}) serves ${w.siteIds.length} site(s): binding it`);
+    return workers;
+  } catch {
+    return [];
+  }
 }

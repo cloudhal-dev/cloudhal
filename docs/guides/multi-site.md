@@ -39,4 +39,21 @@ A publish purges only that site's pages from the edge cache.
 | D1 database size (shared by every site of the installation) | 500 MB | 10 GB |
 | Custom domains per zone | 100 | 100 |
 
-A site with another theme needs its own site Worker. Attaching a second site Worker to the same installation is RFC-0034 phase C2. Until then, a site with another theme is a separate installation.
+## A site with another theme
+
+A site Worker renders one theme. A site with another theme gets its own site Worker, which joins the same installation. It shares the same Studio, database and team.
+
+1. Create the theme project with `cloudhal init` and point it at the installation. The path is relative to this project:
+
+   ```json
+   { "siteId": "site_docs…", "installation": "../newsroom" }
+   ```
+
+2. Run `cloudhal deploy` in the theme project. It deploys only a site Worker, named `<installation>-site-<slug>`:
+   - it uses the installation's database, bucket, analytics dataset and secrets;
+   - it adds this project's site to the installation if the site is not there yet;
+   - it registers the Worker with the installation.
+
+3. Run `cloudhal deploy` once more in the installation's project. The admin Worker then gets a service binding to the new Worker (`SITE_1`, `SITE_2`, …), and sends those sites' cache purges and feed checks to it.
+
+A Worker can't call another Worker over its public address, so the binding is the only way the admin Worker reaches it. That is why the installation deploys again. Adding a site or a domain later needs only the deploy of the Worker that serves it.

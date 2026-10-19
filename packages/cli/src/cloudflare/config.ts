@@ -126,13 +126,19 @@ export interface DeploymentNames {
   readonly databaseName?: string;
   readonly databaseId?: string;
   readonly bucketName?: string;
+  /**
+   * RFC-0034 §4: the site Worker's name when it is not `<name>-site` — a site Worker attached to
+   * another installation (`<installation>-site-<slug>`), which shares that installation's D1, R2
+   * and dataset names through `name`.
+   */
+  readonly siteName?: string;
   /** RFC-0029 §3: the AI Search instance and bucket both Workers bind; absent = FTS5 alone. */
   readonly search?: SearchDeployment;
 }
 
 export function workerNames(n: DeploymentNames) {
   return {
-    site: `${n.name}-site`,
+    site: n.siteName ?? `${n.name}-site`,
     admin: `${n.name}-admin`,
     database: n.databaseName ?? `${n.name}-db`,
     bucket: n.bucketName ?? `${n.name}-blobs`,
@@ -290,6 +296,8 @@ export function adminWorkerConfig(
     siteId?: string;
     /** RFC-0034 §4: the sites a multi-site site Worker serves (`CLOUDHAL_SITE_IDS`). */
     siteIds?: readonly string[];
+    /** RFC-0034 §4: site Workers attached to this installation, bound as `SITE_1`, `SITE_2`, … */
+    siteWorkers?: readonly { readonly name: string; readonly siteIds: readonly string[] }[];
     domain?: string;
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
@@ -314,7 +322,16 @@ export function adminWorkerConfig(
   const c = n.comments;
   const scheduler: SchedulerTicker = n.scheduler ?? "cron";
   const s = n.schedules ?? DEFAULT_SCHEDULES_DEPLOYMENT;
+  // RFC-0034 §4: attached site Workers, in name order so the bindings stay stable across deploys.
+  const attached = [...(n.siteWorkers ?? [])]
+    .filter((w) => w.name !== names.site)
+    .sort((x, y) => x.name.localeCompare(y.name))
+    .map((w, i) => ({ ...w, binding: `SITE_${i + 1}` }));
+  const routes = Object.fromEntries(
+    attached.flatMap((w) => w.siteIds.map((id) => [id, w.binding])),
+  );
   const vars = {
+    ...(attached.length > 0 ? { CLOUDHAL_SITE_ROUTES: JSON.stringify(routes) } : {}),
     // RFC-0008 §11.1: the feed check fetches this site's feed through `SITE` (it serves no other).
     ...(n.siteIds && n.siteIds.length > 0
       ? { CLOUDHAL_SITE_IDS: n.siteIds.join(",") }
@@ -351,7 +368,10 @@ export function adminWorkerConfig(
     // Better Auth needs AsyncLocalStorage.
     compatibility_flags: ["nodejs_compat"],
     ...storageBindings(n),
-    services: [{ binding: "SITE", service: names.site }],
+    services: [
+      { binding: "SITE", service: names.site },
+      ...attached.map((w) => ({ binding: w.binding, service: w.name })),
+    ],
     // Analytics (RFC-0006 §7.3): reads WAE through the binding, no API token; vars for the
     // dataset, the query budget and the defaults. Comments (RFC-0007): the availability switch.
     ...(a ? { analytics: { binding: "ANALYTICS_SQL" } } : {}),
