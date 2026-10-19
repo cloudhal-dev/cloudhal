@@ -37,6 +37,11 @@ export interface PurgeSiteCacheOptions {
     ): Promise<CachePurgePlan>;
   };
   readonly change: PublishChange;
+  /**
+   * RFC-0034 §4: the site whose publish this is. A multi-site Worker then purges only that site's
+   * tags, even for "everything"; a single-site Worker ignores it.
+   */
+  readonly siteId?: string;
   readonly log?: (line: string) => void;
   /**
    * Called once per purge request sent, whatever its answer (RFC-0007 §8.4: publishes and comment
@@ -70,7 +75,11 @@ export async function purgeSiteCache(o: PurgeSiteCacheOptions): Promise<PurgeSit
   };
   const everything = async (reason: string): Promise<PurgeSiteCacheResult> => {
     await sentOne();
-    const res = await o.fetch(PURGE_URL, { method: "POST", headers: auth });
+    const res = await o.fetch(PURGE_URL, {
+      method: "POST",
+      headers: o.siteId ? { ...auth, "content-type": "application/json" } : auth,
+      ...(o.siteId ? { body: JSON.stringify({ siteId: o.siteId }) } : {}),
+    });
     log(`purge everything (${reason}): ${res.status} ${await res.text()}`);
     if (!res.ok) throw new Error(`purge everything failed: ${res.status}`);
     return { mode: "everything", tags: [], requests, reason };
@@ -90,7 +99,7 @@ export async function purgeSiteCache(o: PurgeSiteCacheOptions): Promise<PurgeSit
     const res = await o.fetch(PURGE_URL, {
       method: "POST",
       headers: { ...auth, "content-type": "application/json" },
-      body: JSON.stringify({ tags: batch }),
+      body: JSON.stringify({ tags: batch, ...(o.siteId ? { siteId: o.siteId } : {}) }),
     });
     log(`purge ${batch.length} tag(s) (${summary(plan.why)}): ${res.status} ${await res.text()}`);
     // A partial tag purge would leave stale pages behind: purge everything instead.

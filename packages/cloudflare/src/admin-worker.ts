@@ -109,6 +109,18 @@ export const DEFAULT_ANALYTICS_BUDGET = 8000;
 const PURGE_URL = "https://site.internal/__cloudhal/purge";
 
 /**
+ * A purge of one site's cache (RFC-0034 §4): a multi-site Worker purges only that site's tags; a
+ * single-site Worker purges everything, as before.
+ */
+function sitePurge(token: string, siteId: string): RequestInit {
+  return {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ siteId }),
+  };
+}
+
+/**
  * `CLOUDHAL_ANALYTICS_DEFAULTS` as the Site Worker reads it (`deploymentDefaults` in the renderer):
  * cloudhal.json's `analytics` block, in which `enabled` defaults to `true`.
  */
@@ -166,10 +178,7 @@ export function adminAnalytics(
     ...(site && token
       ? {
           purgeSite: async (siteId: string) => {
-            const res = await site.fetch(PURGE_URL, {
-              method: "POST",
-              headers: { authorization: `Bearer ${token}` },
-            });
+            const res = await site.fetch(PURGE_URL, sitePurge(token, siteId));
             await logPurge(sql, "analytics");
             log(`purge everything after analytics settings of ${siteId}: ${res.status}`);
             if (!res.ok) throw new Error(`purge failed: ${res.status}`);
@@ -294,7 +303,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       await ensureMigrated(sql);
 
       // A takedown (RFC-0004 §4.6) purges the asset's media URLs at once, not at the next publish.
-      const purgeTags = async (tags: string[], what: string) => {
+      const purgeTags = async (tags: string[], what: string, siteId: string) => {
         if (!env.SITE || !env.CLOUDHAL_PURGE_TOKEN) return;
         const res = await env.SITE.fetch("https://site.internal/__cloudhal/purge", {
           method: "POST",
@@ -302,7 +311,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             authorization: `Bearer ${env.CLOUDHAL_PURGE_TOKEN}`,
             "content-type": "application/json",
           },
-          body: JSON.stringify({ tags }),
+          body: JSON.stringify({ tags, siteId }),
         });
         await logPurge(sql, "media");
         log(`purge after ${what}: ${res.status} ${await res.text()}`);
@@ -336,10 +345,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         ...(siteBinding && purgeToken
           ? {
               purgeSite: async (siteId: string) => {
-                const res = await siteBinding.fetch(PURGE_URL, {
-                  method: "POST",
-                  headers: { authorization: `Bearer ${purgeToken}` },
-                });
+                const res = await siteBinding.fetch(PURGE_URL, sitePurge(purgeToken, siteId));
                 await logPurge(sql, "comments");
                 log(`purge everything for comments of ${siteId}: ${res.status}`);
                 if (!res.ok) throw new Error(`purge failed: ${res.status}`);
@@ -375,6 +381,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             token: env.CLOUDHAL_PURGE_TOKEN,
             store,
             change,
+            siteId: site.id,
             log: (line) => log(`${site.id}: ${line}`),
             onRequest: () => logPurge(sql, "publish"),
           });
@@ -386,6 +393,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           purgeTags(
             assetIds.map((id) => `cloudhal-asset-${id}`),
             `taking down media of ${siteId}`,
+            siteId,
           ),
         onHookError: (e) => log(`purge failed: ${e instanceof Error ? e.message : String(e)}`),
       });

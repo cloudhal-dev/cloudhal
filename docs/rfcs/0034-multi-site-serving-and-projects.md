@@ -76,7 +76,7 @@ A site in a multi-site installation is as independent as a site in its own insta
   - `cloudhal deploy` writes the Worker's row.
   - The admin Worker sends a site's purge to the Worker that serves it.
   - Every site Worker of an installation shares the installation's purge token.
-- **Deploying site Workers.** `cloudhal.json` takes either `siteId` (today, unchanged) or `sites: ["site_…", …]`; the two are mutually exclusive.
+- **Deploying site Workers.** `cloudhal.json` keeps `siteId`, the project's own site that `dev`, `push` and `pull` work on. It also takes `sites: ["site_…", …]`, every site the Worker serves, with `siteId` first. *(Implementation note, phase C1: the two are not mutually exclusive, as first drafted.)*
   - The first `cloudhal deploy` creates the installation as today.
   - Another project directory (another theme, or the same theme for another group of sites) deploys only a site Worker into the existing installation with `"installation": "<name>"` in its `cloudhal.json`. The Worker binds the installation's D1 and R2 (`databaseName` / `bucketName` already exist in the deploy config) and registers in `site_workers`.
   - With `sites`, the Worker gets `CLOUDHAL_SITE_IDS`. That list is its allow-list.

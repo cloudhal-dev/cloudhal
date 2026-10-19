@@ -110,6 +110,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       dataDir: cfg.dataDir,
       names: withIds,
       siteId: cfg.siteId,
+      ...(cfg.sites ? { siteIds: cfg.sites } : {}),
       studioDir,
       skillsDir,
       blockTypes: site.blockTypes,

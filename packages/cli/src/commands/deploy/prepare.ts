@@ -53,6 +53,7 @@ import {
 import type { DeployContext } from "./context.ts";
 import type { DeployOptions } from "./options.ts";
 import { ensureResources } from "./resources.ts";
+import { servedSites } from "./served-sites.ts";
 import {
   commentsRateLimitDeployment,
   DEFAULT_QUERY_BUDGET,
@@ -270,11 +271,15 @@ export async function buildSite(
   },
 ) {
   const { options, cfg, site, log } = ctx;
+  // RFC-0034 §4–5: the other sites this Worker serves, checked and with their routes.
+  const served = await servedSites(ctx);
   await writeWranglerConfig(
     siteConfigPath(options.projectDir),
     siteWorkerConfig({
       ...input.withIds,
       siteId: cfg.siteId,
+      ...(served.siteIds ? { siteIds: served.siteIds } : {}),
+      ...(served.hosts.length > 0 ? { domains: served.hosts } : {}),
       ...(cfg.domains?.site ? { domain: cfg.domains.site, siteHosts: [cfg.domains.site] } : {}),
       ...(input.analytics ? { analytics: input.analytics } : {}),
       comments: input.comments,
