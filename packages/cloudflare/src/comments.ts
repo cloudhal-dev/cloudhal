@@ -88,7 +88,7 @@ export async function flushCommentPurges(o: FlushOptions): Promise<FlushReport> 
         const res = await o.fetch(PURGE_URL, {
           method: "POST",
           headers: { authorization: `Bearer ${o.token}`, "content-type": "application/json" },
-          body: JSON.stringify({ tags: request.tags }),
+          body: JSON.stringify({ tags: request.tags, siteId }),
         });
         status = String(res.status);
         // the site Worker answers 502 when Cloudflare said `success: false` (bucket empty)

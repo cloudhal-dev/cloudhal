@@ -181,7 +181,7 @@ describe("admin Worker analytics", () => {
     );
   });
 
-  it("a settings change purges the site's whole cache through the SITE binding", async () => {
+  it("a settings change purges the site's cache through the SITE binding", async () => {
     const calls: { url: string; auth: string | null; body: unknown }[] = [];
     const env = baseEnv({
       CLOUDHAL_ANALYTICS_DATASET: "newsroom_events",
@@ -209,7 +209,8 @@ describe("admin Worker analytics", () => {
       {
         url: "https://site.internal/__cloudhal/purge",
         auth: `Bearer ${"p".repeat(32)}`,
-        body: null,
+        // RFC-0034 §4: the site is named, so a multi-site Worker purges only its tags.
+        body: JSON.stringify({ siteId }),
       },
     ]);
   });

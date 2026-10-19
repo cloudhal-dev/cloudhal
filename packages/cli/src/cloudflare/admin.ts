@@ -69,6 +69,8 @@ export async function prepareAdminWorker(options: {
   names: DeploymentNames;
   /** The site the site Worker serves (`CLOUDHAL_SITE_ID`; the feed check fetches only its feed). */
   siteId?: string | undefined;
+  /** RFC-0034 §4: the sites a multi-site site Worker serves. */
+  siteIds?: readonly string[] | undefined;
   /** Built Studio (`apps/studio/dist`). */
   studioDir: string;
   skillsDir?: string | undefined;
@@ -131,6 +133,7 @@ export async function prepareAdminWorker(options: {
       ...existing,
       ...options.names,
       ...(options.siteId ? { siteId: options.siteId } : {}),
+      ...(options.siteIds ? { siteIds: options.siteIds } : {}),
       main: "./worker.ts",
       studioDir: path.relative(dir, options.studioDir) || ".",
       ...(options.domain ? { domain: options.domain } : {}),

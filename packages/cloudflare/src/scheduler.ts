@@ -79,6 +79,8 @@ export interface SchedulerEnv extends AiSearchEnv {
   CLOUDHAL_TICK_BUDGET?: string;
   /** The site the site Worker serves (the feed check fetches only that site's feed). */
   CLOUDHAL_SITE_ID?: string;
+  /** RFC-0034 §4: the sites a multi-site site Worker serves, by hostname. */
+  CLOUDHAL_SITE_IDS?: string;
   /** `off`: automations stop; releases and gates are unaffected (§11.6). */
   CLOUDHAL_AUTOMATIONS?: string;
   /** Legacy (before RFC-0008): `off` meant "no cron slot", read as `alarm`. */
@@ -175,11 +177,9 @@ export function releasePurger(
       try {
         const res = await site.fetch(PURGE_URL, {
           method: "POST",
-          headers: {
-            authorization: `Bearer ${token}`,
-            ...(tags ? { "content-type": "application/json" } : {}),
-          },
-          ...(tags ? { body: JSON.stringify({ tags }) } : {}),
+          // RFC-0034 §4: the site is named, so a multi-site Worker purges only its tags.
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ siteId, ...(tags ? { tags } : {}) }),
         });
         ok = res.ok;
         await res.body?.cancel();
@@ -302,9 +302,26 @@ export function adminSystemJobs(
 const SITE_ORIGIN = "https://site.internal";
 
 /**
+ * Where the site Worker answers for `siteId`, or undefined when it does not serve it. A multi-site
+ * Worker picks the site by hostname (RFC-0034 §4), so the request carries the site's primary host
+ * (a service-binding request never leaves Cloudflare, whatever its host).
+ */
+async function siteOrigin(env: SchedulerEnv, siteId: string): Promise<string | undefined> {
+  const served = (env.CLOUDHAL_SITE_IDS ?? "").split(/[\s,]+/).filter(Boolean);
+  if (served.length === 0)
+    return !env.CLOUDHAL_SITE_ID || env.CLOUDHAL_SITE_ID === siteId ? SITE_ORIGIN : undefined;
+  if (!served.includes(siteId)) return undefined;
+  const row = await new D1Driver(env.DB).get<{ host: string }>(
+    "SELECT host FROM site_hosts WHERE site_id = ? AND locale IS NULL ORDER BY primary_host DESC, host LIMIT 1",
+    [siteId],
+  );
+  return row ? `https://${row.host}` : undefined;
+}
+
+/**
  * Fetches the site's own `/rss.xml` or `/sitemap.xml` through the `SITE` binding, as readers get
- * them (RFC-0008 §11.1 `feed-check`). The site Worker serves one site (`CLOUDHAL_SITE_ID`): for
- * any other site of the deployment the answer is undefined (not served from here).
+ * them (RFC-0008 §11.1 `feed-check`). For a site the site Worker does not serve the answer is
+ * undefined (not served from here).
  */
 export function siteDocumentFetcher(
   env: SchedulerEnv,
@@ -312,8 +329,9 @@ export function siteDocumentFetcher(
   const site = env.SITE;
   if (!site) return undefined;
   return async ({ siteId, path }) => {
-    if (env.CLOUDHAL_SITE_ID && env.CLOUDHAL_SITE_ID !== siteId) return undefined;
-    const res = await site.fetch(`${SITE_ORIGIN}${path}`, {
+    const origin = await siteOrigin(env, siteId);
+    if (!origin) return undefined;
+    const res = await site.fetch(`${origin}${path}`, {
       headers: { accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.1" },
     });
     const contentType = res.headers.get("content-type");

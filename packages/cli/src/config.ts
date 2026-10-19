@@ -100,7 +100,13 @@ const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
 export interface ProjectConfig {
+  /** The project's own site: what `dev`, `push`, `pull` and the other site commands work on. */
   readonly siteId: string;
+  /**
+   * RFC-0034 §4: every site the deployment's site Worker serves, picked by hostname. `siteId`
+   * always comes first. Absent: the Worker serves `siteId` alone, on every host.
+   */
+  readonly sites?: readonly string[];
   /** Relative to the project root. */
   readonly dataDir: string;
   /**
@@ -139,6 +145,7 @@ export const CONFIG_FILE = "cloudhal.json";
 /** The keys `ProjectConfig` owns; others (e.g. `media`, read by the starter) are kept on write. */
 const OWN_KEYS = new Set([
   "siteId",
+  "sites",
   "dataDir",
   "domains",
   "analytics",
@@ -262,6 +269,17 @@ export function analyticsDefaultsOf(cfg: Pick<ProjectConfig, "analytics">): {
   };
 }
 
+const SITE_ID = /^site_[A-Za-z0-9]{6,32}$/;
+
+/** `sites`: valid ids, each once, the project's site first; undefined unless it adds a site. */
+export function parseSites(siteId: string, input: unknown): string[] | undefined {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input) || !input.every((s) => typeof s === "string" && SITE_ID.test(s)))
+    throw new Error(`${CONFIG_FILE}: sites must be a list of site ids (site_…)`);
+  const sites = [...new Set([siteId, ...(input as string[])])];
+  return sites.length > 1 ? sites : undefined;
+}
+
 export async function readProjectConfig(projectDir: string): Promise<ProjectConfig> {
   const file = path.join(projectDir, CONFIG_FILE);
   let raw: string;
@@ -281,8 +299,10 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   const ai = cfg.ai === (true as unknown) || (cfg.ai && typeof cfg.ai === "object");
   const observability = parseObservabilityConfig(cfg.observability);
   const search = parseSearchConfig(cfg.search);
+  const sites = parseSites(cfg.siteId, cfg.sites);
   return {
     siteId: cfg.siteId,
+    ...(sites ? { sites } : {}),
     dataDir: cfg.dataDir ?? ".cloudhal",
     ...(domains && (domains.site || domains.studio)
       ? {

@@ -155,8 +155,11 @@ const storageBindings = (n: DeploymentNames) => {
 };
 
 /** Cloudflare Custom Domain routes (wrangler creates the DNS record and certificate). */
-function customDomain(hostname: string | undefined) {
-  return hostname ? { routes: [{ pattern: hostname, custom_domain: true }] } : {};
+function customDomain(hostname: string | undefined, more: readonly string[] = []) {
+  const hosts = [...new Set([...(hostname ? [hostname] : []), ...more])];
+  return hosts.length > 0
+    ? { routes: hosts.map((pattern) => ({ pattern, custom_domain: true })) }
+    : {};
 }
 
 /** The site Worker's config, written to the project root (`wrangler.jsonc`) before `astro build`. */
@@ -169,6 +172,8 @@ export function siteWorkerConfig(
      */
     siteIds?: readonly string[];
     domain?: string;
+    /** RFC-0034 §5: every other site's hostnames, one Custom Domain route each. */
+    domains?: readonly string[];
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
     /** Extra hostnames the site answers on (custom domains): analytics and comments check them. */
@@ -227,7 +232,7 @@ export function siteWorkerConfig(
       // RFC-0006 §5.2 / RFC-0007 §6.2 step 2: the same-origin checks accept these hosts too.
       ...((a || c) && hosts.length > 0 ? { CLOUDHAL_SITE_HOSTS: hosts.join(",") } : {}),
     },
-    ...customDomain(n.domain),
+    ...customDomain(n.domain, n.domains),
     // Workers Cache: published pages are cached until a publish purges `cloudhal-site-<id>`.
     cache: { enabled: true },
     observability: observabilitySettings(n.observability),
@@ -283,6 +288,8 @@ export function adminWorkerConfig(
     main: string;
     /** The site the site Worker serves (`CLOUDHAL_SITE_ID`). */
     siteId?: string;
+    /** RFC-0034 §4: the sites a multi-site site Worker serves (`CLOUDHAL_SITE_IDS`). */
+    siteIds?: readonly string[];
     domain?: string;
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
@@ -309,7 +316,11 @@ export function adminWorkerConfig(
   const s = n.schedules ?? DEFAULT_SCHEDULES_DEPLOYMENT;
   const vars = {
     // RFC-0008 §11.1: the feed check fetches this site's feed through `SITE` (it serves no other).
-    ...(n.siteId ? { CLOUDHAL_SITE_ID: n.siteId } : {}),
+    ...(n.siteIds && n.siteIds.length > 0
+      ? { CLOUDHAL_SITE_IDS: n.siteIds.join(",") }
+      : n.siteId
+        ? { CLOUDHAL_SITE_ID: n.siteId }
+        : {}),
     ...(a
       ? {
           CLOUDHAL_ANALYTICS_DATASET: a.dataset,
