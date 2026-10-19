@@ -8,7 +8,9 @@
  * edge under `Cache-Tag: cloudhal-site-<siteId>` until a publish/rollback purges that tag, and
  * never past the snapshot's next time gate (RFC-0008 §7.4); previews are never cached.
  */
+
 import { env, waitUntil } from "cloudflare:workers";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
 import { type AiSearchEnv, SiteGraphStore, searchProviderFromEnv } from "@cloudhal/core-ts";
@@ -41,7 +43,25 @@ export interface AstroLike {
   response: { headers: Headers; status?: number };
 }
 
-let resolver: SiteResolver | undefined;
+/**
+ * RFC-0034 §4: the site this request is for, set by the entry (from the hostname on a multi-site
+ * Worker) around everything the request runs, Astro's render included. Module state, not a header:
+ * a client cannot choose it.
+ */
+const requestSite = new AsyncLocalStorage<string>();
+
+/** Runs `fn` (and everything it awaits) as a request for `siteId`. */
+export function withRequestSite<T>(siteId: string, fn: () => T): T {
+  return requestSite.run(siteId, fn);
+}
+
+/** The request's site: the entry's choice, else `CLOUDHAL_SITE_ID`, else the build's. */
+function siteOf(fallback: string | undefined): string | undefined {
+  return requestSite.getStore() ?? (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? fallback;
+}
+
+/** One resolver per site the isolate has served (pointer, snapshot and bundle caches). */
+const resolvers = new Map<string, SiteResolver>();
 
 /** The site's store; with the deployment's search provider when it has one (RFC-0029 §3). */
 function siteStore(e: SiteWorkerEnv): SiteGraphStore {
@@ -58,7 +78,9 @@ function siteStore(e: SiteWorkerEnv): SiteGraphStore {
 
 function getResolver(siteId: string): SiteResolver {
   const e = env as unknown as SiteWorkerEnv;
-  resolver ??= new SiteResolver({
+  const known = resolvers.get(siteId);
+  if (known) return known;
+  const resolver = new SiteResolver({
     store: siteStore(e),
     siteId,
     previewSecret: e.CLOUDHAL_PREVIEW_SECRET,
@@ -72,12 +94,13 @@ function getResolver(siteId: string): SiteResolver {
     // this deployment renders it without one (release runs, rollbacks, pushes, lifecycle expiry).
     persistBundle: (task) => waitUntil(task),
   });
+  resolvers.set(siteId, resolver);
   return resolver;
 }
 
-/** Test/purge hook: forget cached state in this isolate. */
-export function resetSource(): void {
-  resolver?.invalidate();
+/** Test/purge hook: forget cached state in this isolate, for one site or all of them. */
+export function resetSource(siteId?: string): void {
+  for (const [id, r] of resolvers) if (!siteId || id === siteId) r.invalidate();
 }
 
 /**
@@ -135,7 +158,7 @@ export async function getSource(
   astro?: AstroLike,
 ): Promise<GraphSource | undefined> {
   if (!astro) throw new Error("on Cloudflare, pass the Astro global: getSource(config, Astro)");
-  const siteId = (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? config.siteId;
+  const siteId = siteOf(config.siteId) as string;
   const r = getResolver(siteId);
   const resolution = await r.resolve(astro.request);
   const h = astro.response.headers;
@@ -184,7 +207,7 @@ export async function serveMedia(
   options: { siteId?: string | undefined } = {},
 ): Promise<Response | undefined> {
   if (!matchMediaRoute(new URL(request.url).pathname)) return undefined;
-  const siteId = (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? options.siteId;
+  const siteId = siteOf(options.siteId);
   if (!siteId) return undefined;
   const r = getResolver(siteId);
   const resolution = await r.resolve(request);
