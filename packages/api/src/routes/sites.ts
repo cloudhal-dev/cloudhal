@@ -4,8 +4,11 @@ import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { param } from "../params.ts";
+import { createSiteRoute } from "./projects.ts";
 
 export const sites: Hono<Env> = new Hono<Env>()
+  // RFC-0034 §3: Studio's "New site" (scope `site:create`).
+  .route("/", createSiteRoute)
   // RFC-0034 A2: a person limited to sites sees only theirs.
   .get("/", async (c) => {
     const all = await c.get("store").listSites();

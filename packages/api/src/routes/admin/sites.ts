@@ -18,7 +18,7 @@ import { type AdminDeps, NO_STORE, OPERATOR_ACTOR } from "./shared.ts";
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
 
-interface CreateInput {
+export interface CreateInput {
   name: string;
   slug: string;
   locale: string;
@@ -26,8 +26,8 @@ interface CreateInput {
   theme?: string;
 }
 
-/** The `POST /sites` body, checked (400 on anything off). */
-function parseCreate(body: unknown): CreateInput {
+/** The `POST /sites` body, checked (400 on anything off). Shared with Studio's `POST /api/sites`. */
+export function parseCreate(body: unknown): CreateInput {
   const b = (body ?? {}) as Record<string, unknown>;
   const name = typeof b.name === "string" ? b.name.trim() : "";
   const slug = typeof b.slug === "string" ? b.slug.trim() : "";

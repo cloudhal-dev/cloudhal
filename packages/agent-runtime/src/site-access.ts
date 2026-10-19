@@ -71,6 +71,7 @@ export const INSTALLATION_SCOPES: readonly string[] = [
   "members:manage",
   "agents:manage",
   "audit:read",
+  "site:create",
 ];
 
 /** The principal outside any one site: a site-limited person loses `INSTALLATION_SCOPES`. */

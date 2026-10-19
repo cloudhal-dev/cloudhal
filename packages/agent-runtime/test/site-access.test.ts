@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "../src/policy.ts";
-import { roleScopes } from "../src/roles.ts";
+import { type Role, roleScopes } from "../src/roles.ts";
 import { forInstallation, forSite, isSiteLimited, visibleSites } from "../src/site-access.ts";
 
-const person = (
-  role: Principal["person"] extends infer P ? NonNullable<P>["role"] : never,
-  sites?: Record<string, "editor" | "author" | "contributor">,
-) => ({
+const person = (role: Role, sites?: Record<string, "editor" | "author" | "contributor">) => ({
   id: "user_aaaaaaaa",
   userId: "u1",
   role,

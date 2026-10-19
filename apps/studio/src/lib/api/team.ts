@@ -49,6 +49,7 @@ export type Role = "owner" | "administrator" | "editor" | "author" | "contributo
 
 /** What a person can do, for UI gating only — the server decides (RFC-0005 I16). */
 export type Ability =
+  | "sites.create"
   | "entries.create"
   | "entries.editOwnPublished"
   | "entries.editAny"

@@ -139,6 +139,7 @@ export type {
   RoleChangedNotification,
   StudioNotification,
 } from "./api/notifications.ts";
+export type { Project, ProjectSite } from "./api/projects.ts";
 export type {
   AutomationInput,
   BuiltinJob,
@@ -212,6 +213,7 @@ import { historyApi } from "./api/history.ts";
 import { mediaApi } from "./api/media.ts";
 import { menusApi } from "./api/menus.ts";
 import { notificationsApi } from "./api/notifications.ts";
+import { projectsApi } from "./api/projects.ts";
 import { searchApi } from "./api/search.ts";
 import { taxonomyApi } from "./api/taxonomy.ts";
 import { teamApi } from "./api/team.ts";
@@ -231,6 +233,7 @@ export const api = {
   approvals: approvalsApi,
   previewLinks: contentApi.previewLinks,
   sites: contentApi.sites,
+  projects: projectsApi,
   pages: contentApi.pages,
   entries: contentApi.entries,
   design: contentApi.design,

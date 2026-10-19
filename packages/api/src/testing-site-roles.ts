@@ -170,6 +170,35 @@ export function describeSiteRolesApi(label: string, backend: RolesBackend): void
       expect(names).not.toContain("en");
     });
 
+    it("lets the Owner create a site in a project, and lists projects by what one may open", async () => {
+      const { english, turkish, owner, call, join } = await setup();
+      const editor = await join("editor@example.com", "editor");
+      const body = { name: "Deutsch", slug: "deutsch", locale: "de" };
+      expect((await call("POST", "/api/sites", editor.cookie, body)).status).toBe(403);
+      const projectId = (
+        (await call("GET", `/api/sites/${english}`, owner)).body as { projectId: string }
+      ).projectId;
+      const made = await call("POST", "/api/sites", owner, { ...body, projectId });
+      expect(made.status, JSON.stringify(made.body)).toBe(201);
+      const site = (made.body as { site: { id: string; defaultLocale: string; projectId: string } })
+        .site;
+      expect(site.defaultLocale).toBe("de");
+      expect(site.projectId).toBe(projectId);
+      expect((await call("POST", "/api/sites", owner, body)).status).toBe(409);
+
+      const limited = await join("tr-only@example.com", "author", { [turkish]: "author" });
+      const mine = (await call("GET", "/api/projects", limited.cookie)).body.items as {
+        sites: { id: string }[];
+      }[];
+      expect(mine.flatMap((p) => p.sites.map((s) => s.id))).toEqual([turkish]);
+      const all = (await call("GET", "/api/projects", owner)).body.items as {
+        id: string;
+        sites: { id: string; published: boolean }[];
+      }[];
+      const project = all.find((p) => p.id === projectId);
+      expect(project?.sites.map((s) => s.id)).toContain(site.id);
+    });
+
     it("keeps the person's agent key inside their site over MCP", async () => {
       const { english, turkish, call, join, connect } = await setup();
       const tr = await join("tr-agent@example.com", "editor", { [turkish]: "editor" });

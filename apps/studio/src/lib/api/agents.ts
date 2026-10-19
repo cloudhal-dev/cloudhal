@@ -117,6 +117,7 @@ export type PersonScope =
   | "site:settings"
   | "members:invite"
   | "members:manage"
+  | "site:create"
   | "agents:manage"
   | "commenters:data"
   /** RFC-0016: in-editor AI commands. */

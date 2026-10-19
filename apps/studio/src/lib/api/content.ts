@@ -75,6 +75,9 @@ export const contentApi = {
   },
   sites: {
     list: () => request<Site[]>("/api/sites"),
+    /** RFC-0034 §3: a new site in this installation (`site:create`); 409 when the slug is taken. */
+    create: (input: { name: string; slug: string; locale: string; projectId?: string }) =>
+      request<{ site: Site }>("/api/sites", { method: "POST", ...json(input) }),
     get: (id: string) => request<Site>(`/api/sites/${id}`),
     update: (site: Site) =>
       request<Site>(`/api/sites/${site.id}`, { method: "PUT", ...json(site) }),

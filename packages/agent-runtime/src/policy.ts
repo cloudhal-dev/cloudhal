@@ -33,6 +33,8 @@ export type Scope =
   | "members:invite"
   | "members:manage"
   | "agents:manage"
+  // RFC-0034 §3: creating sites in the installation (Owner and Administrators).
+  | "site:create"
   // RFC-0008 §10.1: schedules — the calendar, releases, gates, automations and runs.
   | "schedules:read"
   | "schedules:write"
@@ -92,6 +94,8 @@ export const PERSON_SCOPES: readonly Scope[] = [
   "members:invite",
   "members:manage",
   "agents:manage",
+  // RFC-0034 §3: new sites belong to people who run the installation.
+  "site:create",
   // RFC-0007 §10.1: commenter emails, a commenter's export and erasure — people only.
   "commenters:data",
   // RFC-0008 §10.1 (D7): creating, editing, resuming, running and deleting automations — standing
