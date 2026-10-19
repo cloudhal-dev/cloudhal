@@ -192,21 +192,14 @@ async function buildPackage(name: string, typesRoot: string): Promise<void> {
   }
 }
 
-const ASSET_SKIP = new Set([
-  "node_modules",
-  "dist",
-  ".astro",
-  ".cloudhal",
-  "cloudhal.json",
-  ".wrangler",
-  "wrangler.jsonc",
-]);
-
 /** The CLI ships the built Studio, the starters (with real dependency versions) and the skills. */
 async function buildCliAssets(): Promise<void> {
   const { materializeDependencies, monorepoVersions } = (await import(
     path.join(ROOT, "packages/cli/src/assets.ts")
   )) as typeof import("../packages/cli/src/assets.ts");
+  const { starterFilter } = (await import(
+    path.join(ROOT, "packages/cli/src/starter-files.ts")
+  )) as typeof import("../packages/cli/src/starter-files.ts");
   const assets = path.join(ROOT, "packages/cli/dist/assets");
   const studio = path.join(ROOT, "apps/studio/dist");
   try {
@@ -226,7 +219,7 @@ async function buildCliAssets(): Promise<void> {
   for (const starter of await readdir(path.join(ROOT, "starters"))) {
     const from = path.join(ROOT, "starters", starter);
     const to = path.join(assets, "starters", starter);
-    await cp(from, to, { recursive: true, filter: (src) => !ASSET_SKIP.has(path.basename(src)) });
+    await cp(from, to, { recursive: true, filter: await starterFilter(from) });
     // npm drops .gitignore from published tarballs; ship it as _gitignore (init renames it back).
     try {
       await cp(path.join(from, ".gitignore"), path.join(to, "_gitignore"));

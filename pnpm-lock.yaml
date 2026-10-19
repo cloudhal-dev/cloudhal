@@ -778,7 +778,7 @@ importers:
         specifier: workspace:*
         version: link:../storage
       zod:
-        specifier: 'catalog:'
+        specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
       '@cloudflare/workers-types':
@@ -1181,7 +1181,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/cloudflare
       wrangler:
-        specifier: 'catalog:'
+        specifier: ^4.148.0
         version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
 
 packages:

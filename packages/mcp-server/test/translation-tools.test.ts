@@ -291,6 +291,10 @@ describe("translation tools", () => {
     const cover = await store.getAsset(saved.coverImage?.assetId as string);
     expect(cover?.siteId).toBe(edition.id);
     expect(cover?.sha256).toBe(asset.sha256);
+    // The source's English cover alt is not copied: the edition's image alt shows instead.
+    expect(saved.coverImage?.alt).toBe("");
+    const again = await call("save_translation", { ...args, coverAlt: "表紙" });
+    expect((again.result.node as ContentEntry).coverImage?.alt).toBe("表紙");
     const news = await store.getTermBySlug(edition.id, "category", "news");
     expect(saved.terms?.category?.ids).toEqual([news?.id]);
     // A site outside the project is not a target.

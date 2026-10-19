@@ -178,6 +178,10 @@ const saveTranslationTool: ToolDefinition = {
       sections: sectionInput,
       body: str("Entries: the translated markdown body"),
       summary: str("Entries: the translated summary"),
+      coverAlt: str(
+        "Entries: the cover image's alt text in `locale`. Without it a new translation leaves the cover alt empty, so the image's own alt text in `locale` (update_asset) is shown",
+        { maxLength: 500 },
+      ),
       seo: { type: "object", description: "Pages: the translated SEO title and description" },
       engine: str("The model that translated, e.g. claude-opus-5-5"),
       targetSiteId: {
@@ -334,13 +338,31 @@ function translatedNode(input: {
     } as Page;
   }
   const base = (existing as ContentEntry | undefined) ?? { ...source, id: "", rev: 0 };
+  const cover = translatedCover(base.coverImage, a.coverAlt as string | undefined, !existing);
+  const { coverImage: _cover, ...rest } = base;
   return {
-    ...base,
+    ...rest,
     ...common,
     slug: (a.slug as string | undefined) ?? base.slug,
     body: { format: "markdown", value: (a.body as string | undefined) ?? base.body.value },
     ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
+    ...(cover ? { coverImage: cover } : {}),
   } as ContentEntry;
+}
+
+/**
+ * The cover of a translated entry: the given alt text in its language, or — for a new translation
+ * — no copy of the source's alt override, which is in the source's language.
+ */
+function translatedCover(
+  cover: ContentEntry["coverImage"],
+  alt: string | undefined,
+  fresh: boolean,
+): ContentEntry["coverImage"] {
+  if (!cover) return undefined;
+  if (alt !== undefined) return { ...cover, alt };
+  // An empty alt falls back to the image's own alt text in the entry's language.
+  return fresh ? { ...cover, alt: "" } : cover;
 }
 
 /** Creates the translation or updates the existing one (CAS on its `rev`). */

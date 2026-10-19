@@ -57,7 +57,15 @@ export function chromeRenderer(
     const { process: child, dir } = chrome;
     chrome = undefined;
     child.kill();
-    child.once("exit", () => rmSync(dir, { recursive: true, force: true }));
+    // Chrome's helpers can still be writing into the profile as the main process exits: retry,
+    // and never let a leftover temporary directory become an uncaught exception.
+    child.once("exit", () => {
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      } catch {
+        // the OS cleans its temporary directory
+      }
+    });
   };
 
   const start = () => {
