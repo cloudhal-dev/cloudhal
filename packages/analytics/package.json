@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "description": "Cloudhal site analytics (RFC-0006): query model, classifiers, beacon handler, SQLite/D1 store, daily rollups and Workers Analytics Engine adapters. Worker-safe.",
   "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
     "directory": "packages/analytics"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
   },
   "type": "module",
   "exports": {

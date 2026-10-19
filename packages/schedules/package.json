@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "description": "Cloudhal schedules (RFC-0008): the time model, the RRULE subset and its sentences, releases (pin, closure, rl1: hash, compose, conflicts, state machine), automation and run state, taint and budget accounting, the Scheduler and runDue, and the SQLite/D1 store. Worker-safe.",
   "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cloudhal-dev/cloudhal",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
     "directory": "packages/schedules"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
   },
   "type": "module",
   "exports": {
