@@ -56,9 +56,46 @@ export function withRequestSite<T>(siteId: string, fn: () => T): T {
   return requestSite.run(siteId, fn);
 }
 
+/**
+ * RFC-0036 §4: a store the entry chose for this request — a playground session's own database in
+ * its Durable Object — instead of the D1/R2 bindings. Its pages are private: never edge-cached and
+ * never tagged.
+ */
+const requestStore = new AsyncLocalStorage<{ store: SiteGraphStore; siteId: string }>();
+const storeResolvers = new WeakMap<SiteGraphStore, SiteResolver>();
+
+/** Runs `fn` (and everything it awaits) as a request for `siteId` over `store`. */
+export function withRequestStore<T>(store: SiteGraphStore, siteId: string, fn: () => T): T {
+  return requestStore.run({ store, siteId }, fn);
+}
+
 /** The request's site: the entry's choice, else `CLOUDHAL_SITE_ID`, else the build's. */
 function siteOf(fallback: string | undefined): string | undefined {
-  return requestSite.getStore() ?? (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ?? fallback;
+  return (
+    requestStore.getStore()?.siteId ??
+    requestSite.getStore() ??
+    (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ??
+    fallback
+  );
+}
+
+/** The resolver over the request's own store (`withRequestStore`), one per store. */
+function scopedResolver(siteId: string): SiteResolver | undefined {
+  const scoped = requestStore.getStore();
+  if (!scoped || scoped.siteId !== siteId) return undefined;
+  let resolver = storeResolvers.get(scoped.store);
+  if (!resolver) {
+    resolver = new SiteResolver({
+      store: scoped.store,
+      siteId,
+      pointerTtlMs: 0,
+      previewCookie: false,
+      // The store lives in the caller's Durable Object, which outlives the response.
+      persistBundle: (task) => void task.catch(() => {}),
+    });
+    storeResolvers.set(scoped.store, resolver);
+  }
+  return resolver;
 }
 
 /** One resolver per site the isolate has served (pointer, snapshot and bundle caches). */
@@ -78,6 +115,8 @@ function siteStore(e: SiteWorkerEnv): SiteGraphStore {
 }
 
 function getResolver(siteId: string): SiteResolver {
+  const scoped = scopedResolver(siteId);
+  if (scoped) return scoped;
   const e = env as unknown as SiteWorkerEnv;
   const known = resolvers.get(siteId);
   if (known) return known;
@@ -214,6 +253,15 @@ export async function getSource(
     h.set("cloudflare-cdn-cache-control", "no-store");
     h.set("x-cloudhal-mode", "unpublished");
     return undefined;
+  }
+  if (requestStore.getStore()) {
+    // RFC-0036 §4: a session's page is the session's alone.
+    h.set("cache-control", "private, no-store");
+    h.set("cloudflare-cdn-cache-control", "no-store");
+    h.set("x-robots-tag", "noindex");
+    h.set("x-cloudhal-mode", "published");
+    h.set("x-cloudhal-snapshot", resolution.snapshotId);
+    return resolution.source;
   }
   // Published: browsers revalidate, the edge keeps it until a publish purges the tag — or, when a
   // time gate lies ahead, until that gate (RFC-0008 §7.4): any page may list any entry, so the

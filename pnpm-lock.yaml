@@ -940,6 +940,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20261007.1
+      '@cloudhal/astro-renderer':
+        specifier: workspace:*
+        version: link:../astro-renderer
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5

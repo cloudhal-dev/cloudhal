@@ -19,7 +19,8 @@
     "./purge": "./src/purge.ts",
     "./mail": "./src/mail.ts",
     "./comments": "./src/comments.ts",
-    "./scheduler": "./src/scheduler.ts"
+    "./scheduler": "./src/scheduler.ts",
+    "./playground": "./src/playground.ts"
   },
   "files": [
     "dist",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "@cloudhal/astro-renderer": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
@@ -77,6 +79,10 @@
       "./scheduler": {
         "types": "./dist/src/scheduler.d.ts",
         "default": "./dist/src/scheduler.js"
+      },
+      "./playground": {
+        "types": "./dist/src/playground.d.ts",
+        "default": "./dist/src/playground.js"
       }
     }
   }
