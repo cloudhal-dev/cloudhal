@@ -80,6 +80,24 @@ describe("cloudhal deploy in Workers Builds", () => {
     await expect(committedNames(file)).rejects.toThrow(/missing or not JSON/);
   });
 
+  it("a dry run from a fresh clone seeds the site and never carries a placeholder id", async () => {
+    const { dataDir } = await readProjectConfig(projectDir);
+    await rm(path.join(projectDir, dataDir), { recursive: true, force: true });
+    await writeFile(
+      path.join(projectDir, "wrangler.jsonc"),
+      BUTTON_CONFIG.replace(DB_ID, "00000000-0000-0000-0000-000000000000"),
+    );
+    const r = await deploy({ projectDir, studioDir, dryRun: true, workersBuilds: true });
+    expect(r.names.site).toBe("my-blog");
+    const generated = (await readFile(path.join(projectDir, "wrangler.jsonc"), "utf8")).replace(
+      /^\s*\/\/.*$/gm,
+      "",
+    );
+    expect(JSON.parse(generated).d1_databases).toEqual([
+      { binding: "DB", database_name: "my-blog-db" },
+    ]);
+  });
+
   it("seeds, deploys with the button's names, keeps the Workers' secrets and never prints the setup link", async () => {
     const { siteId, dataDir } = await readProjectConfig(projectDir);
     // a fresh clone: the committed config, no local store
