@@ -312,7 +312,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/migrations/tags-to-terms/revert`, "site:settings"],
 ];
 
-function matches(pattern: string, path: string): boolean {
+/** Whether `path` fits a `ROUTE_SCOPES` pattern (`:param` one segment, `*` the rest). */
+export function matchesRoute(pattern: string, path: string): boolean {
   const p = pattern.split("/");
   const s = path.replace(/\/+$/, "").split("/");
   for (let i = 0; i < p.length; i++) {
@@ -335,12 +336,20 @@ const SPECIFICITY = [...ROUTE_SCOPES].sort((a, b) => {
   return score(b[1]) - score(a[1]);
 });
 
+/** The declared route a request to `method path` reaches, or undefined when there is none. */
+export function routeFor(
+  method: string,
+  path: string,
+): readonly [Method, string, RouteRequirement] | undefined {
+  const m = method === "HEAD" ? "GET" : method;
+  return SPECIFICITY.find(
+    ([rm, pattern]) => (rm === "ALL" || rm === m) && matchesRoute(pattern, path),
+  );
+}
+
 /** What a request to `method path` requires, or undefined when no route is declared. */
 export function requirementFor(method: string, path: string): RouteRequirement | undefined {
-  const m = method === "HEAD" ? "GET" : method;
-  for (const [rm, pattern, req] of SPECIFICITY)
-    if ((rm === "ALL" || rm === m) && matches(pattern, path)) return req;
-  return undefined;
+  return routeFor(method, path)?.[2];
 }
 
 /**

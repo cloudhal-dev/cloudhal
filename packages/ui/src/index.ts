@@ -328,6 +328,11 @@ export {
   usePageScrollRootRef,
 } from "./blocks/PageLayout.tsx";
 export {
+  PlaygroundBar,
+  type PlaygroundBarLabels,
+  type PlaygroundBarProps,
+} from "./blocks/PlaygroundBar.tsx";
+export {
   morphPreview,
   PREVIEW_DEVICE_WIDTH,
   type PreviewDevice,

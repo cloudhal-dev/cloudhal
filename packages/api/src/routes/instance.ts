@@ -34,6 +34,7 @@ import {
 } from "@cloudhal/schedules";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
+import type { PlaygroundInfo } from "../playground.ts";
 
 export interface InstanceInfo {
   signUp: "first-user" | "closed" | "open" | "unknown";
@@ -58,6 +59,8 @@ export interface InstanceInfo {
     comments: CommentsFeature;
     /** Schedules (RFC-0008 §13). */
     schedules: SchedulesFeature;
+    /** RFC-0036 §5: set only in playground mode (the session's end, Reset and Deploy links). */
+    playground?: PlaygroundInfo;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;

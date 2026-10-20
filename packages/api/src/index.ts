@@ -42,4 +42,14 @@ export {
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";
 export { MailError, type MailMessage, type MailSender } from "./mail.ts";
+export {
+  isBlockedInPlayground,
+  PLAYGROUND_ALLOW,
+  PLAYGROUND_MAX_BODY_BYTES,
+  PLAYGROUND_PRINCIPAL,
+  PLAYGROUND_SCOPES,
+  type PlaygroundBlock,
+  type PlaygroundInfo,
+  type PlaygroundOptions,
+} from "./playground.ts";
 export { releaseApprovalCheck, releaseRights } from "./schedules.ts";

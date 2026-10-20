@@ -15,6 +15,7 @@ import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../li
 import type { PaletteSearch } from "./CommandMenu.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { NotificationsBell } from "./NotificationsBell.tsx";
+import { PlaygroundSessionBar } from "./PlaygroundSessionBar.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import { UserMenu } from "./UserMenu.tsx";
 
@@ -174,6 +175,8 @@ function AppFrameShell({
             <UserMenu />
           </div>
         </header>
+        {/* RFC-0036 §5: only on a playground session. */}
+        <PlaygroundSessionBar />
         <main className="min-w-0 flex-1">{children}</main>
         <CloseSheetOnNavigate />
       </div>

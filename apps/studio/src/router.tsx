@@ -10,6 +10,7 @@ import {
 import { RouteError, RoutePending } from "./components/RouteStates.tsx";
 import { LOCALE_LIST, withMessages } from "./i18n/index.tsx";
 import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-search.ts";
+import { api } from "./lib/api.ts";
 import { authClient } from "./lib/auth.ts";
 import { isQueueTab, type QueueTab } from "./lib/comments-shell.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
@@ -152,9 +153,20 @@ export interface RouterContext {
 }
 
 async function requireSession() {
-  const { data } = await authClient.getSession();
-  if (!data) throw redirect({ to: "/login" });
-  return data;
+  const { data, error } = await authClient.getSession();
+  if (data) return data;
+  // RFC-0036 §5: a playground has no sign-in (its API refuses /api/auth with 403) and answers
+  // every call as its one fixed principal.
+  if (error?.status === 403 && (await isPlayground())) return null;
+  throw redirect({ to: "/login" });
+}
+
+async function isPlayground(): Promise<boolean> {
+  try {
+    return (await api.instance()).features.playground !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({ component: () => <Outlet /> });

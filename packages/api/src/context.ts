@@ -17,6 +17,7 @@ import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { BuildHub } from "./build.ts";
 import type { MailSender } from "./mail.ts";
+import type { PlaygroundOptions } from "./playground.ts";
 import type { AiDeps } from "./routes/ai.ts";
 import type { UploadSecret } from "./uploads.ts";
 
@@ -123,6 +124,13 @@ export interface ApiDeps {
    * on Workers, `restTransport` from Node). Without a transport AI stays unavailable.
    */
   readonly ai?: AiDeps;
+  /**
+   * Playground mode (RFC-0036 §5): every request acts as `PLAYGROUND_PRINCIPAL`, the playground
+   * guard refuses blocked routes (403 `playground`) and large bodies, scopes are checked as for a
+   * member, and `/api/instance` reports `features.playground`. Leave auth, MCP, mail, AI, analytics,
+   * comments and schedules unconfigured.
+   */
+  readonly playground?: PlaygroundOptions;
 }
 
 export type Env = {
