@@ -1,13 +1,14 @@
 # ADR-0037: Domain strategy: cloudhal.com and cloudhal.dev
 - Status: Accepted
 - Date: 2026-10-20 (decided by Halil)
+- Amendment (2026-10-20): editorial, product names removed pending trademark check. No rule or host changed; the control-plane host keeps a placeholder until its name is decided.
 - Related: ADR-0007, ADR-0010, ADR-0012, ADR-0020
 - Sources: [Cloudflare: create a self-managed OAuth client](https://developers.cloudflare.com/fundamentals/oauth/create-an-oauth-client/) · [HSTS preload list (all `.dev` names are preloaded)](https://hstspreload.org) · [EmDash playground](https://github.com/emdash-cms/emdash/tree/main/demos/playground)
 
 ## Context
 Cloudhal owns exactly two domains, `cloudhal.com` and `cloudhal.dev`, and will not buy a third. The repo already uses `https://cloudhal.dev/schemas/v1/*` as JSON Schema `$id`, `https://cloudhal.dev/docs`, the bot User-Agent page `https://cloudhal.dev/fetch`, and `security@`, `legal@` and `conduct@cloudhal.com` for mail. As of 2026-10-20 neither domain has DNS records.
 
-Planned: a hosted control plane in the style of Laravel Forge ("Cloud") and a public playground modelled on EmDash's (a per-visitor SQLite Durable Object, one-hour TTL, no login) in a separate repository, `cloudhal-dev/try`. The question is which domain carries what, and where customer sites live.
+Planned: a future hosted control plane that installs and manages Cloudhal in the customer's own Cloudflare account, and a public playground modelled on EmDash's (a per-visitor SQLite Durable Object, one-hour TTL, no login) in a separate repository, `cloudhal-dev/try`. The question is which domain carries what, and where customer sites live.
 
 ## Decision
 **Host map**
@@ -16,6 +17,7 @@ Planned: a hosted control plane in the style of Laravel Forge ("Cloud") and a pu
 |---|---|
 | `cloudhal.com` | Marketing, pricing, blog |
 | `try.cloudhal.com` | Public playground and the Deploy-to-Cloudflare / OAuth flow. Its own Worker, `__Host-` cookies, no `Domain=` |
+| `<control-plane>.cloudhal.com` | Future control-plane panel: a control-plane host under `cloudhal.com` (name to be decided) |
 | `api.cloudhal.com` | The control plane's API and OAuth redirect host |
 | `status.cloudhal.com` | Status page |
 | `*@cloudhal.com` | All mail: `security@`, `legal@`, `conduct@`, `abuse@`, `support@` |
@@ -25,8 +27,7 @@ Planned: a hosted control plane in the style of Laravel Forge ("Cloud") and a pu
 | `cloudhal.dev/fetch` | Bot User-Agent page |
 | `registry.cloudhal.dev` | Index of plugins, capabilities, themes and skills. Read-only metadata; packages stay on npm. Publisher sign-in through GitHub, host-only cookies |
 
-
-**Customer sites never run on Cloudhal's domains.** Cloud deploys into the customer's own Cloudflare account, and sites use the customer's domains or their own `*.workers.dev`. No Public Suffix List entry and no third domain is needed.
+**Customer sites never run on Cloudhal's domains.** The hosted control plane deploys into the customer's own Cloudflare account, and sites use the customer's domains or their own `*.workers.dev`. No Public Suffix List entry and no third domain is needed.
 
 **Rules**
 1. One trust boundary per domain: login, payment and control-plane data live on `.com`; public, unauthenticated developer content lives on `.dev`.
