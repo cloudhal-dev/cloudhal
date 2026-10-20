@@ -168,8 +168,8 @@ catalogs:
       specifier: 14.3.4
       version: 14.3.4
     '@better-auth/api-key':
-      specifier: 1.7.7
-      version: 1.7.7
+      specifier: 1.7.10
+      version: 1.7.10
     '@better-auth/core':
       specifier: 1.7.7
       version: 1.7.7
@@ -487,178 +487,6 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@26.6.5)(happy-dom@21.0.3)(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  examples/newsroom:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/newsroom-ja:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/smoke:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/starter-demo:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/studio-demo:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/ui-audit:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
   packages/agent-runtime:
     dependencies:
       '@cloudhal/core-contracts':
@@ -719,7 +547,7 @@ importers:
     dependencies:
       '@better-auth/api-key':
         specifier: 'catalog:'
-        version: 1.7.7(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(better-auth@1.7.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.3(@types/node@26.6.5)(happy-dom@21.0.3)(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.5))
+        version: 1.7.10(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(better-auth@1.7.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.3(@types/node@26.6.5)(happy-dom@21.0.3)(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.5))
       '@better-auth/core':
         specifier: 'catalog:'
         version: 1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5)
@@ -1495,13 +1323,13 @@ packages:
       '@types/react':
         optional: true
 
-  '@better-auth/api-key@1.7.7':
-    resolution: {integrity: sha512-XWtZxF37A7BURHh/GvsYh2Vype1p+R1ZxvQHkRzB4tK3uniZpILe2WRIXfVj3m8NIBHdg8Ez8S8sZJY/ewTu7w==}
+  '@better-auth/api-key@1.7.10':
+    resolution: {integrity: sha512-x3UHgLWESfqtXl5XnAG30h1vOsp7A1KRvHoWDL8rb/kgSUYPc7wGnmhhwVE9C+uxxSX4/2+gZry+9L2KgzRpOQ==}
     peerDependencies:
-      '@better-auth/core': ^1.7.7
-      '@better-auth/utils': 0.4.2
-      better-auth: ^1.7.7
-      better-call: 1.4.0
+      '@better-auth/core': ^1.7.10
+      '@better-auth/utils': ^0.4.2 || ^0.5.0
+      better-auth: ^1.7.10
+      better-call: 1.4.2
 
   '@better-auth/core@1.7.7':
     resolution: {integrity: sha512-srgFzHEjB2WWlokFz1i4BfG41sNhsA105Pukgqu6RrEh5A+LSkzf1mCHydVipkjt9l5qswtBMi7IL6ouHbZL4Q==}
@@ -5198,7 +5026,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@better-auth/api-key@1.7.7(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(better-auth@1.7.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.3(@types/node@26.6.5)(happy-dom@21.0.3)(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.5))':
+  '@better-auth/api-key@1.7.10(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(better-auth@1.7.7(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.3(@types/node@26.6.5)(happy-dom@21.0.3)(vite@8.3.3(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.5))':
     dependencies:
       '@better-auth/core': 1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.5)
       '@better-auth/utils': 0.4.2
