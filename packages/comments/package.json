@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/comments",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Cloudhal reader comments (RFC-0007): settings and thread state, text normalising and content rules, linkify, first-party proof of work, the submission pipeline, purge planner, retention plan and the SQLite/D1 store. Worker-safe.",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
