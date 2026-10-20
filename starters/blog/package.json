@@ -24,7 +24,7 @@
     "@cloudhal/cli": "workspace:*"
   },
   "devDependencies": {
-    "wrangler": "^4.148.0",
+    "wrangler": "^4.151.1",
     "@cloudhal/cloudflare": "workspace:*"
   },
   "trustedDependencies": [

@@ -25,7 +25,7 @@ catalog:
   "@cloudflare/workers-types": ^5.20261007.1
   astro: ^7.3.6
   "@astrojs/cloudflare": 14.3.4
-  wrangler: 4.148.0
+  wrangler: 4.151.1
   "@tailwindcss/vite": ^4.3.3
   tailwindcss: ^4.3.3
   marked: ^18.1.0
