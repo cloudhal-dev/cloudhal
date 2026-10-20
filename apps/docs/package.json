@@ -1,0 +1,14 @@
+{
+  "name": "@cloudhal/docs",
+  "version": "0.0.1",
+  "private": true,
+  "description": "cloudhal.dev: the developer site (docs, JSON Schemas, the fetcher page). ADR-0037.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "deploy": "node scripts/build.ts && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
+  }
+}

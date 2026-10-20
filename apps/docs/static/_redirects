@@ -1,0 +1,5 @@
+# Until the docs site lands, /docs points at the docs on GitHub (302: these links will change).
+/docs/deploy https://github.com/cloudhal-dev/cloudhal/blob/main/docs/guides/deploy-button.md 302
+/docs https://github.com/cloudhal-dev/cloudhal#readme 302
+/docs/* https://github.com/cloudhal-dev/cloudhal/tree/main/docs 302
+/github https://github.com/cloudhal-dev/cloudhal 302
