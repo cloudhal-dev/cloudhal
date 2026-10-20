@@ -9,12 +9,10 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
-import { seedStarterSite } from "@cloudhal/core-ts";
-import { openLocalStore } from "@cloudhal/core-ts/local";
 import { assetDir, materializeDependencies, monorepoRoot, monorepoVersions } from "../assets.ts";
-import { loadThemeSettings } from "../blocks.ts";
 import { writeProjectConfig } from "../config.ts";
 import { pnpmWorkspaceYaml } from "../project-setup.ts";
+import { seedProjectSite } from "../seed-site.ts";
 import { starterFilter } from "../starter-files.ts";
 
 export interface InitOptions {
@@ -109,34 +107,16 @@ export async function init(options: InitOptions): Promise<InitResult> {
     await writeFile(path.join(projectDir, "pnpm-workspace.yaml"), pnpmWorkspaceYaml());
 
   const dataDir = ".cloudhal";
-  const local = await openLocalStore(path.join(projectDir, dataDir));
-  try {
-    const seeded = await seedStarterSite(local.store, { name, slug });
-    // RFC-0024 decision 4: new sites start with standard motion when the theme offers it; readers
-    // who ask for reduced motion still get less, and existing sites keep theirs.
-    const settings = await loadThemeSettings(projectDir);
-    const site =
-      settings && "motion" in settings.properties
-        ? await local.store.updateSite({
-            ...seeded,
-            theme: {
-              ...seeded.theme,
-              config: { ...(seeded.theme.config ?? {}), motion: "standard" },
-            },
-          })
-        : seeded;
-    // RFC-0006 owner decision 4: new projects record cookie-less analytics by default.
-    // RFC-0007 §15.4: reader comments are available to the deployment, but stay off for the site
-    // until someone turns them on in Studio (D4).
-    await writeProjectConfig(projectDir, {
-      siteId: site.id,
-      dataDir,
-      analytics: { enabled: true },
-      comments: { available: true },
-    });
-    log(`seeded site ${site.id} (${name}) in ${dataDir}/`);
-    return { projectDir, siteId: site.id, linked: repo !== undefined };
-  } finally {
-    await local.close();
-  }
+  const site = await seedProjectSite(projectDir, { dataDir, name, slug });
+  // RFC-0006 owner decision 4: new projects record cookie-less analytics by default.
+  // RFC-0007 §15.4: reader comments are available to the deployment, but stay off for the site
+  // until someone turns them on in Studio (D4).
+  await writeProjectConfig(projectDir, {
+    siteId: site.id,
+    dataDir,
+    analytics: { enabled: true },
+    comments: { available: true },
+  });
+  log(`seeded site ${site.id} (${name}) in ${dataDir}/`);
+  return { projectDir, siteId: site.id, linked: repo !== undefined };
 }

@@ -53,6 +53,7 @@ const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
     );
   if (r.setupUrl)
     console.log(`\nLocal site pushed. Create the owner account (once) at:\n  ${r.setupUrl}`);
+  if (r.setupInstructions) console.log(`\nStarter site pushed. ${r.setupInstructions}`);
   return 0;
 };
 

@@ -10,6 +10,8 @@ export interface SeedOptions {
   readonly projectId?: string;
   /** The theme the site is designed for (default `blog`). */
   readonly theme?: string;
+  /** The site's id (default: a new one); a project's `cloudhal.json` `siteId` re-seeded elsewhere. */
+  readonly siteId?: string;
 }
 
 /**
@@ -32,6 +34,7 @@ export async function seedStarterSite(store: SiteGraphStore, options: SeedOption
       siteIds: [],
     }));
   let site = await store.createSite({
+    ...(options.siteId ? { id: options.siteId } : {}),
     projectId: project.id,
     name: options.name,
     slug: options.slug,

@@ -52,7 +52,8 @@ async function installationOf(projectDir: string, folder: string) {
 export async function deployAttached(options: DeployOptions): Promise<DeployResult> {
   const own = await readProjectConfig(options.projectDir);
   const inst = await installationOf(options.projectDir, own.installation as string);
-  const loaded = await loadDeploy({ ...options, name: inst.state.name });
+  // the installation lives in another local project, never in a Workers Builds checkout
+  const loaded = await loadDeploy({ ...options, name: inst.state.name, workersBuilds: false });
   const base = { ...loaded.base, siteName: `${inst.state.name}-site-${loaded.site.slug}` };
   const previous = {
     ...(loaded.previous ?? inst.state),
