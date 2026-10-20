@@ -1,10 +1,20 @@
-import { access, cp, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  access,
+  cp,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { seedStarterSite } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { assetDir, materializeDependencies, monorepoRoot, monorepoVersions } from "../assets.ts";
 import { loadThemeSettings } from "../blocks.ts";
 import { writeProjectConfig } from "../config.ts";
+import { pnpmWorkspaceYaml } from "../project-setup.ts";
 import { starterFilter } from "../starter-files.ts";
 
 export interface InitOptions {
@@ -44,7 +54,17 @@ function slugify(s: string): string {
   );
 }
 
-export async function init(options: InitOptions): Promise<{ projectDir: string; siteId: string }> {
+export interface InitResult {
+  readonly projectDir: string;
+  readonly siteId: string;
+  /**
+   * The `@cloudhal/*` dependencies are `link:`s to the monorepo checkout this CLI runs from (its
+   * versions may not be on npm yet); such a project installs with pnpm.
+   */
+  readonly linked: boolean;
+}
+
+export async function init(options: InitOptions): Promise<InitResult> {
   const log = options.log ?? (() => {});
   const projectDir = path.resolve(options.dir);
   const starter = options.starter ?? "blog";
@@ -70,13 +90,23 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
   const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as Record<string, unknown>;
   pkg.name = slug;
   pkg.private = true;
-  // Inside the monorepo workspace the starter keeps workspace:/catalog: links; anywhere else they
-  // become real versions so `npm install` works (published starters already have them).
+  // Inside the monorepo workspace the starter keeps workspace:/catalog: links. Published starters
+  // already carry real versions. From a source checkout, anywhere else, the packages are linked to
+  // that checkout: their version need not exist on npm yet.
   const inWorkspace = (await findWorkspaceRoot(projectDir)) !== undefined;
-  const repo = await monorepoRoot();
-  const out =
-    !inWorkspace && repo ? materializeDependencies(pkg, await monorepoVersions(repo)) : pkg;
+  const repo = inWorkspace ? undefined : await monorepoRoot();
+  const out = repo
+    ? materializeDependencies(pkg, await monorepoVersions(repo), {
+        // real paths, so the relative link survives symlinked folders (macOS /var → /private/var)
+        linkFrom: await realpath(projectDir),
+      })
+    : pkg;
   await writeFile(pkgPath, `${JSON.stringify(out, null, 2)}\n`);
+  if (repo) log(`linked @cloudhal/* to ${repo} (install with pnpm)`);
+  // pnpm 12 fails the install unless the native builds are allowed (settings-only workspace file;
+  // inside the monorepo its own file already allows them).
+  if (!inWorkspace)
+    await writeFile(path.join(projectDir, "pnpm-workspace.yaml"), pnpmWorkspaceYaml());
 
   const dataDir = ".cloudhal";
   const local = await openLocalStore(path.join(projectDir, dataDir));
@@ -105,7 +135,7 @@ export async function init(options: InitOptions): Promise<{ projectDir: string; 
       comments: { available: true },
     });
     log(`seeded site ${site.id} (${name}) in ${dataDir}/`);
-    return { projectDir, siteId: site.id };
+    return { projectDir, siteId: site.id, linked: repo !== undefined };
   } finally {
     await local.close();
   }

@@ -76,8 +76,12 @@ export async function build(
 ): Promise<{ snapshotId: string; outDir: string }> {
   const snapshotId = options.snapshotId ?? (await resolveBuildSnapshot(options.projectDir)).id;
   process.env.CLOUDHAL_SOURCE = `snapshot:${snapshotId}`;
+  const cfg = await readProjectConfig(options.projectDir);
   const astro = await import("astro");
   const root = path.resolve(options.projectDir);
-  await astro.build({ root, logLevel: "info" });
+  // A static build has no request: without `site`, Astro's URLs (canonical links, the sitemap,
+  // feeds) say localhost. The site's own primary domain still wins (`siteOrigin`).
+  const site = cfg.domains?.site ? `https://${cfg.domains.site}` : undefined;
+  await astro.build({ root, logLevel: "info", ...(site ? { site } : {}) });
   return { snapshotId, outDir: path.join(root, "dist") };
 }

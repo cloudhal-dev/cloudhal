@@ -3,10 +3,17 @@
 Created by `cloudhal init`. Pages, posts, categories, tags and redirects live in `.cloudhal/` (SQLite + blobs); this project only holds the theme: `src/layouts`, `src/components`, `src/styles`, `src/theme.ts` (component overrides and theme settings), the routes under `src/pages` and static files in `public/` (the favicon: `favicon.svg` plus a 16/32 px `favicon.ico` for older browsers and `/favicon.ico` requests; replace both with your own). Deployed, `public/` files are Workers static assets, answered before the Site Worker runs, so they never count as renders in analytics.
 
 ```bash
-cloudhal dev      # live preview of the current graph (drafts visible)
-cloudhal snapshot # freeze the current state
-cloudhal build    # static HTML from the published (or latest) snapshot
+npm run dev       # live preview of the current graph (drafts visible)
+npm run snapshot  # freeze the current state
+npm run build     # static HTML from the published (or latest) snapshot
 ```
+
+The same scripts run with `pnpm`, `yarn` or `bun run`; `npx cloudhal <command>` (or `pnpm cloudhal`, `yarn cloudhal`, `bunx cloudhal`) reaches every other command. Installing with pnpm 12 needs `pnpm-workspace.yaml`'s `allowBuilds` (written by `cloudhal init`) and with bun the `trustedDependencies` in `package.json`: SQLite, esbuild and workerd build or download their binaries when installed.
+
+## What to commit
+Everything but `.gitignore`'s list. `cloudhal.json` holds the project's settings (the site id, custom domains, analytics, comments …) and goes with the project; the content itself lives in `.cloudhal/`, which stays on your machine (or in the deployment: `cloudhal push` / `pull`). Secrets never go in `cloudhal.json`: `cloudhal deploy` keeps them in `.cloudhal/deploy/`.
+
+`cloudhal.json` → `domains.site` (set with `cloudhal domain set <hostname>`) is also the address a static build (`cloudhal build`) writes into canonical links, the sitemap, feeds and `robots.txt`.
 
 ## Routes
 - `[...path].astro` — pages at their path, posts at `/<collection>/<slug>`, category and tag archives at `/category/<slug>` and `/tag/<slug>` (`/page/<n>` for older posts). Anything else follows the site's redirects (301), answers 410 for a retired term, or 404.

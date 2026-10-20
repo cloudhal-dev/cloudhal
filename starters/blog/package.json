@@ -26,5 +26,10 @@
   "devDependencies": {
     "wrangler": "^4.148.0",
     "@cloudhal/cloudflare": "workspace:*"
-  }
+  },
+  "trustedDependencies": [
+    "better-sqlite3",
+    "esbuild",
+    "workerd"
+  ]
 }

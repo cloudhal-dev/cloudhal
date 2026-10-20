@@ -1,5 +1,5 @@
 /** What makes the published packages installable (ADR-0013). */
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,12 @@ import {
   publishExports,
   rewriteSpecifiers,
 } from "../../../scripts/build-packages.ts";
-import { assetDir, materializeDependencies, parseCatalog } from "../src/assets.ts";
+import {
+  assetDir,
+  materializeDependencies,
+  monorepoVersions,
+  parseCatalog,
+} from "../src/assets.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -82,17 +87,59 @@ describe("starter dependencies outside the monorepo", () => {
         dependencies: { "@cloudhal/cli": "workspace:*", astro: "catalog:", left: "^1.0.0" },
         devDependencies: { wrangler: "catalog:" },
       },
-      { workspace: { "@cloudhal/cli": "0.3.0" }, catalog },
+      { workspace: { "@cloudhal/cli": "0.3.0" }, catalog, installed: { astro: "7.3.6" } },
     );
+    // exact, like `pnpm publish` writes workspace:* (the packages are released together); the
+    // shared Astro peer at the version the monorepo installed, so a project gets one copy
     expect(out.dependencies).toEqual({
-      "@cloudhal/cli": "^0.3.0",
-      astro: catalog.astro,
+      "@cloudhal/cli": "0.3.0",
+      astro: "7.3.6",
       left: "^1.0.0",
     });
     expect(out.devDependencies).toEqual({ wrangler: catalog.wrangler });
     expect(() =>
       materializeDependencies({ dependencies: { x: "workspace:*" } }, { workspace: {}, catalog }),
     ).toThrow(/x/);
+  });
+
+  it("links @cloudhal/* to a checkout, relative to the project", () => {
+    const out = materializeDependencies(
+      { dependencies: { "@cloudhal/cli": "workspace:*" } },
+      {
+        workspace: { "@cloudhal/cli": "0.3.0" },
+        catalog: {},
+        dirs: { "@cloudhal/cli": "/src/cloudhal/packages/cli" },
+      },
+      { linkFrom: "/src/my-site" },
+    );
+    expect(out.dependencies).toEqual({ "@cloudhal/cli": "link:../cloudhal/packages/cli" });
+  });
+
+  it("the monorepo's versions: every package's own, Astro as the renderer resolves it", async () => {
+    const v = await monorepoVersions(ROOT);
+    const cli = JSON.parse(await readFile(path.join(ROOT, "packages/cli/package.json"), "utf8"));
+    expect(v.workspace["@cloudhal/cli"]).toBe(cli.version);
+    expect(v.dirs?.["@cloudhal/cli"]).toBe(await realpath(path.join(ROOT, "packages/cli")));
+    const astro = JSON.parse(
+      await readFile(
+        path.join(ROOT, "packages/astro-renderer/node_modules/astro/package.json"),
+        "utf8",
+      ),
+    );
+    expect(v.installed?.astro).toBe(astro.version);
+    expect(v.installed?.astro).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it("the published packages share one version (changesets fixed group = PACKAGES)", async () => {
+    const config = JSON.parse(await readFile(path.join(ROOT, ".changeset/config.json"), "utf8"));
+    const names = await Promise.all(
+      PACKAGES.map(
+        async (name) =>
+          JSON.parse(await readFile(path.join(ROOT, "packages", name, "package.json"), "utf8"))
+            .name as string,
+      ),
+    );
+    expect(config.fixed).toEqual([names]);
   });
 
   it("from source, prefers the live monorepo folders over a stale dist/assets copy", async () => {

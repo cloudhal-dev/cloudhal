@@ -3491,7 +3491,7 @@ pub struct Site {
     pub default_locale: Locale,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub design: ::std::option::Option<Design>,
-    #[doc = "Hostnames serving this site. Exactly one should be primary; the *.cloudhal.app subdomain is always present in Cloud."]
+    #[doc = "Hostnames serving this site. Exactly one should be primary: the address canonical links, feeds and previews use. Sites run on their own domains or their Cloudflare account's workers.dev address, never on a Cloudhal domain (ADR-0037)."]
     pub domains: ::std::vec::Vec<Domain>,
     #[serde(
         rename = "homePageId",

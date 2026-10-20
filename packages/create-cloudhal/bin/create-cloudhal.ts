@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
  * `npm create cloudhal@latest [dir] [-- --name "My site"]` — creates a Cloudhal site project:
- * the blog starter with a seeded local site, ready for `npm install && npm run dev`.
+ * the blog starter with a seeded local site, ready for `npm install && npm run dev` (or the same
+ * in pnpm, yarn or bun: the next steps name the package manager that ran it).
  */
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { init } from "@cloudhal/cli";
+import { detectPackageManager, init, nextSteps } from "@cloudhal/cli";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -32,15 +33,8 @@ try {
     log: (l) => console.log(`  ${l}`),
   });
   const rel = path.relative(process.cwd(), r.projectDir) || ".";
-  console.log(`
-Created ${r.projectDir}
-
-  cd ${rel}
-  npm install
-  npm run dev        live preview with drafts, fully offline
-  npm run studio     Studio + API + MCP for this project
-  npm run deploy     put it on Cloudflare (uses your wrangler login)
-`);
+  const steps = nextSteps(rel, r.linked ? "pnpm" : detectPackageManager());
+  console.log(`\nCreated ${r.projectDir}\n\n${steps.map((l) => `  ${l}`).join("\n")}\n`);
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);

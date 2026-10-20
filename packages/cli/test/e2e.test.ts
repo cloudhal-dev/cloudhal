@@ -7,7 +7,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { build, init, readProjectConfig, snapshot } from "../src/index.ts";
+import { build, init, readProjectConfig, snapshot, writeProjectConfig } from "../src/index.ts";
 import {
   applyMenuFixture,
   DEFAULT_FOOTER,
@@ -228,7 +228,10 @@ describe("cloudhal init → dev → snapshot → build", () => {
     });
     await local.close();
 
-    const r = await build({ projectDir });
+    // cloudhal.json's domain is the static build's address (no request to take it from)
+    const before = await readProjectConfig(projectDir);
+    await writeProjectConfig(projectDir, { ...before, domains: { site: "e2e.example.com" } });
+    const r = await build({ projectDir }).finally(() => writeProjectConfig(projectDir, before));
     expect(r.snapshotId).toBe(snap.id);
     const index = await readFile(path.join(r.outDir, "index.html"), "utf8");
     expect(index).toContain("<h1>E2E Site</h1>");
@@ -241,15 +244,17 @@ describe("cloudhal init → dev → snapshot → build", () => {
     );
     expect(post).toMatch(/testimonial__author[^>]*>Ada Lovelace</);
     // search and link-preview basics in the static build
-    expect(post).toMatch(/<link rel="canonical" href="[^"]+\/posts\/hello-world">/);
+    expect(post).toContain(
+      '<link rel="canonical" href="https://e2e.example.com/posts/hello-world">',
+    );
     expect(post).toContain('<meta property="og:type" content="article">');
     expect(post).toContain('"@type":"BlogPosting"');
     const rss = await readFile(path.join(r.outDir, "rss.xml"), "utf8");
     expect(rss).toContain("<title>Hello, world</title>");
     expect(rss).not.toContain("Changed after publish");
-    expect(await readFile(path.join(r.outDir, "sitemap.xml"), "utf8")).toContain(
-      "/posts/hello-world</loc>",
-    );
+    const sitemap = await readFile(path.join(r.outDir, "sitemap.xml"), "utf8");
+    expect(sitemap).toContain("<loc>https://e2e.example.com/posts/hello-world</loc>");
+    expect(sitemap).not.toContain("localhost");
     expect(await readFile(path.join(r.outDir, "robots.txt"), "utf8")).toContain("Sitemap:");
     // the seed's category and tag are on the post and have (thin) archives
     expect(post).toContain('<a class="ch-chip" href="/category/news" rel="tag">News</a>');
