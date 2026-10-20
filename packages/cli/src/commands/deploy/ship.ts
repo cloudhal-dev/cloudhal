@@ -28,7 +28,9 @@ type PreparedAdmin = Awaited<ReturnType<typeof prepareAdminWorker>>;
 export async function shipWorkers(
   ctx: DeployContext,
   input: {
-    secrets: DeploySecrets;
+    /** What this deploy sets on each Worker (the site Worker's share of the admin Worker's). */
+    siteSecrets: Partial<DeploySecrets>;
+    adminSecrets: Partial<DeploySecrets>;
     admin: PreparedAdmin;
     prepareAdmin: (ticker: SchedulerTicker) => Promise<PreparedAdmin>;
     scheduler: SchedulerTicker;
@@ -39,29 +41,27 @@ export async function shipWorkers(
   scheduler: SchedulerTicker;
 }> {
   const { options, run, names, log, dir } = ctx;
-  const { secrets, admin } = input;
+  const { admin } = input;
   let scheduler = input.scheduler;
-  // Secrets go to wrangler through files that exist only while it runs (0600, then removed).
+  // Secrets go to wrangler through files that exist only while it runs (0600, then removed); a
+  // Worker keeps every secret a deploy does not set.
   const siteSecretsFile = path.join(dir, "site-secrets.json");
   const adminSecretsFile = path.join(dir, "admin-secrets.json");
-  const writeSecret = async (file: string, value: object) => {
+  const secretsArgs = async (file: string, value: object) => {
+    if (Object.keys(value).length === 0) return [];
     await writeFile(file, JSON.stringify(value), { mode: 0o600 });
     await chmod(file, 0o600);
+    return ["--secrets-file", file];
   };
   let siteDeploy: Awaited<ReturnType<typeof must>>;
   let adminDeploy: Awaited<ReturnType<typeof must>>;
   try {
-    await writeSecret(siteSecretsFile, {
-      CLOUDHAL_PREVIEW_SECRET: secrets.CLOUDHAL_PREVIEW_SECRET,
-      CLOUDHAL_PURGE_TOKEN: secrets.CLOUDHAL_PURGE_TOKEN,
-      // RFC-0007: the same value as the admin Worker's (proof of work, emails, stored secrets)
-      CLOUDHAL_COMMENTS_KEY: secrets.CLOUDHAL_COMMENTS_KEY,
-    });
-    await writeSecret(adminSecretsFile, secrets);
+    const siteArgs = await secretsArgs(siteSecretsFile, input.siteSecrets);
+    const adminSecrets = await secretsArgs(adminSecretsFile, input.adminSecrets);
     log(`deploying ${names.site}`);
-    siteDeploy = await must(run, ["deploy", "--secrets-file", siteSecretsFile], options.projectDir);
+    siteDeploy = await must(run, ["deploy", ...siteArgs], options.projectDir);
     log(`deploying ${names.admin}`);
-    const adminArgs = ["deploy", "-c", admin.configPath, "--secrets-file", adminSecretsFile];
+    const adminArgs = ["deploy", "-c", admin.configPath, ...adminSecrets];
     adminDeploy = await run(adminArgs, { cwd: admin.dir });
     if (
       adminDeploy.code !== 0 &&

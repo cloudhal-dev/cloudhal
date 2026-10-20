@@ -12,12 +12,15 @@ export async function ensureResources(
     names,
     log,
     where,
+    databaseId: known,
   }: {
     cwd: string;
     names: ReturnType<typeof workerNames>;
     log: (l: string) => void;
     /** Asked only when the database is created: where it lives. */
     where: () => Promise<Jurisdiction>;
+    /** A database already provisioned (Workers Builds): no D1 call at all. */
+    databaseId?: string;
   },
 ): Promise<{ databaseId: string; created?: Jurisdiction }> {
   const info = async () => {
@@ -29,7 +32,7 @@ export async function ensureResources(
       return undefined;
     }
   };
-  let databaseId = await info();
+  let databaseId = known ?? (await info());
   let made: Jurisdiction | undefined;
   if (!databaseId) {
     made = await where();
