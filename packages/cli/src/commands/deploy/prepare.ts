@@ -63,6 +63,7 @@ import {
   rateLimitDeployment,
 } from "./settings.ts";
 import { deployDir, exists, type Jurisdiction, readDeployState } from "./state.ts";
+import { committedNames, inWorkersBuilds, seedIfMissing } from "./workers-builds.ts";
 
 export function checkOptions(options: DeployOptions): void {
   if (options.jurisdiction !== undefined && !["auto", "eu"].includes(options.jurisdiction))
@@ -80,16 +81,22 @@ export async function loadDeploy(options: DeployOptions): Promise<DeployContext>
   const dir = deployDir(options.projectDir, cfg.dataDir);
   await mkdir(dir, { recursive: true });
   const run = options.wrangler ?? wranglerRunner(options.projectDir, log);
+  // Workers Builds: the button's names, and the starter site in a checkout that has none
+  const workersBuilds = inWorkersBuilds(options.workersBuilds);
+  const committed = workersBuilds
+    ? await committedNames(siteConfigPath(options.projectDir))
+    : undefined;
+  if (committed) await seedIfMissing(options.projectDir, cfg, committed.name, log);
 
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   const site = await local.store.getSite(cfg.siteId);
   await local.close();
   if (!site) throw new Error(`site ${cfg.siteId} not found in the local store`);
   const previous = await readDeployState(options.projectDir, cfg.dataDir);
-  const name = options.name ?? previous?.name ?? site.slug;
+  const name = options.name ?? committed?.name ?? previous?.name ?? site.slug;
   // RFC-0029 §3: the search provider's instance and bucket, bound by both Workers.
   const search = searchDeploymentOf(cfg.search, name);
-  const base: DeploymentNames = { name, ...(search ? { search } : {}) };
+  const base: DeploymentNames = { ...committed, name, ...(search ? { search } : {}) };
   if (search)
     log(
       `search: Cloudflare AI Search instance ${search.instance} over R2 bucket ${search.bucket} (the instance must exist, read that bucket and declare the text metadata fields locale and kind); ${search.monthlyLimit} semantic searches a month for the deployment (Cloudflare includes 1,000 per account), then FTS5 alone until the month ends`,
@@ -97,7 +104,7 @@ export async function loadDeploy(options: DeployOptions): Promise<DeployContext>
   const names = workerNames(base);
   // 0. analytics: decided before anything is generated; the wrangler version gates the configs
   const decided = await decideAnalytics(options, cfg, site.name, log);
-  return { options, log, cfg: decided, dir, run, site, previous, base, names };
+  return { options, log, cfg: decided, dir, run, site, previous, base, names, workersBuilds };
 }
 
 /** 0. analytics bindings (wrangler ≥ 4.145); 0b. reader comments (RFC-0007 §15.4). */
@@ -159,8 +166,11 @@ export async function provision(
   ctx: DeployContext,
 ): Promise<{ withIds: DeploymentNames; databaseCreated: Jurisdiction | undefined }> {
   const { options, names, log, base } = ctx;
+  // Workers Builds: the database the button provisioned (its token may not read D1)
+  const known = ctx.workersBuilds ? base.databaseId : undefined;
   const existing = await readExistingIds(siteConfigPath(options.projectDir));
-  let databaseId = existing.databaseId;
+  // (a placeholder id in the committed file is no id: never carried into the config)
+  let databaseId = ctx.workersBuilds ? known : existing.databaseId;
   let databaseCreated: Jurisdiction | undefined;
   if (!options.dryRun) {
     const r = await ensureResources(ctx.run, {
@@ -168,6 +178,7 @@ export async function provision(
       names,
       log,
       where: jurisdictionChooser(options, log),
+      ...(known ? { databaseId: known } : {}),
     });
     databaseId = r.databaseId;
     databaseCreated = r.created;

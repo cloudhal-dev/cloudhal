@@ -14,6 +14,12 @@ export const SECRET_KEYS = [
   "CLOUDHAL_COMMENTS_KEY",
 ] as const;
 export type DeploySecrets = Record<(typeof SECRET_KEYS)[number], string>;
+/** The secrets the site Worker has too, with the same values as the admin Worker's. */
+export const SITE_SECRET_KEYS = [
+  "CLOUDHAL_PREVIEW_SECRET",
+  "CLOUDHAL_PURGE_TOKEN",
+  "CLOUDHAL_COMMENTS_KEY",
+] as const satisfies readonly (typeof SECRET_KEYS)[number][];
 
 export interface DeployState {
   name: string;
