@@ -1,5 +1,21 @@
 # @cloudhal/cli
 
+## 0.3.2
+
+### Patch Changes
+
+- b2dfe81: The Deploy to Cloudflare button deploys the admin Worker under its own name. Workers Builds sets `WRANGLER_CI_OVERRIDE_NAME` to the Worker a build is connected to, and wrangler then deploys every config under that name, so the admin Worker overwrote the site Worker (the site's address served Studio). `cloudhal deploy` no longer passes `WRANGLER_CI_OVERRIDE_NAME` or `WRANGLER_CI_MATCH_TAG` to wrangler; it names each Worker itself.
+- @cloudhal/agent-runtime@0.3.2
+  - @cloudhal/analytics@0.3.2
+  - @cloudhal/api@0.3.2
+  - @cloudhal/cloudflare@0.3.2
+  - @cloudhal/comments@0.3.2
+  - @cloudhal/core-contracts@0.3.2
+  - @cloudhal/core-ts@0.3.2
+  - @cloudhal/mcp-server@0.3.2
+  - @cloudhal/schedules@0.3.2
+  - @cloudhal/storage@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

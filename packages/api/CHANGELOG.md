@@ -1,5 +1,19 @@
 # @cloudhal/api
 
+## 0.3.2
+
+### Patch Changes
+
+- @cloudhal/agent-runtime@0.3.2
+  - @cloudhal/analytics@0.3.2
+  - @cloudhal/astro-renderer@0.3.2
+  - @cloudhal/comments@0.3.2
+  - @cloudhal/core-contracts@0.3.2
+  - @cloudhal/core-ts@0.3.2
+  - @cloudhal/mcp-server@0.3.2
+  - @cloudhal/schedules@0.3.2
+  - @cloudhal/storage@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
