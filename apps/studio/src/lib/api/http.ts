@@ -53,7 +53,9 @@ export function query(params: Record<string, string | number | undefined | null>
 
 /** True when the server answered 404 for a feature it does not run (audit log, agent keys). */
 export function isNotEnabled(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.status === 404;
+  if (!(error instanceof ApiRequestError)) return false;
+  // RFC-0036 §5: a playground refuses what it leaves out with 403 `playground`; read it as off.
+  return error.status === 404 || (error.status === 403 && error.body.error === "playground");
 }
 
 /** The API error code (`body.error`) of a failed request, e.g. `rank` or `invite_gone`. */
