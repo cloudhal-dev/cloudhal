@@ -1,6 +1,6 @@
 # RFC-0036: Public playground: a disposable Cloudhal per visitor on a SQLite Durable Object
 
-- Status: Draft
+- Status: Accepted (2026-10-20, by Halil; ADR-0038). Open questions 1 and 2 decided as recommended (session in the path, seed per session); 3 and 4 are measured in phase 3 and before launch; 5 and 6 stay out of the MVP (recorded walkthrough instead of the agent, share links in phase 5). Phases 1–3 follow in order.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-20
 - Related:
   - Spike: an internal spike report, the numbers behind §1 and §3.
