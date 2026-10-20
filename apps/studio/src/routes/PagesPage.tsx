@@ -17,7 +17,7 @@ import {
 import { EyeSlash, FileText, Plus } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -34,6 +34,7 @@ import {
   useMenuReferences,
   usePageMenus,
 } from "../components/Menus.tsx";
+import { usePageStatusActions } from "../components/PageStatus.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -60,6 +61,7 @@ export function PagesPage() {
   const [toDelete, setToDelete] = useState<Page | undefined>();
   // Pages are structure: Editors and above (RFC-0005 §2.2).
   const pagesGate = useGate("pages.write");
+  const status = usePageStatusActions(siteId, pagesGate.reason);
   const deleteRefs = useMenuReferences(
     siteId,
     toDelete ? { kind: "page", id: toDelete.id } : undefined,
@@ -164,9 +166,9 @@ export function PagesPage() {
                     list={list}
                     menus={pageMenus.get(p.id)}
                     views={viewsColumn}
-                    canWrite={pagesGate.allowed}
-                    deleteDisabledReason={pagesGate.reason}
+                    gate={pagesGate}
                     onDelete={() => setToDelete(p)}
+                    statusItems={status.items(p)}
                   />
                 ))}
               </Table.Body>
@@ -182,6 +184,7 @@ export function PagesPage() {
           setPage={paging.setPage}
         />
       )}
+      {status.dialog}
       <DeleteResource
         open={toDelete !== undefined}
         onOpenChange={(o) => !o && setToDelete(undefined)}
@@ -204,18 +207,19 @@ function PageRow({
   list,
   menus,
   views,
-  canWrite,
-  deleteDisabledReason,
+  gate,
   onDelete,
+  statusItems,
 }: {
   page: Page;
   siteId: string;
   list: TranslationList<Page>;
   menus: string[] | undefined;
   views: ListViewsColumn;
-  canWrite: boolean;
-  deleteDisabledReason: string | undefined;
+  /** Changing pages (Editors and above): `reason` disables Delete, Publish and Unpublish. */
+  gate: { allowed: boolean; reason: string | undefined };
   onDelete: () => void;
+  statusItems: ReactNode;
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -249,7 +253,7 @@ function PageRow({
       </Table.Cell>
       {list.groupOf && (
         <Table.Cell data-testid="languages-cell">
-          {group && <LanguagesCell siteId={siteId} row={group} canWrite={canWrite} />}
+          {group && <LanguagesCell siteId={siteId} row={group} canWrite={gate.allowed} />}
         </Table.Cell>
       )}
       <Table.Cell>
@@ -266,8 +270,9 @@ function PageRow({
           onOpen={() =>
             navigate({ to: "/sites/$siteId/pages/$pageId", params: { siteId, pageId: p.id } })
           }
+          items={statusItems}
           onDelete={onDelete}
-          deleteDisabledReason={deleteDisabledReason}
+          deleteDisabledReason={gate.reason}
         />
       </Table.Cell>
     </Table.Row>

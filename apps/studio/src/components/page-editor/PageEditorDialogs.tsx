@@ -17,6 +17,7 @@ export function PageEditorDialogs({ ed, draft }: { ed: PageEditorState; draft: P
         open={ed.publishOpen}
         onOpenChange={ed.setPublishOpen}
         title={t("editor.publishPageTitle")}
+        description={t("editor.publishPageDescription")}
         confirmLabel={t("common.publish")}
         cancelLabel={t("common.cancel")}
         busy={save.isPending}

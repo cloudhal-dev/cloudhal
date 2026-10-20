@@ -204,6 +204,38 @@ describe("translation tools", () => {
     });
   });
 
+  it("publishes and unpublishes one translation with update_page (RFC-0035)", async () => {
+    const node = (await call("save_translation", spanish())).result.node as Page;
+    const published = (
+      await call("update_page", {
+        siteId: site.id,
+        pageId: node.id,
+        rev: node.rev,
+        status: "published",
+      })
+    ).result.page as Page;
+    expect(published).toMatchObject({ status: "published", title: "Lanzamiento" });
+    const back = (
+      await call("update_page", {
+        siteId: site.id,
+        pageId: node.id,
+        rev: published.rev,
+        status: "draft",
+      })
+    ).result.page as Page;
+    expect(back.status).toBe("draft");
+    // A collection whose machine translations need a person's review: refused until reviewed.
+    const latest = (await store.getSite(site.id)) as Site;
+    await store.updateSite({
+      ...latest,
+      localization: { ...latest.localization, review: { required: ["pages"] } },
+    });
+    await expect(
+      call("update_page", { siteId: site.id, pageId: node.id, rev: back.rev, status: "published" }),
+    ).rejects.toMatchObject({ code: "review_required" });
+    expect((await store.getPage(node.id))?.status).toBe("draft");
+  });
+
   it("translates entries too, and refuses a locale the site does not have", async () => {
     const post = await store.createContentEntry({
       siteId: site.id,
