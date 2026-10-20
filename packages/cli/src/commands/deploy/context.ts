@@ -19,4 +19,6 @@ export interface DeployContext {
   readonly previous: DeployState | undefined;
   readonly base: DeploymentNames;
   readonly names: ReturnType<typeof workerNames>;
+  /** Running in Cloudflare Workers Builds (`workers-builds.ts`). */
+  readonly workersBuilds: boolean;
 }

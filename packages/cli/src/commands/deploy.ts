@@ -39,6 +39,9 @@
  *      `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, the deploy runs
  *      `pnpm --filter @cloudhal/studio build` first; `--no-build-studio` fails instead. A published
  *      install ships Studio prebuilt and is never checked.
+ *  13. Workers Builds (`WORKERS_CI=1`, the Deploy to Cloudflare button): names from the committed
+ *      `wrangler.jsonc`, the starter seeded when the checkout has none, secrets kept on the Workers
+ *      and no setup link printed (`deploy/workers-builds.ts`, docs/guides/deploy-button.md).
  *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
@@ -64,7 +67,8 @@ import { downgradeGuard } from "./deploy/schedules-guard.ts";
 import { attachedWorkers } from "./deploy/served-sites.ts";
 import { commentsResult } from "./deploy/settings.ts";
 import { afterDeploy, purgeIfSwitched, shipWorkers } from "./deploy/ship.ts";
-import { loadOrCreateSecrets, writeDeployState } from "./deploy/state.ts";
+import { loadOrCreateSecrets, SITE_SECRET_KEYS, writeDeployState } from "./deploy/state.ts";
+import { buildsSecrets, setupInstructions } from "./deploy/workers-builds.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
 export type { DeployOptions, DeployResult } from "./deploy/options.ts";
@@ -90,6 +94,15 @@ export {
   SECRET_KEYS,
 } from "./deploy/state.ts";
 
+/** What this deploy sets on each Worker, and the values it knows (all of them, outside Workers Builds). */
+async function deploySecrets(ctx: Awaited<ReturnType<typeof loadDeploy>>) {
+  if (ctx.workersBuilds && !ctx.options.dryRun)
+    return buildsSecrets(ctx.run, { cwd: ctx.options.projectDir, dir: ctx.dir, names: ctx.names });
+  const all = await loadOrCreateSecrets(ctx.dir);
+  const site = Object.fromEntries(SITE_SECRET_KEYS.map((k) => [k, all[k]]));
+  return { site, admin: all, known: all };
+}
+
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   checkOptions(options);
   // RFC-0034 §4: a site Worker that joins another installation deploys only itself.
@@ -99,10 +112,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const { analytics, comments } = await analyticsAndComments(ctx);
   const studioDir = await studioDirFor(ctx);
   const { withIds, databaseCreated } = await provision(ctx);
-  // 2. secrets; 2b. RFC-0008: never deploy code that ignores holds and gates over open releases
-  const secrets = await loadOrCreateSecrets(ctx.dir);
-  if (!options.dryRun && previous?.adminUrl)
-    await downgradeGuard(options, previous.adminUrl, secrets.CLOUDHAL_DEPLOY_TOKEN, log);
+  // 2. secrets (Workers Builds: kept on the Workers); 2b. RFC-0008: never deploy code that
+  // ignores holds and gates over open releases
+  const secrets = await deploySecrets(ctx);
+  if (!options.dryRun && previous?.adminUrl && !ctx.workersBuilds)
+    await downgradeGuard(options, previous.adminUrl, secrets.known.CLOUDHAL_DEPLOY_TOKEN, log);
   const settings = await deploySettings(ctx);
   const { plan, schedules, observability } = settings;
   const site = await buildSite(ctx, { withIds, analytics, comments, observability });
@@ -163,7 +177,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   }
 
   const { siteUrl, adminUrl, scheduler } = await shipWorkers(ctx, {
-    secrets,
+    siteSecrets: secrets.site,
+    adminSecrets: secrets.admin,
     admin,
     prepareAdmin,
     scheduler: settings.scheduler,
@@ -184,18 +199,21 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     plan,
   });
   const pushed = await afterDeploy(ctx, { siteUrl, adminUrl });
-  const { purged, analyticsChanged, commentsChanged } = await purgeIfSwitched(ctx, {
-    siteUrl,
-    analytics,
-    comments,
-    purgeToken: secrets.CLOUDHAL_PURGE_TOKEN,
-  });
+  // Workers Builds knows no previous deploy, nor (after the first) the purge token: no purge
+  const purgeToken = secrets.known.CLOUDHAL_PURGE_TOKEN;
+  const { purged, analyticsChanged, commentsChanged } = purgeToken
+    ? await purgeIfSwitched(ctx, { siteUrl, analytics, comments, purgeToken })
+    : { purged: false, analyticsChanged: false, commentsChanged: false };
 
   // First deploy: the owner account can only be created through this one-time link.
+  const setupToken = secrets.known.CLOUDHAL_SETUP_TOKEN;
+  const first = pushed && adminUrl;
   const setupUrl =
-    pushed && adminUrl
-      ? `${adminUrl.replace(/\/$/, "")}/login#setup=${secrets.CLOUDHAL_SETUP_TOKEN}`
+    first && setupToken && !ctx.workersBuilds
+      ? `${adminUrl.replace(/\/$/, "")}/login#setup=${setupToken}`
       : undefined;
+  const instructions =
+    first && ctx.workersBuilds ? setupInstructions(adminUrl, names.admin) : undefined;
   return {
     dryRun: false,
     names,
@@ -205,6 +223,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     adminUrl,
     pushed,
     ...(setupUrl ? { setupUrl } : {}),
+    ...(instructions ? { setupInstructions: instructions } : {}),
     ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
     ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
     scheduler,

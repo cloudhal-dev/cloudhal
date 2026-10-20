@@ -63,6 +63,12 @@ export interface DeployOptions {
   readonly buildStudio?: boolean;
   /** Injected in tests: runs the Studio build. */
   readonly studioBuilder?: StudioBuilder;
+  /**
+   * Deploying from Cloudflare Workers Builds (the Deploy to Cloudflare button): names from the
+   * committed `wrangler.jsonc`, the starter seeded when missing, secrets kept on the Workers.
+   * Default: `WORKERS_CI=1` in the environment.
+   */
+  readonly workersBuilds?: boolean;
 }
 
 export interface DeployResult {
@@ -75,6 +81,8 @@ export interface DeployResult {
   pushed?: boolean;
   /** First deploy only: open it to create the owner account. */
   setupUrl?: string;
+  /** First deploy from Workers Builds: how to create the owner account (no link is printed). */
+  setupInstructions?: string;
   /** Custom domains from cloudhal.json, routed by this deploy. */
   customSiteUrl?: string;
   customStudioUrl?: string;
