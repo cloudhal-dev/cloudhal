@@ -1,6 +1,6 @@
 # RFC-0036: Public playground: a disposable Cloudhal per visitor on a SQLite Durable Object
 
-- Status: Accepted (2026-10-20, by Halil; ADR-0038). Open questions 1 and 2 decided as recommended (session in the path, seed per session); 3 and 4 are measured in phase 3 and before launch; 5 and 6 stay out of the MVP (recorded walkthrough instead of the agent, share links in phase 5). Phases 1–3 follow in order.
+- Status: Accepted (2026-10-20, by Halil; ADR-0038). Open questions 1 and 2 decided as recommended (session in the path, seed per session); 3 and 4 are measured in phase 3 and before launch; 5 and 6 stay out of the MVP (recorded walkthrough instead of the agent, share links in phase 5). Phases 1–3 implemented (#22, #23 and the phase 3 PR); "Implementation notes" below records where they differ from the text.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-20
 - Related:
   - Spike: an internal spike report, the numbers behind §1 and §3.
@@ -147,7 +147,7 @@ Layers, so that no single mistake opens a hole:
 - **Session.**
   - `POST /_playground/session` sets `__Host-cloudhal_try=<ULID>` (`HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7200`).
   - The DO is `idFromName(ulid)`. There is no server-side session table: the ULID's timestamp is the creation time.
-  - The cookie is unsigned. An unguessable 80-bit random part is enough, because a session holds nothing of value and leaks nothing about anyone else.
+  - The cookie is unsigned. An unguessable 80-bit random part is enough, because a session holds nothing of value and leaks nothing about anyone else. *Amended in phase 3: the cookie is signed, see Implementation notes 1.*
 - **TTL.**
   - On the first write the DO sets an alarm at `min(lastAccess + 60 min, createdAt + 120 min)`.
   - Each request moves it forward, never past the 2-hour cap.
@@ -214,6 +214,18 @@ The monorepo's CI never deploys or holds playground secrets. The `try` repo only
 | 3 · Entry | `@cloudhal/cloudflare/playground` (DO, TTL, reset, limits, kill switch); `withRequestStore` rendering | workerd test: open, edit, publish, render, expire, reset; 20 concurrent sessions |
 | 4 · Launch | `cloudhal-dev/try` repo, landing page, demo pack, custom domain | live; production first open < 1 s p95; abuse checklist green |
 | 5 · Later | signed share links, theme gallery, guided tour, funnel metrics; budgeted agent (own RFC); moving a trial to your own account | |
+
+## Implementation notes (phases 1–3)
+Where building the phases showed the text above wrong or silent, the code follows these notes.
+
+1. **Session cookies are signed** (§6, amends "The cookie is unsigned" and the alternatives row). An unsigned ULID lets a client mint sessions at will, which skips the per-IP limit, Turnstile and the daily cap on session creation. The cookie is `<ulid>.<HMAC-SHA-256 of the ulid, 128 bits, base64url>` keyed by the secret `PLAYGROUND_SECRET` (≥ 32 characters); without it the Worker serves only the landing page. A ULID dated in the future (more than a minute) or older than the 2-hour cap is refused in the Worker as well as in the object.
+2. **Studio is served at the root** (§1 diagram showed `/studio/*`). Studio has no base path; its client routes (`/sites`, …) and `/assets/*` come from the static files with SPA fallback. `/` is the landing page (`landingPath`, default `/landing/`) for visitors without a session, Studio for those with one. `POST /_playground/session` answers `303 → /sites` with the cookie. `/media/*` goes to the session's object too, and rendered pages keep `a[href]` and `form[action]` under `/s/<session>/` (HTMLRewriter), except Worker paths (`/media`, `/_astro`, `/_cloudhal`, `/assets`, `/api`, `/_playground`).
+3. **Studio without sign-in.** `requireSession` accepts the 403 that the playground gives `/api/auth/*` when `/api/instance` reports `features.playground`. The account surface leaves out Agents, Team and Account, and a direct visit shows "Available in your own install".
+4. **The guard** (§5) has two more answers: `schedules` (releases, gates, automations, runs and the scheduler need a ticker and may call out) and `unclassified` (a route on neither list, or not declared at all, is refused at run time, not only by the test). Every media-library change is blocked as `uploads`, since a session's media are the read-only demo pack. The body limit is per request (200 KB) in the API and 1 MB in the Worker.
+5. **The principal** is `user_playground` (the existing `user_` prefix). Besides the installation-wide scopes it lacks `asset:manage`, because `asset:manage` implies `asset:upload` in the scope lattice, and the Editor's `members:invite`, `commenters:data` and `automations:manage`.
+6. **Entry API** (§11): `createPlaygroundWorker({ seed, render, deployUrl, demoMedia, limits, landingPath })` returns `{ worker, PlaygroundSite }`. `seed(store)` returns the site to show. `render(request, { store, siteId, env, ctx })` is the deploying repo's Astro handler; it wraps it in `withRequestStore` (and `serveMedia`) from `@cloudhal/astro-renderer/runtime`, so the monorepo needs no Astro build. The daily cap counts in an object of the same class named `daily:<UTC date>`, deleted after midnight UTC.
+7. **Blob stores** (§2): `FetcherBlobStore` cannot list static files, so it takes the demo keys (`keys`) for `list`; `LayeredBlobStore.delete` only removes the upper copy, so a demo object stays readable after a delete.
+8. **Measured** (workerd via wrangler's test harness, iMac): opening a session, editing, publishing and rendering pass; 20 sessions opened at once answered in 0.44 s, each with its own seeded site.
 
 ## Alternatives considered
 | Option | Pros | Cons | Why not |

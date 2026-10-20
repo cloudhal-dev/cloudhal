@@ -21,3 +21,38 @@ export default createAdminWorker({ skills });
 | `CLOUDHAL_SIGNUP` | `first-user` (default — only the first account, the owner, can sign up), `closed` or `open` |
 
 The site Worker itself is the project's Astro build (`@cloudhal/astro-renderer/cloudflare-entry`). Both are deployed, configured and tested by `@cloudhal/cli` (`cloudhal deploy`, `test/cloudflare*.test.ts` on workerd).
+
+## Playground Worker (RFC-0036)
+
+`@cloudhal/cloudflare/playground` runs a public playground: every visitor gets a disposable Cloudhal in their own SQLite-backed Durable Object (`PlaygroundSite`), seeded on first use and deleted an hour after the last request (two hours at most), or at once on Reset.
+
+```ts
+// worker.ts in the deploying repo (e.g. cloudhal-dev/try)
+import "@cloudhal/cloudflare/workerd-prelude";
+import { handle } from "@astrojs/cloudflare/handler";
+import { serveMedia, withRequestStore } from "@cloudhal/astro-renderer/runtime";
+import { createPlaygroundWorker } from "@cloudhal/cloudflare/playground";
+
+const playground = createPlaygroundWorker({
+  deployUrl: "https://cloudhal.dev/docs/deploy",
+  seed: async (store) => ({ siteId: (await seedDemo(store)).id }),
+  render: (request, { store, siteId, env, ctx }) =>
+    withRequestStore(store, siteId, async () =>
+      (await serveMedia(request, { siteId })) ?? (handle(request, env as never, ctx) as Promise<Response>)),
+  demoMedia: { prefix: "demo/", keys: DEMO_KEYS },
+});
+export const PlaygroundSite = playground.PlaygroundSite;
+export default playground.worker;
+```
+
+| Binding / secret | Purpose |
+|---|---|
+| `PLAYGROUND` (Durable Object, `new_sqlite_classes: ["PlaygroundSite"]`) | one database per session, and the daily counter |
+| `ASSETS` (`run_worker_first: true`) | landing page (`/landing/`), Studio at the root with SPA fallback, site assets, demo media |
+| `PLAYGROUND_SECRET` (≥ 32 chars) | signs the `__Host-cloudhal_try` session cookie; without it only the landing page is served |
+| `PLAYGROUND_ENABLED` | `"false"` is the kill switch |
+| `PLAYGROUND_DAILY_SESSIONS` | new sessions per UTC day |
+| `SESSION_LIMIT`, `WRITE_LIMIT` (rate limits) | new sessions per IP, writes per session |
+| `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY` | asked for only after a session-rate-limit hit |
+
+Routes: `POST /_playground/session` (cookie, then `303 /sites`), `POST /_playground/reset`, `/api/*` (guarded by `isBlockedInPlayground`), `/s/<session>/…` (the session's site, `private, no-store`, `noindex`), `/media/*`. Tested on workerd in `test/playground-workerd.test.ts`.

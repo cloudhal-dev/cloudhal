@@ -1,5 +1,6 @@
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
+import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { SqlDriver } from "@cloudhal/storage";
 import type { CloudhalRendererConfig } from "./integration.ts";
@@ -54,6 +55,14 @@ export function resetSource(_siteId?: string): void {
  * serves the project's one site, so this only runs `fn`.
  */
 export function withRequestSite<T>(_siteId: string, fn: () => T): T {
+  return fn();
+}
+
+/**
+ * RFC-0036 §4: on workerd a playground runs each request over its session's store; `cloudhal dev`
+ * renders from the project's local store, so this only runs `fn`.
+ */
+export function withRequestStore<T>(_store: SiteGraphStore, _siteId: string, fn: () => T): T {
   return fn();
 }
 
