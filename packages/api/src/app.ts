@@ -15,7 +15,7 @@ import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
 import { PLAYGROUND_PRINCIPAL, playgroundGuard } from "./playground.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
-import { adminRoutes } from "./routes/admin.ts";
+import { mountAdmin } from "./routes/admin-mount.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
 import { aiRoutes } from "./routes/ai.ts";
 import { analytics } from "./routes/analytics.ts";
@@ -210,18 +210,11 @@ export function createApi(deps: ApiDeps) {
       c.res.headers.set("cache-control", "no-store");
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true }));
+  const problems = mountAdmin(app, deps);
+  app.get("/api/health", (c) => c.json(problems.length ? { ok: true, problems } : { ok: true }));
   if (deps.authHandler) {
     const handler = deps.authHandler;
     app.on(["GET", "POST"], "/api/auth/*", (c) => handler(c.req.raw));
-  }
-  if (deps.admin) {
-    if (deps.admin.deployToken.length < 32)
-      throw new Error("admin.deployToken must be at least 32 characters");
-    app.route(
-      "/api/admin",
-      adminRoutes(deps.admin.deployToken, deps.admin.storage, deps.ai?.transport, deps.mcp?.render),
-    );
   }
 
   app.get("/api/me", meHandler(membership));
@@ -270,7 +263,7 @@ export function createApi(deps: ApiDeps) {
           mcp: Boolean(deps.mcp),
           activity: Boolean(deps.audit ?? deps.mcp?.audit),
           previewLinks: Boolean(deps.preview),
-          deployTransfer: Boolean(deps.admin),
+          deployTransfer: Boolean(deps.admin) && problems.length === 0,
           approvals: Boolean(deps.mcp?.approvals),
           elevationRequests: Boolean(deps.mcp?.approvals && deps.agentKeys),
           members: Boolean(deps.staff),

@@ -3,7 +3,7 @@ import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApi } from "../src/app.ts";
 
 const TOKEN = "deploy-token-for-tests-0123456789abcdef";
@@ -238,9 +238,41 @@ describe("admin bundle endpoints", () => {
 
     expect((await put(bundle.replace(site.id, "site_other0000001"))).status).toBe(400);
     expect((await put(bundle, "?mode=yolo")).status).toBe(400);
-    expect(() =>
-      createApi({ store: a.store, admin: { deployToken: "short", storage: a } }),
-    ).toThrow(/32/);
+  });
+});
+
+describe("short deploy token", () => {
+  it("disables only /api/admin, logs once and reports it on /api/health", async () => {
+    const b = await backend();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const app = createApi({ store: b.store, admin: { deployToken: "short", storage: b } });
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(String(errors.mock.calls[0]?.[0])).toMatch(/CLOUDHAL_DEPLOY_TOKEN.*32/);
+
+      const health = await app.request("/api/health");
+      expect(health.status).toBe(200);
+      expect(await health.json()).toEqual({ ok: true, problems: ["deploy_token_invalid"] });
+
+      for (const token of ["short", TOKEN]) {
+        const res = await app.request("/api/admin/sites", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.status).toBe(503);
+        expect(((await res.json()) as { error: string }).error).toBe("deploy_token_invalid");
+      }
+      // The rest of the API still answers (here: unauthenticated, not a crash).
+      expect((await app.request("/api/me")).status).toBeLessThan(500);
+      expect(errors).toHaveBeenCalledTimes(1);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("keeps /api/health plain with a valid token", async () => {
+    const b = await backend();
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    expect(await (await app.request("/api/health")).json()).toEqual({ ok: true });
   });
 });
 
