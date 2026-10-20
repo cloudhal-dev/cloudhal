@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/analytics",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Cloudhal site analytics (RFC-0006): query model, classifiers, beacon handler, SQLite/D1 store, daily rollups and Workers Analytics Engine adapters. Worker-safe.",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
