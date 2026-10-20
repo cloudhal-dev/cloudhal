@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/storage",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Cloudhal storage interfaces (SQL driver, blob store) with Cloudflare D1/R2/Durable Object SQLite and local SQLite/filesystem adapters",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
