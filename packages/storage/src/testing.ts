@@ -357,3 +357,4 @@ export async function createMiniflareR2(): Promise<{ bucket: R2Bucket; dispose()
   const bucket = (await mf.getR2Bucket("BUCKET")) as unknown as R2Bucket;
   return { bucket, dispose: () => mf.dispose() };
 }
+export { createMiniflareDoSqlite } from "./testing-do.ts";
