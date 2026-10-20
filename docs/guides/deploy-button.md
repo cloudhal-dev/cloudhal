@@ -43,3 +43,7 @@ Start from `npm create cloudhal@latest`, then:
 - commit `cloudhal.json` and a root `wrangler.jsonc` that names the site Worker, a `DB` D1 database (placeholder id `00000000-0000-0000-0000-000000000000`) and a `BLOBS` R2 bucket
 - remove the `build` script (Workers Builds would run it before `deploy`), keep `"deploy": "cloudhal deploy"`
 - commit a lockfile and a `.node-version` of `24`. The CLI runs on Node 24.
+
+## Before 0.3.2: the site Worker shows Studio
+
+Workers Builds sets `WRANGLER_CI_OVERRIDE_NAME` to the Worker a build is connected to. Before 0.3.2, `cloudhal deploy` passed it on to wrangler, so the admin Worker was uploaded under the site Worker's name. The site's address then served Studio, and no `<name>-admin` Worker existed. To fix a deployment made that way, bump `@cloudhal/*` in your copy of the template to 0.3.2 or later and push. The next build deploys both Workers under their own names.

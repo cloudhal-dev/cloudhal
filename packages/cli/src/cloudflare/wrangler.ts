@@ -70,7 +70,17 @@ export function wranglerRunner(
   return async (args, { cwd, quiet }) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cloudhal-wrangler-"));
     const outputFile = path.join(dir, "output.ndjson");
-    const { VITEST: _v, NODE_ENV: _n, ...env } = process.env;
+    // Workers Builds sets WRANGLER_CI_OVERRIDE_NAME (and WRANGLER_CI_MATCH_TAG) to the one Worker
+    // the build is connected to; wrangler then deploys every config under that name. `cloudhal
+    // deploy` names each Worker itself (the site keeps the connected name), so the admin Worker
+    // would otherwise overwrite the site. Seen on the first Deploy to Cloudflare button run.
+    const {
+      VITEST: _v,
+      NODE_ENV: _n,
+      WRANGLER_CI_OVERRIDE_NAME: _ciName,
+      WRANGLER_CI_MATCH_TAG: _ciTag,
+      ...env
+    } = process.env;
     try {
       const result = await new Promise<{ code: number; stdout: string; stderr: string }>(
         (resolve) => {
