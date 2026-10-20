@@ -1,5 +1,14 @@
 # @cloudhal/comments
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [c70d3fa]
+  - @cloudhal/storage@0.3.0
+  - @cloudhal/core-ts@0.3.0
+  - @cloudhal/core-contracts@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
