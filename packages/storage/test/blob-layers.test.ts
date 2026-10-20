@@ -99,6 +99,14 @@ describe("FetcherBlobStore", () => {
     expect(fetcher.calls).toEqual([]);
   });
 
+  it("never fetches a key outside its list (SPA fallback answers 200 for anything)", async () => {
+    const spa = { fetch: async () => new Response("<!doctype html>studio", { status: 200 }) };
+    const store = new FetcherBlobStore(spa, "demo/", { keys: ["media/a.png"] });
+    expect(await store.get("nodes/abc.json")).toBeNull();
+    expect(await store.head("nodes/abc.json")).toBeNull();
+    expect(await store.get("media/a.png")).not.toBeNull();
+  });
+
   it("reports other failures as StorageError", async () => {
     const store = new FetcherBlobStore(
       { fetch: async () => new Response("", { status: 500 }) },

@@ -27,6 +27,7 @@ import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useCan } from "../components/useMe.ts";
 import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
+import { usePlayground } from "../components/usePlayground.ts";
 import { useSitePalette } from "../components/useSitePalette.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -49,8 +50,10 @@ export function SiteShell() {
     queryKey: ["snapshots", siteId],
     queryFn: () => api.snapshots.list(siteId),
   });
+  // RFC-0036 §5: a playground has no analytics, activity log, approvals, agents or schedules.
+  const full = !usePlayground();
   // Polls while the site surface is open; drives the sidebar badge (and the overview banner).
-  const approvals = usePendingApprovals(siteId);
+  const approvals = usePendingApprovals(siteId, full);
   const pendingApprovals = approvals.data?.length ?? 0;
   // Proposed terms wait for a person (RFC-0002 §8): their count rides on the sidebar item.
   const taxonomy = useTaxonomyData(siteId);
@@ -121,14 +124,16 @@ export function SiteShell() {
               >
                 {t("nav.home")}
               </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={ChartLine}
-                href={`${base}/analytics`}
-                active={is(`${base}/analytics`)}
-                tooltip={t("nav.analytics")}
-              >
-                {t("nav.analytics")}
-              </Sidebar.MenuButton>
+              {full && (
+                <Sidebar.MenuButton
+                  icon={ChartLine}
+                  href={`${base}/analytics`}
+                  active={is(`${base}/analytics`)}
+                  tooltip={t("nav.analytics")}
+                >
+                  {t("nav.analytics")}
+                </Sidebar.MenuButton>
+              )}
             </Sidebar.Menu>
           </Sidebar.Group>
           <Sidebar.Group>
@@ -190,75 +195,14 @@ export function SiteShell() {
               )}
             </Sidebar.Menu>
           </Sidebar.Group>
-          <Sidebar.Group>
-            <Sidebar.GroupLabel>{t("nav.history")}</Sidebar.GroupLabel>
-            <Sidebar.Menu>
-              <Sidebar.MenuButton
-                icon={Camera}
-                href={`${base}/snapshots`}
-                active={is(`${base}/snapshots`)}
-                tooltip={t("nav.snapshots")}
-              >
-                {t("nav.snapshots")}
-                <Sidebar.MenuBadge>{snapshots.data?.length ?? 0}</Sidebar.MenuBadge>
-              </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={ClockCounterClockwise}
-                href={`${base}/activity`}
-                active={is(`${base}/activity`)}
-                tooltip={t("nav.activity")}
-              >
-                {t("nav.activity")}
-              </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={HandPalm}
-                href={`${base}/approvals`}
-                active={is(`${base}/approvals`)}
-                tooltip={t("nav.approvals")}
-              >
-                {t("nav.approvals")}
-                {pendingApprovals > 0 && <Sidebar.MenuBadge>{pendingApprovals}</Sidebar.MenuBadge>}
-              </Sidebar.MenuButton>
-            </Sidebar.Menu>
-          </Sidebar.Group>
-          <Sidebar.Group>
-            <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
-            <Sidebar.Menu>
-              <Sidebar.MenuItem>
-                <Sidebar.Collapsible defaultOpen>
-                  <Sidebar.CollapsibleTrigger
-                    render={
-                      <Sidebar.MenuButton icon={Robot} tooltip={t("nav.agents")}>
-                        {t("nav.agents")}
-                        <Sidebar.MenuChevron />
-                      </Sidebar.MenuButton>
-                    }
-                  />
-                  <Sidebar.CollapsibleContent>
-                    <Sidebar.MenuSub>
-                      <Sidebar.MenuSubButton href="/agents">
-                        {t("nav.agentKeys")}
-                      </Sidebar.MenuSubButton>
-                      <Sidebar.MenuSubButton href="/agents/skills">
-                        {t("nav.agentSkills")}
-                      </Sidebar.MenuSubButton>
-                    </Sidebar.MenuSub>
-                  </Sidebar.CollapsibleContent>
-                </Sidebar.Collapsible>
-              </Sidebar.MenuItem>
-              <Sidebar.MenuButton
-                icon={CalendarDots}
-                href={`${base}/schedules`}
-                active={is(`${base}/schedules`)}
-                tooltip={t("nav.schedules")}
-              >
-                {t("nav.schedules")}
-                {scheduleAttention > 0 && (
-                  <Sidebar.MenuBadge>{scheduleAttention}</Sidebar.MenuBadge>
-                )}
-              </Sidebar.MenuButton>
-            </Sidebar.Menu>
-          </Sidebar.Group>
+          <HistoryGroup
+            base={base}
+            is={is}
+            full={full}
+            snapshots={snapshots.data?.length ?? 0}
+            pendingApprovals={pendingApprovals}
+          />
+          {full && <AutomationGroup base={base} is={is} attention={scheduleAttention} />}
           <SettingsGroup base={base} is={is} />
         </>
       }
@@ -299,6 +243,100 @@ function SettingsGroup({ base, is }: { base: string; is: (path: string) => boole
           tooltip={t("nav.redirects")}
         >
           {t("nav.redirects")}
+        </Sidebar.MenuButton>
+      </Sidebar.Menu>
+    </Sidebar.Group>
+  );
+}
+
+interface GroupProps {
+  base: string;
+  is: (path: string) => boolean;
+}
+
+/** The sidebar's History group: snapshots, and (not on a playground) activity and approvals. */
+function HistoryGroup({
+  base,
+  is,
+  full,
+  snapshots,
+  pendingApprovals,
+}: GroupProps & { full: boolean; snapshots: number; pendingApprovals: number }) {
+  const t = useT();
+  return (
+    <Sidebar.Group>
+      <Sidebar.GroupLabel>{t("nav.history")}</Sidebar.GroupLabel>
+      <Sidebar.Menu>
+        <Sidebar.MenuButton
+          icon={Camera}
+          href={`${base}/snapshots`}
+          active={is(`${base}/snapshots`)}
+          tooltip={t("nav.snapshots")}
+        >
+          {t("nav.snapshots")}
+          <Sidebar.MenuBadge>{snapshots}</Sidebar.MenuBadge>
+        </Sidebar.MenuButton>
+        {full && (
+          <>
+            <Sidebar.MenuButton
+              icon={ClockCounterClockwise}
+              href={`${base}/activity`}
+              active={is(`${base}/activity`)}
+              tooltip={t("nav.activity")}
+            >
+              {t("nav.activity")}
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton
+              icon={HandPalm}
+              href={`${base}/approvals`}
+              active={is(`${base}/approvals`)}
+              tooltip={t("nav.approvals")}
+            >
+              {t("nav.approvals")}
+              {pendingApprovals > 0 && <Sidebar.MenuBadge>{pendingApprovals}</Sidebar.MenuBadge>}
+            </Sidebar.MenuButton>
+          </>
+        )}
+      </Sidebar.Menu>
+    </Sidebar.Group>
+  );
+}
+
+/** The sidebar's Automation group: agents and schedules. */
+function AutomationGroup({ base, is, attention }: GroupProps & { attention: number }) {
+  const t = useT();
+  return (
+    <Sidebar.Group>
+      <Sidebar.GroupLabel>{t("nav.automation")}</Sidebar.GroupLabel>
+      <Sidebar.Menu>
+        <Sidebar.MenuItem>
+          <Sidebar.Collapsible defaultOpen>
+            <Sidebar.CollapsibleTrigger
+              render={
+                <Sidebar.MenuButton icon={Robot} tooltip={t("nav.agents")}>
+                  {t("nav.agents")}
+                  <Sidebar.MenuChevron />
+                </Sidebar.MenuButton>
+              }
+            />
+            <Sidebar.CollapsibleContent>
+              <Sidebar.MenuSub>
+                <Sidebar.MenuSubButton href="/agents">{t("nav.agentKeys")}</Sidebar.MenuSubButton>
+                <Sidebar.MenuSubButton href="/agents/skills">
+                  {t("nav.agentSkills")}
+                </Sidebar.MenuSubButton>
+              </Sidebar.MenuSub>
+            </Sidebar.CollapsibleContent>
+          </Sidebar.Collapsible>
+        </Sidebar.MenuItem>
+        <Sidebar.MenuButton
+          icon={CalendarDots}
+          href={`${base}/schedules`}
+          active={is(`${base}/schedules`)}
+          tooltip={t("nav.schedules")}
+        >
+          {t("nav.schedules")}
+          {attention > 0 && <Sidebar.MenuBadge>{attention}</Sidebar.MenuBadge>}
         </Sidebar.MenuButton>
       </Sidebar.Menu>
     </Sidebar.Group>

@@ -22,9 +22,10 @@ const pendingQuery = (siteId: string) => ({
  * (the site shell, so only while the site surface is open). A server without approvals answers
  * 404 once and is not polled again.
  */
-export function usePendingApprovals(siteId: string) {
+export function usePendingApprovals(siteId: string, enabled = true) {
   return useQuery({
     ...pendingQuery(siteId),
+    enabled,
     refetchInterval: (query) => (isNotEnabled(query.state.error) ? false : APPROVALS_POLL_MS),
   });
 }
