@@ -39,7 +39,8 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     const r = await renderPage(
       chromeRenderer(chrome as string, { idleMs: 10 }),
       pathToFileURL(file).href,
-      { widths: [1440, 390], fullPage: true },
+      // Two widths, full page: the 20 s default is tight on a loaded CI runner (#35).
+      { widths: [1440, 390], fullPage: true, timeoutMs: 50_000 },
     );
     const check = (id: string) => r.checks.find((c) => c.id === id);
     expect(r.shots.map((s) => s.width)).toEqual([1440, 390]);
@@ -95,7 +96,7 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
       const r = await renderPage(
         chromeRenderer(chrome as string, { idleMs: 10 }),
         pathToFileURL(file).href,
-        { widths, fullPage: false },
+        { widths, fullPage: false, timeoutMs: 50_000 },
       );
       return (id: string) => r.checks.find((c) => c.id === id);
     };
