@@ -53,25 +53,27 @@ function cellText(v: unknown, c: Record<string, unknown>, locale: string): strin
   return str(v);
 }
 
-/** RFC-0022 §4: a real table; `data-label` lets the theme stack rows into cards on phones. */
+/**
+ * RFC-0022 §4: a real table; `data-label` lets the theme stack rows into cards on phones, and
+ * `data-phone="hide"` leaves a column out of those cards (never the first, which names the row).
+ */
 export const tableHtml: PrimitiveRenderer = ({ props: p }, { media }) => {
   const locale = media?.locale ?? "en";
   const rows = (Array.isArray(p.rows) ? p.rows : []).filter(isRow).slice(0, 200);
   const columns = (Array.isArray(p.columns) ? p.columns : []).filter(isRow).slice(0, 8);
   const hl = isRow(p.highlight) ? p.highlight : undefined;
+  const extra = (c: Record<string, unknown>, i: number) =>
+    `${c.align === "end" ? ' data-align="end"' : ""}${i > 0 && c.hideOnPhone === true ? ' data-phone="hide"' : ""}`;
   const head = columns
-    .map(
-      (c) =>
-        `<th scope="col"${c.align === "end" ? ' data-align="end"' : ""}>${escapeHtml(str(c.label))}</th>`,
-    )
+    .map((c, i) => `<th scope="col"${extra(c, i)}>${escapeHtml(str(c.label))}</th>`)
     .join("");
   const body = rows
     .map((r) => {
       const marked = hl && str(r[str(hl.field)]) === str(hl.equals);
       return `<tr${marked ? ' data-highlight="yes"' : ""}>${columns
         .map(
-          (c) =>
-            `<td data-label="${escapeHtml(str(c.label))}"${c.align === "end" ? ' data-align="end"' : ""}>${escapeHtml(cellText(r[str(c.field)], c, locale))}</td>`,
+          (c, i) =>
+            `<td data-label="${escapeHtml(str(c.label))}"${extra(c, i)}>${escapeHtml(cellText(r[str(c.field)], c, locale))}</td>`,
         )
         .join("")}</tr>`;
     })

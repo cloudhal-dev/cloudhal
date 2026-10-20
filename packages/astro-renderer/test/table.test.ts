@@ -46,6 +46,20 @@ describe("Table", () => {
     expect(html).not.toContain("<script");
   });
 
+  it("keeps hideOnPhone columns out of the phone cards, never the first", () => {
+    const columns = base.columns.map((c, i) =>
+      i === 0 || i >= 3 ? { ...c, hideOnPhone: true } : c,
+    );
+    expect(checkSurface(table({ ...base, columns }), createCatalog()).issues).toEqual([]);
+    const html = renderSurface(table({ ...base, columns }), { media: { locale: "en" } as never });
+    expect(html).toContain('<th scope="col">Plan</th>');
+    expect(html).toContain('<th scope="col" data-phone="hide">Since</th>');
+    expect(html).toContain('<td data-label="Plan">Pro</td>');
+    expect(html).toContain('<td data-label="Price" data-align="end">$19.50</td>');
+    expect(html).toContain('<td data-label="Since" data-phone="hide">Mar 1, 2026</td>');
+    expect(html.match(/data-phone="hide"/g)).toHaveLength(6);
+  });
+
   it("formats in the page locale", () => {
     const html = renderSurface(table(base), { media: { locale: "tr" } as never });
     expect(html).toMatch(/<td data-label="Price" data-align="end">\$19,50<\/td>/);
