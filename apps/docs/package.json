@@ -2,13 +2,24 @@
   "name": "@cloudhal/docs",
   "version": "0.0.1",
   "private": true,
-  "description": "cloudhal.dev: the developer site (docs, JSON Schemas, the fetcher page). ADR-0037.",
+  "description": "cloudhal.dev: the developer site (Starlight over the repo's docs/, JSON Schemas, docs for agents). ADR-0037, ADR-0039.",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.ts",
-    "deploy": "node scripts/build.ts && wrangler deploy"
+    "dev": "astro dev",
+    "build": "astro build && node scripts/postbuild.ts",
+    "preview": "wrangler dev",
+    "deploy": "pnpm build && wrangler deploy",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "catalog:",
+    "astro": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

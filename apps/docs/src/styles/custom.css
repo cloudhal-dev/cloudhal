@@ -1,0 +1,11 @@
+/* Cloudhal accent on Starlight's palette (light and dark). */
+:root {
+  --sl-color-accent-low: #3b1a0e;
+  --sl-color-accent: #d0643e;
+  --sl-color-accent-high: #f6c3ad;
+}
+:root[data-theme="light"] {
+  --sl-color-accent-low: #f8dccf;
+  --sl-color-accent: #b4441f;
+  --sl-color-accent-high: #5a200c;
+}

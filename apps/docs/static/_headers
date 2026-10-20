@@ -10,6 +10,14 @@
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
 
-/llms.txt
+# Markdown for agents (ADR-0039): llms.txt files and every page's .md copy.
+/*llms.txt
   Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+/*llms-full.txt
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+/*.md
   Access-Control-Allow-Origin: *
