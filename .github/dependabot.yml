@@ -5,6 +5,10 @@ updates:
     schedule: { interval: weekly }
     groups:
       dev-tooling: { patterns: ["@biomejs/*", "turbo", "vitest", "typescript", "@changesets/*", "tsx"] }
+      # better-auth and its plugins share exact internal versions (@better-auth/core, utils,
+      # better-call): bumping one alone breaks npm installs of @cloudhal/api (see its pins test).
+      better-auth: { patterns: ["better-auth", "@better-auth/*", "better-call"] }
+      tiptap: { patterns: ["@tiptap/*"] }
     ignore:
       # Generators are pinned exactly; bump them deliberately with a regen + ADR note.
       - dependency-name: json-schema-to-typescript
