@@ -18,6 +18,8 @@ A local `cloudhal deploy` prints a one-time setup link. In Workers Builds the bu
 
 Until an owner exists, sign-up needs that token. Once the owner exists, sign-up is closed whatever the token is.
 
+**Do not edit `CLOUDHAL_DEPLOY_TOKEN`.** It sits next to `CLOUDHAL_SETUP_TOKEN` in the same list, but it is the deployment token, and every build replaces it. The owner account needs only `CLOUDHAL_SETUP_TOKEN`. If `CLOUDHAL_DEPLOY_TOKEN` is changed to a value shorter than 32 characters, the admin Worker switches off its deploy endpoints (`/api/admin`), and `/api/health` reports `"problems": ["deploy_token_invalid"]`. Studio, sign-in and publishing keep working. To fix it, retry the latest build or push a commit: the build sets a new token.
+
 ## How `cloudhal deploy` behaves in Workers Builds
 
 Workers Builds sets `WORKERS_CI=1`. Every build starts from a fresh clone, with no `.cloudhal/` folder: no local site, no `secrets.json`, no `state.json`. With `WORKERS_CI=1`, `cloudhal deploy`:

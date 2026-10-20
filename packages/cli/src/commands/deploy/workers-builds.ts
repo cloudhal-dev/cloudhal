@@ -142,5 +142,7 @@ export function setupInstructions(adminUrl: string, adminWorker: string): string
     "     edit CLOUDHAL_SETUP_TOKEN and set a random value of your own (32 characters or more),",
     `     or run \`npx wrangler secret put CLOUDHAL_SETUP_TOKEN --name ${adminWorker}\``,
     `  2. open ${login}<that value>`,
+    "Do not edit CLOUDHAL_DEPLOY_TOKEN: every build replaces it, and a changed value switches off",
+    "the deploy endpoints (/api/admin). The owner account only needs CLOUDHAL_SETUP_TOKEN.",
   ].join("\n");
 }
