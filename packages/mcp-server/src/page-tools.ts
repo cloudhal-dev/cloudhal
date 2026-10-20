@@ -175,7 +175,7 @@ const updatePageTool: ToolDefinition = {
   name: "update_page",
   title: "Update page",
   description:
-    "Replace a page's title, path, sections or seo, or set its own motion level and chrome (RFC-0025: header default|transparent|hidden, footer default|minimal|hidden; null goes back to the site's). Requires the current `rev` (optimistic locking). Status changes are not allowed here. Snapshots afterwards.",
+    "Replace a page's title, path, sections or seo, or set its own motion level and chrome (RFC-0025: header default|transparent|hidden, footer default|minimal|hidden; null goes back to the site's). Set `status` (draft, review, published, archived; RFC-0035) to publish or unpublish this one page: a published page goes live with the next site publish, and a machine translation in a review-required collection needs a person's review first. Requires the current `rev` (optimistic locking). Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -185,6 +185,11 @@ const updatePageTool: ToolDefinition = {
       path: str("New path"),
       sections: sectionInput,
       seo: { type: "object" },
+      status: {
+        type: "string",
+        enum: ["draft", "review", "published", "archived"],
+        description: "The page's own status (RFC-0035); live after the next site publish",
+      },
       motion: {
         type: ["string", "null"],
         enum: ["none", "subtle", "standard", "expressive", null],
@@ -241,6 +246,7 @@ const updatePageTool: ToolDefinition = {
       ...(a.path ? { path: a.path as string } : {}),
       ...(a.sections ? { sections: a.sections as Section[] } : {}),
       ...(a.seo ? { seo: a.seo as Seo } : {}),
+      ...(a.status ? { status: a.status as Page["status"] } : {}),
     };
     try {
       const saved = await ctx.store.updatePage(next, { writer: mcpWriter(ctx) });

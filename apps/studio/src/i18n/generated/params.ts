@@ -486,6 +486,8 @@ export interface MessageParams {
   "notifications.toast.endingBody": { time: string | number; from: string | number };
   "notifications.toast.endingTitle": { name: string | number; mode: string | number; left: string | number };
   "overview.commentsWaiting": { count: number };
+  "pageStatus.leftOut": { count: number };
+  "pageStatus.publishTitle": { title: string | number };
   "passwords.advice.empty": { min: string | number };
   "passwords.advice.tooShort": { min: string | number };
   "passwords.errors.tooLong": { max: string | number };

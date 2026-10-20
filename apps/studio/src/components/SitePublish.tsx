@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
+import { UnpublishedPagesNote } from "./PageStatus.tsx";
 import { usePublishMode, usePublishSite } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
 
@@ -107,7 +108,9 @@ export function SitePublish({
         cancelLabel={t("common.cancel")}
         busy={publish.isPending}
         onConfirm={() => publish.mutate({ label: t("snapshots.publishedFromStudio") })}
-      />
+      >
+        <UnpublishedPagesNote siteId={siteId} open={open} onNavigate={() => setOpen(false)} />
+      </ApprovalDialog>
     </>
   );
 }

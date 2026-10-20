@@ -246,6 +246,16 @@ export const en = {
     viewAll: "View all",
     cli: "From the terminal",
   },
+  pageStatus: {
+    publishTitle: "Publish “{title}”?",
+    published: "Page published",
+    unpublished: "Page moved back to draft",
+    failed: "The page's status did not change",
+    leftOut: "{count, plural, one {# page is not published} other {# pages are not published}}",
+    leftOutDescription:
+      "Drafts and pages in review, new translations included, stay off the live site. Publish them first.",
+    review: "Review pages",
+  },
   articles: {
     description: "Posts in the “posts” collection.",
     newArticle: "New article",
@@ -365,6 +375,8 @@ export const en = {
     publishArticleDescription:
       "It becomes visible on the site the next time the site is snapshotted and published.",
     publishPageTitle: "Publish this page?",
+    publishPageDescription:
+      "It goes live the next time the site is published. Other pages and languages keep their own status.",
     deleteArticle: "Delete article",
     deletePage: "Delete page",
     article: "Article",

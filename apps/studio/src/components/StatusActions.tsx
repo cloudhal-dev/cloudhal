@@ -21,6 +21,9 @@ import { TRANSITIONS } from "../lib/workflow.ts";
  * Contributor: draft and review, so "Submit for review" and no Publish — the Publish step stays,
  * disabled, with `publishReason`); `readOnlyReason` disables the whole lifecycle (someone else's
  * article) with the reason as the tooltip.
+ *
+ * `directPublish` (pages, RFC-0035): a draft's next step is Publish itself, not review; "Send to
+ * review" moves into the menu.
  */
 export function StatusActions({
   status,
@@ -31,6 +34,7 @@ export function StatusActions({
   allowed,
   publishReason,
   readOnlyReason,
+  directPublish,
 }: {
   status: PublishStatus;
   busy?: boolean | undefined;
@@ -44,50 +48,52 @@ export function StatusActions({
   publishReason?: string | undefined;
   /** Nothing here is this person's to change: the reason. */
   readOnlyReason?: string | undefined;
+  /** A draft publishes without the review step (pages). */
+  directPublish?: boolean | undefined;
 }) {
   const t = useT();
   const may = (s: PublishStatus) => !allowed || allowed.includes(s);
   const draftOnly = !may("published");
   const transitions = TRANSITIONS[status].filter(may);
   const locked = readOnlyReason !== undefined;
-  const next =
-    status === "draft" && may("review") ? (
-      <Button
-        variant="secondary"
-        icon={<DirectionalIcon icon={PaperPlaneTilt} />}
-        onClick={() => onChange("review")}
-        disabled={busy || locked}
-        title={readOnlyReason}
-        data-testid="send-to-review"
-      >
-        {draftOnly ? t("editor.submitForReview") : t("editor.sendToReview")}
-      </Button>
-    ) : status === "review" ? (
-      <Button
-        variant="secondary"
-        icon={<RocketLaunch />}
-        onClick={onPublish}
-        disabled={busy || locked || draftOnly}
-        title={readOnlyReason ?? (draftOnly ? publishReason : undefined)}
-        data-testid="publish"
-      >
-        {t("common.publish")}
-      </Button>
-    ) : status === "archived" && may("draft") ? (
-      <Button
-        variant="secondary"
-        icon={<ArrowCounterClockwise />}
-        onClick={() => onChange("draft")}
-        disabled={busy || locked}
-        title={readOnlyReason}
-      >
-        {t("editor.restore")}
-      </Button>
-    ) : null;
+  const publishNext = status === "review" || (status === "draft" && directPublish && !draftOnly);
+  const next = publishNext ? (
+    <Button
+      variant="secondary"
+      icon={<RocketLaunch />}
+      onClick={onPublish}
+      disabled={busy || locked || draftOnly}
+      title={readOnlyReason ?? (draftOnly ? publishReason : undefined)}
+      data-testid="publish"
+    >
+      {t("common.publish")}
+    </Button>
+  ) : status === "draft" && may("review") ? (
+    <Button
+      variant="secondary"
+      icon={<DirectionalIcon icon={PaperPlaneTilt} />}
+      onClick={() => onChange("review")}
+      disabled={busy || locked}
+      title={readOnlyReason}
+      data-testid="send-to-review"
+    >
+      {draftOnly ? t("editor.submitForReview") : t("editor.sendToReview")}
+    </Button>
+  ) : status === "archived" && may("draft") ? (
+    <Button
+      variant="secondary"
+      icon={<ArrowCounterClockwise />}
+      onClick={() => onChange("draft")}
+      disabled={busy || locked}
+      title={readOnlyReason}
+    >
+      {t("editor.restore")}
+    </Button>
+  ) : null;
   const others = transitions.filter(
     (s) =>
       s !== "published" &&
-      !(status === "draft" && s === "review") &&
+      !(status === "draft" && s === "review" && !publishNext) &&
       !(status === "archived" && s === "draft"),
   );
   const label = (s: PublishStatus) =>
