@@ -502,6 +502,7 @@ export interface MessageParams {
   "pickers.tagHint": { max: string | number };
   "pickers.under": { path: string | number };
   "pickers.viaSynonym": { value: string | number };
+  "playground.description": { count: number };
   "preview.frameTitle": { name: string | number };
   "projects.waiting": { count: number };
   "proposals.acceptSome": { count: string | number; total: string | number };

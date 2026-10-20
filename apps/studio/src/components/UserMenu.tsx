@@ -8,6 +8,7 @@ import { useThemePreference } from "../lib/theme.ts";
 import { RoleBadge } from "./Roles.tsx";
 import { ThemeRadioItems, themeIcon } from "./ThemeSwitch.tsx";
 import { useMe } from "./useMe.ts";
+import { usePlayground } from "./usePlayground.ts";
 
 /**
  * The signed-in person's menu, at the right end of the top bar (DESIGN.md §1): an avatar button
@@ -20,6 +21,8 @@ export function UserMenu() {
   const navigate = useNavigate();
   const [theme] = useThemePreference();
   const me = useMe();
+  // RFC-0036 §5: a playground has no account, team or sign-out.
+  const people = !usePlayground();
   const name = me.data?.actor.name ?? t("nav.account");
   const role = me.data?.role ?? undefined;
   const signOut = async () => {
@@ -54,12 +57,16 @@ export function UserMenu() {
           {role && <RoleBadge value={role} />}
         </div>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
-          {t("nav.account")}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item icon={UsersThree} onClick={() => navigate({ to: "/team" })}>
-          {t("nav.team")}
-        </DropdownMenu.Item>
+        {people && (
+          <DropdownMenu.Item icon={UserGear} onClick={() => navigate({ to: "/account" })}>
+            {t("nav.account")}
+          </DropdownMenu.Item>
+        )}
+        {people && (
+          <DropdownMenu.Item icon={UsersThree} onClick={() => navigate({ to: "/team" })}>
+            {t("nav.team")}
+          </DropdownMenu.Item>
+        )}
         <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
           {t("nav.allSites")}
         </DropdownMenu.Item>
@@ -85,10 +92,12 @@ export function UserMenu() {
             </DropdownMenu.RadioGroup>
           </DropdownMenu.SubContent>
         </DropdownMenu.Sub>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item icon={directional(SignOut)} onClick={signOut}>
-          {t("common.signOut")}
-        </DropdownMenu.Item>
+        {people && <DropdownMenu.Separator />}
+        {people && (
+          <DropdownMenu.Item icon={directional(SignOut)} onClick={signOut}>
+            {t("common.signOut")}
+          </DropdownMenu.Item>
+        )}
       </DropdownMenu.Content>
     </DropdownMenu>
   );
