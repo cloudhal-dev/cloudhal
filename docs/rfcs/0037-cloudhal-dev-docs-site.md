@@ -120,3 +120,6 @@ Who links where:
 1. ADRs and RFCs on the public site: render all of them, or only Accepted ones, with drafts staying on GitHub? Recommendation: all, with the status shown in the header.
 2. Error codes: one registry in `packages/core-contracts` (shared by TS and Rust), or per package? Recommendation: one registry, since the API, CLI and Studio report the same codes.
 3. Should the docs MCP also be offered as an MCP registry entry (`registry.cloudhal.dev`, ADR-0037), or wait until there is a registry? Recommendation: wait.
+
+## Implementation notes
+- **Phase 1** (`apps/docs`): a custom content loader (`src/lib/repo-docs.ts`) reads `docs/` and the site's own pages (`src/lib/site-pages.ts`). The H1 becomes the title; the description is the first text under `## Summary` or `## Context`; relative links become site paths, or GitHub links for files outside `docs/`. Folders without a README get a generated index (`/docs/rfcs`). `scripts/postbuild.ts` writes the schemas, the `.md` copies, `llms.txt`/`llms-full.txt` (site and per section) and `_redirects` from `src/lib/redirects.ts` from the same page list. The `starlight-llms-txt` plugin is not used: one list feeds the HTML, the Markdown and the indexes, so they cannot disagree.
