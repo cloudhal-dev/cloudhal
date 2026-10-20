@@ -12,7 +12,12 @@ export interface BlobFetcher {
 }
 
 export interface FetcherBlobStoreOptions {
-  /** Keys `list` reports (static assets cannot be listed). Default: none. */
+  /**
+   * The keys this store holds. With it, `get`, `head` and `list` know only these keys and never
+   * fetch another: a static-assets binding with SPA fallback answers 200 with `index.html` for any
+   * missing file, which would otherwise read as a blob. Without it, every key is fetched and
+   * `list` reports none (static assets cannot be listed).
+   */
   readonly keys?: readonly string[];
 }
 
@@ -26,15 +31,18 @@ export class FetcherBlobStore implements BlobStore {
   readonly #fetcher: BlobFetcher;
   readonly #prefix: string;
   readonly #keys: readonly string[];
+  readonly #known: ReadonlySet<string> | undefined;
 
   constructor(fetcher: BlobFetcher, prefix: string, options: FetcherBlobStoreOptions = {}) {
     this.#fetcher = fetcher;
     this.#prefix = prefix.replace(/^\/+/, "");
     this.#keys = [...(options.keys ?? [])].sort();
+    this.#known = options.keys ? new Set(options.keys) : undefined;
   }
 
   async #fetch(key: string): Promise<Response | null> {
     assertBlobKey(key);
+    if (this.#known && !this.#known.has(key)) return null;
     const res = await this.#fetcher.fetch(`https://assets.local/${this.#prefix}${key}`);
     if (res.status === 404) return null;
     if (!res.ok) throw new StorageError(`fetching ${key} failed with ${res.status}`);
