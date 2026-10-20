@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cloudhal HTTP API (Hono): sites, pages, entries, snapshots, auth — runs on Node and Cloudflare Workers",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
@@ -37,6 +37,9 @@
     "hono": "catalog:",
     "better-auth": "catalog:",
     "@better-auth/api-key": "catalog:",
+    "@better-auth/core": "catalog:",
+    "@better-auth/utils": "catalog:",
+    "better-call": "catalog:",
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/mcp-server": "workspace:*",
     "@cloudhal/astro-renderer": "workspace:*",
