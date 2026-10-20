@@ -30,7 +30,7 @@ catalog:
   tailwindcss: ^4.3.3
   marked: ^18.1.0
   parse5: 8.0.1
-  "@tiptap/core": 3.31.4
+  "@tiptap/core": 3.32.0
   "@tiptap/react": 3.31.4
   "@tiptap/pm": 3.31.4
   "@tiptap/starter-kit": 3.31.4
