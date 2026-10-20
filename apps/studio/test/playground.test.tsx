@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlaygroundSessionBar } from "../src/components/PlaygroundSessionBar.tsx";
 import { PlaygroundUnavailable } from "../src/components/PlaygroundUnavailable.tsx";
 import { isPlaygroundBlockedPath, minutesLeft } from "../src/components/usePlayground.ts";
+import { ApiRequestError, isNotEnabled } from "../src/lib/api/http.ts";
 import { INSTANCE, on, serve, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
@@ -32,6 +33,14 @@ describe("playground helpers", () => {
     expect(minutesLeft("2026-10-20T17:59:00Z", now)).toBe(0);
   });
 
+  it("reads a playground refusal as a feature that is off", () => {
+    const refusal = (status: number, error: string) =>
+      new ApiRequestError(status, { error, message: "x" } as never);
+    expect(isNotEnabled(refusal(403, "playground"))).toBe(true);
+    expect(isNotEnabled(refusal(404, "not_found"))).toBe(true);
+    expect(isNotEnabled(refusal(403, "forbidden"))).toBe(false);
+  });
+
   it("knows the account screens a playground leaves out", () => {
     for (const p of ["/team", "/agents", "/agents/skills", "/account"])
       expect(isPlaygroundBlockedPath(p), p).toBe(true);
@@ -49,7 +58,7 @@ describe("PlaygroundSessionBar", () => {
   });
 
   it("shows the time left and Deploy, and Reset deletes the session", async () => {
-    const expires = new Date(Date.now() + 41 * 60_000 - 1000).toISOString();
+    const expires = new Date(Date.now() + 41 * 60_000 + 30_000).toISOString();
     const fetch = serve(
       on("GET", "/api/instance", { status: 200, body: playground(expires) }),
       on("POST", "/_playground/reset", { status: 204 }),

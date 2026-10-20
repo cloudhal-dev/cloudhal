@@ -17,7 +17,8 @@ export function isPlaygroundBlockedPath(pathname: string): boolean {
   return /^\/(agents|team|account)(\/|$)/.test(pathname);
 }
 
-/** Whole minutes until `expiresAt`, never below zero. */
+/** Whole minutes until `expiresAt`: 0 once it has passed, at least 1 before. */
 export function minutesLeft(expiresAt: string, now: number): number {
-  return Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 60_000));
+  const ms = Date.parse(expiresAt) - now;
+  return ms <= 0 ? 0 : Math.max(1, Math.floor(ms / 60_000));
 }

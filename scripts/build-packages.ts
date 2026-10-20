@@ -202,14 +202,9 @@ async function buildCliAssets(): Promise<void> {
   )) as typeof import("../packages/cli/src/starter-files.ts");
   const assets = path.join(ROOT, "packages/cli/dist/assets");
   const studio = path.join(ROOT, "apps/studio/dist");
-  try {
-    await stat(path.join(studio, "index.html"));
-  } catch {
-    execFileSync("pnpm", ["--filter", "@cloudhal/studio", "build"], {
-      stdio: "inherit",
-      cwd: ROOT,
-    });
-  }
+  // Always a fresh build: an existing dist may predate the sources being released (0.3.0 shipped
+  // a Studio from before its playground mode this way).
+  execFileSync("pnpm", ["--filter", "@cloudhal/studio", "build"], { stdio: "inherit", cwd: ROOT });
   await cp(studio, path.join(assets, "studio"), {
     recursive: true,
     filter: (src) => !src.endsWith(".map"),
