@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Prerequisites as CONTRIBUTING.md lists them (no caches on purpose).
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           # No dependency cache on purpose (and pnpm is not installed yet).
