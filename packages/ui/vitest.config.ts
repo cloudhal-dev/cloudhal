@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   test: {
+    // One temp directory per run, removed at the end (scripts/vitest-tmpdir.ts).
+    globalSetup: ["../../scripts/vitest-tmpdir.ts"],
     environment: "happy-dom",
     // PreviewPanel renders iframes; tests assert their attributes, never load them.
     environmentOptions: { happyDOM: { settings: { disableIframePageLoading: true } } },

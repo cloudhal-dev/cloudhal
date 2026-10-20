@@ -4,7 +4,7 @@
  * two player hosts only where a page (or a static build) shows one.
  */
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -142,19 +142,23 @@ describe("the CSP", () => {
 
   it("in static builds, only when the build shows a player", async () => {
     const dir = await mkdtemp(join(tmpdir(), "cloudhal-embeds-"));
-    await mkdir(join(dir, "posts"));
-    await writeFile(join(dir, "index.html"), "<p>Home</p>");
-    expect(await buildShowsEmbeds(dir)).toBe(false);
-    await writeFile(
-      join(dir, "posts", "video.html"),
-      '<figure data-embed-src="https://x"></figure>',
-    );
-    expect(await buildShowsEmbeds(dir)).toBe(true);
-    await writeEmbedClient(dir);
-    expect(await readFile(join(dir, "_cloudhal", "embed.1.js"), "utf8")).toBe(EMBED_SCRIPT.code);
-    await writeStaticSecurityHeaders(dir, { embeds: true });
-    expect(await readFile(join(dir, "_headers"), "utf8")).toContain(
-      `Content-Security-Policy: ${withEmbedFrames(SITE_CSP)}`,
-    );
+    try {
+      await mkdir(join(dir, "posts"));
+      await writeFile(join(dir, "index.html"), "<p>Home</p>");
+      expect(await buildShowsEmbeds(dir)).toBe(false);
+      await writeFile(
+        join(dir, "posts", "video.html"),
+        '<figure data-embed-src="https://x"></figure>',
+      );
+      expect(await buildShowsEmbeds(dir)).toBe(true);
+      await writeEmbedClient(dir);
+      expect(await readFile(join(dir, "_cloudhal", "embed.1.js"), "utf8")).toBe(EMBED_SCRIPT.code);
+      await writeStaticSecurityHeaders(dir, { embeds: true });
+      expect(await readFile(join(dir, "_headers"), "utf8")).toContain(
+        `Content-Security-Policy: ${withEmbedFrames(SITE_CSP)}`,
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

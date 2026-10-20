@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { starterFilter } from "../src/starter-files.ts";
 
 async function files(dir: string): Promise<string[]> {
@@ -25,9 +25,15 @@ async function starter(root: string): Promise<string> {
   return dir;
 }
 
+const roots: string[] = [];
+afterEach(async () => {
+  for (const d of roots.splice(0)) await rm(d, { recursive: true, force: true });
+});
+
 describe("starterFilter", () => {
   it("copies what git knows and leaves ignored leftovers behind", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "cloudhal-starter-"));
+    roots.push(root);
     const dir = await starter(root);
     execFileSync("git", ["init", "-q"], { cwd: root });
     execFileSync("git", ["add", "starter/package.json", "starter/.gitignore"], { cwd: root });
@@ -39,6 +45,7 @@ describe("starterFilter", () => {
 
   it("outside git copies everything but the build directories", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "cloudhal-starter-"));
+    roots.push(root);
     const dir = await starter(root);
     const out = path.join(root, "out");
     await cp(dir, out, { recursive: true, filter: await starterFilter(dir) });
