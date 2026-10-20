@@ -1,5 +1,6 @@
 import { Button, DropdownMenu, directional, Tooltip } from "@cloudhal/ui";
 import { ArrowSquareOut, DotsThree, Trash } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 import { useT } from "../i18n/index.tsx";
 
 /** The "…" menu at the end of a table row (DESIGN.md §2a). */
@@ -7,8 +8,11 @@ export function RowMenu({
   onOpen,
   onDelete,
   deleteDisabledReason,
+  items,
 }: {
   onOpen: () => void;
+  /** Extra `DropdownMenu.Item`s between Open and Delete (a page's Publish / Unpublish). */
+  items?: ReactNode;
   onDelete?: (() => void) | undefined;
   /** The person's role cannot delete this row: the item stays, disabled, with the reason (§2s). */
   deleteDisabledReason?: string | undefined;
@@ -38,6 +42,7 @@ export function RowMenu({
         <DropdownMenu.Item icon={directional(ArrowSquareOut)} onClick={onOpen}>
           {t("sites.open")}
         </DropdownMenu.Item>
+        {items}
         {onDelete &&
           (deleteDisabledReason ? (
             // A disabled item takes no pointer events, so the tooltip hangs on a wrapper.
