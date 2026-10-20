@@ -90,7 +90,8 @@ export function chromeRenderer(
     );
     const endpoint = new Promise<string>((resolve, reject) => {
       let err = "";
-      const timer = setTimeout(() => reject(new Error("Chrome did not start")), 10_000);
+      // A cold start on a busy CI runner can take well over 10 s; a warm one is under a second.
+      const timer = setTimeout(() => reject(new Error("Chrome did not start")), 30_000);
       child.stderr?.on("data", (chunk: Buffer) => {
         err += chunk.toString();
         const m = /DevTools listening on (ws:\/\/\S+)/.exec(err);
