@@ -1,0 +1,15 @@
+// cloudhal.dev (ADR-0037): static assets only, no Worker code.
+// Until the Starlight site lands (RFC pending), /docs redirects to the docs on GitHub.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloudhal-dev",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "drop-trailing-slash"
+  },
+  "routes": [{ "pattern": "cloudhal.dev", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

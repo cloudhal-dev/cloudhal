@@ -6,7 +6,7 @@
 - Sources: [Cloudflare: create a self-managed OAuth client](https://developers.cloudflare.com/fundamentals/oauth/create-an-oauth-client/) · [HSTS preload list (all `.dev` names are preloaded)](https://hstspreload.org) · [EmDash playground](https://github.com/emdash-cms/emdash/tree/main/demos/playground)
 
 ## Context
-Cloudhal owns exactly two domains, `cloudhal.com` and `cloudhal.dev`, and will not buy a third. The repo already uses `https://cloudhal.dev/schemas/v1/*` as JSON Schema `$id`, `https://cloudhal.dev/docs`, the bot User-Agent page `https://cloudhal.dev/fetch`, and `security@`, `legal@` and `conduct@cloudhal.com` for mail. As of 2026-10-20 neither domain has DNS records.
+Cloudhal owns exactly two domains, `cloudhal.com` and `cloudhal.dev`, and will not buy a third. The repo already uses `https://cloudhal.dev/schemas/v1/*` as JSON Schema `$id`, `https://cloudhal.dev/docs`, the bot User-Agent page `https://cloudhal.dev/fetch`, and `security@`, `legal@` and `conduct@cloudhal.com` for mail. As of 2026-10-20 neither domain had DNS records; cloudhal.dev went live on 2026-10-21 from `apps/docs`.
 
 Planned: a future hosted control plane that installs and manages Cloudhal in the customer's own Cloudflare account, and a public playground modelled on EmDash's (a per-visitor SQLite Durable Object, one-hour TTL, no login) in a separate repository, `cloudhal-dev/try`. The question is which domain carries what, and where customer sites live.
 
@@ -49,6 +49,6 @@ Planned: a future hosted control plane that installs and manages Cloudhal in the
 
 ## Operator checklist (not done by this change; done in Cloudflare)
 - [ ] DNS for both zones.
-- [ ] Serve `packages/core-contracts/schemas` at `https://cloudhal.dev/schemas/v1/` with `Content-Type: application/schema+json`.
+- [x] Serve `packages/core-contracts/schemas` at `https://cloudhal.dev/schemas/v1/` with `Content-Type: application/schema+json`.
 - [ ] SPF, DKIM and DMARC for `cloudhal.com`.
 - [ ] `cloudhal.dev` sends no mail: `v=spf1 -all`, DMARC `p=reject`, null MX.
