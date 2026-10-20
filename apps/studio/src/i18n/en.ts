@@ -1761,7 +1761,7 @@ export const en = {
       "You confirm that a person read this machine translation against the original. Readers stop seeing the machine-translation notice, unless the site always shows it.",
     reviewSaveFirst: "Save your changes before you review.",
   },
-  // docs/reports/2026-10-multilingual-studio-ux.md §4a: Pages and Articles on a multilingual site.
+  // an internal review (2026-10) §4a: Pages and Articles on a multilingual site.
   translationList: {
     column: "Languages",
     filter: "Language",

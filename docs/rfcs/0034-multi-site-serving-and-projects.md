@@ -4,7 +4,7 @@
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
   - RFC-0033 §7 and §9: "multi-site serving" is named there as the follow-up; phase F (the newsroom's English edition) depends on it.
-  - [Studio UX report](../reports/2026-10-multilingual-studio-ux.md): when to choose languages in one site and when to choose separate sites.
+  - Studio UX report (internal): when to choose languages in one site and when to choose separate sites.
   - RFC-0018: one theme per site Worker (this RFC keeps the rule and moves it from the deployment to the site Worker).
   - RFC-0005: per-site roles and the deployment Owner; RFC-0006 / RFC-0007: same-origin host checks.
   - ADR-0012: site Worker entry and workerd prelude.

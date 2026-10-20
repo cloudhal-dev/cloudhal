@@ -1,7 +1,7 @@
 # ADR-0034: Translation workflow — catalogs stay in the repo, ICU JSON exchange, Weblate self-hosted (or Tolgee), AI drafts reviewed by people
 - Status: Accepted (2026-10-18, by Halil, as recommended). The open questions below stay open for the owner: platform hosting, reviewers, visitor-facing strings.
 - Date: 2026-10-18
-- Related: `docs/reports/2026-10-studio-i18n-review.md` (Phase 4), ADR-0032 (ICU messages, compiled), DESIGN.md §1 ("Languages", "Adding a language"), the locale registry's `reviewed` flag
+- Related: an internal review (2026-10) (Phase 4), ADR-0032 (ICU messages, compiled), DESIGN.md §1 ("Languages", "Adding a language"), the locale registry's `reviewed` flag
 - Sources:
   - Weblate: file formats (JSON, nested JSON, i18next JSON, gettext PO, XLIFF 1.2/2.0) https://docs.weblate.org/en/latest/formats.html; the ICU MessageFormat quality check (`icu-message-format`, syntax and placeholder mismatches) https://docs.weblate.org/en/latest/user/checks.html; licence GNU GPL v3+ (https://pypi.org/project/weblate/); hosted service with a programme for libre projects https://weblate.org/en/hosting/
   - Tolgee: ICU MessageFormat in the platform and SDKs https://docs.tolgee.io/platform/translation_process/icu_message_format; core open source (Apache-2.0) with an enterprise layer, self-hosting by Docker https://github.com/tolgee/tolgee-platform; in-context editing and machine translation https://docs.tolgee.io/

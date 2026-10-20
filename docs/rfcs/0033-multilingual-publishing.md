@@ -3,7 +3,7 @@
 - Status: Accepted (2026-10-18, by Halil; ADR-0035). Open questions 1–5 decided as recommended. Implementation phases A–F follow in order.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
-  - [Research report](../reports/2026-10-multilingual-publishing-research.md): evidence and sources for every claim here.
+  - Research report (internal): evidence and sources for every claim here.
   - RFC-0001: `Site.locales`, `Page.locale`, `(site, locale, path)` uniqueness.
   - RFC-0002: per-locale term labels; per-locale slugs deferred "until locale routing exists".
   - RFC-0003: one menu tree; per-locale trees deferred.
@@ -345,7 +345,7 @@ Each phase is its own PR or PRs, run sequentially. Tests run one package at a ti
 
 ## References
 
-All sources are listed in the [research report](../reports/2026-10-multilingual-publishing-research.md). The key ones:
+The key sources:
 - Google: [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions), [multi-regional sites](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites), [spam policies](https://developers.google.com/search/docs/essentials/spam-policies), [generative AI content](https://developers.google.com/search/docs/fundamentals/using-gen-ai-content).
 - [EU AI Act Art. 50](https://artificialintelligenceact.eu/article/50/).
 - [Crossref relationships](https://www.crossref.org/documentation/schema-library/markup-guide-metadata-segments/relationships/), [JATS multi-language](https://jats.nlm.nih.gov/publishing/tag-library/1.4/chapter/tag-multi-lang-articles.html).

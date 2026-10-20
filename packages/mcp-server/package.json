@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/mcp-server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Cloudhal MCP server: semantic site tools (pages, articles, snapshots, preview, publish) governed by the policy engine",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",

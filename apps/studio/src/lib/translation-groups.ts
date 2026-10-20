@@ -1,5 +1,5 @@
 /**
- * Pages and Articles on a multilingual site (docs/reports/2026-10-multilingual-studio-ux.md §4a):
+ * Pages and Articles on a multilingual site (an internal review (2026-10) §4a):
  * one row per translation group (`translation.group`; a node without one is its own group), shown
  * by its default-language version (or the original), with one language state per site locale.
  */

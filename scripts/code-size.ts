@@ -1,6 +1,6 @@
 /**
  * Code-size report: oversized files per package, long/deep/complex functions, embedded code
- * strings, giant switches and size × churn risk. Feeds docs/reports/*-code-size-analysis.md.
+ * strings, giant switches and size × churn risk. Feeds the code-size report.
  *
  *   node scripts/code-size.ts [--since=60.days] [--top=40] [--json]
  */

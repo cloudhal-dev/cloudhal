@@ -1,7 +1,7 @@
 /**
  * Read-only i18n audit of Studio: catalog sizes, placeholder parity, plural workarounds, `Intl`
  * use, physical vs logical CSS, hard-coded English and unused keys. Feeds
- * docs/reports/2026-10-studio-i18n-review.md; changes nothing.
+ * an internal review (2026-10); changes nothing.
  *
  *   node scripts/i18n-audit.ts [--json] [--list=<section>]
  */

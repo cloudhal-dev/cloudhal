@@ -1,6 +1,0 @@
----
-"@cloudhal/agent-runtime": minor
-"@cloudhal/mcp-server": minor
----
-
-Taxonomy over MCP (RFC-0002 §6.2–§6.4). `create_entry`/`update_entry` take `terms: {[taxonomy]: {set, add, remove, primary}}` resolved by id, slug, name or synonym (unknown or ambiguous values are errors with suggestions, never implicit creates; `tags` is a deprecated alias for `terms.tag.add`), and `list_entries` takes the RFC filter. Seventeen new tools: `list_taxonomies`, `list_terms`, `resolve_terms`, `propose_term`, `update_term`, `rename_term`, `merge_terms`, `retire_term`, `set_term_parent`, `set_term_visibility`, `review_term`, `taxonomy_report`, `create_taxonomy`, `update_taxonomy`, `list_redirects`, `create_redirect`, `delete_redirect`; structural ones need `site:write`, always wait for a person (prompts list the articles touched and every redirect) and take exactly one snapshot. Store invariant and filter errors map to stable `ToolError` codes with the next step in the text; publish prompts show assignment deltas per article; deltas and governance results go into the audit row's `input.effect`. `@cloudhal/agent-runtime` adds the agent-layer rules `termCreation`, `redirectTargetProblem`, `termReviewProblem` and `reclaimProblem`.

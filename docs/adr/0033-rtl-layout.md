@@ -1,7 +1,7 @@
 # ADR-0033: Right-to-left Studio — logical properties, `dir` from the registry, a Kumo patch until upstream
 - Status: Accepted (2026-10-18, by Halil, as recommended). The open questions below stay open for the owner: the first RTL language and its numerals.
 - Date: 2026-10-18
-- Related: `docs/reports/2026-10-studio-i18n-review.md` (Phase 3), DESIGN.md §1 ("Languages", "Adding a language"), §2v "Kumo locale", ADR-0032, `docs/design/kumo-upstream-notes.md`
+- Related: an internal review (2026-10) (Phase 3), DESIGN.md §1 ("Languages", "Adding a language"), §2v "Kumo locale", ADR-0032, `docs/design/kumo-upstream-notes.md`
 - Sources:
   - Tailwind CSS 4 logical utilities (`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `text-start`, `border-s`, `rounded-s`) and the `rtl:`/`ltr:` variants: https://tailwindcss.com/docs/margin, https://tailwindcss.com/docs/hover-focus-and-other-states#rtl-support
   - Base UI `DirectionProvider` (keyboard arrows and placement follow `dir`): https://base-ui.com/react/utils/direction-provider
