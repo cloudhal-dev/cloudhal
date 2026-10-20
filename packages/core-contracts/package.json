@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/core-contracts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Cloudhal domain contracts: JSON Schema source of truth plus generated TypeScript types",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
