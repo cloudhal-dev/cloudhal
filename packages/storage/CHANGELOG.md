@@ -1,5 +1,12 @@
 # @cloudhal/storage
 
+## 0.3.1
+
+### Patch Changes
+
+- 4a46df0: The CLI ships a freshly built Studio: 0.3.0 shipped one built before Studio's playground mode, so a playground opened at the sign-in page. On a playground, Studio's site sidebar also leaves out Analytics, Activity, Approvals, Agents and Schedules, and a `403 playground` answer reads as a feature that is off (no retries, no error states). `FetcherBlobStore` with `keys` never fetches another key: a static-assets binding with SPA fallback answers 200 for missing files.
+- @cloudhal/core-contracts@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

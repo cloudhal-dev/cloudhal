@@ -1,5 +1,12 @@
 # create-cloudhal
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [4a46df0]
+  - @cloudhal/cli@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes
