@@ -39,6 +39,7 @@ export function PageEditorActions({
       </Tooltip>
       <StatusActions
         status={draft.status}
+        directPublish
         busy={save.isPending}
         onChange={(next: PublishStatus) => {
           if (valid()) save.mutate({ ...draft, status: next });
