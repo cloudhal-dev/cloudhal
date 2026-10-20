@@ -1,7 +1,7 @@
-import { MemoryBlobStore } from "@cloudhal/storage";
+import { MemoryBlobStore, SqlBlobStore } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
-import { createMiniflareD1 } from "@cloudhal/storage/testing";
+import { createMiniflareD1, createMiniflareDoSqlite } from "@cloudhal/storage/testing";
 import { describeSiteGraphStore } from "../src/testing.ts";
 import { correctionsSuite } from "../src/testing-corrections.ts";
 import { gatesSuite } from "../src/testing-gates.ts";
@@ -44,3 +44,19 @@ releasesSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 correctionsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 searchSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
 searchKindsSuite("Cloudflare D1 (Miniflare) + memory blobs", miniflare);
+
+// RFC-0036: the playground's backend. Blobs live in the same Durable Object database.
+let doSqlite: Awaited<ReturnType<typeof createMiniflareDoSqlite>> | undefined;
+const durableObject = {
+  async create() {
+    doSqlite ??= await createMiniflareDoSqlite();
+    const sql = doSqlite.driver("store");
+    return { sql, blobs: new SqlBlobStore(sql) };
+  },
+  async dispose() {
+    await doSqlite?.dispose();
+    doSqlite = undefined;
+  },
+};
+describeSiteGraphStore("Durable Object SQLite (Miniflare) + sql blobs", durableObject);
+searchSuite("Durable Object SQLite (Miniflare) + sql blobs", durableObject);
