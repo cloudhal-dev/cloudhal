@@ -1345,3 +1345,107 @@ describe("image fit (RFC-0028 28b)", () => {
     expect(messages(sec({ fit: "stretch" }) as never).length).toBeGreaterThan(0);
   });
 });
+
+describe("computed operands, labels and digits (RFC-0022, after 22e)", () => {
+  const ctx = { locale: "en" };
+  const call = (name: string, args: Record<string, unknown>) => ({ call: name, args });
+  const calc = (expression: string, vars: Record<string, unknown>) =>
+    call("calculate", { expression, vars });
+  // two offers: 12 months at 9.60 with 20 % off, or 10 months at 11
+  const data = { a: 9.6, b: 11, months: 12 };
+  const a = calc("a * months * 0.8", { a: { path: "/a" }, months: { path: "/months" } });
+  const b = calc("b * 10", { b: { path: "/b" } });
+
+  it("compares computed values in conditions and in if", () => {
+    expect(evaluateCondition({ lt: [a, b] }, data, ctx)).toBe(true);
+    expect(evaluateCondition({ gt: [a, b] }, data, ctx)).toBe(false);
+    expect(evaluateCondition({ not: { gte: [a, b] } }, data, ctx)).toBe(true);
+    expect(evaluateCondition({ eq: [call("count", { list: [1, 2] }), 2] }, data, ctx)).toBe(true);
+    // a blank input gives "" and no ordering comparison holds
+    expect(evaluateCondition({ lt: [a, b] }, { ...data, a: "" }, ctx)).toBe(false);
+    expect(evaluateCondition({ gt: [a, b] }, { ...data, a: "" }, ctx)).toBe(false);
+    expect(
+      resolveValue(
+        call("if", { cond: { lt: [a, b] }, ifTrue: "A is cheaper", ifFalse: "B is cheaper" }),
+        data,
+        ctx,
+      ),
+    ).toBe("A is cheaper");
+  });
+
+  it("checks call operands with the same limits as arguments", () => {
+    const visible = (cond: unknown) =>
+      messages(
+        surface([
+          { id: "root", component: "Stack", children: ["t"] },
+          { id: "t", component: "Text", props: { text: "A is cheaper" }, visible: cond },
+        ] as SurfaceComponent[]),
+      );
+    expect(visible({ lt: [a, b] })).toEqual([]);
+    expect(visible({ and: [{ lt: [a, b] }, { not: { eq: [a, 0] } }] })).toEqual([]);
+    expect(visible({ lt: [call("explode", {}), 1] })).toEqual([
+      `/components/1/visible/lt/0/call one of ${SURFACE_FUNCTIONS.join(", ")}`,
+    ]);
+    expect(visible({ lt: [{ list: [1] }, 1] })).toEqual([
+      "/components/1/visible/lt/0 a text, number, true/false or {path}",
+    ]);
+    // eight calls deep is the limit in a condition too, counted from the enclosing call
+    let deep: unknown = 1;
+    for (let i = 0; i < 8; i++) deep = call("abs", { value: deep });
+    expect(visible({ gt: [deep, 0] })).toEqual([]);
+    expect(evaluateCondition({ gt: [deep, 0] }, {}, ctx)).toBe(true);
+    expect(visible({ gt: [call("abs", { value: deep }), 0] })).toHaveLength(1);
+    expect(evaluateCondition({ gt: [call("abs", { value: deep }), 0] }, {}, ctx)).toBe(false);
+    const inIf = (n: number) => {
+      let x: unknown = 1;
+      for (let i = 0; i < n; i++) x = call("abs", { value: x });
+      return call("if", { cond: { gt: [x, 0] }, ifTrue: "yes", ifFalse: "no" });
+    };
+    expect(
+      messages(surface([{ id: "root", component: "Text", props: { text: inIf(7) } }])),
+    ).toEqual([]);
+    expect(resolveValue(inIf(7), {}, ctx)).toBe("yes");
+    expect(
+      messages(surface([{ id: "root", component: "Text", props: { text: inIf(8) } }])),
+    ).toHaveLength(1);
+    expect(resolveValue(inIf(8), {}, ctx)).toBe("no");
+    // operand calls count towards the surface's calls
+    const many = Array.from({ length: 26 }, (_, i) => ({
+      id: `t${i}`,
+      component: "Text",
+      props: { text: "x" },
+      visible: {
+        lt: [
+          call("add", { values: Array.from({ length: 20 }, () => call("abs", { value: 1 })) }),
+          1,
+        ],
+      },
+    }));
+    expect(
+      messages(
+        surface([{ id: "root", component: "Stack", children: many.map((c) => c.id) }, ...many]),
+      ),
+    ).toContain("/components at most 500 function calls (this surface has 546)");
+  });
+
+  it("keeps trailing zeros with minDigits", () => {
+    const fmt = (args: Record<string, unknown>, locale = "en") =>
+      resolveValue(call("formatNumber", args), {}, { locale });
+    expect(fmt({ value: 9.6 })).toBe("9.6");
+    expect(fmt({ value: 9.6, minDigits: 2 })).toBe("9.60");
+    expect(fmt({ value: 9.6, minDigits: 2 }, "tr")).toBe("9,60");
+    expect(fmt({ value: 9, digits: 2, minDigits: 2 })).toBe("9.00");
+    expect(fmt({ value: 9.125, digits: 1, minDigits: 3 })).toBe("9.125");
+    expect(fmt({ value: 1234.5, digits: 0, minDigits: -4 })).toBe("1,235");
+    expect(fmt({ value: "", minDigits: 2 })).toBe("");
+  });
+
+  it("describes the new props in the catalog and the prompt", () => {
+    const table = catalog.get("Table");
+    expect(JSON.stringify(table?.schema)).toContain('"hideOnPhone":{"type":"boolean"}');
+    const prompt = catalogPrompt(catalog);
+    expect(prompt).toContain('"minDigits":2');
+    expect(prompt).toContain('"hideOnPhone":true');
+    expect(prompt).toContain('{"lt":[{"call":"calculate"');
+  });
+});

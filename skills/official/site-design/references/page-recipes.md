@@ -6,7 +6,7 @@ Starting points, not templates: adapt them to the site's rules and real content.
 1. **Hero:** `Band` (surface `gradient`, `mesh`, `inverse` or `brand`, width `full`, spacing `xl`) → `Heading` level 1 (the promise, ≤ 8 words) → `Text` size `l` (one sentence) → `Row` with one primary and one secondary `Button`.
 2. **Features:** plain section → `Heading` level 2 → `Grid` (columns 3 or 4) of `Card`s with a short `Heading` level 3 and one sentence each.
 3. **Proof:** `Band` surface `muted` or `dots` → `Grid` of `Stat`s, or `Columns 2-1` with a `Quote` / `testimonial` next to an `Image`.
-4. **Pricing:** `Tabs` (monthly / yearly) or a `Toggle` bound to data and `Text` bound with `formatCurrency`; one `Card` per real plan.
+4. **Pricing:** `Tabs` (monthly / yearly) or a `Toggle` with a `label` (shown above it) bound to data and `Text` bound with `formatCurrency`; one `Card` per real plan. A price with no currency symbol is `formatNumber` with `digits` 2 and `minDigits` 2 (9.60, not 9.6).
 5. **Questions:** `faq` block or `Accordion` of `Disclosure`s (the real questions, as many as there are).
 6. **Call to action:** `Band` surface `brand` or `accent` (anchor `start`) → `Heading` level 2 → one primary `Button`.
 
@@ -30,5 +30,5 @@ Compute, don't promise: a result is a function call over the inputs, never text 
 - **Calculator** (calories, loan, savings, price × seats): a `Card` holding a `Heading`, the inputs (`NumberField` with `unit`, `min`, `max`; `RadioGroup` `variant: buttons` for two to four choices; `Checkbox` for yes/no), two or three to a `Grid` row, then the result as a `Stat` right below. Start every number input as `""` in `data`; bind each input's `value` with `{path}`; write the result as one formula with `calculate` and `vars` (each input's path, or a `choose` for a choice), and show it with `formatNumber` or `formatCurrency`. Calories: `(10*w + 6.25*h - 5*a + s) * f` with `s` and `f` from `choose`; a loan payment: `p * r / (1 - (1 + r)^(-12*y))` with `r` the yearly percent ÷ 1200.
 - **Keypad calculator:** a `Text` bound to `/display`, a `Grid` of `Button`s with `append` (digits and operators), `C` as `set` "" and `=` as `set` with `calculate` over `/display`.
 - **Chart:** a `Chart` bound to rows in `data` (`x` the label field, `series` the number fields), titled with what it shows, with a `caption` naming the source. Bar to compare, line over time, donut for parts of a whole.
-- **Comparison:** a `Table` bound to rows, the first column naming the row, numbers aligned `end` with a `format`.
+- **Comparison:** a `Table` bound to rows, the first column naming the row, numbers aligned `end` with a `format`. With more than four columns, mark the ones a phone reader can skip `hideOnPhone: true`, so each phone card keeps three or four lines. To say which option wins, give a `Text` a `visible` that compares the computed values: `{"lt": [{"call": "calculate", …}, {"call": "calculate", …}]}`; no sign tricks with `clamp` and `choose`.
 Check with `render_page`: no `input-label`, `chart-empty` or `overflow-x`, and the result shows a number with the sample values.

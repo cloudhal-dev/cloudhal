@@ -63,7 +63,7 @@ New names in `SURFACE_FUNCTIONS`, in the same shape as today: `{"call": "<name>"
   - nesting at most 8 deep;
   - at most 500 calls per evaluation of a surface;
   - lists of at most 1,000 items for aggregates.
-- **Conditions** gain `gte` and `lte`, next to `eq`, `ne`, `gt` and `lt`.
+- **Conditions** gain `gte` and `lte`, next to `eq`, `ne`, `gt` and `lt`. A comparison operand may also be a call (added after 22e), so computed values compare directly.
 
 **Where it runs.** The same function table runs in `resolveValue` (server render and previews) and in the interaction runtime. A test keeps the two equal, as it does today. The runtime file gets a new version (`/_cloudhal/surface.2.js`). Pages already cached keep `surface.1.js`, which stays served.
 
@@ -145,7 +145,8 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
 - `caption` (required; the table's accessible name);
 - `rows`: an array of objects, as a binding or a literal, at most 200;
 - `columns`: `[{field, label, align: start|end, format?}]`, 1–8; `format` is a call applied to each cell, e.g. `formatCurrency`;
-- optional: `striped`, `highlight` (a `visible`-style condition per row, for "the recommended plan").
+- optional: `striped`, `highlight` (a `visible`-style condition per row, for "the recommended plan");
+- per column, optional `hideOnPhone` (added after 22e): the column stays in the table but not in the phone card. The first column always shows, because it names the row.
 
 - **HTML:** a real `<table>` with `<caption>` and `<th scope>`.
 - **Small screens:** each row becomes a stacked card below 480 px; there is no sideways scroll. `render_page`'s `overflow-x` check must pass.
@@ -261,6 +262,13 @@ Inputs write to the surface's own data model (`value: {"path": …}`). That mode
   - **The fix.** `calculate` takes `vars`, names bound to values, paths or calls, so a result is one formula: `(10*w + 6.25*h - 5*a + s) * f`. The grammar adds `^` (exponent at most ±1000, binding tighter than unary minus), and whitespace no longer runs names together.
   - **Checks:** names are letters, digits and `_`, at most 20 of them. An unknown name or a blank variable gives `""`.
   - **The catalog prompt and the skill** now lead with formulas, with a two-input calculator (BMI) as the worked example. The runtime is `surface.7.js`; 1–6 are aliases.
+- **After 22e: gaps from the newsroom's explainers.** Four interactive articles built through MCP on the live newsroom needed workarounds; each is now part of the vocabulary. All four are additive within `blog@1` (§5): new optional props and wider operands, so stored surfaces are unchanged and no new RFC is needed.
+  - **Computed comparisons.** A `visible` condition, or `if`'s `cond`, takes a call as an operand: `{"lt": [{"call": "calculate", …}, {"call": "calculate", …}]}`. Before, operands were only `{path}` or scalars, and "A is cheaper" needed a `clamp` + `choose` sign trick. Operand calls run on the same function table on the server and in the runtime. They count towards the 8-deep nesting (inside `if`, from the `if`'s own depth) and the 500 calls per surface. A blank or non-finite result is `""`, so no ordering comparison holds until the inputs are filled. The parity test adds 7 conditions and 6 values.
+  - **`Toggle` label.** A labelled `Toggle` renders as a `<fieldset>` with a visible `<legend>`, as `RadioGroup` does (`class="ch-radio ch-toggle-field"`, so themes that style `RadioGroup` already lay it out). Before, the label was only an `aria-label`. An unlabelled `Toggle` keeps its old markup.
+  - **`Table` on phones.** A column with `hideOnPhone: true` gets `data-phone="hide"`, and the theme leaves it out of the phone card below 480 px. An 8-column league table becomes a short card instead of 8 lines a row. Themes need the one CSS rule: the blog theme and the preview have it; a theme without it shows every column, as before.
+  - **Trailing zeros.** `formatNumber` takes `minDigits` (0–6; it raises `digits` when larger), so a price shows 9.60, not 9.6.
+  - **Prompt and skill.** The catalog prompt shows a computed comparison, a `minDigits` price and `hideOnPhone`. The site-design recipes use them for pricing and comparisons.
+  - The runtime is `surface.11.js`; 1–10 are aliases.
 - **Deviations (22e).**
   - **The chart brief builds a page section, not an article:** Build chat builds pages.
   - **No `computed-empty` check:** "Tools working" in the eval covers it, using sample inputs.

@@ -6,8 +6,8 @@ export const INPUT_PRIMITIVES: readonly PrimitiveType[] = [
     name: "Toggle",
     title: { en: "Toggle", tr: "Seçici" },
     description: {
-      en: "A row of choices; the chosen one is written to `value`'s path (bind it: {path}).",
-      tr: "Seçenekler; seçilen, value'nun yoluna yazılır.",
+      en: "A row of choices; the chosen one is written to `value`'s path (bind it: {path}). The label shows above it.",
+      tr: "Seçenekler; seçilen, value'nun yoluna yazılır. Etiket üstünde görünür.",
     },
     category: "interactive",
     props: schema(
@@ -115,8 +115,8 @@ export const INPUT_PRIMITIVES: readonly PrimitiveType[] = [
     name: "Table",
     title: { en: "Table", tr: "Tablo" },
     description: {
-      en: "Rows of the surface's data as a table: rows {path} to a list of objects, columns the fields to show. On phones each row becomes a card.",
-      tr: "Yüzey verisindeki satırlar tablo olarak; telefonda her satır bir karta dönüşür.",
+      en: "Rows of the surface's data as a table: rows {path} to a list of objects, columns the fields to show. On phones each row becomes a card; hideOnPhone keeps a column out of it.",
+      tr: "Yüzey verisindeki satırlar tablo olarak; telefonda her satır bir karta dönüşür, hideOnPhone bir sütunu karttan çıkarır.",
     },
     category: "content",
     props: schema(
@@ -138,6 +138,8 @@ export const INPUT_PRIMITIVES: readonly PrimitiveType[] = [
               format: { type: "string", enum: ["text", "number", "currency", "percent", "date"] },
               currency: { type: "string", pattern: "^[A-Z]{3}$" },
               digits: { type: "integer", minimum: 0, maximum: 6 },
+              // Left out of the phone card (the first column always shows: it names the row).
+              hideOnPhone: { type: "boolean" },
             },
           },
         },

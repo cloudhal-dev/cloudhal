@@ -14,7 +14,9 @@ export const toggleHtml: PrimitiveRenderer = (node, { id }) => {
         `<label class="ch-toggle__option"><input type="radio" name="${id}" value="${escapeHtml(o)}"${model(node)}${o === str(p.value) ? " checked" : ""}><span>${escapeHtml(o)}</span></label>`,
     )
     .join("");
-  return `<div class="ch-toggle" role="radiogroup"${p.label ? ` aria-label="${escapeHtml(str(p.label))}"` : ""}>${radios}</div>`;
+  // A label shows as a legend, as RadioGroup's does (the fieldset names the group).
+  if (!str(p.label)) return `<div class="ch-toggle" role="radiogroup">${radios}</div>`;
+  return `<fieldset class="ch-radio ch-toggle-field"><legend class="ch-field__label">${escapeHtml(str(p.label))}</legend><div class="ch-toggle">${radios}</div></fieldset>`;
 };
 
 export const selectHtml: PrimitiveRenderer = (node) => {

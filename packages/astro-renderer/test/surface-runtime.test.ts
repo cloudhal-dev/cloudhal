@@ -123,7 +123,7 @@ describe("live surface markup", () => {
     );
     expect(html).toContain('<span data-ch-text="');
     expect(html).toMatch(/<div class="ch-node" data-ch-visible="[^"]+" hidden>/);
-    expect(html).toContain('<script type="module" src="/_cloudhal/surface.10.js"></script>');
+    expect(html).toContain('<script type="module" src="/_cloudhal/surface.11.js"></script>');
     // The data cannot end its script element.
     expect(html).not.toContain("</script><script>alert");
     expect(html).toContain("\\u003c/script\\u003e");
@@ -341,6 +341,12 @@ describe("interaction runtime", () => {
       expr: "(1 + 2) × 3 ÷ 4",
     };
     const call = (name: string, args: Record<string, unknown>) => ({ call: name, args });
+    const twelve = call("calculate", { expression: "3 * 4", vars: {} });
+    const deep = (n: number) => {
+      let x: unknown = 1;
+      for (let i = 0; i < n; i++) x = call("abs", { value: x });
+      return x;
+    };
     const values: unknown[] = [
       { call: "formatNumber", args: { value: { path: "/n" }, digits: 1 } },
       { call: "formatCurrency", args: { value: { path: "/n" }, currency: "EUR" } },
@@ -388,6 +394,17 @@ describe("interaction runtime", () => {
         digits: 0,
         value: call("multiply", { values: [call("add", { values: [1, 2] }), 1.5] }),
       }),
+      // after 22e: trailing zeros, and computed values compared in `if`
+      call("formatNumber", { value: 9.6, minDigits: 2 }),
+      call("formatNumber", { value: { path: "/n" }, digits: 0, minDigits: 3 }),
+      call("formatNumber", { value: { path: "/blank" }, minDigits: 2 }),
+      call("if", {
+        cond: { lt: [twelve, call("multiply", { values: [{ path: "/n" }, 0.01] })] },
+        ifTrue: "a",
+        ifFalse: "b",
+      }),
+      call("if", { cond: { gt: [deep(7), 0] }, ifTrue: "in", ifFalse: "past" }),
+      call("if", { cond: { gt: [deep(8), 0] }, ifTrue: "in", ifFalse: "past" }),
     ];
     const conditions: unknown[] = [
       { eq: [{ path: "/b" }, "yearly"] },
@@ -396,6 +413,14 @@ describe("interaction runtime", () => {
       { or: [{ lt: [{ path: "/n" }, 0] }, { ne: [{ path: "/s" }, "hello"] }] },
       { gte: [{ path: "/n" }, 1234.5] },
       { lte: [{ path: "/n" }, 1000] },
+      // after 22e: call operands
+      { lt: [twelve, call("multiply", { values: [{ path: "/n" }, 0.01] })] },
+      { gt: [twelve, call("calculate", { expression: "n / 100", vars: { n: { path: "/n" } } })] },
+      { eq: [call("count", { list: { path: "/rows" }, field: "p" }), 2] },
+      { not: { eq: [call("concat", { parts: [{ path: "/s" }, "!"] }), "hello!"] } },
+      { lt: [call("add", { values: [1, { path: "/blank" }] }), 5] },
+      { gt: [deep(8), 0] },
+      { gt: [deep(9), 0] },
     ];
     const html = `<section data-ch-surface="x"><script type="application/json" data-ch-state>${scriptJson(data)}</script>${values
       .map((v, i) => `<span id="v${i}" data-ch-text='${JSON.stringify(v)}'></span>`)
@@ -410,7 +435,9 @@ describe("interaction runtime", () => {
       );
     });
     conditions.forEach((c, i) => {
-      expect(page.querySelector(`#c${i}`)?.hidden).toBe(!evaluateCondition(c, data));
+      expect(page.querySelector(`#c${i}`)?.hidden).toBe(
+        !evaluateCondition(c, data, { locale: "en" }),
+      );
     });
   });
 
@@ -469,9 +496,9 @@ describe("interaction runtime", () => {
   it("pins the module's code to its versioned name", () => {
     // Bump `surface.<n>.js` with any change to the code (`/_cloudhal/*` is cached as immutable).
     expect(createHash("sha256").update(SURFACE_SCRIPT.code).digest("hex").slice(0, 12)).toBe(
-      "fc0f2c39714e",
+      "c304c0f46e4e",
     );
-    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.10.js");
+    expect(SURFACE_SCRIPT.path).toBe("/_cloudhal/surface.11.js");
     // RFC-0022: pages cached with the first name get the same (compatible) code
     expect(SURFACE_SCRIPT_ALIASES).toEqual([
       "/_cloudhal/surface.1.js",
@@ -483,6 +510,7 @@ describe("interaction runtime", () => {
       "/_cloudhal/surface.7.js",
       "/_cloudhal/surface.8.js",
       "/_cloudhal/surface.9.js",
+      "/_cloudhal/surface.10.js",
     ]);
     // RFC-0025 25d: a copy says so in the page's toast region.
     expect(SURFACE_SCRIPT.code).toContain('.then(()=>toast("copied"))');

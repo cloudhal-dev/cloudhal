@@ -216,6 +216,9 @@ button.ch-button--secondary {
     @apply text-left font-medium text-zinc-600;
     content: attr(data-label);
   }
+  .ch-table td[data-phone="hide"] {
+    @apply hidden;
+  }
   .ch-table tr[data-highlight="yes"] td:first-child {
     box-shadow: none;
   }
