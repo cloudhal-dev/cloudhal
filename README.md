@@ -4,7 +4,7 @@
 
 Blogs and newsrooms first; documentation sites and research or data documentation next. They share the same governed layer, because the more an audience relies on what an agent wrote, the more each change needs an owner, an approval and a way back.
 
-> Status: **alpha, private until launch.** The loop works end to end on the blog starter — Intent → Agent → Safe Change → Preview → Approve → Publish → Rollback — offline and on Cloudflare. Cloudhal's own newsroom is written by an agent and published through it. Packages are not on npm yet; until they are, run the CLI from this repo (see *Contributors* below).
+> Status: **alpha (0.x).** The loop works end to end on the blog starter — Intent → Agent → Safe Change → Preview → Approve → Publish → Rollback — offline and on Cloudflare. Cloudhal's own newsroom and [cloudhal.com](https://cloudhal.com) run on it. Packages are on npm as [`@cloudhal/*`](https://www.npmjs.com/org/cloudhal) and [`create-cloudhal`](https://www.npmjs.com/package/create-cloudhal); expect breaking changes between minor versions until 1.0.
 
 ## What it is
 
@@ -18,8 +18,6 @@ Blogs and newsrooms first; documentation sites and research or data documentatio
 - **Schedules** — publish later as releases that pin the exact versions a person approved; embargoes and expiries the site enforces on every request, with no scheduler needed; one every-minute tick on Cloudflare (cron, or a Durable Object alarm when no cron slot is free) and on Node; built-in checks and scheduled agent tasks with their own keys, run windows, budgets and a taint rule. No language model runs inside Cloudhal; see the [schedules guide](docs/guides/schedules.md).
 
 ## Five minutes: create → ask an agent → preview → publish → your domain
-
-Once the packages are on npm:
 
 ```bash
 npm create cloudhal@latest my-site && cd my-site
