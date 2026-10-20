@@ -1,5 +1,27 @@
 # @cloudhal/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 346781b: Playground mode (RFC-0036): `createApi({ playground: { info } })` answers every request as the fixed `PLAYGROUND_PRINCIPAL` (an Editor with site settings and nothing installation-wide or upload-related), refuses blocked routes with `403 {error: "playground"}` through the pure `isBlockedInPlayground(method, path)` guard (also exported for the playground Worker), limits request bodies, and reports `features.playground` in `/api/instance`. Every declared route is either blocked or allowed, and a route on neither list is refused. Studio shows a session bar (time left, Reset, Deploy to Cloudflare) and leaves out team, agent and account screens on a playground.
+
+### Patch Changes
+
+- Updated dependencies [346781b]
+- Updated dependencies [a28c22e]
+- Updated dependencies [c70d3fa]
+  - @cloudhal/api@0.3.0
+  - @cloudhal/cloudflare@0.3.0
+  - @cloudhal/storage@0.3.0
+  - @cloudhal/mcp-server@0.3.0
+  - @cloudhal/agent-runtime@0.3.0
+  - @cloudhal/analytics@0.3.0
+  - @cloudhal/comments@0.3.0
+  - @cloudhal/core-ts@0.3.0
+  - @cloudhal/schedules@0.3.0
+  - @cloudhal/core-contracts@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
