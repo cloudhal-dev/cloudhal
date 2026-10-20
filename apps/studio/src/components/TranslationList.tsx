@@ -1,5 +1,5 @@
 /**
- * Pages and Articles on a multilingual site (docs/reports/2026-10-multilingual-studio-ux.md §4a,
+ * Pages and Articles on a multilingual site (an internal review (2026-10) §4a,
  * DESIGN.md §2a): one row per translation group with a Languages cell, a language filter that
  * shows one language's versions flat, and the working language new pages and articles start in.
  * A single-language site gets none of it: the list is exactly the nodes it was given.

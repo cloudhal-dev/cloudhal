@@ -1,4 +1,4 @@
-/** Findings of the body rendering audit (docs/reports/2026-10-body-rendering-audit.md). */
+/** Findings of the body rendering audit (an internal review (2026-10)). */
 import { describe, expect, it } from "vitest";
 import { renderInlineMarkdown, renderMarkdown } from "../src/markdown.ts";
 import { renderFragmentPreview } from "../src/preview.ts";

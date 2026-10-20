@@ -1,5 +1,5 @@
 /**
- * The working language (docs/reports/2026-10-multilingual-studio-ux.md §4a): the content language
+ * The working language (an internal review (2026-10) §4a): the content language
  * a person last chose on a site, remembered in this browser only. New pages and articles start in
  * it. Storage can be missing or throw (private windows, blocked site data): then it is forgotten.
  */

@@ -3,7 +3,7 @@
 - Status: Accepted (2026-10-19, by Halil)
 - Date: 2026-10-19
 - Related:
-  - RFC-0034 and the [Studio multilingual UX report](../reports/2026-10-multilingual-studio-ux.md)
+  - RFC-0034 and the Studio multilingual UX report (internal)
   - RFC-0033 / ADR-0035 (Site = publication, cross-site translation groups)
   - RFC-0018 (one theme per renderer)
   - RFC-0005 (per-site roles)

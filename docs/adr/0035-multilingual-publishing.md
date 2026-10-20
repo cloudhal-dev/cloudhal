@@ -2,7 +2,7 @@
 
 - Status: Accepted (2026-10-18, by Halil)
 - Date: 2026-10-18
-- Related: RFC-0033; the [research report](../reports/2026-10-multilingual-publishing-research.md); RFC-0001/0002/0003/0004/0008/0018 (their deferred locale work); ADR-0033/0034 (Studio's own UI, not this)
+- Related: RFC-0033; the research report (internal); RFC-0001/0002/0003/0004/0008/0018 (their deferred locale work); ADR-0033/0034 (Studio's own UI, not this)
 - Sources:
   - Google: [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions), [multi-regional sites](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites), [spam policies](https://developers.google.com/search/docs/essentials/spam-policies)
   - [EU AI Act Art. 50](https://artificialintelligenceact.eu/article/50/)

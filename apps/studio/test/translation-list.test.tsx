@@ -1,5 +1,5 @@
 /**
- * Pages and Articles on a multilingual site (docs/reports/2026-10-multilingual-studio-ux.md §4a):
+ * Pages and Articles on a multilingual site (an internal review (2026-10) §4a):
  * one row per translation group with a chip per language, a language filter that lists one
  * language flat, and the working language new pages start in. Single-language sites are unchanged.
  */

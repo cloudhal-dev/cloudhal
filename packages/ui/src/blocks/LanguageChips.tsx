@@ -101,7 +101,7 @@ function Chip({
 }
 
 /**
- * A list row's languages (docs/reports/2026-10-multilingual-studio-ux.md §4a): one chip per site
+ * A list row's languages (an internal review (2026-10) §4a): one chip per site
  * language in the site's order — published, draft, outdated or needs review, each opening that
  * version — and a missing language that a person can start by hand. Past `collapseAfter`
  * languages the cell shows "2/6" with every chip in a popover.

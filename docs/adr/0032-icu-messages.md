@@ -1,7 +1,7 @@
 # ADR-0032: Studio messages are an ICU MessageFormat 1 subset, compiled to data at build time
 - Status: Accepted
 - Date: 2026-10-18
-- Related: RFC-0032, DESIGN.md §1, `docs/reports/2026-10-studio-i18n-review.md`
+- Related: RFC-0032, DESIGN.md §1, an internal review (2026-10)
 - Sources:
   - CLDR plural rules: https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
   - ICU MessageFormat: https://unicode-org.github.io/icu/userguide/format_parse/messages/

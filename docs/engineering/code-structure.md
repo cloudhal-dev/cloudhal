@@ -2,7 +2,7 @@
 
 Status: binding for new code from 2026-10-17. Enforced by `pnpm size:check` (part of `pnpm check`
 and CI), Biome complexity warnings and the clippy lints in `Cargo.toml`. Data behind the numbers:
-[`docs/reports/2026-10-code-size-analysis.md`](../reports/2026-10-code-size-analysis.md).
+an internal code-size review (2026-10).
 
 Cloudhal is written by humans and coding agents together. Both lose the thread in a 3 000-line
 file: an agent reads it in slices and edits the wrong copy of a helper, a reviewer cannot see what a

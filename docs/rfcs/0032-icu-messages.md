@@ -2,7 +2,7 @@
 - Status: Implemented (2026-10-18; ADR-0032). Accepted 2026-10-18 by Halil; open questions 2 and 3 decided as recommended: a separate private package `@cloudhal/messages`, and `{count}` allowed inside plural branches besides `#`. Steps a–f landed in PRs #154–#159, the §5.5 lint rules (`i18n-plural`, `i18n-concat`) with the last one.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-18
 - Related:
-  - `docs/reports/2026-10-studio-i18n-review.md` (Phase 1 of its plan; the measurements below update it);
+  - an internal review (2026-10) (Phase 1 of its plan; the measurements below update it);
   - DESIGN.md §1 (message catalogs, lazy namespaces, the locale registry and "Adding a language");
   - AGENTS.md hard rules 5 (Worker-safe imports), 6 (no `eval`), 10 (no hard-coded words) and 12 (size ratchet);
   - PRs #149 (one language per page), #151 (no hard-coded words, `apiErrorText`), #152 (locale registry, German).

@@ -1,6 +1,0 @@
----
-"@cloudhal/api": minor
-"@cloudhal/core-ts": minor
----
-
-The media library over REST (RFC-0004 §5.5, §6.1): `/api/sites/:siteId/assets` lists files (kind, status, search, unused, missing alt, uploaded by; cursor), reads one with where it is used, serves Studio's private copy of the bytes (`…/content`, `no-store`), edits details with `rev` (own uploads with `asset:upload`, any with `asset:manage`; images keep alt text or are decorative), retires, restores and deletes them (`asset:manage`; refused while in use, with the uses), and takes them down or allows them again (Owner, audited). Uploads are two steps: `POST …/assets/uploads` opens signed, single-use tickets (at most 20 files per request and 50 open per person, 15 minutes; known content answers with the existing asset before any transfer; refusals per file), then one streamed `PUT …/assets/uploads/:id` per file runs the store's ingest pipeline (sizes enforced while streaming, metadata stripped by default, SVG validated, streamed kinds verified against their SHA-256). Every change writes an `asset.*` audit row. `SiteGraphStore` gains `openUploadTickets`, `claimUploadTicket`, `getUploadTicket`, `openUploadCount` and `assetForUploadedContent`.
