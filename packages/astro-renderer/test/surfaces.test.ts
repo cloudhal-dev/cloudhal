@@ -76,6 +76,23 @@ describe("renderSurface (RFC-0020)", () => {
     expect(html).not.toContain("Yearly");
   });
 
+  it("shows a Toggle's label as a legend, as RadioGroup does", () => {
+    const toggle = (props: Record<string, unknown>) =>
+      renderSurface(surface([{ id: "root", component: "Toggle", props }], { billing: "monthly" }));
+    const labelled = toggle({
+      label: "Billing",
+      options: ["monthly", "yearly"],
+      value: { path: "/billing" },
+    });
+    expect(labelled).toContain(
+      '<fieldset class="ch-radio ch-toggle-field"><legend class="ch-field__label">Billing</legend><div class="ch-toggle">',
+    );
+    expect(labelled).not.toContain("aria-label");
+    expect(toggle({ options: ["monthly", "yearly"], value: { path: "/billing" } })).toContain(
+      '<div class="ch-toggle" role="radiogroup">',
+    );
+  });
+
   it("draws tabs and disclosures that work without JavaScript", () => {
     const html = renderSurface(
       surface([

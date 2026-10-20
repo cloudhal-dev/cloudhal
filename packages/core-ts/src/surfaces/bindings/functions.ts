@@ -23,7 +23,12 @@ export function runFunction(
       const n = num(value);
       if (!Number.isFinite(n)) return "";
       const digits = Math.min(Math.max(0, Math.trunc(num(args.digits ?? 2)) || 0), 6);
-      return new Intl.NumberFormat(ctx.locale, { maximumFractionDigits: digits }).format(n);
+      // `minDigits` keeps trailing zeros (9.6 → 9.60); it raises `digits` when larger.
+      const min = Math.min(Math.max(0, Math.trunc(num(args.minDigits ?? 0)) || 0), 6);
+      return new Intl.NumberFormat(ctx.locale, {
+        minimumFractionDigits: min,
+        maximumFractionDigits: Math.max(digits, min),
+      }).format(n);
     }
     case "formatCurrency": {
       if (blank(value)) return "";
