@@ -25,6 +25,12 @@ npx cloudhal dev                                          # local site with draf
 claude mcp add cloudhal -- npx cloudhal mcp --mode edits  # connect your agent (any MCP client works)
 ```
 
+Or put a blog on your Cloudflare account in one click, with nothing installed:
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudhal-dev/cloudhal-template)
+
+The button copies [cloudhal-template](https://github.com/cloudhal-dev/cloudhal-template) into your GitHub account and runs `cloudhal deploy` in Workers Builds. You get the site Worker, the admin Worker (Studio, API, MCP), one D1 database, one R2 bucket and a starter blog; every push redeploys. See the [deploy button guide](docs/guides/deploy-button.md).
+
 Ask your agent: *"Write a launch post about our new product, show me a preview, then publish it."* It writes through 20 semantic MCP tools. Every change is snapshotted. It previews, and the publish waits for your approval.
 
 ```bash
