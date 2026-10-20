@@ -31,7 +31,7 @@ export {
   loadOrCreateSecrets,
   readDeployState,
 } from "./commands/deploy.ts";
-export { findWorkspaceRoot, type InitOptions, init } from "./commands/init.ts";
+export { findWorkspaceRoot, type InitOptions, type InitResult, init } from "./commands/init.ts";
 export {
   describeMediaImport,
   type MediaImportCliOptions,
@@ -73,3 +73,10 @@ export {
   readProjectConfig,
   writeProjectConfig,
 } from "./config.ts";
+export {
+  BUILD_DEPENDENCIES,
+  detectPackageManager,
+  nextSteps,
+  type PackageManager,
+  pnpmWorkspaceYaml,
+} from "./project-setup.ts";

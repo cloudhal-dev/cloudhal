@@ -2,7 +2,23 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@cloudhal/core-contracts",
+      "@cloudhal/storage",
+      "@cloudhal/analytics",
+      "@cloudhal/core-ts",
+      "@cloudhal/comments",
+      "@cloudhal/schedules",
+      "@cloudhal/astro-renderer",
+      "@cloudhal/agent-runtime",
+      "@cloudhal/mcp-server",
+      "@cloudhal/api",
+      "@cloudhal/cloudflare",
+      "@cloudhal/cli",
+      "create-cloudhal"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",

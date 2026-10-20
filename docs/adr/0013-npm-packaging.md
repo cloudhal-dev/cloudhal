@@ -13,7 +13,8 @@ Every package exports its TypeScript sources so the monorepo needs no build step
 3. **The CLI carries its assets.** `dist/assets/{studio,starters,skills}`: the built Studio (no source maps), the starters with `workspace:`/`catalog:` replaced by real versions, and the official skills. `src/assets.ts` resolves them in the published layout first, then in the monorepo. `.gitignore` ships as `_gitignore` and `init` renames it.
 4. **`create-cloudhal`** (`npm create cloudhal@latest`) wraps `cloudhal init`; starters get npm scripts (`dev`, `build`, `studio`, `deploy`) and their own `@cloudhal/cli`.
 5. **`@cloudhal/ui` stays private**: it is bundled into the Studio build and not consumed on its own yet.
-6. **Proof:** `scripts/smoke-pack.ts` packs everything, then with plain npm in an empty directory runs create → install → snapshot/build → `cloudhal dev` → `deploy --dry-run` (CI: weekly, manual, and on packaging changes).
+6. **One version for everything published** (amended 2026-10-20, after dogfooding cloudhal.com): the published packages are a changesets `fixed` group, and a starter names each `@cloudhal/*` package at that exact version, as `pnpm publish` writes `workspace:*`. Astro, a peer of the renderer and the CLI, is pinned to the version the monorepo installed, so a project gets one copy. `cloudhal init` run from a source checkout, outside the workspace, links the packages to that checkout (`link:`, installed with pnpm) instead of naming a version that may not be on npm. New projects get `pnpm-workspace.yaml` `allowBuilds`, bun `trustedDependencies` and yarn `nodeLinker: node-modules`, and next steps in the package manager that ran the command.
+7. **Proof:** `scripts/smoke-pack.ts` packs everything, then with plain npm in an empty directory runs create → install → snapshot/build → `cloudhal dev` → `deploy --dry-run` (CI: weekly, manual, and on packaging changes).
 
 ## Alternatives considered
 | Alternative | Pros | Cons | Why not |

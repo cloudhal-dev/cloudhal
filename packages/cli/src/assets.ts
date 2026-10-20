@@ -4,7 +4,7 @@
  * - Published package: `dist/assets/{studio,starters,skills}` (copied by scripts/build-packages.ts).
  * - Monorepo: `apps/studio/dist`, `starters/`, `skills/official`.
  */
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,17 +79,36 @@ export function parseCatalog(yaml: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Third-party peers of the `@cloudhal/*` packages that a project must install exactly once (one
+ * Astro for the renderer, the CLI and the project): pinned to the version the monorepo tests with.
+ */
+export const SHARED_PEERS = ["astro"] as const;
+
 export interface DependencyVersions {
-  /** `@cloudhal/*` package versions (workspace:* → ^version). */
+  /** `@cloudhal/*` package versions (workspace:* → that exact version, as pnpm publishes it). */
   workspace: Record<string, string>;
   /** pnpm catalog (catalog: → version). */
   catalog: Record<string, string>;
+  /** Installed versions of `SHARED_PEERS` (win over the catalog's range). */
+  installed?: Record<string, string>;
+  /** `@cloudhal/*` package folders, for linking a project to a checkout. */
+  dirs?: Record<string, string>;
 }
 
-/** Replaces `workspace:` and `catalog:` specifiers so a project installs with plain npm. */
+export interface MaterializeOptions {
+  /**
+   * Link every `@cloudhal/*` dependency to the monorepo checkout (`link:`, relative to this
+   * project folder) instead of naming a version: from source, that version may not be on npm.
+   */
+  readonly linkFrom?: string;
+}
+
+/** Replaces `workspace:` and `catalog:` specifiers so a project installs outside the monorepo. */
 export function materializeDependencies(
   pkg: Record<string, unknown>,
   versions: DependencyVersions,
+  options: MaterializeOptions = {},
 ): Record<string, unknown> {
   const out = { ...pkg };
   for (const field of [
@@ -102,12 +121,9 @@ export function materializeDependencies(
     if (!deps) continue;
     const next: Record<string, string> = {};
     for (const [name, spec] of Object.entries(deps)) {
-      if (spec.startsWith("workspace:")) {
-        const v = versions.workspace[name];
-        if (!v) throw new Error(`no published version known for ${name}`);
-        next[name] = `^${v}`;
-      } else if (spec.startsWith("catalog:")) {
-        const v = versions.catalog[name];
+      if (spec.startsWith("workspace:")) next[name] = workspaceSpec(name, versions, options);
+      else if (spec.startsWith("catalog:")) {
+        const v = versions.installed?.[name] ?? versions.catalog[name];
         if (!v) throw new Error(`${name} is not in the pnpm catalog`);
         next[name] = v;
       } else next[name] = spec;
@@ -117,28 +133,57 @@ export function materializeDependencies(
   return out;
 }
 
+function workspaceSpec(
+  name: string,
+  versions: DependencyVersions,
+  options: MaterializeOptions,
+): string {
+  if (options.linkFrom !== undefined) {
+    const dir = versions.dirs?.[name];
+    if (!dir) throw new Error(`no package folder known for ${name}`);
+    return `link:${path.relative(options.linkFrom, dir).split(path.sep).join("/")}`;
+  }
+  const v = versions.workspace[name];
+  if (!v) throw new Error(`no published version known for ${name}`);
+  // Exact, like `pnpm publish` writes `workspace:*`: the packages are released together.
+  return v;
+}
+
+async function readJson(file: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    return JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Versions as the monorepo defines them right now (for running the CLI from source). */
 export async function monorepoVersions(root: string): Promise<DependencyVersions> {
   const catalog = parseCatalog(await readFile(path.join(root, "pnpm-workspace.yaml"), "utf8"));
   const workspace: Record<string, string> = {};
-  for (const dir of ["packages", "apps"]) {
+  const dirs: Record<string, string> = {};
+  const installed: Record<string, string> = {};
+  for (const group of ["packages", "apps"]) {
     let names: string[] = [];
     try {
-      names = await (await import("node:fs/promises")).readdir(path.join(root, dir));
+      names = await readdir(path.join(root, group));
     } catch {
       continue;
     }
     for (const n of names) {
-      try {
-        const p = JSON.parse(await readFile(path.join(root, dir, n, "package.json"), "utf8")) as {
-          name: string;
-          version: string;
-        };
-        workspace[p.name] = p.version;
-      } catch {
-        // not a package
+      const dir = path.join(root, group, n);
+      const p = await readJson(path.join(dir, "package.json"));
+      if (typeof p?.name !== "string" || typeof p.version !== "string") continue;
+      workspace[p.name] = p.version;
+      dirs[p.name] = await realpath(dir);
+      // A peer as this package resolves it in the monorepo: the version the tests ran with.
+      const peers = (p.peerDependencies ?? {}) as Record<string, string>;
+      for (const peer of SHARED_PEERS) {
+        if (installed[peer] || !peers[peer]) continue;
+        const got = await readJson(path.join(dir, "node_modules", peer, "package.json"));
+        if (typeof got?.version === "string") installed[peer] = got.version;
       }
     }
   }
-  return { workspace, catalog };
+  return { workspace, catalog, installed, dirs };
 }

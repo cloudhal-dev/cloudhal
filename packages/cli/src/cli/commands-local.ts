@@ -8,6 +8,7 @@ import { describeRender, render } from "../commands/render.ts";
 import { snapshot } from "../commands/snapshot.ts";
 import { studio } from "../commands/studio.ts";
 import { tokensExport } from "../commands/tokens.ts";
+import { detectPackageManager, nextSteps } from "../project-setup.ts";
 import { type CliCommand, untilSignal } from "./types.ts";
 
 /** `cloudhal init`, `dev`, `snapshot`, `build`, `studio`, `mcp`: the project on this machine. */
@@ -21,7 +22,8 @@ const initCommand: CliCommand = async (rest, values) => {
     ...(values.starter ? { starter: values.starter } : {}),
     log: (l) => console.log(`  ${l}`),
   });
-  console.log(`\nCreated ${r.projectDir}\n  cd ${dir}\n  pnpm install\n  cloudhal dev\n`);
+  const steps = nextSteps(dir, r.linked ? "pnpm" : detectPackageManager());
+  console.log(`\nCreated ${r.projectDir}\n\n${steps.map((l) => `  ${l}`).join("\n")}\n`);
   return 0;
 };
 
