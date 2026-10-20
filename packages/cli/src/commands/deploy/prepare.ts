@@ -169,7 +169,8 @@ export async function provision(
   // Workers Builds: the database the button provisioned (its token may not read D1)
   const known = ctx.workersBuilds ? base.databaseId : undefined;
   const existing = await readExistingIds(siteConfigPath(options.projectDir));
-  let databaseId = known ?? existing.databaseId;
+  // (a placeholder id in the committed file is no id: never carried into the config)
+  let databaseId = ctx.workersBuilds ? known : existing.databaseId;
   let databaseCreated: Jurisdiction | undefined;
   if (!options.dryRun) {
     const r = await ensureResources(ctx.run, {
