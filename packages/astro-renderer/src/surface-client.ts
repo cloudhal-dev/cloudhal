@@ -52,7 +52,7 @@ const ex=()=>{let v=te();for(let c=pk();c==="+"||c==="-";c=pk()){i++;const r=te(
 try{if(!pk())return"";const v=ex();return pk()===undefined?fin(v):"";}catch{return"";}};
 const fn=(name,a,loc)=>{const v=a.value;switch(name){
 case"formatDate":{const d=new Date(txt(v));if(Number.isNaN(d.getTime()))return"";const st=["short","medium","long","full"].includes(txt(a.style))?txt(a.style):"medium";return new Intl.DateTimeFormat(loc,{dateStyle:st,timeZone:"UTC"}).format(d);}
-case"formatNumber":{if(blank(v))return"";const n=num(v);if(!Number.isFinite(n))return"";const g=Math.min(Math.max(0,Math.trunc(num(a.digits===undefined?2:a.digits))||0),6);return new Intl.NumberFormat(loc,{maximumFractionDigits:g}).format(n);}
+case"formatNumber":{if(blank(v))return"";const n=num(v);if(!Number.isFinite(n))return"";const g=Math.min(Math.max(0,Math.trunc(num(a.digits===undefined?2:a.digits))||0),6);const m=Math.min(Math.max(0,Math.trunc(num(a.minDigits===undefined?0:a.minDigits))||0),6);return new Intl.NumberFormat(loc,{minimumFractionDigits:m,maximumFractionDigits:Math.max(g,m)}).format(n);}
 case"formatCurrency":{if(blank(v))return"";const n=num(v);const c=txt(a.currency).toUpperCase();if(!Number.isFinite(n)||!/^[A-Z]{3}$/.test(c))return"";try{return new Intl.NumberFormat(loc,{style:"currency",currency:c}).format(n);}catch{return"";}}
 case"pluralize":{const n=num(a.count);return(n===1?txt(a.one):txt(a.other)).replace(/#/g,Number.isFinite(n)?String(n):"");}
 case"concat":return(Array.isArray(a.parts)?a.parts:[]).map(txt).join("");
@@ -76,14 +76,14 @@ case"calculate":return calc(txt(a.expression),a.vars);}
 return"";};
 const nil=(o)=>o===undefined||o===null?"":o;
 const val=(v,d,loc,z=0)=>{if(isPath(v))return get(d,v.path);if(isCall(v)){if(z>=8)return"";const r=obj(v.args)?v.args:{};const at=(x)=>val(x,d,loc,z+1);
-if(v.call==="if")return nil(cond(r.cond,d)?at(r.ifTrue):at(r.ifFalse));
+if(v.call==="if")return nil(cond(r.cond,d,loc,z+1)?at(r.ifTrue):at(r.ifFalse));
 if(v.call==="calculate"&&obj(r.vars)){const vs={};for(const[k,x]of Object.entries(r.vars))vs[k]=at(x);return calc(txt(at(r.expression)),vs);}
 if(v.call==="choose"){const k=txt(at(r.value));const c=obj(r.cases)?r.cases:{};return nil(own(c,k)?at(c[k]):at(r.default));}
 const a={};for(const[k,x]of Object.entries(r))a[k]=Array.isArray(x)?x.map(at):at(x);return fn(v.call,a,loc);}return v;};
 const truthy=(v)=>!(v===undefined||v===null||v===false||v===0||v===""||(Array.isArray(v)&&v.length===0));
-const cond=(c,d)=>{if(c===undefined)return true;if(isPath(c))return truthy(get(d,c.path));if(!obj(c))return false;const[op,a]=Object.entries(c)[0]||[];const o=(x)=>isPath(x)?get(d,x.path):x;
+const cond=(c,d,loc,z=0)=>{if(c===undefined)return true;if(isPath(c))return truthy(get(d,c.path));if(!obj(c))return false;const[op,a]=Object.entries(c)[0]||[];const o=(x)=>isPath(x)||isCall(x)?val(x,d,loc,z):x;const sub=(x)=>cond(x,d,loc,z);
 if(["eq","ne","gt","lt","gte","lte"].includes(op)&&Array.isArray(a)){const x=o(a[0]);const y=o(a[1]);if(op==="eq")return x===y;if(op==="ne")return x!==y;if(typeof x!==typeof y||(typeof x!=="number"&&typeof x!=="string"))return false;return op==="gt"?x>y:op==="lt"?x<y:op==="gte"?x>=y:x<=y;}
-if(op==="and"&&Array.isArray(a))return a.every((x)=>cond(x,d));if(op==="or"&&Array.isArray(a))return a.some((x)=>cond(x,d));if(op==="not")return!cond(a,d);return false;};
+if(op==="and"&&Array.isArray(a))return a.every(sub);if(op==="or"&&Array.isArray(a))return a.some(sub);if(op==="not")return!sub(a);return false;};
 const safe=(h)=>typeof h==="string"&&/^(\/(?!\/)|#|https:\/\/)/.test(h)&&!/[\s<>"']/.test(h);
 const json=(el,a)=>{try{return JSON.parse(el.getAttribute(a)||"null");}catch{return undefined;}};
 let chartMod;
@@ -93,7 +93,7 @@ if(chartMod)draw(chartMod);else import("${CHART_SCRIPT.path}").then((m)=>{chartM
 const boot=(root)=>{const s=root.querySelector("script[data-ch-state]");if(!s||root.hasAttribute("data-ch-live"))return;root.setAttribute("data-ch-live","");
 let init;try{init=JSON.parse(s.textContent||"{}");}catch{return;}let d=structuredClone(init);const loc=document.documentElement.lang||"en";
 const render=()=>{for(const el of root.querySelectorAll("[data-ch-text]"))el.textContent=txt(val(json(el,"data-ch-text"),d,loc));
-for(const el of root.querySelectorAll("[data-ch-visible]"))el.hidden=!cond(json(el,"data-ch-visible"),d);
+for(const el of root.querySelectorAll("[data-ch-visible]"))el.hidden=!cond(json(el,"data-ch-visible"),d,loc);
 charts(root,d,loc);
 for(const el of root.querySelectorAll("[data-ch-invalid]"))el.setAttribute("aria-invalid",truthy(val(json(el,"data-ch-invalid"),d,loc))?"true":"false");
 for(const el of root.querySelectorAll("[data-ch-model]")){const v=get(d,el.getAttribute("data-ch-model"));if(el.type==="radio")el.checked=el.value===txt(v);else if(el.type==="checkbox")el.checked=truthy(v);else if(v!==undefined&&document.activeElement!==el)el.value=txt(v);}};
@@ -117,7 +117,7 @@ render();};
 for(const root of document.querySelectorAll("[data-ch-surface]"))boot(root);
 `;
 
-export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.10.js", code } as const;
+export const SURFACE_SCRIPT = { path: "/_cloudhal/surface.11.js", code } as const;
 
 /**
  * Earlier names of the runtime, served with the current code: pages cached with them keep
@@ -133,6 +133,7 @@ export const SURFACE_SCRIPT_ALIASES = [
   "/_cloudhal/surface.7.js",
   "/_cloudhal/surface.8.js",
   "/_cloudhal/surface.9.js",
+  "/_cloudhal/surface.10.js",
 ] as const;
 
 /** JSON for a `<script type="application/json">`: nothing in it can end the element. */

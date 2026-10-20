@@ -202,7 +202,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
     const index = section.components.indexOf(c);
     if (invalidProps.has(String(index))) return undefined;
     // A live surface keeps hidden components (the runtime shows them when their condition holds).
-    const shown = evaluateCondition(c.visible, data);
+    const shown = evaluateCondition(c.visible, data, { locale });
     if (!shown && !live) return undefined;
     const entry = catalog.get(c.component);
     if (!entry) return undefined;

@@ -111,7 +111,8 @@ export function checkCall(v: CallValue, path: string, out: PropsIssue[], depth =
   for (const [k, a] of Object.entries(v.args)) {
     const at = `${path}/args/${k}`;
     // `if` takes a condition; `choose` a map from keys to values.
-    if (v.call === "if" && k === "cond") checkCondition(a, at, out);
+    if (v.call === "if" && k === "cond")
+      checkConditionAt(a, at, out, { depth: 0, callDepth: depth });
     else if (v.call === "choose" && k === "cases") {
       if (!isObj(a) || Object.keys(a).length > SURFACE_LIMITS.chooseCases)
         out.push({
@@ -170,8 +171,24 @@ export function checkDynamic(v: unknown, path: string, out: PropsIssue[]): void 
 
 export const COMPARE = ["eq", "ne", "gt", "lt", "gte", "lte"] as const;
 
-/** A visibility condition (RFC-0020 §3): `{path}`, `eq|ne|gt|lt: [a, b]`, `and|or: [...]`, `not`. */
+/**
+ * A visibility condition (RFC-0020 §3): `{path}`, `eq|ne|gt|lt: [a, b]`, `and|or: [...]`, `not`.
+ * A comparison operand may be a call (RFC-0022).
+ */
 export function checkCondition(c: unknown, path: string, out: PropsIssue[], depth = 0): void {
+  checkConditionAt(c, path, out, { depth, callDepth: 0 });
+}
+
+/**
+ * `callDepth` is the enclosing call's depth (0 for a `visible`), so `if` counts its operand calls
+ * towards the same limit as its other arguments.
+ */
+function checkConditionAt(
+  c: unknown,
+  path: string,
+  out: PropsIssue[],
+  { depth, callDepth }: { depth: number; callDepth: number },
+): void {
   if (depth > SURFACE_LIMITS.conditionDepth) {
     out.push({ path, message: `nested at most ${SURFACE_LIMITS.conditionDepth} deep` });
     return;
@@ -190,7 +207,7 @@ export function checkCondition(c: unknown, path: string, out: PropsIssue[], dept
       out.push({ path: `${path}/${op}`, message: "two operands" });
     else
       arg.forEach((x, i) => {
-        checkOperand(x, `${path}/${op}/${i}`, out);
+        checkArg(x, `${path}/${op}/${i}`, out, callDepth);
       });
   } else if (op === "and" || op === "or") {
     if (!Array.isArray(arg) || arg.length === 0 || arg.length > SURFACE_LIMITS.conditionItems)
@@ -200,9 +217,10 @@ export function checkCondition(c: unknown, path: string, out: PropsIssue[], dept
       });
     else
       arg.forEach((x, i) => {
-        checkCondition(x, `${path}/${op}/${i}`, out, depth + 1);
+        checkConditionAt(x, `${path}/${op}/${i}`, out, { depth: depth + 1, callDepth });
       });
-  } else if (op === "not") checkCondition(arg, `${path}/not`, out, depth + 1);
+  } else if (op === "not")
+    checkConditionAt(arg, `${path}/not`, out, { depth: depth + 1, callDepth });
   else out.push({ path, message: "one of {path}, eq, ne, gt, lt, gte, lte, and, or, not" });
 }
 

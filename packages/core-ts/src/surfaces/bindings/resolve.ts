@@ -6,6 +6,7 @@ import {
   FUNCTIONS,
   getPointer,
   isCallValue,
+  isDynamic,
   isPathValue,
   type ResolveContext,
   text,
@@ -19,7 +20,9 @@ export function resolveValue(v: unknown, data: unknown, ctx: ResolveContext, dep
     const raw = isObj(v.args) ? v.args : {};
     const at = (x: unknown) => resolveValue(x, data, ctx, depth + 1);
     if (v.call === "if")
-      return (evaluateCondition(raw.cond, data) ? at(raw.ifTrue) : at(raw.ifFalse)) ?? "";
+      return (
+        (evaluateCondition(raw.cond, data, ctx, depth + 1) ? at(raw.ifTrue) : at(raw.ifFalse)) ?? ""
+      );
     // RFC-0022: a formula's variables are values, bindings or calls, resolved first.
     if (v.call === "calculate" && isObj(raw.vars)) {
       const vars: Record<string, unknown> = {};
@@ -58,13 +61,21 @@ export const truthy = (v: unknown) =>
     (Array.isArray(v) && v.length === 0)
   );
 
-/** Whether a visibility condition holds for `data`; no condition is visible. */
-export function evaluateCondition(c: unknown, data: unknown): boolean {
+/**
+ * Whether a visibility condition holds for `data`; no condition is visible. A call operand
+ * (RFC-0022) resolves at `depth`, the depth of a call argument in its place.
+ */
+export function evaluateCondition(
+  c: unknown,
+  data: unknown,
+  ctx: ResolveContext = { locale: "en" },
+  depth = 0,
+): boolean {
   if (c === undefined) return true;
   if (isPathValue(c)) return truthy(getPointer(data, c.path));
   if (!isObj(c)) return false;
   const [op, arg] = (Object.entries(c)[0] ?? []) as [string, unknown];
-  const operand = (x: unknown) => (isPathValue(x) ? getPointer(data, x.path) : x);
+  const operand = (x: unknown) => (isDynamic(x) ? resolveValue(x, data, ctx, depth) : x);
   if ((COMPARE as readonly string[]).includes(op) && Array.isArray(arg)) {
     const a = operand(arg[0]);
     const b = operand(arg[1]);
@@ -75,9 +86,10 @@ export function evaluateCondition(c: unknown, data: unknown): boolean {
     const y = b as number;
     return op === "gt" ? x > y : op === "lt" ? x < y : op === "gte" ? x >= y : x <= y;
   }
-  if (op === "and" && Array.isArray(arg)) return arg.every((x) => evaluateCondition(x, data));
-  if (op === "or" && Array.isArray(arg)) return arg.some((x) => evaluateCondition(x, data));
-  if (op === "not") return !evaluateCondition(arg, data);
+  const sub = (x: unknown) => evaluateCondition(x, data, ctx, depth);
+  if (op === "and" && Array.isArray(arg)) return arg.every(sub);
+  if (op === "or" && Array.isArray(arg)) return arg.some(sub);
+  if (op === "not") return !sub(arg);
   return false;
 }
 
