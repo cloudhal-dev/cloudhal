@@ -195,6 +195,7 @@ export type {
   Member,
   MemberRemoval,
   NewInvite,
+  PlaygroundInfo,
   ResetDetails,
   Role,
   RolesInfo,

@@ -1,6 +1,17 @@
 /** English (source of truth for keys). Other locales are typed against this object. */
 export const en = {
   app: { name: "Cloudhal Studio", tagline: "Sign in to operate your sites." },
+  /** RFC-0036 §5: the playground session bar and the screens a playground does not offer. */
+  playground: {
+    title: "Playground",
+    description:
+      "{count, plural, one {# minute left} other {# minutes left}}. Everything here is deleted when the session ends, so don't enter personal data.",
+    reset: "Reset",
+    deploy: "Deploy to Cloudflare",
+    unavailableTitle: "Available in your own install",
+    unavailableDescription:
+      "Team members, agent keys and account settings need sign-in, so the playground leaves them out. Deploy Cloudhal to your Cloudflare account to use them.",
+  },
   common: {
     save: "Save",
     cancel: "Cancel",
