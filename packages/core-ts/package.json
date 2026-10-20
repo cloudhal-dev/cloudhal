@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/core-ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cloudhal Site Graph core (TypeScript): load/save nodes with optimistic locking, snapshots, diff, publish and rollback; taxonomies, terms, redirects and menus",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
