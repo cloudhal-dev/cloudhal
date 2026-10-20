@@ -31,6 +31,8 @@ export interface InstanceInfo {
     schedules?: SchedulesFeature;
     /** In-editor AI (RFC-0016): how the server reaches Workers AI. Older servers omit it. */
     ai?: AiTransportKind;
+    /** RFC-0036 §5: set only on a playground session (try.cloudhal.com). */
+    playground?: PlaygroundInfo;
   };
   /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
   agentModes?: AgentModesInfo;
@@ -40,6 +42,16 @@ export interface InstanceInfo {
   invites?: InvitesInfo;
   /** How a forgotten password is reset (RFC-0011): `email` when the server can send. */
   passwordReset?: ("admin" | "email")[];
+}
+
+/** A playground session (`features.playground`, packages/api/src/playground.ts). */
+export interface PlaygroundInfo {
+  /** When the session's data is deleted (ISO 8601). */
+  expiresAt: string;
+  /** `POST` deletes the session at once. */
+  resetUrl: string;
+  /** Where "Deploy to Cloudflare" leads. */
+  deployUrl: string;
 }
 
 // ---- staff roles, members and invites (RFC-0005, packages/api/src/routes/{members,invites}.ts) ----
@@ -213,7 +225,7 @@ export type SignUpPolicy = InstanceInfo["signUp"];
 /** The on/off features (`analytics` is an object of its own). */
 export type InstanceFeature = Exclude<
   keyof InstanceInfo["features"],
-  "analytics" | "comments" | "schedules" | "ai"
+  "analytics" | "comments" | "schedules" | "ai" | "playground"
 >;
 
 export const teamApi = {

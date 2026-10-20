@@ -463,6 +463,11 @@ Site › Settings gets an **Appearance** section after Domains (`components/Appe
 - **Feedback.** `design_lint` warnings show as an `alert` `Banner` ("Worth a look"). A conflict on save shows the shared conflict wording.
 - **Hints.** A secondary line says agents propose changes that wait in Approvals. Below Administrator the section is read-only, with the gate's reason.
 
+### 2af. Playground session (RFC-0036 §5, ADR-0038)
+- Only when `/api/instance` reports `features.playground` (try.cloudhal.com). Studio has no sign-in there: `requireSession` accepts a 403 from `/api/auth` when the instance is a playground.
+- **Session bar**: `PlaygroundBar` under the top bar on every screen — a compact secondary `Banner` (`Timer`), title "Playground", the minutes left as an ICU plural with the privacy note, a ghost "Reset" (`POST resetUrl`, then the landing page) and a primary "Deploy to Cloudflare" `LinkButton` (external). At zero minutes the browser returns to the landing page.
+- **Left out**: the account surface's Agents group and Team/Account items (and their palette commands), the user menu's Account, Team and Sign out. A direct visit to `/agents`, `/team` or `/account` shows `PlaygroundUnavailable`: a bare `Empty` (`LockSimple`) "Available in your own install" with the Deploy button. Site screens are gated as everywhere else, by `features.*` and the principal's abilities (no uploads, analytics, comments, schedules, AI, preview links).
+
 ## 3. Sidebar specification
 ```tsx
 <Sidebar.Provider defaultOpen collapsible="icon" peekable mobileBreakpoint={768}>
@@ -574,6 +579,7 @@ Studio must use each component where it fits; "later" means the surface does not
 | AnalyticsRangePicker (Cloudhal block) | the analytics range: preset `Tabs`, "Custom…" `Popover` with a lazy `DatePicker mode="range"` (UTC, Studio locale), optional compare `Switch`; controlled by `{preset}` or `{from, to}` (§2v) |
 | BreakdownTable / BreakdownMeters (Cloudhal blocks) | ranked analytics breakdowns — top content, channels, referrers (never linked), campaigns, countries — with share `Meter`s and one folded "(other)" row; small breakdowns (devices, top channels) as a `Meter` list (§2v) |
 | AnalyticsTimeseries / CountryMap / ReadersSummary (Cloudhal blocks, `@cloudhal/ui/charts`) | traffic over time with a legend and a data-table toggle (UTC throughout); the country choropleth with its top-countries table and no HTML tooltips; the editors' Readers card body (§2v) |
+| PlaygroundBar (Cloudhal block) | the playground session bar: time left, Reset and Deploy to Cloudflare in a compact secondary `Banner` (§2af) |
 | AnalyticsQuotaBanner (Cloudhal block) | the Workers Free request warning with its estimate as a `Meter` (`shouldWarnFreePlan`, §2v) |
 | AnalyticsBotBanner (Cloudhal block) | the possible-bot-traffic warning on the Analytics screen with its reasons in a `Collapsible` (§2v) |
 | CommentText / CommentRow / CommentThread (Cloudhal blocks) | comment text as plain text with the public page's `https:`-only link rule (never HTML), one comment with its author, status, labels, entry, reply context and untrusted-text panel, and the two-level thread with folded replies and in-reply-to jumps (§2w) |

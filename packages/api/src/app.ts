@@ -3,15 +3,17 @@ import {
   type OwnershipResolver,
   PEOPLE_ONLY_OWNERSHIP,
   PolicyEngine,
+  type Principal,
 } from "@cloudhal/agent-runtime";
 import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
 import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler, unauthorized } from "./errors.ts";
+import { PLAYGROUND_PRINCIPAL, playgroundGuard } from "./playground.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { agentKeys } from "./routes/agent-keys.ts";
@@ -132,6 +134,10 @@ export function createApi(deps: ApiDeps) {
     return engine;
   };
 
+  // RFC-0036 §5: a playground refuses blocked routes before anything else runs.
+  const playground = deps.playground;
+  if (playground) app.use("*", playgroundGuard(playground));
+
   // DNS rebinding: a server without auth (local scripts) only answers its own host names.
   if (deps.allowedHosts) {
     const allowed = new Set(deps.allowedHosts.map((h) => h.toLowerCase()));
@@ -186,20 +192,15 @@ export function createApi(deps: ApiDeps) {
     // Raw and decoded: whichever form Better Auth or Hono would dispatch on is fenced.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname) || FENCED_AUTH_PATHS.test(c.req.path))
       return c.json({ error: "not_found", message: "not found" }, 404);
-    if (deps.resolvePrincipal) {
-      const principal = await deps.resolvePrincipal(c);
-      c.set("principal", principal);
-      c.set("actor", principal?.actor);
-    } else {
-      const actor = deps.resolveActor ? await deps.resolveActor(c) : undefined;
-      c.set("actor", actor);
-      c.set("principal", actor ? { actor, scopes: defaultScopes(actor) } : undefined);
-    }
+    const principal = await resolvePrincipal(c, deps);
+    c.set("principal", principal);
+    c.set("actor", principal?.actor);
     await next();
   });
 
   // Default-deny REST (RFC-0005 I15): every route declares its requirement in `ROUTE_SCOPES`.
-  app.use("/api/*", routeGuard({ requireAuth, membership: Boolean(deps.staff) }));
+  const membership = Boolean(deps.staff || playground); // a playground is checked like a role
+  app.use("/api/*", routeGuard({ requireAuth, membership }));
 
   // API answers are per person and change with every write: a GET without its own caching header
   // says `no-store`, because Workers Cache was seen caching header-less GET answers (RFC-0008 §13).
@@ -223,7 +224,7 @@ export function createApi(deps: ApiDeps) {
     );
   }
 
-  app.get("/api/me", meHandler(Boolean(deps.staff)));
+  app.get("/api/me", meHandler(membership));
 
   if (deps.mcp) {
     const mcp = createCloudhalMcpHandler({
@@ -284,6 +285,7 @@ export function createApi(deps: ApiDeps) {
             schedules,
             schedulesAvailable(schedules) && (await gatesEnforcedEverywhere(deps.store)),
           ),
+          ...(playground ? { playground: await playground.info() } : {}), // RFC-0036 §5
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),
@@ -324,6 +326,14 @@ export function createApi(deps: ApiDeps) {
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),
   );
   return app;
+}
+
+/** Who is calling: the playground's one principal (RFC-0036 §5), else the deployment's resolver. */
+async function resolvePrincipal(c: Context<Env>, deps: ApiDeps): Promise<Principal | undefined> {
+  if (deps.playground) return PLAYGROUND_PRINCIPAL;
+  if (deps.resolvePrincipal) return deps.resolvePrincipal(c);
+  const actor = deps.resolveActor ? await deps.resolveActor(c) : undefined;
+  return actor ? { actor, scopes: defaultScopes(actor) } : undefined;
 }
 
 export type CloudhalApi = ReturnType<typeof createApi>;
