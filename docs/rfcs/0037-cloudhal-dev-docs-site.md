@@ -1,6 +1,6 @@
 # RFC-0037: cloudhal.dev, the developer site: docs from the repo, a link contract, docs for agents
 
-- Status: Draft
+- Status: Accepted (2026-10-21, by Halil; ADR-0039). Open questions decided as recommended: all ADRs and RFCs are published with their status shown, error codes live in one registry in `packages/core-contracts`, and the docs MCP waits for a registry.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - ADR-0037 (domains): `cloudhal.dev` is the developer domain; `cloudhal.dev/docs` is the only copy of the docs; `/schemas/v1/*` is permanent.
