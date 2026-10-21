@@ -51,6 +51,7 @@ import {
   relatedEntries,
   termAncestors,
 } from "@cloudhal/astro-renderer/taxonomy";
+import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { ContentEntry } from "@cloudhal/core-contracts";
 /**
  * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
@@ -73,8 +74,10 @@ import NotFound from "../components/NotFound.astro";
 import PostTerms from "../components/PostTerms.astro";
 import RelatedPosts from "../components/RelatedPosts.astro";
 import Search from "../components/Search.astro";
+import { fontLinkHeader, PAIRING_PRELOADS } from "../fonts.ts";
 import { iconSet } from "../icons.ts";
 import Base from "../layouts/Base.astro";
+import { themeSettings } from "../settings.ts";
 import {
   ARCHIVE_PAGE_SIZE,
   blocks,
@@ -354,6 +357,10 @@ const localized = localizeHead(head, site, {
 });
 const meta = fallback || notFound ? { ...localized, robots: "noindex,follow" } : localized;
 Astro.response.headers.set("content-language", shownIn);
+// The pairing's fonts as a Link header too (Early Hints), not only as <link rel=preload> in <head>.
+const pairing = themeVariables(site, themeSettings).attributes["data-ch-type-pairing"];
+const preloads = PAIRING_PRELOADS[pairing ?? ""] ?? [];
+if (preloads.length) Astro.response.headers.set("link", fontLinkHeader(preloads));
 // The reader's notice (RFC-0033 §4): machine output until a person reviews it (or always, when
 // the site asks), a page shown in its original language, each with a link to the original.
 const original = alternates.find((a) => a.original && !a.current);
