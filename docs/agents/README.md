@@ -9,7 +9,7 @@ Cloudhal is built for agents to work on sites, with people in charge. Agents con
 | Server | `cloudhal mcp`, started by your client over stdio | `https://<studio-host>/mcp` on a deployment (streamable HTTP) |
 | Works on | The project folder it runs in (`.cloudhal/` store) | The deployment's sites |
 | Who the agent is | You, the local developer | An agent key created in Studio |
-| Authentication | None (a local process) | `x-api-key: <key>` header |
+| Authentication | None (a local process) | `Authorization: Bearer <key>` or `x-api-key: <key>` header |
 | Approvals | Asked in your MCP client | Asked in your client, or wait in Studio's **Approvals** |
 | Set up | [Connect an agent](/docs/agents/clients) | [Remote agents](#remote-agents-on-a-deployment) below |
 
@@ -54,7 +54,7 @@ The server publishes skills as MCP resources: `skill://<name>/SKILL.md` and its 
 ## Remote agents on a deployment
 
 1. In Studio, open **Agents** and create a key. Choose its mode and scopes; they can never exceed your own role. The secret is shown once.
-2. Point your client at `https://<studio-host>/mcp` with the header `x-api-key: <key>`. See [Connect an agent](/docs/agents/clients#remote-server) for each client's format.
+2. Point your client at `https://<studio-host>/mcp` with the header `Authorization: Bearer <key>` (or `x-api-key: <key>`). See [Connect an agent](/docs/agents/clients#remote-server) for each client's format.
 3. The agent's calls run as that key: Studio's **Activity** shows them, **Approvals** collects what waits, and you can change the key's mode or revoke it at any time.
 
 Keep keys narrow. A key that reads reader comments should not also publish: comment text is written by strangers and reaches the agent. The [comments guide](/docs/guides/comments) and the [schedules guide](/docs/guides/schedules) (agent tasks with their own keys and budgets) go further.

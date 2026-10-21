@@ -129,7 +129,8 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
         schema: { invitation: { additionalFields: INVITATION_FIELDS } },
       }),
       admin(),
-      // Non-interactive credentials for agents/CI: `x-api-key` → `agent` actor (ADR-0011).
+      // Non-interactive credentials for agents/CI: `x-api-key` or `Authorization: Bearer` → `agent`
+      // actor (ADR-0011); `resolvePrincipal` reads them (`agentKeyFrom`).
       apiKey({
         apiKeyHeaders: API_KEY_HEADER,
         enableMetadata: true,

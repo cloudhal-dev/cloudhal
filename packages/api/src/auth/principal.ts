@@ -20,14 +20,14 @@ import {
   personRef,
   storedScopes,
 } from "./key-rows.ts";
-import { API_KEY_HEADER } from "./types.ts";
+import { agentKeyFrom } from "./types.ts";
 
 export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
   const { now, staffStore, keyLimit, instance, api } = d;
   const resolvePrincipal: PrincipalResolver = async (
     c: Context,
   ): Promise<Principal | undefined> => {
-    const key = c.req.header(API_KEY_HEADER);
+    const key = agentKeyFrom(c.req.raw.headers, c.req.path);
     if (key) {
       const verified = await api.verifyApiKey({ body: { key } });
       if (!verified.valid || !verified.key) return undefined;
