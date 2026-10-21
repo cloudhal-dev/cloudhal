@@ -22,7 +22,9 @@ Everything but `.gitignore`'s list. `cloudhal.json` holds the project's settings
 - `search.json.ts` — the search modal's answers (RFC-0029), where the deployment answers searches (`cloudhal dev`, the Cloudflare Site Worker). `components/SearchDialog.astro` is the modal's markup and words; Cloudhal's `/_cloudhal/search.1.js` wires it, and without it the header form opens `/search`.
 
 ## Styles (`src/styles`)
-`global.css` (imported by `layouts/Base.astro`) loads Tailwind, `fonts.css` and one file per feature from `styles/features/` (`tokens.css` with `@theme`, `prose.css`, `surfaces.css`, `motion.css`, `chrome.css`, `carousel.css` …) in cascade order. The rules are unlayered and later files override earlier ones, so keep the order; add a feature as a new file and import it from `global.css`. `source("..")` on the Tailwind import is relative to `global.css`, so that import stays there.
+`global.css` (imported by `layouts/Base.astro`) loads Tailwind, `fonts.css`, `font-fallbacks.css` and one file per feature from `styles/features/` (`tokens.css` with `@theme`, `prose.css`, `surfaces.css`, `motion.css`, `chrome.css`, `carousel.css` …) in cascade order. The rules are unlayered and later files override earlier ones, so keep the order; add a feature as a new file and import it from `global.css`. `source("..")` on the Tailwind import is relative to `global.css`, so that import stays there.
+
+Fonts are self-hosted under `public/fonts/v1/` and cached for a year (`public/_headers`): files never change under a path, so a new font set goes in `public/fonts/v2/`. Each web font in the pairing stacks (`tokens.css`) is followed by a metric-matched fallback from `font-fallbacks.css` (a system font scaled to the web font's width, ascent and descent), so the swap when the web font arrives does not move the text. That file is generated: after changing a font, run `pnpm fonts:fallbacks` in the monorepo.
 
 ## Theme settings (`src/theme.ts`)
 - `ARCHIVE_PAGE_SIZE` — posts per archive page (20).

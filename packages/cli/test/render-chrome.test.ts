@@ -2,7 +2,7 @@
  * RFC-0021 §4: render_page's checks in the local Chrome, on a page with one of each problem.
  * Skipped where this machine has no Chrome (set CHROME_PATH).
  */
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -249,6 +249,27 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     );
     expect(crops("image-fit")?.examples).toEqual([
       expect.stringMatching(/keeps 25% of the picture with no focal point/),
+    ]);
+    // RFC-0023 §2: a web font straight onto a system font moves the text when it loads; one
+    // followed by its metric-matched fallback does not. (A data URL: file:// pages load no font files.)
+    const woff2 = await readFile(
+      path.join(
+        import.meta.dirname,
+        "../../../starters/blog/public/fonts/v1/inter-latin-wght-normal.woff2",
+      ),
+      "base64",
+    );
+    const src = `url(data:font/woff2;base64,${woff2}) format("woff2")`;
+    const fonts = await run(
+      "fonts.html",
+      `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><style>
+@font-face{font-family:Bare;src:${src}}@font-face{font-family:Tuned;src:${src}}
+@font-face{font-family:"Tuned Fallback";src:local("Arial");size-adjust:107%;ascent-override:90%}
+</style></head><body><main><h1 style="font-family:Tuned,'Tuned Fallback',sans-serif">Matched</h1>
+<p style="font-family:Bare,sans-serif">Jumps</p></main></body></html>`,
+    );
+    expect(fonts("font-fallback")?.examples).toEqual([
+      expect.stringMatching(/p "Jumps" — "bare" has no metric-matched fallback/),
     ]);
   }, 90_000);
 });

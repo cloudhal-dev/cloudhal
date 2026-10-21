@@ -1,0 +1,5 @@
+# Font files never change under a path: a new font set gets a new directory (/fonts/v2/…).
+# Cached for a year, the browser uses them on every reload without asking the server, so the
+# text is drawn in its font from the first paint instead of swapping in later.
+/fonts/v1/*
+  Cache-Control: public, max-age=31536000, immutable

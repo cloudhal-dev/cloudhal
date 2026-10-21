@@ -4,12 +4,18 @@
  * (Turkish and other accented letters) load on demand through fonts.css's unicode ranges.
  */
 export const PAIRING_PRELOADS: Readonly<Record<string, readonly string[]>> = {
-  editorial: ["/fonts/fraunces-latin-wght-normal.woff2", "/fonts/inter-latin-wght-normal.woff2"],
-  modern: ["/fonts/space-grotesk-latin-wght-normal.woff2", "/fonts/inter-latin-wght-normal.woff2"],
-  humanist: ["/fonts/source-sans-3-latin-wght-normal.woff2"],
-  technical: [
-    "/fonts/jetbrains-mono-latin-wght-normal.woff2",
-    "/fonts/inter-latin-wght-normal.woff2",
+  editorial: [
+    "/fonts/v1/fraunces-latin-wght-normal.woff2",
+    "/fonts/v1/inter-latin-wght-normal.woff2",
   ],
-  classic: ["/fonts/source-serif-4-latin-wght-normal.woff2"],
+  modern: [
+    "/fonts/v1/space-grotesk-latin-wght-normal.woff2",
+    "/fonts/v1/inter-latin-wght-normal.woff2",
+  ],
+  humanist: ["/fonts/v1/source-sans-3-latin-wght-normal.woff2"],
+  technical: [
+    "/fonts/v1/jetbrains-mono-latin-wght-normal.woff2",
+    "/fonts/v1/inter-latin-wght-normal.woff2",
+  ],
+  classic: ["/fonts/v1/source-serif-4-latin-wght-normal.woff2"],
 };

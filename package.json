@@ -10,11 +10,12 @@
   },
   "type": "module",
   "scripts": {
-    "check": "biome check --diagnostic-level=error . && node scripts/size-check.ts && turbo run typecheck && turbo run test --concurrency=3",
+    "check": "biome check --diagnostic-level=error . && node scripts/size-check.ts && node scripts/font-fallbacks.ts --check && turbo run typecheck && turbo run test --concurrency=3",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "size:check": "node scripts/size-check.ts",
     "size:report": "node scripts/code-size.ts",
+    "fonts:fallbacks": "node scripts/font-fallbacks.ts",
     "design:lint": "node apps/studio/scripts/design-lint.ts",
     "design:shots": "node apps/studio/scripts/screenshots.ts",
     "i18n:export": "node scripts/i18n-exchange.ts export",
@@ -34,6 +35,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@capsizecss/unpack": "catalog:",
     "@changesets/cli": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:"
