@@ -136,8 +136,13 @@ export async function must(
 
 /** URLs of a deployed Worker from wrangler's structured output. */
 export function deployedUrls(records: Record<string, unknown>[]): string[] {
-  return records
-    .filter((r) => r.type === "deploy")
-    .flatMap((r) => (Array.isArray(r.targets) ? (r.targets as string[]) : []))
-    .map((t) => (t.startsWith("http") ? t : `https://${t}`));
+  return (
+    records
+      .filter((r) => r.type === "deploy")
+      .flatMap((r) => (Array.isArray(r.targets) ? (r.targets as string[]) : []))
+      // Wrangler lists custom domains as "cloudhal.com (custom domain)": keep the hostname only.
+      .map((t) => t.trim().split(/\s+/)[0] ?? "")
+      .filter(Boolean)
+      .map((t) => (t.startsWith("http") ? t : `https://${t}`))
+  );
 }
