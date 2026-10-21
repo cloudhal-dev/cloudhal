@@ -72,6 +72,7 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "carousel-focus": "carousel focus",
   "carousel-autoplay": "carousel autoplay",
   "image-fit": "image crops",
+  "font-fallback": "font swap shift",
 };
 
 function summary(r: RenderPageResult): string {

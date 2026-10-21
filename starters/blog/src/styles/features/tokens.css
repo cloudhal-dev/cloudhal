@@ -55,29 +55,41 @@
   font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 /*
- * Font pairings (RFC-0023 §2): the families come from fonts.css and load only when used. They win
+ * Font pairings (RFC-0023 §2): the families come from fonts.css and load only when used; each is
+ * followed by its metric-matched fallback (font-fallbacks.css), so the swap does not move the
+ * text. They win
  * over the older typeface setting; `system` keeps it.
  */
 [data-ch-type-pairing="editorial"] {
-  --ch-font-display: "Fraunces Variable", ui-serif, Georgia, serif;
-  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-display: "Fraunces Variable", "Fraunces Variable Fallback", ui-serif, Georgia, serif;
+  --ch-font-text: "Inter Variable", "Inter Variable Fallback", ui-sans-serif, system-ui, sans-serif;
 }
 [data-ch-type-pairing="modern"] {
-  --ch-font-display: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
-  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-display:
+    "Space Grotesk Variable", "Space Grotesk Variable Fallback", ui-sans-serif, system-ui,
+    sans-serif;
+  --ch-font-text: "Inter Variable", "Inter Variable Fallback", ui-sans-serif, system-ui, sans-serif;
 }
 [data-ch-type-pairing="humanist"] {
-  --ch-font-display: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
-  --ch-font-text: "Source Sans 3 Variable", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-display:
+    "Source Sans 3 Variable", "Source Sans 3 Variable Fallback", ui-sans-serif, system-ui,
+    sans-serif;
+  --ch-font-text:
+    "Source Sans 3 Variable", "Source Sans 3 Variable Fallback", ui-sans-serif, system-ui,
+    sans-serif;
 }
 [data-ch-type-pairing="technical"] {
-  --ch-font-display: "JetBrains Mono Variable", ui-monospace, monospace;
-  --ch-font-text: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --ch-font-code: "JetBrains Mono Variable", ui-monospace, monospace;
+  --ch-font-display:
+    "JetBrains Mono Variable", "JetBrains Mono Variable Fallback", ui-monospace, monospace;
+  --ch-font-text: "Inter Variable", "Inter Variable Fallback", ui-sans-serif, system-ui, sans-serif;
+  --ch-font-code:
+    "JetBrains Mono Variable", "JetBrains Mono Variable Fallback", ui-monospace, monospace;
 }
 [data-ch-type-pairing="classic"] {
-  --ch-font-display: "Source Serif 4 Variable", ui-serif, Georgia, serif;
-  --ch-font-text: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  --ch-font-display:
+    "Source Serif 4 Variable", "Source Serif 4 Variable Fallback", ui-serif, Georgia, serif;
+  --ch-font-text:
+    "Source Serif 4 Variable", "Source Serif 4 Variable Fallback", ui-serif, Georgia, serif;
 }
 [data-ch-type-pairing]:not([data-ch-type-pairing="system"]) .ch-body {
   font-family: var(--ch-font-text);

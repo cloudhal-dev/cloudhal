@@ -10,6 +10,7 @@
 import { COMPONENT_CHECKS } from "./components.ts";
 import { CONTENT_CHECKS } from "./content.ts";
 import { CONTRAST_CHECKS } from "./contrast.ts";
+import { FONT_CHECKS } from "./fonts.ts";
 import { LAYOUT_CHECKS } from "./layout.ts";
 import { MOTION_CHECKS } from "./motion.ts";
 import { NAVIGATION_CHECKS } from "./navigation.ts";
@@ -21,6 +22,7 @@ export const RENDER_CHECK_SCRIPT = [
   LAYOUT_CHECKS,
   CONTRAST_CHECKS,
   CONTENT_CHECKS,
+  FONT_CHECKS,
   MOTION_CHECKS,
   NAVIGATION_CHECKS,
   COMPONENT_CHECKS,

@@ -1,6 +1,7 @@
 /* Scan `src/` only: automatic detection may walk up the file system (docs/design/starter-references.md §6). */
 @import "tailwindcss" source("..");
 @import "./fonts.css";
+@import "./font-fallbacks.css";
 
 /*
  * One file per feature (docs/engineering/code-structure.md §8), in cascade order. Unlayered on

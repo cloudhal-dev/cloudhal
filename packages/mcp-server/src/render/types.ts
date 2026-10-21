@@ -87,6 +87,8 @@ export const RENDER_CHECK_IDS = [
   "carousel-autoplay",
   // RFC-0028: an image cropped hard by cover with no focal point to keep its subject in view.
   "image-fit",
+  // RFC-0023 §2: a web font with no metric-matched fallback, so its text moves when it loads.
+  "font-fallback",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 
