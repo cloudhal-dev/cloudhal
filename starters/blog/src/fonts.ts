@@ -19,3 +19,13 @@ export const PAIRING_PRELOADS: Readonly<Record<string, readonly string[]>> = {
   ],
   classic: ["/fonts/v1/source-serif-4-latin-wght-normal.woff2"],
 };
+
+/**
+ * The same preloads as a `Link` response header. On a Cloudflare zone with Early Hints on, the
+ * edge sends it as a 103 before the page, so the fonts load while the Worker is still rendering.
+ */
+export function fontLinkHeader(hrefs: readonly string[]): string {
+  return hrefs
+    .map((h) => `<${h}>; rel=preload; as=font; type="font/woff2"; crossorigin`)
+    .join(", ");
+}
