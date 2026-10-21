@@ -86,7 +86,7 @@ A site in a multi-site installation is as independent as a site in its own insta
   3. An unknown host, or one whose site is not in the allow-list, gets a plain 404, cached for 60 s. No other site's content is ever served for it.
   4. The Worker's `*.workers.dev` hostname serves the first site in `sites`, marked `noindex`, so a fresh deploy has something to check.
 - **Per-site state.** `getResolver(siteId)`, media, search, feeds and the analytics and comments settings use the resolved id. The module-level caches become maps keyed by `siteId`. Same-origin checks (RFC-0006 §5.2, RFC-0007 §6.2) read the site's host rows. `CLOUDHAL_SITE_HOSTS` keeps working in single-site mode.
-- **Cache.** The edge cache key already contains the host. Every response, 404s included, carries `cloudhal-site-<id>`. In multi-site mode, purges use tags only, never `purgeEverything`, so one site's publish never empties another site's cache.
+- **Cache.** Workers Cache keys by path, not host (correction, #62: this RFC first said the key already contained the host). Every site Worker response carries `Vary: Host`, so each host keeps its own cached variant. Every response, 404s included, carries `cloudhal-site-<id>`. In multi-site mode, purges use tags only, never `purgeEverything`, so one site's publish never empties another site's cache.
 - **Locale domains** (RFC-0033 §4) are host rows with `locale` set; the host decides the locale before the path, as today.
 
 ### 5. Domains
@@ -174,7 +174,7 @@ What one installation can hold, from Cloudflare's published limits (Workers and 
 - **Rollback:** switch `cloudhal.json` back to `siteId` and redeploy. The tables are ignored in single-site mode.
 
 ## Security & policy impact
-- **Isolation within an installation:** invariants 1–4. The cache key includes the host, and purge tags are per site.
+- **Isolation within an installation:** invariants 1–4. Cached responses vary by host (`Vary: Host`, #62), and purge tags are per site.
 - **New scopes:**
   - `site:create`: installation Owner and admins; also used for editions.
   - `site:delete`: Owner only, typed confirmation, audited.

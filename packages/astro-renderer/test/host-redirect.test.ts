@@ -11,6 +11,8 @@ describe("redirect-only hosts (#49)", () => {
     const r = hostRedirect(new Request("https://WWW.example.com/blog/post?ref=x"), env);
     expect(r?.status).toBe(301);
     expect(r?.headers.get("location")).toBe("https://example.com/blog/post?ref=x");
+    // #62: never in the edge cache, which every host of the Worker shares
+    expect(r?.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
     expect(hostRedirect(new Request("http://old.example.org/"), env)?.headers.get("location")).toBe(
       "https://example.com/",
     );

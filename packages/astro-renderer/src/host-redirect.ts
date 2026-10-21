@@ -27,6 +27,8 @@ export function hostRedirect(request: Request, env: RedirectEnv): Response | und
     headers: {
       location: `https://${to}${url.pathname}${url.search}`,
       "cache-control": "public, max-age=86400",
+      // Never in the edge cache (#62): it is shared with the hosts this one redirects to.
+      "cloudflare-cdn-cache-control": "no-store",
     },
   });
 }
