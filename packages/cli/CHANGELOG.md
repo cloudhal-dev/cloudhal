@@ -1,5 +1,22 @@
 # @cloudhal/cli
 
+## 0.3.10
+
+### Patch Changes
+
+- 46f59d5: The site Worker's responses carry `Vary: Host`, and redirect-host 301s never enter the edge cache (#62). Workers Cache keys by path, not hostname, so before this every host routed to one site Worker shared a cache entry per path: a `--redirect` host's 301 could be served on the site's own domain (a redirect loop), and the sites of a multi-site Worker could serve each other's cached pages.
+- c2cd92e: `cloudhal deploy` retries its post-deploy calls (push check, primary domain) for up to 90 seconds while they get 401: a Workers Builds deploy makes a new deployment token, and the edge can answer from the previous admin Worker version for a few seconds. Such a build used to fail after both Workers had deployed.
+- @cloudhal/api@0.3.10
+  - @cloudhal/cloudflare@0.3.10
+  - @cloudhal/mcp-server@0.3.10
+  - @cloudhal/agent-runtime@0.3.10
+  - @cloudhal/analytics@0.3.10
+  - @cloudhal/comments@0.3.10
+  - @cloudhal/core-contracts@0.3.10
+  - @cloudhal/core-ts@0.3.10
+  - @cloudhal/schedules@0.3.10
+  - @cloudhal/storage@0.3.10
+
 ## 0.3.9
 
 ### Patch Changes
