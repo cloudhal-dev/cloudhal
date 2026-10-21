@@ -4,5 +4,5 @@
     "noEmit": true,
     "declaration": false
   },
-  "include": ["src/lib", "scripts", "test"]
+  "include": ["src/lib", "src/worker", "scripts", "test"]
 }

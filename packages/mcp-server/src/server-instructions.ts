@@ -21,7 +21,9 @@ Languages: a site lists its locales (get_site). To translate a page or entry, ca
 
 Schedules: to publish later, propose or schedule a release with the entries (propose_release, schedule_release); a person approves the pinned versions in Studio and Cloudhal publishes them at that time — do not poll and do not call again, get_release shows the outcome. Scheduled content is locked; ask a person to unschedule it. Embargoes and expiries are times on the entry (set_embargo, schedule_unpublish), enforced by the site itself; lifting an embargo early is always a person's decision (lift_embargo). Inside an automation run (begin_run) you have a budget and an end time; once you read reader text, 404 paths, analytics referrers or fetched pages, the run can only read, label, hide or pause. Close it with end_run.
 
-If you are following a Cloudhal skill (read it from the skill:// resources), send its name in the request \`_meta["cloudhal.skill"]\`; your calls are then limited to the scopes that skill declared.`;
+If you are following a Cloudhal skill (read it from the skill:// resources), send its name in the request \`_meta["cloudhal.skill"]\`; your calls are then limited to the scopes that skill declared.
+
+Cloudhal's developer docs (themes, the CLI, integrations; not needed to work on site content) are at https://cloudhal.dev/llms.txt, every page also as Markdown.`;
 
 const MODE_TEXT: Record<AgentMode, string> = {
   plan: "You are in PLAN mode: read and preview only. Do not try to change anything; describe the changes you would make so a person can decide.",

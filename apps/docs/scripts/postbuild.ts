@@ -5,7 +5,8 @@
  * - `/schemas/v1/<name>.schema.json` at the permanent `$id` URLs, plus `index.json`; the build
  *   fails when a schema's `$id` is not its URL here;
  * - every page as Markdown at `<path>.md` and `<path>/index.md`, links absolute;
- * - `/llms.txt`, `/llms-full.txt` and one pair per section (llmstxt.org).
+ * - `/llms.txt`, `/llms-full.txt` and one pair per section (llmstxt.org);
+ * - the docs MCP's search index (`/_mcp/search-index.json`, read by `src/worker`).
  */
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -13,22 +14,13 @@ import { fileURLToPath } from "node:url";
 import { allPages, type Page } from "../src/lib/pages.ts";
 import { redirectLines } from "../src/lib/redirects.ts";
 import { ORIGIN } from "../src/lib/repo-docs.ts";
+import { buildSearchIndex, SEARCH_INDEX_PATH } from "../src/lib/search-index.ts";
+import { SECTIONS, sectionOf, urlOf } from "../src/lib/sections.ts";
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = path.resolve(APP, "../..");
 const SCHEMAS = path.join(REPO, "packages/core-contracts/schemas");
 const DIST = path.join(APP, "dist");
-
-/** Sections with their own `llms.txt`, in index order. */
-const SECTIONS = [
-  { key: "start", prefix: "docs/start/", title: "Start" },
-  { key: "agents", prefix: "docs/agents", title: "Agents and MCP" },
-  { key: "reference", prefix: "docs/reference/", title: "Reference" },
-  { key: "guides", prefix: "docs/guides/", title: "Guides" },
-  { key: "contributing", prefix: "docs/", title: "Contributing and internals" },
-  { key: "adr", prefix: "docs/adr", title: "Architecture decisions" },
-  { key: "rfcs", prefix: "docs/rfcs", title: "Proposals" },
-] as const;
 
 interface SchemaEntry {
   readonly name: string;
@@ -54,8 +46,6 @@ async function copySchemas(): Promise<SchemaEntry[]> {
   );
   return entries;
 }
-
-const urlOf = (page: Page) => (page.id === "index" ? `${ORIGIN}/` : `${ORIGIN}/${page.id}`);
 
 function markdownOf(page: Page): string {
   const front = [
@@ -83,15 +73,6 @@ async function writeMarkdown(pages: readonly Page[]): Promise<void> {
       await writeFile(path.join(DIST, page.id, "index.md"), md);
     }
   }
-}
-
-function sectionOf(page: Page): (typeof SECTIONS)[number] | undefined {
-  if (!page.id.startsWith("docs/")) return undefined;
-  return SECTIONS.find((s) =>
-    s.key === "contributing"
-      ? !/^docs\/(start|agents|reference|guides|adr|rfcs)(\/|$)/.test(page.id)
-      : page.id === s.prefix || page.id.startsWith(s.prefix),
-  );
 }
 
 const linkLine = (page: Page) => `- [${page.title}](${urlOf(page)}.md): ${page.description}`;
@@ -139,4 +120,6 @@ const schemas = await copySchemas();
 const pages = allPages(REPO, true);
 await writeMarkdown(pages);
 await writeLlms(pages, schemas);
+await mkdir(path.dirname(path.join(DIST, SEARCH_INDEX_PATH)), { recursive: true });
+await writeFile(path.join(DIST, SEARCH_INDEX_PATH), JSON.stringify(buildSearchIndex(pages)));
 console.log(`cloudhal.dev: ${pages.length} pages, ${schemas.length} schemas`);

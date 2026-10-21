@@ -1,14 +1,22 @@
-// cloudhal.dev (ADR-0037): static assets only, no Worker code.
-// Until the Starlight site lands (RFC pending), /docs redirects to the docs on GitHub.
+// cloudhal.dev (ADR-0037, ADR-0039): the static site plus a small Worker script in front of it
+// (src/worker): the read-only docs MCP at /mcp and `Accept: text/markdown` on pages. Everything
+// else is served by the assets binding unchanged.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "cloudhal-dev",
+  "main": "src/worker/index.ts",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
     "not_found_handling": "404-page",
     "html_handling": "drop-trailing-slash"
   },
+  // Docs MCP: 100 requests a minute per IP (RFC-0037 "Security & policy impact").
+  "ratelimits": [
+    { "name": "MCP_RATE_LIMITER", "namespace_id": "1039", "simple": { "limit": 100, "period": 60 } }
+  ],
   "routes": [{ "pattern": "cloudhal.dev", "custom_domain": true }],
   "workers_dev": false,
   "preview_urls": false
