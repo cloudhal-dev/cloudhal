@@ -1,5 +1,23 @@
 # @cloudhal/cli
 
+## 0.3.9
+
+### Patch Changes
+
+- 348a00a: `cloudhal domain set <host> --redirect www.<host>`: hosts that answer with a 301 to the site's domain (path and query kept), routed to the site Worker as Custom Domains on the next deploy (#49). `cloudhal domain remove redirects` drops them.
+- 304246e: `cloudhal domain set <host>` also makes the host the local site's primary domain, so canonical links, the sitemap and feeds use it before the first deploy (#48).
+- 6f002de: `cloudhal snapshot --publish` makes no new snapshot when nothing changed since the live one; it says "nothing changed since <snapshot>" instead (#51).
+- @cloudhal/api@0.3.9
+  - @cloudhal/cloudflare@0.3.9
+  - @cloudhal/mcp-server@0.3.9
+  - @cloudhal/agent-runtime@0.3.9
+  - @cloudhal/analytics@0.3.9
+  - @cloudhal/comments@0.3.9
+  - @cloudhal/core-contracts@0.3.9
+  - @cloudhal/core-ts@0.3.9
+  - @cloudhal/schedules@0.3.9
+  - @cloudhal/storage@0.3.9
+
 ## 0.3.8
 
 ### Patch Changes

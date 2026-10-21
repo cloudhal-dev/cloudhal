@@ -1,5 +1,16 @@
 # @cloudhal/astro-renderer
 
+## 0.3.9
+
+### Patch Changes
+
+- 348a00a: `cloudhal domain set <host> --redirect www.<host>`: hosts that answer with a 301 to the site's domain (path and query kept), routed to the site Worker as Custom Domains on the next deploy (#49). `cloudhal domain remove redirects` drops them.
+- @cloudhal/analytics@0.3.9
+  - @cloudhal/comments@0.3.9
+  - @cloudhal/core-contracts@0.3.9
+  - @cloudhal/core-ts@0.3.9
+  - @cloudhal/storage@0.3.9
+
 ## 0.3.8
 
 ### Patch Changes
