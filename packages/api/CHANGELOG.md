@@ -1,5 +1,21 @@
 # @cloudhal/api
 
+## 0.3.4
+
+### Patch Changes
+
+- d6427d5: Agent keys are also accepted as `Authorization: Bearer <key>` (what most MCP clients and Codex's `bearer_token_env_var` send), on `/mcp` and wherever `x-api-key` was. `/api/admin/*` keeps its deployment-token bearer and never reads it as an agent key.
+- Updated dependencies [aae143f]
+  - @cloudhal/mcp-server@0.3.4
+  - @cloudhal/agent-runtime@0.3.4
+  - @cloudhal/analytics@0.3.4
+  - @cloudhal/astro-renderer@0.3.4
+  - @cloudhal/comments@0.3.4
+  - @cloudhal/core-contracts@0.3.4
+  - @cloudhal/core-ts@0.3.4
+  - @cloudhal/schedules@0.3.4
+  - @cloudhal/storage@0.3.4
+
 ## 0.3.3
 
 ### Patch Changes

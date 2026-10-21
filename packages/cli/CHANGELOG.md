@@ -1,5 +1,23 @@
 # @cloudhal/cli
 
+## 0.3.4
+
+### Patch Changes
+
+- 94ca22c: New projects exempt `@cloudhal/*` and `create-cloudhal` from pnpm's `minimumReleaseAge` in their `pnpm-workspace.yaml`, so pnpm installs a Cloudhal release on the day it ships instead of refusing it for a day.
+- Updated dependencies [d6427d5]
+- Updated dependencies [aae143f]
+  - @cloudhal/api@0.3.4
+  - @cloudhal/mcp-server@0.3.4
+  - @cloudhal/cloudflare@0.3.4
+  - @cloudhal/agent-runtime@0.3.4
+  - @cloudhal/analytics@0.3.4
+  - @cloudhal/comments@0.3.4
+  - @cloudhal/core-contracts@0.3.4
+  - @cloudhal/core-ts@0.3.4
+  - @cloudhal/schedules@0.3.4
+  - @cloudhal/storage@0.3.4
+
 ## 0.3.3
 
 ### Patch Changes

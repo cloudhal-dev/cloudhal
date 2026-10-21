@@ -1,5 +1,19 @@
 # @cloudhal/mcp-server
 
+## 0.3.4
+
+### Patch Changes
+
+- aae143f: The server's instructions point developer agents to the docs at https://cloudhal.dev/llms.txt. The server itself has no docs tools; the docs have their own MCP server at https://cloudhal.dev/mcp.
+- @cloudhal/agent-runtime@0.3.4
+  - @cloudhal/analytics@0.3.4
+  - @cloudhal/astro-renderer@0.3.4
+  - @cloudhal/comments@0.3.4
+  - @cloudhal/core-contracts@0.3.4
+  - @cloudhal/core-ts@0.3.4
+  - @cloudhal/schedules@0.3.4
+  - @cloudhal/storage@0.3.4
+
 ## 0.3.3
 
 ### Patch Changes
