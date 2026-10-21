@@ -1,5 +1,15 @@
 # @cloudhal/astro-renderer
 
+## 0.3.4
+
+### Patch Changes
+
+- @cloudhal/analytics@0.3.4
+  - @cloudhal/comments@0.3.4
+  - @cloudhal/core-contracts@0.3.4
+  - @cloudhal/core-ts@0.3.4
+  - @cloudhal/storage@0.3.4
+
 ## 0.3.3
 
 ### Patch Changes
