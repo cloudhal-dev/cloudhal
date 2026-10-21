@@ -5,7 +5,10 @@
  * Cloudflare Workers with `cloudhal deploy --dry-run`. Needs network access to the npm registry
  * for third-party dependencies; @cloudhal/* come from the local tarballs.
  *
- *   node scripts/smoke-pack.ts [--keep]
+ *   node scripts/smoke-pack.ts [--keep] [--tarballs <dir>]
+ *
+ * `--tarballs <dir>` packs into that folder and leaves the tarballs there: the release job
+ * (`publish-ci.ts`) publishes exactly what this test installed.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -16,6 +19,8 @@ import { PACKAGES } from "./build-packages.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const keep = process.argv.includes("--keep");
+const tarballsArg = process.argv.indexOf("--tarballs");
+const tarballsDir = tarballsArg === -1 ? undefined : process.argv[tarballsArg + 1];
 const run = (cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}) => {
   console.log(`$ ${cmd} ${args.join(" ")}   (in ${path.relative(os.tmpdir(), cwd) || cwd})`);
   const { VITEST: _v, NODE_ENV: _n, npm_config_user_agent: _ua, ...base } = process.env;
@@ -25,7 +30,7 @@ const run = (cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = 
 const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-smoke-"));
 try {
   run(process.execPath, ["scripts/build-packages.ts"], ROOT);
-  const tarballs = path.join(tmp, "tarballs");
+  const tarballs = tarballsDir ? path.resolve(tarballsDir) : path.join(tmp, "tarballs");
   for (const name of PACKAGES)
     run("pnpm", ["pack", "--pack-destination", tarballs], path.join(ROOT, "packages", name));
   const files = await readdir(tarballs);
