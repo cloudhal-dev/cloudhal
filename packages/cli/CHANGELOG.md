@@ -1,5 +1,21 @@
 # @cloudhal/cli
 
+## 0.3.5
+
+### Patch Changes
+
+- 0a6ac44: Cloudhal packages are now published from GitHub Actions with npm trusted publishing and provenance: each version on npm links to the commit and workflow run that built it, and `npm audit signatures` verifies it.
+- @cloudhal/agent-runtime@0.3.5
+  - @cloudhal/analytics@0.3.5
+  - @cloudhal/api@0.3.5
+  - @cloudhal/cloudflare@0.3.5
+  - @cloudhal/comments@0.3.5
+  - @cloudhal/core-contracts@0.3.5
+  - @cloudhal/core-ts@0.3.5
+  - @cloudhal/mcp-server@0.3.5
+  - @cloudhal/schedules@0.3.5
+  - @cloudhal/storage@0.3.5
+
 ## 0.3.4
 
 ### Patch Changes
