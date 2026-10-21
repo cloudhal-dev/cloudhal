@@ -3,6 +3,7 @@
  * generated folder indexes. The content loader renders them; the post-build step writes their
  * Markdown copies and `llms.txt` from the same list.
  */
+import { cliReference } from "./reference.ts";
 import { folderIndex, listDocs, readDoc } from "./repo-docs.ts";
 import { SITE_PAGES } from "./site-pages.ts";
 
@@ -25,5 +26,5 @@ const FOLDER_INDEXES = [{ dir: "docs/rfcs", title: "Proposals (RFCs)" }] as cons
 export function allPages(repoRoot: string, absolute = false): Page[] {
   const docs = listDocs(repoRoot).map((file) => readDoc(repoRoot, file, absolute));
   const indexes = FOLDER_INDEXES.map(({ dir, title }) => folderIndex(repoRoot, dir, title));
-  return [...SITE_PAGES, ...indexes, ...docs];
+  return [...SITE_PAGES, cliReference(), ...indexes, ...docs];
 }

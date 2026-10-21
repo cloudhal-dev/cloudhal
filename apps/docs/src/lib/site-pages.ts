@@ -39,16 +39,19 @@ const home: SitePage = {
 \`\`\`sh
 npm create cloudhal@latest my-site
 cd my-site
-npx cloudhal dev
+npm install
+npm run dev
 \`\`\`
 
-Then connect your agent. Any MCP client works:
+Then connect your agent. Any MCP client works ([Codex, Cursor, VS Code and more](/docs/agents/clients)):
 
 \`\`\`sh
 claude mcp add cloudhal -- npx cloudhal mcp --mode edits
 \`\`\`
 
 Or deploy a blog to your Cloudflare account in one click with the [Deploy to Cloudflare button](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudhal-dev/cloudhal-template), or try a private site for an hour at [try.cloudhal.com](https://try.cloudhal.com).
+
+Step by step, with pnpm, Yarn and Bun: the [quickstart](/docs/start/quickstart).
 
 ## Reference
 
@@ -69,8 +72,15 @@ const docsIndex: SitePage = {
 
 ## Get going
 
-- [Install and run locally](https://github.com/cloudhal-dev/cloudhal#readme): \`npm create cloudhal@latest\`, \`cloudhal dev\`, connect an agent.
-- [Deploy to Cloudflare with one click](/docs/guides/deploy-button).
+- [Installation](/docs/start/installation): Node 24, npm, pnpm, Yarn or Bun.
+- [Quickstart](/docs/start/quickstart): create a site, open Studio, connect an agent, publish, deploy.
+- [Deploy to Cloudflare with one click](/docs/guides/deploy-button), with nothing installed.
+
+## Agents
+
+- [Agents and MCP](/docs/agents): local and remote servers, modes, approvals, skills.
+- [Connect an agent](/docs/agents/clients): Claude Code, Codex, Cursor, VS Code, Claude Desktop and more.
+- [Docs for agents](/docs/agents/docs-for-agents): Markdown pages, \`llms.txt\` and the docs MCP server.
 - [Harden a Cloudflare deployment](/docs/guides/cloudflare-hardening).
 
 ## Guides
@@ -79,6 +89,11 @@ const docsIndex: SitePage = {
 - [Several sites in one deployment](/docs/guides/multi-site)
 - [Analytics and privacy](/docs/guides/analytics-privacy)
 - [Translations with Weblate](/docs/guides/translations-weblate)
+
+## Reference
+
+- [CLI](/docs/reference/cli), generated from \`cloudhal --help\`.
+- [JSON Schemas v1](/schemas/v1/index.json).
 
 ## How Cloudhal is built
 

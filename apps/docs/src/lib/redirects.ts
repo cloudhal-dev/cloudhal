@@ -10,6 +10,8 @@ export const REDIRECTS: readonly (readonly [from: string, to: string])[] = [
   ["/docs/design", "/docs/design/design"],
   // Folders without an index page.
   ["/docs/guides", "/docs"],
+  ["/docs/start", "/docs/start/quickstart"],
+  ["/docs/reference", "/docs/reference/cli"],
   ["/docs/engineering", "/docs/engineering/code-structure"],
   ["/docs/security", "/docs/security/threat-model"],
   ["/github", "https://github.com/cloudhal-dev/cloudhal"],

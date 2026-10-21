@@ -21,6 +21,9 @@ const DIST = path.join(APP, "dist");
 
 /** Sections with their own `llms.txt`, in index order. */
 const SECTIONS = [
+  { key: "start", prefix: "docs/start/", title: "Start" },
+  { key: "agents", prefix: "docs/agents", title: "Agents and MCP" },
+  { key: "reference", prefix: "docs/reference/", title: "Reference" },
   { key: "guides", prefix: "docs/guides/", title: "Guides" },
   { key: "contributing", prefix: "docs/", title: "Contributing and internals" },
   { key: "adr", prefix: "docs/adr", title: "Architecture decisions" },
@@ -86,7 +89,7 @@ function sectionOf(page: Page): (typeof SECTIONS)[number] | undefined {
   if (!page.id.startsWith("docs/")) return undefined;
   return SECTIONS.find((s) =>
     s.key === "contributing"
-      ? !/^docs\/(guides|adr|rfcs)(\/|$)/.test(page.id)
+      ? !/^docs\/(start|agents|reference|guides|adr|rfcs)(\/|$)/.test(page.id)
       : page.id === s.prefix || page.id.startsWith(s.prefix),
   );
 }
