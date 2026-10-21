@@ -15,7 +15,7 @@ import {
   parseSiteRoles,
   replaceSiteRoles,
   type SiteRoles,
-  siteRolesOf,
+  toRoles,
 } from "./site-members.ts";
 
 /** The one organization of a deployment (Cloud: one per tenant). */
@@ -99,14 +99,22 @@ export class StaffStore {
 
   // ───────────────────────────── members ─────────────────────────────
 
+  /**
+   * One query with the member's site assignments (it runs on every signed-in API request, and a
+   * second round trip to D1 there slowed every screen).
+   */
   async member(userId: string): Promise<MemberRow | undefined> {
-    const row = await this.#sql.get<Row>(
-      `SELECT m."userId", m."role", m."createdAt", u."name", u."email" FROM "member" m JOIN "user" u ON u."id" = m."userId" WHERE m."organizationId" = ? AND m."userId" = ?`,
+    const rows = await this.#sql.all<Row>(
+      `SELECT m."userId", m."role", m."createdAt", u."name", u."email", s.site_id AS "siteId", s.role AS "siteRole" FROM "member" m JOIN "user" u ON u."id" = m."userId" LEFT JOIN site_members s ON s.user_id = m."userId" WHERE m."organizationId" = ? AND m."userId" = ? ORDER BY s.site_id`,
       [DEPLOYMENT_ORG, userId],
     );
-    const member = row ? toMember(row) : undefined;
+    const member = rows[0] ? toMember(rows[0]) : undefined;
     if (!member) return undefined;
-    const sites = await siteRolesOf(this.#sql, userId);
+    const sites = toRoles(
+      rows
+        .filter((r) => typeof r.siteId === "string")
+        .map((r) => ({ site_id: r.siteId as string, role: String(r.siteRole) })),
+    );
     return sites ? { ...member, sites } : member;
   }
 

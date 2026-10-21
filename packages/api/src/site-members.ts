@@ -28,15 +28,6 @@ export function parseSiteRoles(value: unknown): SiteRoles | undefined {
   }
 }
 
-/** One member's assignments (undefined: every site). */
-export async function siteRolesOf(sql: SqlDriver, userId: string): Promise<SiteRoles | undefined> {
-  const rows = await sql.all<{ site_id: string; role: string }>(
-    "SELECT site_id, role FROM site_members WHERE user_id = ? ORDER BY site_id",
-    [userId],
-  );
-  return toRoles(rows);
-}
-
 /** Every member's assignments, by user id. */
 export async function allSiteRoles(sql: SqlDriver): Promise<Map<string, SiteRoles>> {
   const rows = await sql.all<{ user_id: string; site_id: string; role: string }>(
@@ -52,7 +43,8 @@ export async function allSiteRoles(sql: SqlDriver): Promise<Map<string, SiteRole
   return out;
 }
 
-function toRoles(rows: readonly { site_id: string; role: string }[]): SiteRoles | undefined {
+/** Assignment rows → the map (undefined for none). */
+export function toRoles(rows: readonly { site_id: string; role: string }[]): SiteRoles | undefined {
   const out: Record<string, Role> = {};
   for (const r of rows) if (isRole(r.role) && isSiteRole(r.role)) out[r.site_id] = r.role;
   return Object.keys(out).length > 0 ? out : undefined;

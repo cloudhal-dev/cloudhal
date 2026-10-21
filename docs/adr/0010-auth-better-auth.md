@@ -26,3 +26,13 @@ Adopt **Better Auth 1.7.x** (MIT; Vercel-owned since 2026-07 with an open-source
 - Positive: one library covers Studio login, tenants, API keys and the MCP authorization server on both runtimes.
 - Negative: 1.5→1.7 churn (adapter packages split, OIDC plugin removed, tables renamed) and a wide advisory history → pin to 1.7.x, subscribe to GHSAs, keep telemetry off.
 - Risks: scrypt cost on Workers free plan (override hashing or document paid plan); Vercel governance (mitigated by MIT + data in our DB).
+
+## Addendum (2026-10-22): session cookie cache
+Every signed-in API request reads the session, and on D1 that was a round trip before the handler could start. Studio fires 10–13 calls per screen, and D1 serves one query at a time per database, so these lookups queued behind each other (internal performance review, 2026-10).
+
+- **Session cookie cache.** Better Auth's `session.cookieCache` is on with `maxAge: 60`: the session is signed into a cookie and read from it for 60 seconds. The trade-off, accepted by the maintainer:
+  - a session revoked from another device, or by an administrator, stays usable for up to 60 seconds;
+  - a person's own sign-out clears the cookie at once;
+  - Better Auth's sensitive endpoints (password change, revoking sessions) do not use the cache;
+  - membership and roles are still read from D1 on every request, so removing a member or changing a role takes effect immediately.
+- **Rate limiter.** It stays on for every auth endpoint except `/get-session`, which is not a brute-force target and which Studio asks for often. Its storage is D1, so each limited call costs a read and a write.
