@@ -1,45 +1,99 @@
 name: Release
 
+# Releases from CI (ADR-0013; the decisions in CONTRIBUTING.md "Releasing"):
+# 1. `version`: on every push to main, the Changesets action opens or updates the release PR
+#    `chore(release): x.y.z` from the pending changesets. Merging it is the decision to release.
+# 2. `plan`: after that merge, finds that npm lacks the packages' new version.
+# 3. `publish`: waits for the `npm-publish` environment's approval (one click, the maintainer's
+#    2FA), then scripts/publish-ci.ts builds, smoke-tests the packed tarballs, publishes them with
+#    npm trusted publishing (OIDC, provenance), and creates one `v<version>` tag and GitHub Release.
+# npm's trusted-publisher entry for each package names this file and the `npm-publish`
+# environment: renaming either breaks publishing.
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+permissions: {}
 
-concurrency: release-${{ github.ref }}
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  changesets:
-    name: Version or publish (Changesets)
-    # Publishing is gated until the npm org `cloudhal` exists and trusted publishing is
-    # configured: set the repository variable RELEASE_ENABLED=true to turn it on.
+  version:
+    name: Release PR (Changesets)
     if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org
-      - run: pnpm install --frozen-lockfile
-      - name: Create release PR or publish to npm
-        # changesets/action v2: kebab-case inputs, and the token goes in `github-token` (the
-        # GITHUB_TOKEN environment variable is no longer read). npm auth stays trusted publishing.
-        uses: changesets/action@v2
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # Version only: publishing happens in `publish`, behind the environment approval.
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           version-script: pnpm changeset version
-          publish-script: pnpm release
           commit-message: "chore(release): version packages"
           pr-title: "chore(release): version packages"
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  plan:
+    name: Anything to publish?
+    if: vars.RELEASE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.plan.outputs.publish }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: plan
+        run: node scripts/publish-ci.ts --plan
+
+  publish:
+    name: Publish ${{ needs.plan.outputs.version }} to npm
+    needs: plan
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: npm-publish
+      url: https://www.npmjs.com/package/@cloudhal/cli/v/${{ needs.plan.outputs.version }}
+    permissions:
+      contents: write # the v<version> tag and the GitHub Release
+      id-token: write # npm trusted publishing (OIDC) and provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # No registry-url: its generated .npmrc token line is not needed with OIDC.
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@12
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-packages.ts --check
+      - run: node scripts/publish-ci.ts
         env:
-          NPM_CONFIG_PROVENANCE: "true"
+          GH_TOKEN: ${{ github.token }}
   # crates.io publishing is added once cloudhal-schema reaches 0.1 (see docs/adr/0006).
