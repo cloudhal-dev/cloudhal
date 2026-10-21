@@ -3,7 +3,7 @@
 Every MCP client connects to Cloudhal in one of two ways ([which one?](/docs/agents#two-ways-to-connect)):
 
 - **Local server:** the client starts `cloudhal mcp` in your project folder. Nothing to authenticate; the agent works on the project's local store.
-- **Remote server:** the client calls `https://<studio-host>/mcp` on a deployment, sending an agent key created in Studio under **Agents** as `Authorization: Bearer <key>` or in the `x-api-key` header. Both work; use whichever your client supports. Studio shows each client's setup with the key filled in right after you create it.
+- **Remote server:** the client calls `https://<studio-host>/mcp` on a deployment, sending an agent key created in Studio under **Agents** as `Authorization: Bearer <key>` or in the `x-api-key` header. Both work; use whichever your client supports. Bearer needs a deployment on Cloudhal 0.3.4 or later; on older ones use `x-api-key`, or upgrade and run `cloudhal deploy`. Studio shows each client's setup with the key filled in right after you create it.
 
 `cloudhal mcp` serves the project folder it starts in. Configure local servers **per project** (the project-scoped files below), or start the client from the project folder.
 
