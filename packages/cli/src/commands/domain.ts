@@ -2,8 +2,13 @@
  * `cloudhal domain` — the custom domains `cloudhal deploy` routes to this project's Workers
  * (Cloudflare Custom Domains: the zone must be in the same Cloudflare account; wrangler creates
  * the DNS record and certificate). Kept in cloudhal.json so the setting travels with the project.
+ * The site's own hostname also becomes its primary domain in the local store, so `cloudhal build`
+ * writes it into canonical links, the sitemap and feeds before any deploy (#48); `deploy` does the
+ * same on the deployment.
  */
-import { isHostname, normalizeHostname } from "@cloudhal/core-ts";
+import path from "node:path";
+import { isHostname, normalizeHostname, withPrimaryDomain } from "@cloudhal/core-ts";
+import { openLocalStore } from "@cloudhal/core-ts/local";
 import { type ProjectConfig, readProjectConfig, writeProjectConfig } from "../config.ts";
 
 export type DomainTarget = "site" | "studio";
@@ -40,5 +45,18 @@ export async function domain(options: DomainOptions): Promise<ProjectConfig["dom
       ...(next.site || next.studio ? { domains: next } : {}),
     });
   }
+  if (next.site && options.set?.site) await makePrimary(options.projectDir, cfg, next.site);
   return next.site || next.studio ? next : undefined;
+}
+
+/** `hostname` becomes the local site's primary domain (other domains stay, as secondary). */
+async function makePrimary(projectDir: string, cfg: ProjectConfig, hostname: string) {
+  const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+  try {
+    const site = await local.store.getSite(cfg.siteId);
+    if (site && site.domains.find((d) => d.primary)?.hostname !== hostname)
+      await local.store.updateSite({ ...site, domains: withPrimaryDomain(site.domains, hostname) });
+  } finally {
+    await local.close();
+  }
 }

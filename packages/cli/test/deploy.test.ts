@@ -494,6 +494,13 @@ describe("cloudhal deploy", () => {
       site: "news.example.com",
       studio: "studio.example.com",
     });
+    // #48: the local site takes it as its primary domain before any deploy (`cloudhal build`)
+    const before = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    expect((await before.store.getSite(cfg.siteId))?.domains[0]).toEqual({
+      hostname: "news.example.com",
+      primary: true,
+    });
+    await before.close();
 
     const r = await run();
     expect(r).toMatchObject({
