@@ -1,6 +1,7 @@
 # RFC-0037: cloudhal.dev, the developer site: docs from the repo, a link contract, docs for agents
 
 - Status: Accepted (2026-10-21, by Halil; ADR-0039). Open questions decided as recommended: all ADRs and RFCs are published with their status shown, error codes live in one registry in `packages/core-contracts`, and the docs MCP waits for a registry.
+- Amendment (2026-10-21, phase 3): no docs tools in `cloudhal mcp`; the standalone `cloudhal.dev/mcp` is the only docs MCP, with a build-time index instead of Pagefind's. See §4 and Implementation notes.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - ADR-0037 (domains): `cloudhal.dev` is the developer domain; `cloudhal.dev/docs` is the only copy of the docs; `/schemas/v1/*` is permanent.
@@ -9,7 +10,7 @@
   - Prior art: Cloudflare's developer docs ([docs for agents](https://developers.cloudflare.com/docs-for-agents/): `/index.md` per page, `Accept: text/markdown`, `/llms.txt` and `/llms-full.txt` per product), Sanity and Strands (`.md` per page, `llms.txt`), Microsoft Learn's docs MCP server, Astro Starlight with `starlight-llms-txt`.
 
 ## Summary
-cloudhal.dev becomes an Astro Starlight site in `apps/docs`, built from the Markdown in the monorepo's `docs/` folder and deployed as the `cloudhal-dev` Worker that already serves the schemas. Every URL it publishes is a contract: it never breaks, moves get a redirect, and CI checks every link that Cloudhal's code, packages and sites point at. Every page is also published for agents, as Markdown at `<page>.md` and through content negotiation, indexed in `/llms.txt`, and searchable through a read-only MCP endpoint and a `search_docs` tool in `cloudhal mcp`.
+cloudhal.dev becomes an Astro Starlight site in `apps/docs`, built from the Markdown in the monorepo's `docs/` folder and deployed as the `cloudhal-dev` Worker that already serves the schemas. Every URL it publishes is a contract: it never breaks, moves get a redirect, and CI checks every link that Cloudhal's code, packages and sites point at. Every page is also published for agents, as Markdown at `<page>.md` and through content negotiation, indexed in `/llms.txt`, and searchable through a read-only MCP endpoint at `cloudhal.dev/mcp`.
 
 ## Motivation
 - **Links already point here.** The 13 npm packages' `homepage`, seven links on cloudhal.com, 89 schema `$id`s, the fetcher's User-Agent and the playground Worker's documented `deployUrl` all name cloudhal.dev URLs. Until #33 none of them resolved. Today `/docs/*` lands on GitHub's file view, which is fine for contributors but poor for users: no navigation, no search, no Markdown for agents.
@@ -72,14 +73,14 @@ Who links where:
 - **Content negotiation.** A small Worker script in front of the assets answers `Accept: text/markdown` on any page with its Markdown, sets `Vary: Accept`, and adds `x-markdown-tokens` (an estimate), as Cloudflare does. Everything else is served by the assets binding unchanged.
 - **Indexes.** `/llms.txt` lists every page with its one-line description, grouped by section. `/llms-full.txt` is the whole docs in one file. Each section has its own `llms.txt` and `llms-full.txt`.
 - **Docs MCP.** `https://cloudhal.dev/mcp` is a stateless, read-only MCP endpoint with no authentication. It has two tools:
-  - `search_docs(query, section?)` returns up to 8 hits with title, URL and snippet, from the Pagefind index or a build-time FTS index;
+  - `search_docs(query, section?)` returns up to 8 hits with title, URL and snippet, from a build-time index;
   - `read_doc(url)` returns one page's Markdown.
 
-  `cloudhal mcp` gains the same two tools, so the agent already connected to a site can look up how to use it. They proxy to cloudhal.dev and are read-only, so policy class `read`.
-- **AGENTS.md for users.** `/docs/start/agents` explains how to point an agent at Cloudhal: the MCP server, the docs MCP, the `llms.txt`. The page is written for agents to read.
+  *Amended 2026-10-21:* `cloudhal mcp` does **not** gain these tools. The site MCP server is for agents working on sites (content, design, generated UI, comments, schedules), and its how-to knowledge lives in skills, tool descriptions and server instructions. Docs tools there would add tools that narrow-scoped keys never need, a second knowledge source that can contradict the first, and an outbound dependency on cloudhal.dev. Microsoft Learn, AWS, Mintlify and GitBook ship docs as a standalone, unauthenticated MCP server; Supabase and Sanity put docs tools in their product server, but those servers are developer tools, while Cloudhal's is content-operational and policy-governed. Developer agents connect `cloudhal.dev/mcp` (or read `llms.txt`); the site server's instructions name `llms.txt` and nothing more.
+- **AGENTS.md for users.** `/docs/agents/docs-for-agents` explains how to point an agent at Cloudhal: the MCP server, the docs MCP, the `llms.txt`. The page is written for agents to read.
 
 ### 5. Search, versions, languages
-- Search: Pagefind (Starlight's default; static, no service). The docs MCP reuses its index.
+- Search: Pagefind (Starlight's default; static, no service) for people. The docs MCP has its own index, built from the same page list (Implementation notes).
 - Versions: while Cloudhal is 0.x, only the latest release is documented, with an "applies to 0.3.x" note in the header taken from the packages' version. At 1.0, older majors move to `/docs/v1/` and so on.
 - Languages: English only (the default language rule). Starlight's i18n and the Weblate setup (`docs/guides/translations-weblate.md`) can add languages later without URL changes, under `/docs/<lang>/`.
 
@@ -92,7 +93,7 @@ Who links where:
 ### 7. Phases
 1. Starlight in `apps/docs` over the existing `docs/`, with the IA above, Pagefind, `.md` per page, `llms.txt`/`llms-full.txt`, and the redirects that replace today's GitHub 302s.
 2. Generated reference (CLI, MCP tools, config, schemas, changelog), `/e/<code>` pages, link checks in CI, deploy from CI with PR previews.
-3. Content negotiation Worker, `https://cloudhal.dev/mcp`, `search_docs`/`read_doc` in `cloudhal mcp`.
+3. Content negotiation Worker and `https://cloudhal.dev/mcp` (no docs tools in `cloudhal mcp`, amended).
 4. New content: `docs/start/*` and `docs/concepts/*`. Then point the CLI, Studio, cloudhal.com and the template at the new URLs.
 
 ## Alternatives considered
@@ -112,7 +113,7 @@ Who links where:
 
 ## Security & policy impact
 - The docs MCP endpoint is read-only, unauthenticated and stateless. It is rate limited per IP with a Workers rate-limiting binding. It reads only the built docs, never a site.
-- `search_docs` and `read_doc` in `cloudhal mcp` are `read` tools. Their output is public docs text; they never send site data to cloudhal.dev, only the query.
+- The site MCP server sends nothing to cloudhal.dev (amended: no docs tools there).
 - The CI deploy token can edit only the `cloudhal-dev` Worker.
 - No cookies, no analytics beyond Cloudflare's aggregate Web Analytics, no third-party scripts.
 
@@ -123,3 +124,4 @@ Who links where:
 
 ## Implementation notes
 - **Phase 1** (`apps/docs`): a custom content loader (`src/lib/repo-docs.ts`) reads `docs/` and the site's own pages (`src/lib/site-pages.ts`). The H1 becomes the title; the description is the first text under `## Summary` or `## Context`; relative links become site paths, or GitHub links for files outside `docs/`. Folders without a README get a generated index (`/docs/rfcs`). `scripts/postbuild.ts` writes the schemas, the `.md` copies, `llms.txt`/`llms-full.txt` (site and per section) and `_redirects` from `src/lib/redirects.ts` from the same page list. The `starlight-llms-txt` plugin is not used: one list feeds the HTML, the Markdown and the indexes, so they cannot disagree.
+- **Phase 3** (`apps/docs/src/worker`, amended 2026-10-21): the `cloudhal-dev` Worker now has a script, run before the assets (`run_worker_first`). `/mcp` is the docs MCP: Streamable HTTP, stateless (no `Mcp-Session-Id`, no event stream; GET and DELETE answer 405), one JSON answer per POST, protocol versions 2024-11-05 to 2025-11-25, tools `search_docs` and `read_doc` (read-only annotations), 100 requests a minute per IP through the `MCP_RATE_LIMITER` binding. `scripts/postbuild.ts` writes the search index (`/_mcp/search-index.json`: plain text and an inverted index with title, description and path boosts, from the same page list as the HTML) and the Worker ranks with BM25 plus prefix matches. Pagefind's index is built for the browser (fragments fetched on demand), so it was not reused. `read_doc` takes only cloudhal.dev URLs or site paths and answers the page's `.md` copy. `Accept: text/markdown` on a page answers that copy with `Vary: Accept` and `x-markdown-tokens` (characters / 4); every other request goes to the assets binding unchanged, and page HTML gains `Vary: Accept`.

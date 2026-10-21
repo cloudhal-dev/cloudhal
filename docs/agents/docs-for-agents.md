@@ -11,7 +11,7 @@ https://cloudhal.dev/docs/start/quickstart      → HTML
 https://cloudhal.dev/docs/start/quickstart.md   → Markdown
 ```
 
-`<page>/index.md` works too. Each Markdown file starts with frontmatter: `title`, `description`, `url` and `source` (the file in the repository). Links in it are absolute, so it reads correctly anywhere.
+`<page>/index.md` works too, and so does asking for the page itself with `Accept: text/markdown` (the answer carries `Vary: Accept` and an `x-markdown-tokens` estimate). Each Markdown file starts with frontmatter: `title`, `description`, `url` and `source` (the file in the repository). Links in it are absolute, so it reads correctly anywhere.
 
 ## llms.txt
 
@@ -44,6 +44,52 @@ Docs: https://cloudhal.dev/llms.txt (every page also as Markdown: add .md to its
 
 Cloudhal's contracts are JSON Schemas at permanent URLs: [`/schemas/v1/index.json`](/schemas/v1/index.json) lists them. Every node an MCP tool returns follows one of them.
 
-## Searching the docs from the MCP server
+## Searching the docs: the docs MCP
 
-Planned ([RFC-0037](/docs/rfcs/0037-cloudhal-dev-docs-site)): `search_docs` and `read_doc` tools in the Cloudhal MCP server, so the agent already connected to your site can look up how to use it, for the version you have installed. Until then, the Markdown pages and `llms.txt` above are the way in.
+`https://cloudhal.dev/mcp` is a public MCP server for the docs: read-only, no sign-in, no key. It has two tools:
+
+- `search_docs` with `query` (and optionally `section`: `start`, `agents`, `reference`, `guides`, `contributing`, `adr` or `rfcs`) returns up to 8 pages with title, URL and a snippet;
+- `read_doc` with `url` (a `https://cloudhal.dev/…` URL or a path such as `/docs/agents/clients`) returns that page's Markdown.
+
+It is **separate from Cloudhal's own MCP server** ([`cloudhal mcp`](/docs/agents/clients), or `/mcp` on a deployment), which works on your sites and has no docs tools. Connect the docs MCP to the agent that writes your theme or integrates Cloudhal; an agent that only edits content does not need it. The answers are public docs text, and the only thing sent to cloudhal.dev is the query. Requests are rate limited per IP address.
+
+Claude Code:
+
+```sh
+claude mcp add --transport http cloudhal-docs https://cloudhal.dev/mcp
+```
+
+Codex:
+
+```sh
+codex mcp add cloudhal-docs --url https://cloudhal.dev/mcp
+```
+
+or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.cloudhal-docs]
+url = "https://cloudhal.dev/mcp"
+```
+
+Cursor, in `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "cloudhal-docs": { "url": "https://cloudhal.dev/mcp" }
+  }
+}
+```
+
+VS Code (GitHub Copilot), in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "cloudhal-docs": { "type": "http", "url": "https://cloudhal.dev/mcp" }
+  }
+}
+```
+
+Claude Desktop and claude.ai: **Settings › Connectors › Add custom connector** with the URL `https://cloudhal.dev/mcp` and no authentication. Other clients take the same URL as a Streamable HTTP server without headers.

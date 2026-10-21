@@ -21,3 +21,7 @@
 
 /*.md
   Access-Control-Allow-Origin: *
+
+# The docs MCP's search index (read by the Worker, not a public API).
+/_mcp/*
+  X-Robots-Tag: noindex
