@@ -14,7 +14,7 @@ import type {
 import { deployedUrls, isCronLimitError, must, WranglerError } from "../../cloudflare/wrangler.ts";
 import { pushSite, setPrimaryDomain } from "../sync.ts";
 import type { DeployContext } from "./context.ts";
-import { purgeSite, waitForHealth } from "./resources.ts";
+import { purgeSite, waitForHealth, whileTokenPropagates } from "./resources.ts";
 import { CRON_REFUSED_MESSAGE } from "./schedules-guard.ts";
 import type { DeploySecrets } from "./state.ts";
 
@@ -111,29 +111,35 @@ export async function afterDeploy(
       });
     await l.close();
   }
-  const result = await pushSite({
-    projectDir: options.projectDir,
-    ifAbsent: true,
-    log,
-    ...(options.fetch ? { fetch: options.fetch } : {}),
-  });
-  // A custom domain becomes the site's primary hostname (the workers.dev one stays secondary).
-  if (cfg.domains?.site) {
-    await setPrimaryDomain({
+  const retry = <T>(step: () => Promise<T>) => whileTokenPropagates(step, { log });
+  const result = await retry(() =>
+    pushSite({
       projectDir: options.projectDir,
-      hostname: cfg.domains.site,
+      ifAbsent: true,
+      log,
       ...(options.fetch ? { fetch: options.fetch } : {}),
-    });
-    log(
-      `site domain: https://${cfg.domains.site} (Cloudflare issues the certificate on first use)`,
+    }),
+  );
+  // A custom domain becomes the site's primary hostname (the workers.dev one stays secondary).
+  const domain = cfg.domains?.site;
+  if (domain) {
+    await retry(() =>
+      setPrimaryDomain({
+        projectDir: options.projectDir,
+        hostname: domain,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      }),
     );
+    log(`site domain: https://${domain} (Cloudflare issues the certificate on first use)`);
   } else if (previous?.siteDomain && siteUrl) {
     // The custom domain was removed from cloudhal.json: workers.dev is primary again.
-    await setPrimaryDomain({
-      projectDir: options.projectDir,
-      hostname: new URL(siteUrl).hostname,
-      ...(options.fetch ? { fetch: options.fetch } : {}),
-    });
+    await retry(() =>
+      setPrimaryDomain({
+        projectDir: options.projectDir,
+        hostname: new URL(siteUrl).hostname,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      }),
+    );
     log(
       `site domain ${previous.siteDomain} removed from cloudhal.json; if Cloudflare still lists it under the Worker's Domains & Routes, remove it there`,
     );

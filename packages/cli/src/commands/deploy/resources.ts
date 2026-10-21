@@ -139,6 +139,31 @@ export async function waitForHealth(
   }
 }
 
+/**
+ * Runs `step` again while it fails with 401. Right after a deploy the edge can still answer from
+ * the previous admin Worker version, which holds the previous deployment token (Workers Builds
+ * makes a new one on every build), for a few seconds. Gives up after `timeoutMs`.
+ */
+export async function whileTokenPropagates<T>(
+  step: () => Promise<T>,
+  options: { log: (line: string) => void; timeoutMs?: number; waitMs?: number },
+): Promise<T> {
+  const deadline = Date.now() + (options.timeoutMs ?? 90_000);
+  let announced = false;
+  for (;;) {
+    try {
+      return await step();
+    } catch (e) {
+      if (!/\(401\)/.test(e instanceof Error ? e.message : "") || Date.now() > deadline) throw e;
+      if (!announced) {
+        options.log("the deployment does not accept the new token yet; retrying while it spreads…");
+        announced = true;
+      }
+      await new Promise((r) => setTimeout(r, options.waitMs ?? 5000));
+    }
+  }
+}
+
 /** Purges the site Worker's whole cache once (the script tag lives in cached HTML). */
 export async function purgeSite(
   siteUrl: string,
