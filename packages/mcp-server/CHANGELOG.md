@@ -1,5 +1,19 @@
 # @cloudhal/mcp-server
 
+## 0.3.8
+
+### Patch Changes
+
+- da8fe6f: `render_page` and `cloudhal render` gain a `font-fallback` check: text set in a web font with no metric-matched fallback after it in its stack, which moves when the font loads.
+- @cloudhal/agent-runtime@0.3.8
+  - @cloudhal/analytics@0.3.8
+  - @cloudhal/astro-renderer@0.3.8
+  - @cloudhal/comments@0.3.8
+  - @cloudhal/core-contracts@0.3.8
+  - @cloudhal/core-ts@0.3.8
+  - @cloudhal/schedules@0.3.8
+  - @cloudhal/storage@0.3.8
+
 ## 0.3.7
 
 ### Patch Changes

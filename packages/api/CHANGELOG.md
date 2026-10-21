@@ -1,5 +1,20 @@
 # @cloudhal/api
 
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies [da8fe6f]
+  - @cloudhal/mcp-server@0.3.8
+  - @cloudhal/agent-runtime@0.3.8
+  - @cloudhal/analytics@0.3.8
+  - @cloudhal/astro-renderer@0.3.8
+  - @cloudhal/comments@0.3.8
+  - @cloudhal/core-contracts@0.3.8
+  - @cloudhal/core-ts@0.3.8
+  - @cloudhal/schedules@0.3.8
+  - @cloudhal/storage@0.3.8
+
 ## 0.3.7
 
 ### Patch Changes
