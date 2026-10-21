@@ -1,5 +1,24 @@
 # @cloudhal/cli
 
+## 0.3.8
+
+### Patch Changes
+
+- f646b76: Blog starter: pages send their type pairing's font preloads as a `Link` header too, so a Cloudflare zone with Early Hints on starts loading the fonts with a 103 before the page arrives.
+- da8fe6f: Blog starter: no more text jumping when the web fonts load. Font files move to `/fonts/v1/` and are cached for a year (`public/_headers`), so reloads draw text in its font from the first paint, and each web font gets a metric-matched fallback face (`font-fallbacks.css`), so a first visit swaps fonts without moving the text.
+- da8fe6f: `render_page` and `cloudhal render` gain a `font-fallback` check: text set in a web font with no metric-matched fallback after it in its stack, which moves when the font loads.
+- Updated dependencies [da8fe6f]
+  - @cloudhal/mcp-server@0.3.8
+  - @cloudhal/api@0.3.8
+  - @cloudhal/cloudflare@0.3.8
+  - @cloudhal/agent-runtime@0.3.8
+  - @cloudhal/analytics@0.3.8
+  - @cloudhal/comments@0.3.8
+  - @cloudhal/core-contracts@0.3.8
+  - @cloudhal/core-ts@0.3.8
+  - @cloudhal/schedules@0.3.8
+  - @cloudhal/storage@0.3.8
+
 ## 0.3.7
 
 ### Patch Changes
