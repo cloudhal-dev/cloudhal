@@ -11,12 +11,15 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Cloudhal",
+      logo: { src: "./src/assets/mark.svg", alt: "" },
       description: "Open-source, agent-native site platform.",
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/cloudhal-dev/cloudhal" },
       ],
       customCss: ["./src/styles/custom.css"],
       head: [
+        { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "32x32" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
         {
           tag: "link",
           attrs: { rel: "alternate", type: "text/markdown", href: "/llms.txt", title: "llms.txt" },
