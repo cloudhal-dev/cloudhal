@@ -54,6 +54,7 @@ import {
   SiteAnalytics,
 } from "./analytics.ts";
 import { isCloudhalCacheTag } from "./cache-tags.ts";
+import { varyByHost } from "./cache-vary.ts";
 import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
@@ -529,21 +530,25 @@ async function serveSite(
 
 export function createSiteWorker(options: { siteId?: string } = {}) {
   const searchLimiter = new SearchLimiter();
+  async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
+    if (url.pathname === "/__cloudhal/features") return features(request, env);
+    const moved = hostRedirect(request, env);
+    if (moved) return moved;
+    // RFC-0034 §4: the hostname picks the site on a multi-site Worker; everything the request
+    // runs (Astro's render included) then sees that site.
+    const choice = await siteDispatch(env, options.siteId).choose(request);
+    if (choice.kind === "unknown") return unknownHost();
+    const siteId = choice.siteId;
+    const run = () => serveSite({ request, env, ctx }, siteId, searchLimiter);
+    const response = siteId ? await withRequestSite(siteId, run) : await run();
+    return choice.noindex ? withNoindex(response) : response;
+  }
   return {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-      const url = new URL(request.url);
-      if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
-      if (url.pathname === "/__cloudhal/features") return features(request, env);
-      const moved = hostRedirect(request, env);
-      if (moved) return moved;
-      // RFC-0034 §4: the hostname picks the site on a multi-site Worker; everything the request
-      // runs (Astro's render included) then sees that site.
-      const choice = await siteDispatch(env, options.siteId).choose(request);
-      if (choice.kind === "unknown") return unknownHost();
-      const siteId = choice.siteId;
-      const run = () => serveSite({ request, env, ctx }, siteId, searchLimiter);
-      const response = siteId ? await withRequestSite(siteId, run) : await run();
-      return choice.noindex ? withNoindex(response) : response;
+      // #62: the edge cache is shared by every host this Worker answers on, unless told to vary.
+      return varyByHost(await route(request, env, ctx));
     },
   };
 }
