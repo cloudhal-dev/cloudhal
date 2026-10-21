@@ -14,11 +14,9 @@ import {
   SectionCard,
   SectionEmpty,
   Table,
-  Tabs,
   Text,
   Tooltip,
 } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import {
   ArrowsInSimple,
   ClockCountdown,
@@ -53,6 +51,7 @@ import {
 } from "../components/Elevation.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
+import { McpClientSetup } from "../components/McpClientSetup.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RoleBadge } from "../components/Roles.tsx";
 import { ScopeBadge } from "../components/ScopeBadge.tsx";
@@ -65,7 +64,7 @@ import { type Fold, usePaging } from "../components/usePaging.ts";
 import { usePendingElevations } from "../components/usePendingApprovals.ts";
 import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { initials } from "../lib/account.ts";
-import { mcpSnippet, ownModeOf, type SnippetKind, sameScopes, sortScopes } from "../lib/agents.ts";
+import { ownModeOf, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { activeElevation, modesAbove } from "../lib/elevation.ts";
@@ -150,7 +149,6 @@ function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
 /** The "Connect an MCP client" card: endpoint, header and ready-to-paste client config. */
 export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
   const t = useT();
-  const [kind, setKind] = useState<SnippetKind>("json");
   return (
     <SectionCard
       title={t("agents.connect.title")}
@@ -181,36 +179,13 @@ export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
           <dd className="min-w-0">
             <ClipboardText
               size="base"
-              text="x-api-key"
+              text="Authorization: Bearer"
               tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
             />
           </dd>
         </div>
       </dl>
-      <div className="grid min-w-0 gap-3">
-        <Tabs
-          variant="segmented"
-          size="sm"
-          value={kind}
-          onValueChange={(v) => setKind(v as SnippetKind)}
-          tabs={(["json", "claude", "stdio"] as const).map((k) => ({
-            value: k,
-            label: t(`agents.connect.tabs.${k}`),
-          }))}
-        />
-        <div className="min-w-0 overflow-x-auto">
-          <CodeHighlighted
-            code={mcpSnippet(kind, endpoint)}
-            lang={kind === "json" ? "json" : "bash"}
-            showCopyButton
-          />
-        </div>
-        {kind === "stdio" && (
-          <Text variant="secondary" size="sm">
-            {t("agents.connect.stdioHint")}
-          </Text>
-        )}
-      </div>
+      <McpClientSetup endpoint={endpoint} local />
     </SectionCard>
   );
 }

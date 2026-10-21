@@ -88,7 +88,7 @@
       "lines": 350
     },
     "apps/studio/src/components/CreateAgentKeyDialog.tsx::CreateAgentKeyDialog": {
-      "lines": 338
+      "lines": 317
     },
     "apps/studio/src/components/CreateTermDialog.tsx::CreateTermDialog": {
       "lines": 173

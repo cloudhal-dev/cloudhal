@@ -152,9 +152,11 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Pagination",
     "DeleteResource",
     "ClipboardText",
-    "CodeHighlighted",
+    "McpClientSetup",
     "CreateAgentKeyDialog",
   ],
+  // Per-client MCP setup (docs/agents/clients.md), on the page and in the one-time key reveal.
+  "components/McpClientSetup.tsx": ["Select", "CodeHighlighted"],
   // Navigation menus (§2t, RFC-0003 §8): the MenuTree editor with its preview, picker and delta.
   "routes/NavigationPage.tsx": [
     "PageLayout",
@@ -216,7 +218,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Checkbox",
     "ClipboardText",
     "Banner",
-    "CodeHighlighted",
+    "McpClientSetup",
     "Collapsible",
   ],
   // Agent modes (§2g, ADR-0015): mode-first create flow, change-mode dialog, badges, explainer.

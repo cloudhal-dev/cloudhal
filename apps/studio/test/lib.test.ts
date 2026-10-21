@@ -25,6 +25,7 @@ import {
   sameScopes,
   scopesForMode,
   scopeVariant,
+  snippetLang,
   sortScopes,
 } from "../src/lib/agents.ts";
 import type { AuditRow } from "../src/lib/api.ts";
@@ -222,15 +223,30 @@ describe("agent scopes", () => {
     expect(scopeVariant("site:rollback")).toBe("warning");
   });
 
-  it("fills a fresh key into the client config, placeholder otherwise", () => {
-    const json = JSON.parse(mcpSnippet("json", "https://x.dev/mcp", "k_123"));
-    expect(json.mcpServers.cloudhal).toEqual({
+  it("fills a fresh key into each client's setup, placeholder otherwise", () => {
+    const url = "https://x.dev/mcp";
+    const cursor = JSON.parse(mcpSnippet("cursor", url, "k_123"));
+    expect(cursor.mcpServers.cloudhal).toEqual({ url, headers: { Authorization: "Bearer k_123" } });
+    const generic = JSON.parse(mcpSnippet("generic", url, "k_123"));
+    expect(generic.mcpServers.cloudhal).toEqual({
       type: "http",
-      url: "https://x.dev/mcp",
-      headers: { "x-api-key": "k_123" },
+      url,
+      headers: { Authorization: "Bearer k_123" },
     });
-    expect(mcpSnippet("claude", "https://x.dev/mcp")).toContain('"x-api-key: <your agent key>"');
-    expect(mcpSnippet("stdio", "https://x.dev/mcp")).toContain("cloudhal mcp --mode edits");
+    // VS Code prompts for the key: the file never holds it.
+    const vscode = mcpSnippet("vscode", url, "k_123");
+    expect(vscode).not.toContain("k_123");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: VS Code's own input variable
+    expect(JSON.parse(vscode).servers.cloudhal.headers.Authorization).toBe(
+      "Bearer ${input:cloudhal-key}",
+    );
+    expect(mcpSnippet("codex", url, "k_123")).toBe(
+      'export CLOUDHAL_API_KEY="k_123"\ncodex mcp add cloudhal --url https://x.dev/mcp \\\n  --bearer-token-env-var CLOUDHAL_API_KEY',
+    );
+    expect(mcpSnippet("claude", url)).toContain('"Authorization: Bearer <your agent key>"');
+    expect(mcpSnippet("stdio", url)).toContain("cloudhal mcp --mode edits");
+    expect(snippetLang("codex")).toBe("bash");
+    expect(snippetLang("vscode")).toBe("json");
   });
 });
 

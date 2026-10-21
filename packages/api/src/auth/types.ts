@@ -202,6 +202,22 @@ export const NOT_A_MEMBER_MESSAGE =
   "Your access was removed. Ask an administrator for a new invite.";
 
 export const API_KEY_HEADER = "x-api-key";
+
+/** `/api/admin/*` takes `Authorization: Bearer <CLOUDHAL_DEPLOY_TOKEN>`, never an agent key. */
+const DEPLOY_TOKEN_PATHS = /^\/api\/admin(\/|$)/;
+
+/**
+ * The agent key a request carries: `x-api-key`, else `Authorization: Bearer <key>` (what most MCP
+ * clients and Codex's `bearer_token_env_var` send). On the deployment-token routes the bearer is the
+ * deploy token, so it is not read as a key there.
+ */
+export function agentKeyFrom(headers: Headers, path: string): string | undefined {
+  const key = headers.get(API_KEY_HEADER);
+  if (key) return key;
+  if (DEPLOY_TOKEN_PATHS.test(path)) return undefined;
+  const bearer = /^Bearer\s+(\S+)\s*$/i.exec(headers.get("authorization") ?? "")?.[1];
+  return bearer || undefined;
+}
 export const SETUP_TOKEN_HEADER = "x-cloudhal-setup-token";
 
 /**

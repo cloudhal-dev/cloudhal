@@ -3,7 +3,7 @@
 Every MCP client connects to Cloudhal in one of two ways ([which one?](/docs/agents#two-ways-to-connect)):
 
 - **Local server:** the client starts `cloudhal mcp` in your project folder. Nothing to authenticate; the agent works on the project's local store.
-- **Remote server:** the client calls `https://<studio-host>/mcp` on a deployment, sending an agent key created in Studio under **Agents** in the `x-api-key` header.
+- **Remote server:** the client calls `https://<studio-host>/mcp` on a deployment, sending an agent key created in Studio under **Agents** as `Authorization: Bearer <key>` or in the `x-api-key` header. Both work; use whichever your client supports. Studio shows each client's setup with the key filled in right after you create it.
 
 `cloudhal mcp` serves the project folder it starts in. Configure local servers **per project** (the project-scoped files below), or start the client from the project folder.
 
@@ -40,7 +40,7 @@ Remote:
 
 ```sh
 claude mcp add --transport http cloudhal https://studio.example.com/mcp \
-  --header "x-api-key: $CLOUDHAL_API_KEY"
+  --header "Authorization: Bearer $CLOUDHAL_API_KEY"
 ```
 
 Or in `.mcp.json`, with the key read from the environment when Claude Code starts:
@@ -51,7 +51,7 @@ Or in `.mcp.json`, with the key read from the environment when Claude Code start
     "cloudhal": {
       "type": "http",
       "url": "https://studio.example.com/mcp",
-      "headers": { "x-api-key": "${CLOUDHAL_API_KEY}" }
+      "headers": { "Authorization": "Bearer ${CLOUDHAL_API_KEY}" }
     }
   }
 }
@@ -75,12 +75,18 @@ command = "npx"
 args = ["cloudhal", "mcp", "--mode", "edits"]
 ```
 
-Remote, with the key taken from the environment:
+Remote, with the key taken from the environment and sent as `Authorization: Bearer`:
+
+```sh
+codex mcp add cloudhal --url https://studio.example.com/mcp --bearer-token-env-var CLOUDHAL_API_KEY
+```
+
+Or in `config.toml`:
 
 ```toml
 [mcp_servers.cloudhal]
 url = "https://studio.example.com/mcp"
-env_http_headers = { "x-api-key" = "CLOUDHAL_API_KEY" }
+bearer_token_env_var = "CLOUDHAL_API_KEY"
 ```
 
 ## Cursor
@@ -105,7 +111,7 @@ Remote:
   "mcpServers": {
     "cloudhal": {
       "url": "https://studio.example.com/mcp",
-      "headers": { "x-api-key": "${env:CLOUDHAL_API_KEY}" }
+      "headers": { "Authorization": "Bearer ${env:CLOUDHAL_API_KEY}" }
     }
   }
 }
@@ -138,7 +144,7 @@ Remote. VS Code asks for the key once and stores it securely:
     "cloudhal": {
       "type": "http",
       "url": "https://studio.example.com/mcp",
-      "headers": { "x-api-key": "${input:cloudhal-key}" }
+      "headers": { "Authorization": "Bearer ${input:cloudhal-key}" }
     }
   }
 }
@@ -146,7 +152,7 @@ Remote. VS Code asks for the key once and stores it securely:
 
 ## Claude Desktop and claude.ai
 
-Use the remote server: **Settings › Connectors › Add custom connector**, the URL `https://studio.example.com/mcp`, and a request header `x-api-key` with your key. Claude connects from Anthropic's cloud, so this needs a deployment; `localhost` is not reachable. For a local project, use Claude Code.
+Use the remote server: **Settings › Connectors › Add custom connector**, the URL `https://studio.example.com/mcp`, and a request header `Authorization` with the value `Bearer <your key>`. Claude connects from Anthropic's cloud, so this needs a deployment; `localhost` is not reachable. For a local project, use Claude Code.
 
 ## Windsurf
 
@@ -157,7 +163,7 @@ Remote, in `mcp_config.json` (global, so prefer the remote server):
   "mcpServers": {
     "cloudhal": {
       "serverUrl": "https://studio.example.com/mcp",
-      "headers": { "x-api-key": "${env:CLOUDHAL_API_KEY}" }
+      "headers": { "Authorization": "Bearer ${env:CLOUDHAL_API_KEY}" }
     }
   }
 }
@@ -178,7 +184,7 @@ In the project's `.zed/settings.json`:
 }
 ```
 
-Remote: `{ "url": "https://studio.example.com/mcp", "headers": { "x-api-key": "…" } }` in place of `command` and `args`.
+Remote: `{ "url": "https://studio.example.com/mcp", "headers": { "Authorization": "Bearer …" } }` in place of `command` and `args`.
 
 ## Gemini CLI
 
@@ -195,20 +201,20 @@ Local, in the project's `.gemini/settings.json`:
 Remote (Gemini uses `httpUrl` for streamable HTTP):
 
 ```sh
-gemini mcp add --transport http -H "x-api-key: $CLOUDHAL_API_KEY" cloudhal https://studio.example.com/mcp
+gemini mcp add --transport http -H "Authorization: Bearer $CLOUDHAL_API_KEY" cloudhal https://studio.example.com/mcp
 ```
 
 ## Any other client
 
 - **stdio:** command `npx`, arguments `cloudhal mcp --mode edits`, working directory: your project.
-- **Streamable HTTP:** URL `https://<studio-host>/mcp`, header `x-api-key: <key>`.
+- **Streamable HTTP:** URL `https://<studio-host>/mcp`, header `Authorization: Bearer <key>` (or `x-api-key: <key>`).
 
-A client that cannot send headers can reach the remote server through [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a local stdio command: `npx -y mcp-remote https://studio.example.com/mcp --header "x-api-key:${CLOUDHAL_API_KEY}"`.
+A client that cannot send headers can reach the remote server through [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a local stdio command: `npx -y mcp-remote https://studio.example.com/mcp --header "Authorization:Bearer ${CLOUDHAL_API_KEY}"`.
 
 ## Troubleshooting
 
 - **The client lists no tools.** Run the command yourself in the project folder: `npx cloudhal mcp` should start and keep running (it waits for a client on stdin). An error there (Node older than 24, not a Cloudhal project) is what the client sees.
 - **The agent edits a different site.** The local server serves the folder it started in. Use a project-scoped config, or start the client from the project.
-- **`401 unauthorized` remotely.** The key is missing, revoked, or sent in another header. Cloudhal reads `x-api-key`.
+- **`401 unauthorized` remotely.** The key is missing, revoked, or sent in another header. Cloudhal reads `Authorization: Bearer <key>` and `x-api-key`; on `/mcp` a bearer must be an agent key, not the deployment token.
 - **`403 not_a_member`.** The key's owner no longer belongs to the deployment; create a new key.
 - **A call says it is waiting for approval.** Accept it in your client, or in Studio under **Approvals** on a deployment.

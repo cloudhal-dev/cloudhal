@@ -323,24 +323,66 @@ export function sortScopes(scopes: readonly AgentScope[]): AgentScope[] {
  */
 export const ALWAYS_GATED_TOOLS = ["rollback", "delete_page", "delete_entry"] as const;
 
-export type SnippetKind = "json" | "claude" | "stdio";
+/**
+ * MCP clients Studio shows setup for (docs/agents/clients.md); `stdio` is the local server. Every
+ * remote snippet sends the key as `Authorization: Bearer` (the server also takes `x-api-key`).
+ */
+export const REMOTE_CLIENTS = ["claude", "codex", "cursor", "vscode", "generic"] as const;
+export type McpClient = (typeof REMOTE_CLIENTS)[number] | "stdio";
 
-/** Client configuration for this Studio's MCP endpoint; `key` fills in a freshly created key. */
-export function mcpSnippet(kind: SnippetKind, endpoint: string, key?: string): string {
-  const secret = key ?? "<your agent key>";
-  if (kind === "json") {
-    return JSON.stringify(
-      {
-        mcpServers: {
-          cloudhal: { type: "http", url: endpoint, headers: { "x-api-key": secret } },
+/** The environment variable the snippets read the key from where a client takes one. */
+const KEY_ENV = "CLOUDHAL_API_KEY";
+
+const json = (value: unknown) => JSON.stringify(value, null, 2);
+
+/** Setup per client, in the formats of docs/agents/clients.md; `key` fills in a fresh key. */
+const SNIPPETS: Record<McpClient, (endpoint: string, key: string) => string> = {
+  claude: (endpoint, key) =>
+    `claude mcp add --transport http cloudhal ${endpoint} \\\n  --header "Authorization: Bearer ${key}"`,
+  // Codex reads the key from the environment and sends it as `Authorization: Bearer`.
+  codex: (endpoint, key) =>
+    `export ${KEY_ENV}="${key}"\ncodex mcp add cloudhal --url ${endpoint} \\\n  --bearer-token-env-var ${KEY_ENV}`,
+  cursor: (endpoint, key) =>
+    json({
+      mcpServers: { cloudhal: { url: endpoint, headers: { Authorization: `Bearer ${key}` } } },
+    }),
+  // VS Code asks for the key once and keeps it in its secret storage, so the file holds none.
+  vscode: (endpoint) =>
+    json({
+      inputs: [
+        {
+          type: "promptString",
+          id: "cloudhal-key",
+          // i18n-ignore: written into the person's .vscode/mcp.json, as in docs/agents/clients.md
+          description: "Cloudhal agent key",
+          password: true,
+        },
+      ],
+      servers: {
+        cloudhal: {
+          type: "http",
+          url: endpoint,
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: VS Code's own input variable
+          headers: { Authorization: "Bearer ${input:cloudhal-key}" },
         },
       },
-      null,
-      2,
-    );
-  }
-  if (kind === "claude") {
-    return `claude mcp add --transport http cloudhal ${endpoint} \\\n  --header "x-api-key: ${secret}"`;
-  }
-  return "# Run inside the site project; no key needed on your own machine\ncd my-site\nclaude mcp add cloudhal -- npx cloudhal mcp --mode edits";
+    }),
+  generic: (endpoint, key) =>
+    json({
+      mcpServers: {
+        cloudhal: { type: "http", url: endpoint, headers: { Authorization: `Bearer ${key}` } },
+      },
+    }),
+  stdio: () =>
+    "# Run inside the site project; no key needed on your own machine\ncd my-site\nclaude mcp add cloudhal -- npx cloudhal mcp --mode edits",
+};
+
+/** Client configuration for this Studio's MCP endpoint; `key` fills in a freshly created key. */
+export function mcpSnippet(client: McpClient, endpoint: string, key?: string): string {
+  return SNIPPETS[client](endpoint, key ?? "<your agent key>");
+}
+
+/** The highlighter language of a client's snippet. */
+export function snippetLang(client: McpClient): "json" | "bash" {
+  return client === "cursor" || client === "vscode" || client === "generic" ? "json" : "bash";
 }
