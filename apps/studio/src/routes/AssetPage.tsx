@@ -234,7 +234,7 @@ export function AssetPage() {
   const readOnlyReason = data.editable ? undefined : (upload.reason ?? t("media.detail.notOwn"));
   const show = (e: unknown) => showErrors && e !== undefined;
   const usedCount = new Set(data.uses.map((u) => u.nodeId)).size;
-  const contentUrl = api.assets.contentUrl(siteId, asset.id);
+  const contentUrl = api.assets.contentUrl(siteId, asset.id, asset.sha256);
   const ext = asset.slug ? data.url.split(".").pop() : "";
   const prefix = asset.sha256.slice(0, 16);
 

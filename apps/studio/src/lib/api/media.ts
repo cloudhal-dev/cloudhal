@@ -154,6 +154,10 @@ export const mediaApi = {
       method: "POST",
       ...json({ files }),
     }),
-  /** Studio's own, session-authenticated copy of the bytes (drafts included, never cached). */
-  contentUrl: (siteId: string, id: string) => `${assetPath(siteId, id)}/content`,
+  /**
+   * Studio's own, session-authenticated copy of the bytes (drafts included). With the file's hash
+   * (`v`, its first 16 hex digits) the browser keeps it for a day instead of asking again.
+   */
+  contentUrl: (siteId: string, id: string, sha256?: string) =>
+    `${assetPath(siteId, id)}/content${sha256 ? `?v=${sha256.slice(0, 16)}` : ""}`,
 };

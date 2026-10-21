@@ -11,6 +11,7 @@
  *
  * Every change writes one audit row (`asset.*`, §6.3); REST writes by people take no snapshot.
  */
+
 import { holds } from "@cloudhal/agent-runtime";
 import type { Actor, Asset, Site } from "@cloudhal/core-contracts";
 import { InvariantError, termName, type UploadTicket } from "@cloudhal/core-ts";
@@ -22,7 +23,6 @@ import {
   mediaPath,
   mediaTypeFromFilename,
   normalizeMediaType,
-  servedContentType,
 } from "@cloudhal/core-ts/media";
 import { BlobIntegrityError, readAllBytes, sha256OfBytes } from "@cloudhal/storage";
 import { type Context, Hono } from "hono";
@@ -32,6 +32,7 @@ import { actorOf, requireSite } from "../governance.ts";
 import { personOf } from "../own.ts";
 import { param } from "../params.ts";
 import { signUploadTicket, verifyUploadTicket } from "../uploads.ts";
+import { contentHeaders } from "./asset-content-headers.ts";
 
 /** RFC-0004 §5.1: per request, per actor and per ticket. */
 export const UPLOAD_LIMITS = {
@@ -417,27 +418,6 @@ function uploadError(e: unknown, ticket: UploadTicket): never {
   throw e;
 }
 
-/** Response headers for Studio's private previews (never cached, never executed). */
-function contentHeaders(asset: Asset): Record<string, string> {
-  const info = MEDIA_TYPES[asset.mediaType];
-  const svg = asset.mediaType === "image/svg+xml";
-  const filename = `${asset.slug}.${mediaExtension(asset.mediaType)}`;
-  return {
-    "content-type": servedContentType(asset.mediaType),
-    "content-disposition":
-      info?.disposition === "inline" ? "inline" : `attachment; filename="${filename}"`,
-    "cache-control": "private, no-store",
-    "x-content-type-options": "nosniff",
-    "cross-origin-resource-policy": "same-origin",
-    "content-security-policy": svg
-      ? "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox"
-      : asset.mediaType === "application/pdf"
-        ? "frame-ancestors 'self'"
-        : "default-src 'none'; frame-ancestors 'self'",
-    etag: `"${asset.sha256}"`,
-  };
-}
-
 export const assets: Hono<Env> = new Hono<Env>()
   .get("/", async (c) => {
     const store = c.get("store");
@@ -657,7 +637,7 @@ export const assets: Hono<Env> = new Hono<Env>()
     const state = await store.blobState(asset.siteId, asset.sha256);
     if (state?.state === "purged")
       throw apiError(410, "purged", "this file was taken down; its bytes are gone");
-    const headers = contentHeaders(asset);
+    const headers = contentHeaders(asset, c.req.query("v") || undefined);
     if (c.req.header("if-none-match") === headers.etag) return c.body(null, 304, headers);
     const key = `media/${asset.siteId}/${asset.sha256}`;
     const blobs = store.blobs;

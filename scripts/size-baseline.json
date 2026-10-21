@@ -10,7 +10,7 @@
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 881,
     "packages/api/src/build-turn.ts": 885,
-    "packages/api/src/routes/assets.ts": 853,
+    "packages/api/src/routes/assets.ts": 833,
     "packages/api/src/routes/comments.ts": 874,
     "packages/api/src/routes/schedules.ts": 992,
     "packages/api/src/testing-roles.ts": 1936,

@@ -64,6 +64,7 @@ export function AssetFrame({
       fit={size === "card" ? "contain" : "cover"}
       src={src}
       alt={alt ?? ""}
+      {...(asset.image ? { placeholder: asset.image } : {})}
       labels={{
         empty: t("media.preview.empty"),
         loading: t("media.preview.loading"),

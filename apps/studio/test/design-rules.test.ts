@@ -1068,7 +1068,7 @@ describe("design rules (DESIGN.md)", () => {
     }
     // The content route is the only asset source, and it is Studio's own (same origin).
     const media = readFileSync(path.join(SRC, "lib/media.ts"), "utf8");
-    expect(media).toMatch(/return api\.assets\.contentUrl\(siteId, asset\.id\)/);
+    expect(media).toMatch(/return api\.assets\.contentUrl\(siteId, asset\.id, asset\.sha256\)/);
   });
 
   it("file bytes go up only through a single-use ticket (§2u, RFC-0004 §5.5)", () => {
