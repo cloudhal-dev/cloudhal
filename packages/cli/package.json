@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/cli",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "cloudhal — create, run and build Cloudhal sites locally",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",

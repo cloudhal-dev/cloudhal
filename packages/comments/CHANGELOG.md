@@ -1,5 +1,13 @@
 # @cloudhal/comments
 
+## 0.3.7
+
+### Patch Changes
+
+- @cloudhal/core-contracts@0.3.7
+  - @cloudhal/core-ts@0.3.7
+  - @cloudhal/storage@0.3.7
+
 ## 0.3.6
 
 ### Patch Changes

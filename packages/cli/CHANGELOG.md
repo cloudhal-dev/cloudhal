@@ -1,5 +1,21 @@
 # @cloudhal/cli
 
+## 0.3.7
+
+### Patch Changes
+
+- 0d6b49d: `cloudhal deploy` no longer fails with "Invalid URL" after deploying a site with a custom domain from a fresh checkout (Workers Builds): wrangler lists the domain as `example.com (custom domain)`, and the note is now dropped before the address is used.
+- @cloudhal/agent-runtime@0.3.7
+  - @cloudhal/analytics@0.3.7
+  - @cloudhal/api@0.3.7
+  - @cloudhal/cloudflare@0.3.7
+  - @cloudhal/comments@0.3.7
+  - @cloudhal/core-contracts@0.3.7
+  - @cloudhal/core-ts@0.3.7
+  - @cloudhal/mcp-server@0.3.7
+  - @cloudhal/schedules@0.3.7
+  - @cloudhal/storage@0.3.7
+
 ## 0.3.6
 
 ### Patch Changes
