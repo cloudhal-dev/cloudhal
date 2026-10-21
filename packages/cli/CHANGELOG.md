@@ -1,5 +1,21 @@
 # @cloudhal/cli
 
+## 0.3.6
+
+### Patch Changes
+
+- 950fb3d: Studio has a favicon: the Cloudhal mark.
+- @cloudhal/agent-runtime@0.3.6
+  - @cloudhal/analytics@0.3.6
+  - @cloudhal/api@0.3.6
+  - @cloudhal/cloudflare@0.3.6
+  - @cloudhal/comments@0.3.6
+  - @cloudhal/core-contracts@0.3.6
+  - @cloudhal/core-ts@0.3.6
+  - @cloudhal/mcp-server@0.3.6
+  - @cloudhal/schedules@0.3.6
+  - @cloudhal/storage@0.3.6
+
 ## 0.3.5
 
 ### Patch Changes
