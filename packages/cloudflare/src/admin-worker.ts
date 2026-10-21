@@ -258,6 +258,22 @@ function required(env: AdminEnv, key: keyof AdminEnv): string {
   return value;
 }
 
+/** How often one isolate sweeps due comment purges on an admin request. */
+const COMMENTS_SWEEP_MS = 10_000;
+/** When this isolate last swept them; a plain number (ADR-0012: no objects between requests). */
+let commentsSweptAt = 0;
+
+/**
+ * Whether this request sweeps due comment purges. Each sweep reads D1, which serves one query at
+ * a time, so sweeping on every request slowed the screen's own calls; moderation still wakes its
+ * own flush.
+ */
+function commentsSweepDue(now = Date.now()): boolean {
+  if (now - commentsSweptAt <= COMMENTS_SWEEP_MS) return false;
+  commentsSweptAt = now;
+  return true;
+}
+
 export function createAdminWorker(options: AdminWorkerOptions = {}) {
   const skills: LoadedSkill[] = (options.skills ?? []).map((s) => skillFromSource(s));
   // Checked once per isolate; `cloudhal deploy` refused invalid types before uploading.
@@ -357,8 +373,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             }
           : {}),
       });
-      // Every admin request also flushes what is due (Studio polls every 15–60 s).
-      if (comments) ctx.waitUntil(flush());
+      // Every admin request also flushes what is due (Studio polls every 15–60 s), throttled.
+      if (comments && commentsSweepDue()) ctx.waitUntil(flush());
       const store: SiteGraphStore = new SiteGraphStore({
         sql,
         blobs,

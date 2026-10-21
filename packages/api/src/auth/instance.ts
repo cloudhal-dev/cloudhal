@@ -72,6 +72,10 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
       autoSignIn: true,
     },
     telemetry: { enabled: false },
+    // Every signed-in API request reads the session; signed into a cookie for 60 s, it costs no
+    // D1 round trip. A revoked session or a sign-out on another device takes effect within 60 s
+    // (the person's own sign-out clears the cookie at once).
+    session: { cookieCache: { enabled: true, maxAge: 60 } },
     hooks: {
       // Checked before the endpoint runs (outside Better Auth's write transaction, which would
       // deadlock a second query on single-connection SQLite).
@@ -109,7 +113,13 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
     },
     ...(options.workers
       ? {
-          rateLimit: { enabled: true, storage: "database" as const },
+          // Stored in D1, so each limited call costs a read and a write. Reading the session is
+          // not a brute-force target and Studio asks for it often: it is not limited.
+          rateLimit: {
+            enabled: true,
+            storage: "database" as const,
+            customRules: { "/get-session": false as const },
+          },
           advanced: {
             ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
             ...(options.workers.waitUntil
