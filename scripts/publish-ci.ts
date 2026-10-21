@@ -56,8 +56,11 @@ if (missing.length) {
   }
   for (let i = 0; i < 30 && (await unpublished(pkgs, onNpm)).length; i++)
     await new Promise((r) => setTimeout(r, 10_000));
+  // `npm publish` succeeded for each, so the registry has them; it can take longer than five
+  // minutes to serve one (0.3.8, 0.3.10). That must not keep the tag and the release back.
   const left = await unpublished(pkgs, onNpm);
-  if (left.length) throw new Error(`npm does not serve yet: ${left.map((p) => p.name).join(", ")}`);
+  if (left.length)
+    console.warn(`npm does not serve yet: ${left.map((p) => p.name).join(", ")}; tagging anyway`);
 } else console.log(`npm already has every package at ${version}`);
 
 const tag = `v${version}`;
