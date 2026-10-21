@@ -13,6 +13,7 @@ import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-s
 import { api } from "./lib/api.ts";
 import { authClient } from "./lib/auth.ts";
 import { isQueueTab, type QueueTab } from "./lib/comments-shell.ts";
+import { cachedSession } from "./lib/session-cache.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
 
@@ -153,11 +154,18 @@ export interface RouterContext {
 }
 
 async function requireSession() {
-  const { data, error } = await authClient.getSession();
+  // Kept between navigations (lib/session-cache.ts): asking each time held every screen back.
+  const last: { status?: number } = {};
+  const data = await cachedSession(async () => {
+    const r = await authClient.getSession();
+    if (r.error) last.status = r.error.status;
+    return r.data;
+  });
   if (data) return data;
   // RFC-0036 §5: a playground has no sign-in (its API refuses /api/auth with 403) and answers
   // every call as its one fixed principal.
-  if (error?.status === 403 && (await isPlayground())) return null;
+  // (A caller that shared another's request has no status of its own: it asks too.)
+  if ((last.status ?? 403) === 403 && (await isPlayground())) return null;
   throw redirect({ to: "/login" });
 }
 
@@ -498,6 +506,10 @@ export function createStudioRouter(queryClient: QueryClient) {
     routeTree,
     context: { queryClient },
     defaultPreload: "intent",
+    // The router's own default waits a second before showing the pending screen, so a short wait
+    // looked frozen: the URL had changed and nothing else had.
+    defaultPendingMs: 150,
+    defaultPendingMinMs: 300,
     defaultPendingComponent: RoutePending,
     defaultErrorComponent: RouteError,
   });

@@ -1,4 +1,5 @@
 /** The fetch core of the Studio API client: `request`, its error type and the URL/body helpers. */
+import { forgetSession } from "../session-cache.ts";
 
 export interface ApiError {
   error: string;
@@ -27,6 +28,8 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   const body = (await res
     .json()
     .catch(() => ({ error: "invalid_json", message: res.statusText }))) as T | ApiError;
+  // The session ended on the server: the next navigation asks again (and lands on the login).
+  if (res.status === 401) forgetSession();
   if (!res.ok) throw new ApiRequestError(res.status, body as ApiError);
   return body as T;
 }

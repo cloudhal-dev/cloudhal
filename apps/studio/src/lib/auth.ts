@@ -1,8 +1,20 @@
 import { adminClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { forgetSession } from "./session-cache.ts";
 
-/** Same-origin (Vite proxies /api in dev; `cloudhal studio` serves both in prod), so no baseURL. */
-export const authClient = createAuthClient({ plugins: [organizationClient(), adminClient()] });
+/**
+ * Same-origin (Vite proxies /api in dev; `cloudhal studio` serves both in prod), so no baseURL.
+ * Any auth call but the session check itself (sign-in, sign-out, revoking sessions, a new
+ * password) may change the session, so the one kept between navigations is forgotten.
+ */
+export const authClient = createAuthClient({
+  plugins: [organizationClient(), adminClient()],
+  fetchOptions: {
+    onResponse: ({ request }) => {
+      if (!String(request.url).includes("/get-session")) forgetSession();
+    },
+  },
+});
 
 /** A Better Auth call that failed; `code` is Better Auth's error code (e.g. `INVALID_PASSWORD`). */
 export class AuthRequestError extends Error {
