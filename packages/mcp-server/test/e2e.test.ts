@@ -282,7 +282,7 @@ describe("MCP client ↔ Cloudhal server", () => {
       audit,
       elicitation: true,
       // The edit is awaited before answering: it must land before the retry, whatever the load.
-      answer: async () => {
+      answer: async (): Promise<Answer> => {
         if (!edited) {
           edited = true;
           const page = (await store.listPages(siteId))[0];
