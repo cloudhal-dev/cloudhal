@@ -1,5 +1,18 @@
 # @cloudhal/cloudflare
 
+## 0.3.9
+
+### Patch Changes
+
+- @cloudhal/api@0.3.9
+  - @cloudhal/mcp-server@0.3.9
+  - @cloudhal/agent-runtime@0.3.9
+  - @cloudhal/analytics@0.3.9
+  - @cloudhal/comments@0.3.9
+  - @cloudhal/core-ts@0.3.9
+  - @cloudhal/schedules@0.3.9
+  - @cloudhal/storage@0.3.9
+
 ## 0.3.8
 
 ### Patch Changes
