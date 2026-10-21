@@ -160,6 +160,8 @@ describe("CreateAgentKeyDialog", () => {
     const reveal = await screen.findByTestId("key-reveal");
     expect(reveal).toHaveTextContent("You won't see this key again");
     expect(reveal.innerHTML).toContain("abc123_secret_value");
+    // Ready-to-copy setup for each client, starting with Claude Code.
+    expect(within(reveal).getByTestId("mcp-client-setup")).toHaveAttribute("data-client", "claude");
     fireEvent.click(screen.getByRole("button", { name: "I've stored the key" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

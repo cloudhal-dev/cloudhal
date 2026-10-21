@@ -8,26 +8,23 @@ import {
   Input,
   InsetPanel,
   LayerDialog,
-  Tabs,
   Text,
 } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import { ArrowCounterClockwise, Info, Warning } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { listOf, useT } from "../i18n/index.tsx";
 import {
   type GrantableScope,
-  mcpSnippet,
   SCOPE_GROUPS,
   type ScopeGroup,
-  type SnippetKind,
   sameScopes,
   scopeOptions,
 } from "../lib/agents.ts";
 import { api, type CreatedAgentKey, errorCode, type KeyMode } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { AutoModeConfirm, BypassHint, ModeBadge, ModePicker } from "./AgentModes.tsx";
+import { McpClientSetup } from "./McpClientSetup.tsx";
 import { useAgentModeRules } from "./useAgentModeRules.ts";
 
 type Step = "mode" | "details";
@@ -61,7 +58,6 @@ export function CreateAgentKeyDialog({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [created, setCreated] = useState<CreatedAgentKey | undefined>();
-  const [snippet, setSnippet] = useState<SnippetKind>("json");
 
   const modeScopes = rules.scopesFor(mode);
   const customised = !sameScopes(scopes, modeScopes);
@@ -89,7 +85,6 @@ export function CreateAgentKeyDialog({
       setScopes(rules.scopesFor(rules.defaultMode));
       setAdvancedOpen(false);
       setSubmitted(false);
-      setSnippet("json");
       create.reset();
     } else {
       setCreated(undefined);
@@ -160,30 +155,11 @@ export function CreateAgentKeyDialog({
                   tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
                 />
               </div>
-              <div className="grid min-w-0 gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Text size="sm" bold as="span">
-                    {t("agents.reveal.config")}
-                  </Text>
-                  <Tabs
-                    variant="segmented"
-                    size="sm"
-                    value={snippet}
-                    onValueChange={(v) => setSnippet(v as SnippetKind)}
-                    tabs={(["json", "claude"] as const).map((k) => ({
-                      value: k,
-                      label: t(`agents.connect.tabs.${k}`),
-                    }))}
-                  />
-                </div>
-                <div className="min-w-0 overflow-x-auto">
-                  <CodeHighlighted
-                    code={mcpSnippet(snippet, endpoint, created.key)}
-                    lang={snippet === "json" ? "json" : "bash"}
-                    showCopyButton
-                  />
-                </div>
-              </div>
+              <McpClientSetup
+                endpoint={endpoint}
+                agentKey={created.key}
+                label={t("agents.reveal.config")}
+              />
             </div>
           ) : step === "mode" ? (
             <div className="grid gap-5" data-testid="create-step-mode">

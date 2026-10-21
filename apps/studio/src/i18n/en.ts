@@ -899,7 +899,8 @@ export const en = {
     },
     reveal: {
       title: "Copy your new key",
-      description: "“{name}” is ready. Your agent sends it in the x-api-key header.",
+      description:
+        "“{name}” is ready. Your agent sends it as a bearer token or in the x-api-key header.",
       warningTitle: "You won't see this key again",
       warning:
         "Store it now in your password manager or the agent's secret store. If it's lost, revoke it and create a new one.",
@@ -913,9 +914,28 @@ export const en = {
         "Agents reach Studio over MCP at this address and send their key in a header. When it connects, the agent is told its key's mode, so it knows what waits for you.",
       endpoint: "MCP endpoint",
       header: "Header",
-      tabs: { json: "JSON", claude: "Claude Code", stdio: "Local" },
-      stdioHint:
-        "On your own machine, run the stdio server inside the site folder; no key needed. --mode sets how it works, and only here can it be bypass.",
+      client: "Client",
+      clients: {
+        claude: "Claude Code",
+        codex: "Codex",
+        cursor: "Cursor",
+        vscode: "VS Code",
+        generic: "Other client",
+        stdio: "Local (stdio)",
+      },
+      hints: {
+        claude: "Run it in a terminal, then check the connection with /mcp inside Claude Code.",
+        codex:
+          "Codex reads the key from CLOUDHAL_API_KEY and sends it as a bearer token. Put the export line in your shell profile so the key is set whenever Codex starts.",
+        cursor:
+          "Paste it into ~/.cursor/mcp.json, or .cursor/mcp.json in a project. The file holds the key, so keep it out of version control.",
+        vscode:
+          "Save it as .vscode/mcp.json in your project. VS Code asks for the key once and keeps it in its secret storage.",
+        generic:
+          "Any client that speaks streamable HTTP: this URL, with the key in the Authorization header as a bearer token. The x-api-key header works too.",
+        stdio:
+          "On your own machine, run the stdio server inside the site folder; no key needed. --mode sets how it works, and only here can it be bypass.",
+      },
     },
   },
   activity: {
