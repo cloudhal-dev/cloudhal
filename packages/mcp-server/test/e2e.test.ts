@@ -23,7 +23,7 @@ async function connect(opts: {
   store: SiteGraphStore;
   audit: AuditLog;
   elicitation: boolean;
-  answer?: () => Answer;
+  answer?: () => Answer | Promise<Answer>;
   prompts?: string[];
   confirmTokenFallback?: boolean;
   approvals?: ApprovalStore;
@@ -45,7 +45,7 @@ async function connect(opts: {
   if (opts.elicitation) {
     client.setRequestHandler("elicitation/create", async (req) => {
       opts.prompts?.push(req.params.message);
-      const action = opts.answer?.() ?? "accept";
+      const action = (await opts.answer?.()) ?? "accept";
       return action === "accept" ? { action, content: { confirm: true } } : { action };
     });
   }
@@ -281,18 +281,16 @@ describe("MCP client ↔ Cloudhal server", () => {
       store,
       audit,
       elicitation: true,
-      answer: () => {
+      // The edit is awaited before answering: it must land before the retry, whatever the load.
+      answer: async (): Promise<Answer> => {
         if (!edited) {
           edited = true;
-          void (async () => {
-            const page = (await store.listPages(siteId))[0];
-            if (page) await store.updatePage({ ...page, title: "Changed after the question" });
-          })();
+          const page = (await store.listPages(siteId))[0];
+          if (page) await store.updatePage({ ...page, title: "Changed after the question" });
         }
         return "accept";
       },
     });
-    await new Promise((r) => setTimeout(r, 0));
     const r = await client.callTool({ name: "publish", arguments: { siteId } });
     expect(r.isError).toBe(true);
     expect((r.content[0] as { text: string }).text).toMatch(/site changed meanwhile/);
