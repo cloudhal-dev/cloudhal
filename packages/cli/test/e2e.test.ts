@@ -218,6 +218,9 @@ describe("cloudhal init → dev → snapshot → build", () => {
     }
     const snap = await snapshot({ projectDir, label: "v1", publish: true });
     expect(snap.summary.added).toBeGreaterThan(0);
+    // #51: publishing again with nothing changed makes no new snapshot
+    const again = await snapshot({ projectDir, publish: true });
+    expect(again).toMatchObject({ id: snap.id, unchanged: true });
 
     const cfg = await readProjectConfig(projectDir);
     const local = await openLocalStore(path.join(projectDir, cfg.dataDir));

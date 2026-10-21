@@ -45,6 +45,10 @@ const snapshotCommand: CliCommand = async (_rest, values, { projectDir }) => {
     ...(values.label ? { label: values.label } : {}),
     ...(values.publish ? { publish: true } : {}),
   });
+  if (snap.unchanged) {
+    console.log(`nothing changed since ${snap.id} (live); no new snapshot`);
+    return 0;
+  }
   console.log(
     `${snap.id}  nodes=${snap.nodes.length}  +${snap.summary.added} ~${snap.summary.changed} -${snap.summary.removed}${values.publish ? "  (published)" : ""}`,
   );
