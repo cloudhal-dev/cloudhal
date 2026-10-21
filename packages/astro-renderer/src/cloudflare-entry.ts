@@ -57,11 +57,12 @@ import { isCloudhalCacheTag } from "./cache-tags.ts";
 import { type CommentsRateLimit, isCommentsPath, SiteComments } from "./comments.ts";
 import { SITE_CSP } from "./csp.ts";
 import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
+import { hostRedirect, type RedirectEnv } from "./host-redirect.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { SearchLimiter, searchCost } from "./search-limit.ts";
 import { SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
 
-interface Env {
+interface Env extends RedirectEnv {
   CLOUDHAL_SITE_ID?: string;
   /**
    * RFC-0034 §4: the sites a multi-site Worker serves (comma-separated); the hostname picks one
@@ -533,6 +534,8 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
       const url = new URL(request.url);
       if (url.pathname === "/__cloudhal/purge") return purge(request, env, options.siteId);
       if (url.pathname === "/__cloudhal/features") return features(request, env);
+      const moved = hostRedirect(request, env);
+      if (moved) return moved;
       // RFC-0034 §4: the hostname picks the site on a multi-site Worker; everything the request
       // runs (Astro's render included) then sees that site.
       const choice = await siteDispatch(env, options.siteId).choose(request);

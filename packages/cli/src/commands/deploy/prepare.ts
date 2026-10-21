@@ -292,6 +292,7 @@ export async function buildSite(
       ...(served.siteIds ? { siteIds: served.siteIds } : {}),
       ...(served.hosts.length > 0 ? { domains: served.hosts } : {}),
       ...(cfg.domains?.site ? { domain: cfg.domains.site, siteHosts: [cfg.domains.site] } : {}),
+      ...(cfg.domains?.redirects ? { redirects: cfg.domains.redirects } : {}),
       ...(input.analytics ? { analytics: input.analytics } : {}),
       comments: input.comments,
       observability: input.observability,

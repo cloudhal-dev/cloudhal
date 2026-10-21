@@ -11,12 +11,19 @@ import { isHostname, normalizeHostname, withPrimaryDomain } from "@cloudhal/core
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { type ProjectConfig, readProjectConfig, writeProjectConfig } from "../config.ts";
 
-export type DomainTarget = "site" | "studio";
+export type DomainTarget = "site" | "studio" | "redirects";
 
 export interface DomainOptions {
   readonly projectDir: string;
-  /** Hostnames to set (others stay as they are). */
-  readonly set?: { readonly site?: string; readonly studio?: string };
+  /**
+   * Hostnames to set (others stay as they are). `redirects` replaces the list of hosts that
+   * answer with a 301 to the site's domain (#49).
+   */
+  readonly set?: {
+    readonly site?: string;
+    readonly studio?: string;
+    readonly redirects?: readonly string[];
+  };
   /** Domains to forget. */
   readonly remove?: readonly DomainTarget[];
 }
@@ -32,21 +39,37 @@ export function checkHostname(input: string): string {
 
 export async function domain(options: DomainOptions): Promise<ProjectConfig["domains"]> {
   const cfg = await readProjectConfig(options.projectDir);
-  const next: { site?: string; studio?: string } = { ...cfg.domains };
+  const next: { site?: string; studio?: string; redirects?: readonly string[] } = {
+    ...cfg.domains,
+  };
   for (const target of options.remove ?? []) delete next[target];
+  // redirects go to the site's domain: without it they have nowhere to go
+  if (options.remove?.includes("site")) delete next.redirects;
   if (options.set?.site) next.site = checkHostname(options.set.site);
   if (options.set?.studio) next.studio = checkHostname(options.set.studio);
+  if (options.set?.redirects)
+    next.redirects = [...new Set(options.set.redirects.map(checkHostname))];
   if (next.site && next.site === next.studio)
     throw new Error("the site and Studio need different hostnames");
+  checkRedirects(next);
+  if (!next.redirects?.length) delete next.redirects;
+  const any = next.site || next.studio || next.redirects;
   if (options.set || options.remove) {
     const { domains: _old, ...rest } = cfg;
-    await writeProjectConfig(options.projectDir, {
-      ...rest,
-      ...(next.site || next.studio ? { domains: next } : {}),
-    });
+    await writeProjectConfig(options.projectDir, { ...rest, ...(any ? { domains: next } : {}) });
   }
   if (next.site && options.set?.site) await makePrimary(options.projectDir, cfg, next.site);
-  return next.site || next.studio ? next : undefined;
+  return any ? next : undefined;
+}
+
+/** Redirect hosts need a site domain to go to, and are neither it nor Studio's. */
+function checkRedirects(d: { site?: string; studio?: string; redirects?: readonly string[] }) {
+  if (!d.redirects?.length) return;
+  if (!d.site)
+    throw new Error("redirects need the site's own domain: cloudhal domain set <hostname>");
+  for (const host of d.redirects)
+    if (host === d.site || host === d.studio)
+      throw new Error(`${host} is already the site's or Studio's domain; it cannot redirect`);
 }
 
 /** `hostname` becomes the local site's primary domain (other domains stay, as secondary). */

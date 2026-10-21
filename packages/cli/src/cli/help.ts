@@ -21,7 +21,7 @@ Usage:
                                                           open releases and time gates; from the monorepo a
                                                           stale apps/studio/dist is rebuilt first
                                                           (--no-build-studio: fail instead)
-  cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
+  cloudhal domain [set <hostname>] [--studio <hostname>] [--redirect <hostname>]… | remove [site|studio|redirects|all]
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
                                                           local site → deployment (refused while releases are
