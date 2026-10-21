@@ -1,5 +1,16 @@
 # @cloudhal/astro-renderer
 
+## 0.3.10
+
+### Patch Changes
+
+- 46f59d5: The site Worker's responses carry `Vary: Host`, and redirect-host 301s never enter the edge cache (#62). Workers Cache keys by path, not hostname, so before this every host routed to one site Worker shared a cache entry per path: a `--redirect` host's 301 could be served on the site's own domain (a redirect loop), and the sites of a multi-site Worker could serve each other's cached pages.
+- @cloudhal/analytics@0.3.10
+  - @cloudhal/comments@0.3.10
+  - @cloudhal/core-contracts@0.3.10
+  - @cloudhal/core-ts@0.3.10
+  - @cloudhal/storage@0.3.10
+
 ## 0.3.9
 
 ### Patch Changes
