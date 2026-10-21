@@ -502,13 +502,31 @@ describe("cloudhal deploy", () => {
     });
     await before.close();
 
+    // #49: hosts that answer with a 301 to the site's domain
+    await expect(domain({ projectDir, set: { redirects: ["news.example.com"] } })).rejects.toThrow(
+      /cannot redirect/,
+    );
+    expect(
+      await domain({
+        projectDir,
+        set: { redirects: ["WWW.news.example.com", "www.news.example.com"] },
+      }),
+    ).toMatchObject({ redirects: ["www.news.example.com"] });
+
     const r = await run();
     expect(r).toMatchObject({
       customSiteUrl: "https://news.example.com",
       customStudioUrl: "https://studio.example.com",
     });
     const siteCfg = await jsonc(path.join(projectDir, "wrangler.jsonc"));
-    expect(siteCfg.routes).toEqual([{ pattern: "news.example.com", custom_domain: true }]);
+    expect(siteCfg.routes).toEqual([
+      { pattern: "news.example.com", custom_domain: true },
+      { pattern: "www.news.example.com", custom_domain: true },
+    ]);
+    expect(siteCfg.vars).toMatchObject({
+      CLOUDHAL_REDIRECT_HOSTS: "www.news.example.com",
+      CLOUDHAL_REDIRECT_TO: "news.example.com",
+    });
     const adminCfg = await jsonc(r.adminConfig);
     expect(adminCfg.routes).toEqual([{ pattern: "studio.example.com", custom_domain: true }]);
     // the custom domain is primary on the deployment and locally; workers.dev stays secondary

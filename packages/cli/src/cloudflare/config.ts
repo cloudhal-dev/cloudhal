@@ -180,6 +180,8 @@ export function siteWorkerConfig(
     domain?: string;
     /** RFC-0034 §5: every other site's hostnames, one Custom Domain route each. */
     domains?: readonly string[];
+    /** Hosts that answer with a 301 to `domain` (#49), each routed as a Custom Domain too. */
+    redirects?: readonly string[];
     analytics?: AnalyticsDeployment;
     comments?: CommentsDeployment;
     /** Extra hostnames the site answers on (custom domains): analytics and comments check them. */
@@ -191,6 +193,7 @@ export function siteWorkerConfig(
   const a = n.analytics;
   const c = n.comments?.available ? n.comments : undefined;
   const hosts = [...new Set([...(n.siteHosts ?? []), ...(a?.siteHosts ?? [])])];
+  const redirects = n.domain ? (n.redirects ?? []) : [];
   const ratelimits = [
     // Optional cross-isolate beacon limit (RFC-0006 §5.5): one key per client (an HMAC, never the IP).
     ...(a?.rateLimit
@@ -237,8 +240,11 @@ export function siteWorkerConfig(
         : {}),
       // RFC-0006 §5.2 / RFC-0007 §6.2 step 2: the same-origin checks accept these hosts too.
       ...((a || c) && hosts.length > 0 ? { CLOUDHAL_SITE_HOSTS: hosts.join(",") } : {}),
+      ...(n.domain && redirects.length > 0
+        ? { CLOUDHAL_REDIRECT_HOSTS: redirects.join(","), CLOUDHAL_REDIRECT_TO: n.domain }
+        : {}),
     },
-    ...customDomain(n.domain, n.domains),
+    ...customDomain(n.domain, [...(n.domains ?? []), ...redirects]),
     // Workers Cache: published pages are cached until a publish purges `cloudhal-site-<id>`.
     cache: { enabled: true },
     observability: observabilitySettings(n.observability),

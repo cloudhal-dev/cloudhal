@@ -117,9 +117,14 @@ export interface ProjectConfig {
   readonly dataDir: string;
   /**
    * Custom domains `cloudhal deploy` routes to the Workers (Cloudflare Custom Domains; the zone
-   * must be in the same account). The workers.dev addresses keep working.
+   * must be in the same account). The workers.dev addresses keep working. `redirects` answer with
+   * a 301 to `site` (#49), e.g. `www.example.com`.
    */
-  readonly domains?: { readonly site?: string; readonly studio?: string };
+  readonly domains?: {
+    readonly site?: string;
+    readonly studio?: string;
+    readonly redirects?: readonly string[];
+  };
   /** Site analytics (RFC-0006); absent = off. */
   readonly analytics?: AnalyticsConfig;
   /** Reader comments (RFC-0007); absent = available, off per site. */
@@ -166,6 +171,21 @@ const OWN_KEYS = new Set([
 ]);
 
 const VITALS = [0, 1, 2, 5, 10, 20];
+
+/** `domains`, leniently: values of the wrong type are left out. */
+function parseDomains(input: unknown): ProjectConfig["domains"] {
+  if (!input || typeof input !== "object") return undefined;
+  const d = input as Record<string, unknown>;
+  const redirects = Array.isArray(d.redirects)
+    ? d.redirects.filter((h): h is string => typeof h === "string" && h !== "")
+    : [];
+  const out = {
+    ...(typeof d.site === "string" && d.site ? { site: d.site } : {}),
+    ...(typeof d.studio === "string" && d.studio ? { studio: d.studio } : {}),
+    ...(redirects.length > 0 ? { redirects } : {}),
+  };
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 /** Leniently parsed, like `domains`: values of the wrong type are left out. */
 export function parseAnalyticsConfig(input: unknown): AnalyticsConfig | undefined {
@@ -297,7 +317,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
   }
   const cfg = JSON.parse(raw) as Partial<ProjectConfig>;
   if (typeof cfg.siteId !== "string") throw new Error(`${CONFIG_FILE}: missing siteId`);
-  const domains = cfg.domains && typeof cfg.domains === "object" ? cfg.domains : undefined;
+  const domains = parseDomains(cfg.domains);
   const analytics = parseAnalyticsConfig(cfg.analytics);
   const comments = parseCommentsConfig(cfg.comments);
   const schedules = parseSchedulesConfig(cfg.schedules);
@@ -314,14 +334,7 @@ export async function readProjectConfig(projectDir: string): Promise<ProjectConf
       ? { installation: cfg.installation }
       : {}),
     dataDir: cfg.dataDir ?? ".cloudhal",
-    ...(domains && (domains.site || domains.studio)
-      ? {
-          domains: {
-            ...(typeof domains.site === "string" ? { site: domains.site } : {}),
-            ...(typeof domains.studio === "string" ? { studio: domains.studio } : {}),
-          },
-        }
-      : {}),
+    ...(domains ? { domains } : {}),
     ...(analytics ? { analytics } : {}),
     ...(comments ? { comments } : {}),
     ...(schedules ? { schedules } : {}),

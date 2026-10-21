@@ -60,23 +60,27 @@ const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
 function changeDomain(rest: string[], values: CliValues, projectDir: string) {
   const [action, arg] = rest;
   if (action === "set") {
-    if (!arg && !values.studio)
-      throw new Error("usage: cloudhal domain set <hostname> [--studio <hostname>]");
+    const redirects = (values.redirect ?? []).flatMap((v) => v.split(","));
+    if (!arg && !values.studio && redirects.length === 0)
+      throw new Error(
+        "usage: cloudhal domain set <hostname> [--studio <hostname>] [--redirect <hostname>]…",
+      );
     return domain({
       projectDir,
       set: {
         ...(arg ? { site: arg } : {}),
         ...(values.studio ? { studio: values.studio } : {}),
+        ...(redirects.length > 0 ? { redirects } : {}),
       },
     });
   }
   if (action === "remove") {
     const which = arg ?? "all";
-    if (!["site", "studio", "all"].includes(which))
-      throw new Error("usage: cloudhal domain remove [site|studio|all]");
+    if (!["site", "studio", "redirects", "all"].includes(which))
+      throw new Error("usage: cloudhal domain remove [site|studio|redirects|all]");
     return domain({
       projectDir,
-      remove: which === "all" ? ["site", "studio"] : [which as DomainTarget],
+      remove: which === "all" ? ["site", "studio", "redirects"] : [which as DomainTarget],
     });
   }
   if (action === undefined) return domain({ projectDir });
@@ -87,7 +91,7 @@ const domainCommand: CliCommand = async (rest, values, { projectDir }) => {
   const result = await changeDomain(rest, values, projectDir);
   console.log(
     result
-      ? `site:   ${result.site ? `https://${result.site}` : "(workers.dev)"}\nstudio: ${result.studio ? `https://${result.studio}` : "(workers.dev)"}`
+      ? `site:   ${result.site ? `https://${result.site}` : "(workers.dev)"}\nstudio: ${result.studio ? `https://${result.studio}` : "(workers.dev)"}${result.redirects ? `\n301:    ${result.redirects.join(", ")} → https://${result.site}` : ""}`
       : "no custom domains; the Workers answer on workers.dev",
   );
   if (rest[0])

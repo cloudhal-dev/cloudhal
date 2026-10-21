@@ -26,6 +26,7 @@ export const OPTIONS = {
   replace: { type: "boolean" },
   "admin-url": { type: "string" },
   studio: { type: "string" },
+  redirect: { type: "string", multiple: true },
   revert: { type: "string" },
   to: { type: "string" },
   "include-markdown": { type: "boolean" },
