@@ -113,7 +113,7 @@ export function assetPreviewUrl(siteId: string, asset: Asset): string | undefine
   if (asset.kind !== "image") return undefined;
   if (asset.storage.kind === "external")
     return /^https:\/\//.test(asset.storage.url) ? asset.storage.url : undefined;
-  return api.assets.contentUrl(siteId, asset.id);
+  return api.assets.contentUrl(siteId, asset.id, asset.sha256);
 }
 
 /**

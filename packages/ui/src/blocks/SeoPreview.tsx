@@ -32,6 +32,11 @@ export interface ImagePreviewProps {
   caption?: ReactNode;
   /** Replaces the caption while the image is broken, e.g. why a site path cannot load here. */
   errorHint?: ReactNode;
+  /**
+   * Shown while the image loads, in place of the spinner: its dominant colour and its small
+   * blurred preview (`Asset.image.color`, `.lqip`, computed at upload, RFC-0028).
+   */
+  placeholder?: { color?: string; lqip?: string };
   /** Called once per source with the image's natural size. */
   onLoad?: (size: { width: number; height: number }) => void;
   onStatusChange?: (status: ImagePreviewStatus) => void;
@@ -54,6 +59,7 @@ export function ImagePreview({
   onLoad,
   onStatusChange,
   className,
+  placeholder,
 }: ImagePreviewProps) {
   const [state, setState] = useState<{ src: string | undefined; status: ImagePreviewStatus }>({
     src,
@@ -74,6 +80,17 @@ export function ImagePreview({
   const compact = thumb || tile;
   const iconSize = thumb ? 16 : tile ? 24 : 32;
   const note = status === "error" ? errorHint : caption;
+  // The image's own colour and preview stand in while it loads (data, not a design colour).
+  const painted = status === "loading" && (placeholder?.color || placeholder?.lqip);
+  const paint = painted
+    ? {
+        backgroundColor: placeholder?.color,
+        backgroundImage: placeholder?.lqip ? `url("${placeholder.lqip}")` : undefined,
+        backgroundSize: fit === "contain" ? "contain" : "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }
+    : undefined;
   const frame = (
     <div
       data-image-status={status}
@@ -86,6 +103,7 @@ export function ImagePreview({
             : "aspect-[1.91/1] w-full rounded-lg",
         className,
       )}
+      style={paint}
     >
       {src && status !== "error" && (
         <img
@@ -119,13 +137,15 @@ export function ImagePreview({
           title={compact ? labelFor(status, labels) : undefined}
         >
           {status === "loading" ? (
-            <Loader size={compact ? "sm" : "base"} />
+            painted ? null : (
+              <Loader size={compact ? "sm" : "base"} />
+            )
           ) : status === "error" ? (
             <ImageBroken size={iconSize} aria-hidden />
           ) : (
             <ImageIcon size={iconSize} aria-hidden />
           )}
-          {compact ? (
+          {compact || painted ? (
             <span className="sr-only">{labelFor(status, labels)}</span>
           ) : (
             <Text as="span" variant="secondary" size="sm">

@@ -166,7 +166,22 @@ export function describeAssetsApi(label: string, backend: AssetsApiBackend): voi
         headers: { "x-test-user": "1" },
       });
       expect(content.status).toBe(200);
-      expect(content.headers.get("cache-control")).toBe("private, no-store");
+      // Without the hash the browser asks again, and the ETag answers 304; with it, it keeps
+      // the bytes for a day (the URL cannot change meaning).
+      expect(content.headers.get("cache-control")).toBe("private, no-cache");
+      const again = await app.request(`${base()}/${asset.id}/content`, {
+        headers: { "x-test-user": "1", "if-none-match": `"${asset.sha256}"` },
+      });
+      expect(again.status).toBe(304);
+      const pinned = await app.request(
+        `${base()}/${asset.id}/content?v=${asset.sha256.slice(0, 16)}`,
+        { headers: { "x-test-user": "1" } },
+      );
+      expect(pinned.headers.get("cache-control")).toBe("private, max-age=86400");
+      const stale = await app.request(`${base()}/${asset.id}/content?v=0000000000000000`, {
+        headers: { "x-test-user": "1" },
+      });
+      expect(stale.headers.get("cache-control")).toBe("private, no-cache");
       expect(content.headers.get("x-content-type-options")).toBe("nosniff");
       expect(content.headers.get("content-type")).toBe("image/jpeg");
       const stored = new Uint8Array(await content.arrayBuffer());

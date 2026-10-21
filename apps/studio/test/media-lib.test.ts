@@ -102,8 +102,9 @@ describe("showing files (§2u)", () => {
   });
 
   it("previews stored images from Studio's private content route, never the public URL", () => {
+    // `v` names the bytes, so the browser may keep them (a day)
     expect(assetPreviewUrl("site_1", asset())).toBe(
-      "/api/sites/site_1/assets/asset_photo01/content",
+      `/api/sites/site_1/assets/asset_photo01/content?v=${"ab".repeat(8)}`,
     );
     expect(
       assetPreviewUrl("site_1", asset({ kind: "data", mediaType: "text/csv", image: undefined })),
