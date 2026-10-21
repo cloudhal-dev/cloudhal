@@ -20,10 +20,12 @@ Blogs and newsrooms first; documentation sites and research or data documentatio
 ## Five minutes: create → ask an agent → preview → publish → your domain
 
 ```bash
-npm create cloudhal@latest my-site && cd my-site
+npm create cloudhal@latest my-site && cd my-site && npm install
 npx cloudhal dev                                          # local site with drafts visible
 claude mcp add cloudhal -- npx cloudhal mcp --mode edits  # connect your agent (any MCP client works)
 ```
+
+Step by step, with pnpm, Yarn and Bun: the [quickstart](https://cloudhal.dev/docs/start/quickstart). Codex, Cursor, VS Code and other clients: [connect an agent](https://cloudhal.dev/docs/agents/clients).
 
 Or put a blog on your Cloudflare account in one click, with nothing installed:
 

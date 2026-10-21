@@ -11,12 +11,21 @@
  */
 export const BUILD_DEPENDENCIES = ["better-sqlite3", "esbuild", "workerd"] as const;
 
+/**
+ * Cloudhal's own packages, exempt from pnpm's `minimumReleaseAge`: without this, every pnpm
+ * install refuses a Cloudhal release for its first day, including the upgrade a release asks for.
+ */
+export const RELEASE_AGE_EXEMPT = ["@cloudhal/*", "create-cloudhal"] as const;
+
 /** pnpm settings for a project outside a workspace: settings only, no `packages`. */
 export function pnpmWorkspaceYaml(): string {
   return [
     "# pnpm 12 runs install scripts only for packages allowed here.",
     "allowBuilds:",
     ...BUILD_DEPENDENCIES.map((name) => `  ${name}: true`),
+    "# Cloudhal releases install on the day they ship.",
+    "minimumReleaseAgeExclude:",
+    ...RELEASE_AGE_EXEMPT.map((name) => `  - '${name}'`),
     "",
   ].join("\n");
 }

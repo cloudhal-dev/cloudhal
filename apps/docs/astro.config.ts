@@ -28,8 +28,18 @@ export default defineConfig({
           label: "Start",
           items: [
             { label: "Overview", link: "/docs" },
+            { label: "Installation", link: "/docs/start/installation" },
+            { label: "Quickstart", link: "/docs/start/quickstart" },
             { label: "Deploy to Cloudflare", link: "/docs/guides/deploy-button" },
             { label: "Playground", link: "https://try.cloudhal.com" },
+          ],
+        },
+        {
+          label: "Agents",
+          items: [
+            { label: "Agents and MCP", link: "/docs/agents" },
+            { label: "Connect an agent", link: "/docs/agents/clients" },
+            { label: "Docs for agents", link: "/docs/agents/docs-for-agents" },
           ],
         },
         { label: "Guides", items: [{ autogenerate: { directory: "docs/guides" } }] },
@@ -60,6 +70,7 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
+            { label: "CLI", link: "/docs/reference/cli" },
             { label: "JSON Schemas v1", link: "/schemas/v1/index.json" },
             { label: "Cloudhal-Fetch", link: "/fetch" },
             { label: "llms.txt", link: "/llms.txt" },

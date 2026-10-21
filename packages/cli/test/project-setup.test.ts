@@ -42,7 +42,7 @@ describe("install settings", () => {
     const workspace = await readFile(path.join(ROOT, "pnpm-workspace.yaml"), "utf8");
     for (const name of BUILD_DEPENDENCIES) expect(workspace).toContain(`\n  ${name}: true`);
     expect(pnpmWorkspaceYaml()).toBe(
-      "# pnpm 12 runs install scripts only for packages allowed here.\nallowBuilds:\n  better-sqlite3: true\n  esbuild: true\n  workerd: true\n",
+      "# pnpm 12 runs install scripts only for packages allowed here.\nallowBuilds:\n  better-sqlite3: true\n  esbuild: true\n  workerd: true\n# Cloudhal releases install on the day they ship.\nminimumReleaseAgeExclude:\n  - '@cloudhal/*'\n  - 'create-cloudhal'\n",
     );
     const pkg = JSON.parse(await readFile(path.join(STARTER, "package.json"), "utf8"));
     expect(pkg.trustedDependencies).toEqual([...BUILD_DEPENDENCIES]);
