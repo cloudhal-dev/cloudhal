@@ -25,10 +25,25 @@ export function permalinkPrefix(template: string): string {
 }
 
 /** `/blog/hello-world`: the collection's template with the entry's slug filled in. */
+type EntryRef = Pick<ContentEntry, "collection" | "slug">;
+
+export function entryPath(site: PermalinkSite | undefined, entry: EntryRef): string;
+/**
+ * @deprecated The one-argument form of the renderer's old `entryPath(entry)`, kept because themes
+ * copied from the starter before 0.3.11 call it (also as `entries.map(entryPath)`, which passes
+ * the index second). It ignores collection permalinks; pass the site.
+ */
+export function entryPath(entry: EntryRef, index?: number): string;
 export function entryPath(
-  site: PermalinkSite | undefined,
-  entry: Pick<ContentEntry, "collection" | "slug">,
+  siteOrEntry: PermalinkSite | EntryRef | undefined,
+  entry?: EntryRef | number,
 ): string {
+  // Old call: no second argument, or a `map` index; the first argument is the entry.
+  if (typeof entry !== "object" || entry === null) {
+    const old = siteOrEntry as EntryRef;
+    return `/${old.collection}/${old.slug}`;
+  }
+  const site = siteOrEntry as PermalinkSite | undefined;
   return `${permalinkPrefix(collectionPermalink(site, entry.collection))}/${entry.slug}`;
 }
 
