@@ -2654,6 +2654,20 @@ export const en = {
       "Your changes include work that isn't yours, so an Editor must approve the publish. You'll find the request in Approvals.",
     openRequest: "Open Approvals",
     refused: "You can't publish",
+    /** The badge beside Publish: how many changes a publish would carry. */
+    pending: "{count, plural, one {# change} other {# changes}}",
+    /** The badge's tooltip; `kinds` is a list of `pendingKind`, e.g. "2 articles and 1 page". */
+    pendingSummary:
+      "{count, plural, one {# change isn't live yet} other {# changes aren't live yet}} · {kinds}",
+    /** The tooltip of a site that was never published; `kinds` as in `pendingSummary`. */
+    firstPublish: "Not published yet. The first publish puts {kinds} live.",
+    /** One kind of node in the pending changes, with its count. */
+    pendingKind:
+      "{kind, select, page {{count, plural, one {# page} other {# pages}}} contentEntry {{count, plural, one {# article} other {# articles}}} site {site settings} taxonomy {{count, plural, one {# taxonomy} other {# taxonomies}}} term {{count, plural, one {# term} other {# terms}}} redirect {{count, plural, one {# redirect} other {# redirects}}} menu {{count, plural, one {# menu} other {# menus}}} asset {{count, plural, one {# media file} other {# media files}}} glossary {the glossary} other {{count, plural, one {# item} other {# items}}}}",
+    /** The Publish button's accessible name while changes wait: the label, then the tooltip text. */
+    withPending: "{action}. {summary}",
+    /** The badge beside Publish for a site that was never published. */
+    notPublished: "Not published",
   },
   liveSite: {
     view: "View site",

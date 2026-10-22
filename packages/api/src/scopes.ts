@@ -117,6 +117,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", "/api/sites", "site:create"],
   ["GET", "/api/projects", "site:read"],
   ["GET", S, "site:read"],
+  // what a publish would carry, as counts (Studio's badge beside Publish)
+  ["GET", `${S}/pending`, "site:read"],
   ["PUT", S, "site:settings"],
   ["GET", `${S}/pages`, "content:read"],
   ["POST", `${S}/pages`, "content:write"],

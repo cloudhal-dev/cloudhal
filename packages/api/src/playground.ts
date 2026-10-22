@@ -108,6 +108,7 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   "GET /api/sites",
   "GET /api/projects",
   `GET ${S}`,
+  `GET ${S}/pending`,
   `PUT ${S}`,
   `GET ${S}/pages`,
   `POST ${S}/pages`,

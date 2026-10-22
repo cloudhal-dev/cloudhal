@@ -513,6 +513,11 @@ export interface MessageParams {
   "proposals.step.move": { before: string | number };
   "proposals.step.replace": { before: string | number };
   "proposals.step.replaceText": { before: string | number; after: string | number };
+  "publishing.firstPublish": { kinds: string | number };
+  "publishing.pending": { count: number };
+  "publishing.pendingKind": { kind: "page" | "contentEntry" | "site" | "taxonomy" | "term" | "redirect" | "menu" | "asset" | "glossary"; count: number };
+  "publishing.pendingSummary": { count: number; kinds: string | number };
+  "publishing.withPending": { action: string | number; summary: string | number };
   "readers.chart.description": { period: string | number; total: string | number };
   "readers.delta": { delta: string | number; days: string | number };
   "readers.figures": { period: string | number };

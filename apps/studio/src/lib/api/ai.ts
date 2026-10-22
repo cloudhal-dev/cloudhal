@@ -1,5 +1,5 @@
 /** In-editor AI and Studio's Build chat. */
-import { type ApiError, ApiRequestError, json, request } from "./http.ts";
+import { type ApiError, ApiRequestError, json, request, wrote } from "./http.ts";
 
 // ---- in-editor AI (RFC-0016, packages/api/src/routes/ai.ts) -------------------------------------
 
@@ -159,6 +159,7 @@ export const aiApi = {
       }
     } finally {
       reader.releaseLock();
+      wrote(`/api/sites/${siteId}/ai/build/${pageId}`, "POST");
     }
   },
   /** The model picker (503 when the server cannot reach Workers AI). */

@@ -227,6 +227,76 @@ export function describeApi(label: string, factory: ApiStoreFactory): void {
       ]);
     });
 
+    it("pending: what a publish would carry, as counts", async () => {
+      type Pending = {
+        live: boolean;
+        liveSnapshotId?: string;
+        counts: { added: number; changed: number; removed: number; total: number };
+        byKind: Record<string, number>;
+      };
+      const pending = async () => {
+        const res = await app.request(`/api/sites/${siteId}/pending`, auth);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("cache-control")).toBe("no-store");
+        return (await res.json()) as Pending;
+      };
+      expect((await call(`/api/sites/${siteId}/pending`)).status).toBe(401);
+      expect((await call(`/api/sites/site_doesnotexist1/pending`, auth)).status).toBe(404);
+
+      // Never published: no live snapshot, every node the first publish takes counts as added.
+      const first = await pending();
+      const nodes = (await store.createSnapshot(siteId, { reason: "manual", actor: human })).nodes;
+      expect(first).toMatchObject({ live: false, counts: { changed: 0, removed: 0 } });
+      expect(first.liveSnapshotId).toBeUndefined();
+      expect(first.counts.added).toBe(nodes.length);
+      expect(first.counts.total).toBe(nodes.length);
+      expect(first.byKind.site).toBe(1);
+      expect(first.byKind.page).toBe(nodes.filter((n) => n.kind === "page").length);
+
+      // Right after a publish nothing is pending.
+      const published = await call(`/api/sites/${siteId}/snapshots`, {
+        ...auth,
+        method: "POST",
+        body: JSON.stringify({ publish: true }),
+      });
+      const live = (published.body as { site: Site }).site.publishedSnapshotId;
+      expect(await pending()).toEqual({
+        live: true,
+        liveSnapshotId: live,
+        counts: { added: 0, changed: 0, removed: 0, total: 0 },
+        byKind: {},
+      });
+
+      // An edited entry is one change; an added page is one more.
+      const entry = (await store.listContentEntries(siteId, "posts"))[0] as ContentEntry;
+      await call(`/api/sites/${siteId}/entries/${entry.id}`, {
+        ...auth,
+        method: "PUT",
+        body: JSON.stringify({ ...entry, title: `${entry.title} (edited)` }),
+      });
+      expect(await pending()).toMatchObject({
+        counts: { added: 0, changed: 1, removed: 0, total: 1 },
+        byKind: { contentEntry: 1 },
+      });
+      await call(`/api/sites/${siteId}/pages`, {
+        ...auth,
+        method: "POST",
+        body: JSON.stringify({
+          path: "/pending",
+          title: "Pending",
+          locale: "en",
+          status: "draft",
+          sections: [],
+        }),
+      });
+      expect(await pending()).toEqual({
+        live: true,
+        liveSnapshotId: live,
+        counts: { added: 1, changed: 1, removed: 0, total: 2 },
+        byKind: { contentEntry: 1, page: 1 },
+      });
+    });
+
     it("unknown routes and ids are 404", async () => {
       expect((await call("/api/nope", auth)).status).toBe(404);
       expect((await call(`/api/sites/site_doesnotexist1`, auth)).status).toBe(404);
