@@ -5,9 +5,7 @@
   "name": "Minimal",
   "slug": "minimal",
   "defaultLocale": "en",
-  "locales": [
-    "en"
-  ],
+  "locales": ["en"],
   "domains": [],
   "pageIds": [],
   "theme": {
