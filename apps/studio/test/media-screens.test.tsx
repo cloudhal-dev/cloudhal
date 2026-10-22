@@ -367,7 +367,7 @@ describe("a file's page (§2u)", { timeout: 45_000 }, () => {
     );
     render(wrap(<AssetPage />));
     const link = await screen.findByRole("link", { name: "Ferries at dawn" });
-    expect(link).toHaveAttribute("href", "/sites/site_1/articles/entry_1");
+    expect(link).toHaveAttribute("href", "/sites/site_1/collections/posts/entry_1");
     expect(screen.getByText("Cover image")).toBeInTheDocument();
     // In use: Delete stays, disabled (its reason is the tooltip); takedown is the Owner's.
     expect(screen.getByTestId("asset-delete")).toBeDisabled();

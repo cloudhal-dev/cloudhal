@@ -150,6 +150,7 @@ export interface MessageParams {
   "collections.settings.key": { key: string | number };
   "collections.settings.taxonomyAll": { label: string | number };
   "collections.settings.title": { name: string | number };
+  "commands.goCollection": { name: string | number };
   "comments.agentRequests.title": { count: number; agent: string | number };
   "comments.agentRequests.titleSeveral": { count: number };
   "comments.approvals.approveConfirm": { count: number };

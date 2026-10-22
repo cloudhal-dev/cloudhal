@@ -22,6 +22,7 @@ import {
 import { ShieldWarning } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { RunFinding } from "../lib/api.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { formatWhen } from "../lib/schedules.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
 import { type ST, scheduleKeys, useScheduleWords, useSiteZone } from "./Schedules.tsx";
@@ -54,7 +55,7 @@ const SEVERITY = { error: "error", warning: "warning", info: "secondary" } as co
 /** Where a node is edited, from its id's prefix. */
 function nodeHref(siteId: string, id: string | undefined): string | undefined {
   if (!id) return undefined;
-  if (id.startsWith("entry_")) return `/sites/${siteId}/articles/${id}`;
+  if (id.startsWith("entry_")) return entryHref(siteId, id);
   if (id.startsWith("page_")) return `/sites/${siteId}/pages/${id}`;
   if (id.startsWith("term_")) return `/sites/${siteId}/taxonomy/${id}`;
   if (id.startsWith("rel_")) return `/sites/${siteId}/schedules/releases/${id}`;

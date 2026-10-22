@@ -462,7 +462,7 @@ export function TaxonomyPage() {
                                     <span className="inline-flex" data-testid="usage">
                                       {tax.key === "category" || tax.key === "tag" ? (
                                         <Link
-                                          href={`/sites/${siteId}/articles?${tax.key}=${term.slug}`}
+                                          href={`/sites/${siteId}/collections/posts?${tax.key}=${term.slug}`}
                                           variant="plain"
                                         >
                                           <Text as="span">

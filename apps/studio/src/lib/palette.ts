@@ -5,6 +5,7 @@
  */
 import type { SiteSearchHit, SiteSearchKind } from "./api.ts";
 import { matchCommands } from "./command-match.ts";
+import { entryRoute } from "./entry-href.ts";
 
 /** Content kinds in the order the palette shows them. */
 export const PALETTE_KINDS = [
@@ -68,7 +69,10 @@ export function paletteGroups<C extends PaletteCommandLike>(
 
 /** Where a content hit opens in Studio (TanStack Router options). */
 export type HitLocation =
-  | { to: "/sites/$siteId/articles/$entryId"; params: { siteId: string; entryId: string } }
+  | {
+      to: "/sites/$siteId/collections/$collection/$entryId";
+      params: { siteId: string; collection: string; entryId: string };
+    }
   | { to: "/sites/$siteId/pages/$pageId"; params: { siteId: string; pageId: string } }
   | { to: "/sites/$siteId/taxonomy/$termId"; params: { siteId: string; termId: string } }
   | { to: "/sites/$siteId/media/$assetId"; params: { siteId: string; assetId: string } }
@@ -83,10 +87,7 @@ type Locate = (siteId: string, hit: SiteSearchHit) => HitLocation;
 
 /** One screen per kind (a dispatch table): the editor of the node, or the list that holds it. */
 const LOCATIONS: Record<SiteSearchKind, Locate> = {
-  entry: (siteId, h) => ({
-    to: "/sites/$siteId/articles/$entryId",
-    params: { siteId, entryId: h.id },
-  }),
+  entry: (siteId, h) => entryRoute(siteId, h.id, h.context),
   page: (siteId, h) => ({ to: "/sites/$siteId/pages/$pageId", params: { siteId, pageId: h.id } }),
   term: (siteId, h) => ({
     to: "/sites/$siteId/taxonomy/$termId",

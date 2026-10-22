@@ -78,6 +78,19 @@ export const messages = {
         "Which taxonomies entries of this collection use. A taxonomy without a list of collections applies to all of them.",
       taxonomyAll: "{label} (every collection)",
       noTaxonomies: "This site has no taxonomies.",
+      comments: "Comments",
+      commentsDescription:
+        "Whether readers can comment on this collection's entries, and when threads close. Saved with the site's comment settings.",
+      commentsEnabled: "Accept comments",
+      commentsEnabledHint:
+        "Readers can comment on published entries. Each entry can still open, close or hide its own thread.",
+      commentsCloseAfter: "Close threads after",
+      commentsCloseAfterHint:
+        "Counted from each entry's publish date. “Same as the site” follows Site settings › Comments.",
+      commentsSiteOff: "Comments are off for the whole site",
+      commentsSiteOffDescription:
+        "Readers see no comment form until Accept comments is on in Site settings › Comments.",
+      commentsLink: "All comment settings",
       address: "Address",
       addressDescription:
         "Where entries live. Changing it moves their public URLs: old addresses answer with a permanent redirect.",

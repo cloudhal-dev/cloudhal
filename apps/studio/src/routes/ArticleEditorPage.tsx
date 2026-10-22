@@ -56,11 +56,12 @@ import { StatusActions } from "../components/StatusActions.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
-import { useCollectionCrumb } from "../components/useCollectionView.ts";
+import { useCollectionCrumb, useEntryCollectionUrl } from "../components/useCollectionView.ts";
 import { useSavedToast } from "../components/useLiveSite.ts";
 import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
+import { entryRoute } from "../lib/entry-href.ts";
 import { entryAccess } from "../lib/roles.ts";
 import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
@@ -102,7 +103,8 @@ const READ_ONLY_REASON = {
 
 export function ArticleEditorPage() {
   const t = useT();
-  const { siteId, entryId } = useParams({ from: "/sites/$siteId/articles/$entryId" });
+  const params = useParams({ from: "/sites/$siteId/collections/$collection/$entryId" });
+  const { siteId, entryId } = params;
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
@@ -157,10 +159,7 @@ export function ArticleEditorPage() {
     onSuccess: async (created) => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
       toast.success(t("editor.duplicated"), created.slug);
-      await navigate({
-        to: "/sites/$siteId/articles/$entryId",
-        params: { siteId, entryId: created.id },
-      });
+      await navigate(entryRoute(siteId, created.id, created.collection));
     },
   });
   const remove = useMutation({
@@ -171,6 +170,7 @@ export function ArticleEditorPage() {
     },
   });
   const articlesCrumb = useCollectionCrumb(siteId, query.data?.collection);
+  useEntryCollectionUrl(siteId, entryId, params.collection, query.data?.collection);
 
   if (!draft) {
     return (

@@ -29,6 +29,8 @@ export {
   validateAnalyticsSearch,
 } from "./analytics-search.ts";
 
+import { entryHref } from "./entry-href.ts";
+
 // ---- the range ----------------------------------------------------------------------------------
 
 export function rangeFromSearch(search: AnalyticsSearch): AnalyticsRange {
@@ -89,7 +91,7 @@ export function analyticsSituation(
 export function editorHref(siteId: string, node: AnalyticsNode): string | undefined {
   if (!node.exists) return undefined;
   const id = encodeURIComponent(node.nodeId);
-  if (node.kind === "entry") return `/sites/${siteId}/articles/${id}`;
+  if (node.kind === "entry") return entryHref(siteId, id);
   if (node.kind === "page") return `/sites/${siteId}/pages/${id}`;
   if (node.kind === "archive") return `/sites/${siteId}/taxonomy/${id}`;
   return undefined;

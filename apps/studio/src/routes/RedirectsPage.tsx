@@ -45,6 +45,7 @@ import { useGate } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { externalHost, servedPaths } from "../lib/redirects.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 
@@ -117,7 +118,7 @@ export function RedirectsPage() {
     }
     if (r.source.kind === "contentEntry") {
       const e = entries.data?.find((x) => x.id === r.source?.id);
-      return e ? { label: e.title, href: `/sites/${siteId}/articles/${e.id}` } : undefined;
+      return e ? { label: e.title, href: entryHref(siteId, e.id, e.collection) } : undefined;
     }
     const p = pages.data?.find((x) => x.id === r.source?.id);
     return p ? { label: p.title, href: `/sites/${siteId}/pages/${p.id}` } : undefined;

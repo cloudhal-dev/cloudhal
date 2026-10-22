@@ -72,6 +72,21 @@ export function collectionNames(
   return collectionLabel(site, key, locale);
 }
 
+/**
+ * The name Studio shows for a collection: its plural label (`collectionNames`), Studio's own
+ * `articles` word for an unnamed `posts`, else its key.
+ */
+export function collectionName(
+  site: Pick<Site, "collections" | "defaultLocale"> | undefined,
+  key: string,
+  locale: string,
+  articles: string,
+): string {
+  return (
+    collectionNames(site, key, locale)?.plural ?? (key === BUILT_IN_COLLECTION ? articles : key)
+  );
+}
+
 /** Entries of every status and locale. */
 export function entryTotal(info: Pick<CollectionInfo, "counts">): number {
   return Object.values(info.counts).reduce((a, b) => a + (b ?? 0), 0);

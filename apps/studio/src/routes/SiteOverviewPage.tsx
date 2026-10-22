@@ -1,3 +1,4 @@
+import { BUILT_IN_COLLECTION } from "@cloudhal/core-ts/collections";
 import {
   Button,
   Code,
@@ -21,10 +22,12 @@ import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx
 import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
+import { RecentContentCard } from "../components/site-overview/RecentContentCard.tsx";
 import { SiteStatusCard } from "../components/site-overview/SiteStatusCard.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT, withMessages } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { entryTotal, useCollections } from "../lib/collections.ts";
 
 // "Scheduled work is not running" (RFC-0008 §8.7): its words load only when it shows.
 const SchedulerStalledBanner = lazy(() =>
@@ -41,10 +44,8 @@ export function SiteOverviewPage() {
   const s = scheduler.data;
   const stalled = !!s && !s.healthy && (s.state !== "unknown" || s.dueWithin24h);
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
-  const entries = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
-  });
+  const registry = useCollections(siteId);
+  const posts = registry.data?.find((c) => c.key === BUILT_IN_COLLECTION);
   const snapshots = useQuery({
     queryKey: ["snapshots", siteId],
     queryFn: () => api.snapshots.list(siteId),
@@ -67,9 +68,6 @@ export function SiteOverviewPage() {
   const order = new Map((site.data?.pageIds ?? []).map((id, i) => [id, i]));
   const topPages = [...(pages.data ?? [])]
     .sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9))
-    .slice(0, 5);
-  const recent = [...(entries.data ?? [])]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 5);
 
   const viewAll = (href: string) => (
@@ -104,7 +102,12 @@ export function SiteOverviewPage() {
           <Button
             variant="secondary"
             icon={<Article />}
-            onClick={() => navigate({ to: "/sites/$siteId/articles", params: { siteId } })}
+            onClick={() =>
+              navigate({
+                to: "/sites/$siteId/collections/$collection",
+                params: { siteId, collection: BUILT_IN_COLLECTION },
+              })
+            }
           >
             {t("articles.newArticle")}
           </Button>
@@ -118,7 +121,7 @@ export function SiteOverviewPage() {
         </Suspense>
       ) : null}
       <CommentsWaitingBanner siteId={siteId} />
-      <ErrorBanner error={site.error ?? pages.error ?? entries.error ?? createPage.error} />
+      <ErrorBanner error={site.error ?? pages.error ?? createPage.error} />
       <Columns variant="2-1">
         <div className="grid min-w-0 content-start gap-6">
           <SectionCard
@@ -174,62 +177,15 @@ export function SiteOverviewPage() {
               )}
             </Table>
           </SectionCard>
-          <SectionCard
-            title={t("overview.recentArticles")}
-            icon={<Article size={16} />}
-            actions={viewAll(`/sites/${siteId}/articles`)}
-            flush
-          >
-            <Table>
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head>{t("articles.columns.title")}</Table.Head>
-                  <Table.Head>{t("articles.columns.author")}</Table.Head>
-                  <Table.Head>{t("articles.columns.status")}</Table.Head>
-                </Table.Row>
-              </Table.Header>
-              {entries.isPending ? (
-                <TableSkeleton columns={3} rows={3} />
-              ) : recent.length === 0 ? (
-                <Table.Body>
-                  <Table.Row>
-                    <Table.Cell colSpan={3}>
-                      <SectionEmpty
-                        icon={<Article size={32} className="text-kumo-inactive" />}
-                        title={t("articles.empty")}
-                      />
-                    </Table.Cell>
-                  </Table.Row>
-                </Table.Body>
-              ) : (
-                <Table.Body>
-                  {recent.map((e) => (
-                    <Table.Row key={e.id}>
-                      <Table.Cell>
-                        <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
-                          <Text bold as="span">
-                            {e.title}
-                          </Text>
-                        </Link>
-                      </Table.Cell>
-                      <Table.Cell>{e.author.name ?? e.author.id}</Table.Cell>
-                      <Table.Cell>
-                        <Status status={e.status} />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              )}
-            </Table>
-          </SectionCard>
+          <RecentContentCard siteId={siteId} site={site.data} />
         </div>
         <div className="grid min-w-0 content-start gap-6">
           <OverviewAnalyticsCard siteId={siteId} />
           <SiteStatusCard
             siteId={siteId}
-            loading={site.isPending || pages.isPending}
+            loading={site.isPending || pages.isPending || registry.isPending}
             pages={pages.data?.length ?? 0}
-            articles={entries.data?.length ?? 0}
+            articles={posts ? entryTotal(posts) : 0}
             snapshots={snapshots.data?.length ?? 0}
           />
           <SectionCard

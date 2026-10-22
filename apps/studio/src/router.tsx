@@ -55,7 +55,11 @@ const CollectionsPage = lazyRouteComponent(
   "CollectionsPage",
 );
 const CollectionSettingsPage = lazyRouteComponent(
-  () => withMessages(import("./routes/CollectionSettingsPage.tsx"), ["collections"]),
+  () =>
+    withMessages(import("./routes/CollectionSettingsPage.tsx"), [
+      "collections",
+      "commentsSettings",
+    ]),
   "CollectionSettingsPage",
 );
 const CommentsPage = lazyRouteComponent(
@@ -486,10 +490,23 @@ const buildRoute = createRoute({
   }),
   component: BuildPage,
 });
+/** RFC-0040 §4: an entry's editor, under its collection. */
+const entryEditorRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/collections/$collection/$entryId",
+  component: ArticleEditorPage,
+});
+/** Old links and bookmarks: `posts`, which the editor corrects to the entry's own collection. */
 const articleEditorRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/articles/$entryId",
-  component: ArticleEditorPage,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/sites/$siteId/collections/$collection/$entryId",
+      params: { siteId: params.siteId, collection: "posts", entryId: params.entryId },
+      replace: true,
+    });
+  },
 });
 
 const routeTree = rootRoute.addChildren([
@@ -514,6 +531,7 @@ const routeTree = rootRoute.addChildren([
     collectionsRoute,
     collectionRoute,
     collectionSettingsRoute,
+    entryEditorRoute,
     snapshotsRoute,
     activityRoute,
     approvalsRoute,
