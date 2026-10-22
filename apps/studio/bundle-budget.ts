@@ -32,7 +32,9 @@ export const BUNDLE_BUDGET = {
    * 443.7 kB on 2026-10-17 with three Phosphor weights instead of six. 401.3 kB on 2026-10-17
    * once the core catalogs load one language (Turkish, 39 kB gzip, arrives only for Turkish via
    * `loadLocale`) and the `menus` words moved to a lazy namespace, so the budget came down from
-   * 455 kB.
+   * 455 kB. 387.6 kB on 2026-10-22 (was 419.9 kB) once the bell's items, the elevation and
+   * agent-mode UI and the taxonomy model left the shell (`LAZY_ONLY`); the budget stays at
+   * 420 kB as headroom for shell features.
    */
   initialGzipBytes: 420_000,
 };
@@ -70,6 +72,11 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]core-ts[\\/]src[\\/]tokens\.ts$/,
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/]ColorRolePreview\.tsx$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]AppearanceColors\.tsx$/,
+  // The bell panel's items and the agent-mode, elevation and taxonomy UI behind them load with
+  // their screens (and the first bell with something in it), never with the shell: the shell
+  // keeps the hooks (`elevation-actions.ts`, `useShortDuration.ts`, `taxonomy-keys.ts`).
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](NotificationItems|AgentModes|Elevation|ElevationRequest|Taxonomy|RelativeTime)\.tsx$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](taxonomy|seo|activity)\.ts$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
   // Core catalogs other than English load with their language (`loadLocale`), never with English.
