@@ -2,7 +2,8 @@
 import { assertValid, type Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import { checkTimeZone, isTimeZone } from "../availability.ts";
-import { ConflictError, InvariantError, isOpGuardViolation } from "../errors.ts";
+import { type CollectionCount, type CollectionInfo, collectionRegistry } from "../collections.ts";
+import { ConflictError, InvariantError, isOpGuardViolation, NotFoundError } from "../errors.ts";
 import { nodeHash } from "../hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "../hosts.ts";
 import { ID_PREFIX } from "../ids.ts";
@@ -125,6 +126,18 @@ export class SiteEngine {
       throw new ConflictError("site", site.id, site.rev, rev);
     }
     return written;
+  }
+
+  /** RFC-0040: the registry, with entry counts per status from one grouped query. */
+  async collections(siteId: string): Promise<CollectionInfo[]> {
+    const site = await this.#ctx.graph.getSite(siteId);
+    if (!site) throw new NotFoundError("site", siteId);
+    const rows = await this.#ctx.sql.all<CollectionCount>(
+      `SELECT json_extract(body, '$.collection') AS collection, json_extract(body, '$.status') AS status,
+         COUNT(*) AS count FROM nodes WHERE site_id = ? AND kind = 'contentEntry' GROUP BY 1, 2`,
+      [siteId],
+    );
+    return collectionRegistry(site, rows);
   }
 
   /** The CAS alone, or with its anchored statements; a failed `op_guards` assertion is a miss. */

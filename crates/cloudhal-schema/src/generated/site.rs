@@ -1657,13 +1657,253 @@ impl ::std::convert::TryFrom<::std::string::String> for ChromeHeaderWidth {
         value.parse()
     }
 }
+#[doc = "`CollectionLabel`"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CollectionLabel {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub description: ::std::option::Option<CollectionLabelDescription>,
+    pub plural: CollectionLabelPlural,
+    pub singular: CollectionLabelSingular,
+}
+#[doc = "`CollectionLabelDescription`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CollectionLabelDescription(::std::string::String);
+impl ::std::ops::Deref for CollectionLabelDescription {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CollectionLabelDescription> for ::std::string::String {
+    fn from(value: CollectionLabelDescription) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CollectionLabelDescription {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 1000usize {
+            return Err("longer than 1000 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionLabelDescription {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionLabelDescription {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CollectionLabelDescription {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`CollectionLabelPlural`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CollectionLabelPlural(::std::string::String);
+impl ::std::ops::Deref for CollectionLabelPlural {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CollectionLabelPlural> for ::std::string::String {
+    fn from(value: CollectionLabelPlural) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CollectionLabelPlural {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionLabelPlural {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionLabelPlural {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CollectionLabelPlural {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`CollectionLabelSingular`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CollectionLabelSingular(::std::string::String);
+impl ::std::ops::Deref for CollectionLabelSingular {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CollectionLabelSingular> for ::std::string::String {
+    fn from(value: CollectionLabelSingular) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CollectionLabelSingular {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionLabelSingular {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionLabelSingular {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CollectionLabelSingular {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "`CollectionSettings`"]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct CollectionSettings {
+    #[doc = "RFC-0040: entries appear in the site's RSS feeds. Absent: true."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub feed: ::std::option::Option<bool>,
+    #[doc = "RFC-0040: a name from Studio's closed icon set (e.g. calendar, briefcase, users). Unknown names show the default icon. Never a URL or markup."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub icon: ::std::option::Option<CollectionSettingsIcon>,
+    #[doc = "RFC-0040: display names per locale (Studio, agents, themes). Absent or missing a locale: the default locale's, then the key."]
+    #[serde(
+        default,
+        skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
+    )]
+    pub labels: ::std::collections::HashMap<Locale, CollectionLabel>,
     #[doc = "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub permalink: ::std::option::Option<CollectionSettingsPermalink>,
+    #[doc = "RFC-0040: published entries appear in sitemap.xml. Absent: true."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub sitemap: ::std::option::Option<bool>,
+    #[doc = "RFC-0040: default order where none is given (Studio's list, entry queries without sort, MCP list_entries). Absent: newest."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub sort: ::std::option::Option<CollectionSettingsSort>,
+}
+#[doc = "RFC-0040: a name from Studio's closed icon set (e.g. calendar, briefcase, users). Unknown names show the default icon. Never a URL or markup."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CollectionSettingsIcon(::std::string::String);
+impl ::std::ops::Deref for CollectionSettingsIcon {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CollectionSettingsIcon> for ::std::string::String {
+    fn from(value: CollectionSettingsIcon) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CollectionSettingsIcon {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 40usize {
+            return Err("longer than 40 characters".into());
+        }
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^[a-z0-9]+(-[a-z0-9]+)*$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z0-9]+(-[a-z0-9]+)*$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionSettingsIcon {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionSettingsIcon {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CollectionSettingsIcon {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
 }
 #[doc = "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -1717,6 +1957,61 @@ impl<'de> ::serde::Deserialize<'de> for CollectionSettingsPermalink {
             .map_err(|e: self::error::ConversionError| {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
+    }
+}
+#[doc = "RFC-0040: default order where none is given (Studio's list, entry queries without sort, MCP list_entries). Absent: newest."]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum CollectionSettingsSort {
+    #[serde(rename = "newest")]
+    Newest,
+    #[serde(rename = "oldest")]
+    Oldest,
+    #[serde(rename = "title")]
+    Title,
+}
+impl ::std::fmt::Display for CollectionSettingsSort {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Newest => f.write_str("newest"),
+            Self::Oldest => f.write_str("oldest"),
+            Self::Title => f.write_str("title"),
+        }
+    }
+}
+impl ::std::str::FromStr for CollectionSettingsSort {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "newest" => Ok(Self::Newest),
+            "oldest" => Ok(Self::Oldest),
+            "title" => Ok(Self::Title),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionSettingsSort {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionSettingsSort {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
     }
 }
 #[doc = "`Consent`"]
@@ -3547,7 +3842,7 @@ pub struct Site {
     pub brand: ::std::option::Option<Brand>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub chrome: ::std::option::Option<Chrome>,
-    #[doc = "RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults."]
+    #[doc = "RFC-0038, RFC-0040: the site's declared collections and their settings, keyed by collection (ContentEntry.collection). A key here declares the collection, even with no settings ({}). A collection with entries but no key is inferred and uses the defaults."]
     #[serde(
         default,
         skip_serializing_if = ":: std :: collections :: HashMap::is_empty"

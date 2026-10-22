@@ -19,6 +19,7 @@
     "./filter": "./src/filter.ts",
     "./names": "./src/names.ts",
     "./permalinks": "./src/permalinks.ts",
+    "./collections": "./src/collections.ts",
     "./locale-paths": "./src/locale-paths.ts",
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
