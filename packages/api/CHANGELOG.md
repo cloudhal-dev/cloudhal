@@ -1,5 +1,21 @@
 # @cloudhal/api
 
+## 0.3.12
+
+### Patch Changes
+
+- bc096b2: Studio shows changes that are not live yet: a badge beside Publish with the count ("2 changes", or "Not published" before the first publish) and a tooltip by kind ("3 changes aren't live yet · 2 articles and 1 page"). It comes from the new `GET /api/sites/:siteId/pending` (`site:read`): counts of what a publish would add, change and remove, by kind; adding or removing a page counts once. Studio refreshes it after every write to the site, on window focus and every 30 s.
+- Updated dependencies [84d1fc3]
+  - @cloudhal/core-ts@0.3.12
+  - @cloudhal/astro-renderer@0.3.12
+  - @cloudhal/comments@0.3.12
+  - @cloudhal/mcp-server@0.3.12
+  - @cloudhal/agent-runtime@0.3.12
+  - @cloudhal/analytics@0.3.12
+  - @cloudhal/core-contracts@0.3.12
+  - @cloudhal/schedules@0.3.12
+  - @cloudhal/storage@0.3.12
+
 ## 0.3.11
 
 ### Patch Changes

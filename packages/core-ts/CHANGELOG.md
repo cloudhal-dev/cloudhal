@@ -1,5 +1,14 @@
 # @cloudhal/core-ts
 
+## 0.3.12
+
+### Patch Changes
+
+- 84d1fc3: `@cloudhal/core-ts/locale-paths`: the locale URL helpers (`localeRouting`, `localizedPath`, `localeUrl`) move from the renderer into core-ts, browser-safe, with `itemUrl(site, origin, item)` for a page's or entry's public URL. `@cloudhal/astro-renderer/locales` re-exports them unchanged.
+- @cloudhal/core-contracts@0.3.12
+  - @cloudhal/schedules@0.3.12
+  - @cloudhal/storage@0.3.12
+
 ## 0.3.11
 
 ### Patch Changes
