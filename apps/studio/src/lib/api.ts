@@ -94,6 +94,7 @@ export type {
   EntryListQuery,
   NewEntry,
   NewPage,
+  PendingChanges,
   PreviewLink,
   PreviewLinkInput,
   PreviewTarget,
@@ -117,6 +118,7 @@ export {
   isNotEnabled,
   json,
   listOf,
+  onApiWrite,
   query,
   request,
 } from "./api/http.ts";

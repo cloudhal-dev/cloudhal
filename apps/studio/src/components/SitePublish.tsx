@@ -13,6 +13,7 @@ import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { UnpublishedPagesNote } from "./PageStatus.tsx";
+import { PendingBadge, pendingText, usePendingChanges } from "./PendingChanges.tsx";
 import { usePublishMode, usePublishSite } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
 
@@ -22,7 +23,8 @@ import { useToast } from "./Toast.ts";
  * the person's role (§2s): an Author whose changes include others' work sends "Request publish"
  * (the server files a request an Editor approves, 202); a Contributor sees Publish disabled with
  * the reason, since an Editor publishes their work. The palette's Publish command opens the same
- * confirmation (RFC-0029 §7), never publishing on its own.
+ * confirmation (RFC-0029 §7), never publishing on its own. Beside it, `PendingBadge` says how many
+ * changes are not live yet; the Publish button's accessible name carries the same sentence.
  */
 export function SitePublish({
   siteId,
@@ -52,8 +54,12 @@ export function SitePublish({
     onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
   });
   const request = mode === "request";
+  const action = request ? t("publishing.request") : t("site.publish");
+  const pending = usePendingChanges(siteId).data;
+  const waiting = pending && (!pending.live || pending.counts.total > 0);
   return (
     <>
+      <PendingBadge pending={pending} />
       <ButtonGroup aria-label={t("site.publish")}>
         <Button
           variant="primary"
@@ -63,9 +69,14 @@ export function SitePublish({
           loading={publish.isPending || snapshot.isPending}
           disabled={mode === "none"}
           title={reason}
+          aria-label={
+            waiting
+              ? t("publishing.withPending", { action, summary: pendingText(t, pending) })
+              : undefined
+          }
           data-publish-mode={mode}
         >
-          {request ? t("publishing.request") : t("site.publish")}
+          {action}
         </Button>
         <DropdownMenu>
           <DropdownMenu.Trigger

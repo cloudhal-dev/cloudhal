@@ -18,19 +18,40 @@ export class ApiRequestError extends Error {
   }
 }
 
+const writeListeners = new Set<(path: string) => void>();
+
+/**
+ * Calls `listener` with the path of every write (`POST`/`PUT`/`PATCH`/`DELETE`) the API answered
+ * with success, so a view of derived state (the pending changes beside Publish) refreshes after
+ * any save without each screen invalidating it. Returns the unsubscribe.
+ */
+export function onApiWrite(listener: (path: string) => void): () => void {
+  writeListeners.add(listener);
+  return () => writeListeners.delete(listener);
+}
+
+/** Tells `onApiWrite` listeners about a write made outside `request` (a streamed Build turn). */
+export function wrote(path: string, method: string | undefined): void {
+  if (method && method !== "GET" && method !== "HEAD") for (const fn of writeListeners) fn(path);
+}
+
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
     ...init,
     headers: { "content-type": "application/json", ...(init.headers ?? {}) },
   });
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) {
+    wrote(path, init.method);
+    return undefined as T;
+  }
   const body = (await res
     .json()
     .catch(() => ({ error: "invalid_json", message: res.statusText }))) as T | ApiError;
   // The session ended on the server: the next navigation asks again (and lands on the login).
   if (res.status === 401) forgetSession();
   if (!res.ok) throw new ApiRequestError(res.status, body as ApiError);
+  wrote(path, init.method);
   return body as T;
 }
 

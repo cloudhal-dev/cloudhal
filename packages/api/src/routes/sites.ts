@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { param } from "../params.ts";
+import { pendingFor } from "../pending.ts";
 import { createSiteRoute } from "./projects.ts";
 
 export const sites: Hono<Env> = new Hono<Env>()
@@ -22,6 +23,13 @@ export const sites: Hono<Env> = new Hono<Env>()
     const site = await c.get("store").getSite(param(c, "siteId"));
     if (!site) throw notFound("site not found");
     return c.json(site);
+  })
+  // What a publish would carry, as counts (Studio's badge beside Publish).
+  .get("/:siteId/pending", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    return c.json(await pendingFor(store, site));
   })
   .put("/:siteId", async (c) => {
     const body = (await c.req.json()) as Site;

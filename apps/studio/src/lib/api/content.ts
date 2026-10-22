@@ -1,5 +1,5 @@
 /** Sites, pages, entries, design rules, theme settings, block types, previews and preview links. */
-import type { ContentEntry, Page, PublishStatus, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, NodeRef, Page, PublishStatus, Site } from "@cloudhal/core-contracts";
 import type { BlockType, PropsSchema } from "@cloudhal/core-ts/blocks";
 import { json, query, request } from "./http.ts";
 
@@ -43,6 +43,18 @@ export interface PreviewLinkInput {
   /** Absolute path on the site, e.g. `/blog/hello`. */
   path?: string;
   ttlSeconds?: number;
+}
+
+/**
+ * `GET /api/sites/:id/pending`: what a publish would carry, as counts. `live` is false for a site
+ * that was never published; then every node counts as added.
+ */
+export interface PendingChanges {
+  live: boolean;
+  liveSnapshotId?: string;
+  counts: { added: number; changed: number; removed: number; total: number };
+  /** The total by node kind (`page`, `contentEntry`, `site`, …); kinds without changes are absent. */
+  byKind: Partial<Record<NodeRef["kind"], number>>;
 }
 
 /** A signed, expiring link (`POST /api/sites/:id/preview-links`). */
@@ -89,6 +101,7 @@ export const contentApi = {
         edition?: { pages: number; menus: number; skipped: { what: string; reason: string }[] };
       }>("/api/sites", { method: "POST", ...json(input) }),
     get: (id: string) => request<Site>(`/api/sites/${id}`),
+    pending: (id: string) => request<PendingChanges>(`/api/sites/${id}/pending`),
     update: (site: Site) =>
       request<Site>(`/api/sites/${site.id}`, { method: "PUT", ...json(site) }),
   },
