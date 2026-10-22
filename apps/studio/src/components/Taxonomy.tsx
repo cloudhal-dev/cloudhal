@@ -1,4 +1,4 @@
-import type { Taxonomy, Term } from "@cloudhal/core-contracts";
+import type { ContentEntry, Page, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { Badge, DirectionalIcon, Link, Text, Tooltip } from "@cloudhal/ui";
 import {
   ArrowElbowDownRight,
@@ -10,6 +10,7 @@ import {
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useI18n, useT } from "../i18n/index.tsx";
 import { api, type TermListItem, type TermUsage } from "../lib/api.ts";
+import type { servedPaths } from "../lib/redirects.ts";
 import {
   archivePath,
   defaultTaxonomies,
@@ -86,6 +87,22 @@ export function useTaxonomyData(siteId: string, enabled = true) {
 }
 
 export type TaxonomyData = ReturnType<typeof useTaxonomyData>;
+
+/** What `servedPaths` reads, from the taxonomy data (entries under the site's permalinks). */
+export function servedPathsInput(
+  data: TaxonomyData,
+  pages: readonly Page[] = [],
+  entries: readonly ContentEntry[] = [],
+): Parameters<typeof servedPaths>[0] {
+  return {
+    pages,
+    entries,
+    defaultLocale: data.defaultLocale,
+    taxonomies: data.taxonomies.data ?? [],
+    terms: data.items.map((i) => i.term),
+    site: data.site.data,
+  };
+}
 
 /** After a taxonomy change: terms, taxonomies, articles, redirects and snapshots may all move. */
 export async function invalidateTaxonomy(qc: QueryClient, siteId: string): Promise<void> {

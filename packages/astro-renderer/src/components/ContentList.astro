@@ -1,12 +1,15 @@
 ---
 import type { ContentEntry, ContentListSection } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts";
+import type { MediaContext } from "../media.ts";
 
 interface Props {
   section: ContentListSection;
   entries: ContentEntry[];
+  media?: MediaContext | undefined;
   hrefFor?: (entry: ContentEntry) => string;
 }
-const { section, entries, hrefFor = (e) => `/${e.collection}/${e.slug}` } = Astro.props;
+const { section, entries, media, hrefFor = (e) => entryPath(media?.permalinks, e) } = Astro.props;
 const sorted = [...entries]
   .sort((a, b) =>
     section.sort === "title"

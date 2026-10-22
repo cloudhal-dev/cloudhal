@@ -1,12 +1,13 @@
 /**
  * How URLs map onto the graph, shared by the starter's routes, sitemaps, feeds and previews: a
- * Page owns its `path`; an entry lives at `/<collection>/<slug>`; a term archive at
+ * Page owns its `path`; an entry lives at its collection's permalink (core-ts `entryPath`,
+ * `/<collection>/<slug>` by default, RFC-0038); a term archive at
  * `<basePath>/<slug>[/page/<n>|/rss.xml]` (RFC-0002 §7). Pages win when several could answer, so a
  * page at `/posts/x` is never shadowed by an article. Anything else asks the site's redirects
  * before it is a 404 (or a 410 for a retired term).
  */
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
-import { normalisePath, SEARCH_PATH, termName } from "@cloudhal/core-ts";
+import { entryAt, entryPath, normalisePath, SEARCH_PATH, termName } from "@cloudhal/core-ts";
 import {
   type ArchiveSummary,
   type ArchiveView,
@@ -31,11 +32,12 @@ import {
   taxonomyIndex,
 } from "./taxonomy.ts";
 
-export function entryPath(entry: Pick<ContentEntry, "collection" | "slug">): string {
-  return `/${entry.collection}/${entry.slug}`;
-}
+/** Themes link entries with core-ts's `entryPath(site, entry)`; re-exported for them. */
+export { entryAt, entryPath };
 
 export type Resolved = { kind: "page"; page: Page } | { kind: "entry"; entry: ContentEntry };
+
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** The page or entry at `path` (leading slash, no trailing slash except "/") in `locale`, if any. */
 export async function resolvePath(
@@ -43,21 +45,33 @@ export async function resolvePath(
   path: string,
   locale?: string,
 ): Promise<Resolved | undefined> {
-  const page = await source.pageByPath(path, locale);
+  return resolveIn(source, path, { locale });
+}
+
+/** `resolvePath` with the site already loaded (`resolveRoute` has it). */
+async function resolveIn(
+  source: GraphSource,
+  path: string,
+  options: { locale?: string | undefined; site?: Site },
+): Promise<Resolved | undefined> {
+  const page = await source.pageByPath(path, options.locale);
   if (page) return { kind: "page", page };
-  const m = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
-  if (!m) return undefined;
-  const entry = await source.entryBySlug(m[1] as string, m[2] as string, locale);
+  const at = entryAt(options.site ?? (await source.site()), path);
+  if (!at || !SLUG.test(at.collection) || !SLUG.test(at.slug)) return undefined;
+  const entry = await source.entryBySlug(at.collection, at.slug, options.locale);
   return entry ? { kind: "entry", entry } : undefined;
 }
 
 /** Every page and entry path of a locale (default: the site's), as graph paths without prefix. */
 export async function routablePaths(source: GraphSource, locale?: string): Promise<string[]> {
   const pages = await source.pages();
-  const loc = locale ?? (await source.site()).defaultLocale;
+  const site = await source.site();
+  const loc = locale ?? site.defaultLocale;
   const pagePaths = pages.filter((p) => p.locale === loc).map((p) => p.path);
   const taken = new Set(pagePaths);
-  const entryPaths = (await source.allEntries(loc)).map(entryPath).filter((p) => !taken.has(p));
+  const entryPaths = (await source.allEntries(loc))
+    .map((e) => entryPath(site, e))
+    .filter((p) => !taken.has(p));
   return [...pagePaths, ...entryPaths];
 }
 
@@ -148,7 +162,7 @@ export async function resolveRoute(
   const path = normalisePath(requestPath);
   const site = await source.site();
   const locale = options.locale ?? site.defaultLocale;
-  const resolved = await resolvePath(source, path, locale);
+  const resolved = await resolveIn(source, path, { locale, site });
   if (resolved) return resolved;
   if (path === SEARCH_PATH && source.search) {
     const { query, page } = searchRequest(options.search ?? "");

@@ -55,7 +55,7 @@ import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
 import type { ContentEntry } from "@cloudhal/core-contracts";
 /**
  * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
- * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
+ * its collection's permalink (`/<collection>/<slug>` by default, RFC-0038); a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
  * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
  * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
  * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
@@ -161,7 +161,9 @@ const isMenu = route.kind === "not-found" && path === "/menu";
 // Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
 // `?comments=<n>` past the last page is a miss.
 const comments =
-  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
+  route.kind === "entry"
+    ? await loadComments(config, Astro, route.entry, { locale, site })
+    : undefined;
 // A miss (RFC-0033 §4) answers 404 in the request's locale: the site's page at `/404` (its
 // translation, or the original under `default-with-notice`), else the theme's NotFound below.
 // The authored page answers 404 at its own path too.
@@ -199,6 +201,8 @@ const media: MediaContext = {
   icons: { weight: String(site.theme.config?.iconWeight ?? "regular"), set: iconSet },
   // RFC-0028: one placeholder allowance for the whole page.
   budget: placeholderBudget(),
+  // RFC-0038: entry links follow the site's collection permalinks.
+  permalinks: site,
 };
 const t = strings(locale, site.theme.config?.strings);
 const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source, locale);

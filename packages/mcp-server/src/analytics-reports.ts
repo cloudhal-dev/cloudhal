@@ -21,10 +21,9 @@ import type {
 } from "@cloudhal/analytics";
 import { ID_RE, parseRange, privacySignalShare } from "@cloudhal/analytics";
 import { type AnalyticsService, previousRange } from "@cloudhal/analytics/service";
-import { entryPath } from "@cloudhal/astro-renderer/routing";
 import { archivePath } from "@cloudhal/astro-renderer/taxonomy";
 import type { ContentEntry, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
-import { type SiteGraphStore, termName } from "@cloudhal/core-ts";
+import { entryPath, type SiteGraphStore, termName } from "@cloudhal/core-ts";
 
 export type AnalyticsNodeKind = "page" | "entry" | "archive";
 
@@ -143,7 +142,7 @@ export async function analyticsNodes(
               kind: "entry",
               exists: true,
               title: e.title,
-              path: entryPath(e),
+              path: entryPath(site, e),
               status: e.status,
             }
           : gone(id),
@@ -581,7 +580,7 @@ export async function brokenLinksReport(
       ...pages
         .filter((p) => p.status === "published")
         .map((p) => ({ path: p.path, nodeId: p.id, segment: lastSegment(p.path) })),
-      ...entries.map((e) => ({ path: entryPath(e), nodeId: e.id, segment: e.slug })),
+      ...entries.map((e) => ({ path: entryPath(site, e), nodeId: e.id, segment: e.slug })),
     ];
     return candidates;
   };

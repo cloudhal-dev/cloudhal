@@ -190,6 +190,7 @@ describe("entry sources", () => {
     const asked: string[] = [];
     const sources = await loadSurfaceSources(
       {
+        site: async () => ({}),
         entries: async () => posts,
         entriesByFilter: async (f) => {
           asked.push(f);

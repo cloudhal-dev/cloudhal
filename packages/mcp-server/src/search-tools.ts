@@ -98,6 +98,7 @@ const searchSiteTool: ToolDefinition = {
         };
       }
       return await searchSiteNodes(ctx.store, site.id, query, {
+        site,
         ...(kinds ? { kinds: kinds as SiteSearchKind[] } : {}),
         ...(limit !== undefined ? { limit } : {}),
       });

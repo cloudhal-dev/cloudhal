@@ -53,6 +53,7 @@ import { Lexer, type Token, type Tokens } from "marked";
 import { gateState } from "./availability.ts";
 import { ASSET_HREF, imageSlots, markdownSlots } from "./media/refs.ts";
 import { MEDIA_ROUTE, mediaPrefix } from "./media/types.ts";
+import { entryAt, entryPath } from "./permalinks.ts";
 import { matchRedirect, normalisePath } from "./redirects.ts";
 
 // ───────────────────────────── inputs from the deployment ─────────────────────────────
@@ -288,7 +289,6 @@ type Resolution =
   | { readonly ok: false; readonly gated?: { id: string; state: "embargoed" | "expired" } };
 
 const WELL_KNOWN = new Set(["/", "/rss.xml", "/sitemap.xml", "/robots.txt"]);
-const ENTRY_PATH = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
 /** The live site's routes, gates and assets at `now` (RFC-0002 §7's order: page, entry, archive, redirect). */
 class LiveIndex {
@@ -313,7 +313,7 @@ class LiveIndex {
         list.push(i);
         this.#pages.set(i.path, list);
       } else if (i.kind === "contentEntry" && i.collection && i.slug)
-        this.#entries.set(`/${i.collection}/${i.slug}`, i);
+        this.#entries.set(entryPathOf(live.site, i), i);
       else if (i.kind === "term" && i.taxonomyId && i.slug)
         this.#terms.set(`${i.taxonomyId}\n${i.slug}`, i);
       else if (i.kind === "taxonomy" && i.archiveOn && i.archiveBase) this.#taxonomies.push(i);
@@ -359,9 +359,8 @@ class LiveIndex {
     if (WELL_KNOWN.has(path)) return { ok: true };
     const page = this.#node(this.#pages.get(path));
     if (page?.ok) return page;
-    const entry = ENTRY_PATH.test(path)
-      ? this.#node(this.#entries.has(path) ? [this.#entries.get(path) as RouteInfo] : undefined)
-      : undefined;
+    const hit = entryAt(this.live.site, path) && this.#entries.get(path);
+    const entry = hit ? this.#node([hit]) : undefined;
     if (entry?.ok) return entry;
     for (const tax of this.#taxonomies) {
       const base = tax.archiveBase as string;
@@ -391,7 +390,8 @@ class LiveIndex {
   }
 }
 
-const entryPathOf = (i: RouteInfo) => `/${i.collection}/${i.slug}`;
+const entryPathOf = (site: Site, i: { collection?: unknown; slug?: unknown }) =>
+  entryPath(site, { collection: `${i.collection}`, slug: `${i.slug}` });
 
 /** The live index: one read of the routes, plus live bodies of nodes changed since publishing. */
 async function liveIndex(
@@ -745,7 +745,7 @@ export function graphBuiltinSources(o: GraphBuiltinSourcesOptions): BuiltinSourc
                       segment: lastSegment(i.path as string),
                     })),
                   ...index.entries().map((i) => ({
-                    path: entryPathOf(i),
+                    path: entryPathOf(index.live.site, i),
                     nodeId: i.id,
                     segment: i.slug as string,
                   })),
@@ -823,7 +823,7 @@ export function graphBuiltinSources(o: GraphBuiltinSourcesOptions): BuiltinSourc
           severity: "info",
           nodeId: r.id,
           title: r.title ?? r.id,
-          path: `/${r.collection}/${r.slug}`,
+          path: entryPathOf(live.site, r),
           updatedAt: r.updated_at,
           ageDays: Math.floor((t - Date.parse(r.updated_at)) / DAY_MS),
         });
@@ -853,14 +853,14 @@ export function graphBuiltinSources(o: GraphBuiltinSourcesOptions): BuiltinSourc
         if (i.kind !== "page" && i.kind !== "contentEntry") continue;
         const v = index.visibility(i);
         if (v !== "embargoed" && v !== "expired") continue;
-        const path = i.kind === "page" ? i.path : entryPathOf(i);
+        const path = i.kind === "page" ? i.path : entryPathOf(index.live.site, i);
         if (path) gated.push({ nodeId: i.id, path, state: v });
       }
       return {
         now: canonicalInstant(now),
         newest: entries.map((e) => ({
           nodeId: e.id,
-          path: entryPathOf(e),
+          path: entryPathOf(index.live.site, e),
           title: e.title ?? e.id,
         })),
         gated,

@@ -14,6 +14,7 @@ import { archivePath, taxonomyIndex, termAncestors } from "@cloudhal/astro-rende
 import type { Menu, MenuItem, Site } from "@cloudhal/core-contracts";
 import {
   ConflictError,
+  entryPath,
   InvariantError,
   normalisePath,
   type SiteGraphStore,
@@ -228,7 +229,7 @@ function preview(
   const nav = toNavigation(resolved);
   if (!path) return { key, derived: false, resolved, navigation: markActive(nav) };
   const clean = normalisePath(path);
-  const entry = data.entries.find((e) => `/${e.collection}/${e.slug}` === clean);
+  const entry = data.entries.find((e) => entryPath(data.site, e) === clean);
   const index = taxonomyIndex(data.taxonomies, data.terms, locale);
   const archive = data.terms.find((t) => {
     const tax = index.byId.get(t.taxonomyId);

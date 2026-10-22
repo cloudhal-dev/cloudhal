@@ -1657,6 +1657,68 @@ impl ::std::convert::TryFrom<::std::string::String> for ChromeHeaderWidth {
         value.parse()
     }
 }
+#[doc = "`CollectionSettings`"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CollectionSettings {
+    #[doc = "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub permalink: ::std::option::Option<CollectionSettingsPermalink>,
+}
+#[doc = "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct CollectionSettingsPermalink(::std::string::String);
+impl ::std::ops::Deref for CollectionSettingsPermalink {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<CollectionSettingsPermalink> for ::std::string::String {
+    fn from(value: CollectionSettingsPermalink) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for CollectionSettingsPermalink {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^(/[a-z0-9]+(-[a-z0-9]+)*)+/\\{slug\\}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^(/[a-z0-9]+(-[a-z0-9]+)*)+/\\{slug\\}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for CollectionSettingsPermalink {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for CollectionSettingsPermalink {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CollectionSettingsPermalink {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "`Consent`"]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -3485,6 +3547,12 @@ pub struct Site {
     pub brand: ::std::option::Option<Brand>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub chrome: ::std::option::Option<Chrome>,
+    #[doc = "RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults."]
+    #[serde(
+        default,
+        skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
+    )]
+    pub collections: ::std::collections::HashMap<Slug, CollectionSettings>,
     #[serde(rename = "createdAt")]
     pub created_at: Timestamp,
     #[serde(rename = "defaultLocale")]

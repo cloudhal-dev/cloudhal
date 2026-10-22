@@ -1,4 +1,5 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts/permalinks";
 import {
   Badge,
   InlineCopyText,
@@ -195,7 +196,7 @@ function useNodeNames(siteId: string, enabled: boolean) {
     return entry
       ? {
           title: entry.title,
-          detail: `/${entry.collection}/${entry.slug}`,
+          detail: entryPath(site.data, entry),
           href: `/sites/${siteId}/articles/${entry.id}`,
         }
       : {};

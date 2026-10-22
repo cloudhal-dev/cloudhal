@@ -15,7 +15,7 @@ export const ME_KEY = ["me"] as const;
  * The site the Studio URL is about (`/sites/<id>/…`), read from the location so the hook also works
  * outside the router (dialogs in tests, the account surface).
  */
-function currentSiteId(): string | undefined {
+export function currentSiteId(): string | undefined {
   const match = /^\/sites\/([^/]+)/.exec(globalThis.location?.pathname ?? "");
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }

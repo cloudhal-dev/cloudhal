@@ -59,6 +59,7 @@ import {
 } from "../components/CommentThreadControls.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DetailsCard, EditorLayout } from "../components/EditorLayout.tsx";
+import { EntryPath } from "../components/EntryPath.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { SettingRow } from "../components/Settings.tsx";
 import { useToast } from "../components/Toast.ts";
@@ -668,9 +669,7 @@ export function CommentThreadPage() {
             ? [
                 {
                   label: t("comments.thread.path"),
-                  value: (
-                    <Text variant="mono-secondary">{`/${entry.data.collection}/${entry.data.slug}`}</Text>
-                  ),
+                  value: <EntryPath siteId={siteId} entry={entry.data} />,
                 },
               ]
             : []),

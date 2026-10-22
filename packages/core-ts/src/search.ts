@@ -186,12 +186,14 @@ export async function planSearch(input: {
     (n) => INDEXED.has(n.kind) && (changed(n) || (n.kind === "term" && archivesChanged)),
   );
   const rows: SearchRow[] = [];
+  const siteRef = target.nodes.find((n) => n.kind === "site");
+  const site = siteRef && rewrite.length > 0 ? ((await input.read(siteRef)) as Site) : undefined;
   const archives = rewrite.some((n) => n.kind === "term")
-    ? await archiveContext(target, input.read)
+    ? await archiveContext(target, site, input.read)
     : undefined;
   for (const ref of rewrite) {
     const node = await input.read(ref);
-    if (ref.kind === "contentEntry") pushRow(rows, searchRowOf(node as ContentEntry));
+    if (ref.kind === "contentEntry") pushRow(rows, searchRowOf(node as ContentEntry, { site }));
     else if (ref.kind === "page") pushRow(rows, pageSearchRow(node as Page));
     else if (archives) {
       const term = node as Term;
@@ -223,10 +225,9 @@ function pushRow(rows: SearchRow[], row: SearchRow | undefined): void {
 /** The site's locales and taxonomies, which term rows need. */
 async function archiveContext(
   target: Snap,
+  site: Site | undefined,
   read: (ref: NodeRef) => Promise<unknown>,
 ): Promise<{ locales: string[]; taxonomies: Map<string, Taxonomy> }> {
-  const siteRef = target.nodes.find((n) => n.kind === "site");
-  const site = siteRef ? ((await read(siteRef)) as Site) : undefined;
   const taxonomies = new Map<string, Taxonomy>();
   for (const ref of target.nodes.filter((n) => n.kind === "taxonomy"))
     taxonomies.set(ref.id, (await read(ref)) as Taxonomy);

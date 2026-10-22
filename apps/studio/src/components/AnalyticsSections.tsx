@@ -84,7 +84,8 @@ import { RedirectDialog } from "./RedirectDialog.tsx";
 import { RelativeTime } from "./RelativeTime.tsx";
 import { SettingRow } from "./Settings.tsx";
 import { TableSkeleton } from "./TableSkeleton.tsx";
-import { taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx";
+import { servedPathsInput, taxonomyKeys, useTaxonomyData } from "./Taxonomy.tsx";
+import { useEditorByPath } from "./useEditorByPath.ts";
 import { useGate } from "./useMe.ts";
 
 /** What every card reads for: the site, the range (and its UTC days), the filter, polling. */
@@ -565,28 +566,6 @@ function statusVariant(status: number): "warning" | "secondary" | "error" | "inf
   return status >= 500 ? "error" : "info";
 }
 
-/** Where a same-site path is edited: pages by path, published articles by `/<collection>/<slug>`. */
-function useEditorByPath(siteId: string, enabled: boolean) {
-  const pages = useQuery({
-    queryKey: ["pages", siteId],
-    queryFn: () => api.pages.list(siteId),
-    enabled,
-  });
-  const entries = useQuery({
-    queryKey: ["entries", siteId, "all"],
-    queryFn: () => api.entries.list(siteId),
-    enabled,
-  });
-  return useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of pages.data ?? []) map.set(p.path, `/sites/${siteId}/pages/${p.id}`);
-    for (const e of entries.data ?? [])
-      if (e.status === "published")
-        map.set(`/${e.collection}/${e.slug}`, `/sites/${siteId}/articles/${e.id}`);
-    return map;
-  }, [pages.data, entries.data, siteId]);
-}
-
 /** The redirect dialog, prefilled with a broken path; it loads what it checks against when opened. */
 function CreateRedirect({
   siteId,
@@ -614,13 +593,7 @@ function CreateRedirect({
     queryFn: () => api.entries.list(siteId),
     enabled: open,
   });
-  const served = servedPaths({
-    pages: pages.data ?? [],
-    entries: entries.data ?? [],
-    defaultLocale: data.defaultLocale,
-    taxonomies: data.taxonomies.data ?? [],
-    terms: data.items.map((i) => i.term),
-  });
+  const served = servedPaths(servedPathsInput(data, pages.data, entries.data));
   return (
     <RedirectDialog
       siteId={siteId}

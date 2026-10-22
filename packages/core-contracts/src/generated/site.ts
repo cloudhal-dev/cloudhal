@@ -136,6 +136,12 @@ export interface Site {
   pageIds: Id[];
   homePageId?: Id;
   localization?: Localization;
+  /**
+   * RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults.
+   */
+  collections?: {
+    [k: string]: CollectionSettings | undefined;
+  };
   theme: ThemeRef;
   design?: Design;
   brand?: Brand;
@@ -192,6 +198,16 @@ export interface Localization {
    * When readers see the machine-translation notice: unreviewed (until a person reviews) or always.
    */
   label?: "unreviewed" | "always";
+}
+/**
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "CollectionSettings".
+ */
+export interface CollectionSettings {
+  /**
+   * RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}.
+   */
+  permalink?: string;
 }
 /**
  * Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.

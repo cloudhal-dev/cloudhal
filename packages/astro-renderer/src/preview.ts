@@ -7,6 +7,7 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts";
 import {
   type ArchiveState,
   type ArchiveView,
@@ -19,7 +20,6 @@ import { renderComponentSection } from "./blocks.ts";
 import { gateNotice } from "./gates.ts";
 import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
-import { entryPath } from "./routing.ts";
 import { archiveHead, siteOrigin } from "./seo.ts";
 import { pickEntries, renderSurface, surfaceSources } from "./surfaces.ts";
 import {
@@ -126,7 +126,7 @@ export function renderSectionHtml(
       const items = list
         .map(
           (e) =>
-            `<li><a href="/${esc(e.collection)}/${esc(e.slug)}">${esc(e.title)}</a>${e.summary ? `<p>${esc(e.summary)}</p>` : ""}</li>`,
+            `<li><a href="${esc(entryPath(media?.permalinks, e))}">${esc(e.title)}</a>${e.summary ? `<p>${esc(e.summary)}</p>` : ""}</li>`,
         )
         .join("");
       return `<section class="ch-contentlist" data-section-id="${esc(section.id)}" data-kind="contentList" data-collection="${esc(section.collection)}">${
@@ -142,7 +142,10 @@ export function renderSectionHtml(
     // filter is applied on the site; a preview shows the collection's newest).
     case "surface": {
       const sources = Object.fromEntries(
-        surfaceSources(section).map((q) => [q.key, pickEntries(entries[q.collection] ?? [], q)]),
+        surfaceSources(section).map((q) => [
+          q.key,
+          pickEntries(entries[q.collection] ?? [], q, media?.permalinks),
+        ]),
       );
       return renderSurface(section, { ...(media ? { media } : {}), sources, preview: true });
     }
@@ -210,7 +213,13 @@ export function renderPagePreview(
 
 /** Previews resolve `asset:` references and asset-backed images, never through transformations. */
 function previewMedia(site: Site, media: MediaContext | undefined): MediaContext {
-  return { locale: site.defaultLocale, defaultLocale: site.defaultLocale, ...media, preview: true };
+  return {
+    locale: site.defaultLocale,
+    defaultLocale: site.defaultLocale,
+    permalinks: site,
+    ...media,
+    preview: true,
+  };
 }
 
 /**
@@ -228,7 +237,7 @@ export function renderEntryPreview(
     renderEntryArticle(entry, site.defaultLocale, previewMedia(site, media));
   return {
     title: entry.title,
-    path: `/${entry.collection}/${entry.slug}`,
+    path: entryPath(site, entry),
     html: document(site, entry.title, entry.summary, body),
   };
 }
@@ -418,7 +427,7 @@ export function renderArchivePreview(
       : `<ul class="ch-entrylist">${view.entries
           .map(
             (e) =>
-              `<li><a href="${esc(entryPath(e))}">${esc(e.title)}</a>${e.summary ? `<p>${esc(e.summary)}</p>` : ""}${
+              `<li><a href="${esc(entryPath(site, e))}">${esc(e.title)}</a>${e.summary ? `<p>${esc(e.summary)}</p>` : ""}${
                 e.publishedAt
                   ? `<time datetime="${esc(e.publishedAt)}">${esc(date(e.publishedAt))}</time>`
                   : ""

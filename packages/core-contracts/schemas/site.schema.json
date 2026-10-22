@@ -45,6 +45,12 @@
     },
     "homePageId": { "$ref": "common.schema.json#/$defs/Id" },
     "localization": { "$ref": "#/$defs/Localization" },
+    "collections": {
+      "type": "object",
+      "description": "RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults.",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/Slug" },
+      "additionalProperties": { "$ref": "#/$defs/CollectionSettings" }
+    },
     "theme": { "$ref": "#/$defs/ThemeRef" },
     "design": { "$ref": "#/$defs/Design" },
     "brand": { "$ref": "#/$defs/Brand" },
@@ -63,6 +69,17 @@
     "metadata": { "$ref": "common.schema.json#/$defs/Metadata" }
   },
   "$defs": {
+    "CollectionSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permalink": {
+          "type": "string",
+          "description": "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}.",
+          "pattern": "^(/[a-z0-9]+(-[a-z0-9]+)*)+/\\{slug\\}$"
+        }
+      }
+    },
     "Brand": {
       "type": "object",
       "description": "The site's logo and social links (RFC-0025 \u00a71), shared by the header, the footer and SEO.",

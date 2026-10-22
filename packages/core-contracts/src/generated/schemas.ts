@@ -174,6 +174,16 @@ export const SiteSchema = {
     "localization": {
       "$ref": "#/$defs/Localization"
     },
+    "collections": {
+      "type": "object",
+      "description": "RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults.",
+      "propertyNames": {
+        "$ref": "#/$defs/Slug"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/CollectionSettings"
+      }
+    },
     "theme": {
       "$ref": "#/$defs/ThemeRef"
     },
@@ -545,6 +555,17 @@ export const SiteSchema = {
           "items": {
             "$ref": "#/$defs/HeaderAction"
           }
+        }
+      }
+    },
+    "CollectionSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permalink": {
+          "type": "string",
+          "description": "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}.",
+          "pattern": "^(/[a-z0-9]+(-[a-z0-9]+)*)+/\\{slug\\}$"
         }
       }
     },

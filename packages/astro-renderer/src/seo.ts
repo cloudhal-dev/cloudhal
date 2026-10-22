@@ -4,10 +4,10 @@
  * gets the same, tested output and themes only decide where to render `<SeoHead>`.
  */
 import type { ContentEntry, ImageRef, Page, Site } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts";
 import type { ArchiveView } from "./archive.ts";
 import { inlineMarkdownText, markdownText, safeSrc } from "./markdown.ts";
 import { assetAlt, imageObject, type MediaContext, socialImageUrl } from "./media.ts";
-import { entryPath } from "./routing.ts";
 import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
 
 export interface HeadMeta {
@@ -227,7 +227,7 @@ export function entryHead(
   media?: MediaContext,
   comments?: { readonly commentCount: number; readonly comment?: readonly object[] },
 ): HeadMeta {
-  const url = `${origin}${entryPath(entry)}`;
+  const url = `${origin}${entryPath(site, entry)}`;
   const description = clip(entry.summary);
   const image = cardImage(entry.coverImage, origin, entry.locale, media);
   const title = `${entry.title} · ${site.name}`;
@@ -384,7 +384,7 @@ export function archiveHead(
             itemListElement: view.entries.map((e, i) => ({
               "@type": "ListItem",
               position: (view.page - 1) * view.perPage + i + 1,
-              url: `${origin}${entryPath(e)}`,
+              url: `${origin}${entryPath(site, e)}`,
             })),
           },
         },

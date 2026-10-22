@@ -251,7 +251,7 @@ export function commentTools(): ToolDefinition[] {
           d.store.counts(site.id, a.nodeId !== undefined ? { nodeId: a.nodeId as string } : {}),
           commentEntries(
             ctx.store,
-            site.id,
+            site,
             page.comments.map((c) => c.nodeId),
           ),
           d.store.listReports(site.id, { open: true, limit: 200 }),
@@ -320,7 +320,7 @@ export function commentTools(): ToolDefinition[] {
         const d = comments(ctx);
         const site = await requireSite(ctx, a.siteId as string);
         const nodeId = a.nodeId as string;
-        const entry = (await commentEntries(ctx.store, site.id, [nodeId])).get(nodeId);
+        const entry = (await commentEntries(ctx.store, site, [nodeId])).get(nodeId);
         if (!entry) throw new ToolError("not_found", `article ${nodeId} not found`);
         const all = await d.store.threadComments(site.id, nodeId, {
           includePending: a.includePending !== false,
@@ -410,7 +410,7 @@ export function commentTools(): ToolDefinition[] {
         ]);
         const entries = await commentEntries(
           ctx.store,
-          site.id,
+          site,
           stats.busiest.map((b) => b.nodeId),
         );
         const age = (at: string | null) =>
@@ -720,7 +720,7 @@ export function commentTools(): ToolDefinition[] {
         const d = comments(ctx);
         const site = await requireSite(ctx, a.siteId as string);
         const nodeId = a.nodeId as string;
-        const entry = (await commentEntries(ctx.store, site.id, [nodeId])).get(nodeId);
+        const entry = (await commentEntries(ctx.store, site, [nodeId])).get(nodeId);
         if (!entry) throw new ToolError("not_found", `article ${nodeId} not found`);
         await assertOwn(ctx, [entry]);
         const actor = threadClass(a) === "person" ? personActor(ctx) : ctx.principal.actor;

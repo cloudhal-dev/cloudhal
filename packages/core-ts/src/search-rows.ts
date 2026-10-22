@@ -5,6 +5,7 @@
  */
 import type { ContentEntry, Page, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { termName } from "./names.ts";
+import { entryPath, type PermalinkSite } from "./permalinks.ts";
 import { MARK_CLOSE, MARK_OPEN, SEARCH_TEXT_MAX, type SearchRow } from "./search-common.ts";
 import { termSlug } from "./term-locales.ts";
 
@@ -72,7 +73,7 @@ function entryTermIds(entry: ContentEntry): string[] {
  */
 export function searchRowOf(
   entry: ContentEntry,
-  options: { drafts?: boolean } = {},
+  options: { drafts?: boolean; site?: PermalinkSite | undefined } = {},
 ): SearchRow | undefined {
   if (!shown(entry.status, options.drafts)) return undefined;
   const terms = entryTermIds(entry);
@@ -83,7 +84,7 @@ export function searchRowOf(
     title: entry.title,
     summary: entry.summary ?? "",
     body: searchText(entry.body),
-    href: `/${entry.collection}/${entry.slug}`,
+    href: entryPath(options.site, entry),
     publishedAt: iso(entry.publishedAt),
     gateFrom: iso(entry.availability?.from),
     gateUntil: iso(entry.availability?.until),
@@ -241,11 +242,14 @@ export function searchDocuments(input: {
   drafts?: boolean;
   /** The site's default locale, whose archive slugs are the terms' own (default: `locales[0]`). */
   defaultLocale?: string;
+  /** The site's collection permalinks (RFC-0038), for article links. */
+  site?: PermalinkSite;
 }): SearchRow[] {
   const options = { drafts: input.drafts ?? false };
+  const entryOptions = { ...options, site: input.site };
   const byId = new Map(input.taxonomies.map((t) => [t.id, t]));
   const rows: (SearchRow | undefined)[] = [
-    ...input.entries.map((e) => searchRowOf(e, options)),
+    ...input.entries.map((e) => searchRowOf(e, entryOptions)),
     ...input.pages.map((p) => pageSearchRow(p, options)),
   ];
   for (const term of input.terms) {

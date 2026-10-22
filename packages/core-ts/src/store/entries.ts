@@ -9,6 +9,7 @@ import { ID_PREFIX } from "../ids.ts";
 import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { uniquenessKey } from "../nodes.ts";
+import { entryPath } from "../permalinks.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import type { StoreContext } from "./context.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
@@ -98,8 +99,9 @@ export class EntryEngine {
       wasPublished:
         !!stored && sameLocale && (stored.status === "published" || !!stored.publishedAt),
       isPublished: entry.status === "published",
-      oldPath: stored && sameLocale ? `/${stored.collection}/${stored.slug}` : undefined,
-      newPath: `/${entry.collection}/${entry.slug}`,
+      // Both under the site's current templates (RFC-0038).
+      oldPath: stored && sameLocale ? entryPath(site, stored) : undefined,
+      newPath: entryPath(site, entry),
       source: { kind: "contentEntry", id: entry.id },
     });
     if (newTerms.length === 0 && !plan) {

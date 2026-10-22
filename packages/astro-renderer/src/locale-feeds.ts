@@ -4,17 +4,17 @@
  * single-locale functions in `feeds.ts`; this module only loops over locales and localizes URLs.
  */
 import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
+import { entryPath, type PermalinkSite } from "@cloudhal/core-ts";
 import { archiveSummaries } from "./archive.ts";
 import { FEED_LIMIT, rssXml, type SitemapUrl, sitemapUrls } from "./feeds.ts";
 import { hostLocale, localeUrl } from "./locales.ts";
 import { loadAssetIndex } from "./media.ts";
 import { notFoundPageIds } from "./not-found.ts";
-import { entryPath } from "./routing.ts";
 import type { GraphSource } from "./source.ts";
 import { loadTaxonomyIndex } from "./taxonomy.ts";
 
 type Localized = Page | ContentEntry;
-const pathOf = (n: Localized) => ("path" in n ? n.path : entryPath(n));
+const pathOf = (site: PermalinkSite, n: Localized) => ("path" in n ? n.path : entryPath(site, n));
 
 /** The locales a host serves: its own one, or every locale without a domain of its own. */
 export function hostLocales(site: Site, host: string): string[] {
@@ -46,7 +46,7 @@ function alternateIndex(site: Site, nodes: readonly Localized[], origin: string)
     const out = members
       .filter((m) => site.locales.includes(m.locale))
       .sort((a, b) => site.locales.indexOf(a.locale) - site.locales.indexOf(b.locale))
-      .map((m) => ({ locale: m.locale, href: localeUrl(site, m.locale, pathOf(m), origin) }));
+      .map((m) => ({ locale: m.locale, href: localeUrl(site, m.locale, pathOf(site, m), origin) }));
     const fallback = out.find((a) => a.locale === site.defaultLocale);
     return fallback ? [...out, { locale: "x-default", href: fallback.href }] : out;
   };
@@ -72,7 +72,9 @@ export async function localizedSitemap(
     const archives = archiveSummaries(await loadTaxonomyIndex(source, locale), entries);
     // `sitemapUrls` lists the site's default locale: view the site as if `locale` were it.
     const urls = sitemapUrls({ ...site, defaultLocale: locale }, pages, entries, origin, archives);
-    const byPath = new Map(nodes.filter((n) => n.locale === locale).map((n) => [pathOf(n), n]));
+    const byPath = new Map(
+      nodes.filter((n) => n.locale === locale).map((n) => [pathOf(site, n), n]),
+    );
     for (const u of urls) {
       const path = u.loc.slice(origin.length) || "/";
       const node = byPath.get(path);
@@ -127,7 +129,7 @@ export async function llmsTxt(
   const entries = (await source.allEntries(locale)).filter(visible).slice(0, FEED_LIMIT * 4);
   const line = (n: Localized) => {
     const summary = "summary" in n && n.summary ? `: ${n.summary.replace(/\s+/g, " ")}` : "";
-    return `- [${n.title}](${localeUrl(site, locale, pathOf(n), origin)})${summary}`;
+    return `- [${n.title}](${localeUrl(site, locale, pathOf(site, n), origin)})${summary}`;
   };
   const others = site.locales.filter((l) => l !== locale);
   const description = home?.seo?.description ?? site.name;

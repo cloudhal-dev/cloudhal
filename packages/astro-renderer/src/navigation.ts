@@ -19,7 +19,7 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import { normalisePath, termName } from "@cloudhal/core-ts";
+import { entryPath, normalisePath, termName } from "@cloudhal/core-ts";
 import {
   type MenuLookup,
   type MenuLookupNode,
@@ -79,9 +79,6 @@ export interface LookupData {
   readonly collectionIndex?: CollectionIndexHook;
 }
 
-/** `/<collection>/<slug>`. */
-const entryHref = (e: Pick<ContentEntry, "collection" | "slug">) => `/${e.collection}/${e.slug}`;
-
 /**
  * A `MenuLookup` over a site's nodes (§7.1 table). Term items follow `archiveState` (200 only when
  * the archive lists entries the site serves in the locale); a collection index comes from the theme
@@ -124,7 +121,7 @@ export function menuLookup(data: LookupData): MenuLookup {
     },
     entry: (id) => {
       const e = entries.get(id);
-      return e ? node(e, entryHref(e)) : undefined;
+      return e ? node(e, entryPath(data.site, e)) : undefined;
     },
     term: (id, locale) => {
       const term = terms.get(id);

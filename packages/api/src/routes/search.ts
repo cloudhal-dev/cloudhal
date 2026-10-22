@@ -26,6 +26,7 @@ export const siteSearch: Hono<Env> = new Hono<Env>().get("/", async (c) => {
   return c.json(
     await searchSiteNodes(c.get("store"), site.id, c.req.query("q") ?? "", {
       kinds,
+      site,
       ...(Number.isInteger(limit) && limit > 0 ? { limit } : {}),
     }),
   );

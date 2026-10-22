@@ -38,7 +38,7 @@ import {
 } from "@cloudhal/comments";
 import type { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { Site } from "@cloudhal/core-contracts";
-import { entryPath } from "./routing.ts";
+import { entryPath } from "@cloudhal/core-ts";
 import type { GraphSource } from "./source.ts";
 
 export const COMMENTS_PATH = "/__cloudhal/comments";
@@ -146,7 +146,7 @@ export class SiteComments {
     return {
       nodeId: entry.id,
       collection: entry.collection,
-      path: entryPath(entry),
+      path: entryPath(await source.site(), entry),
       publishedAt: entry.publishedAt ?? null,
     };
   }
