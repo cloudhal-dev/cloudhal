@@ -47,7 +47,7 @@ import {
 import { EntryPath } from "../components/EntryPath.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
-import { EntryAddress } from "../components/LiveAddress.tsx";
+import { EntryAddress, ViewLiveButton } from "../components/LiveAddress.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
@@ -98,6 +98,9 @@ const READ_ONLY_REASON = {
   notOwn: "gating.entryNotOwn",
   published: "gating.entryPublished",
 } as const;
+
+/** The Articles list, the editor's first crumb. */
+const articlesHref = (siteId: string) => `/sites/${siteId}/articles`;
 
 export function ArticleEditorPage() {
   const t = useT();
@@ -169,10 +172,7 @@ export function ArticleEditorPage() {
       await navigate({ to: "/sites/$siteId/articles", params: { siteId } });
     },
   });
-  const articlesCrumb = {
-    label: t("pageHeaders.articles.title"),
-    href: `/sites/${siteId}/articles`,
-  };
+  const articlesCrumb = { label: t("pageHeaders.articles.title"), href: articlesHref(siteId) };
 
   if (!draft) {
     return (
@@ -290,6 +290,7 @@ export function ArticleEditorPage() {
       actions={
         <>
           <PreviewToggle visible={previewVisible} onChange={setPreviewVisible} />
+          <ViewLiveButton siteId={siteId} item={draft} />
           <StatusActions
             status={draft.status}
             busy={save.isPending}

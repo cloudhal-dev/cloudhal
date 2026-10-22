@@ -25,7 +25,9 @@ export function originHost(origin: string): string {
 
 /**
  * Whether an address is live: the live snapshot holds the item as published, at the same address.
- * `liveNode` is the item as the live snapshot holds it (undefined when it is not in there).
+ * `liveNode` is the item as the live snapshot holds it (undefined when it is not in there);
+ * `addressOf` gives the full localized address (core-ts `itemUrl`), so a changed path, slug,
+ * permalink or locale all count as a different address.
  */
 export function servesAt<T extends { status: string }>(
   liveNode: T | undefined,

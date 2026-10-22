@@ -13,7 +13,6 @@ import {
   Text,
   Tooltip,
 } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import {
   CheckCircle,
   ClockCountdown,
@@ -32,6 +31,7 @@ import { ApproveElevationDialog } from "../components/ApproveElevationDialog.tsx
 import { ApproveRequestDialog } from "../components/ApproveRequestDialog.tsx";
 import { ActorCell, ToolCell, useToolLabel } from "../components/Audit.tsx";
 import { useBodyDiffLabels } from "../components/BodyChanges.tsx";
+import { CodeHighlighted } from "../components/CodeHighlighted.tsx";
 import { ApproveCommentsDialog, CommentRequestDetails } from "../components/CommentApprovals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import {

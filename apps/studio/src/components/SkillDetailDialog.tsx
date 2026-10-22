@@ -1,11 +1,11 @@
 import { Badge, ClipboardText, LayerDialog, Text } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import { FileText, HandPalm } from "@phosphor-icons/react";
 import { type ReactNode, useRef } from "react";
 import { useT } from "../i18n/index.tsx";
 import type { SkillSummary } from "../lib/api.ts";
 import { isAgentScope, orderSkillScopes, skillCallSnippet } from "../lib/skills.ts";
 import { useToolLabel } from "./Audit.tsx";
+import { CodeHighlighted } from "./CodeHighlighted.tsx";
 import { ScopeBadge } from "./ScopeBadge.tsx";
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

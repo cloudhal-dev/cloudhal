@@ -8,7 +8,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChangeAgentModeDialog } from "../src/components/ChangeAgentModeDialog.tsx";
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { ElevateAgentKeyDialog } from "../src/components/ElevateAgentKeyDialog.tsx";
 import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
 import type { AgentKeySummary, AuditRow } from "../src/lib/api.ts";
@@ -26,9 +25,7 @@ function wrap(children: ReactNode, locale: Locale = "en") {
   return (
     <I18nProvider initialLocale={locale}>
       <QueryClientProvider client={qc}>
-        <CodeProvider>
-          <Toasty>{children}</Toasty>
-        </CodeProvider>
+        <Toasty>{children}</Toasty>
       </QueryClientProvider>
     </I18nProvider>
   );

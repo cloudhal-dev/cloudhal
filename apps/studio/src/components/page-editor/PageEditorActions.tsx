@@ -1,10 +1,11 @@
-/** The page editor's header actions: preview, Build live, status, schedule and Save. */
+/** The page editor's header actions: preview, View live, Build live, status, schedule and Save. */
 import type { Page, PublishStatus } from "@cloudhal/core-contracts";
 import { Button, DropdownMenu, LinkButton, Tooltip } from "@cloudhal/ui";
 import { Copy, Lightning, Trash } from "@phosphor-icons/react";
 import { useT } from "../../i18n/index.tsx";
 import { PreviewToggle } from "../EditorLayout.tsx";
 import { ScheduleAction } from "../EditorSchedule.tsx";
+import { ViewLiveButton } from "../LiveAddress.tsx";
 import { StatusActions } from "../StatusActions.tsx";
 import type { PageEditorState } from "./usePageEditor.ts";
 
@@ -27,6 +28,7 @@ export function PageEditorActions({
   return (
     <>
       <PreviewToggle visible={ed.previewVisible} onChange={ed.setPreviewVisible} />
+      <ViewLiveButton siteId={siteId} item={draft} />
       <Tooltip content={t("editor.buildLiveHint")}>
         <LinkButton
           href={`/sites/${siteId}/pages/${pageId}/build`}

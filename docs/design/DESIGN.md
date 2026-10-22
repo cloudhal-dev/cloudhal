@@ -29,7 +29,7 @@ Studio mirrors this one-to-one:
 | Feedback | `Banner` (page/section), `Field`/`Input error` (inline), `Toasty` + `useKumoToastManager` (transient). |
 | Confirmation | `ApprovalDialog` (ours, on `Dialog`) for publish/rollback; `DeleteResource` (block) for typed-name deletes; `LayerDialog.Alert` for other destructive alerts. Always rendered, controlled by `open`. |
 | Forms & detail sheets | `LayerDialog.Root open onOpenChange` → `LayerDialog.Content` whose **direct** children are `Title`, optional `Description`, `Body`, optional `Actions` (Kumo throws otherwise; branch *inside* each part). Desktop dialog, bottom sheet on phones. |
-| Code & config | `CodeHighlighted` from `@cloudhal/ui/code` (Shiki, lazy, `showCopyButton`) for snippets and JSON payloads; `ShikiProvider` lives at the app root (`CodeProvider`, localised copy labels). `Code` stays for one-line CLI hints in usage panels. |
+| Code & config | `CodeHighlighted` from `@cloudhal/ui/code` (Shiki, lazy, `showCopyButton`) for snippets and JSON payloads; screens import it through `components/CodeHighlighted.tsx`, which brings its own `ShikiProvider` (localised copy labels) so Kumo's code module and Shiki stay out of the shell's initial load. `Code` stays for one-line CLI hints in usage panels. |
 
 Keyboard parity with the dashboard: `⌘K` / `/` open the palette; `t s` toggles the sidebar; `?` lists shortcuts (palette entry).
 

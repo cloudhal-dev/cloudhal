@@ -37,6 +37,7 @@ export * from "./hash.ts";
 export type { NodeHold } from "./holds.ts";
 export * from "./hosts.ts";
 export * from "./ids.ts";
+export * from "./locale-paths.ts";
 export {
   importMediaUrls,
   type LoadedSource,

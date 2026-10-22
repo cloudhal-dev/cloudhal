@@ -15,10 +15,10 @@ import {
   Text,
   Tooltip,
 } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import { BookOpenText, CaretRight, FolderSimplePlus, Info, Lightbulb } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
+import { CodeHighlighted } from "../components/CodeHighlighted.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";

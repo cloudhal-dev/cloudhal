@@ -16,7 +16,6 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
   useNavigate: () => navigate,
 }));
 
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { NotificationSettings } from "../src/components/NotificationSettings.tsx";
 import { NotificationsBell } from "../src/components/NotificationsBell.tsx";
 import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
@@ -38,9 +37,7 @@ function wrap(children: ReactNode, options: { locale?: Locale; qc?: QueryClient 
   return (
     <I18nProvider initialLocale={options.locale ?? "en"}>
       <QueryClientProvider client={qc}>
-        <CodeProvider>
-          <Toasty>{children}</Toasty>
-        </CodeProvider>
+        <Toasty>{children}</Toasty>
       </QueryClientProvider>
     </I18nProvider>
   );

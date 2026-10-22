@@ -1,5 +1,4 @@
 import { Banner, InlineCopyText, LayerDialog, LinkButton, Text } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import { GitDiff, HandPalm, Lightning, Prohibit } from "@phosphor-icons/react";
 import { type ReactNode, useRef } from "react";
 import { useI18n } from "../i18n/index.tsx";
@@ -8,6 +7,7 @@ import { autoApprovalCount, isAutoApproved } from "../lib/agents.ts";
 import type { AuditRow } from "../lib/api.ts";
 import { ModeBadge } from "./AgentModes.tsx";
 import { ActorCell, DecisionCell, ElevationGrant, Outcome, useToolLabel } from "./Audit.tsx";
+import { CodeHighlighted } from "./CodeHighlighted.tsx";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (

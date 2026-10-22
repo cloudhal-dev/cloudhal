@@ -63,6 +63,9 @@ export const LAZY_ONLY: readonly RegExp[] = [
   // CodeMirror (Markdown mode) only with the first switch to it.
   /[\\/]node_modules[\\/].*[\\/](@tiptap|prosemirror-[a-z-]+|linkifyjs|orderedmap|rope-sequence|w3c-keyname|@codemirror|@lezer|@marijn|crelt|style-mod)[\\/]/,
   /[\\/]packages[\\/]ui[\\/]src[\\/](editor\.ts|blocks[\\/]MarkdownEditor\.tsx|blocks[\\/]editor[\\/])/,
+  // Kumo's highlighted code blocks (and Shiki behind them): each screen that shows code brings
+  // its own provider (`components/CodeHighlighted.tsx`); at the app root they cost 2.9 kB gzip.
+  /[\\/]@cloudflare[\\/]kumo[\\/]dist[\\/]code\.js$/,
   // Color tokens (RFC-0023): the expansion and the swatches load with the lazy site settings route.
   /[\\/]packages[\\/]core-ts[\\/]src[\\/]tokens\.ts$/,
   /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/]ColorRolePreview\.tsx$/,

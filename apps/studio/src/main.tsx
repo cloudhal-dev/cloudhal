@@ -4,7 +4,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppLink } from "./components/AppLink.tsx";
-import { CodeProvider } from "./components/CodeProvider.tsx";
 import { KumoLocale } from "./components/KumoLocale.tsx";
 import { reloadForNewDeploy } from "./components/RouteStates.tsx";
 import { currentLocale, I18nProvider, type Locale, loadLocale } from "./i18n/index.tsx";
@@ -31,11 +30,9 @@ const start = (initialLocale?: Locale) => {
           <QueryClientProvider client={queryClient}>
             <LinkProvider component={AppLink}>
               <TooltipProvider>
-                <CodeProvider>
-                  <Toasty>
-                    <RouterProvider router={router} />
-                  </Toasty>
-                </CodeProvider>
+                <Toasty>
+                  <RouterProvider router={router} />
+                </Toasty>
               </TooltipProvider>
             </LinkProvider>
           </QueryClientProvider>
