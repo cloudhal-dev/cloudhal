@@ -11,5 +11,8 @@ export default defineConfig({
     environmentOptions: { happyDOM: { settings: { disableIframePageLoading: true } } },
     include: ["test/**/*.test.tsx"],
     setupFiles: ["./test/setup.ts"],
+    // The first test to open a lazy kit (the calendar, charts) pays its cold import; on a CI runner
+    // shared with the heavy suites that went past Vitest's 5 s default. Same limit as Studio.
+    testTimeout: 20_000,
   },
 });
