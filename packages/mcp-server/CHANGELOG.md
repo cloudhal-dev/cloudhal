@@ -1,5 +1,39 @@
 # @cloudhal/mcp-server
 
+## 0.4.0
+
+### Minor Changes
+
+- 18a3960: MCP collection tools (RFC-0040 step 4):
+  - `list_collections` (`content:read`) lists every collection with its names, icon, entry counts by status, permalink, feed, sitemap and sort settings, and the taxonomies that apply.
+  - `create_collection` declares a collection. It needs names in the default locale and optionally takes an icon, permalink, feed, sitemap and sort.
+  - `update_collection` changes a collection's names (merged by locale), icon, feed, sitemap or sort.
+  - Both write tools need `site:write` and wait for a person in every mode, and that person must hold `site:settings`. Overlaps, duplicates and missing names are refused before anyone is asked; `dryRun` checks without asking.
+  - `create_entry` now refuses a collection outside the registry (`collection_undeclared`) and points to `create_collection`. Collections that already have entries keep working.
+
+### Patch Changes
+
+- 3c4453e: First-class collections, step 2 (RFC-0040 / ADR-0042).
+  - **Store:** the first entry of a new collection is refused (`path_conflict`, `reserved_path`) when its default prefix `/<collection>` overlaps another collection's permalink, a taxonomy archive, `/search` or a locale prefix. This closes the gap RFC-0038 left. A site update that declares a new collection runs the same check, and a declared collection that still has entries, or that a taxonomy names, cannot be undeclared (`collection_in_use`).
+  - **API:** new routes under `/api/sites/:id/collections`:
+    - `GET` (`content:read`) lists the registry;
+    - `PUT /:key { settings, rev }` declares or changes a collection (`site:settings`), with `?dryRun=1`;
+    - `DELETE /:key?rev=` undeclares an empty one.
+  
+    Creating an entry in a collection outside the registry is refused with `collection_undeclared` (422).
+  - **Renderer:** RSS feeds leave out collections with `feed: false`, and `sitemap.xml` leaves out those with `sitemap: false`. The defaults are unchanged. `collectionLabel` and `collectionSettings` are re-exported from `./routing` for themes.
+  - **MCP:** resetting a permalink with `set_collection_permalink` keeps the collection declared. Agents get hints for the new error codes.
+- Updated dependencies [c287a09]
+- Updated dependencies [3c4453e]
+  - @cloudhal/core-contracts@0.4.0
+  - @cloudhal/core-ts@0.4.0
+  - @cloudhal/astro-renderer@0.4.0
+  - @cloudhal/agent-runtime@0.4.0
+  - @cloudhal/analytics@0.4.0
+  - @cloudhal/comments@0.4.0
+  - @cloudhal/schedules@0.4.0
+  - @cloudhal/storage@0.4.0
+
 ## 0.3.13
 
 ### Patch Changes
