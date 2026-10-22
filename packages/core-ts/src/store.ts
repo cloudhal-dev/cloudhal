@@ -38,6 +38,7 @@ import { checkAvailability, type GateSupport, sameAvailability } from "./availab
 import { type BlockRegistry, createBlockRegistry, type PropsSchema } from "./blocks.ts";
 import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
+import type { CollectionInfo } from "./collections.ts";
 import { addedCorrections, type CorrectionInput } from "./corrections.ts";
 import { ConflictError, InvariantError, NotFoundError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
@@ -419,6 +420,11 @@ export class SiteGraphStore {
     return this.#entries.write(undefined, entry, ts, options);
   }
 
+  /** RFC-0040: declared collections, those inferred from entries, and `posts`, with counts. */
+  listCollections(siteId: string): Promise<CollectionInfo[]> {
+    return this.#sites.collections(siteId);
+  }
+
   async getContentEntry(id: string): Promise<ContentEntry | undefined> {
     return this.#getNode<ContentEntry>("contentEntry", id);
   }
@@ -717,14 +723,8 @@ export class SiteGraphStore {
     };
     if (!options.dryRun) return this.createMenu(input);
     const ts = this.#stamp();
-    return {
-      ...input,
-      schemaVersion: 1,
-      id: this.#newId(ID_PREFIX.menu),
-      rev: 0,
-      createdAt: ts,
-      updatedAt: ts,
-    };
+    const id = this.#newId(ID_PREFIX.menu);
+    return { ...input, schemaVersion: 1, id, rev: 0, createdAt: ts, updatedAt: ts };
   }
 
   // ───────────────────────────── assets (RFC-0004) ─────────────────────────────

@@ -47,8 +47,9 @@
     "localization": { "$ref": "#/$defs/Localization" },
     "collections": {
       "type": "object",
-      "description": "RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults.",
+      "description": "RFC-0038, RFC-0040: the site's declared collections and their settings, keyed by collection (ContentEntry.collection). A key here declares the collection, even with no settings ({}). A collection with entries but no key is inferred and uses the defaults.",
       "propertyNames": { "$ref": "common.schema.json#/$defs/Slug" },
+      "maxProperties": 50,
       "additionalProperties": { "$ref": "#/$defs/CollectionSettings" }
     },
     "theme": { "$ref": "#/$defs/ThemeRef" },
@@ -77,7 +78,43 @@
           "type": "string",
           "description": "RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}.",
           "pattern": "^(/[a-z0-9]+(-[a-z0-9]+)*)+/\\{slug\\}$"
+        },
+        "labels": {
+          "type": "object",
+          "description": "RFC-0040: display names per locale (Studio, agents, themes). Absent or missing a locale: the default locale's, then the key.",
+          "propertyNames": { "$ref": "common.schema.json#/$defs/Locale" },
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/CollectionLabel" }
+        },
+        "icon": {
+          "type": "string",
+          "description": "RFC-0040: a name from Studio's closed icon set (e.g. calendar, briefcase, users). Unknown names show the default icon. Never a URL or markup.",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "maxLength": 40
+        },
+        "feed": {
+          "type": "boolean",
+          "description": "RFC-0040: entries appear in the site's RSS feeds. Absent: true."
+        },
+        "sitemap": {
+          "type": "boolean",
+          "description": "RFC-0040: published entries appear in sitemap.xml. Absent: true."
+        },
+        "sort": {
+          "type": "string",
+          "description": "RFC-0040: default order where none is given (Studio's list, entry queries without sort, MCP list_entries). Absent: newest.",
+          "enum": ["newest", "oldest", "title"]
         }
+      }
+    },
+    "CollectionLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["singular", "plural"],
+      "properties": {
+        "singular": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "plural": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 }
       }
     },
     "Brand": {

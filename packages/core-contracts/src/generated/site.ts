@@ -137,7 +137,7 @@ export interface Site {
   homePageId?: Id;
   localization?: Localization;
   /**
-   * RFC-0038: per-collection settings, keyed by collection (ContentEntry.collection). A collection without an entry here uses the defaults.
+   * RFC-0038, RFC-0040: the site's declared collections and their settings, keyed by collection (ContentEntry.collection). A key here declares the collection, even with no settings ({}). A collection with entries but no key is inferred and uses the defaults.
    */
   collections?: {
     [k: string]: CollectionSettings | undefined;
@@ -208,6 +208,37 @@ export interface CollectionSettings {
    * RFC-0038: where the collection's entries live, as a template with a closed token set. Version 1: one or more fixed lower-case path segments followed by /{slug}, e.g. /blog/{slug}. Absent means /<collection>/{slug}.
    */
   permalink?: string;
+  /**
+   * RFC-0040: display names per locale (Studio, agents, themes). Absent or missing a locale: the default locale's, then the key.
+   */
+  labels?: {
+    [k: string]: CollectionLabel | undefined;
+  };
+  /**
+   * RFC-0040: a name from Studio's closed icon set (e.g. calendar, briefcase, users). Unknown names show the default icon. Never a URL or markup.
+   */
+  icon?: string;
+  /**
+   * RFC-0040: entries appear in the site's RSS feeds. Absent: true.
+   */
+  feed?: boolean;
+  /**
+   * RFC-0040: published entries appear in sitemap.xml. Absent: true.
+   */
+  sitemap?: boolean;
+  /**
+   * RFC-0040: default order where none is given (Studio's list, entry queries without sort, MCP list_entries). Absent: newest.
+   */
+  sort?: "newest" | "oldest" | "title";
+}
+/**
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "CollectionLabel".
+ */
+export interface CollectionLabel {
+  singular: string;
+  plural: string;
+  description?: string;
 }
 /**
  * Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.
