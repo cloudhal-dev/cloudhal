@@ -2,6 +2,7 @@
 
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import type { CorrectionKind, EntryQuery } from "@cloudhal/core-ts";
+import { requireRegistered } from "./collection-tools.ts";
 import {
   autoSnapshot,
   entryLimitCheck,
@@ -109,7 +110,7 @@ const createEntryTool: ToolDefinition = {
   name: "create_entry",
   title: "Create article",
   description:
-    "Create a draft content entry (markdown body), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Snapshots afterwards.",
+    "Create a draft content entry (markdown body) in an existing collection (list_collections; a new one needs create_collection first), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -140,6 +141,9 @@ const createEntryTool: ToolDefinition = {
   },
   scopes: ["content:write"],
   own: "entry",
+  // RFC-0040 §5: only collections of the registry (a new one goes through create_collection).
+  precheck: (a, ctx) =>
+    requireRegistered(ctx, a.siteId as string, (a.collection as string | undefined) ?? "posts"),
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
     await entryLimitCheck(ctx, "create", undefined, {

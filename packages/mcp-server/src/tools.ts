@@ -31,6 +31,7 @@ import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools } from "./asset-tools.ts";
 import { bodyTools } from "./body-tools.ts";
 import { chromeTools } from "./chrome-tools.ts";
+import { collectionTools } from "./collection-tools.ts";
 import { commentTools } from "./comment-tools.ts";
 import { type ToolContext, type ToolDefinition, ToolError, toToolError } from "./common.ts";
 import { designTools } from "./design-tools.ts";
@@ -86,6 +87,8 @@ export function defineTools(): ToolDefinition[] {
     // Taxonomy, term and redirect tools (RFC-0002 §6.2), then menu tools (RFC-0003 §6.1) and
     // media tools (RFC-0004 §6.2), follow the article tools.
     ...taxonomyTools(),
+    // RFC-0040 §5: the collection registry; new collections are a person's decision.
+    ...collectionTools(),
     // RFC-0038 §5: where a collection's entries live (always a person's decision).
     ...permalinkTools(),
     ...menuTools(),
