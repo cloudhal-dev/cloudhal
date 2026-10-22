@@ -1,15 +1,21 @@
 # RFC-0039: Site archives: `cloudhal export` and `cloudhal import`
 
-- Status: Draft
+- Status: Accepted (2026-10-22, by Halil; ADR-0041). Open questions decided as recommended. Revised before acceptance after a comparison with Sanity, Strapi, Contentful, Ghost, WordPress, Directus and Webflow (see Prior art): NDJSON parts instead of one JSON file, per-file checksums, contract versions in the manifest, and a snapshot before `--replace`.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - #47 (found while building cloudhal.com: no way to keep or move a site's content without a deployment, so it was written as code).
   - RFC-0004 §4.7 (media bytes travel apart from the bundle, verified by SHA-256), RFC-0010 (snapshot bundles).
   - `SiteBundle` (`cloudhal.site-bundle@1`), `exportSite`, `importSite`, `copyMediaBlobs` in `packages/core-ts/src/sync.ts`: what `cloudhal push` and `pull` send over HTTP today.
+  - Prior art:
+    - [Sanity dataset export/import](https://www.sanity.io/docs/cli-reference/dataset): tar.gz with NDJSON and assets, asset checks, `--replace`/`--missing`.
+    - [Strapi data management](https://docs.strapi.io/cms/data-management/export): JSONL parts, schema match required, AES-128-ECB encryption, import erases the target.
+    - [Contentful CLI export](https://github.com/contentful/contentful-cli/tree/main/docs/space/export): one JSON file, credentials dropped.
+    - [Ghost](https://docs.ghost.org/migration/ghost): JSON without images.
+    - [WordPress WXR](https://wordpress.org/documentation/article/tools-export-screen/): XML, media by URL, carries users.
 
 ## Summary
 
-`cloudhal export` writes one site of a local project to a single file, its content graph, snapshots and media; `cloudhal import` reads it back into a local project, keeping the site's id. The file is a gzipped tar holding the existing `SiteBundle` JSON and the media bytes, so the format adds a container, not a second serialisation. This gives backups, starters and templates as files, moving a site between machines, and demo seeding without a deployment and without content written as code.
+`cloudhal export` writes one site of a local project to a single file, its content graph, snapshots and media; `cloudhal import` reads it back into a local project, keeping the site's id. The file is a gzipped tar of the existing `SiteBundle`'s rows as NDJSON parts plus the media bytes, so it streams for large sites and adds a container, not a second data model. This gives backups, starters and templates as files, moving a site between machines, and demo seeding without a deployment and without content written as code.
 
 ## Motivation
 
@@ -25,23 +31,35 @@
 `<name>.cloudhal` (suggested; any name works): a gzip-compressed POSIX tar (ustar) with, in this order:
 
 ```
-manifest.json        the archive's own header (below), first so it can be read without unpacking the rest
-bundle.json          a SiteBundle, exactly as push/pull send it (cloudhal.site-bundle@1)
-media/<sha256>       one file per BundleMedia entry, the raw bytes
+manifest.json               the archive's header (below), first so it can be read without unpacking the rest
+project.json                the project row, when the site has one
+nodes/0001.ndjson …         one node row per line, sorted by id, a new part every 8 MB
+snapshots/0001.ndjson …     one snapshot row per line, by creation time
+blobs/0001.ndjson …         {hash, body} per line: node bodies the snapshots reference
+media/<sha256>              one file per media entry, the raw bytes
+ledger.ndjson               taken-down content (the bundle's `purged` rows), when there is any
 ```
+
+The rows are the `SiteBundle`'s, one per line instead of one large JSON document, so neither export nor import has to hold the whole site in memory: Sanity and Strapi stream for the same reason. Reading the parts back in order gives exactly the `SiteBundle` that `importSite` takes.
 
 ```ts
 interface SiteArchiveManifest {
   format: "cloudhal.site-archive@1";
+  /** The contracts' schemaVersion the rows were written with (all `1` today). */
+  contracts: { schemaVersion: number };
+  /** The bundle format the rows reassemble into. */
+  bundle: "cloudhal.site-bundle@1";
   siteId: string;
   siteName: string;
   /** `@cloudhal/cli` version that wrote it. */
   createdBy: string;
   createdAt: string; // RFC 3339
-  /** What the bundle holds, so `import --dry-run` can show it without parsing bundle.json. */
-  counts: { nodes: number; snapshots: number; media: number; mediaBytes: number };
-  /** SHA-256 of bundle.json, so a damaged or edited file is refused. */
-  bundleSha256: string;
+  /** What the archive holds, so `import --dry-run` can show it before reading the parts. */
+  counts: { nodes: number; snapshots: number; blobs: number; media: number; mediaBytes: number };
+  /** Every other file in the archive with its SHA-256 and size: a damaged or edited file is refused. */
+  files: { path: string; sha256: string; bytes: number }[];
+  /** True when written with --no-media: import warns that the media must come from elsewhere. */
+  mediaOmitted?: true;
 }
 ```
 
@@ -52,33 +70,48 @@ cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
 cloudhal import <file> [--replace] [--dry-run]
 ```
 
-- **export:** reads the local store with `exportSite` (the project's site, or with `--site <id>` another site listed in `cloudhal.json` `sites`) and its media from the local blob store. Default file: `<site-slug>-<YYYYMMDD>.cloudhal`. `--no-media` writes the graph only; the manifest says so and `import` warns. `--latest-only` keeps only the published and latest snapshots, for templates that should not carry history.
-- **import:** checks the manifest and `bundleSha256`, verifies every media file against its name (SHA-256) as it is written to the blob store, then calls `importSite`:
-  - into a project with no site, or one whose site is the archive's (same `siteId`): `mode: "bootstrap"`. It refuses diverged nodes, as `pull` does;
-  - with `--replace`: `mode: "replace"`; the local nodes become the archive's, and snapshots are added (they are immutable and never removed);
-  - into a project whose site has another id: refused unless `--replace`, which then switches `cloudhal.json`'s `siteId` to the archive's. The old site stays in the local store, unlisted; there is no command to delete a local site yet.
-- `--dry-run` prints the manifest and what would change (nodes added, changed, removed; snapshots added; media to copy) and writes nothing.
+- **export:**
+  - Streams the local store, the project's site or, with `--site <id>`, another site listed in `cloudhal.json` `sites`, together with its media from the local blob store.
+  - The default file name is `<site-slug>-<YYYYMMDD>.cloudhal`.
+  - `--no-media` writes the graph only.
+  - `--latest-only` keeps only the published and latest snapshots, for templates that should not carry history.
+- **import:** checks the manifest and every file's SHA-256 as it streams (media files are named by their hash as well), then calls `importSite`. Three modes:
+  - **bootstrap** (default), into a project with no site or one whose site is the archive's (same `siteId`). Like `pull`, it adds what is missing and refuses nodes that differ: never Strapi's "erase the target first".
+  - **`--replace`:** the local nodes become the archive's. Snapshots are only ever added. First, the current local graph is saved as a snapshot labelled `before import <file>`, so the import can be undone with a rollback. Into a project whose site has another id, `--replace` switches `cloudhal.json`'s `siteId` to the archive's. The old site stays in the local store, unlisted; there is no command to delete a local site yet.
+  - **`--dry-run`:** prints the manifest and the difference the import would make (nodes added, changed and removed by kind and title; snapshots added; media to copy) and writes nothing.
 
 ### 3. Invariants
 
 1. The site's id is kept: an imported site is the same site, so a later `push` to its deployment is an update, not a second site.
 2. Nothing in the archive runs: it is data validated with the precompiled validators (`assertValidRows`), and gates (`assertGates`) apply as for push.
-3. Every media file is verified by SHA-256 before it is used; a missing or wrong file fails the import before any node is written (the bundle's `missing_media` rule).
-4. Taken-down content stays taken down: the `purged` ledger travels and the import never restores those bytes.
-5. Import writes the graph in one atomic batch (no interactive transactions, AGENTS.md rule 4); a failure leaves the project as it was.
-6. Same content, same file: entries are written in a fixed order with fixed timestamps in the tar headers, so exporting an unchanged site twice gives identical bytes (good for git and for diffing).
+3. Every file is verified against the manifest (SHA-256 and size), and every media file against its own name, before it is used. A missing or wrong file fails the import before any node is written (the bundle's `missing_media` rule).
+4. An archive written by a newer format or a newer contracts `schemaVersion` is refused with the CLI version needed. Older ones are read, and migrated forward if a later schema version requires it.
+5. Taken-down content stays taken down: the `purged` ledger travels and the import never restores those bytes.
+6. Import writes the graph in atomic batches (no interactive transactions, AGENTS.md rule 4), guarded like `importSite` today. A failure leaves the project as it was, and `--replace` can always be undone through its `before import` snapshot.
+7. Same content, same file: rows and files are written in a fixed order, with zero timestamps and fixed modes in the tar headers, so exporting an unchanged site twice gives identical bytes (good for git and for diffing).
 
 ### 4. What is not in an archive
 
-The content graph only, as with push/pull: no users, sessions, roles or agent keys; no comments or readers; no analytics; no audit log; no automations or schedule runs; no deployment secrets. The manifest says so, and `export` prints it. People and personal data never leave in a file by accident.
+The content graph only, as with push/pull. Excluded:
+- users, sessions, roles and agent keys;
+- comments and readers;
+- analytics;
+- the audit log;
+- automations and schedule runs;
+- deployment secrets and webhook credentials.
+
+The manifest says so, and `export` prints it. People and personal data never leave in a file by accident, which is also why the format needs no encryption of its own (see Alternatives).
 
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not |
 |---|---|---|---|
 | One JSON file, media inlined as base64 | One format, no container | A third larger; whole file in memory; one bad byte breaks everything | Media can be hundreds of MB |
-| A directory (`bundle.json` + `media/`) | No container code; diffable in git | Not one file to send or attach; easy to copy half of it | Can be a later `--dir` option; the tar is the default |
+| A directory (the same layout, unpacked) | No container code; diffable in git | Not one file to send or attach; easy to copy half of it | Can be a later `--dir` option; the tar is the default |
 | Zip | Opens on every OS | Needs a zip library or a writer of our own; no streaming read of a gzipped stream | Node has gzip built in, and ustar is small enough to write without a dependency |
+| One `bundle.json` (the first draft) | Reuses the bundle as is | The whole site in memory on both sides; one damaged byte invalidates everything | NDJSON parts stream and are checked file by file |
+| Built-in encryption (Strapi) | Protects a leaked file | Strapi's AES-128-ECB shows how easily it is done wrong; key handling in the CLI | No secrets or personal data are in the file; pipe through `age` or `gpg` when needed |
+| Erase-then-import (Strapi) | Simple | Destroys local work on a wrong file | Bootstrap by default, `--replace` with a snapshot first |
 | Commit `.cloudhal/data.db` | No code | SQLite binary in git; schema-version bound; carries users and secrets | Unsafe and not portable |
 | Content as code (cloudhal.com's old way) | Reviewable diffs | Not how sites are edited; drifts from the graph | The problem #47 reports |
 
@@ -86,18 +119,32 @@ The content graph only, as with push/pull: no users, sessions, roles or agent ke
 
 - New commands only; push, pull and the `SiteBundle` format are unchanged.
 - `cloudhal.site-archive@1`: a later `@2` reader keeps reading `@1`. `import` refuses unknown formats with a message naming the CLI version needed.
-- `bundle.json` is `cloudhal.site-bundle@1`, so a future bundle format bump is read through `importSite`'s own format check.
-- Rollout: (a) the tar writer and reader with their tests (round trip, damaged file, wrong hash); (b) `export`; (c) `import` with `--dry-run`; (d) `--replace` and the site id switch; (e) docs and a starter demo archive.
+- The parts reassemble into `cloudhal.site-bundle@1`, named in the manifest, so a future bundle format bump is read through `importSite`'s own format check.
+- Rollout, one PR each:
+  1. The streaming tar writer and reader, with tests (round trip, damaged file, wrong hash, path traversal, deterministic bytes).
+  2. `export`.
+  3. `import` with `--dry-run`.
+  4. `--replace`, the `before import` snapshot, and the site id switch.
+  5. Docs and a starter demo archive.
 
 ## Security & policy impact
 
-- A local CLI command, so no new scopes. Importing is like `pull`: the file is untrusted input, so it is validated, size-capped (manifest counts against actual entries, per-entry and total byte limits), and tar paths outside `manifest.json`, `bundle.json` and `media/<64 hex>` are rejected (no path traversal, no symlinks or devices).
+- A local CLI command, so no new scopes. Importing is like `pull`: the file is untrusted input, so it is validated, size-capped (manifest counts against actual entries, per-entry and total byte limits), and tar paths outside the layout of §1 (`manifest.json`, `project.json`, `ledger.ndjson`, `nodes|snapshots|blobs/<4 digits>.ndjson`, `media/<64 hex>`) are rejected (no path traversal, no symlinks or devices).
 - Personal data: none of the stores that hold it are exported (§4). Entries may name authors, as published pages do.
-- The archive is not signed in v1: it is as trustworthy as where it came from. See open question 2.
+- The archive is not signed in v1: it is as trustworthy as where it came from. See Later.
 
-## Open questions
+## Later (decided, not in v1)
 
-1. Should `cloudhal init --from <file.cloudhal>` start a new project from an archive (templates, the playground's demo)? **[default: yes, as a follow-up; it is `init` + `import`]**
-2. Sign archives (e.g. Sigstore, like the npm provenance we publish with) so templates can be verified? **[default: not in v1]**
-3. Import as a copy with new ids (`--as-new-site`) for templates used many times in one project? Rewriting ids across nodes, snapshots and redirects is a large change. **[default: not in v1; one archive, one site]**
-4. Should Studio offer "Download site archive" through the admin API? **[default: later; the API already has the bundle route push/pull use]**
+- **`cloudhal init --from <file.cloudhal>`:** start a project from an archive (templates, the playground's demo). It is `init` plus `import`.
+- **`--new-ids` for templates:** import as a copy with new ids, rewriting references (Sanity imports references weak and then strengthens them). Keeping ids is right for a backup and wrong for "use as a starter".
+- **Partial export:** `--collection <key>` and `--no-snapshots`.
+- **Export from a deployment:** `--from <admin-url>`, through the bundle route push and pull already use. All the headless CMS CLIs export from the remote service directly.
+- **Studio "Download site archive":** the same route, from the browser.
+- **Signed archives:** for example with Sigstore, like the npm provenance releases carry, so templates can be verified.
+
+## Open questions (decided as recommended)
+
+1. `cloudhal init --from`: yes, as a follow-up (see Later).
+2. Signing: not in v1.
+3. Import as a copy with new ids: not in v1; one archive, one site.
+4. Studio download: later, through the existing bundle route.
