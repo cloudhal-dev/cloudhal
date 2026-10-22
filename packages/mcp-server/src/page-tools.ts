@@ -54,7 +54,8 @@ const listSitesTool: ToolDefinition = {
 const getSiteTool: ToolDefinition = {
   name: "get_site",
   title: "Get site",
-  description: "A site with its page order, locales, theme and published snapshot.",
+  description:
+    "A site with its page order, locales, theme, published snapshot and per-collection settings (`collections.<key>.permalink`, e.g. /blog/{slug}; a collection without one lives at /<collection>/{slug}).",
   inputSchema: obj({ siteId: id }, ["siteId"]),
   outputSchema: obj({ site: SITE }, ["site"]),
   annotations: {

@@ -38,6 +38,7 @@ import { elevationTools } from "./elevation-tools.ts";
 import { entryTools } from "./entry-tools.ts";
 import { menuTools } from "./menu-tools.ts";
 import { pageRemovalTools, siteAndPageTools } from "./page-tools.ts";
+import { permalinkTools } from "./permalink-tools.ts";
 import { previewDoc } from "./preview-doc.ts";
 import { ownOnlyPublish, publishTools } from "./publish-tools.ts";
 import { renderTools } from "./render-tools.ts";
@@ -85,6 +86,8 @@ export function defineTools(): ToolDefinition[] {
     // Taxonomy, term and redirect tools (RFC-0002 §6.2), then menu tools (RFC-0003 §6.1) and
     // media tools (RFC-0004 §6.2), follow the article tools.
     ...taxonomyTools(),
+    // RFC-0038 §5: where a collection's entries live (always a person's decision).
+    ...permalinkTools(),
     ...menuTools(),
     ...assetTools(),
     ...publishTools(),
@@ -111,6 +114,7 @@ export function toolPolicies(tools: ToolDefinition[]): ToolPolicy[] {
     ...(t.own ? { own: t.own } : {}),
     ...(t.classify ? { classify: t.classify } : {}),
     ...(t.proposeScopes ? { proposeScopes: t.proposeScopes } : {}),
+    ...(t.approverScopes ? { approverScopes: t.approverScopes } : {}),
   }));
 }
 

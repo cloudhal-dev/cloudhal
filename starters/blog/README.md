@@ -16,7 +16,7 @@ Everything but `.gitignore`'s list. `cloudhal.json` holds the project's settings
 `cloudhal.json` → `domains.site` (set with `cloudhal domain set <hostname>`) is also the address a static build (`cloudhal build`) writes into canonical links, the sitemap, feeds and `robots.txt`.
 
 ## Routes
-- `[...path].astro` — pages at their path, posts at `/<collection>/<slug>`, category and tag archives at `/category/<slug>` and `/tag/<slug>` (`/page/<n>` for older posts). Anything else follows the site's redirects (301), answers 410 for a retired term, or 404.
+- `[...path].astro` — pages at their path, posts at their collection's permalink (`/<collection>/<slug>` unless Studio's Site settings › Collections or the `set_collection_permalink` tool moves them, e.g. to `/blog/<slug>`, with a 301 from the old URLs), category and tag archives at `/category/<slug>` and `/tag/<slug>` (`/page/<n>` for older posts). Anything else follows the site's redirects (301), answers 410 for a retired term, or 404.
 - `[...path]/rss.xml.ts` — a feed per category and tag (`/category/<slug>/rss.xml`).
 - `rss.xml.ts`, `sitemap.xml.ts`, `robots.txt.ts` — the site feed, the sitemap (pages, posts and indexable archives) and robots rules.
 - `search.json.ts` — the search modal's answers (RFC-0029), where the deployment answers searches (`cloudhal dev`, the Cloudflare Site Worker). `components/SearchDialog.astro` is the modal's markup and words; Cloudhal's `/_cloudhal/search.1.js` wires it, and without it the header form opens `/search`.

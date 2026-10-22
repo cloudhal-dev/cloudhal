@@ -633,6 +633,8 @@ export const en = {
       unique: "Something with this name or address already exists.",
       slug_taken: "This address is already in use.",
       path_conflict: "Another page or article already uses this path.",
+      reserved_path:
+        "This path is reserved for the site itself (search, media or a language prefix).",
       in_use: "It's still in use, so it can't be removed.",
       quota_exceeded: "The storage quota is full.",
       too_large: "This change is too large for one operation. Split it up.",
@@ -1177,6 +1179,7 @@ export const en = {
     sections: {
       general: "General",
       domains: "Domains",
+      collections: "Collections",
       appearance: "Appearance",
       design: "Design rules",
       previews: "Preview links",
@@ -1202,6 +1205,28 @@ export const en = {
       publishHint: "Saved changes show on the site after the next publish.",
       saved: "Appearance saved",
       failed: "Could not save the appearance",
+    },
+    /** RFC-0038 §5: where each collection's entries live (the part of the address before the slug). */
+    collections: {
+      description:
+        "Where each collection's entries live on the site. Changing a prefix moves the address of every entry in that collection; old addresses keep working through a permanent redirect. Leave a field empty for the default, the collection's own name. New addresses go live with the next publish.",
+      /** Shown under a row: one real entry's address (or an example). */
+      preview: "Entries live at addresses like {url}",
+      /** Shown under a changed row before saving. */
+      previewMoved:
+        "Entries will live at addresses like {url}. The old address {old} redirects there.",
+      /** An example slug when the collection has no entries yet: lower-case letters, digits and hyphens only. */
+      exampleSlug: "my-article",
+      empty: "No collections yet",
+      emptyDescription: "Collections appear here once the site has articles or other entries.",
+      saved: "Collections saved",
+      failed: "Couldn't save the collections",
+      errors: {
+        slash: "Start with a slash, like /blog",
+        trailingSlash: "Leave out the slash at the end",
+        invalid:
+          "Use lower-case letters, digits and hyphens between slashes, like /blog or /docs/guides",
+      },
     },
     conflictTitle: "This site changed somewhere else",
     conflictDescription:

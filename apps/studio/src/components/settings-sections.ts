@@ -3,6 +3,7 @@ import { AI_SETTINGS_SECTION } from "./AiSettings.tsx";
 import { ANALYTICS_SETTINGS_SECTION } from "./AnalyticsSettings.tsx";
 import { APPEARANCE_SETTINGS_SECTION } from "./AppearanceSettings.tsx";
 import { CHROME_SETTINGS_SECTION } from "./ChromeSettings.tsx";
+import { COLLECTION_SETTINGS_SECTION } from "./CollectionSettings.tsx";
 import { COMMENT_SETTINGS_SECTION } from "./CommentSettings.tsx";
 import { DESIGN_RULES_SECTION } from "./DesignRulesSettings.tsx";
 import { GLOSSARY_SETTINGS_SECTION } from "./GlossarySettings.tsx";
@@ -12,6 +13,7 @@ import { SCHEDULE_SETTINGS_SECTION } from "./ScheduleSettings.tsx";
 export const SETTINGS_SECTIONS = [
   "general",
   "domains",
+  COLLECTION_SETTINGS_SECTION,
   APPEARANCE_SETTINGS_SECTION,
   CHROME_SETTINGS_SECTION,
   DESIGN_RULES_SECTION,

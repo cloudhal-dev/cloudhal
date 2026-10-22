@@ -21,7 +21,6 @@ import {
   Tooltip,
 } from "@cloudhal/ui";
 import {
-  ArrowClockwise,
   ArrowSquareOut,
   DotsThree,
   Globe,
@@ -40,8 +39,10 @@ import { AiSettingsSection } from "../components/AiSettings.tsx";
 import { AnalyticsSettingsSection } from "../components/AnalyticsSettings.tsx";
 import { AppearanceSettingsSection } from "../components/AppearanceSettings.tsx";
 import { ChromeSettingsSection } from "../components/ChromeSettings.tsx";
+import { CollectionSettingsSection } from "../components/CollectionSettings.tsx";
 import { CommentSettingsSection } from "../components/CommentSettings.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
+import { ConflictBanner } from "../components/ConflictBanner.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DesignRulesSettingsSection } from "../components/DesignRulesSettings.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -90,31 +91,6 @@ function useSaveSite(siteId: string) {
       await qc.invalidateQueries({ queryKey: ["sites"] });
     },
   });
-}
-
-/** 409 from the CAS: explain and offer the latest version (DESIGN.md §5, Error). */
-function ConflictBanner({ onReload, reloading }: { onReload: () => void; reloading: boolean }) {
-  const t = useT();
-  return (
-    <div role="alert">
-      <Banner
-        variant="alert"
-        icon={<Warning weight="fill" />}
-        title={t("siteSettings.conflictTitle")}
-        description={t("siteSettings.conflictDescription")}
-        action={
-          <Banner.Action
-            variant="secondary"
-            icon={<ArrowClockwise />}
-            onClick={onReload}
-            loading={reloading}
-          >
-            {t("siteSettings.loadLatest")}
-          </Banner.Action>
-        }
-      />
-    </div>
-  );
 }
 
 function SaveError({
@@ -857,6 +833,8 @@ export function SiteSettingsPage() {
           <GeneralSection site={site.data} onReload={reload} reloading={site.isFetching} />
           <DomainsSection site={site.data} onReload={reload} reloading={site.isFetching} />
         </ReadOnly>
+        {/* RFC-0038 §5: where each collection's entries live; settings.write changes it. */}
+        <CollectionSettingsSection siteId={siteId} />
         {/* The theme's design settings (RFC-0017 §1): settings.write changes them. */}
         <AppearanceSettingsSection siteId={siteId} />
         {/* The header, footer and brand (RFC-0025): settings.write changes them. */}

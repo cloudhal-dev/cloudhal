@@ -195,7 +195,8 @@ describe("RFC-0003 over MCP", () => {
     expect(names).toEqual(
       expect.arrayContaining(["list_menus", "get_menu", "update_menu", "set_menu", "delete_menu"]),
     );
-    expect(names.indexOf("list_menus")).toBe(names.indexOf("delete_redirect") + 1);
+    // RFC-0038 §5's set_collection_permalink sits between the redirect and the menu tools.
+    expect(names.indexOf("list_menus")).toBe(names.indexOf("set_collection_permalink") + 1);
     for (const n of ["list_menus", "get_menu"])
       expect(byName[n]).toMatchObject({
         scopes: ["site:read"],

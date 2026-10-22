@@ -19,7 +19,13 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import { entryPath, normalisePath, termName } from "@cloudhal/core-ts";
+import {
+  collectionPermalink,
+  entryPath,
+  normalisePath,
+  permalinkPrefix,
+  termName,
+} from "@cloudhal/core-ts";
 import {
   type MenuLookup,
   type MenuLookupNode,
@@ -82,8 +88,9 @@ export interface LookupData {
 /**
  * A `MenuLookup` over a site's nodes (§7.1 table). Term items follow `archiveState` (200 only when
  * the archive lists entries the site serves in the locale); a collection index comes from the theme
- * hook, else the first served page (in `Site.pageIds` order) of the locale with an unfiltered
- * `contentList` of that collection (answer 5).
+ * hook, else a served page at the collection's permalink prefix (RFC-0038 §5), else the first
+ * served page (in `Site.pageIds` order) of the locale with an unfiltered `contentList` of that
+ * collection (answer 5).
  */
 export function menuLookup(data: LookupData): MenuLookup {
   const served = (status: Page["status"]) =>
@@ -138,14 +145,19 @@ export function menuLookup(data: LookupData): MenuLookup {
     collectionIndex: (collection, locale) => {
       const hooked = data.collectionIndex?.(collection, locale);
       if (hooked !== undefined) return hooked;
-      return [...data.pages]
+      const shown = [...data.pages]
         .filter((p) => p.locale === locale && served(p.status))
-        .sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9))
-        .find((p) =>
+        .sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
+      // RFC-0038 §5: a page at the template's fixed prefix (`/docs` for `/docs/{slug}`) first.
+      const prefix = permalinkPrefix(collectionPermalink(data.site, collection));
+      return (
+        shown.find((p) => p.path === prefix) ??
+        shown.find((p) =>
           p.sections.some(
             (s) => s.kind === "contentList" && s.collection === collection && !s.filter,
           ),
-        )?.path;
+        )
+      )?.path;
     },
   };
 }

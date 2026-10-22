@@ -276,6 +276,14 @@ export async function canDecide(
     .evaluate(asPerson, request.tool, { confirmed: true, args: input });
   if (verdict.kind === "deny")
     return NO("missing_scope", `your role cannot ${request.tool}: ${verdict.reason}`);
+  // Some calls need more of the person deciding than of the agent asking (`approverScopes`).
+  const extra = c.get("policy")().tool(request.tool)?.approverScopes ?? [];
+  const lacking = extra.filter((s) => !holds(principal.scopes, s));
+  if (lacking.length > 0)
+    return NO(
+      "missing_scope",
+      `your role cannot approve ${request.tool}: needs ${lacking.join(", ")}`,
+    );
   if (RELEASE_TOOLS.has(request.tool)) return releaseDecideCheck(c, request, asPerson);
   const limit = verdict.limit;
   if (!limit) return { ok: true };

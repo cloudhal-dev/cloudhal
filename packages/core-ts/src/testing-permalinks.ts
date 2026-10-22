@@ -100,6 +100,18 @@ export function permalinksSuite(ctx: SuiteContext): void {
       expect(await redirects(site)).toHaveLength(2);
     });
 
+    it("§5: a dry run checks the template and writes nothing", async () => {
+      const site = await setup();
+      const s = await fresh(site);
+      const next = { ...s, collections: { posts: { permalink: "/blog/{slug}" } } };
+      const dry = await ctx.store().updateSite(next, { dryRun: true });
+      expect(dry).toMatchObject({ rev: s.rev + 1, collections: next.collections });
+      expect((await fresh(site)).rev).toBe(s.rev);
+      expect(await redirects(site)).toEqual([]);
+      const clash = { ...s, collections: { posts: { permalink: "/about/{slug}" } } };
+      expect(await code(ctx.store().updateSite(clash, { dryRun: true }))).toBe("path_conflict");
+    });
+
     it("§3: moving again collapses the chain; moving back to the default leaves no loop", async () => {
       const site = await setup();
       await move(site, "/blog/{slug}");
