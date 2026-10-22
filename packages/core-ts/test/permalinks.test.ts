@@ -49,4 +49,9 @@ describe("permalinks (RFC-0038)", () => {
     ])
       expect(entryAt(site, entryPath(site, x))).toEqual(x);
   });
+
+  it("still answers the old one-argument call of themes copied before 0.3.11", () => {
+    expect(entryPath(e("posts", "hello"))).toBe("/posts/hello");
+    expect([e("posts", "a"), e("news", "b")].map(entryPath)).toEqual(["/posts/a", "/news/b"]);
+  });
 });
