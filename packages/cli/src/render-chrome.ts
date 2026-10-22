@@ -90,8 +90,9 @@ export function chromeRenderer(
     );
     const endpoint = new Promise<string>((resolve, reject) => {
       let err = "";
-      // A cold start on a busy CI runner can take well over 10 s; a warm one is under a second.
-      const timer = setTimeout(() => reject(new Error("Chrome did not start")), 30_000);
+      // A warm start is under a second, a cold one on a busy CI runner can take over 10 s; one that
+      // hangs past this is killed and launched once more (session()).
+      const timer = setTimeout(() => reject(new Error("Chrome did not start")), 20_000);
       child.stderr?.on("data", (chunk: Buffer) => {
         err += chunk.toString();
         const m = /DevTools listening on (ws:\/\/\S+)/.exec(err);
@@ -108,15 +109,24 @@ export function chromeRenderer(
     });
     endpoint.catch(() => {});
     chrome = { process: child, endpoint, dir };
-    process.once("exit", () => child.kill());
+    const killOnExit = () => child.kill();
+    process.once("exit", killOnExit);
+    child.once("exit", () => process.off("exit", killOnExit));
     return chrome;
   };
 
   return {
     async session() {
       clearTimeout(idle);
-      const { endpoint } = chrome ?? start();
-      const ws = new WebSocket(await endpoint);
+      let url: string;
+      try {
+        url = await (chrome ?? start()).endpoint;
+      } catch {
+        // A stuck or crashed cold start: one fresh launch with a new profile.
+        stop();
+        url = await start().endpoint;
+      }
+      const ws = new WebSocket(url);
       await new Promise<void>((resolve, reject) => {
         ws.addEventListener("open", () => resolve(), { once: true });
         ws.addEventListener("error", () => reject(new Error("could not reach Chrome")), {

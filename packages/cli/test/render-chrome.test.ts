@@ -72,7 +72,8 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     expect(check("landmarks")?.examples).toEqual(
       expect.arrayContaining(["@1440: the page — 0 page headers (one is right)"]),
     );
-  }, 60_000);
+    // The first test starts Chrome: up to two 20 s launch attempts (render-chrome.ts) plus the render.
+  }, 120_000);
 
   it("checks the chrome: skip link, landmarks, a transparent header's contrast, focus under it", async () => {
     dir ??= await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-test-"));
@@ -279,4 +280,25 @@ describe("localRender", () => {
     expect(localRender({ CLOUDHAL_RENDER: "off" })).toBeUndefined();
     expect(localRender({ CHROME_PATH: "/nonexistent/chrome" })).toBeUndefined();
   });
+});
+
+describe("chromeRenderer", () => {
+  it.skipIf(process.platform === "win32")(
+    "launches a Chrome that fails to start once more, with a new profile",
+    async () => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-retry-"));
+      const log = path.join(tmp, "launches");
+      const fake = path.join(tmp, "chrome");
+      await writeFile(fake, `#!/bin/sh\necho "$@" >> "${log}"\nexit 1\n`, { mode: 0o755 });
+      try {
+        await expect(chromeRenderer(fake).session()).rejects.toThrow("Chrome exited");
+        const launches = (await readFile(log, "utf8")).trim().split("\n");
+        expect(launches).toHaveLength(2);
+        const profile = (line?: string) => /--user-data-dir=(\S+)/.exec(line ?? "")?.[1];
+        expect(profile(launches[0])).not.toBe(profile(launches[1]));
+      } finally {
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
 });
