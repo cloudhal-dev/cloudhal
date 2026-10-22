@@ -1,5 +1,31 @@
 # @cloudhal/cli
 
+## 0.3.11
+
+### Patch Changes
+
+- 25b002c: Fewer D1 round trips per admin API request. The session is cached in a signed cookie for 60 seconds, so a session revoked elsewhere can stay usable that long (ADR-0010 addendum); membership and roles still apply at once. A member and their site roles load in one query. `get-session` is no longer rate limited, since the limiter's D1 read and write landed on every session check. Due comment purges are swept at most every 10 seconds per isolate instead of on every request.
+- 55deb41: RFC-0038 step 1: `Site.collections.<key>.permalink` in the contracts (a template, `/blog/{slug}`; v1 is fixed segments plus `{slug}`), and `entryPath(site, entry)` / `entryAt(site, path)` in `@cloudhal/core-ts` (also `@cloudhal/core-ts/permalinks`). Every entry URL in the renderer, starter, API, MCP server, CLI and Studio now comes from them; with no `collections` set, every URL is the same as before. The renderer's one-argument `entryPath(entry)` is replaced by core's `entryPath(site, entry)` (re-exported from `@cloudhal/astro-renderer/routing`); themes pass the site, or `MediaContext.permalinks`.
+- 2d0a257: Collection permalinks, step 2 (RFC-0038 §3–§4): changing a collection's permalink in a site update adds a prefix redirect from the old URL prefix to the new one, in every locale and in the same batch as the site update. A template may not overlap another collection, a taxonomy archive, a page or a reserved path (`path_conflict`/`reserved_path`), and pages and archives may not be created inside a configured prefix. The search index rewrites entry links on the next publish.
+- 4cd475d: Collection permalinks, step 3 (RFC-0038 §5): Studio's Site settings has a Collections section, one row per collection with the URL prefix before `/{slug}` and a real entry's address; saving goes through the site update, which writes the permanent redirect, and a path conflict shows on the row. The new MCP tool `set_collection_permalink` (`site:write`) moves a collection's URLs and always waits for a person, in every mode, with a prompt listing the old and new template, example entries' old and new URLs and the redirect; `dryRun: true` returns that plan without changing anything, and overlaps are refused before anyone is asked. `get_site` documents `collections`. `SiteGraphStore.updateSite(site, { dryRun: true })` runs every check without writing. A menu item for a collection links to a published page at the collection's permalink prefix when there is one, before the page that lists the collection. The blog starter's README describes collection permalinks. Only someone who may change site settings (`site:settings`) approves it: tool policies take a new `approverScopes`.
+- 1d7998a: Studio's images load faster and stop re-downloading. Preview URLs carry the file's hash (`?v=`), so the browser keeps them for a day; without it the content route answers `private, no-cache` and a 304 through the ETag, instead of `no-store`. While an image loads, its tile shows the image's own colour and small blurred preview (computed at upload) instead of a spinner.
+- bb15690: Studio switches screens faster: the signed-in session is kept between navigations (asked again after five minutes, on sign-out, on revoking sessions and on any 401) instead of being checked with the server on every click, and the pending screen shows after 150 ms instead of the router's one second, so a short wait no longer looks frozen.
+- Updated dependencies [25b002c]
+- Updated dependencies [55deb41]
+- Updated dependencies [2d0a257]
+- Updated dependencies [4cd475d]
+- Updated dependencies [1d7998a]
+  - @cloudhal/api@0.3.11
+  - @cloudhal/cloudflare@0.3.11
+  - @cloudhal/core-contracts@0.3.11
+  - @cloudhal/core-ts@0.3.11
+  - @cloudhal/mcp-server@0.3.11
+  - @cloudhal/agent-runtime@0.3.11
+  - @cloudhal/analytics@0.3.11
+  - @cloudhal/comments@0.3.11
+  - @cloudhal/schedules@0.3.11
+  - @cloudhal/storage@0.3.11
+
 ## 0.3.10
 
 ### Patch Changes

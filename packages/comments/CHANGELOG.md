@@ -1,5 +1,16 @@
 # @cloudhal/comments
 
+## 0.3.11
+
+### Patch Changes
+
+- Updated dependencies [55deb41]
+- Updated dependencies [2d0a257]
+- Updated dependencies [4cd475d]
+  - @cloudhal/core-contracts@0.3.11
+  - @cloudhal/core-ts@0.3.11
+  - @cloudhal/storage@0.3.11
+
 ## 0.3.10
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @cloudhal/storage
 
+## 0.3.11
+
+### Patch Changes
+
+- Updated dependencies [55deb41]
+  - @cloudhal/core-contracts@0.3.11
+
 ## 0.3.10
 
 ### Patch Changes
