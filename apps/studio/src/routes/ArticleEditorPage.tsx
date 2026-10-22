@@ -56,6 +56,7 @@ import { StatusActions } from "../components/StatusActions.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useCollectionCrumb } from "../components/useCollectionView.ts";
 import { useSavedToast } from "../components/useLiveSite.ts";
 import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
@@ -98,9 +99,6 @@ const READ_ONLY_REASON = {
   notOwn: "gating.entryNotOwn",
   published: "gating.entryPublished",
 } as const;
-
-/** The Articles list, the editor's first crumb. */
-const articlesHref = (siteId: string) => `/sites/${siteId}/articles`;
 
 export function ArticleEditorPage() {
   const t = useT();
@@ -169,10 +167,10 @@ export function ArticleEditorPage() {
     mutationFn: (entry: ContentEntry) => api.entries.remove(entry),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      await navigate({ to: "/sites/$siteId/articles", params: { siteId } });
+      await navigate({ href: articlesCrumb.href });
     },
   });
-  const articlesCrumb = { label: t("pageHeaders.articles.title"), href: articlesHref(siteId) };
+  const articlesCrumb = useCollectionCrumb(siteId, query.data?.collection);
 
   if (!draft) {
     return (

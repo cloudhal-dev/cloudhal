@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { type MessageKey, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { useCollectionKeys } from "../lib/collections.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import {
   archiveChange,
@@ -63,7 +64,7 @@ const PATH_ERROR: Record<BasePathError, MessageKey> = {
 const NEW_TERMS = ["none", "propose", "free"] as const;
 
 /** A `Switch` with its explanation underneath (related text close together). */
-function SwitchField({
+export function SwitchField({
   label,
   hint,
   checked,
@@ -181,7 +182,7 @@ export function TaxonomySettingsDialog({
 
   const editing = taxonomy !== undefined;
   const set = (patch: Partial<TaxonomyDraft>) => setDraft((d) => ({ ...d, ...patch }));
-  const collections = knownCollections(entries.data ?? [], draft);
+  const collections = knownCollections(entries.data ?? [], draft, useCollectionKeys(siteId));
   const errors = validateTaxonomy(draft, {
     defaultLocale,
     taxonomies: data.taxonomies.data ?? [],

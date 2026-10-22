@@ -184,7 +184,7 @@
       "lines": 470
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
-      "lines": 214
+      "lines": 197
     },
     "apps/studio/src/routes/AssetPage.tsx::AssetPage": {
       "lines": 739
@@ -268,7 +268,7 @@
       "lines": 164
     },
     "apps/studio/src/routes/SiteShell.tsx::SiteShell": {
-      "lines": 172
+      "lines": 160
     },
     "apps/studio/src/routes/SkillsPage.tsx::SkillsPage": {
       "lines": 170

@@ -29,6 +29,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
+import { CollectionActions } from "../components/CollectionActions.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { EntryPath } from "../components/EntryPath.tsx";
@@ -55,6 +56,12 @@ import {
   type TranslationList,
   useTranslationList,
 } from "../components/TranslationList.tsx";
+import {
+  scopeTaxonomies,
+  useCollectionHeader,
+  useCollectionParam,
+  useNewEntry,
+} from "../components/useCollectionView.ts";
 import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { listOf, useI18n, useT } from "../i18n/index.tsx";
@@ -85,17 +92,20 @@ function namesOf(entry: ContentEntry, tax: Taxonomy | undefined, data: TaxonomyD
 }
 
 /**
- * Site › Articles (DESIGN.md §2a, §2p): the "posts" collection, newest first, with its primary
- * category and first tags, and category / tag facets that query the API's filter language.
+ * Site › a collection (DESIGN.md §2a, §2p; RFC-0040 §4): its entries, newest first, with their
+ * primary category and first tags where those taxonomies apply, and category / tag facets that
+ * query the API's filter language. `posts` is Articles; `/articles` redirects here.
  */
 export function ArticlesPage() {
   const t = useT();
   const { siteId } = useParams({ from: "/sites/$siteId" });
+  const collection = useCollectionParam();
+  const header = useCollectionHeader(siteId, collection);
   const facets = useSearch({ strict: false }) as { category?: string; tag?: string };
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
-  const data = useTaxonomyData(siteId);
+  const data = scopeTaxonomies(useTaxonomyData(siteId), collection);
   const host = primaryHostname(site.data?.domains ?? []);
   const { category: catTax, tag: tagTax } = data.defaults;
   const filter = facetFilter({
@@ -106,13 +116,13 @@ export function ArticlesPage() {
     tag: tagTax && facets.tag ? { key: tagTax.key, slug: facets.tag } : undefined,
   });
   const entries = useQuery({
-    queryKey: filter ? ["entries", siteId, "posts", filter] : ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, { collection: "posts", filter }),
+    queryKey: filter ? ["entries", siteId, collection, filter] : ["entries", siteId, collection],
+    queryFn: () => api.entries.list(siteId, { collection, filter }),
     enabled: !filter || data.taxonomies.isSuccess,
   });
   const all = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
+    queryKey: ["entries", siteId, collection],
+    queryFn: () => api.entries.list(siteId, collection),
   });
   const viewsColumn = useListViews(siteId);
   const [toDelete, setToDelete] = useState<ContentEntry | undefined>();
@@ -132,8 +142,8 @@ export function ArticlesPage() {
   );
   const setFacets = (next: { category?: string | undefined; tag?: string | undefined }) =>
     navigate({
-      to: "/sites/$siteId/articles",
-      params: { siteId },
+      to: "/sites/$siteId/collections/$collection",
+      params: { siteId, collection },
       search: {
         ...(next.category ? { category: next.category } : {}),
         ...(next.tag ? { tag: next.tag } : {}),
@@ -141,26 +151,7 @@ export function ArticlesPage() {
       replace: true,
     });
   const filtered = Boolean(facets.category || facets.tag);
-  const create = useMutation({
-    mutationFn: () =>
-      api.entries.create(siteId, {
-        collection: "posts",
-        slug: `untitled-${Date.now().toString(36)}`,
-        locale: list.newLocale,
-        status: "draft",
-        title: t("articles.untitled"),
-        body: { format: "markdown", value: "" },
-        fields: {},
-        tags: [],
-      }),
-    onSuccess: async (entry) => {
-      await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      await navigate({
-        to: "/sites/$siteId/articles/$entryId",
-        params: { siteId, entryId: entry.id },
-      });
-    },
-  });
+  const create = useNewEntry(siteId, collection, list.newLocale);
   const remove = useMutation({
     mutationFn: (entry: ContentEntry) => api.entries.remove(entry),
     onSuccess: async () => {
@@ -176,7 +167,7 @@ export function ArticlesPage() {
       loading={create.isPending}
       data-testid="new-article"
     >
-      {t("articles.newArticle")}
+      {header.newLabel}
     </Button>
   );
   const migrated = (data.taxonomies.data?.length ?? 0) > 0;
@@ -184,11 +175,11 @@ export function ArticlesPage() {
   const columns = 6 + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + (list.groupOf ? 1 : 0);
   return (
     <PageLayout
-      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: t("pageHeaders.articles.title") }]} />}
-      icon={<Article size={24} />}
-      title={t("pageHeaders.articles.title")}
-      description={t("pageHeaders.articles.description")}
-      actions={newButton}
+      crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: header.title }]} />}
+      icon={<header.Icon size={24} />}
+      title={header.title}
+      description={header.description}
+      actions={<CollectionActions siteId={siteId} collection={collection} add={newButton} />}
     >
       <ErrorBanner error={entries.error ?? create.error ?? remove.error} />
       {needsTagsMigration(data.taxonomies.data, all.data) && (
@@ -197,7 +188,7 @@ export function ArticlesPage() {
       <ListToolbar
         search={paging.search}
         onSearch={paging.setSearch}
-        placeholder={t("articles.search")}
+        placeholder={header.search}
         actions={
           facetsShown || list.multilingual ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -230,8 +221,8 @@ export function ArticlesPage() {
           />
         ) : (
           <Empty
-            icon={<Article size={48} className="text-kumo-inactive" />}
-            title={t("articles.empty")}
+            icon={<header.Icon size={48} className="text-kumo-inactive" />}
+            title={header.empty}
             description={t("articles.emptyDescription")}
             contents={newButton}
           />

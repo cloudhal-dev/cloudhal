@@ -50,6 +50,14 @@ const ArticlesPage = lazyRouteComponent(
   () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers", "menus"]),
   "ArticlesPage",
 );
+const CollectionsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CollectionsPage.tsx"), ["collections"]),
+  "CollectionsPage",
+);
+const CollectionSettingsPage = lazyRouteComponent(
+  () => withMessages(import("./routes/CollectionSettingsPage.tsx"), ["collections"]),
+  "CollectionSettingsPage",
+);
 const CommentsPage = lazyRouteComponent(
   () => withMessages(import("./routes/CommentsPage.tsx"), ["comments"]),
   "CommentsPage",
@@ -278,16 +286,42 @@ const pagesRoute = createRoute({
   path: "/pages",
   component: PagesPage,
 });
+/** `?category=<slug>&tag=<slug>`: the facet filters (linked from Categories & tags). */
+function facetSearch(search: Record<string, unknown>): { category?: string; tag?: string } {
+  const category = slugParam(search.category);
+  const tag = slugParam(search.tag);
+  return { ...(category ? { category } : {}), ...(tag ? { tag } : {}) };
+}
+/** RFC-0040: Articles is the `posts` collection; old links keep working. */
 const articlesRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/articles",
-  /** `?category=<slug>&tag=<slug>`: the facet filters (linked from Categories & tags). */
-  validateSearch: (search: Record<string, unknown>): { category?: string; tag?: string } => {
-    const category = slugParam(search.category);
-    const tag = slugParam(search.tag);
-    return { ...(category ? { category } : {}), ...(tag ? { tag } : {}) };
+  validateSearch: facetSearch,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: "/sites/$siteId/collections/$collection",
+      params: { siteId: params.siteId, collection: "posts" },
+      search,
+      replace: true,
+    });
   },
+});
+/** RFC-0040 §4: every collection of the registry, with "New collection". */
+const collectionsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/collections",
+  component: CollectionsPage,
+});
+const collectionRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/collections/$collection",
+  validateSearch: facetSearch,
   component: ArticlesPage,
+});
+const collectionSettingsRoute = createRoute({
+  getParentRoute: () => siteRoute,
+  path: "/collections/$collection/settings",
+  component: CollectionSettingsPage,
 });
 /** Site › Categories & tags (RFC-0002 §8): `?taxonomy=<key>&filter=<status>`. */
 const taxonomyRoute = createRoute({
@@ -477,6 +511,9 @@ const routeTree = rootRoute.addChildren([
     analyticsRoute,
     pagesRoute,
     articlesRoute,
+    collectionsRoute,
+    collectionRoute,
+    collectionSettingsRoute,
     snapshotsRoute,
     activityRoute,
     approvalsRoute,

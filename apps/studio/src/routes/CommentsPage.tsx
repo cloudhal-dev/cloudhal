@@ -362,8 +362,8 @@ export function CommentsPage() {
     retry: (count, error) => !isNotEnabled(error) && count < 1,
   });
   const entries = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
+    queryKey: ["entries", siteId, "all"],
+    queryFn: () => api.entries.list(siteId),
     enabled: known && read.allowed,
   });
   const approvals = usePendingApprovals(siteId);
