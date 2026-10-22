@@ -1,0 +1,54 @@
+---
+/**
+ * A list of articles as cards: cover thumbnail (when the article has one), title, summary,
+ * publication date and reading time.
+ */
+import { readingMinutes } from "@cloudhal/astro-renderer/kit";
+import { renderBody } from "@cloudhal/astro-renderer/markdown";
+import { imageAttributes, type MediaContext } from "@cloudhal/astro-renderer/media";
+import { entryPath } from "@cloudhal/astro-renderer/routing";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import { strings } from "../theme.ts";
+
+interface Props {
+  entries: ContentEntry[];
+  locale: string;
+  media?: MediaContext | undefined;
+}
+const { entries, locale, media } = Astro.props;
+const t = strings(locale);
+const date = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+const cover = (e: ContentEntry) => {
+  const asset = e.coverImage?.assetId ? media?.assets?.get(e.coverImage.assetId) : undefined;
+  if (!asset || !e.coverImage) return undefined;
+  return imageAttributes(asset, e.coverImage, {
+    locale,
+    defaultLocale: media?.defaultLocale ?? locale,
+    transform: media?.transform ?? "none",
+    ...(media?.budget ? { budget: media.budget } : {}),
+    sizes: "12rem",
+    ...(media?.preview ? { preview: true } : {}),
+  });
+};
+---
+<ul class="ch-entrylist">
+  {entries.map((e) => {
+    const img = cover(e);
+    return (
+      <li class="ch-card-entry" data-has-cover={img ? "yes" : undefined}>
+        {img && (
+          <img class="ch-card-entry__cover" src={img.src} srcset={img.srcset} sizes={img.sizes} alt="" width={img.width || undefined} height={img.height || undefined} loading="lazy" decoding="async" />
+        )}
+        <div class="ch-card-entry__body">
+          <a href={entryPath(e)}>{e.title}</a>
+          {e.summary && <p>{e.summary}</p>}
+          <span class="ch-card-entry__meta">
+            {e.publishedAt && <time datetime={e.publishedAt}>{date(e.publishedAt)}</time>}
+            <span>{t.minRead(readingMinutes(renderBody(e.body)))}</span>
+          </span>
+        </div>
+      </li>
+    );
+  })}
+</ul>

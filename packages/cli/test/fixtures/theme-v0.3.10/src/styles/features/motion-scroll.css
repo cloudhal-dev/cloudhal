@@ -1,0 +1,309 @@
+/*
+ * Scroll effects (RFC-0024 24b): continuous, tied to the element's place in the viewport. With
+ * scroll-driven animations (Chrome, Safari) they need no script; elsewhere the motion module
+ * writes the progress as --ch-p (0–1). Only "fade-through" plays at "subtle" (it moves nothing).
+ */
+[data-ch-scroll] {
+  --ch-dep-px: calc(var(--ch-dep, 1) * var(--ch-move-m, 0px));
+}
+[data-ch-dep="-3"] {
+  --ch-dep: -3;
+}
+[data-ch-dep="-2"] {
+  --ch-dep: -2;
+}
+[data-ch-dep="-1"] {
+  --ch-dep: -1;
+}
+[data-ch-dep="1"] {
+  --ch-dep: 1;
+}
+[data-ch-dep="2"] {
+  --ch-dep: 2;
+}
+[data-ch-dep="3"] {
+  --ch-dep: 3;
+}
+@keyframes ch-sc-parallax {
+  from {
+    translate: 0 calc(var(--ch-dep-px) * -1);
+  }
+  to {
+    translate: 0 var(--ch-dep-px);
+  }
+}
+@keyframes ch-sc-pan {
+  from {
+    translate: calc(var(--ch-dep-px) * -1) 0;
+  }
+  to {
+    translate: var(--ch-dep-px) 0;
+  }
+}
+@keyframes ch-sc-fade {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  30%,
+  70% {
+    opacity: 1;
+  }
+}
+@keyframes ch-sc-scale {
+  0% {
+    scale: 0.88;
+  }
+  45%,
+  100% {
+    scale: 1;
+  }
+}
+@keyframes ch-sc-rotate {
+  from {
+    rotate: -5deg;
+  }
+  to {
+    rotate: 5deg;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-scroll],
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="fade-through"] {
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="parallax"] {
+      animation-name: ch-sc-parallax;
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-scroll="pan"] {
+      animation-name: ch-sc-pan;
+    }
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="fade-through"] {
+      animation-name: ch-sc-fade;
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="scale-through"] {
+      animation-name: ch-sc-scale;
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="rotate-through"] {
+      animation-name: ch-sc-rotate;
+    }
+  }
+  @supports not (animation-timeline: view()) {
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="parallax"] {
+      translate: 0 calc((var(--ch-p, 0.5) * 2 - 1) * var(--ch-dep-px));
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-scroll="pan"] {
+      translate: calc((var(--ch-p, 0.5) * 2 - 1) * var(--ch-dep-px)) 0;
+    }
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="fade-through"] {
+      opacity: clamp(0.25, calc(1 - (max(var(--ch-p, 0.5), 1 - var(--ch-p, 0.5)) - 0.7) * 2.5), 1);
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="scale-through"] {
+      scale: clamp(0.88, calc(0.88 + var(--ch-p, 0.5) * 0.27), 1);
+    }
+    :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-scroll="rotate-through"] {
+      rotate: calc((var(--ch-p, 0.5) * 2 - 1) * 5deg);
+    }
+  }
+}
+/*
+ * Scroll story (RFC-0024 §3): the first child stays in view beside (or, on phones, above) the
+ * steps; the step being read gets a brand rule at its edge. Without JavaScript the steps simply
+ * follow each other, all equally readable.
+ */
+.ch-scrolly {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: calc(var(--spacing) * 10);
+  align-items: start;
+}
+.ch-scrolly[data-ratio="2-1"] {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.ch-scrolly[data-ratio="1-2"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+.ch-scrolly > :first-child {
+  grid-row: 1 / span 12;
+  grid-column: 1;
+  position: sticky;
+  top: calc(var(--ch-header-h, 0px) + 12vh);
+}
+.ch-scrolly > .ch-step {
+  grid-column: 2;
+}
+.ch-scrolly[data-side="end"] > :first-child {
+  grid-column: 2;
+}
+.ch-scrolly[data-side="end"] > .ch-step {
+  grid-column: 1;
+}
+.ch-step {
+  display: flex;
+  min-height: 70vh;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--spacing) * 3);
+  border-inline-start: 3px solid transparent;
+  padding-inline-start: calc(var(--spacing) * 5);
+}
+.ch-scrolly[data-ch-live] > .ch-step[data-ch-active] {
+  border-inline-start-color: var(--ch-color-brand);
+}
+:root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+  .ch-scrolly[data-ch-live]
+  > .ch-step {
+  transition: border-color var(--ch-dur-normal, 0ms) var(--ch-ease-standard);
+}
+@media (max-width: 767px) {
+  .ch-scrolly,
+  .ch-scrolly[data-ratio] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: calc(var(--spacing) * 4);
+  }
+  .ch-scrolly > :first-child,
+  .ch-scrolly[data-side="end"] > :first-child {
+    grid-row: auto;
+    grid-column: 1;
+    top: var(--ch-header-h, 0px);
+    z-index: 1;
+    max-height: 45vh;
+    overflow: hidden;
+    background: var(--ch-color-surface);
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .ch-scrolly > .ch-step,
+  .ch-scrolly[data-side="end"] > .ch-step {
+    grid-column: 1;
+    min-height: 55vh;
+  }
+}
+/* Scroll progress (RFC-0024 §3): a thin bar; hidden where nothing may move. */
+.ch-progress {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--ch-color-border) 70%, transparent);
+}
+.ch-progress[data-placement="page"] {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+}
+.ch-progress[data-placement="section"] {
+  position: sticky;
+  top: var(--ch-header-h, 0px);
+  z-index: 5;
+}
+.ch-progress__bar {
+  display: block;
+  height: 100%;
+  background: var(--ch-color-brand);
+  transform-origin: 0 50%;
+  scale: var(--ch-p, 0) 1;
+}
+.ch-progress[data-tone="accent"] .ch-progress__bar {
+  background: var(--ch-color-accent);
+}
+.ch-progress[data-tone="neutral"] .ch-progress__bar {
+  background: var(--ch-color-text-muted);
+}
+:root[data-ch-motion="none"] .ch-progress {
+  display: none;
+}
+@keyframes ch-progress {
+  from {
+    scale: 0 1;
+  }
+  to {
+    scale: 1 1;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .ch-surface {
+    view-timeline: --ch-section block;
+  }
+  .ch-progress[data-placement="page"] .ch-progress__bar {
+    animation: ch-progress linear both;
+    animation-duration: auto;
+    animation-timeline: scroll(root);
+  }
+  .ch-progress[data-placement="section"] .ch-progress__bar {
+    animation: ch-progress linear both;
+    animation-duration: auto;
+    animation-timeline: --ch-section;
+    animation-range: contain 0% contain 100%;
+  }
+}
+/*
+ * Kinetic type (RFC-0024 24c): a split heading or text reveals piece by piece; the element itself
+ * stays put, its pieces (words, or characters within words) rise and fade in turn.
+ */
+[data-ch-reveal^="split-"] {
+  --ch-from-tr: none;
+  --ch-from-sc: none;
+  --ch-from-f: none;
+  --ch-from-c: none;
+}
+[data-ch-reveal^="split-"].ch-pre {
+  opacity: 1;
+}
+.ch-split .ch-w {
+  display: inline-block;
+}
+.ch-split[data-mode="chars"] .ch-w {
+  white-space: nowrap;
+}
+.ch-split[data-mode="chars"] .ch-c {
+  display: inline-block;
+}
+.ch-split {
+  --ch-piece-tr: 0 0.45em;
+  --ch-piece-step: 45ms;
+}
+.ch-split[data-mode="chars"] {
+  --ch-piece-step: 22ms;
+}
+.ch-split[data-mode="lines"] {
+  --ch-piece-step: 120ms;
+}
+:root[data-ch-motion="subtle"] .ch-split {
+  --ch-piece-tr: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+    :is(.ch-split:not([data-mode="chars"]) .ch-w, .ch-split[data-mode="chars"] .ch-c) {
+    transition:
+      opacity var(--ch-dur-normal) var(--ch-ease-standard)
+      calc(var(--ch-piece-step) * var(--ch-i, 0)),
+      translate var(--ch-dur-normal) var(--ch-ease-standard)
+      calc(var(--ch-piece-step) * var(--ch-i, 0));
+  }
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-pre
+    :is(.ch-split:not([data-mode="chars"]) .ch-w, .ch-split[data-mode="chars"] .ch-c) {
+    opacity: 0;
+    translate: var(--ch-piece-tr);
+  }
+  @starting-style {
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      :is(.ch-split:not([data-mode="chars"]) .ch-w, .ch-split[data-mode="chars"] .ch-c) {
+      opacity: 0;
+      translate: var(--ch-piece-tr);
+    }
+  }
+}

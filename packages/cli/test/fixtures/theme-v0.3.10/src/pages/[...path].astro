@@ -1,0 +1,456 @@
+---
+import config from "virtual:cloudhal/config";
+import { archiveSummaries } from "@cloudhal/astro-renderer/archive";
+import {
+  addCacheTags,
+  listCacheTag,
+  nodeCacheTag,
+  termCacheTag,
+} from "@cloudhal/astro-renderer/cache-tags";
+import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
+import { Comments, Sections } from "@cloudhal/astro-renderer/components";
+import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
+import { gateNotice } from "@cloudhal/astro-renderer/gates";
+import {
+  alternatesFor,
+  linkLocalizer,
+  localeRequest,
+  localeUrl,
+  localizedPath,
+  localizeHead,
+} from "@cloudhal/astro-renderer/locales";
+import {
+  loadAssetIndex,
+  type MediaContext,
+  placeholderBudget,
+} from "@cloudhal/astro-renderer/media";
+import {
+  type ActiveNavItem,
+  type ActiveRoute,
+  activeItem,
+  derivedNavigation,
+  markActive,
+  markCurrent,
+  navigationCacheTags,
+} from "@cloudhal/astro-renderer/navigation";
+import { notFoundPage, notFoundPageIds } from "@cloudhal/astro-renderer/not-found";
+import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
+import { getSource, peerEditions } from "@cloudhal/astro-renderer/runtime";
+import { searchAvailable } from "@cloudhal/astro-renderer/search";
+import {
+  archiveHead,
+  entryHead,
+  pageHead,
+  searchHead,
+  siteOrigin,
+} from "@cloudhal/astro-renderer/seo";
+import { loadSurfaceSources, surfaceSources } from "@cloudhal/astro-renderer/surfaces";
+import {
+  entryTaxonomy,
+  loadTaxonomyIndex,
+  relatedEntries,
+  termAncestors,
+} from "@cloudhal/astro-renderer/taxonomy";
+import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+/**
+ * One route for the whole graph (RFC-0002 §7 order): a Page answers at its `path`; an article at
+ * `/<collection>/<slug>`; a category or tag archive at `<basePath>/<slug>[/page/<n>]`. Anything
+ * else asks the site's redirects (301 with the query kept), then answers 410 for a retired term
+ * or 404. Term feeds live next door in `[...path]/rss.xml.ts`. The header renders the `primary`
+ * menu, or the derived header without one; a `footer` menu replaces the footer links (RFC-0003).
+ * Articles end with reader comments when the site has them on (RFC-0007; `?comments=<n>` pages).
+ * `/search?q=` is the site search (RFC-0019 §3) where the deployment answers it: never cached,
+ * never indexed, and its form sits in the header. A miss answers 404 with the site's page at
+ * `/404` in the request's locale, else the theme's own not-found page in that locale.
+ */
+import { resolveChrome } from "@cloudhal/core-ts/chrome";
+import { blockTypes } from "../blocks.ts";
+import Archive from "../components/Archive.astro";
+import Article from "../components/Article.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import MenuPanel from "../components/MenuPanel.astro";
+import NotFound from "../components/NotFound.astro";
+import PostTerms from "../components/PostTerms.astro";
+import RelatedPosts from "../components/RelatedPosts.astro";
+import Search from "../components/Search.astro";
+import { fontLinkHeader, PAIRING_PRELOADS } from "../fonts.ts";
+import { iconSet } from "../icons.ts";
+import Base from "../layouts/Base.astro";
+import { themeSettings } from "../settings.ts";
+import {
+  ARCHIVE_PAGE_SIZE,
+  blocks,
+  collectionIndex,
+  components,
+  NAV_CATEGORIES,
+  RELATED_POSTS,
+  strings,
+} from "../theme.ts";
+
+export async function getStaticPaths() {
+  const source = await getSource(config);
+  const site = await source.site();
+  const { pages } = await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE });
+  // RFC-0025 §2: the phone menu's page, unless the site has a page there.
+  if (!pages.includes("/menu")) pages.push("/menu");
+  // RFC-0033: every other locale on this host under its prefix (archives follow in a later step).
+  const domains = site.localization?.domains ?? {};
+  const urls = pages.map((p) => localizedPath(site, site.defaultLocale, p));
+  for (const locale of site.locales)
+    if (locale !== site.defaultLocale && domains[locale] === undefined)
+      for (const p of [
+        ...(await staticPaths(source, { perPage: ARCHIVE_PAGE_SIZE, locale })).pages,
+        "/menu",
+      ])
+        urls.push(localizedPath(site, locale, p));
+  return [...new Set(urls)].map((path) => ({
+    params: { path: path === "/" ? undefined : path.slice(1) },
+  }));
+}
+
+const source = await getSource(config, Astro);
+if (!source) return new Response("This site has not been published yet.", { status: 503 });
+const site = await source.site();
+const requested = Astro.params.path ? `/${Astro.params.path}` : "/";
+// RFC-0033 §4: the locale is in the path prefix or the host; a non-canonical locale URL moves.
+const lr = localeRequest(site, Astro.url.host, requested);
+if (lr.redirect !== undefined)
+  return new Response(null, {
+    status: 301,
+    headers: { location: `${lr.redirect}${Astro.url.search}` },
+  });
+const locale = lr.locale;
+const path = lr.path;
+let route = await resolveRoute(source, path, {
+  perPage: ARCHIVE_PAGE_SIZE,
+  search: Astro.url.search,
+  locale,
+});
+// RFC-0033 §4: a site may show a missing translation in its original language, with a notice,
+// never indexed and never in `hreflang` (`localization.fallback`).
+let shownIn = locale;
+if (
+  route.kind === "not-found" &&
+  locale !== site.defaultLocale &&
+  site.localization?.fallback === "default-with-notice"
+) {
+  const original = await resolveRoute(source, path, {
+    perPage: ARCHIVE_PAGE_SIZE,
+    search: Astro.url.search,
+    locale: site.defaultLocale,
+  });
+  if (original.kind === "page" || original.kind === "entry") {
+    route = original;
+    shownIn = site.defaultLocale;
+  }
+}
+if (route.kind === "redirect")
+  return new Response(null, {
+    status: route.status,
+    headers: {
+      location: route.location.startsWith("/")
+        ? localizedPath(site, locale, route.location)
+        : route.location,
+    },
+  });
+if (route.kind === "gone") return new Response(null, { status: 410 });
+// RFC-0025 §2: `/menu` is the phone menu as a page (the menu link's target without JavaScript),
+// unless the site has a page there.
+const isMenu = route.kind === "not-found" && path === "/menu";
+// Reader comments (RFC-0007): tags the response `cloudhal-comments-<id>` and reads the thread;
+// `?comments=<n>` past the last page is a miss.
+const comments =
+  route.kind === "entry" ? await loadComments(config, Astro, route.entry, { locale }) : undefined;
+// A miss (RFC-0033 §4) answers 404 in the request's locale: the site's page at `/404` (its
+// translation, or the original under `default-with-notice`), else the theme's NotFound below.
+// The authored page answers 404 at its own path too.
+const notFound =
+  (!isMenu && (route.kind === "not-found" || route.kind === "feed")) ||
+  comments?.notFound === true ||
+  (route.kind === "page" && notFoundPageIds(await source.pages()).has(route.page.id));
+if (notFound) {
+  Astro.response.status = 404;
+  const authored = route.kind === "page" ? route.page : await notFoundPage(source, site, locale);
+  route = authored ? { kind: "page", page: authored } : { kind: "not-found" };
+  shownIn = authored?.locale ?? locale;
+}
+
+// Search results (RFC-0019 §3) are per query: never in the edge cache, never in search engines.
+if (route.kind === "search") {
+  Astro.response.headers.set("cache-control", "no-store");
+  Astro.response.headers.set("cloudflare-cdn-cache-control", "no-store");
+  Astro.response.headers.set("x-robots-tag", "noindex");
+}
+const origin = siteOrigin(site, Astro.url);
+// Internal links of a localized page stay in its locale (`src/middleware.ts`).
+const links = await linkLocalizer(source, locale, origin);
+if (links) (Astro.locals as { cloudhalLinks?: (p: string) => string }).cloudhalLinks = links;
+// Media (RFC-0004): assets resolve `assetId` and `asset:<id>`; previews never use transformations.
+const media: MediaContext = {
+  assets: await loadAssetIndex(source),
+  locale,
+  defaultLocale: site.defaultLocale,
+  transform: config.media?.transform ?? "none",
+  preview: Astro.response.headers.get("x-cloudhal-mode") === "preview",
+  onMiss: (id) =>
+    console.warn(`cloudhal: ${path} refers to ${id}, which this version does not have`),
+  // RFC-0026: icons in the site's weight, the theme's own drawings over the set's.
+  icons: { weight: String(site.theme.config?.iconWeight ?? "regular"), set: iconSet },
+  // RFC-0028: one placeholder allowance for the whole page.
+  budget: placeholderBudget(),
+};
+const t = strings(locale, site.theme.config?.strings);
+const index = route.kind === "archive" ? route.index : await loadTaxonomyIndex(source, locale);
+const primary = await source.navigation("primary", locale, { collectionIndex });
+const footerMenu = await source.navigation("footer", locale, { collectionIndex });
+const derivedCategories = !primary && NAV_CATEGORIES;
+const needsEntries = derivedCategories || (route.kind === "entry" && RELATED_POSTS > 0);
+const all = needsEntries ? await source.allEntries(locale) : [];
+const categories = derivedCategories
+  ? archiveSummaries(
+      index,
+      all.filter((e) => e.status === "published"),
+    ).filter((a) => a.taxonomy.key === "category" && !a.term.parentId)
+  : [];
+// The active item: exact path, longest prefix, then the entry's category or collection.
+const activeRoute: ActiveRoute = {
+  path,
+  ...(route.kind === "entry" ? { entry: route.entry } : {}),
+  ...(route.kind === "archive" ? { archiveTermId: route.archive.term.id } : {}),
+};
+const ancestors = (id: string) => {
+  const term = index.terms.get(id);
+  return term ? termAncestors(index, term).map((a) => a.id) : [];
+};
+// The derived header lists top-level pages, never the not-found page.
+const allPages = await source.pages();
+const notFoundIds = notFoundPageIds(allPages);
+const navPages = allPages.filter((p) => !notFoundIds.has(p.id));
+const nav = primary
+  ? markActive(primary, activeItem(primary, activeRoute, ancestors))
+  : markCurrent(derivedNavigation(site, navPages, categories, locale), path);
+const footer = footerMenu
+  ? markActive(footerMenu, activeItem(footerMenu, activeRoute, ancestors))
+  : undefined;
+// RFC-0025: the page's header and footer, and the menus they name beyond primary and footer.
+const chrome = resolveChrome(site, route.kind === "page" ? route.page : undefined);
+const menus: Record<string, ActiveNavItem[] | undefined> = { primary: nav, footer };
+const extraMenus = await Promise.all(
+  chrome.menus
+    .filter((key) => !(key in menus))
+    .map(async (key) => [key, await source.navigation(key, locale, { collectionIndex })] as const),
+);
+for (const [key, menu] of extraMenus)
+  menus[key] = menu ? markActive(menu, activeItem(menu, activeRoute, ancestors)) : undefined;
+// Edge-cache tags next to the site tag (published responses on Cloudflare only), so a publish
+// purges only the responses that show what changed (`cache-tags.ts`). The tags a purge must reach
+// come first; the header's categories (names shown on every page) last.
+const tags: string[] = [];
+
+let entries: Record<string, ContentEntry[]> = {};
+let surfaces: Awaited<ReturnType<typeof loadSurfaceSources>> = {};
+let terms = entryTaxonomy(undefined, { tags: [] });
+let related: ContentEntry[] = [];
+if (route.kind === "page") {
+  tags.push(nodeCacheTag(route.page.id));
+  // Lists of the site's entries change with any entry: the site's list tag covers them.
+  if (
+    route.page.sections.some(
+      (s) => s.kind === "contentList" || (s.kind === "surface" && surfaceSources(s).length > 0),
+    )
+  )
+    tags.push(listCacheTag(site.id));
+  // Generated UI (RFC-0020 §3): entry sources load from the same source as the page.
+  surfaces = await loadSurfaceSources(source, route.page.sections);
+  const collections = [
+    ...new Set(
+      route.page.sections.filter((s) => s.kind === "contentList").map((s) => s.collection),
+    ),
+  ];
+  entries = Object.fromEntries(
+    await Promise.all(collections.map(async (c) => [c, await source.entries(c, locale)])),
+  );
+  // A section with a `filter` (RFC-0002 §5) lists its own entries, keyed by section id.
+  for (const s of route.page.sections)
+    if (s.kind === "contentList" && s.filter)
+      entries[s.id] = await source
+        .entriesByFilter(`collection:${s.collection}+${s.filter}`, { locale })
+        .catch((err: unknown) => {
+          console.warn(`cloudhal: section ${s.id} has an invalid filter: ${String(err)}`);
+          return [];
+        });
+} else if (route.kind === "entry") {
+  terms = entryTaxonomy(index, route.entry);
+  related = relatedEntries(route.entry, all, index, RELATED_POSTS);
+  tags.push(
+    nodeCacheTag(route.entry.id),
+    // the related posts it links to: a retitled or removed one purges this page too
+    ...related.map((e) => nodeCacheTag(e.id)),
+    ...terms.groups.flatMap((g) => g.terms.map((s) => termCacheTag(s.id))),
+    ...terms.trail.map((s) => termCacheTag(s.id)),
+  );
+} else if (route.kind === "archive") {
+  tags.push(
+    // which entries the archive lists (and how many pages it has) changes with its membership
+    listCacheTag(route.archive.term.id),
+    termCacheTag(route.archive.term.id),
+    ...route.archive.trail.map((s) => termCacheTag(s.id)),
+    ...route.archive.entries.map((e) => nodeCacheTag(e.id)),
+  );
+}
+tags.push(
+  ...categories.map((a) => termCacheTag(a.term.id)),
+  ...navigationCacheTags(primary),
+  ...navigationCacheTags(footerMenu),
+  ...extraMenus.flatMap(([, menu]) => navigationCacheTags(menu)),
+);
+// RFC-0025 §2: the footer's surface region loads its entry sources like a page's surfaces.
+const regionSources = chrome.footer.region
+  ? await loadSurfaceSources(source, [chrome.footer.region])
+  : {};
+if (chrome.footer.region && surfaceSources(chrome.footer.region).length > 0)
+  tags.push(listCacheTag(site.id));
+addCacheTags(Astro.response.headers, tags);
+
+// Video players (RFC-0015 §4): the Site Worker allows their frames on this page only.
+if (
+  (route.kind === "page" && usesEmbeds({ sections: route.page.sections })) ||
+  (route.kind === "entry" &&
+    route.entry.body.format === "markdown" &&
+    usesEmbeds({ markdown: route.entry.body.value }))
+)
+  Astro.response.headers.set(EMBED_HEADER, "1");
+
+// Time gates (RFC-0008 §7.3): the published source never returns an embargoed or expired page or
+// entry (it is a 404), so a gate that is closed here means a preview or `cloudhal dev`: say so.
+const gated = route.kind === "page" ? route.page : route.kind === "entry" ? route.entry : undefined;
+const gate = gated ? gateNotice(gated, site, locale, Date.now()) : undefined;
+const notice = gate && { state: gate.state, at: gate.at, text: t[gate.state](gate.when) };
+
+const head =
+  route.kind === "page"
+    ? pageHead(site, route.page, origin, media)
+    : route.kind === "entry"
+      ? entryHead(site, route.entry, origin, terms, media, commentsJsonLd(comments, origin))
+      : route.kind === "archive"
+        ? archiveHead(site, route.archive, origin, media)
+        : route.kind === "search"
+          ? searchHead(site, route.search.query, origin, locale)
+          : {
+              ...searchHead(site, "", origin, locale),
+              title: `${isMenu ? t.menu : t.notFoundTitle} · ${site.name}`,
+              canonical: `${origin}${isMenu ? "/menu" : path}`,
+            };
+// RFC-0033 §4: self-canonical in the locale, `lang`/`dir`, and the `hreflang` set from the group.
+const fallback = shownIn !== locale;
+const alternates =
+  gated && !fallback && !notFound
+    ? // RFC-0034 §6: language editions published by other sites of the project, on their hosts.
+      await alternatesFor(source, gated, origin, await peerEditions(config, gated))
+    : [];
+const localized = localizeHead(head, site, {
+  locale: shownIn,
+  origin,
+  alternates,
+  ...(gated?.translation ? { translation: gated.translation } : {}),
+});
+const meta = fallback || notFound ? { ...localized, robots: "noindex,follow" } : localized;
+Astro.response.headers.set("content-language", shownIn);
+// The pairing's fonts as a Link header too (Early Hints), not only as <link rel=preload> in <head>.
+const pairing = themeVariables(site, themeSettings).attributes["data-ch-type-pairing"];
+const preloads = PAIRING_PRELOADS[pairing ?? ""] ?? [];
+if (preloads.length) Astro.response.headers.set("link", fontLinkHeader(preloads));
+// The reader's notice (RFC-0033 §4): machine output until a person reviews it (or always, when
+// the site asks), a page shown in its original language, each with a link to the original.
+const original = alternates.find((a) => a.original && !a.current);
+const tr = gated?.translation;
+const machine =
+  tr?.method === "machine" ||
+  (tr?.method === "machine-reviewed" && site.localization?.label === "always");
+const translationNotice = fallback
+  ? { text: t.notTranslated }
+  : machine
+    ? {
+        text: tr?.review ? t.machineReviewed : t.machineTranslated,
+        ...(original
+          ? { original: { href: original.href, text: t.readOriginal, lang: original.locale } }
+          : {}),
+      }
+    : undefined;
+// The language switcher: this page's versions, else each language's home page.
+const nativeName = (l: string) => {
+  try {
+    return new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l;
+  } catch {
+    return l;
+  }
+};
+// RFC-0034 §6: languages a language edition publishes (another site) follow the site's own.
+const editionLocales = alternates
+  .map((a) => a.locale)
+  .filter((l) => l !== "x-default" && !site.locales.includes(l));
+const languages =
+  site.locales.length + editionLocales.length > 1
+    ? {
+        label: t.languages,
+        items: [...site.locales, ...editionLocales].map((l) => ({
+          locale: l,
+          name: nativeName(l),
+          href: alternates.find((a) => a.locale === l)?.href ?? localeUrl(site, l, "/", origin),
+          current: l === locale,
+        })),
+      }
+    : undefined;
+const searchForm = searchAvailable(config, source)
+  ? {
+      label: t.searchLabel,
+      placeholder: t.searchPlaceholder,
+      button: t.search,
+      modal: t.searchModal,
+      ...(route.kind === "search" ? { query: route.search.query } : {}),
+    }
+  : undefined;
+---
+<Base site={site} meta={meta} nav={nav} footer={footer} notice={notice} translation={translationNotice} languages={languages} search={searchForm} motion={route.kind === "page" ? route.page.motion : undefined} chrome={chrome} menus={menus} words={{ skip: t.skipToContent, main: t.mainMenu, secondary: t.secondaryMenu, menu: t.menu, closeMenu: t.closeMenu, footer: t.footerMenu, legal: t.legalMenu, social: t.socialLinks, credit: t.builtWith }} barWords={{ announcement: t.announcement, dismiss: t.dismiss, privacy: t.privacy, consentNotice: t.consentNotice, consentChoices: t.consentChoices, consentOk: t.consentOk, consentAll: t.consentAll, consentEssential: t.consentEssential, privacyPolicy: t.privacyPolicy, copied: t.copied, linkCopied: t.linkCopied }}>
+  {chrome.footer.region && (
+    <Fragment slot="footer-region">
+      <Sections sections={[chrome.footer.region]} entries={{}} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={regionSources} />
+    </Fragment>
+  )}
+  {isMenu && (
+    <div class="ch-menu-page">
+      <h1>{t.menu}</h1>
+      <MenuPanel
+        iconWeight={media.icons?.weight}
+        nav={chrome.header.nav === "primary" ? nav : (menus[chrome.header.nav] ?? [])}
+        utility={chrome.header.utility ? (menus[chrome.header.utility] ?? []) : []}
+        search={searchForm}
+        words={{ main: t.mainMenu, secondary: t.secondaryMenu }}
+        idSuffix="page"
+      />
+    </div>
+  )}
+  {route.kind === "page" && (
+    <Sections sections={route.page.sections} entries={entries} components={components} blocks={blocks} blockTypes={blockTypes} media={media} surfaceSources={surfaces} />
+  )}
+  {route.kind === "entry" && (
+    <Fragment>
+      <Breadcrumbs
+        label={t.breadcrumb}
+        items={[
+          { name: t.home, href: "/" },
+          ...terms.trail.map((s) => ({ name: s.name, href: s.href })),
+          { name: route.entry.title },
+        ]}
+      />
+      <Article entry={route.entry} terms={terms} locale={locale} t={t} media={media} blocks={blocks} blockTypes={blockTypes} />
+      <PostTerms taxonomy={terms} locale={locale} />
+      <RelatedPosts title={t.related} entries={related} locale={locale} media={media} />
+      <Comments view={comments} />
+    </Fragment>
+  )}
+  {route.kind === "archive" && <Archive archive={route.archive} t={t} media={media} />}
+  {route.kind === "search" && <Search search={route.search} locale={locale} t={t} />}
+  {route.kind === "not-found" && !isMenu && <NotFound t={t} search={searchForm !== undefined} />}
+</Base>

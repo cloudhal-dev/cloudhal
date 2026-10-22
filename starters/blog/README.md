@@ -46,3 +46,6 @@ Themes need nothing for analytics (RFC-0006). Deployed with `cloudhal deploy`, t
 
 ## Redirects in static builds
 A static host cannot be told to answer with a status code by HTML alone. `cloudhal build` therefore writes each redirected path as a small meta-refresh page and also writes `dist/_redirects`, which Cloudflare (Workers/Pages static assets) and Netlify turn into real 301s. Deployed with `cloudhal deploy`, the Site Worker answers redirects itself.
+
+## Upgrading Cloudhal
+`cloudhal init` copied this theme into your project, so it keeps calling `@cloudhal/astro-renderer` and `@cloudhal/core-ts` as they were then. The exports a theme uses are therefore a public API: a breaking change to one keeps a deprecated fallback for the old call (as `entryPath(entry)` did when it gained a `site` argument in 0.3.11), so updating the packages never requires editing your theme. Cloudhal's CI builds copies of earlier starters with each release to keep that promise.
