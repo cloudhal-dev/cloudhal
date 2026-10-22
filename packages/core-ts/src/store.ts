@@ -355,8 +355,8 @@ export class SiteGraphStore {
     return projectId ? sites.filter((s) => s.projectId === projectId) : sites;
   }
 
-  async updateSite(site: Site): Promise<Site> {
-    return this.#sites.update(site);
+  async updateSite(site: Site, options?: { dryRun?: boolean }): Promise<Site> {
+    return this.#sites.update(site, undefined, options);
   }
 
   /**

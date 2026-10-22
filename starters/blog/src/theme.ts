@@ -36,8 +36,9 @@ export const NAV_CATEGORIES = true;
 
 /**
  * Where this theme serves a collection's index, for menu items that link to a collection
- * (RFC-0003 §7.1). Return `undefined` to use the default: the first published page that lists the
- * collection (the blog's home page lists `posts`); without one the item is hidden.
+ * (RFC-0003 §7.1). Return `undefined` to use the default: a published page at the collection's
+ * permalink prefix (`/docs` for `/docs/{slug}`, RFC-0038 §5), else the first published page that
+ * lists the collection (the blog's home page lists `posts`); without one the item is hidden.
  */
 export const collectionIndex: CollectionIndexHook = () => undefined;
 

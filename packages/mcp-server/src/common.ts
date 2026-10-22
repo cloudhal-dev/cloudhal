@@ -71,6 +71,8 @@ export interface ToolDefinition {
   classify?: (args: Record<string, unknown>) => CallClass | undefined;
   /** The scopes a `propose` call needs instead of `scopes` (ADR-0028). */
   proposeScopes?: Scope[];
+  /** Scopes the person approving the call must also hold (person-only ones included). */
+  approverScopes?: Scope[];
   /**
    * What the call would change, for a person deciding its approval request (RFC-0014 §5): Studio
    * lists it with the request. Computed against the current state when the request is listed.

@@ -236,6 +236,12 @@ export interface ToolPolicy {
    * needs `content:propose`, not the write it proposes.
    */
   proposeScopes?: Scope[];
+  /**
+   * Scopes the person who approves a call must hold besides the tool's own, person-only ones
+   * included: an agent with `site:write` may ask to move a collection's URLs, but only someone who
+   * could change site settings in Studio (`site:settings`) decides it (RFC-0038 §5).
+   */
+  approverScopes?: Scope[];
 }
 
 export interface Principal {

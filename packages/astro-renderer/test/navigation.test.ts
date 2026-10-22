@@ -175,6 +175,23 @@ describe("GraphSource.navigation (§7.1)", () => {
     expect(shape(dev)?.[2]).toEqual(["Draft", "/draft", [["About", "/about"]]]);
   });
 
+  it("RFC-0038 §5: without a hook, a collection item links to a page at its permalink prefix", async () => {
+    await store.createMenu({ siteId: site.id, key: "primary", maxDepth: 3, items: items() });
+    ({ site } = await store.createPage((await store.getSite(site.id)) as Site, {
+      siteId: site.id,
+      path: "/docs",
+      title: "Docs",
+      locale: "en",
+      status: "published",
+      sections: [],
+    }));
+    const [live] = await sources();
+    const nav = await live?.navigation("primary");
+    expect(nav?.items.find((i) => i.label === "Docs")?.href).toBe("/docs");
+    // posts still falls back to the page that lists them (no page at /posts)
+    expect(nav?.items[0]?.href).toBe("/");
+  });
+
   it("a deleted page or an emptied archive hides the item on the next render", async () => {
     await store.createMenu({
       siteId: site.id,

@@ -656,6 +656,8 @@ export interface MessageParams {
   "siteAccess.title": { name: string | number };
   "siteSettings.appearance.description": { theme: string | number };
   "siteSettings.appearance.none": { theme: string | number };
+  "siteSettings.collections.preview": { url: string | number };
+  "siteSettings.collections.previewMoved": { url: string | number; old: string | number };
   "siteSettings.design.count": { count: string | number; max: string | number };
   "siteSettings.design.noTheme": { theme: string | number };
   "siteSettings.design.theme": { theme: string | number };

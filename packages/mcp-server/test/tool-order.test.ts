@@ -55,6 +55,7 @@ const ORDER = [
   "list_redirects",
   "create_redirect",
   "delete_redirect",
+  "set_collection_permalink",
   "list_menus",
   "get_menu",
   "update_menu",

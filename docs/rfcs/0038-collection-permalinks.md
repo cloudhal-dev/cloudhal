@@ -149,3 +149,5 @@ No new scopes: changing a template is a site update (`site:write`). In Studio a 
 - **The reverse.** Page writes (`checkPagePath`/`pageGuard` in `store/site-permalinks.ts`) and taxonomy writes (`#checkTaxonomy`/`#archiveGuard`) refuse a path in a configured prefix; their SQL guards read the site row's `collections` (`configuredPrefixFree`).
 - **Search.** `planSearch` rewrites every entry row when the live site node's templates differ from the indexed snapshot's, so hrefs follow the move on the next publish.
 - **Rollback** restores the template with the site node; redirects stay, as invariant 5 says.
+
+**Who approves (added in review).** The tool needs `site:write` from the agent. The person who approves it must also hold `site:settings`, the scope Studio's Site settings needs, so an Editor cannot approve an agent's URL move that they could not make themselves. This is a new optional `ToolPolicy.approverScopes` (`@cloudhal/agent-runtime`), checked in the API's `canDecide`. It can hold person-only scopes, which never satisfy a tool's own `scopes`.

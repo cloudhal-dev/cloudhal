@@ -8,7 +8,7 @@
     "apps/studio/src/routes/CommentThreadPage.tsx": 813,
     "apps/studio/src/routes/NavigationPage.tsx": 1171,
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
-    "apps/studio/src/routes/SiteSettingsPage.tsx": 881,
+    "apps/studio/src/routes/SiteSettingsPage.tsx": 859,
     "packages/api/src/build-turn.ts": 885,
     "packages/api/src/routes/assets.ts": 833,
     "packages/api/src/routes/comments.ts": 874,

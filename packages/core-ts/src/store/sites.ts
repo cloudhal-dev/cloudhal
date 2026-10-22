@@ -48,10 +48,16 @@ export class SiteEngine {
     return site;
   }
 
-  /** `updateSite` with statements in the same batch, guarded on the site's new hash. */
+  /**
+   * `updateSite` with statements in the same batch, guarded on the site's new hash. `dryRun`
+   * runs every check (schema, hosts, RFC-0038 permalink overlaps) and returns the site that would
+   * be written, without writing it: the MCP tool's precheck, so a refused call never waits for a
+   * person.
+   */
   async update(
     site: Site,
     extra?: (guard: SiteGuard, at: string) => SqlStatement[],
+    options: { dryRun?: boolean } = {},
   ): Promise<Site> {
     const next: Site = structuredClone({
       ...site,
@@ -95,6 +101,7 @@ export class SiteEngine {
     const permalinks = await planPermalinks(this.#ctx, stored, next);
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
+    if (options.dryRun) return written;
     const s = await casUpdateStatement(
       "site",
       written,
