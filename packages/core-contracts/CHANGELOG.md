@@ -1,5 +1,9 @@
 # @cloudhal/core-contracts
 
+## 0.3.13
+
+No changes in this release.
+
 ## 0.3.12
 
 No changes in this release.

@@ -1,5 +1,14 @@
 # @cloudhal/core-ts
 
+## 0.3.13
+
+### Patch Changes
+
+- 6a39c6d: Fix: sites whose theme was copied from the starter before 0.3.11 rendered empty pages (200 with no body). Their `EntryList` calls the renderer's old one-argument `entryPath(entry)` (and `.map(entryPath)`), which became `entryPath(site, entry)` in 0.3.11. `entryPath` accepts the old call again (deprecated; it ignores collection permalinks — pass the site to get them).
+- @cloudhal/core-contracts@0.3.13
+  - @cloudhal/schedules@0.3.13
+  - @cloudhal/storage@0.3.13
+
 ## 0.3.12
 
 ### Patch Changes
