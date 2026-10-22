@@ -65,6 +65,10 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   too_large: 409,
   slug_taken: 409,
   path_conflict: 409,
+  // RFC-0040
+  collection_undeclared: 422,
+  collection_in_use: 409,
+  collection_exists: 409,
   reserved_key: 400,
   immutable_field: 400,
   primary_not_assigned: 422,

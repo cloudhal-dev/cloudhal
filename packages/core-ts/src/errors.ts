@@ -167,7 +167,14 @@ export type InvariantCode =
   /** Invariant 5: a machine translation in a review-required collection was published unreviewed. */
   | "review_required"
   /** RFC-0034 invariant 1: the hostname already serves another site of the installation. */
-  | "host_taken";
+  | "host_taken"
+  // ── RFC-0040 (first-class collections) ──
+  /** An entry or tool names a collection that is neither declared, in use, nor `posts`. */
+  | "collection_undeclared"
+  /** A declared collection with entries (or named by a taxonomy) cannot be undeclared. */
+  | "collection_in_use"
+  /** `create_collection` for a key that is already declared. */
+  | "collection_exists";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

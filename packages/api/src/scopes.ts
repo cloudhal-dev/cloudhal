@@ -120,6 +120,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // what a publish would carry, as counts (Studio's badge beside Publish)
   ["GET", `${S}/pending`, "site:read"],
   ["PUT", S, "site:settings"],
+  // RFC-0040: the collection registry; declaring or changing one is a site setting
+  ["GET", `${S}/collections`, "content:read"],
+  ["PUT", `${S}/collections/:key`, "site:settings"],
+  ["DELETE", `${S}/collections/:key`, "site:settings"],
   ["GET", `${S}/pages`, "content:read"],
   ["POST", `${S}/pages`, "content:write"],
   ["GET", `${S}/pages/:pageId/preview`, "content:read"],

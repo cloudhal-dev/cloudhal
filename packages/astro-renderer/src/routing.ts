@@ -32,6 +32,8 @@ import {
   taxonomyIndex,
 } from "./taxonomy.ts";
 
+/** RFC-0040: a collection's labels and settings with defaults, for themes. */
+export { collectionLabel, collectionSettings } from "@cloudhal/core-ts/collections";
 /** Themes link entries with core-ts's `entryPath(site, entry)`; re-exported for them. */
 export { entryAt, entryPath };
 

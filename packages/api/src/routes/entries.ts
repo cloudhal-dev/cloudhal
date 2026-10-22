@@ -1,6 +1,8 @@
 import { checkEntryLimit } from "@cloudhal/agent-runtime";
 import { renderEntryPreview, renderFragmentPreview } from "@cloudhal/astro-renderer/preview";
 import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
+import { InvariantError } from "@cloudhal/core-ts";
+import { isRegistered } from "@cloudhal/core-ts/collections";
 import { Hono } from "hono";
 import { patchBody } from "../body.ts";
 import type { Env } from "../context.ts";
@@ -43,6 +45,13 @@ export const entries: Hono<Env> = new Hono<Env>()
       ContentEntry,
       "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
     >;
+    // RFC-0040 §5: a new collection is declared first (Studio's New collection).
+    const registry = await c.get("store").listCollections(siteId);
+    if (typeof input.collection === "string" && !isRegistered(registry, input.collection))
+      throw new InvariantError(
+        "collection_undeclared",
+        `collection "${input.collection}" is not declared; declare it first`,
+      );
     const actor = c.get("actor") ?? API_ACTOR;
     // `author` is server-controlled (RFC-0005 I9): the caller, unless they hold full
     // content:write (Editors may credit someone else, e.g. imports).

@@ -121,7 +121,8 @@ describe("set_collection_permalink (RFC-0038 §5)", () => {
     expect(back.approvalPrompt).toContain("/blog/{slug} to /posts/{slug} (the default)");
     expect(back.approvalPrompt).toContain("− redirect /posts → /blog (it would point to itself)");
     const reset = await run({ permalink: null }, true);
-    expect((reset.result as { site: Site }).site.collections).toBeUndefined();
+    // RFC-0040: the collection stays declared, with no settings.
+    expect((reset.result as { site: Site }).site.collections).toEqual({ posts: {} });
   });
 
   it("an overlap or a no-op is refused before a person is asked", async () => {

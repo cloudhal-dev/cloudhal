@@ -4,7 +4,7 @@
  * published only, noindex respected, canonical elsewhere excluded — live in one tested place.
  */
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
-import { entryPath } from "@cloudhal/core-ts";
+import { collectionSettings, entryPath } from "@cloudhal/core-ts";
 import type { ArchiveSummary, ArchiveView } from "./archive.ts";
 import { markdownText, renderBody } from "./markdown.ts";
 import type { AssetIndex } from "./media.ts";
@@ -72,39 +72,41 @@ export function rssXml(options: FeedOptions): string {
   const { site, origin } = options;
   const base = options.linkOrigin ?? origin;
   const self = `${base}${options.feedPath ?? "/rss.xml"}`;
-  const items = published(options.entries)
-    .slice(0, FEED_LIMIT)
-    .map((e) => {
-      const url = `${base}${entryPath(site, e)}`;
-      const date = new Date(e.publishedAt ?? e.createdAt).toUTCString();
-      const cover = e.coverImage?.assetId ? options.assets?.get(e.coverImage.assetId) : undefined;
-      const image = cover
-        ? absoluteUrl(
-            origin,
-            cover.storage.kind === "external" ? cover.storage.url : e.coverImage?.src,
-          )
-        : absoluteUrl(origin, e.coverImage?.src);
-      const mediaAttrs = cover
-        ? ` type="${xml(cover.mediaType)}" fileSize="${cover.bytes}"${cover.image ? ` width="${cover.image.width}" height="${cover.image.height}"` : ""}`
-        : "";
-      const author = e.author.kind === "human" && e.author.name ? e.author.name : site.name;
-      return [
-        "<item>",
-        `<title>${xml(e.title)}</title>`,
-        `<link>${xml(url)}</link>`,
-        `<guid isPermaLink="true">${xml(url)}</guid>`,
-        `<pubDate>${date}</pubDate>`,
-        `<dc:creator>${cdata(author)}</dc:creator>`,
-        ...itemCategories(e, options.taxonomy).map((t) => `<category>${xml(t)}</category>`),
-        e.summary ? `<description>${cdata(e.summary)}</description>` : "",
-        image ? `<media:content url="${xml(image)}" medium="image"${mediaAttrs}/>` : "",
-        `<content:encoded>${cdata(renderBody(e.body, options.assets ? { assets: options.assets, locale: e.locale, defaultLocale: site.defaultLocale } : undefined))}</content:encoded>`,
-        "</item>",
-      ]
-        .filter(Boolean)
-        .join("");
-    });
-  const newest = published(options.entries)[0];
+  // RFC-0040: a collection with `feed: false` stays out of every feed.
+  const shown = published(options.entries).filter(
+    (e) => collectionSettings(site, e.collection).feed,
+  );
+  const items = shown.slice(0, FEED_LIMIT).map((e) => {
+    const url = `${base}${entryPath(site, e)}`;
+    const date = new Date(e.publishedAt ?? e.createdAt).toUTCString();
+    const cover = e.coverImage?.assetId ? options.assets?.get(e.coverImage.assetId) : undefined;
+    const image = cover
+      ? absoluteUrl(
+          origin,
+          cover.storage.kind === "external" ? cover.storage.url : e.coverImage?.src,
+        )
+      : absoluteUrl(origin, e.coverImage?.src);
+    const mediaAttrs = cover
+      ? ` type="${xml(cover.mediaType)}" fileSize="${cover.bytes}"${cover.image ? ` width="${cover.image.width}" height="${cover.image.height}"` : ""}`
+      : "";
+    const author = e.author.kind === "human" && e.author.name ? e.author.name : site.name;
+    return [
+      "<item>",
+      `<title>${xml(e.title)}</title>`,
+      `<link>${xml(url)}</link>`,
+      `<guid isPermaLink="true">${xml(url)}</guid>`,
+      `<pubDate>${date}</pubDate>`,
+      `<dc:creator>${cdata(author)}</dc:creator>`,
+      ...itemCategories(e, options.taxonomy).map((t) => `<category>${xml(t)}</category>`),
+      e.summary ? `<description>${cdata(e.summary)}</description>` : "",
+      image ? `<media:content url="${xml(image)}" medium="image"${mediaAttrs}/>` : "",
+      `<content:encoded>${cdata(renderBody(e.body, options.assets ? { assets: options.assets, locale: e.locale, defaultLocale: site.defaultLocale } : undefined))}</content:encoded>`,
+      "</item>",
+    ]
+      .filter(Boolean)
+      .join("");
+  });
+  const newest = shown[0];
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">',
@@ -160,7 +162,8 @@ export interface SitemapUrl {
  * What belongs in `sitemap.xml`: published pages and entries of the default locale, and the
  * indexable term archives (page 1 only, `lastmod` = the later of the newest listed entry and the
  * term; see `archiveSummaries` — pass it published entries). Pages and archives asking for
- * `noindex`, or canonicalised to another URL, are left out (a sitemap lists canonical URLs).
+ * `noindex`, or canonicalised to another URL, are left out (a sitemap lists canonical URLs), and so
+ * are the entries of collections with `sitemap: false` (RFC-0040).
  */
 export function sitemapUrls(
   site: Site,
@@ -183,6 +186,7 @@ export function sitemapUrls(
   for (const entry of published(entries)) {
     const path = entryPath(site, entry);
     if (entry.locale !== site.defaultLocale || seen.has(path)) continue;
+    if (!collectionSettings(site, entry.collection).sitemap) continue;
     seen.add(path);
     urls.push({ loc: `${origin}${path}`, lastmod: entry.updatedAt });
   }

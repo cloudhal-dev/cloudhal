@@ -11,6 +11,7 @@ import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } fro
 import { uniquenessKey } from "../nodes.ts";
 import { entryPath } from "../permalinks.ts";
 import { canonicalTerms } from "../taxonomy.ts";
+import { entersCollection, planNewCollection } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
@@ -90,7 +91,11 @@ export class EntryEngine {
     const refs = await this.#ctx.assets.planRefs("contentEntry", site.id, draft, stored);
     const prepared = await this.#ctx.tax.prepareEntry(refs.node, site, ts);
     const { entry, newTerms } = prepared;
-    const guard = and(prepared.guard, refs.guard);
+    // RFC-0040 §3: the first entry of a collection claims its default prefix.
+    const opening = entersCollection(stored, entry)
+      ? await planNewCollection(this.#ctx, site, entry.collection, entry.id)
+      : undefined;
+    const guard = and(prepared.guard, refs.guard, opening?.guard);
     const extra = refs.statements(await nodeHash(entry));
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
@@ -115,6 +120,7 @@ export class EntryEngine {
           throw new ConflictError("contentEntry", entry.id, stored.rev, rev);
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
+        await opening?.diagnose();
         throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
       }
       return entry;
@@ -132,6 +138,7 @@ export class EntryEngine {
       diagnose: async () => {
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
+        await opening?.diagnose();
       },
     });
     return entry;

@@ -45,7 +45,9 @@ function nextSite(site: Site, collection: string, permalink: string | null): Sit
   const { [collection]: current, ...others } = site.collections ?? {};
   const { permalink: _old, ...rest } = current ?? {};
   const settings = permalink ? { ...rest, permalink } : rest;
-  const collections = Object.keys(settings).length ? { ...others, [collection]: settings } : others;
+  // RFC-0040: a declared collection stays declared when its permalink goes back to the default.
+  const keep = Object.keys(settings).length > 0 || current !== undefined;
+  const collections = keep ? { ...others, [collection]: settings } : others;
   const { collections: _drop, ...base } = site;
   return Object.keys(collections).length ? { ...base, collections } : (base as Site);
 }
