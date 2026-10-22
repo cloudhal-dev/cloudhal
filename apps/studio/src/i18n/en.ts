@@ -633,7 +633,8 @@ export const en = {
       unique: "Something with this name or address already exists.",
       slug_taken: "This address is already in use.",
       path_conflict: "Another page or article already uses this path.",
-      reserved_path: "This path is reserved for the site itself (search, media or a language prefix).",
+      reserved_path:
+        "This path is reserved for the site itself (search, media or a language prefix).",
       in_use: "It's still in use, so it can't be removed.",
       quota_exceeded: "The storage quota is full.",
       too_large: "This change is too large for one operation. Split it up.",
@@ -1212,7 +1213,8 @@ export const en = {
       /** Shown under a row: one real entry's address (or an example). */
       preview: "Entries live at addresses like {url}",
       /** Shown under a changed row before saving. */
-      previewMoved: "Entries will live at addresses like {url}. The old address {old} redirects there.",
+      previewMoved:
+        "Entries will live at addresses like {url}. The old address {old} redirects there.",
       /** An example slug when the collection has no entries yet: lower-case letters, digits and hyphens only. */
       exampleSlug: "my-article",
       empty: "No collections yet",
@@ -1222,7 +1224,8 @@ export const en = {
       errors: {
         slash: "Start with a slash, like /blog",
         trailingSlash: "Leave out the slash at the end",
-        invalid: "Use lower-case letters, digits and hyphens between slashes, like /blog or /docs/guides",
+        invalid:
+          "Use lower-case letters, digits and hyphens between slashes, like /blog or /docs/guides",
       },
     },
     conflictTitle: "This site changed somewhere else",
