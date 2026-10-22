@@ -12,6 +12,7 @@ import { useBlockTitle, useBlockTypes } from "../BlockSection.tsx";
 import { usePreviewVisible } from "../EditorLayout.tsx";
 import { useMenuReferences } from "../Menus.tsx";
 import { useToast } from "../Toast.ts";
+import { useSavedToast } from "../useLiveSite.ts";
 import { useGate } from "../useMe.ts";
 import { duplicateOf } from "./sections.ts";
 
@@ -22,6 +23,7 @@ export function usePageEditor(siteId: string, pageId: string) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
+  const savedToast = useSavedToast();
   const query = useQuery({
     queryKey: ["page", siteId, pageId],
     queryFn: () => api.pages.get(siteId, pageId),
@@ -52,7 +54,7 @@ export function usePageEditor(siteId: string, pageId: string) {
       setShowErrors(false);
       qc.setQueryData(["page", siteId, pageId], saved);
       await qc.invalidateQueries({ queryKey: ["pages", siteId] });
-      toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
+      savedToast(saved, query.data?.status);
     },
   });
   const duplicate = useMutation({

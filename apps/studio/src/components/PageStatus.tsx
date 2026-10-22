@@ -12,6 +12,7 @@ import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 import { useToast } from "./Toast.ts";
+import { useMarkedPublishedNotice } from "./useLiveSite.ts";
 
 /** Pages a site publish leaves off the live site: drafts and pages in review. */
 export function unpublishedPages(pages: readonly Page[]): Page[] {
@@ -27,6 +28,7 @@ export function usePageStatusActions(siteId: string, reason: string | undefined)
   const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
+  const markedPublished = useMarkedPublishedNotice();
   const [toPublish, setToPublish] = useState<Page | undefined>();
   const change = useMutation({
     mutationFn: (page: Page) => api.pages.update(page),
@@ -34,9 +36,9 @@ export function usePageStatusActions(siteId: string, reason: string | undefined)
       setToPublish(undefined);
       await qc.invalidateQueries({ queryKey: ["pages", siteId] });
       await qc.invalidateQueries({ queryKey: ["page", siteId, saved.id] });
-      toast.success(
-        saved.status === "published" ? t("pageStatus.published") : t("pageStatus.unpublished"),
-      );
+      // Published only marks it: the notice says it goes live with the next site publish.
+      if (saved.status === "published") markedPublished(saved);
+      else toast.success(t("pageStatus.unpublished"));
     },
     onError: (e) => toast.error(t("pageStatus.failed"), apiErrorText(t, e)),
   });

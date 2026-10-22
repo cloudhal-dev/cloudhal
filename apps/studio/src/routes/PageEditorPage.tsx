@@ -7,6 +7,7 @@ import { EditorLayout } from "../components/EditorLayout.tsx";
 import { isScheduleError, ScheduleLock } from "../components/EditorSchedule.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { PageAddress } from "../components/LiveAddress.tsx";
 import { PageEditorActions } from "../components/page-editor/PageEditorActions.tsx";
 import { PageEditorAside } from "../components/page-editor/PageEditorAside.tsx";
 import { PageEditorDialogs } from "../components/page-editor/PageEditorDialogs.tsx";
@@ -137,6 +138,7 @@ export function PageEditorPage() {
                     className="w-full font-mono"
                   />
                 </Grid>
+                <PageAddress siteId={siteId} page={draft} />
               </SectionCard>
               <PageSeoCard
                 page={draft}

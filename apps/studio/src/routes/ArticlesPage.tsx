@@ -40,6 +40,7 @@ import {
   ListViewsHead,
   useListViews,
 } from "../components/ListViews.tsx";
+import { EntryLiveItems } from "../components/LiveRowItems.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
@@ -438,6 +439,7 @@ function ArticleRow({
               params: { siteId, entryId: e.id },
             })
           }
+          items={<EntryLiveItems siteId={siteId} entry={e} />}
           onDelete={onDelete}
           deleteDisabledReason={deleteDisabledReason}
         />

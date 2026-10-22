@@ -9,6 +9,7 @@ import type { PaletteCommand } from "./AppFrame.tsx";
 import type { PaletteSearch } from "./CommandMenu.tsx";
 import { usePublishMode } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
+import { openLive, useLiveSite } from "./useLiveSite.ts";
 
 /** The site's screens the palette goes to, in its order (a table, not a list of closures). */
 const SITE_SCREENS = [
@@ -63,6 +64,7 @@ export function useSitePalette({
   const toast = useToast();
   const [publishOpen, setPublishOpen] = useState(false);
   const publishing = usePublishMode(siteId);
+  const live = useLiveSite(siteId);
   const createArticle = useMutation({
     mutationFn: () =>
       api.entries.create(siteId, {
@@ -138,6 +140,10 @@ export function useSitePalette({
             run: () => setPublishOpen(true),
           },
         ]),
+    // The live site in a new tab, once it has a domain and has been published.
+    ...(live.origin && live.liveSnapshotId
+      ? [{ id: "open-site", label: t("liveSite.open"), run: () => openLive(`${live.origin}/`) }]
+      : []),
     { id: "all-sites", label: t("nav.allSites"), run: () => navigate({ to: "/sites" }) },
   ];
   const search: PaletteSearch = {

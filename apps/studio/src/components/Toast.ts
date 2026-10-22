@@ -9,12 +9,35 @@ export interface ToastAction {
 /** How long a notice (something that needs the person) stays before it slides away. */
 const NOTICE_TIMEOUT_MS = 15_000;
 
+/** At most two actions per toast (DESIGN.md §2n). */
+const MAX_ACTIONS = 2;
+
 /** Small wrapper so screens don't depend on Kumo's toast API shape. */
 export function useToast() {
   const manager = useKumoToastManager();
+  /** Kumo's action buttons; an action closes the toast it sits on. */
+  const buttons = (close: () => void, actions: readonly ToastAction[] | undefined) =>
+    actions?.slice(0, MAX_ACTIONS).map((action) => ({
+      children: action.label,
+      variant: "secondary",
+      size: "sm",
+      onClick: () => {
+        close();
+        action.onClick();
+      },
+    }));
   return {
-    success: (title: string, description?: string) =>
-      manager.add({ title, description, type: "success" } as never),
+    /** Done; `actions` (at most two) offer the next step, e.g. "View site" after a publish. */
+    success: (title: string, description?: string, actions?: readonly ToastAction[]) => {
+      let id = "";
+      id = manager.add({
+        title,
+        description,
+        type: "success",
+        actions: buttons(() => manager.close(id), actions),
+      } as never) as unknown as string;
+      return id;
+    },
     error: (title: string, description?: string) =>
       manager.add({ title, description, type: "error" } as never),
     /**
@@ -36,15 +59,7 @@ export function useToast() {
         description: options.description,
         variant: options.tone,
         timeout: options.timeout ?? NOTICE_TIMEOUT_MS,
-        actions: options.actions?.map((action) => ({
-          children: action.label,
-          variant: "secondary",
-          size: "sm",
-          onClick: () => {
-            manager.close(options.id);
-            action.onClick();
-          },
-        })),
+        actions: buttons(() => manager.close(options.id), options.actions),
       } as never),
   };
 }

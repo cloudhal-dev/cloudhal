@@ -28,6 +28,7 @@ import {
   ListViewsHead,
   useListViews,
 } from "../components/ListViews.tsx";
+import { PageLiveItems } from "../components/LiveRowItems.tsx";
 import {
   InMenuBadge,
   MenuDeleteNotice,
@@ -270,7 +271,12 @@ function PageRow({
           onOpen={() =>
             navigate({ to: "/sites/$siteId/pages/$pageId", params: { siteId, pageId: p.id } })
           }
-          items={statusItems}
+          items={
+            <>
+              <PageLiveItems siteId={siteId} page={p} />
+              {statusItems}
+            </>
+          }
           onDelete={onDelete}
           deleteDisabledReason={gate.reason}
         />

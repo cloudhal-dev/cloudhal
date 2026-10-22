@@ -1,22 +1,19 @@
 import {
-  Badge,
   Button,
   Code,
   Columns,
-  InlineCopyText,
   Link,
   LinkButton,
   PageLayout,
   SectionCard,
   SectionEmpty,
-  SkeletonLine,
   Table,
   Text,
 } from "@cloudhal/ui";
 import { Article, FileText, Plus, TerminalWindow } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { lazy, type ReactNode, Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { CommentsWaitingBanner } from "../components/CommentsWaitingBanner.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -24,6 +21,7 @@ import { PendingApprovalsBanner } from "../components/PendingApprovalsBanner.tsx
 import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
+import { SiteStatusCard } from "../components/site-overview/SiteStatusCard.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT, withMessages } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
@@ -227,36 +225,13 @@ export function SiteOverviewPage() {
         </div>
         <div className="grid min-w-0 content-start gap-6">
           <OverviewAnalyticsCard siteId={siteId} />
-          <SectionCard
-            title={t("overview.status")}
-            actions={
-              site.data?.publishedSnapshotId ? (
-                <Badge variant="success" appearance="dot">
-                  {t("overview.live")}
-                </Badge>
-              ) : (
-                <Badge variant="secondary" appearance="dot">
-                  {t("overview.notPublished")}
-                </Badge>
-              )
-            }
-          >
-            {site.isPending || pages.isPending ? (
-              <SkeletonLine />
-            ) : (
-              <dl className="grid divide-y divide-kumo-hairline">
-                <StatRow label={t("overview.pages")} value={pages.data?.length ?? 0} />
-                <StatRow label={t("nav.articles")} value={entries.data?.length ?? 0} />
-                <StatRow label={t("nav.snapshots")} value={snapshots.data?.length ?? 0} />
-                {site.data?.publishedSnapshotId && (
-                  <StatRow
-                    label={t("overview.liveSnapshotLabel")}
-                    value={<InlineCopyText>{site.data.publishedSnapshotId}</InlineCopyText>}
-                  />
-                )}
-              </dl>
-            )}
-          </SectionCard>
+          <SiteStatusCard
+            siteId={siteId}
+            loading={site.isPending || pages.isPending}
+            pages={pages.data?.length ?? 0}
+            articles={entries.data?.length ?? 0}
+            snapshots={snapshots.data?.length ?? 0}
+          />
           <SectionCard
             title={t("activity.recent")}
             actions={viewAll(`/sites/${siteId}/activity`)}
@@ -270,18 +245,5 @@ export function SiteOverviewPage() {
         </div>
       </Columns>
     </PageLayout>
-  );
-}
-
-function StatRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
-      <Text as="dt" variant="secondary">
-        {label}
-      </Text>
-      <Text as="dd" bold>
-        {value}
-      </Text>
-    </div>
   );
 }
