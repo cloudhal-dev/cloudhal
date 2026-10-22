@@ -101,6 +101,10 @@
         "types": "./dist/src/permalinks.d.ts",
         "default": "./dist/src/permalinks.js"
       },
+      "./collections": {
+        "types": "./dist/src/collections.d.ts",
+        "default": "./dist/src/collections.js"
+      },
       "./locale-paths": {
         "types": "./dist/src/locale-paths.d.ts",
         "default": "./dist/src/locale-paths.js"
