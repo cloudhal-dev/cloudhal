@@ -1,6 +1,6 @@
 # RFC-0040: First-class collections
 
-- Status: Draft
+- Status: Accepted (2026-10-22, by Halil; ADR-0042). Open questions decided as recommended.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-22
 - Related:
   - #71 (research and staging: first-class collections, then typed custom fields).
