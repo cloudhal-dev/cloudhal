@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/api",
-  "version": "0.3.13",
+  "version": "0.4.0",
   "description": "Cloudhal HTTP API (Hono): sites, pages, entries, snapshots, auth — runs on Node and Cloudflare Workers",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",

@@ -1,5 +1,36 @@
 # @cloudhal/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- 7f88a5a: Studio: first-class collections (RFC-0040 step 3).
+  - **Sidebar:** lists every collection of the site, declared ones and those that agents or imports filled. Each shows its name in Studio's language, its icon and its entry count, followed by **Collections**.
+  - **Collections screen:** shows each collection's address, entry count and whether it is named. It has a **New collection** dialog with plural and singular name, key, icon and address, and the API checks the address for overlaps.
+  - **Collection list:** each collection gets the Articles list (`/collections/<key>`, where `/articles` now redirects). Category and tag columns and filters appear only where those taxonomies apply.
+  - **Collection settings:** names in every site language, icon, RSS feed, sitemap, default order, and which categories and tags apply.
+  - **Editor:** its breadcrumb leads back to the entry's own collection.
+  - **Elsewhere:** the comments queue, the language review options and the taxonomy dialog cover every collection.
+  - **Translations:** new strings in all 19 languages; every language except English is an AI draft awaiting review.
+
+### Patch Changes
+
+- f755ce6: `render_page` on Node: a Chrome that hangs or crashes on a cold start is launched once more with a fresh profile instead of failing the render.
+- f9062ce: Studio loads about 32 kB (gzip) less before the first screen: the notification panel's items, the agent-mode and elevation views and the taxonomy helpers now load when they are needed.
+- Updated dependencies [18a3960]
+- Updated dependencies [c287a09]
+- Updated dependencies [3c4453e]
+  - @cloudhal/mcp-server@0.4.0
+  - @cloudhal/core-contracts@0.4.0
+  - @cloudhal/core-ts@0.4.0
+  - @cloudhal/api@0.4.0
+  - @cloudhal/cloudflare@0.4.0
+  - @cloudhal/agent-runtime@0.4.0
+  - @cloudhal/analytics@0.4.0
+  - @cloudhal/comments@0.4.0
+  - @cloudhal/schedules@0.4.0
+  - @cloudhal/storage@0.4.0
+
 ## 0.3.13
 
 ### Patch Changes

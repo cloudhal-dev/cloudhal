@@ -1,5 +1,13 @@
 # @cloudhal/agent-runtime
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [c287a09]
+  - @cloudhal/core-contracts@0.4.0
+  - @cloudhal/storage@0.4.0
+
 ## 0.3.13
 
 ### Patch Changes
