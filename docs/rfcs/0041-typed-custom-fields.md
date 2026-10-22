@@ -1,6 +1,6 @@
 # RFC-0041: Typed custom fields per collection
 
-- Status: Draft
+- Status: Accepted (2026-10-23, by Halil; ADR-0043). Open questions decided as recommended.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-23
 - Related:
   - #71 stage 2; RFC-0040 / ADR-0042 ("Stage 2 (sketch, own RFC)").
@@ -410,7 +410,7 @@ Steps 4 and 5 can swap. Step 3 ships before step 4, so agents never meet a defin
 - **Limits:** 30 fields per collection, 200 per site, 256 KB of `collections`, 256 KB of values per entry, 50 options per select, 5,000 characters of text, 50,000 of rich text.
 - **Tenant isolation:** unchanged; everything is per site, and language editions copy values instead of reading across sites.
 
-## Open questions (recommended defaults)
+## Open questions (decided as recommended, 2026-10-23)
 
 1. **Discriminator name:** `type`, with rule 2 reworded to "a one-value enum discriminator, `kind` unless the domain says otherwise", recorded in the ADR. *Recommended.* The alternative, `kind`, is consistent with the rest of the repo but reads oddly for field types.
 2. **Localized fallback:** an empty localized field on a translation shows the original's value (flagged `fromOriginal`), and Studio shows it as a placeholder. *Recommended.* The alternative is to show nothing.

@@ -15,7 +15,7 @@ Contracts are JSON Schema 2020-12 files in `packages/core-contracts/schemas/`. B
 
 1. **Decide the version impact.** Adding an optional field is non-breaking. Removing/renaming a field, changing a type, or adding a required field is breaking → bump `SchemaVersion` enum in `common.schema.json` only with an accepted RFC (`write-rfc`), and keep the old version's fixtures.
 2. **Edit the schema.** Shared shapes go in `common.schema.json#/$defs`; root-specific helpers in that root's `$defs`. Stay inside the generator-safe subset:
-   - unions: `oneOf` + inline object variants + `"kind": {"type":"string","enum":["one"]}` + `required` includes `kind`
+   - unions: `oneOf` + inline object variants + a one-value enum discriminator, `"kind": {"type":"string","enum":["one"]}` unless the domain says otherwise (field definitions use `type`, ADR-0043), listed in `required`
    - no `default`, `$dynamicRef`, `unevaluatedProperties`, `dependentSchemas`, `if/then`
    - cross-file refs only `common.schema.json#/$defs/X` or `<root>.schema.json` (top level)
    - `additionalProperties: false` on objects; maps use `additionalProperties: {schema}`

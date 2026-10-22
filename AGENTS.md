@@ -44,7 +44,7 @@ pnpm i18n:export / pnpm i18n:import [--locale xx]  # translations as nested ICU 
 
 ## Hard rules
 1. **Never edit generated files.** Change the schema, run `pnpm gen`, commit both.
-2. **Schema subset** (so TS and Rust generators agree): discriminated unions = `oneOf` with inline variants and `kind: {"type":"string","enum":["x"]}`; no `default`; no `$dynamicRef`/`unevaluated*`/`dependentSchemas`; cross-file `$ref` only to `common.schema.json#/$defs/*` or another root schema's top level; `additionalProperties: false` on every object except declared maps.
+2. **Schema subset** (so TS and Rust generators agree): discriminated unions = `oneOf` with inline variants and a one-value enum discriminator, `kind: {"type":"string","enum":["x"]}` unless the domain says otherwise (field definitions use `type`, ADR-0043); no `default`; no `$dynamicRef`/`unevaluated*`/`dependentSchemas`; cross-file `$ref` only to `common.schema.json#/$defs/*` or another root schema's top level; `additionalProperties: false` on every object except declared maps.
 3. **Every root type** has `schemaVersion` (enum `[1]`); mutable nodes have `rev`. New fields are optional unless an RFC says otherwise.
 4. **No interactive DB transactions** anywhere (D1 has none); only atomic `batch()`. Composite writes guard later statements on the earlier CAS (match on the new content `hash`, not `rev + 1`).
 5. **Worker-safe imports:** code reachable from a Worker never imports Node-only modules at top level (`better-sqlite3`, `node:fs` helpers, `@cloudhal/core-contracts/bundle`, `@cloudhal/api/auth/node`). Use the package subpaths.
