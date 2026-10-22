@@ -10,6 +10,7 @@
  */
 
 import type { Asset, ImageRef } from "@cloudhal/core-contracts";
+import type { PermalinkSite } from "@cloudhal/core-ts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import type { IconSet } from "@cloudhal/core-ts/icons";
 import { assetUrl, formatBytes, MEDIA_TYPES, mediaPath } from "@cloudhal/core-ts/media";
@@ -45,6 +46,8 @@ export interface MediaContext {
     | undefined;
   /** RFC-0028 §4: the page's placeholder allowance, shared by every image it draws. */
   readonly budget?: PlaceholderBudget | undefined;
+  /** RFC-0038: the site's collection permalinks, for links to entries (`entryPath`). */
+  readonly permalinks?: PermalinkSite | undefined;
 }
 
 export interface ImageAttributeOptions {

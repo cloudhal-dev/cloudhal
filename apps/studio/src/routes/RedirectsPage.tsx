@@ -39,7 +39,7 @@ import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RedirectDialog } from "../components/RedirectDialog.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
-import { taxonomyKeys, useTaxonomyData } from "../components/Taxonomy.tsx";
+import { servedPathsInput, taxonomyKeys, useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
@@ -93,13 +93,7 @@ export function RedirectsPage() {
     list,
     (r, q, fold) => fold(r.from).includes(q) || fold(r.to).includes(q),
   );
-  const served = servedPaths({
-    pages: pages.data ?? [],
-    entries: entries.data ?? [],
-    defaultLocale: data.defaultLocale,
-    taxonomies: data.taxonomies.data ?? [],
-    terms: data.items.map((i) => i.term),
-  });
+  const served = servedPaths(servedPathsInput(data, pages.data, entries.data));
   const remove = useMutation({
     mutationFn: (r: Redirect) => api.redirects.remove(r),
     onSuccess: async (_x, r) => {

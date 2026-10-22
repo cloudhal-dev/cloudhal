@@ -342,7 +342,7 @@ export const comments: Hono<Env> = new Hono<Env>()
     ]);
     const entries = await commentEntries(
       c.get("store"),
-      site.id,
+      site,
       stats.busiest.map((b) => b.nodeId),
     );
     return c.json({
@@ -388,7 +388,7 @@ export const comments: Hono<Env> = new Hono<Env>()
       ).flat();
       const entries = await commentEntries(
         c.get("store"),
-        site.id,
+        site,
         found.map((x) => x.nodeId),
       );
       const own = new Set((await ownScope(c, "comments:moderate", entries.values())) ?? []);
@@ -406,7 +406,7 @@ export const comments: Hono<Env> = new Hono<Env>()
     if (!report) throw notFound("report not found");
     const comment = await d.store.get(site.id, report.commentId);
     const entry = comment
-      ? (await commentEntries(c.get("store"), site.id, [comment.nodeId])).get(comment.nodeId)
+      ? (await commentEntries(c.get("store"), site, [comment.nodeId])).get(comment.nodeId)
       : undefined;
     if (entry) await assertOwn(c, "comments:moderate", [entry]);
     const resolution = typeof b.resolution === "string" ? b.resolution : "";
@@ -690,7 +690,7 @@ export const comments: Hono<Env> = new Hono<Env>()
     const d = deps(c);
     const site = await requireSite(c);
     const nodeId = param(c, "nodeId");
-    const entry = (await commentEntries(c.get("store"), site.id, [nodeId])).get(nodeId);
+    const entry = (await commentEntries(c.get("store"), site, [nodeId])).get(nodeId);
     if (!entry) throw notFound("article not found");
     return c.json({
       thread: await threadView(d, site.id, nodeId, entry, c.get("now")()),
@@ -703,7 +703,7 @@ export const comments: Hono<Env> = new Hono<Env>()
     const actor = person(c);
     const b = await body(c);
     const nodeId = param(c, "nodeId");
-    const entry = (await commentEntries(c.get("store"), site.id, [nodeId])).get(nodeId);
+    const entry = (await commentEntries(c.get("store"), site, [nodeId])).get(nodeId);
     if (!entry) throw notFound("article not found");
     await assertOwn(c, "comments:moderate", [entry]);
     if (!Number.isInteger(b.rev)) throw badRequest("rev is required (0 before the first change)");

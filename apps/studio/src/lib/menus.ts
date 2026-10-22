@@ -29,7 +29,8 @@ import {
   type ResolvedMenuItem,
   walkMenu,
 } from "@cloudhal/core-ts/menu";
-import { termLabel } from "./taxonomy.ts";
+import { entryPath } from "@cloudhal/core-ts/permalinks";
+import { archivePath, termLabel } from "./taxonomy.ts";
 
 export type { MenuDelta, MenuHiddenReason, ResolvedMenu, ResolvedMenuItem };
 export { MENU_LIMITS, menuDelta, newMenuItemId };
@@ -418,7 +419,7 @@ export function hostOf(href: string): string | undefined {
 
 /** What Studio knows about the site to name targets and offer them. */
 export interface TargetData {
-  site: Pick<Site, "defaultLocale" | "locales">;
+  site: Pick<Site, "defaultLocale" | "locales" | "collections">;
   pages: readonly Page[];
   entries: readonly ContentEntry[];
   taxonomies: readonly Taxonomy[];
@@ -473,9 +474,6 @@ export function choiceOf(value: string): TargetChoice | undefined {
   return undefined;
 }
 
-const archivePathOf = (tax: Pick<Taxonomy, "archive">, slug: string) =>
-  `${tax.archive.basePath}/${slug}`;
-
 /** Every target the picker offers, grouped: pages, articles, each taxonomy, collections, other. */
 export function targetOptions(data: TargetData): TargetOption[] {
   const locale = data.site.defaultLocale;
@@ -496,7 +494,7 @@ export function targetOptions(data: TargetData): TargetOption[] {
       value: `contentEntry:${e.id}`,
       group: "articles" as const,
       label: e.title,
-      detail: `/${e.collection}/${e.slug}`,
+      detail: entryPath(data.site, e),
       ...(e.status !== "published" ? { status: e.status } : {}),
     }));
   const terms: TargetOption[] = [];
@@ -519,7 +517,7 @@ export function targetOptions(data: TargetData): TargetOption[] {
           group: "terms",
           taxonomy: tax.key,
           label: termLabel(t, locale, ...data.site.locales),
-          ...(tax.archive.enabled ? { detail: archivePathOf(tax, t.slug) } : {}),
+          ...(tax.archive.enabled ? { detail: archivePath(tax, t.slug) } : {}),
           ...(t.status === "proposed"
             ? { status: "proposed" }
             : t.visibility === "internal"
@@ -592,7 +590,7 @@ export function summarizeTarget(item: MenuItem, data: TargetData): TargetSummary
     case "contentEntry": {
       const e = data.entries.find((x) => x.id === item.entryId);
       return e
-        ? { kind: "contentEntry", where: `/${e.collection}/${e.slug}`, title: e.title }
+        ? { kind: "contentEntry", where: entryPath(data.site, e), title: e.title }
         : { kind: "contentEntry", missing: true };
     }
     case "term": {
@@ -603,7 +601,7 @@ export function summarizeTarget(item: MenuItem, data: TargetData): TargetSummary
             kind: "term",
             title: termLabel(t, data.site.defaultLocale),
             ...(tax ? { taxonomy: tax.key } : {}),
-            ...(tax?.archive.enabled ? { where: archivePathOf(tax, t.slug) } : {}),
+            ...(tax?.archive.enabled ? { where: archivePath(tax, t.slug) } : {}),
           }
         : { kind: "term", missing: true };
     }

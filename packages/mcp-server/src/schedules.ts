@@ -58,6 +58,7 @@ import {
   untrustedEffectiveScopes,
 } from "@cloudhal/schedules";
 import type { ReleaseRecord, SqlScheduleStore } from "@cloudhal/schedules/sql";
+import { titleOf } from "./release-titles.ts";
 
 /** What a deployment provides for schedules (RFC-0008 §16). */
 export interface SchedulesDeps {
@@ -518,32 +519,6 @@ export interface ReleaseView extends Release {
   };
 }
 
-function titleOf(node: unknown): { title: string | null; path: string | null } {
-  const n = node as {
-    title?: string;
-    path?: string;
-    name?: unknown;
-    key?: string;
-    from?: string;
-    to?: string;
-    filename?: string;
-    slug?: string;
-    collection?: string;
-  };
-  if (!n) return { title: null, path: null };
-  const name =
-    typeof n.name === "string"
-      ? n.name
-      : n.name && typeof n.name === "object"
-        ? (Object.values(n.name as Record<string, string>)[0] ?? null)
-        : null;
-  const title =
-    n.title ?? name ?? n.key ?? (n.from ? `${n.from} → ${n.to}` : null) ?? n.filename ?? null;
-  const path =
-    n.path ?? (n.collection && n.slug ? `/${n.collection}/${n.slug}` : null) ?? n.from ?? null;
-  return { title: title ? String(title).slice(0, 200) : null, path };
-}
-
 /** A release with its items' titles and paths, overlaps, locks and the request (§12 `get_release`). */
 export async function releaseView(
   deps: SchedulesDeps,
@@ -553,6 +528,7 @@ export async function releaseView(
 ): Promise<ReleaseView> {
   const r = record.release;
   const overlaps = await deps.store.overlaps(r.siteId);
+  const site = await graph.getSite(r.siteId);
   // What the dependency closure added (§6.1 step 2): new nodes another item's target references.
   const referenced = new Set(record.items.flatMap((p) => (p.item.kind === "set" ? p.deps : [])));
   const closure = new Set(
@@ -569,7 +545,7 @@ export async function releaseView(
       nodeId: i.nodeId,
       nodeKind: i.nodeKind,
       kind: i.kind,
-      ...titleOf(node),
+      ...titleOf(site, node),
       pinnedRev: i.kind === "set" ? i.target.rev : null,
       liveRev: i.base?.rev ?? null,
       closure: closure.has(i.nodeId),

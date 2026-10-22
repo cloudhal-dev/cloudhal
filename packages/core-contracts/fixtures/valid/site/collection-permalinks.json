@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9CP",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Minimal",
+  "slug": "minimal",
+  "defaultLocale": "en",
+  "locales": ["en"],
+  "domains": [],
+  "pageIds": [],
+  "theme": {
+    "name": "blog"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-07T20:00:00Z",
+  "updatedAt": "2026-10-07T20:00:00Z",
+  "collections": {
+    "posts": {
+      "permalink": "/blog/{slug}"
+    },
+    "guides": {
+      "permalink": "/docs/guides/{slug}"
+    },
+    "news": {}
+  }
+}

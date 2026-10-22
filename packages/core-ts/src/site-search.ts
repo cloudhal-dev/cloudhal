@@ -16,6 +16,7 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import { foldName, termName } from "./names.ts";
+import { entryPath, type PermalinkSite } from "./permalinks.ts";
 import { SEARCH_QUERY_MAX, SEARCH_TERMS_MAX } from "./search-common.ts";
 
 export type SiteSearchKind = "entry" | "page" | "term" | "asset" | "menu" | "redirect";
@@ -117,16 +118,21 @@ function menuItems(menu: Menu): Candidate[] {
   return out;
 }
 
-type Reader = (src: SiteSearchSource, siteId: string, query: string) => Promise<Candidate[]>;
+type Reader = (
+  src: SiteSearchSource,
+  siteId: string,
+  query: string,
+  site: PermalinkSite | undefined,
+) => Promise<Candidate[]>;
 
 /** Where each kind's candidates come from (a dispatch table, one reader per kind). */
 const READERS: Record<SiteSearchKind, Reader> = {
-  entry: async (src, siteId) =>
+  entry: async (src, siteId, _query, site) =>
     (await src.listContentEntries(siteId)).map((e) => ({
       kind: "entry",
       id: e.id,
       title: e.title,
-      detail: `/${e.collection}/${e.slug}`,
+      detail: entryPath(site, e),
       context: e.collection,
       status: e.status,
       locale: e.locale,
@@ -195,7 +201,12 @@ export async function searchSiteNodes(
   src: SiteSearchSource,
   siteId: string,
   query: string,
-  options: { kinds?: readonly SiteSearchKind[]; limit?: number } = {},
+  options: {
+    kinds?: readonly SiteSearchKind[];
+    limit?: number;
+    /** The site's collection permalinks (RFC-0038), for entries' paths. */
+    site?: PermalinkSite;
+  } = {},
 ): Promise<SiteSearchResult> {
   const q = query.slice(0, SEARCH_QUERY_MAX).trim();
   const words = siteSearchWords(q);
@@ -204,7 +215,7 @@ export async function searchSiteNodes(
   const wanted = SITE_SEARCH_KINDS.filter((k) => !options.kinds || options.kinds.includes(k));
   const groups = await Promise.all(
     wanted.map(async (kind) => {
-      const candidates = await READERS[kind](src, siteId, q);
+      const candidates = await READERS[kind](src, siteId, q, options.site);
       return candidates
         .map((c) => ({
           c,

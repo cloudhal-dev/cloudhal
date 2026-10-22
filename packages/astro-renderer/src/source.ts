@@ -255,6 +255,7 @@ export class LiveSource implements GraphSource {
     const rows = searchDocuments({
       locales: [locale],
       defaultLocale: site.defaultLocale,
+      site,
       entries,
       pages: pages.filter((p) => p.locale === locale),
       taxonomies,

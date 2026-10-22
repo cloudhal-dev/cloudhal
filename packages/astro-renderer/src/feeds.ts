@@ -4,11 +4,11 @@
  * published only, noindex respected, canonical elsewhere excluded — live in one tested place.
  */
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts";
 import type { ArchiveSummary, ArchiveView } from "./archive.ts";
 import { markdownText, renderBody } from "./markdown.ts";
 import type { AssetIndex } from "./media.ts";
 import { notFoundPageIds } from "./not-found.ts";
-import { entryPath } from "./routing.ts";
 import { absoluteUrl } from "./seo.ts";
 import { entryTaxonomy, type TaxonomyIndex } from "./taxonomy.ts";
 
@@ -75,7 +75,7 @@ export function rssXml(options: FeedOptions): string {
   const items = published(options.entries)
     .slice(0, FEED_LIMIT)
     .map((e) => {
-      const url = `${base}${entryPath(e)}`;
+      const url = `${base}${entryPath(site, e)}`;
       const date = new Date(e.publishedAt ?? e.createdAt).toUTCString();
       const cover = e.coverImage?.assetId ? options.assets?.get(e.coverImage.assetId) : undefined;
       const image = cover
@@ -181,7 +181,7 @@ export function sitemapUrls(
     urls.push({ loc: own, lastmod: page.updatedAt });
   }
   for (const entry of published(entries)) {
-    const path = entryPath(entry);
+    const path = entryPath(site, entry);
     if (entry.locale !== site.defaultLocale || seen.has(path)) continue;
     seen.add(path);
     urls.push({ loc: `${origin}${path}`, lastmod: entry.updatedAt });

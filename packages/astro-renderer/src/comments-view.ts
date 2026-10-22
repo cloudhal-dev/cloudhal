@@ -35,10 +35,10 @@ import {
   withoutScriptAllowed,
 } from "@cloudhal/comments";
 import type { ContentEntry } from "@cloudhal/core-contracts";
+import { entryPath, type PermalinkSite } from "@cloudhal/core-ts";
 import { addCacheTags, commentsCacheTag } from "./cache-tags.ts";
 import { turnstileCsp } from "./csp.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
-import { entryPath } from "./routing.ts";
 
 export { type CommentStrings, commentStrings, commentsHtml } from "./comments-html.ts";
 
@@ -107,7 +107,12 @@ export async function loadComments(
   config: CloudhalRendererConfig,
   astro: CommentsAstro,
   entry: ContentEntry,
-  options: { readonly locale?: string; readonly now?: Date } = {},
+  options: {
+    readonly locale?: string;
+    readonly now?: Date;
+    /** The site's collection permalinks (RFC-0038), for the entry's path. */
+    readonly site?: PermalinkSite;
+  } = {},
 ): Promise<CommentsView | undefined> {
   const backend = await commentsBackend(config);
   if (!backend) return undefined;
@@ -115,7 +120,7 @@ export async function loadComments(
   addCacheTags(headers, [commentsCacheTag(entry.id)]);
   const base = {
     nodeId: entry.id,
-    path: entryPath(entry),
+    path: entryPath(options.site, entry),
     locale: options.locale ?? entry.locale,
     ...(config.commentsScript ? { script: config.commentsScript } : {}),
   };

@@ -1,4 +1,5 @@
 import type { ContentEntry, Page, Redirect, Taxonomy, Term } from "@cloudhal/core-contracts";
+import { entryPath, type PermalinkSite } from "@cloudhal/core-ts/permalinks";
 
 /**
  * Manual redirects in Studio (RFC-0002 invariant 14). The patterns are the contract's
@@ -53,11 +54,13 @@ export function servedPaths(input: {
   defaultLocale: string;
   taxonomies: readonly Pick<Taxonomy, "id" | "archive">[];
   terms: readonly Pick<Term, "taxonomyId" | "slug" | "status" | "visibility">[];
+  /** The site's collection permalinks (RFC-0038), for articles' paths. */
+  site?: PermalinkSite | undefined;
 }): Set<string> {
   const out = new Set(input.pages.map((p) => p.path));
   for (const e of input.entries)
     if (e.status === "published" && e.locale === input.defaultLocale)
-      out.add(`/${e.collection}/${e.slug}`);
+      out.add(entryPath(input.site, e));
   for (const tax of input.taxonomies) {
     if (!tax.archive.enabled) continue;
     for (const term of input.terms)

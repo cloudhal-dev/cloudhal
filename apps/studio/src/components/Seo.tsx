@@ -1,4 +1,5 @@
 import type { ContentEntry, Page } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts/permalinks";
 import {
   Badge,
   Banner,
@@ -34,6 +35,7 @@ import {
   truncateForSearch,
 } from "../lib/seo.ts";
 import { setOptional } from "../lib/util.ts";
+import { useSitePermalinks } from "./EntryPath.tsx";
 import { ImageRefField } from "./MediaPicker.tsx";
 import { SettingRow } from "./Settings.tsx";
 
@@ -190,7 +192,8 @@ export function ArticleSeoPreviewCard({
   const title = entry.title.trim() || t("articles.untitled");
   const summary = entry.summary?.trim() ?? "";
   const description = summary ? truncateForSearch(summary).text : t("seo.preview.noSummary");
-  const path = `/${entry.collection}/${entry.slug}`;
+  const site = useSitePermalinks(entry.siteId);
+  const path = entryPath(site, entry);
   const cover = entry.coverImage;
   const coverUrl = cover ? imageRefPreviewUrl(entry.siteId, cover, host) : undefined;
   const titleState = titleStatus(entry.title);

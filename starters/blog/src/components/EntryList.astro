@@ -41,7 +41,7 @@ const cover = (e: ContentEntry) => {
           <img class="ch-card-entry__cover" src={img.src} srcset={img.srcset} sizes={img.sizes} alt="" width={img.width || undefined} height={img.height || undefined} loading="lazy" decoding="async" />
         )}
         <div class="ch-card-entry__body">
-          <a href={entryPath(e)}>{e.title}</a>
+          <a href={entryPath(media?.permalinks, e)}>{e.title}</a>
           {e.summary && <p>{e.summary}</p>}
           <span class="ch-card-entry__meta">
             {e.publishedAt && <time datetime={e.publishedAt}>{date(e.publishedAt)}</time>}

@@ -4,6 +4,7 @@
  * out. Worker-safe.
  */
 import type { ContentEntry, SurfaceSection } from "@cloudhal/core-contracts";
+import { entryPath, type PermalinkSite } from "@cloudhal/core-ts";
 import type { BlockRegistry } from "@cloudhal/core-ts/blocks";
 import {
   type Catalog,
@@ -69,10 +70,13 @@ export interface SurfaceEntryCard {
   collection: string;
 }
 
-export function surfaceEntryCard(e: ContentEntry): SurfaceEntryCard {
+export function surfaceEntryCard(
+  site: PermalinkSite | undefined,
+  e: ContentEntry,
+): SurfaceEntryCard {
   return {
     id: e.id,
-    href: `/${e.collection}/${e.slug}`,
+    href: entryPath(site, e),
     title: e.title,
     collection: e.collection,
     ...(e.summary ? { summary: e.summary } : {}),
@@ -104,6 +108,7 @@ export function surfaceSources(
 export function pickEntries(
   entries: readonly ContentEntry[],
   q: { sort: string; limit: number },
+  site?: PermalinkSite,
 ): SurfaceEntryCard[] {
   const at = (e: ContentEntry) => e.publishedAt ?? e.createdAt;
   // The page's source already holds only what this response may show (published, or the draft
@@ -117,7 +122,7 @@ export function pickEntries(
           : at(b).localeCompare(at(a)),
     )
     .slice(0, q.limit)
-    .map(surfaceEntryCard);
+    .map((e) => surfaceEntryCard(site, e));
 }
 
 export interface SurfaceContext {
@@ -290,6 +295,7 @@ export function surfaceTree(section: SurfaceSection, ctx: SurfaceContext = {}): 
 
 /** What a page's source offers for entry sources (`GraphSource`). */
 export interface SurfaceEntrySource {
+  site(): Promise<PermalinkSite>;
   entries(collection: string): Promise<ContentEntry[]>;
   entriesByFilter(filter: string): Promise<ContentEntry[]>;
 }
@@ -303,6 +309,7 @@ export async function loadSurfaceSources(
   sections: readonly { kind: string }[],
 ): Promise<Record<string, Record<string, SurfaceEntryCard[]>>> {
   const out: Record<string, Record<string, SurfaceEntryCard[]>> = {};
+  const site = sections.some((s) => s.kind === "surface") ? await source.site() : undefined;
   for (const s of sections) {
     if (s.kind !== "surface") continue;
     const section = s as SurfaceSection;
@@ -313,7 +320,7 @@ export async function loadSurfaceSources(
             .entriesByFilter(`collection:${q.collection}+${q.filter}`)
             .catch(() => [] as ContentEntry[])
         : await source.entries(q.collection);
-      loaded[q.key] = pickEntries(list, q);
+      loaded[q.key] = pickEntries(list, q, site);
     }
     out[section.id] = loaded;
   }

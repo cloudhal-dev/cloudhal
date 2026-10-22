@@ -31,6 +31,7 @@ import {
   TERM_LIMITS,
   validateSlug,
 } from "../lib/taxonomy.ts";
+import { EntryPath } from "./EntryPath.tsx";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 import { Status } from "./Status.tsx";
 import { invalidateTaxonomy, type TaxonomyData } from "./Taxonomy.tsx";
@@ -436,9 +437,7 @@ function PreviewSection({
                     <Text as="span" truncate>
                       {e.title || t("articles.untitled")}
                     </Text>
-                    <Text variant="mono-secondary" as="span" truncate>
-                      /{e.collection}/{e.slug}
-                    </Text>
+                    <EntryPath entry={e} truncate />
                   </span>
                   <Status status={e.status} />
                 </div>

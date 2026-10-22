@@ -14,7 +14,7 @@
 
 import { holds } from "@cloudhal/agent-runtime";
 import type { Actor, Asset, Site } from "@cloudhal/core-contracts";
-import { InvariantError, termName, type UploadTicket } from "@cloudhal/core-ts";
+import { entryPath, InvariantError, termName, type UploadTicket } from "@cloudhal/core-ts";
 import {
   assetUrl,
   formatBytes,
@@ -355,7 +355,7 @@ function assetName(asset: Asset, locale: string): string {
 }
 
 /** Where an asset is used, with each node's title and path (Studio's "Used by" list). */
-async function usesOf(c: Context<Env>, asset: Asset, locale: string): Promise<AssetUse[]> {
+async function usesOf(c: Context<Env>, asset: Asset, site: Site): Promise<AssetUse[]> {
   const store = c.get("store");
   const usage = (await store.assetUsage(asset.siteId, [asset.id])).get(asset.id);
   const out: AssetUse[] = [];
@@ -366,7 +366,7 @@ async function usesOf(c: Context<Env>, asset: Asset, locale: string): Promise<As
       if (e)
         Object.assign(use, {
           title: e.title,
-          path: `/${e.collection}/${e.slug}`,
+          path: entryPath(site, e),
           status: e.status,
         });
     } else if (ref.nodeKind === "page") {
@@ -374,7 +374,7 @@ async function usesOf(c: Context<Env>, asset: Asset, locale: string): Promise<As
       if (p) Object.assign(use, { title: p.title, path: p.path, status: p.status });
     } else if (ref.nodeKind === "term") {
       const t = await store.getTerm(ref.nodeId);
-      if (t) Object.assign(use, { title: termName(t, locale), status: t.status });
+      if (t) Object.assign(use, { title: termName(t, site.defaultLocale), status: t.status });
     } else if (ref.nodeKind === "site") {
       // RFC-0025: the brand's logo, on every page.
       const s = await store.getSite(ref.nodeId);
@@ -616,7 +616,7 @@ export const assets: Hono<Env> = new Hono<Env>()
     const store = c.get("store");
     const site = await requireSite(c);
     const asset = await loadAsset(c);
-    const uses = await usesOf(c, asset, site.defaultLocale);
+    const uses = await usesOf(c, asset, site);
     const blob =
       asset.storage.kind === "blob" ? await store.blobState(site.id, asset.sha256) : undefined;
     const detail: AssetDetail = {
@@ -785,7 +785,7 @@ export const assets: Hono<Env> = new Hono<Env>()
       await c.get("store").deleteAsset({ ...asset, rev });
     } catch (e) {
       if (e instanceof InvariantError && e.code === "in_use") {
-        const uses = await usesOf(c, asset, site.defaultLocale);
+        const uses = await usesOf(c, asset, site);
         throw apiError(409, "in_use", e.message, { uses });
       }
       throw e;

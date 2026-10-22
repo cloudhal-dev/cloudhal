@@ -48,6 +48,7 @@ export {
 } from "./media-import.ts";
 export * from "./menu.ts";
 export * from "./names.ts";
+export * from "./permalinks.ts";
 export * from "./preview-token.ts";
 export * from "./proposals.ts";
 export {

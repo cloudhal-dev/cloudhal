@@ -1,4 +1,5 @@
 import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
+import { collectionPermalink, permalinkPrefix } from "@cloudhal/core-ts/permalinks";
 import {
   ApprovalDialog,
   Button,
@@ -43,6 +44,7 @@ import {
   ScheduleAside,
   ScheduleLock,
 } from "../components/EditorSchedule.tsx";
+import { EntryPath } from "../components/EntryPath.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
@@ -278,9 +280,7 @@ export function ArticleEditorPage() {
       description={
         <span className="flex flex-wrap items-center gap-2">
           <Status status={draft.status} />
-          <Text variant="mono-secondary" as="span">
-            /{draft.collection}/{draft.slug}
-          </Text>
+          <EntryPath siteId={siteId} entry={draft} />
         </span>
       }
       actions={
@@ -405,7 +405,9 @@ export function ArticleEditorPage() {
                 }
               >
                 <InputGroup className="w-full">
-                  <InputGroup.Addon>/{draft.collection}/</InputGroup.Addon>
+                  <InputGroup.Addon>
+                    {permalinkPrefix(collectionPermalink(site.data, draft.collection))}/
+                  </InputGroup.Addon>
                   <InputGroup.Input
                     aria-label={t("editor.slug")}
                     value={draft.slug}

@@ -7,7 +7,7 @@
  * links to the same locale. Worker-safe.
  */
 import type { ContentEntry, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
-import { termSlug } from "@cloudhal/core-ts";
+import { entryPath, type PermalinkSite, termSlug } from "@cloudhal/core-ts";
 import type { HeadMeta } from "./seo.ts";
 import type { GraphSource } from "./source.ts";
 
@@ -114,7 +114,7 @@ export interface Alternate {
 }
 
 type Localized = Page | ContentEntry;
-const pathOf = (n: Localized) => ("path" in n ? n.path : `/${n.collection}/${n.slug}`);
+const pathOf = (site: PermalinkSite, n: Localized) => ("path" in n ? n.path : entryPath(site, n));
 
 /** The visible members of `group` in this source (pages, or entries in the site's locales). */
 async function groupMembers(
@@ -159,7 +159,7 @@ export async function alternatesFor(
   );
   const out: Alternate[] = own.map((m) => ({
     locale: m.locale,
-    href: localeUrl(site, m.locale, pathOf(m), origin),
+    href: localeUrl(site, m.locale, pathOf(site, m), origin),
     current: m.id === node.id,
     ...(m.id === group ? { original: true } : {}),
   }));
@@ -169,7 +169,7 @@ export async function alternatesFor(
       if (peerSite.locales.includes(m.locale) && !out.some((a) => a.locale === m.locale))
         out.push({
           locale: m.locale,
-          href: localeUrl(peerSite, m.locale, pathOf(m), peer.origin),
+          href: localeUrl(peerSite, m.locale, pathOf(peerSite, m), peer.origin),
           current: false,
           ...(m.id === group ? { original: true } : {}),
         });
@@ -222,7 +222,7 @@ export async function linkLocalizer(
   const map = new Map<string, string>();
   for (const n of [...pages.filter((p) => p.locale === def), ...entries]) {
     const twin = byGroup.get(`${"path" in n ? "p" : "e"}:${n.translation?.group ?? n.id}`);
-    map.set(pathOf(n), twin ? here(pathOf(twin)) : home(pathOf(n)));
+    map.set(pathOf(site, n), twin ? here(pathOf(site, twin)) : home(pathOf(site, n)));
   }
   const archive = archiveLocalizer(taxonomies, terms, locale, def);
   return (path) => map.get(path) ?? (archive(path) ? here(archive(path) as string) : here(path));

@@ -1,11 +1,11 @@
 {
   "$comment": "Oversized files and functions as of their last tightening. Entries may only shrink: run `node scripts/size-check.ts --update` after a refactor. See docs/engineering/code-structure.md.",
   "files": {
-    "apps/studio/src/components/AnalyticsSections.tsx": 1350,
+    "apps/studio/src/components/AnalyticsSections.tsx": 1323,
     "apps/studio/src/components/CommentSettings.tsx": 837,
-    "apps/studio/src/lib/menus.ts": 831,
+    "apps/studio/src/lib/menus.ts": 829,
     "apps/studio/src/routes/AssetPage.tsx": 855,
-    "apps/studio/src/routes/CommentThreadPage.tsx": 814,
+    "apps/studio/src/routes/CommentThreadPage.tsx": 813,
     "apps/studio/src/routes/NavigationPage.tsx": 1171,
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
     "apps/studio/src/routes/SiteSettingsPage.tsx": 881,
@@ -26,7 +26,7 @@
     "packages/core-ts/src/taxonomy.ts": 1723,
     "packages/mcp-server/src/menu-tools.ts": 1058,
     "packages/mcp-server/src/schedule-tools.ts": 1596,
-    "packages/mcp-server/src/schedules.ts": 890,
+    "packages/mcp-server/src/schedules.ts": 866,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
     "packages/schedules/src/recurrence.ts": 939,
     "packages/schedules/src/scheduler.ts": 1343,
@@ -100,7 +100,7 @@
       "lines": 273
     },
     "apps/studio/src/components/GovernanceDialog.tsx::PreviewSection": {
-      "lines": 167
+      "lines": 165
     },
     "apps/studio/src/components/InviteDialog.tsx::InviteDialog": {
       "lines": 229
@@ -217,7 +217,7 @@
       "lines": 156
     },
     "apps/studio/src/routes/CommentThreadPage.tsx::CommentThreadPage": {
-      "lines": 427
+      "lines": 425
     },
     "apps/studio/src/routes/InvitePage.tsx::InvitePage": {
       "lines": 252
@@ -235,7 +235,7 @@
       "lines": 1042
     },
     "apps/studio/src/routes/RedirectsPage.tsx::RedirectsPage": {
-      "lines": 296
+      "lines": 290
     },
     "apps/studio/src/routes/ReleasePage.tsx::ReleasePage": {
       "lines": 505

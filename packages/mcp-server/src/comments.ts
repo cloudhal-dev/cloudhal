@@ -8,7 +8,6 @@
  * for them (invariant C1), and commenter data stays in the person-only REST routes.
  */
 import { type OwnershipResolver, ownsEntry } from "@cloudhal/agent-runtime";
-import { entryPath } from "@cloudhal/astro-renderer/routing";
 import {
   type CommentKeys,
   type CommentReport,
@@ -20,8 +19,8 @@ import {
   threadState,
 } from "@cloudhal/comments";
 import type { SqlCommentStore } from "@cloudhal/comments/sql";
-import type { Actor, Comment, ContentEntry } from "@cloudhal/core-contracts";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import type { Actor, Comment, ContentEntry, Site } from "@cloudhal/core-contracts";
+import { entryPath, type PermalinkSite, type SiteGraphStore } from "@cloudhal/core-ts";
 
 /** What a deployment provides for reader comments (RFC-0007 §15.3). */
 export interface CommentsDeps {
@@ -69,11 +68,11 @@ export interface CommentEntry {
 
 const ENTRY_GETS = 20;
 
-export function toCommentEntry(e: ContentEntry): CommentEntry {
+export function toCommentEntry(site: PermalinkSite | undefined, e: ContentEntry): CommentEntry {
   return {
     nodeId: e.id,
     title: e.title,
-    path: entryPath(e),
+    path: entryPath(site, e),
     collection: e.collection,
     status: e.status,
     publishedAt: e.publishedAt ?? null,
@@ -81,20 +80,26 @@ export function toCommentEntry(e: ContentEntry): CommentEntry {
   };
 }
 
-/** The entries of `nodeIds` on `siteId` (unknown ids are left out). */
+/**
+ * The entries of `nodeIds` on the site (unknown ids are left out). Pass the site when the caller
+ * has it; with only its id, it is read for the entries' paths (RFC-0038).
+ */
 export async function commentEntries(
   graph: SiteGraphStore,
-  siteId: string,
+  site: string | Site,
   nodeIds: Iterable<string>,
 ): Promise<Map<string, CommentEntry>> {
   const ids = [...new Set(nodeIds)];
   const out = new Map<string, CommentEntry>();
   if (ids.length === 0) return out;
-  const found =
+  const siteId = typeof site === "string" ? site : site.id;
+  const [found, permalinks] = await Promise.all([
     ids.length <= ENTRY_GETS
-      ? await Promise.all(ids.map((id) => graph.getContentEntry(id)))
-      : (await graph.listContentEntries(siteId)).filter((e) => ids.includes(e.id));
-  for (const e of found) if (e && e.siteId === siteId) out.set(e.id, toCommentEntry(e));
+      ? Promise.all(ids.map((id) => graph.getContentEntry(id)))
+      : graph.listContentEntries(siteId).then((all) => all.filter((e) => ids.includes(e.id))),
+    typeof site === "string" ? graph.getSite(site) : site,
+  ]);
+  for (const e of found) if (e && e.siteId === siteId) out.set(e.id, toCommentEntry(permalinks, e));
   return out;
 }
 

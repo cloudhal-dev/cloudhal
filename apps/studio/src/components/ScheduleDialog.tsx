@@ -6,6 +6,7 @@
  * it waits in Approvals; what the items need that is not live yet joins them (the closure).
  */
 import type { PublishStatus } from "@cloudhal/core-contracts";
+import { entryPath } from "@cloudhal/core-ts/permalinks";
 import {
   Banner,
   Combobox,
@@ -132,7 +133,7 @@ export function ScheduleDialog({
       value: e.id,
       label: e.title || e.slug,
       kind: "contentEntry" as const,
-      detail: `/${e.collection}/${e.slug}`,
+      detail: entryPath(zone.site, e),
     })),
     ...(pages.data ?? []).map((p) => ({
       value: p.id,

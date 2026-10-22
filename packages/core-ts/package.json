@@ -18,6 +18,7 @@
     "./local": "./src/local.ts",
     "./filter": "./src/filter.ts",
     "./names": "./src/names.ts",
+    "./permalinks": "./src/permalinks.ts",
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
     "./cache-tags": "./src/cache-tags.ts",
@@ -93,6 +94,10 @@
       "./names": {
         "types": "./dist/src/names.d.ts",
         "default": "./dist/src/names.js"
+      },
+      "./permalinks": {
+        "types": "./dist/src/permalinks.d.ts",
+        "default": "./dist/src/permalinks.js"
       },
       "./taxonomy-report": {
         "types": "./dist/src/taxonomy-report.d.ts",

@@ -14,7 +14,7 @@ import {
   rangeFromParams,
 } from "@cloudhal/analytics/service";
 import { SqlAnalytics } from "@cloudhal/analytics/sql";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import { entryPath, type SiteGraphStore } from "@cloudhal/core-ts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { SqlDriver } from "@cloudhal/storage";
 import {
@@ -247,7 +247,8 @@ export interface SeedCliOptions {
 
 /** The site's published pages, articles and public archives, most important first. */
 async function publishedNodes(store: SiteGraphStore, siteId: string): Promise<DemoNode[]> {
-  const [pages, entries, terms, taxonomies] = await Promise.all([
+  const [site, pages, entries, terms, taxonomies] = await Promise.all([
+    store.getSite(siteId),
     store.listPages(siteId),
     store.listContentEntries(siteId, { status: ["published"] }),
     store.listTerms(siteId),
@@ -265,7 +266,7 @@ async function publishedNodes(store: SiteGraphStore, siteId: string): Promise<De
     ...entries.map((e) => ({
       nodeId: e.id,
       nodeKind: "entry" as const,
-      path: `/${e.collection}/${e.slug}`,
+      path: entryPath(site, e),
       locale: e.locale,
     })),
     ...pages

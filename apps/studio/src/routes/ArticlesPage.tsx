@@ -31,6 +31,7 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
+import { EntryPath } from "../components/EntryPath.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import {
@@ -352,9 +353,7 @@ function ArticleRow({
                 {e.title}
               </Text>
             </Link>
-            <Text variant="mono-secondary" as="span" truncate>
-              /{e.collection}/{e.slug}
-            </Text>
+            <EntryPath siteId={siteId} entry={e} truncate />
           </div>
         </div>
       </Table.Cell>

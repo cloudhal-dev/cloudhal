@@ -1,0 +1,25 @@
+{
+  "reason": "version 1 permalinks have only the {slug} token",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T2",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Minimal",
+    "slug": "minimal",
+    "defaultLocale": "en",
+    "locales": ["en"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-10-07T20:00:00Z",
+    "updatedAt": "2026-10-07T20:00:00Z",
+    "collections": {
+      "posts": {
+        "permalink": "/{year}/{slug}"
+      }
+    }
+  }
+}
