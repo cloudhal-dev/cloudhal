@@ -241,8 +241,9 @@ describe("the hourly comments job (§8.5, §9.3)", () => {
       T0.toISOString(),
     ]);
 
-    // the snapshots carry the real time: 40 days after T0 the deletion is due
-    const now = new Date(T0.getTime() + 40 * 86_400_000);
+    // the snapshots carry the real time, so the deletion is due 40 days after the later of T0 and
+    // now (a fixed T0 alone stopped being 30 days past the snapshot once the calendar caught up)
+    const now = new Date(Math.max(T0.getTime(), Date.now()) + 40 * 86_400_000);
     const r = await runCommentsHourly({ graph, store, now });
     expect(r.sites).toBe(1);
     expect(await store.get(siteId, old)).toBeNull();
