@@ -77,7 +77,7 @@ Studio shows this text in Site settings › Analytics › "Privacy notice for yo
 >
 > Tekil ziyaretçileri saymak için IP adresin ve tarayıcı bilgilerin her 24 saatte bir silinen rastgele bir değerle birleştirilir ve yalnızca sonuç saklanır; bu sonuç sana kadar geri izlenemez ve günler arasında eşleştirilemez. Tarayıcın Global Privacy Control ya da Do Not Track sinyali gönderirse ziyareti sayarız ama bu adımı atlarız.
 
-The source of these strings is `apps/studio/src/i18n/en.ts` and `tr.ts` (`analyticsSettings.notice`). If they change there, change them here too.
+The source of these strings is `apps/studio/src/i18n/lazy/analyticsSettings.en.ts` and `analyticsSettings.tr.ts` (`analyticsSettings.notice`). If they change there, change them here too.
 
 ## Requests from visitors
 In the default mode nothing is stored about a person, so there is nothing to export or delete per person. In the unique-visitors mode, the stored hash cannot be recomputed once its day's random value is deleted, so it cannot be matched to a request either. Site-level daily totals can be exported as CSV (`cloudhal analytics export`).

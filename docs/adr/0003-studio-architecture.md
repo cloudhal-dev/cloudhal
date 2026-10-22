@@ -20,3 +20,11 @@ The initial plan proposed Astro + React islands for Studio with Kumo UI. Verifie
 - Positive: one React root, providers everywhere, Kumo's registry feeds the `studio-ui` skill.
 - Negative: Kumo 2.x deprecates things weekly; the barrel is mandatory to contain churn.
 - Risks: Kumo stalls → swap to shadcn behind the barrel; Base UI package rename already happened once (`@base-ui-components/react` is frozen; use `@base-ui/react`).
+
+## Addendum (2026-10-22): the Cloudhal blocks as built
+Of the blocks named in the Decision, `SnapshotTimeline` and `ApprovalDialog` are in `packages/ui/src/blocks`. The others were not built under those names:
+- **DiffViewer:** body changes use the `BodyDiff` block; snapshot diffs are Studio's `SnapshotDiffDialog` (`apps/studio/src/components`).
+- **PolicyBadge:** mode and scope badges are Studio components (`ModeBadge` in `AgentModes.tsx`, `ScopeBadge.tsx`); audit decisions use the `AuditBadges` block.
+- **AgentRunPanel:** agent work is shown by `BuildActivity` and `BuildChatLog` (Build chat) and `ScheduleRunRow` (automation runs).
+
+The current block list is `packages/ui/src/blocks`, and the rules for adding one are in [DESIGN.md](../design/DESIGN.md). The docs site is `apps/docs` (Astro Starlight, [ADR-0039](0039-cloudhal-dev-docs-site.md)), not `apps/site`.

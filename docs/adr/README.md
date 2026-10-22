@@ -22,7 +22,7 @@ One file per decision, numbered, immutable once accepted (write a new ADR to sup
 | [0003](0003-studio-architecture.md) | Studio is a Vite React SPA on Kumo; Astro only renders sites |
 | [0004](0004-mcp-server.md) | Stateless MCP server (spec 2026-07-28), layered approval |
 | [0005](0005-skills-format.md) | Skills follow the Agent Skills spec; Cloudhal data in metadata |
-| [0006](0006-toolchain-and-runtime.md) | Node-first toolchain and runtime; Bun supported, not primary |
+| [0006](0006-toolchain-and-runtime.md) | Node-first toolchain and runtime (the planned Bun support was not built; addendum) |
 | [0007](0007-license-and-community.md) | Apache-2.0 open core, DCO, Contributor Covenant 3.0 |
 | [0008](0008-runtime-validation-and-d1-testing.md) | Precompiled schema validators; D1 tested through Miniflare |
 | [0009](0009-renderer-sources-and-local-dev.md) | Renderer: live in dev, snapshot in builds; starters own routes |

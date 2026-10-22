@@ -33,7 +33,7 @@ Or put a blog on your Cloudflare account in one click, with nothing installed:
 
 The button copies [cloudhal-template](https://github.com/cloudhal-dev/cloudhal-template) into your GitHub account and runs `cloudhal deploy` in Workers Builds. You get the site Worker, the admin Worker (Studio, API, MCP), one D1 database, one R2 bucket and a starter blog; every push redeploys. See the [deploy button guide](docs/guides/deploy-button.md).
 
-Ask your agent: *"Write a launch post about our new product, show me a preview, then publish it."* It writes through 20 semantic MCP tools. Every change is snapshotted. It previews, and the publish waits for your approval.
+Ask your agent: *"Write a launch post about our new product, show me a preview, then publish it."* It writes through Cloudhal's MCP tools (over 100, [full list](packages/mcp-server/README.md#tool-reference)). Every change is snapshotted. It previews, and the publish waits for your approval.
 
 ```bash
 npx cloudhal deploy                         # Cloudflare Workers + D1 + R2 with your wrangler login
@@ -63,7 +63,7 @@ An agent can ask for a more autonomous mode for a while. You grant it in Studio,
 ```bash
 git clone https://github.com/cloudhal-dev/cloudhal && cd cloudhal
 pnpm install
-pnpm check                      # biome + typecheck + vitest (incl. an init→dev→build e2e)
+pnpm check                      # biome lint, size check, generated-file checks, typecheck, vitest (incl. an init→dev→build e2e)
 cargo test --workspace          # Rust contract tests
 node packages/cli/bin/cloudhal.ts init examples/my-site --name "My Site"
 cd examples/my-site && pnpm install && node ../../packages/cli/bin/cloudhal.ts dev      # site preview
@@ -82,25 +82,27 @@ packages/astro-renderer   Astro 7 integration, live/snapshot data sources, secti
 packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
 packages/comments         reader comments (RFC-0007): rules, proof of work, submission pipeline, SQLite/D1 store
 packages/schedules        schedules (RFC-0008): time model, RRULE subset, releases, automations, taint, budgets, runDue, SQLite/D1 store
-packages/cli              cloudhal init / dev / snapshot / build / studio / mcp / deploy / domain / push / pull / analytics / comments / schedules
+packages/cli              the cloudhal CLI: init, dev, studio, mcp, deploy, push, pull, … (all commands: cloudhal --help, https://cloudhal.dev/docs/reference/cli)
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
-packages/mcp-server       MCP server: 20 semantic tools, approval gate, agent modes, skills as resources; stdio + HTTP
+packages/mcp-server       MCP server: over 100 tools (README tool reference), approval gate, agent modes, skills as resources; stdio + HTTP
 packages/cloudflare       admin Worker (Studio + API + auth + MCP on D1/R2); site Worker entry lives in astro-renderer
 packages/ui               Kumo re-export + Cloudhal blocks
-apps/studio               Studio admin UI (Vite + React SPA, en/tr)
+apps/studio               Studio admin UI (Vite + React SPA, 19 languages)
 starters/blog             the first starter: routes, layout, theme map
-skills/official           site-bootstrap, safe-edit, publish-article, rollback (Agent Skills spec)
+skills/official           Agent Skills shipped with Cloudhal (site-bootstrap, safe-edit, publish-article, …; one folder each)
 crates/cloudhal-schema    generated Rust types + fixture tests
 docs/adr                  architecture decision records
 docs/design               DESIGN.md — the binding admin design system (Kumo)
-docs/guides               guides for site owners (analytics and privacy, reader comments, schedules)
+docs/guides               guides for site owners and operators (analytics, comments, schedules, search, deploy, …)
 docs/rfcs                 design proposals (RFC-0001: Site Graph)
 docs/security             threat model
 .agents/skills            skills for coding agents working on this repo
 apps/demo-newsroom        Cloudhal's own newsroom, published by an agent through Cloudhal (dogfooding)
 packages/create-cloudhal  npm create cloudhal
 ```
+
+Every CLI command is in the [CLI reference](https://cloudhal.dev/docs/reference/cli) (`cloudhal --help`), the official skills in [skills/official](skills/official/) and the guides in [docs/guides](docs/guides/).
 
 Planned: `packages/sdk-js`, `capabilities/`.
 

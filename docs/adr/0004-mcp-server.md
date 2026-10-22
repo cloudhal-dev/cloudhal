@@ -20,3 +20,9 @@ MCP spec 2026-07-28 removed sessions and `initialize`; every request is self-des
 - Positive: scales horizontally, no session affinity, works from any MCP client.
 - Negative: more explicit handle plumbing; two approval paths to test.
 - Risks: host elicitation support is uneven in 2026; the `confirm_token` fallback must be first-class, not an afterthought.
+
+## Addendum (2026-10-22): what was built instead
+Three parts of the Decision were not built. The stateless server, `createMcpHandler`, `outputSchema`/`structuredContent`, honest annotations, the deterministic `tools/list` and the layered approval (elicitation with a `confirmToken` fallback) are as decided.
+- **No OAuth provider.** `@cloudflare/workers-oauth-provider` is not used. `/mcp` is mounted in the Hono API, which resolves the caller before the MCP handler sees the request: a session cookie for a person, or an agent key (Better Auth API key) as `x-api-key` or `Authorization: Bearer`. See [ADR-0011](0011-agent-layer.md) §5–6, which deferred OAuth 2.1.
+- **No server-minted handles.** Tools take the contract ids (`snap_…` and the other prefixed ids) and the node's `rev`; every call is re-authorized by the policy engine, and approval state is an HMAC-signed `requestState` bound to the tool, the arguments and the principal (ADR-0011 §4), not a stored handle.
+- **More than four scopes.** The scope list grew with the features (content, preview, assets, analytics, comments, schedules and releases, `:own` variants, person-only scopes). The single source is `KEY_SCOPES` and `PERSON_SCOPES` in `packages/agent-runtime/src/policy.ts`; roles are in `src/roles.ts` ([ADR-0018](0018-roles-and-invites.md)). Each tool's scopes are in the [tool reference](../../packages/mcp-server/README.md#tool-reference).

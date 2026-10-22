@@ -1,34 +1,14 @@
 # @cloudhal/cli
 
+Every command and flag is in `cloudhal --help` and the generated [CLI reference](https://cloudhal.dev/docs/reference/cli). The ones you use most:
+
 ```
-cloudhal init <dir> [--name <name>] [--starter blog]   create a site project with a seeded local store
-cloudhal dev [--port <n>] [--host]                      live preview (drafts visible)
-cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
-cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
-cloudhal studio [--port <n>] [--no-auth]                API + Studio UI (+ /mcp) for this project
-cloudhal mcp [--scopes a,b] [--skills <dir>] [--preview-url <url>]
-                                                        MCP server over stdio for this project
-cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
-                [--force-downgrade] [--no-build-studio] site + admin Workers on Cloudflare
-cloudhal domain [set <hostname>] [--studio <hostname>] | remove [site|studio|all]
-cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]
-                                                        local site → deployment
-cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
-cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
-                                                        entry tags → tag terms (RFC-0002)
-cloudhal analytics status [--remote]                    site analytics (RFC-0006): settings, totals, budget
-cloudhal analytics rollup [--days <n>] [--remote] [--redo]
-                                                        daily totals (--remote backfills from WAE)
-cloudhal analytics seed [--days <n>] [--views <n>]      demo traffic, local SQLite only
-cloudhal analytics export [--from <date> --to <date>] [--remote] [--out <file>]
-                                                        daily totals as CSV
-cloudhal comments status [--remote]                     reader comments (RFC-0007): counts, daily cap, purges
-cloudhal comments export [--remote] [--with-personal-data --out <file>]
-                                                        comments as JSON lines
-cloudhal comments import --in <file> [--remote]         idempotent; safe to run again
-cloudhal schedules status [--remote]                    schedules (RFC-0008): scheduler health, open releases, gates
-cloudhal schedules list [--remote] [--limit <n>]        the site's releases
-cloudhal schedules run-due [--remote]                   one scheduler tick now
+cloudhal init <dir> [--name <name>]          create a site project with a seeded local store
+cloudhal dev                                 live preview (drafts visible)
+cloudhal studio                              API + Studio UI (+ /mcp) for this project
+cloudhal mcp [--mode plan|manual|edits|auto] MCP server over stdio for this project
+cloudhal deploy                              site + admin Workers on Cloudflare
+cloudhal push / cloudhal pull                local site ↔ deployment
 ```
 
 **Studio build.** The published CLI ships Studio prebuilt. Run from the monorepo, `cloudhal deploy` uploads `apps/studio/dist` and first checks that it is current: when it is missing, or its `index.html` is older than the newest file in `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, it runs `pnpm --filter @cloudhal/studio build`. With `--no-build-studio` it never builds and fails on a missing or stale build instead.

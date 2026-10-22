@@ -40,12 +40,12 @@ On a deployment, pending approvals also appear in Studio under **Approvals**, wi
 The tools work on Cloudhal's site graph: sites, pages and their sections, articles and other entries, taxonomies, menus, media, snapshots and releases.
 
 - **Read:** `list_sites`, `get_site`, `list_pages`, `get_page`, `list_entries`, `get_entry`, `search_site`, the taxonomy and redirect listings, analytics (`get_analytics`, `top_content`, `content_stats`, `broken_links`).
-- **Write:** `create_page`, `update_page`, `create_entry`, `update_entry`, `add_correction`, `edit_body` and `patch_draft` for article bodies, taxonomy changes through `propose_term`, media (`upload_asset`, `fetch_asset_url`), menus (`set_menu`), design and chrome (`set_design`, `set_chrome`), translations (`save_translation`). Updates carry the node's current `rev`, so an agent never overwrites a change it has not seen.
+- **Write:** `create_page`, `update_page`, `create_entry`, `update_entry`, `add_correction`, `edit_body` for markdown bodies, `patch_draft` for a page's title, sections and SEO (JSON Patch), taxonomy changes through `propose_term`, media (`upload_asset`, `fetch_asset_url`), menus (`set_menu`), design and chrome (`set_design`, `set_chrome`), translations (`save_translation`). Updates carry the node's current `rev`, so an agent never overwrites a change it has not seen.
 - **Check:** `preview_page` returns a private preview link; `render_page` renders a page in Chrome and reports layout, contrast, alt text and heading problems.
 - **Publish:** `create_snapshot`, `diff_snapshots`, `publish`, `rollback`, scheduled releases and embargoes.
 - **Mode:** `get_mode`, `request_elevation`.
 
-About 100 tools in all; a client lists them with their JSON Schemas. Every mutation creates exactly one snapshot. Errors have stable codes and say what to do next.
+These are highlights: every tool, with its scopes and approval, is in the [tool reference](../../packages/mcp-server/README.md#tool-reference), and a client lists them with their JSON Schemas. Every mutation creates exactly one snapshot. Errors have stable codes and say what to do next.
 
 ## Skills
 

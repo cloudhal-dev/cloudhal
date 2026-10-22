@@ -209,9 +209,10 @@ from `/_cloudhal/`, `script-src 'self'`, no eval). They stay that way, with limi
   and is the first to split (bindings / actions / toasts as separate modules loaded on demand).
 - Shared helpers (pointer parsing, toast) live in one `client-shared.ts` constant concatenated by the
   module that needs it, not copied.
-- A string over ~30 lines that is *checked code* (e.g. `RENDER_CHECK_SCRIPT` in
-  `packages/mcp-server/src/render.ts`, 26 000 chars) should become a real `.js` module under
-  `src/client/` read at build time or bundled as text, so Biome and the type checker see it.
+- A string over ~30 lines that is *checked code* should become a real `.js` module under
+  `src/client/` read at build time or bundled as text, so Biome and the type checker see it, or at
+  least be split into ordered parts by concern (`RENDER_CHECK_SCRIPT` is assembled in
+  `packages/mcp-server/src/render/checks/index.ts` from one module per check family).
 - SQL in migrations is data and is exempt in spirit; keep each migration to one feature.
 
 ## 8. Studio screens and CSS
