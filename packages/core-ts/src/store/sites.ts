@@ -13,6 +13,7 @@ import { type Creatable, uniquenessKey } from "../nodes.ts";
 import { changedPermalinks } from "../permalinks.ts";
 import type { SiteGuard } from "../search.ts";
 import { checkPageSurfaces, createCatalog } from "../surfaces.ts";
+import { planDeclarations } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
 import { planPermalinks } from "./site-permalinks.ts";
 import { checkThemeConfig } from "./validation.ts";
@@ -100,6 +101,8 @@ export class SiteEngine {
     if (stored && stored.rev !== site.rev && changedPermalinks(stored, next).length > 0)
       throw new ConflictError("site", site.id, site.rev, stored.rev);
     const permalinks = await planPermalinks(this.#ctx, stored, next);
+    // RFC-0040 §3: a collection in use stays declared; a new one claims a free prefix.
+    const declared = await planDeclarations(this.#ctx, stored, next);
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
     if (options.dryRun) return written;
@@ -107,7 +110,7 @@ export class SiteEngine {
       "site",
       written,
       site.rev,
-      and(refs.guard, permalinks?.guard),
+      and(refs.guard, permalinks?.guard, declared?.guard),
     );
     const hash = await nodeHash(written);
     const more = [
@@ -121,6 +124,7 @@ export class SiteEngine {
       const rev = await this.#ctx.revOf(site.id);
       if (rev === site.rev) {
         await permalinks?.diagnose();
+        await declared?.diagnose();
         await refs.diagnose();
       }
       throw new ConflictError("site", site.id, site.rev, rev);

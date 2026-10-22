@@ -23,6 +23,7 @@ import { approvals } from "./routes/approvals.ts";
 import { assets, siteMedia } from "./routes/assets.ts";
 import { blockTypes } from "./routes/block-types.ts";
 import { chrome } from "./routes/chrome.ts";
+import { collections } from "./routes/collections.ts";
 import { comments } from "./routes/comments.ts";
 import { design } from "./routes/design.ts";
 import { entries } from "./routes/entries.ts";
@@ -71,6 +72,8 @@ const FENCED_AUTH_PATHS = /^\/api\/auth\/(organization|admin|api-key)(\/|$)/;
 const SITE_AREAS: readonly (readonly [string, Hono<Env>])[] = [
   ["pages", pages],
   ["entries", entries],
+  // RFC-0040: the collection registry.
+  ["collections", collections],
   ["proposals", proposals],
   // RFC-0015: the block registry (built-ins and the theme's types).
   ["block-types", blockTypes],

@@ -70,7 +70,8 @@ export function permalinksSuite(ctx: SuiteContext): void {
     const move = async (site: Site, permalink: string | undefined) => {
       const s = await fresh(site);
       const { posts: _drop, ...others } = s.collections ?? {};
-      const collections = permalink ? { ...others, posts: { permalink } } : others;
+      // RFC-0040: back to the default keeps posts declared (`{}`), as the tools and Studio do.
+      const collections = { ...others, posts: permalink ? { permalink } : {} };
       return ctx.store().updateSite({ ...s, collections });
     };
     const location = async (site: Site, path: string, locale?: string) =>

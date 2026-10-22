@@ -56,7 +56,8 @@ describe("collection permalinks (lib)", () => {
     expect(keys).toEqual(["docs", "posts"]);
     expect(prefixForm(site, keys)).toEqual({ docs: "/handbook", posts: "" });
     const next = withPrefixes(site, { docs: "", posts: "/blog" });
-    expect(next.collections).toEqual({ posts: { permalink: "/blog/{slug}" } });
+    // RFC-0040: docs goes back to the default and stays declared.
+    expect(next.collections).toEqual({ docs: {}, posts: { permalink: "/blog/{slug}" } });
     // The default prefix is the same as no setting.
     expect(withPrefixes(SITE, { posts: "/posts" }).collections).toBeUndefined();
     expect(changedKeys(site, { docs: "/handbook", posts: "/blog" })).toEqual(["posts"]);

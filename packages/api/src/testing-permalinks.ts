@@ -58,11 +58,11 @@ export function describePermalinkApi(label: string, factory: ApiStoreFactory): v
         ["/posts", "/blog", "prefix", 301],
       ]);
 
-      // Back to the default: the setting goes, the redirect that would loop goes with it.
-      const { collections: _drop, ...rest } = await site();
-      const reset = await putSite(rest as Site);
+      // Back to the default: the setting goes (posts stays declared, RFC-0040), and the redirect
+      // that would loop goes with it.
+      const reset = await putSite({ ...(await site()), collections: { posts: {} } });
       expect(reset.status, JSON.stringify(reset.body)).toBe(200);
-      expect((reset.body as unknown as Site).collections?.posts).toBeUndefined();
+      expect((reset.body as unknown as Site).collections?.posts).toEqual({});
       const after = (await call(`/api/sites/${siteId}/redirects`)).body as unknown as Redirect[];
       expect(after.some((r) => r.from === "/posts" && r.to === "/blog")).toBe(false);
     });

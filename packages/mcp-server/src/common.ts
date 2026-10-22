@@ -418,6 +418,12 @@ function invariantHint(e: InvariantError): string | undefined {
       return "save it as a draft; a person reviews machine translations of this collection before they publish";
     case "host_taken":
       return "pick another hostname; this one already serves another site of the installation";
+    case "collection_undeclared":
+      return "call list_collections and use one of them, or create_collection first (a person approves it)";
+    case "collection_in_use":
+      return "the collection still has entries or a taxonomy names it; move or delete those first";
+    case "collection_exists":
+      return "the collection is already declared; change it with update_collection";
     case "invalid_surface":
       return "fix the parts named by the JSON Pointers in details.issues; get_catalog lists every component, its props and the binding rules";
     default:

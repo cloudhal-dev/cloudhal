@@ -110,6 +110,10 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   `GET ${S}`,
   `GET ${S}/pending`,
   `PUT ${S}`,
+  // RFC-0040: the collection registry, part of the site's structure.
+  `GET ${S}/collections`,
+  `PUT ${S}/collections/:key`,
+  `DELETE ${S}/collections/:key`,
   `GET ${S}/pages`,
   `POST ${S}/pages`,
   `GET ${S}/pages/:pageId/preview`,

@@ -204,6 +204,30 @@ describe("feeds and sitemap", () => {
   });
 });
 
+describe("RFC-0040 collection feed and sitemap settings", () => {
+  it("feed: false and sitemap: false keep a collection out; the defaults keep it in", async () => {
+    await entry({});
+    await entry({ collection: "notes", slug: "a-note", title: "A note", tags: [] });
+    await entry({ collection: "team", slug: "ayse", title: "Ayşe", tags: [] });
+    const settled = await store.updateSite({
+      ...site,
+      collections: { notes: { feed: false }, team: { sitemap: false } },
+    });
+    const live = new LiveSource(store, site.id);
+    const all = await live.allEntries();
+    const feed = rssXml({ site: settled, origin: "https://news.example.com", entries: all });
+    expect(feed).toContain("/posts/launch</link>");
+    expect(feed).not.toContain("/notes/a-note");
+    expect(feed).toContain("/team/ayse</link>");
+    const locs = sitemapUrls(settled, await live.pages(), all, "https://news.example.com").map(
+      (u) => u.loc,
+    );
+    expect(locs).toContain("https://news.example.com/posts/launch");
+    expect(locs).toContain("https://news.example.com/notes/a-note");
+    expect(locs).not.toContain("https://news.example.com/team/ayse");
+  });
+});
+
 describe("routing", () => {
   it("resolves pages first, then articles of any collection; lists every routable path", async () => {
     await entry({ collection: "notes", slug: "a-note", title: "A note" });

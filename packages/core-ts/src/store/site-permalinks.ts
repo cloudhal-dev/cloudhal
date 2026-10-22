@@ -111,7 +111,7 @@ async function checkPermalinks(
 }
 
 /** Media URLs, the search page and locale prefixes are not entry prefixes. */
-function checkReservedPrefix(site: Site, prefix: string): void {
+export function checkReservedPrefix(site: Site, prefix: string): void {
   checkReservedPath(`${prefix}/`);
   const first = prefix.split("/")[1] ?? "";
   const locales = [site.defaultLocale, ...site.locales].map((l) => l.toLowerCase());

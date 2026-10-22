@@ -1,7 +1,8 @@
 /**
  * Site › Settings › Collections (RFC-0038 §5): where each collection's entries live. Version 1
  * templates are a fixed prefix followed by `/{slug}`, so the form edits the prefix (`/blog`);
- * an empty field is the default, `/<collection>`, and removes the setting.
+ * an empty field is the default, `/<collection>`, and removes the setting (the collection stays
+ * declared, RFC-0040).
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { collectionPermalink, entryPath, permalinkPrefix } from "@cloudhal/core-ts/permalinks";
@@ -44,7 +45,7 @@ export function validatePrefix(value: string): PrefixError | undefined {
   return PREFIX.test(v) ? undefined : "invalid";
 }
 
-/** The site with the form applied. An empty prefix, or the default one, removes the setting. */
+/** The site with the form applied. An empty prefix, or the default one, removes the permalink. */
 export function withPrefixes(site: Site, form: PrefixForm): Site {
   const collections: NonNullable<Site["collections"]> = { ...site.collections };
   for (const [key, raw] of Object.entries(form)) {
@@ -52,7 +53,8 @@ export function withPrefixes(site: Site, form: PrefixForm): Site {
     const { permalink: _old, ...rest } = collections[key] ?? {};
     if (prefix && prefix !== `/${key}`)
       collections[key] = { ...rest, permalink: `${prefix}/{slug}` };
-    else if (Object.keys(rest).length) collections[key] = rest;
+    // RFC-0040: resetting a permalink keeps a declared collection declared.
+    else if (Object.keys(rest).length || site.collections?.[key]) collections[key] = rest;
     else delete collections[key];
   }
   const { collections: _drop, ...base } = site;

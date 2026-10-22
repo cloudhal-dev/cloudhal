@@ -5,9 +5,19 @@
  */
 import type { Actor, ContentEntry, Site } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
+import { InvariantError } from "./errors.ts";
 import type { SuiteContext } from "./testing-taxonomy.ts";
 
 const person: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
+
+async function code(p: Promise<unknown>): Promise<string> {
+  try {
+    await p;
+  } catch (e) {
+    return e instanceof InvariantError ? e.code : (e as Error).name;
+  }
+  throw new Error("expected a rejection");
+}
 
 export function collectionsSuite(ctx: SuiteContext): void {
   describe("RFC-0040 collection registry in the store", () => {
@@ -86,6 +96,61 @@ export function collectionsSuite(ctx: SuiteContext): void {
       const before = (await ctx.store().getSite(site.id)) as Site;
       await ctx.store().listCollections(site.id);
       expect(await ctx.store().getSite(site.id)).toEqual(before);
+    });
+
+    describe("§3 invariants", () => {
+      const fresh = async (site: Site) => (await ctx.store().getSite(site.id)) as Site;
+      const withTaxonomies = async (collections?: Site["collections"]) => {
+        const site = await setup(collections);
+        await ctx.store().createDefaultTaxonomies(site, { categoryRequired: false });
+        return fresh(site);
+      };
+
+      it("the first entry of a new collection may not take another's URLs", async () => {
+        const site = await withTaxonomies({ posts: { permalink: "/blog/{slug}" } });
+        expect(await code(entry(site, "blog", "first"))).toBe("path_conflict");
+        expect(await code(entry(site, "tag", "first"))).toBe("path_conflict");
+        expect(await code(entry(site, "tr", "first"))).toBe("reserved_path");
+        expect(await code(entry(site, "search", "first"))).toBe("reserved_path");
+        expect(await ctx.store().listContentEntries(site.id)).toEqual([]);
+        // A free prefix, then a second entry in the now-used collection, are fine.
+        await entry(site, "events", "one");
+        await entry(site, "events", "two");
+        expect((await ctx.store().listContentEntries(site.id, "events")).length).toBe(2);
+      });
+
+      it("moving an entry into a new collection runs the same check", async () => {
+        const site = await withTaxonomies({ posts: { permalink: "/blog/{slug}" } });
+        const e = (await entry(site, "posts", "hello")) as ContentEntry;
+        expect(await code(ctx.store().updateContentEntry({ ...e, collection: "blog" }))).toBe(
+          "path_conflict",
+        );
+        const moved = await ctx.store().updateContentEntry({ ...e, collection: "notes" });
+        expect(moved.collection).toBe("notes");
+      });
+
+      it("declaring a collection checks its default prefix", async () => {
+        const site = await withTaxonomies({ posts: { permalink: "/blog/{slug}" } });
+        const clash = { ...site, collections: { ...site.collections, blog: {} } };
+        expect(await code(ctx.store().updateSite(clash))).toBe("path_conflict");
+        const ok = { ...site, collections: { ...site.collections, events: {} } };
+        expect((await ctx.store().updateSite(ok)).collections?.events).toEqual({});
+      });
+
+      it("a declared collection with entries, or named by a taxonomy, stays declared", async () => {
+        const site = await withTaxonomies({ events: {}, team: {}, notes: {} });
+        await entry(site, "events", "launch");
+        const drop = (s: Site, key: string) => {
+          const { [key]: _gone, ...rest } = s.collections ?? {};
+          return ctx.store().updateSite({ ...s, collections: rest });
+        };
+        expect(await code(drop(site, "events"))).toBe("collection_in_use");
+        const tag = (await ctx.store().listTaxonomies(site.id)).find((t) => t.key === "tag");
+        if (tag) await ctx.store().updateTaxonomy({ ...tag, collections: ["notes"] });
+        expect(await code(drop(await fresh(site), "notes"))).toBe("collection_in_use");
+        const after = await drop(await fresh(site), "team");
+        expect(Object.keys(after.collections ?? {}).sort()).toEqual(["events", "notes"]);
+      });
     });
 
     it("an unknown site is not found", async () => {
