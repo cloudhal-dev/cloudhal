@@ -32,6 +32,7 @@ jobs:
       # Size ratchet (docs/engineering/code-structure.md): no new oversized files or functions.
       - run: pnpm size:check
       - run: node scripts/font-fallbacks.ts --check
+      - run: node scripts/mcp-tools-doc.ts --check
       - run: pnpm turbo run typecheck
       # Each vitest starts a worker per core; more than two packages at once oversubscribes the
       # 4-vCPU runner and slow tests (auth, D1, workerd) hit their timeouts.

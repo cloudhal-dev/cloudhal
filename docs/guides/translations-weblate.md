@@ -7,7 +7,7 @@ What the Libre plan is, from https://weblate.org/en/hosting/:
 - set up from https://hosted.weblate.org/hosting/;
 - the same limits as the 160k plan: **160,000 hosted strings**, counted as source strings × (languages + 1), with unlimited projects, components and translators.
 
-Studio has about 4,550 message keys, so English plus Turkish, German and Arabic is about 18,200 hosted strings.
+Studio has about 4,800 message keys and 18 languages besides English (`apps/studio/src/i18n/locales.ts`), so all of them together are about 90,000 hosted strings, within the limit.
 
 ## 1. Account and project (you)
 
@@ -33,7 +33,7 @@ One Weblate component per catalog file, all in the same project:
 | File mask | `i18n/*/<file>.json` |
 | Source language | English |
 | Quality checks (flags) | `icu-message-format` (ICU syntax and placeholders, RFC-0032) |
-| Languages | Turkish (reviewed, by you), German and Arabic (community review) |
+| Languages | every language in `apps/studio/src/i18n/locales.ts`: Turkish (reviewed, by you), the others machine drafts for community review |
 
 Turn on **reviews** (translated → approved), so "approved by a reviewer" is what makes a language `reviewed: true` in `apps/studio/src/i18n/locales.ts`.
 

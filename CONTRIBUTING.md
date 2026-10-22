@@ -15,7 +15,7 @@ Thanks for considering a contribution. The goal of this document is that you can
 
 ```bash
 pnpm install
-pnpm check                 # biome lint, size check, tsc, vitest
+pnpm check                 # biome lint, size check, generated-file checks, typecheck, vitest
 cargo test --workspace     # Rust fixture tests
 ```
 

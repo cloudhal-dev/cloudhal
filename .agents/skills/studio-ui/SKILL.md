@@ -14,7 +14,7 @@ metadata:
 Stack (ADR-0003): Vite 8 + React 19 SPA, TanStack Router + Query, Tailwind 4, **Kumo** (`@cloudflare/kumo` 2.x on `@base-ui/react`, Phosphor icons) consumed only through `@cloudhal/ui`. Cloudhal is a premium, community-facing product: use Kumo's components and blocks, not hand-rolled markup.
 
 ## Workflow (every UI change)
-1. **Look it up, don't guess:** `pnpm kumo ls` (53 components), `pnpm kumo doc <Name>` (props, sub-components, examples), `pnpm kumo blocks` / `pnpm kumo add <Block>` (copied into `packages/ui/src/blocks/kumo`, owned by us), `pnpm kumo ai` (usage guide). Registry: `packages/ui/node_modules/@cloudflare/kumo/ai/component-registry.json`.
+1. **Look it up, don't guess:** `pnpm kumo ls` (every component), `pnpm kumo doc <Name>` (props, sub-components, examples), `pnpm kumo blocks` / `pnpm kumo add <Block>` (copied into `packages/ui/src/blocks/kumo`, owned by us), `pnpm kumo ai` (usage guide). Registry: `packages/ui/node_modules/@cloudflare/kumo/ai/component-registry.json`.
 2. **Pick the template** (DESIGN.md §2) and register a new route in `ROUTE_TEMPLATES` (`apps/studio/scripts/design-lint.ts`): `list`, `dashboard`, `settings`, `editor`, `auth`, `shell`. Copy the reference screen: `SitesPage` (list + aside), `PagesPage` (list), `SiteOverviewPage` (dashboard), `LoginPage` (auth).
 3. **Compose from blocks:**
    - page → `PageLayout` (`crumbs` from `Crumbs`/`SiteCrumbs`, `title`, `description`, `actions` for the primary action, `tabs` only for sub-views, `aside` for usage/help, `width="narrow"` for forms). Never your own container, header, breadcrumbs or columns.

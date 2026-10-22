@@ -24,3 +24,6 @@ Cloudhal must run on Cloudflare (workerd) and self-hosted. Wrangler, miniflare a
 - Positive: everything first-class; CI mirrors Cloudflare's own repos.
 - Negative: single-binary self-host story is weaker on Node (SEA experimental) until Bun stabilizes.
 - Risks: `.astro` type-checking waits for TS 7.1 (`astro check` as a separate CI step).
+
+## Addendum (2026-10-22): Bun support not built
+The Bun parts of the Decision were not built: there is no `bun-sqlite` storage adapter (the SQL adapters are `better-sqlite3`, `d1` and `do-sqlite` in `packages/storage/src/sql/`), no Bun CI job (`.github/workflows/ci.yml` runs Node only) and no `cloudhal serve` command (`cloudhal studio` serves the API and Studio locally; deployments run on Cloudflare Workers, [ADR-0012](0012-cloudflare-deployment.md)). Bun works as a package manager for site projects (`bunx cloudhal …`, see the [quickstart](../start/quickstart.md)). The rest of the Decision stands; current versions are in `AGENTS.md` ("Versions").
